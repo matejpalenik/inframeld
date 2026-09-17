@@ -1,0 +1,15 @@
+node_modules
+.pnpm-store
+.next
+.turbo
+dist
+coverage
+.venv
+__pycache__
+.pytest_cache
+.ruff_cache
+.pyright
+pnpm-lock.yaml
+apps/backend/uv.lock
+.husky/_
+contracts/openapi/v1/inframeld-v1.json

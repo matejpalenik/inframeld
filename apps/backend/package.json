@@ -1,0 +1,16 @@
+{
+  "name": "@inframeld/backend",
+  "private": true,
+  "scripts": {
+    "dev": "uv run uvicorn inframeld_backend.main:app --reload --host 127.0.0.1 --port 8000",
+    "start": "uv run uvicorn inframeld_backend.main:app --host 127.0.0.1 --port 8000",
+    "openapi": "uv run python scripts/export_openapi.py",
+    "openapi:check": "uv run pytest tests/contract/test_openapi_contract.py",
+    "lint": "uv run ruff check .",
+    "format": "uv run ruff format .",
+    "format:check": "uv run ruff format --check .",
+    "typecheck": "uv run pyright",
+    "test": "uv run pytest",
+    "build": "uv build"
+  }
+}

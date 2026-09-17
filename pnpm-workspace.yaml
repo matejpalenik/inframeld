@@ -1,0 +1,19 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Temporary three-day release-age policy; restore to seven days after the migration window.
+# minimumReleaseAge: 10080
+minimumReleaseAge: 4320
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+
+# Re-verify the committed lockfile against the policies above on every install.
+trustLockfile: false
+blockExoticSubdeps: true
+allowBuilds:
+  unrs-resolver: true
+
+strictDepBuilds: true
+trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 4320

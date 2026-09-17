@@ -1,0 +1,33 @@
+[project]
+name = "inframeld-backend"
+version = "0.1.0"
+description = "FastAPI application for the Inframeld governed RAG release loop."
+readme = "README.md"
+authors = [{ name = "Matej Palenik", email = "matejpale@gmail.com" }]
+requires-python = ">=3.13"
+dependencies = ["fastapi>=0.141.1", "uvicorn[standard]>=0.52.4"]
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Only consider Python distributions uploaded at least seven days ago.
+exclude-newer = "7 days"
+index-strategy = "first-index"
+
+[dependency-groups]
+dev = ["httpx2>=2.12.0", "pyright>=1.1.414", "pytest>=9.1.1", "ruff>=0.16.6"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
