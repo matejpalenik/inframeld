@@ -17,15 +17,15 @@ permission. Resolve paths from the repository root. Read the guide's vector,
 build and serving sections and the relevant protocol before assessing a detail.
 
 - `docs/ARCHITECTURE.md` is the human explanation.
-- `docs/adr/ADR-0005-postgresql-source-of-truth-and-shared-chroma.md` owns
+- `docs/adr/ADR-0004-postgresql-source-of-truth-and-shared-chroma.md` owns
   physical identity, writer/retry/filter/retirement rules and qualification.
-- `docs/adr/ADR-0016-profile-specific-index-materializations-and-pipeline-bindings.md`
-  owns profiles, materializations and binding readiness; ADR-0004 owns lineage.
-- `docs/adr/ADR-0011-secure-document-ingestion-boundary.md` and
-  `docs/adr/ADR-0017-docling-processing-and-cross-encoder-reranking.md` own
+- `docs/adr/ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md`
+  owns profiles, materializations and binding readiness; ADR-0003 owns lineage.
+- `docs/adr/ADR-0010-secure-document-ingestion-boundary.md` and
+  `docs/adr/ADR-0016-docling-processing-and-cross-encoder-reranking.md` own
   processor isolation and built-in adapter behavior.
-- Read ADR-0006/0007 for access/gateway, ADR-0008 for job attempts, and ADR-0015
-  for deletion when the task crosses those boundaries. ADR-0020 owns the default
+- Read ADR-0005/0006 for access/gateway, ADR-0007 for job attempts, and ADR-0014
+  for deletion when the task crosses those boundaries. ADR-0019 owns the default
   default automatic path and reversible publication modes; neither weakens readiness.
 
 ## Language and consistency boundaries
@@ -93,6 +93,6 @@ envelope; no hard 120-second gate or readiness shortcut follows from it.
 For a reuse/recovery question, draw the small PostgreSQL/Chroma/artifact state
 before and after one changed document. For a query question, state membership,
 current actor scope, generated filter, required shards and failure outcome.
-Use ADR-0005's existing failure/recall/resource tests; do not invent measured
+Use ADR-0004's existing failure/recall/resource tests; do not invent measured
 capacity. Reconsider a failed backend assumption rather than rescue it with
 unbounded filter splitting, a distributed coordinator or a new search engine.

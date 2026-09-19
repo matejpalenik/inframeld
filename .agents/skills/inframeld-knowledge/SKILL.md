@@ -18,16 +18,16 @@ section of `docs/ARCHITECTURE.md`, then the owning ADR before applying a detaile
 rule. Report contradictions; skills are derived guidance, not a second design.
 
 - Start with the guide's first-use, identities and knowledge-ingestion sections.
-- Read `docs/adr/ADR-0004-immutable-rag-lineage-and-release-identities.md` for
+- Read `docs/adr/ADR-0003-immutable-rag-lineage-and-release-identities.md` for
   source/version/membership identity.
 - For uploads and parsing admission, read
-  `docs/adr/ADR-0011-secure-document-ingestion-boundary.md`.
-- For retries, read `docs/adr/ADR-0008-durable-jobs-idempotency-and-recovery.md`;
-  for erasure, `docs/adr/ADR-0015-data-retention-deletion-and-external-processing.md`.
+  `docs/adr/ADR-0010-secure-document-ingestion-boundary.md`.
+- For retries, read `docs/adr/ADR-0007-durable-jobs-idempotency-and-recovery.md`;
+  for erasure, `docs/adr/ADR-0014-data-retention-deletion-and-external-processing.md`.
 - For default uploads/resources, read
-  `docs/adr/ADR-0020-default-onboarding-and-first-publication.md`.
-- Read ADR-0006 only when access is at issue, ADR-0016 when passing work to
-  Indexing, and ADR-0012 when checking the artifact adapter's publication rules.
+  `docs/adr/ADR-0019-default-onboarding-and-first-publication.md`.
+- Read ADR-0005 only when access is at issue, ADR-0015 when passing work to
+  Indexing, and ADR-0011 when checking the artifact adapter's publication rules.
 
 ## Language and consistency boundaries
 
@@ -76,7 +76,7 @@ map. A large Collection must not require loading its whole corpus into memory.
 Configure models → upload → ask without manual internal resource setup is an
 accepted v1 requirement. Defaults use ordinary resources and the same admission,
 access, profile and build rules. Creator-private provisioning and nonempty
-default upload groups are accepted. ADR-0020 selects Automatic updates for the
+default upload groups are accepted. ADR-0019 selects Automatic updates for the
 default path and Manual releases for new deployments unless automatic is chosen
 at creation; switching works both ways. An authorized completed batch can request
 build and publication for its target in automatic mode. Upload-only permission,

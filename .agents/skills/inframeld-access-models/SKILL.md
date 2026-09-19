@@ -16,14 +16,14 @@ issue credentials, contact a provider or change grants. Paths are repository-roo
 relative. Read the applicable guide section and owning ADR before a detailed claim.
 
 - `docs/ARCHITECTURE.md`: first-use, users/integrations and ModelGateway sections.
-- `docs/adr/ADR-0006-api-enforced-tenancy-and-authorization.md`: Access policy.
-- `docs/adr/ADR-0007-byok-provider-boundary.md`: connections, roles and egress.
-- `docs/adr/ADR-0021-persistent-outbound-credentials.md`: accepted persistence
+- `docs/adr/ADR-0005-api-enforced-tenancy-and-authorization.md`: Access policy.
+- `docs/adr/ADR-0006-byok-provider-boundary.md`: connections, roles and egress.
+- `docs/adr/ADR-0020-persistent-outbound-credentials.md`: accepted persistence
   requirement and accepted PostgreSQL/PyNaCl encrypted storage.
-- `docs/adr/ADR-0020-default-onboarding-and-first-publication.md`: accepted
+- `docs/adr/ADR-0019-default-onboarding-and-first-publication.md`: accepted
   private access defaults and accepted reversible publication modes.
-- Read ADR-0008 for secret-bearing idempotency, ADR-0018 for feedback rights,
-  ADR-0019 for MCP credentials and ADR-0015 for deletion/revocation as needed.
+- Read ADR-0007 for secret-bearing idempotency, ADR-0017 for feedback rights,
+  ADR-0018 for MCP credentials and ADR-0014 for deletion/revocation as needed.
 
 ## Language and ownership
 
@@ -72,14 +72,14 @@ Do not infer a class/aggregate per grant, token or profile from these concepts.
    when appropriate so the user does not re-enter its credential. Freeze
    semantic connection/model references in profiles/versions. Credential-only
    rotation preserves semantics; changed endpoint/model meaning does not.
-   Under ADR-0021's accepted storage design, key replacement/removal invalidates its
+   Under ADR-0020's accepted storage design, key replacement/removal invalidates its
    previous role-probe status. Changing endpoint origin requires a new connection
    and explicit credential provision; never forward the saved key automatically.
 7. Persistent application-entered provider keys are required. Saved plaintext
    never returns to Studio or enters domain snapshots, jobs, logs, evaluator
    evidence, receipts or parser sandboxes. Only scoped credential operations
    create/replace/remove it; outward responses contain safe metadata.
-8. The ADR-0021 PostgreSQL adapter using PyNaCl `Aead` and a separately supplied
+8. The ADR-0020 PostgreSQL adapter using PyNaCl `Aead` and a separately supplied
    root key is accepted. Preserve its fail-closed behavior, authenticated
    resource binding and narrow plaintext-resolution boundary.
    Mounted files can supply bootstrap/root keys but do not replace the required
@@ -96,7 +96,7 @@ initial administrator and creator-private starter project/group, with ordinary
 ID-bound resources. Administrator status alone does not grant source reading.
 Other users and integrations receive access explicitly. Nonempty default
 allowlists apply on admission; changing a default does not retroactively make
-all documents public. Read ADR-0020 for the precise access boundary. The default
+all documents public. Read ADR-0019 for the precise access boundary. The default
 starts automatic; new deployments default manual with an explicit automatic
 creation choice. Automatic update admission needs source/configuration plus
 build/deploy rights for each specified target; queued work rechecks current

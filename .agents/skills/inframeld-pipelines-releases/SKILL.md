@@ -20,14 +20,14 @@ letting this reminder become an alternative specification.
 - `docs/ARCHITECTURE.md`: first-use, builds, serving, evaluations, releases and
   feedback sections as relevant; do not routinely load them all.
 - `docs/adr/ADR-0002-product-owned-openapi-contract.md`: accepted in-app workflow.
-- `docs/adr/ADR-0004-immutable-rag-lineage-and-release-identities.md` and
-  `docs/adr/ADR-0016-profile-specific-index-materializations-and-pipeline-bindings.md`:
+- `docs/adr/ADR-0003-immutable-rag-lineage-and-release-identities.md` and
+  `docs/adr/ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md`:
   immutable inputs and complete ready bindings.
-- `docs/adr/ADR-0010-sticky-logical-canary-deployments.md`: routing/transitions.
-- `docs/adr/ADR-0018-answer-feedback.md`: accepted feedback/receipt behavior.
-- `docs/adr/ADR-0020-default-onboarding-and-first-publication.md`: required default
+- `docs/adr/ADR-0009-sticky-logical-canary-deployments.md`: routing/transitions.
+- `docs/adr/ADR-0017-answer-feedback.md`: accepted feedback/receipt behavior.
+- `docs/adr/ADR-0019-default-onboarding-and-first-publication.md`: required default
   experience and accepted reversible Automatic updates / Manual releases.
-- Consult ADR-0005/0006/0008/0009 for pins, access, retries or offline evidence
+- Consult ADR-0004/0005/0007/0008 for pins, access, retries or offline evidence
   only when that dependency matters to the task.
 
 ## Domain language and boundaries
@@ -119,7 +119,7 @@ old job's captured authority. A switch cannot undo an already committed release.
 
 Default deletion/rebinding invalidates old work; restart never resurrects removed
 resources. Shared default-route shape remains an implementation recommendation;
-HTTP/MCP/SDK parity and concurrency behavior require qualification. Read ADR-0020
+HTTP/MCP/SDK parity and concurrency behavior require qualification. Read ADR-0019
 for the detailed sequence rather than inventing a generic release-policy engine.
 
 ## Review examples

@@ -21,14 +21,14 @@ client-surface and jobs sections, plus the owning contract for the task.
 - `docs/adr/ADR-0001-modular-application-structure.md` owns DDD/Clean Architecture
   and lightweight CQRS; `docs/adr/ADR-0002-product-owned-openapi-contract.md`
   owns the code-first public contract and generated TypeScript requirement.
-- `docs/adr/ADR-0008-durable-jobs-idempotency-and-recovery.md` owns admission,
+- `docs/adr/ADR-0007-durable-jobs-idempotency-and-recovery.md` owns admission,
   attempts, fingerprints, safe replay and uncertainty.
-- `docs/adr/ADR-0019-first-party-mcp-adapter.md` owns the accepted MCP surface.
-- Read ADR-0018 for feedback, ADR-0020 for default-route orchestration, and
-  ADR-0021 for credential mutations when those operations are being exposed.
+- `docs/adr/ADR-0018-first-party-mcp-adapter.md` owns the accepted MCP surface.
+- Read ADR-0017 for feedback, ADR-0019 for default-route orchestration, and
+  ADR-0020 for credential mutations when those operations are being exposed.
 - `docs/reviews/sdk-kit-feasibility.md` is external SDK evidence/status, not an
   instruction to extract it. For a requested runtime change only, consult
-  ADR-0012/0013/0014; retain their existing baseline without expanding it.
+  ADR-0011/0012/0013; retain their existing baseline without expanding it.
 
 ## Owners, contracts and dependencies
 
@@ -76,13 +76,13 @@ immutable values and direct scoped read DTOs avoid unnecessary hydration.
    original 202 job. Synchronous in-progress, completed safe replay and uncertain
    external outcomes are distinct. Ambiguous paid model work is not repeated
    automatically. Exact frozen vector insertion has a separate proven replay
-   protocol in ADR-0005; do not generalize either rule to every operation.
+   protocol in ADR-0004; do not generalize either rule to every operation.
 8. Authenticate/authorize on replay. Same key/different content conflicts;
    expected revisions separately protect competing commands. Secret-bearing
    requests use keyed fingerprints; saved plaintext never enters replay caches.
    An answer replay returns receipt-only status; a generated integration secret
    is shown once. Clients must surface these outcomes honestly.
-9. Defaults reuse ordinary application commands. ADR-0020 accepts automatic
+9. Defaults reuse ordinary application commands. ADR-0019 accepts automatic
    default updates and reversible per-deployment publication modes. New
    deployments default manual with an explicit automatic creation choice.
    Automatic operations call normal Build then separate conditional publication;
@@ -95,7 +95,7 @@ immutable values and direct scoped read DTOs avoid unnecessary hydration.
 For the recommended default alias, find the original logical-route idempotency
 record before resolving a fresh deployment target. A retry after promotion or
 alias rebinding reads the original operation/receipt; it must not become another
-paid query merely because the target changed. Read ADR-0020 for selector and
+paid query merely because the target changed. Read ADR-0019 for selector and
 publication-mode concurrency details. Exact schemas and SDK behavior still
 require qualification.
 

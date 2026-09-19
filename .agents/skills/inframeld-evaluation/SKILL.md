@@ -17,13 +17,13 @@ model call, external export or release. Resolve paths from the repository root.
 Start with the guide's evaluation explanation and only the relevant owning ADR.
 
 - `docs/ARCHITECTURE.md` explains the in-app experience and evidence limits.
-- `docs/adr/ADR-0009-deterministic-evaluation-and-release-decisions.md` owns the
+- `docs/adr/ADR-0008-deterministic-evaluation-and-release-decisions.md` owns the
   complete evaluation model, rubric, adapter and qualification requirements.
-- `docs/adr/ADR-0007-byok-provider-boundary.md` owns ModelGateway; ADR-0008 owns
-  job/retry behavior and ADR-0006 current authorization.
-- ADR-0004/0016 explain exact version bindings when comparability is in question;
-  ADR-0010 owns publication/release authority; ADR-0018 owns online feedback.
-- ADR-0015 governs evidence deletion. ADR-0020's first-answer experience must
+- `docs/adr/ADR-0006-byok-provider-boundary.md` owns ModelGateway; ADR-0007 owns
+  job/retry behavior and ADR-0005 current authorization.
+- ADR-0003/0015 explain exact version bindings when comparability is in question;
+  ADR-0009 owns publication/release authority; ADR-0017 owns online feedback.
+- ADR-0014 governs evidence deletion. ADR-0019's first-answer experience must
   not require test creation, an evaluation run or judge-model configuration.
 
 ## Language and consistency boundaries
@@ -92,7 +92,7 @@ improvement. For “a changed question lost its history,” trace the stable cas
 to its frozen old content and results. For gateway review, follow every actual
 library call/repair path and check budgets, retries and disabled telemetry.
 
-Use the bounded human-labelled calibration and repeatability tests in ADR-0009;
+Use the bounded human-labelled calibration and repeatability tests in ADR-0008;
 distinguish a proposed threshold from measured accuracy. A small benchmark is
 feedback about those cases, not a production guarantee. Read the neighboring
 release/access rule when relevant without loading all domain skills.
