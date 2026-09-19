@@ -22,7 +22,7 @@ Start with the guide's evaluation explanation and only the relevant owning ADR.
 - `docs/adr/ADR-0007-byok-provider-boundary.md` owns ModelGateway; ADR-0008 owns
   job/retry behavior and ADR-0006 current authorization.
 - ADR-0004/0016 explain exact version bindings when comparability is in question;
-  ADR-0010 owns explicit release authority; ADR-0018 owns online feedback.
+  ADR-0010 owns publication/release authority; ADR-0018 owns online feedback.
 - ADR-0015 governs evidence deletion. ADR-0020's first-answer experience must
   not require test creation, an evaluation run or judge-model configuration.
 
@@ -75,7 +75,11 @@ These are planned domain concepts, not claims about implemented symbols.
 9. Store bounded answers/final evidence and provenance needed for case review;
    exclude secrets and unbounded traces. Recheck current permissions on history.
    Erased/expired evidence is unavailable, not mysteriously reproducible.
-10. Neither scores nor feedback authorize a release. LangSmith, Langfuse,
+10. Neither scores nor feedback authorize a release. Comparisons are explicit
+    in both publication modes and freeze exact versions; they do not pause
+    Automatic updates. Use Manual releases for a fixed endpoint during review.
+    Automatic publication is authorized by the source/configuration action,
+    never by a metric, and runs no hidden judge. LangSmith, Langfuse,
     exporters, custom evaluator platforms and deeper diagnosis/remediation are
     deferred. Preserve application-owned evidence/read contracts, not an unused
     exporter or autonomous optimization framework.

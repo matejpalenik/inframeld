@@ -82,19 +82,21 @@ immutable values and direct scoped read DTOs avoid unnecessary hydration.
    requests use keyed fingerprints; saved plaintext never enters replay caches.
    An answer replay returns receipt-only status; a generated integration secret
    is shown once. Clients must surface these outcomes honestly.
-9. Defaults reuse ordinary application commands. ADR-0020's accepted Prepare and
-   ask action authorizes initial build and conditional first publication through
-   small explicit orchestration. It is not a hidden deployment mutation in the
-   build worker or permission for automatic later publication. HTTP, MCP and
-   generated clients use one default resolver. Its recommended selector shape
-   is an implementation choice, not a pending product-approval gate; do not add
-   a parallel quickstart implementation with weaker authorization.
+9. Defaults reuse ordinary application commands. ADR-0020 accepts automatic
+   default updates and reversible per-deployment publication modes. New
+   deployments default manual with an explicit automatic creation choice.
+   Automatic operations call normal Build then separate conditional publication;
+   Indexing never moves traffic. Mode switches use revisions/idempotency;
+   enabling automatic admits fresh inputs, never revives an old job. Expose mode,
+   current and pending update status through the same HTTP/SDK application API.
+   MCP stays query/receipt only. All share the default resolver; its selector
+   shape remains an implementation choice, not a parallel quickstart engine.
 
 For the recommended default alias, find the original logical-route idempotency
 record before resolving a fresh deployment target. A retry after promotion or
 alias rebinding reads the original operation/receipt; it must not become another
 paid query merely because the target changed. Read ADR-0020 for selector and
-first-preparation concurrency details. Exact schemas and SDK behavior still
+publication-mode concurrency details. Exact schemas and SDK behavior still
 require qualification.
 
 ## Review method and useful tasks

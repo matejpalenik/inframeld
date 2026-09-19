@@ -82,10 +82,14 @@ contracts do not import vendor SDK or HTTP types. Avoid a generic repository,
 command bus, workflow engine or framework merely to demonstrate a pattern.
 
 Default onboarding, private starter access and PostgreSQL/PyNaCl provider-key
-storage are accepted. Prepare and ask explicitly authorizes initial build and
-conditional first publication; subsequent publication stays explicit. Ordinary
-builds publish readiness, not traffic. All model calls use ModelGateway. The
-first-answer timing goal is flexible; do not weaken correctness to meet it.
+storage are accepted. The default serving path starts in Automatic updates;
+new deployments default to Manual releases with an explicit automatic option
+at creation. Switching is supported both ways. Authorized automatic updates
+call normal builds and separate conditional publication; changing mode/control
+revision invalidates old publication authority. Canaries and rollback require
+manual mode. Ordinary builds publish readiness, not traffic. All model calls
+use ModelGateway. The first-answer timing goal is flexible; do not weaken
+correctness to meet it.
 
 Backend work starts first. Native OpenAPI 3.1.x follows the selected FastAPI
 output. Studio uses the official generated TypeScript SDK; external SDK Kit

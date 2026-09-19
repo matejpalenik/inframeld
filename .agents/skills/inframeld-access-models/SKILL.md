@@ -21,7 +21,7 @@ relative. Read the applicable guide section and owning ADR before a detailed cla
 - `docs/adr/ADR-0021-persistent-outbound-credentials.md`: accepted persistence
   requirement and accepted PostgreSQL/PyNaCl encrypted storage.
 - `docs/adr/ADR-0020-default-onboarding-and-first-publication.md`: accepted
-  secure bootstrap/private access defaults and accepted first-publication orchestration.
+  private access defaults and accepted reversible publication modes.
 - Read ADR-0008 for secret-bearing idempotency, ADR-0018 for feedback rights,
   ADR-0019 for MCP credentials and ADR-0015 for deletion/revocation as needed.
 
@@ -96,11 +96,14 @@ initial administrator and creator-private starter project/group, with ordinary
 ID-bound resources. Administrator status alone does not grant source reading.
 Other users and integrations receive access explicitly. Nonempty default
 allowlists apply on admission; changing a default does not retroactively make
-all documents public. Read ADR-0020 for the precise access boundary. Its accepted
-Prepare and ask action explicitly authorizes initial build and conditional first
-publication. Later release decisions remain explicit, and ordinary builds have
-no release authority. The recommended shared default-route shape does not alter
-these authorization rules.
+all documents public. Read ADR-0020 for the precise access boundary. The default
+starts automatic; new deployments default manual with an explicit automatic
+creation choice. Automatic update admission needs source/configuration plus
+build/deploy rights for each specified target; queued work rechecks current
+authority. Mode alone never elevates upload-only or query-only access. Switching
+to manual invalidates pending publication; enabling automatic authorizes fresh
+selected inputs. Ordinary builds still have no release authority. The shared
+default-route shape does not alter these rules.
 
 ## Task examples and checks
 

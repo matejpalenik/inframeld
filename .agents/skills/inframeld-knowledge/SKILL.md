@@ -76,11 +76,15 @@ map. A large Collection must not require loading its whole corpus into memory.
 Configure models → upload → ask without manual internal resource setup is an
 accepted v1 requirement. Defaults use ordinary resources and the same admission,
 access, profile and build rules. Creator-private provisioning and nonempty
-default upload groups are accepted. ADR-0020's accepted Prepare and ask action
-authorizes a frozen-batch build and conditional first publication. Subsequent
-updates require explicit release. Its shared default-route shape is an
-implementation recommendation. Do not present an upload as an unconditional
-release trigger. Initial model setup does not require a benchmark or judge.
+default upload groups are accepted. ADR-0020 selects Automatic updates for the
+default path and Manual releases for new deployments unless automatic is chosen
+at creation; switching works both ways. An authorized completed batch can request
+build and publication for its target in automatic mode. Upload-only permission,
+partial admission or a saved draft never unconditionally releases. Each request
+freezes a complete corpus; newer authorized selections supersede older pending
+publication without dropping unchanged documents. Manual mode leaves new inputs
+unpublished. Its shared default-route shape is an implementation recommendation.
+Initial model setup does not require a benchmark or judge.
 
 Use Access to determine the actor/project/document scope; Indexing to turn an
 admitted revision into verified search data; Pipelines/Releases to bind and serve

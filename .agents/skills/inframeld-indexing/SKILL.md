@@ -26,7 +26,7 @@ build and serving sections and the relevant protocol before assessing a detail.
   processor isolation and built-in adapter behavior.
 - Read ADR-0006/0007 for access/gateway, ADR-0008 for job attempts, and ADR-0015
   for deletion when the task crosses those boundaries. ADR-0020 owns the default
-  first-use path and accepted initial-publication policy; neither weakens these rules.
+  default automatic path and reversible publication modes; neither weakens readiness.
 
 ## Language and consistency boundaries
 

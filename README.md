@@ -1,6 +1,6 @@
 # Inframeld
 
-Inframeld is an open-source MVP for a governed RAG release loop: versioned knowledge, deterministic evaluation, reviewable promotion, and traceable answers.
+Inframeld is an open-source MVP for configuring models, uploading knowledge and asking grounded questions, with versioned knowledge, benchmark comparisons and governed releases when users need them.
 
 The repository is intentionally structured as a small monorepo so the API, web client, generated contract, architecture decisions, and delivery checks can evolve together.
 
@@ -67,7 +67,7 @@ pnpm commit
 
 ## Architecture
 
-Start with the [MVP governed RAG release-loop architecture](docs/2026-09-17-mvp-governed-rag-release-loop-architecture.md) and its [architecture decision records](docs/adr/README.md).
+Start with the [canonical developer architecture guide](docs/ARCHITECTURE.md), which explains the planned product from the ground up. The [architecture decision records](docs/adr/README.md) contain detailed decisions; the [closing review](docs/reviews/v1-architecture-review.md) records the v1 scope assessment and remaining bounded choices. Design acceptance does not mean the planned behavior has already been implemented or qualified. Backend implementation comes first; external SDK Kit suitability blocks Studio work, whose primary client remains the official generated TypeScript SDK. Root [AGENTS.md](AGENTS.md) establishes read-only AI guidance for developers who code by hand. Six installed domain skills under `.agents/skills/` provide targeted context; the [repository-skills plan](docs/development/repository-skills-plan.md) records their coverage, usage and maintenance.
 
 ## Contributing
 
