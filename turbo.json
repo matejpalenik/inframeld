@@ -6,15 +6,21 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["INFRAMELD_*"]
     },
     "openapi": {
-      "cache": false
+      "cache": false,
+      "env": ["INFRAMELD_*"]
     },
-    "openapi:check": {},
+    "openapi:check": {
+      "env": ["INFRAMELD_*"]
+    },
     "lint": {},
     "typecheck": {},
-    "test": {},
+    "test": {
+      "env": ["INFRAMELD_*"]
+    },
     "format": {},
     "format:check": {}
   }
