@@ -4,17 +4,23 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy import URL, text
 from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
 
+from inframeld_backend.shared.infrastructure.migrations import SUPPORTED_SCHEMA_REVISION
 from inframeld_backend.shared.infrastructure.settings import DatabaseSettings
 
 
 class DatabaseStartupError(RuntimeError):
     """Raised when PostgreSQL cannot be reached during startup."""
+
+
+class DatabaseSchemaCompatibilityError(DatabaseStartupError):
+    """Raised when PostgreSQL has an unsupported application schema."""
 
 
 class Database:
@@ -46,6 +52,30 @@ class Database:
             self._engine, class_=AsyncSession, expire_on_commit=False
         )
 
+    async def _check_schema_compatibility(
+        self,
+        connection: AsyncConnection,
+    ) -> None:
+        version_table = await connection.scalar(
+            text("SELECT to_regclass('public.alembic_version')")
+        )
+
+        if version_table is None:
+            raise DatabaseSchemaCompatibilityError(
+                f"PostgreSQL schema is not initialized for {self._target}. "
+                "Run the operator-controlled migration command."
+            )
+
+        result = await connection.execute(text("SELECT version_num FROM public.alembic_version"))
+        revisions = tuple(result.scalars())
+
+        if revisions != (SUPPORTED_SCHEMA_REVISION,):
+            observed = ", ".join(str(revision) for revision in revisions) or "none"
+            raise DatabaseSchemaCompatibilityError(
+                f"Unsupported PostgreSQL schema revision for {self._target}. "
+                f"Expected {SUPPORTED_SCHEMA_REVISION!r}; found {observed}."
+            )
+
     async def startup(self) -> None:
         """Verify PostgreSQL availability before serving requests."""
 
@@ -53,6 +83,10 @@ class Database:
             async with asyncio.timeout(self._startup_timeout_seconds):
                 async with self._engine.connect() as connection:
                     await connection.execute(text("SELECT 1"))
+                    await self._check_schema_compatibility(connection)
+        except DatabaseSchemaCompatibilityError:
+            await self.shutdown()
+            raise
         except TimeoutError:
             await self.shutdown()
             raise DatabaseStartupError(
