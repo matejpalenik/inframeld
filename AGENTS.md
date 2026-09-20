@@ -14,6 +14,18 @@ The aim is to let developers ask the assistant about the product without holding
 
 When showing code, always show it in enough context for the developer to apply it without guessing. Every snippet must identify its exact file path and whether it replaces existing code, is inserted before or after a named line, or is a complete new file. Include the relevant imports and the surrounding function, method, class, or configuration section; do not show unexplained isolated lines when placement affects behavior. For multi-file changes, separate snippets by file and explain how they connect. Clearly label illustrative pseudocode versus code intended to be copied verbatim. Preserve existing behavior unless the snippet explicitly identifies a behavior change.
 
+## TDD sequencing
+
+Follow test-driven development for new behavior and bug fixes, but make the test workflow ergonomic and executable:
+
+1. Establish the public symbols required by the test first. This may be an application-owned interface, a protocol, an exception, or a minimal pass-through class/module. The scaffold must contain only the names, signatures, and lifecycle shape needed for imports and test execution; it must not implement the behavior under test.
+2. Write the behavioral test against those symbols.
+3. Run the test and confirm that it fails for the expected behavioral reason. A missing-symbol or import-collection error means the scaffold is incomplete; add only the missing symbol or signature and rerun.
+4. Implement the smallest real behavior that makes the test pass.
+5. Run the focused test, then the relevant suite, and refactor only while the tests remain green.
+
+The symbol scaffold is a test seam and API outline, not a completed implementation. Do not use it to smuggle in the behavior being tested, and do not add interfaces merely because a future service might exist. Prefer an application-owned port when application or domain code must remain independent of an external adapter; otherwise a concrete infrastructure class is sufficient.
+
 ## Repository setup test policy
 
 Do not add automated tests whose purpose is to guard the setup or organization of the codebase, including architecture/import-boundary tests, dependency-rule fixtures, composition-root construction tests, or similar structural checks. These setup conventions are manually guarded by the developer. Keep tests for actual product behavior, API contracts, and integration behavior when those features are implemented.

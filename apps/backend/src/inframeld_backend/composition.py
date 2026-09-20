@@ -1,16 +1,31 @@
-from typing import Any
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Any, cast
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from inframeld_backend.shared.http.health import router as health_router
 from inframeld_backend.shared.http.request_context import RequestContextMiddleware
+from inframeld_backend.shared.infrastructure.database import Database
 from inframeld_backend.shared.infrastructure.logging import configure_logging
 from inframeld_backend.shared.infrastructure.settings import Settings, get_settings
 
 API_TITLE = "Inframeld API"
 API_VERSION = "0.1.0"
 OPENAPI_VERSION = "3.2.1"
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
+    database = cast(Database, application.state.database)
+
+    await database.startup()
+
+    try:
+        yield
+    finally:
+        await database.shutdown()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -20,6 +35,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     configure_logging(level=resolved_settings.log_level, log_format=resolved_settings.log_format)
 
+    database = Database(resolved_settings.database)
+
     application = FastAPI(
         title=API_TITLE,
         version=API_VERSION,
@@ -27,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/v1/openapi.json",
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
     def custom_openapi() -> dict[str, Any]:
@@ -48,5 +66,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(health_router)
     application.openapi = custom_openapi
     application.add_middleware(RequestContextMiddleware)
+
+    application.state.database = database
 
     return application

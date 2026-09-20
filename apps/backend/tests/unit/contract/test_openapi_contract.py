@@ -5,7 +5,7 @@ from typing import Any, cast
 from inframeld_backend.main import create_app
 
 CONTRACT_PATH = (
-    Path(__file__).resolve().parents[4] / "contracts" / "openapi" / "v1" / "inframeld-v1.json"
+    Path(__file__).resolve().parents[5] / "contracts" / "openapi" / "v1" / "inframeld-v1.json"
 )
 
 
