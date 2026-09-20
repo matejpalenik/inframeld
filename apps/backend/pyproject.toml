@@ -7,7 +7,10 @@ authors = [{ name = "Matej Palenik", email = "matejpale@gmail.com" }]
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.141.1",
+    "psycopg[binary]>=3.3.5",
     "pydantic-settings>=2.15.0",
+    "pytest-asyncio>=1.4.0",
+    "sqlalchemy[asyncio]>=2.0.52",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.52.4",
 ]
@@ -22,7 +25,13 @@ exclude-newer = "7 days"
 index-strategy = "first-index"
 
 [dependency-groups]
-dev = ["httpx2>=2.12.0", "pyright>=1.1.414", "pytest>=9.1.1", "ruff>=0.16.6"]
+dev = [
+    "httpx2>=2.12.0",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.6",
+]
 
 [tool.ruff]
 target-version = "py313"

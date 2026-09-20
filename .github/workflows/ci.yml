@@ -42,6 +42,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Prepare backend test configuration
+        run: cp apps/backend/.env.example apps/backend/.env.test
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
         with:
