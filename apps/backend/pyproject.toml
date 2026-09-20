@@ -30,7 +30,18 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-extend-select = ["I"]
+select = [
+    "E4",     # pycodestyle errors: import and indentation-related rules
+    "E7",     # pycodestyle errors: statement-related rules
+    "E9",     # pycodestyle errors: runtime-related rules
+    "F",      # Pyflakes
+    "I",      # import sorting
+    "B",      # bugbear
+    "UP",     # modern Python syntax
+    "SIM",    # simplifications
+    "ASYNC",  # async correctness
+    "RUF100", # unused noqa directives
+]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from inframeld_backend.shared.http.health import router as health_router
+from inframeld_backend.shared.http.request_context import RequestContextMiddleware
 from inframeld_backend.shared.infrastructure.logging import configure_logging
 from inframeld_backend.shared.infrastructure.settings import Settings, get_settings
 
@@ -28,8 +29,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url="/redoc",
     )
 
-    application.include_router(health_router)
-
     def custom_openapi() -> dict[str, Any]:
         if application.openapi_schema is not None:
             return application.openapi_schema
@@ -46,6 +45,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         return schema
 
+    application.include_router(health_router)
     application.openapi = custom_openapi
+    application.add_middleware(RequestContextMiddleware)
 
     return application

@@ -75,3 +75,6 @@ def configure_logging(*, level: LogLevel, log_format: LogFormat) -> None:
         logger.handlers.clear()
         logger.propagate = True
         logger.setLevel(logging.NOTSET)
+
+    # RequestContextMiddleware is the cannonical access logger - disable the Uvicorn default.
+    logging.getLogger("uvicorn.access").disabled = True
