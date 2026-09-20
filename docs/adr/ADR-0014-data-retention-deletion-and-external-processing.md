@@ -1,9 +1,6 @@
 # ADR-0014: Retention, scoped deletion, and external processing
 
-**Status:** Accepted — security and retention boundaries; precise retention defaults remain implementation work.
-**Revised:** 19 September 2026.
-**Required approach:** Ownership-scoped, resumable deletion that blocks access before physical cleanup, applies current permissions to historical records, and reports backup and external-processing limits explicitly.
-**Related:** [Access](ADR-0005-api-enforced-tenancy-and-authorization.md), [model gateway](ADR-0006-byok-provider-boundary.md), [durable jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md), [recovery](ADR-0013-minimal-hosted-observability-and-recovery.md).
+**Status:** Accepted — security and retention boundaries; precise retention defaults remain implementation work. **Revised:** 19 September 2026. **Required approach:** Ownership-scoped, resumable deletion that blocks access before physical cleanup, applies current permissions to historical records, and reports backup and external-processing limits explicitly. **Related:** [Access](ADR-0005-api-enforced-tenancy-and-authorization.md), [model gateway](ADR-0006-byok-provider-boundary.md), [durable jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md), [recovery](ADR-0013-minimal-hosted-observability-and-recovery.md).
 
 ## Context
 
@@ -27,11 +24,11 @@ This design uses the selected SeaweedFS artifact storage, Kratos identity integr
 
 **Scope** identifies exactly whose data and which resources an operation may affect. Keep three categories distinct:
 
-| Category                                        | Ownership and deletion rule                                                                                                                                                    |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **User identity, profile, and session records** | Handle through the account-administration flow, Kratos, and the application’s authorization rules. Removing a user is not an instruction to delete shared project data.        |
-| **Project-owned knowledge and releases**        | Belong to the project, not automatically to the individual who uploaded or created them. Delete them only through an authorized operation for that ownership scope.            |
-| **Bounded operational records**                 | Jobs, receipts, idempotency records, audit evidence, and logs follow their defined retention and erasure rules. They are not an unlimited archive of user activity or content. |
+| Category | Ownership and deletion rule |
+| --- | --- |
+| **User identity, profile, and session records** | Handle through the account-administration flow, Kratos, and the application’s authorization rules. Removing a user is not an instruction to delete shared project data. |
+| **Project-owned knowledge and releases** | Belong to the project, not automatically to the individual who uploaded or created them. Delete them only through an authorized operation for that ownership scope. |
+| **Bounded operational records** | Jobs, receipts, idempotency records, audit evidence, and logs follow their defined retention and erasure rules. They are not an unlimited archive of user activity or content. |
 
 For example, Mira can upload a manual into a shared project. Removing Mira’s account does not, by itself, delete that project’s manual or the versions other members use.
 
@@ -49,11 +46,11 @@ An **artifact** is stored content such as a source file, processing output, or m
 
 Some references temporarily prevent routine expiry. These are **pins**: records that an artifact is still required.
 
-| Situation                                                        | Required behavior                                                                                                                                                                          |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Current, candidate, or designated previous Deployment target** | Pin the artifacts that target needs. Current serves requests, candidate is being tried, and the designated previous target is retained for rollback. Routine expiry must not break them.   |
-| **Admitted query**                                               | Temporarily protect the selected immutable artifacts while the accepted query uses them. Admission means the application has accepted the operation for execution.                         |
-| **Explicit source erasure or security deletion**                 | Invalidate affected serving state first, then follow the deletion procedure. Retention pins do not override the erasure action. Explain why an affected historical version is unavailable. |
+| Situation | Required behavior |
+| --- | --- |
+| **Current, candidate, or designated previous Deployment target** | Pin the artifacts that target needs. Current serves requests, candidate is being tried, and the designated previous target is retained for rollback. Routine expiry must not break them. |
+| **Admitted query** | Temporarily protect the selected immutable artifacts while the accepted query uses them. Admission means the application has accepted the operation for execution. |
+| **Explicit source erasure or security deletion** | Invalidate affected serving state first, then follow the deletion procedure. Retention pins do not override the erasure action. Explain why an affected historical version is unavailable. |
 
 **An immutable version is not a promise to keep its content forever.** Its recorded identity must not be silently rewritten, but explicit erasure can remove data it needs to serve.
 
@@ -162,14 +159,14 @@ The selected authentication/account-deletion flow must support this observation 
 
 The feedback feature extends the existing bounded serving receipt with a current rating and comment. It does not introduce a permanent feedback archive.
 
-| Event or constraint                | Required feedback behavior                                                                                                                                                 |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Eligibility and retention**      | The current rating/comment shares its receipt’s eligibility and retention window. Feedback does not extend that window or pin vectors.                                     |
-| **Stored content**                 | Do not add full production query or answer bodies to support feedback.                                                                                                     |
-| **Reading a comment**              | Check all source identities bound to the final generation context, including uncited evidence. A comment may quote a source that did not appear in the answer’s citations. |
-| **Receipt expiry**                 | Remove the associated feedback as part of the expiry.                                                                                                                      |
-| **Source or project erasure**      | Remove or redact affected comments. Tombstones deny access while cleanup proceeds.                                                                                         |
-| **Ordinary permission revocation** | Change access at the established current-authorization check boundary without rewriting the historical serving version.                                                    |
+| Event or constraint | Required feedback behavior |
+| --- | --- |
+| **Eligibility and retention** | The current rating/comment shares its receipt’s eligibility and retention window. Feedback does not extend that window or pin vectors. |
+| **Stored content** | Do not add full production query or answer bodies to support feedback. |
+| **Reading a comment** | Check all source identities bound to the final generation context, including uncited evidence. A comment may quote a source that did not appear in the answer’s citations. |
+| **Receipt expiry** | Remove the associated feedback as part of the expiry. |
+| **Source or project erasure** | Remove or redact affected comments. Tombstones deny access while cleanup proceeds. |
+| **Ordinary permission revocation** | Change access at the established current-authorization check boundary without rewriting the historical serving version. |
 
 The **final generation context** is the selected evidence supplied to the model to produce the answer. Its complete source-identity set matters even when only some sources were cited.
 
@@ -191,12 +188,12 @@ Document backup expiry and the limits it creates. **Do not claim that a deletion
 
 **Data egress** means data leaving the application environment for processing elsewhere. The selected model connection determines where these operations send content.
 
-| Operation                   | Content or processing boundary to disclose                                                                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Document embedding**      | Chunk text goes to the selected model gateway. A chunk is a document excerpt prepared for retrieval.                                        |
-| **Answer generation**       | The query and permitted source excerpts go to the selected generation connection through the gateway.                                       |
-| **Evaluation judging**      | Any selected judge has its own explicitly disclosed evidence payload through the same gateway. A judge is a model that evaluates an answer. |
-| **Future Chroma Cloud use** | An external-processing option for future EE, not a selected v1 requirement.                                                                 |
+| Operation | Content or processing boundary to disclose |
+| --- | --- |
+| **Document embedding** | Chunk text goes to the selected model gateway. A chunk is a document excerpt prepared for retrieval. |
+| **Answer generation** | The query and permitted source excerpts go to the selected generation connection through the gateway. |
+| **Evaluation judging** | Any selected judge has its own explicitly disclosed evidence payload through the same gateway. A judge is a model that evaluates an answer. |
+| **Future Chroma Cloud use** | An external-processing option for future EE, not a selected v1 requirement. |
 
 Customer-controlled remote endpoints can have their own logging and retention. Inframeld cannot universally promise to erase those external copies merely because it deleted the local source.
 
@@ -210,18 +207,18 @@ A deletion endpoint implements these technical boundaries. **It does not, by its
 
 These are acceptance requirements, not evidence that the implementation has passed them.
 
-| Area                               | Required verification                                                                                                                                                                              |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Ownership and scope**            | Deny cross-scope deletion. Removing a user must not silently delete project-owned knowledge, and the last administrator must not orphan shared ownership.                                          |
-| **Tombstone ordering**             | Commit the tombstone and block affected access/work before cleanup. A late job must fail its publication check.                                                                                    |
-| **Shared vectors**                 | Preserve vectors still needed by another retained materialization. Route every Chroma deletion through the designated mutation owner.                                                              |
-| **Crash recovery**                 | Interrupt deletion and resume its bounded, idempotent steps without expanding scope or losing unresolved-step visibility.                                                                          |
-| **Late external writes**           | Exercise delayed Chroma inserts and SeaweedFS uploads after deletion. Keep them inaccessible and report physical cleanup as pending until completion/quiescence and final cleanup are established. |
-| **Current authorization**          | Deny revoked receipt/result access and idempotency replay. Verify group allowlists, fixed integration authority, and scoped opaque credentials rather than trusting caller-supplied identities.    |
-| **Content minimization**           | Keep secrets and full production answers out of replay caches, and source text, prompts, credentials, and model responses out of operational logs.                                                 |
-| **Feedback**                       | Check uncited final-context sources, expire feedback with its receipt, and remove/redact affected comments on erasure without creating a permanent archive.                                        |
-| **Account and storage procedures** | Validate the selected Kratos and SeaweedFS procedures, including an authorized way to observe deletion completion without reopening deleted content.                                               |
-| **Backup restore**                 | Restore a backup that predates a deletion tombstone and verify that current restrictions and deleted-content exclusion remain enforced.                                                            |
+| Area | Required verification |
+| --- | --- |
+| **Ownership and scope** | Deny cross-scope deletion. Removing a user must not silently delete project-owned knowledge, and the last administrator must not orphan shared ownership. |
+| **Tombstone ordering** | Commit the tombstone and block affected access/work before cleanup. A late job must fail its publication check. |
+| **Shared vectors** | Preserve vectors still needed by another retained materialization. Route every Chroma deletion through the designated mutation owner. |
+| **Crash recovery** | Interrupt deletion and resume its bounded, idempotent steps without expanding scope or losing unresolved-step visibility. |
+| **Late external writes** | Exercise delayed Chroma inserts and SeaweedFS uploads after deletion. Keep them inaccessible and report physical cleanup as pending until completion/quiescence and final cleanup are established. |
+| **Current authorization** | Deny revoked receipt/result access and idempotency replay. Verify group allowlists, fixed integration authority, and scoped opaque credentials rather than trusting caller-supplied identities. |
+| **Content minimization** | Keep secrets and full production answers out of replay caches, and source text, prompts, credentials, and model responses out of operational logs. |
+| **Feedback** | Check uncited final-context sources, expire feedback with its receipt, and remove/redact affected comments on erasure without creating a permanent archive. |
+| **Account and storage procedures** | Validate the selected Kratos and SeaweedFS procedures, including an authorized way to observe deletion completion without reopening deleted content. |
+| **Backup restore** | Restore a backup that predates a deletion tombstone and verify that current restrictions and deleted-content exclusion remain enforced. |
 
 Exact retention defaults and erasure/anonymization policies still need implementation decisions. Provisional backup operating targets, future organization packaging, and finer access-control lists (ACLs) remain distinct from these accepted deletion and security requirements.
 
@@ -269,11 +266,11 @@ No separate comparative evaluation is recorded. The approaches below are exclude
 
 ## References
 
-| Reference                                                                                        | Responsibility                                                                                                                        |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| [ADR-0004: Vector storage and cleanup](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md) | Shared immutable generations, the singleton vector mutation owner, delayed-write handling, and final cleanup requirements.            |
-| [ADR-0005: Access](ADR-0005-api-enforced-tenancy-and-authorization.md)                           | Kratos integration, group allowlists, fixed integration authority, and current authorization.                                         |
-| [ADR-0006: Model gateway](ADR-0006-byok-provider-boundary.md)                                    | Model-call destinations, customer-controlled endpoints, and disclosed data egress.                                                    |
-| [ADR-0007: Durable jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md)                      | Resumable work, sanitized idempotency outcomes, and bounded receipts without durable full-query replay.                               |
-| [ADR-0013: Recovery](ADR-0013-minimal-hosted-observability-and-recovery.md)                      | The provisional backup/restore operating model, later restriction/deletion reconciliation, and deferred product-level reconstruction. |
-| [ADR-0017: Answer feedback](ADR-0017-answer-feedback.md)                                         | Feedback eligibility, receipt-linked retention, evidence access, and reporting denominators.                                          |
+| Reference | Responsibility |
+| --- | --- |
+| [ADR-0004: Vector storage and cleanup](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md) | Shared immutable generations, the singleton vector mutation owner, delayed-write handling, and final cleanup requirements. |
+| [ADR-0005: Access](ADR-0005-api-enforced-tenancy-and-authorization.md) | Kratos integration, group allowlists, fixed integration authority, and current authorization. |
+| [ADR-0006: Model gateway](ADR-0006-byok-provider-boundary.md) | Model-call destinations, customer-controlled endpoints, and disclosed data egress. |
+| [ADR-0007: Durable jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Resumable work, sanitized idempotency outcomes, and bounded receipts without durable full-query replay. |
+| [ADR-0013: Recovery](ADR-0013-minimal-hosted-observability-and-recovery.md) | The provisional backup/restore operating model, later restriction/deletion reconciliation, and deferred product-level reconstruction. |
+| [ADR-0017: Answer feedback](ADR-0017-answer-feedback.md) | Feedback eligibility, receipt-linked retention, evidence access, and reporting denominators. |

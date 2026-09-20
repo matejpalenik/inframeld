@@ -13,11 +13,11 @@ Those inputs can change independently. A document can be updated without changin
 
 The starting point is to separate three questions:
 
-| Question                                            | What answers it                                                                                                  |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Question | What answers it |
+| --- | --- |
 | **What produced this answer or evaluation result?** | Recorded source versions, configuration, artifacts, and execution details. Together, these form its **lineage**. |
-| **Which version should serve requests now?**        | The Deployment's current release state.                                                                          |
-| **Who may read this content now?**                  | Current permissions, including permissions on historical content.                                                |
+| **Which version should serve requests now?** | The Deployment's current release state. |
+| **Who may read this content now?** | Current permissions, including permissions on historical content. |
 
 We need to preserve the first without freezing the other two. Otherwise, updating a release could change the apparent origin of an old answer, or an old access decision could continue exposing content after permission was revoked.
 
@@ -61,10 +61,10 @@ ProcessingGeneration + EmbeddingProfile -> semantic Vectorization reuse key
 Vectorization -> immutable physical VectorGeneration + numerical payload evidence
 ```
 
-| Identity             | What it identifies                                                                                                                                                                                              |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Vectorization**    | The semantic inputs used to decide whether existing embedding work is compatible and reusable. Its reuse key includes the organization/project, document version, processing generation, and embedding profile. |
-| **VectorGeneration** | One physical numerical execution of those inputs: the particular generated vectors and the evidence of their numerical payload.                                                                                 |
+| Identity | What it identifies |
+| --- | --- |
+| **Vectorization** | The semantic inputs used to decide whether existing embedding work is compatible and reusable. Its reuse key includes the organization/project, document version, processing generation, and embedding profile. |
+| **VectorGeneration** | One physical numerical execution of those inputs: the particular generated vectors and the evidence of their numerical payload. |
 
 This distinction matters because **matching inputs do not authorize overwriting existing numerical output**.
 
@@ -193,24 +193,24 @@ In particular, this decision does not guarantee byte-identical output from a hos
 
 **IDs and hashes alone cannot reconstruct numerical embeddings.** Knowing which inputs were used is not the same as retaining the actual numerical output.
 
-| Capability                          | Treatment in this decision                                                                          |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Lineage records**                 | Preserve the identities and relationships needed to explain an execution.                           |
+| Capability | Treatment in this decision |
+| --- | --- |
+| **Lineage records** | Preserve the identities and relationships needed to explain an execution. |
 | **Normal immutable-write recovery** | Accepted for qualification under ADR-0004. This is distinct from reconstructing lost product state. |
-| **Tested backup and restore**       | Remain the recovery baseline under ADR-0013.                                                        |
-| **Product-level reconstruction**    | Deferred. Lineage is not a promise that Inframeld can rebuild every lost artifact.                  |
-| **Permanent numerical archives**    | Deferred. Immutable physical generations do not imply permanent retention of every vector payload.  |
+| **Tested backup and restore** | Remain the recovery baseline under ADR-0013. |
+| **Product-level reconstruction** | Deferred. Lineage is not a promise that Inframeld can rebuild every lost artifact. |
+| **Permanent numerical archives** | Deferred. Immutable physical generations do not imply permanent retention of every vector payload. |
 
 The immutable physical-generation design, PostgreSQL-owned membership, and initial group/fixed-integration permissions are accepted. **Implementation qualification is still pending**: the implementation must be tested against the design, including the runtime cost of resolving authorized generation membership. Acceptance is not a claim that this testing has already passed.
 
 ### 9. Examples of the resulting behavior
 
-| Change or event                                            | Expected behavior                                                                                   |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Release prompt B against the same corpus and profiles.** | Reuse the compatible ready materialization; the prompt change does not require new embeddings.      |
-| **Change the embedding model.**                            | Create lineage for the new vector space rather than overwrite the old numerical generations.        |
-| **Revoke Alice's document access.**                        | Deny her historical source reads too, even though the historical hashes remain recorded.            |
-| **Delete source data needed by an older release.**         | The rollback target may become unavailable. Report that fact rather than fabricate reproducibility. |
+| Change or event | Expected behavior |
+| --- | --- |
+| **Release prompt B against the same corpus and profiles.** | Reuse the compatible ready materialization; the prompt change does not require new embeddings. |
+| **Change the embedding model.** | Create lineage for the new vector space rather than overwrite the old numerical generations. |
+| **Revoke Alice's document access.** | Deny her historical source reads too, even though the historical hashes remain recorded. |
+| **Delete source data needed by an older release.** | The rollback target may become unavailable. Report that fact rather than fabricate reproducibility. |
 
 These relationships describe product behavior. They are not separate services, and they do not require an object-relational mapping (ORM) aggregate for every manifest entry.
 
@@ -254,12 +254,12 @@ No separate comparative evaluation is recorded. The approaches below are exclude
 
 ## References
 
-| Reference                                                                             | Responsibility identified by this ADR                                                      |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| [ADR-0004](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md)                  | PostgreSQL/Chroma ownership and normal immutable-write recovery.                           |
-| ADR-0005                                                                              | Group allowlists, fixed integration authority, and the actor/delegated-subject boundary.   |
-| ADR-0008                                                                              | The minimal evaluation snapshot and comparison model.                                      |
-| [ADR-0009](ADR-0009-sticky-logical-canary-deployments.md)                             | Promotion, candidate rejection, and rollback transitions.                                  |
-| ADR-0013                                                                              | Tested backup/restore and the deferral of reconstruction and permanent numerical archives. |
-| [ADR-0015](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Profile-specific materializations and pipeline bindings.                                   |
-| [ADR-0017](ADR-0017-answer-feedback.md)                                               | Answer receipts, feedback, API behavior, and retention.                                    |
+| Reference | Responsibility identified by this ADR |
+| --- | --- |
+| [ADR-0004](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md) | PostgreSQL/Chroma ownership and normal immutable-write recovery. |
+| ADR-0005 | Group allowlists, fixed integration authority, and the actor/delegated-subject boundary. |
+| ADR-0008 | The minimal evaluation snapshot and comparison model. |
+| [ADR-0009](ADR-0009-sticky-logical-canary-deployments.md) | Promotion, candidate rejection, and rollback transitions. |
+| ADR-0013 | Tested backup/restore and the deferral of reconstruction and permanent numerical archives. |
+| [ADR-0015](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Profile-specific materializations and pipeline bindings. |
+| [ADR-0017](ADR-0017-answer-feedback.md) | Answer receipts, feedback, API behavior, and retention. |

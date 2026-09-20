@@ -1,9 +1,6 @@
 # ADR-0018: First-party MCP access to deployed knowledge
 
-**Status:** Accepted — consuming interface and supported-client profile; SDK and interoperability qualification pending.
-**Date:** 19 September 2026.
-**Required approach:** Two tools in the existing API process, using the same application behavior as HTTP and trusted clients that manage bearer credentials and idempotency keys. Universal OAuth interoperability and delegated-user access are outside this decision.
-**Related:** [API contract](ADR-0002-product-owned-openapi-contract.md), [authorization](ADR-0005-api-enforced-tenancy-and-authorization.md), [model gateway](ADR-0006-byok-provider-boundary.md), [idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md), [canaries](ADR-0009-sticky-logical-canary-deployments.md).
+**Status:** Accepted — consuming interface and supported-client profile; SDK and interoperability qualification pending. **Date:** 19 September 2026. **Required approach:** Two tools in the existing API process, using the same application behavior as HTTP and trusted clients that manage bearer credentials and idempotency keys. Universal OAuth interoperability and delegated-user access are outside this decision. **Related:** [API contract](ADR-0002-product-owned-openapi-contract.md), [authorization](ADR-0005-api-enforced-tenancy-and-authorization.md), [model gateway](ADR-0006-byok-provider-boundary.md), [idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md), [canaries](ADR-0009-sticky-logical-canary-deployments.md).
 
 ## Context
 
@@ -51,10 +48,10 @@ Do not automatically turn every OpenAPI operation into a tool. Reuse also does n
 
 ### 2. Expose exactly two application tools
 
-| Tool                     | Inputs and result                                                                                                                                                                                                                        | Application behavior                                                                                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`query_deployment`**   | Accepts `deploymentId`, a bounded `question`, required `idempotencyKey`, and optional `affinityKey`. First success returns the answer, citations, `answerId`, operation identity, and selected pipeline version and Deployment revision. | Resolve project and permissions on the server, select the current or canary version once, retrieve authorized evidence, and generate through `ModelGateway`. |
-| **`get_answer_receipt`** | Accepts `answerId`. Returns the existing safe receipt/status, selected version, and currently authorized citation identities.                                                                                                            | Read an existing receipt under current authorization. Do not regenerate the answer or return cached answer text or source snippets.                          |
+| Tool | Inputs and result | Application behavior |
+| --- | --- | --- |
+| **`query_deployment`** | Accepts `deploymentId`, a bounded `question`, required `idempotencyKey`, and optional `affinityKey`. First success returns the answer, citations, `answerId`, operation identity, and selected pipeline version and Deployment revision. | Resolve project and permissions on the server, select the current or canary version once, retrieve authorized evidence, and generate through `ModelGateway`. |
+| **`get_answer_receipt`** | Accepts `answerId`. Returns the existing safe receipt/status, selected version, and currently authorized citation identities. | Read an existing receipt under current authorization. Do not regenerate the answer or return cached answer text or source snippets. |
 
 An **answer receipt** is the bounded record of an answer's execution and outcome, not a stored copy of its full response. An **operation identity** identifies the accepted work independently of an individual network request.
 
@@ -124,12 +121,12 @@ A **canary** routes a portion of requests to a candidate pipeline version. An **
 
 The client supplies a stable opaque `affinityKey`, and the normal router selects one pipeline for the query.
 
-| Routing situation                                | Required behavior                                           |
-| ------------------------------------------------ | ----------------------------------------------------------- |
-| **Candidate traffic enabled, affinity supplied** | Use the ordinary integration-scoped canary routing.         |
-| **Candidate traffic enabled, affinity missing**  | Return the existing `affinity_required` error.              |
-| **No candidate traffic**                         | Affinity remains optional.                                  |
-| **Credential rotated for the same integration**  | Preserve its stable principal and existing cohort behavior. |
+| Routing situation | Required behavior |
+| --- | --- |
+| **Candidate traffic enabled, affinity supplied** | Use the ordinary integration-scoped canary routing. |
+| **Candidate traffic enabled, affinity missing** | Return the existing `affinity_required` error. |
+| **No candidate traffic** | Affinity remains optional. |
+| **Credential rotated for the same integration** | Preserve its stable principal and existing cohort behavior. |
 
 Do not route every MCP user as one cohort by using the credential, and do not substitute a JSON-RPC request ID. **JSON-RPC** is the protocol message format; its request ID identifies a transport exchange, not a stable user/conversation or an application operation.
 
@@ -149,12 +146,12 @@ SupportBot sends question **Q** with key **K**, receives an answer, and retains 
 
 If the first answer was lost in transit, that receipt still reports completion. It cannot reconstruct the missing answer text.
 
-| Operation state                         | What the retry reports                                                                             |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Completed**                           | The known receipt/status with `responseAvailable: false`, not a regenerated or cached full answer. |
-| **Still running**                       | Its operation identity and the existing bounded retry guidance.                                    |
-| **Provider outcome uncertain**          | `recovery_required`, without automatically dispatching another model request.                      |
-| **A deliberately new key is submitted** | A new query that may incur another charge. This is not an automatic repair for a lost answer.      |
+| Operation state | What the retry reports |
+| --- | --- |
+| **Completed** | The known receipt/status with `responseAvailable: false`, not a regenerated or cached full answer. |
+| **Still running** | Its operation identity and the existing bounded retry guidance. |
+| **Provider outcome uncertain** | `recovery_required`, without automatically dispatching another model request. |
+| **A deliberately new key is submitted** | A new query that may incur another charge. This is not an automatic repair for a lost answer. |
 
 Key expiry and disaster-restore limits remain those of [ADR-0007](ADR-0007-durable-jobs-idempotency-and-recovery.md). MCP does not extend the underlying retention or deduplication guarantee.
 
@@ -166,11 +163,11 @@ Declare input/output schemas and return **`structuredContent`**, the machine-rea
 
 Both representations must distinguish a first successful answer, a safe replay, and a failure or uncertain outcome. **Do not present a receipt as an empty successful answer or suggest that the client should automatically ask again with a new key.**
 
-| Failure boundary                                             | Representation                                                                                                                                    |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Missing/invalid credentials or insufficient query grants** | HTTP `401` or `403` before tool execution.                                                                                                        |
-| **Malformed protocol request**                               | The SDK's protocol error handling. Do not implement another JSON-RPC parser.                                                                      |
-| **Application failure**                                      | Sanitized tool result with `isError: true`, a stable application error code, an optional operation identity, and retry guidance where applicable. |
+| Failure boundary | Representation |
+| --- | --- |
+| **Missing/invalid credentials or insufficient query grants** | HTTP `401` or `403` before tool execution. |
+| **Malformed protocol request** | The SDK's protocol error handling. Do not implement another JSON-RPC parser. |
+| **Application failure** | Sanitized tool result with `isError: true`, a stable application error code, an optional operation identity, and retry guidance where applicable. |
 
 Never expose exception traces, secret configuration, cross-project identifiers, or provider request bodies.
 
@@ -178,12 +175,12 @@ Never expose exception traces, secret configuration, cross-project identifiers, 
 
 Use these annotations for `query_deployment`:
 
-| Annotation            | Value   | Why                                                                                                                             |
-| --------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **`readOnlyHint`**    | `false` | The call creates an operation/receipt and consumes a model budget.                                                              |
-| **`destructiveHint`** | `false` | The tool requests an answer rather than a destructive administrative change.                                                    |
-| **`idempotentHint`**  | `false` | Deduplication depends on the explicit key and its documented lifetime; repeated tool calls are not unconditionally effect-free. |
-| **`openWorldHint`**   | `true`  | Answering can involve the configured external model connection.                                                                 |
+| Annotation | Value | Why |
+| --- | --- | --- |
+| **`readOnlyHint`** | `false` | The call creates an operation/receipt and consumes a model budget. |
+| **`destructiveHint`** | `false` | The tool requests an answer rather than a destructive administrative change. |
+| **`idempotentHint`** | `false` | Deduplication depends on the explicit key and its documented lifetime; repeated tool calls are not unconditionally effect-free. |
+| **`openWorldHint`** | `true` | Answering can involve the configured external model connection. |
 
 Describe costs and data egress in the tool description. **Egress** means data leaving an environment for another recipient. The receipt read can be marked read-only.
 
@@ -214,13 +211,13 @@ The two-tool scope is accepted; **this exact selector shape remains a recommenda
 
 The source records its protocol and SDK research on **19 September 2026**. Preserve those versioned choices as the basis for qualification, not as evidence of a working Inframeld integration or a fresh upstream verification.
 
-| Component                        | Recorded evidence and implementation direction                                                                                                                                                |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **MCP protocol**                 | The source records `latest` as the released **2026-07-28** revision with stateless requests, not a release candidate or draft. Recommend it as the primary wire version.                      |
-| **Official Python SDK**          | The source records **`mcp 2.2.0`**, released **7 September 2026**, under MIT, with 2.x current and **1.30.0** the maintenance line. Initially qualify a pinned 2.2.0 dependency.              |
-| **Older protocol compatibility** | Recommend **2025-11-25** only as a limited compatibility profile handled by the SDK, not as the latest protocol.                                                                              |
-| **Hosting support**              | Tagged 2.2.0 documentation describes mounting its Starlette ASGI application in FastAPI, with the parent starting the MCP session manager's lifespan.                                         |
-| **Reference client support**     | Tagged 2.2.0 documentation accepts an application-supplied HTTP client carrying authorization headers. This establishes a specific integration direction, not universal client compatibility. |
+| Component | Recorded evidence and implementation direction |
+| --- | --- |
+| **MCP protocol** | The source records `latest` as the released **2026-07-28** revision with stateless requests, not a release candidate or draft. Recommend it as the primary wire version. |
+| **Official Python SDK** | The source records **`mcp 2.2.0`**, released **7 September 2026**, under MIT, with 2.x current and **1.30.0** the maintenance line. Initially qualify a pinned 2.2.0 dependency. |
+| **Older protocol compatibility** | Recommend **2025-11-25** only as a limited compatibility profile handled by the SDK, not as the latest protocol. |
+| **Hosting support** | Tagged 2.2.0 documentation describes mounting its Starlette ASGI application in FastAPI, with the parent starting the MCP session manager's lifespan. |
+| **Reference client support** | Tagged 2.2.0 documentation accepts an application-supplied HTTP client carrying authorization headers. This establishes a specific integration direction, not universal client compatibility. |
 
 Earlier 2.0-alpha advice is superseded by the stable SDK release recorded in the source. A stable upstream release still does not establish that Inframeld's integration is correct.
 
@@ -254,14 +251,14 @@ Bound request bodies, question length, response size, admission concurrency, and
 
 Use explicit **`TransportSecuritySettings`** with DNS-rebinding protection enabled, allowed installation hostnames, and exact allowed origins. DNS rebinding is a risk involving a hostname resolving to a different destination; the selected SDK checks must remain enabled.
 
-| Boundary                           | Required behavior                                                                                                                                       |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Boundary | Required behavior |
+| --- | --- |
 | **`Host` and `Origin` validation** | Configure allowed installation hosts and exact origins. Reject an invalid present `Origin`; do not fix validation failures by disabling the protection. |
-| **Requests without `Origin`**      | Installed/server clients may omit it. Its absence does not bypass authentication.                                                                       |
-| **Proxy and container exposure**   | Keep API container ports private. Trust forwarded headers only from the configured proxy.                                                               |
-| **Canonical URL**                  | Configure the final HTTPS URL, including the endpoint path, to avoid accidental redirects.                                                              |
-| **Local trial**                    | Restrict exposure to loopback, the local machine's network interface.                                                                                   |
-| **Cross-origin browser access**    | Not included in this initial installed/server-client profile. Do not add wildcard CORS or store integration secrets in the browser.                     |
+| **Requests without `Origin`** | Installed/server clients may omit it. Its absence does not bypass authentication. |
+| **Proxy and container exposure** | Keep API container ports private. Trust forwarded headers only from the configured proxy. |
+| **Canonical URL** | Configure the final HTTPS URL, including the endpoint path, to avoid accidental redirects. |
+| **Local trial** | Restrict exposure to loopback, the local machine's network interface. |
+| **Cross-origin browser access** | Not included in this initial installed/server-client profile. Do not add wildcard CORS or store integration secrets in the browser. |
 
 **CORS**, cross-origin resource sharing, controls browser requests between origins. Later browser MCP support needs explicit qualification of exact origins, preflight headers, and secret handling. A preflight is the browser's preliminary permission-check request.
 
@@ -301,15 +298,15 @@ Source text remains untrusted evidence, not instructions that grant tools, crede
 
 ### 12. Test the deployed integration before claiming client support
 
-| Area                                      | Required qualification                                                                                                                                                                                                                                     |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Hosting and lifecycle**                 | Run real HTTP tests through the TLS proxy and mounted FastAPI lifespan. Exercise startup, shutdown, and exact endpoint paths. An in-memory SDK test does not test the deployed authentication boundary.                                                    |
-| **Protocol and limits**                   | Test current-version metadata/header mismatches, unsupported versions, legacy stateless negotiation, bounded bodies/timeouts, and absence of unintended tools/capabilities. Verify JSON and structured-result handling with each supported client version. |
-| **Authentication and transport security** | Test missing, expired, revoked, wrong-resource, and insufficient-scope tokens; invalid Host/Origin; missing Origin with valid server-client credentials; and rejection of cookie-only access.                                                              |
-| **Scope and application parity**          | Reject forged users/groups and cross-project Deployment/receipt IDs. Prove HTTP/MCP equivalence for group revocation, deleted citations, model-gateway routing, canary affinity, missing affinity, and credential rotation.                                |
-| **Retries and interrupted requests**      | Race identical query keys, disconnect before and after provider dispatch, retry completed queries, and change input under the same key. Verify no automatic second model call and no durable full-answer replay cache.                                     |
-| **Receipts and credential boundaries**    | Read receipts after permission revocation and verify that clients visibly distinguish receipt-only and uncertain outcomes. Ensure tokens and secret-bearing provider details never cross their intended boundaries.                                        |
-| **Default selector**                      | Verify that HTTP and MCP share permission checks, default-target resolution, and the not-ready outcome.                                                                                                                                                    |
+| Area | Required qualification |
+| --- | --- |
+| **Hosting and lifecycle** | Run real HTTP tests through the TLS proxy and mounted FastAPI lifespan. Exercise startup, shutdown, and exact endpoint paths. An in-memory SDK test does not test the deployed authentication boundary. |
+| **Protocol and limits** | Test current-version metadata/header mismatches, unsupported versions, legacy stateless negotiation, bounded bodies/timeouts, and absence of unintended tools/capabilities. Verify JSON and structured-result handling with each supported client version. |
+| **Authentication and transport security** | Test missing, expired, revoked, wrong-resource, and insufficient-scope tokens; invalid Host/Origin; missing Origin with valid server-client credentials; and rejection of cookie-only access. |
+| **Scope and application parity** | Reject forged users/groups and cross-project Deployment/receipt IDs. Prove HTTP/MCP equivalence for group revocation, deleted citations, model-gateway routing, canary affinity, missing affinity, and credential rotation. |
+| **Retries and interrupted requests** | Race identical query keys, disconnect before and after provider dispatch, retry completed queries, and change input under the same key. Verify no automatic second model call and no durable full-answer replay cache. |
+| **Receipts and credential boundaries** | Read receipts after permission revocation and verify that clients visibly distinguish receipt-only and uncertain outcomes. Ensure tokens and secret-bearing provider details never cross their intended boundaries. |
+| **Default selector** | Verify that HTTP and MCP share permission checks, default-target resolution, and the not-ready outcome. |
 
 These are future acceptance cases, not completed tests or a new general certification suite. No MCP server implementation, client interoperability test, security test, or operational qualification was performed by the source documentation change.
 
@@ -355,25 +352,25 @@ The source excludes or defers the approaches below. It does not record a separat
 
 ### Related decisions
 
-| Reference                                                                            | Responsibility                                                                                                            |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| [ADR-0002: API contract](ADR-0002-product-owned-openapi-contract.md)                 | The HTTP contract and shared application request/result behavior.                                                         |
-| [ADR-0005: Authorization](ADR-0005-api-enforced-tenancy-and-authorization.md)        | Integration credentials, fixed application authority, current document permissions, and the deferred delegation boundary. |
-| [ADR-0006: Model gateway](ADR-0006-byok-provider-boundary.md)                        | Model-call ownership, approved credentials/endpoints, and data egress.                                                    |
-| [ADR-0007: Idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md)           | Query admission, fingerprints, receipt-only retries, uncertainty, key lifetime, and restore limits.                       |
-| [ADR-0009: Canaries](ADR-0009-sticky-logical-canary-deployments.md)                  | Stable integration-scoped affinity and selection of one pipeline version per query.                                       |
-| [ADR-0017: Answer feedback](ADR-0017-answer-feedback.md)                             | The existing HTTP feedback contract; no additional feedback tool is selected here.                                        |
-| [ADR-0019: Default onboarding](ADR-0019-default-onboarding-and-first-publication.md) | The recommended project-default selector and ordinary serving behavior across publication modes.                          |
+| Reference | Responsibility |
+| --- | --- |
+| [ADR-0002: API contract](ADR-0002-product-owned-openapi-contract.md) | The HTTP contract and shared application request/result behavior. |
+| [ADR-0005: Authorization](ADR-0005-api-enforced-tenancy-and-authorization.md) | Integration credentials, fixed application authority, current document permissions, and the deferred delegation boundary. |
+| [ADR-0006: Model gateway](ADR-0006-byok-provider-boundary.md) | Model-call ownership, approved credentials/endpoints, and data egress. |
+| [ADR-0007: Idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Query admission, fingerprints, receipt-only retries, uncertainty, key lifetime, and restore limits. |
+| [ADR-0009: Canaries](ADR-0009-sticky-logical-canary-deployments.md) | Stable integration-scoped affinity and selection of one pipeline version per query. |
+| [ADR-0017: Answer feedback](ADR-0017-answer-feedback.md) | The existing HTTP feedback contract; no additional feedback tool is selected here. |
+| [ADR-0019: Default onboarding](ADR-0019-default-onboarding-and-first-publication.md) | The recommended project-default selector and ordinary serving behavior across publication modes. |
 
 ### Recorded external evidence
 
 The original ADR records these official references as checked on **19 September 2026**. Their version and capability observations are preserved here; they have not been freshly verified or demonstrated by an Inframeld integration test as part of this rewrite.
 
-| Reference group                | Recorded evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Protocol release**           | [2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28) and [release announcement](https://blog.modelcontextprotocol.io/posts/2026-07-28/).                                                                                                                                                                                                                                                                                                                                                 |
-| **SDK release**                | [`mcp 2.2.0` on PyPI](https://pypi.org/project/mcp/2.2.0/), [SDK 2.2.0 release](https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.2.0), and [1.30.0 maintenance release](https://github.com/modelcontextprotocol/python-sdk/releases/tag/v1.30.0).                                                                                                                                                                                                                                                      |
-| **Hosting and lifecycle**      | [Tagged ASGI mounting guide](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/run/asgi.md), [hosting example](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs_src/asgi/tutorial002.py), and [transport options](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/run/index.md).                                                                                                                                                                                |
-| **Transport and clients**      | [Versioned Streamable HTTP rules](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http), [tagged deployment behavior](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/run/deploy.md), and [client transport guidance](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/client/transports.md).                                                                                                                                                |
+| Reference group | Recorded evidence |
+| --- | --- |
+| **Protocol release** | [2026-07-28 specification](https://modelcontextprotocol.io/specification/2026-07-28) and [release announcement](https://blog.modelcontextprotocol.io/posts/2026-07-28/). |
+| **SDK release** | [`mcp 2.2.0` on PyPI](https://pypi.org/project/mcp/2.2.0/), [SDK 2.2.0 release](https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.2.0), and [1.30.0 maintenance release](https://github.com/modelcontextprotocol/python-sdk/releases/tag/v1.30.0). |
+| **Hosting and lifecycle** | [Tagged ASGI mounting guide](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/run/asgi.md), [hosting example](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs_src/asgi/tutorial002.py), and [transport options](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/run/index.md). |
+| **Transport and clients** | [Versioned Streamable HTTP rules](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http), [tagged deployment behavior](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/run/deploy.md), and [client transport guidance](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/client/transports.md). |
 | **Security and authorization** | [Tagged transport-security implementation](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/src/mcp/server/transport_security.py), [SDK authorization contract](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/run/authorization.md), [protocol authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization), and [PKCE/security requirements](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/security-considerations). |
-| **Tools and results**          | [Tool result/error contract](https://modelcontextprotocol.io/specification/2026-07-28/server/tools) and [annotation definitions](https://modelcontextprotocol.io/specification/2026-07-28/schema#toolannotations).                                                                                                                                                                                                                                                                                                       |
+| **Tools and results** | [Tool result/error contract](https://modelcontextprotocol.io/specification/2026-07-28/server/tools) and [annotation definitions](https://modelcontextprotocol.io/specification/2026-07-28/schema#toolannotations). |

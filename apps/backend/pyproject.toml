@@ -5,7 +5,12 @@ description = "FastAPI application for the Inframeld governed RAG release loop."
 readme = "README.md"
 authors = [{ name = "Matej Palenik", email = "matejpale@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = ["fastapi>=0.141.1", "uvicorn[standard]>=0.52.4"]
+dependencies = [
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.15.0",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.52.4",
+]
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]
@@ -25,7 +30,18 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-extend-select = ["I"]
+select = [
+    "E4",     # pycodestyle errors: import and indentation-related rules
+    "E7",     # pycodestyle errors: statement-related rules
+    "E9",     # pycodestyle errors: runtime-related rules
+    "F",      # Pyflakes
+    "I",      # import sorting
+    "B",      # bugbear
+    "UP",     # modern Python syntax
+    "SIM",    # simplifications
+    "ASYNC",  # async correctness
+    "RUF100", # unused noqa directives
+]
 
 [tool.ruff.format]
 quote-style = "double"

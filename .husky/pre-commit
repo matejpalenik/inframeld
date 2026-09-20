@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+set -eu
+
+pnpm exec lint-staged
+pnpm --filter @inframeld/backend typecheck
+pnpm --filter @inframeld/backend test
+pnpm --filter @inframeld/backend openapi:check

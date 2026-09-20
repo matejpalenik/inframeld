@@ -1,10 +1,6 @@
 # ADR-0015: Profile-specific generations, materializations, and pipeline bindings
 
-**Status:** Accepted — v1 design; implementation and performance qualification pending.
-**Revised:** 19 September 2026.
-**Required approach:** Separate source ingestion, exact collection membership, immutable profile-specific vector generations, and ready pipeline bindings.
-**Source:** [Canonical architecture guide](../ARCHITECTURE.md).
-**Related:** [Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md), [vector protocol](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md), [authorization](ADR-0005-api-enforced-tenancy-and-authorization.md), [model gateway](ADR-0006-byok-provider-boundary.md), [durable jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md), [releases](ADR-0009-sticky-logical-canary-deployments.md), [processing](ADR-0016-docling-processing-and-cross-encoder-reranking.md).
+**Status:** Accepted — v1 design; implementation and performance qualification pending. **Revised:** 19 September 2026. **Required approach:** Separate source ingestion, exact collection membership, immutable profile-specific vector generations, and ready pipeline bindings. **Source:** [Canonical architecture guide](../ARCHITECTURE.md). **Related:** [Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md), [vector protocol](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md), [authorization](ADR-0005-api-enforced-tenancy-and-authorization.md), [model gateway](ADR-0006-byok-provider-boundary.md), [durable jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md), [releases](ADR-0009-sticky-logical-canary-deployments.md), [processing](ADR-0016-docling-processing-and-cross-encoder-reranking.md).
 
 ## Context
 
@@ -32,16 +28,16 @@ A **DocumentVersion** identifies an immutable version of a source’s content. A
 
 A **chunk** is an excerpt produced by processing a document. An **embedding** is a numerical vector representing text for similarity search.
 
-| Concept                            | Responsibility                                                                                                                                                                                                                                            |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`ProcessingProfile`**            | Immutable parser/chunker behavior: how the source is read and divided into chunks.                                                                                                                                                                        |
-| **`ProcessingGeneration`**         | The resulting chunk evidence for a document version processed under that profile.                                                                                                                                                                         |
-| **`EmbeddingProfile`**             | Immutable vector-space configuration: semantic gateway routing, model, dimensions, normalization, and distance metric. Dimensions specify the number of values in a vector; normalization and the metric determine how vectors are prepared and compared. |
-| **`VectorGeneration`**             | One immutable physical numerical execution for a document processing generation and embedding profile. It owns its record IDs and frozen manifest evidence. A manifest is an inventory of expected records, identities, and verification information.     |
-| **`VectorIndex`**                  | The application’s profile-specific search resource. It is not necessarily one physical Chroma collection.                                                                                                                                                 |
-| **`VectorLayout` / `VectorShard`** | The immutable placement contract and the physical shard references. A shard is a partition of the index; the layout records how records are placed.                                                                                                       |
-| **`IndexMaterialization`**         | A verified binding of one collection revision and profile combination to exact physical generations in one layout. It identifies the searchable data required for that revision.                                                                          |
-| **`PipelineIndexBinding`**         | An immutable reference from a pipeline version to a ready materialization. It selects existing verified index data rather than copying it into the pipeline.                                                                                              |
+| Concept | Responsibility |
+| --- | --- |
+| **`ProcessingProfile`** | Immutable parser/chunker behavior: how the source is read and divided into chunks. |
+| **`ProcessingGeneration`** | The resulting chunk evidence for a document version processed under that profile. |
+| **`EmbeddingProfile`** | Immutable vector-space configuration: semantic gateway routing, model, dimensions, normalization, and distance metric. Dimensions specify the number of values in a vector; normalization and the metric determine how vectors are prepared and compared. |
+| **`VectorGeneration`** | One immutable physical numerical execution for a document processing generation and embedding profile. It owns its record IDs and frozen manifest evidence. A manifest is an inventory of expected records, identities, and verification information. |
+| **`VectorIndex`** | The application’s profile-specific search resource. It is not necessarily one physical Chroma collection. |
+| **`VectorLayout` / `VectorShard`** | The immutable placement contract and the physical shard references. A shard is a partition of the index; the layout records how records are placed. |
+| **`IndexMaterialization`** | A verified binding of one collection revision and profile combination to exact physical generations in one layout. It identifies the searchable data required for that revision. |
+| **`PipelineIndexBinding`** | An immutable reference from a pipeline version to a ready materialization. It selects existing verified index data rather than copying it into the pipeline. |
 
 #### Keep ownership with the responsible module
 
@@ -63,13 +59,13 @@ The project/build selects the profiles. The application creates the document ver
 
 Creating a profile records it in PostgreSQL and queues asynchronous provisioning. **Provisioning** prepares the required infrastructure/configuration for later use. It does not create Chroma state inside the profile-creation transaction and does not immediately re-embed the whole project.
 
-| Change                                                                                                   | Required behavior                                                                                                                                                      |
-| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Create an additional profile**                                                                         | Record and provision it asynchronously. Index data under it on demand, rather than silently multiplying model cost and memory use.                                     |
+| Change | Required behavior |
+| --- | --- |
+| **Create an additional profile** | Record and provision it asynchronously. Index data under it on demand, rather than silently multiplying model cost and memory use. |
 | **Change the embedding model, dimensions, normalization, distance metric, or semantic gateway behavior** | Create a new immutable embedding profile. Semantic behavior means what vectors the configured connection/model produces, not merely which credential permits the call. |
-| **Rotate a credential without changing semantics**                                                       | Do not create a new embedding profile solely because the secret changed.                                                                                               |
-| **Change the processing profile**                                                                        | Produce new chunks and embeddings where required, reusing the original unchanged source bytes rather than requiring another upload.                                    |
-| **Change only the prompt with the same collection revision and profiles**                                | Reuse the ready materialization.                                                                                                                                       |
+| **Rotate a credential without changing semantics** | Do not create a new embedding profile solely because the secret changed. |
+| **Change the processing profile** | Produce new chunks and embeddings where required, reusing the original unchanged source bytes rather than requiring another upload. |
+| **Change only the prompt with the same collection revision and profiles** | Reuse the ready materialization. |
 
 The interface must distinguish source ingestion, processing, profile provisioning/vectorization, logical revision state, and materialization status. They are not one undifferentiated “ready” flag.
 
@@ -92,11 +88,11 @@ A physical generation has a separate, never-reused **incarnation ID** identifyin
 
 **Compatible inputs allow reuse of existing output; they do not permit overwriting that output with a fresh model response.**
 
-| Operation                                                   | Identity rule                                                                                                                                       |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Reuse compatible ready output**                           | Select the existing physical generation.                                                                                                            |
-| **Retry a captured write**                                  | Use the same sealed payload and physical record IDs. A sealed payload is the exact write data saved before dispatch and kept unchanged for retries. |
-| **Execute the model again and obtain new numerical output** | Use a fresh physical generation identity and corresponding record IDs. Never overwrite retained records under the semantic reuse key.               |
+| Operation | Identity rule |
+| --- | --- |
+| **Reuse compatible ready output** | Select the existing physical generation. |
+| **Retry a captured write** | Use the same sealed payload and physical record IDs. A sealed payload is the exact write data saved before dispatch and kept unchanged for retries. |
+| **Execute the model again and obtain new numerical output** | Use a fresh physical generation identity and corresponding record IDs. Never overwrite retained records under the semantic reuse key. |
 
 A logical revision, prompt change, or pipeline ID is not part of vector identity. This is what lets compatible revisions and pipeline versions share existing numerical records.
 
@@ -129,10 +125,10 @@ Each materialization records exact generation references, expected and verified 
 
 Verification has two related responsibilities:
 
-| What is being verified?              | Required evidence                                                                                                                                                                      |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A new physical vector generation** | Check the actual numerical records against their frozen payload. An expected hash copied into record metadata is not proof that the stored vector matches.                             |
-| **A new materialization**            | Initially read all expected IDs, immutable metadata, and placement in bounded pages. Reuse already-verified numerical-generation evidence and perform targeted checks of actual bytes. |
+| What is being verified? | Required evidence |
+| --- | --- |
+| **A new physical vector generation** | Check the actual numerical records against their frozen payload. An expected hash copied into record metadata is not proof that the stored vector matches. |
+| **A new materialization** | Initially read all expected IDs, immutable metadata, and placement in bounded pages. Reuse already-verified numerical-generation evidence and perform targeted checks of actual bytes. |
 
 A **bounded page** limits the amount read at once. It avoids loading the entire inventory into memory without skipping required verification.
 
@@ -150,11 +146,11 @@ Let **D** be the number of document-version memberships and **N** the number of 
 
 Start with pipeline **v1**, collection revision **A**, and prompt **P1**. Its materialization is complete and ready.
 
-| Version | Change                                                          | Indexing behavior                                                                                                                 |
-| ------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **v1**  | Revision A with prompt P1.                                      | Uses A’s ready materialization under the selected profiles.                                                                       |
-| **v2**  | Keep revision A and the same profiles; change the prompt to P2. | Reuses A’s materialization. No new embeddings are needed for this prompt-only change.                                             |
-| **v3**  | Change one source document and select the resulting revision B. | Reuses unchanged ready generations and prepares the changed document’s chunks and vectors, then verifies B’s full expected scope. |
+| Version | Change | Indexing behavior |
+| --- | --- | --- |
+| **v1** | Revision A with prompt P1. | Uses A’s ready materialization under the selected profiles. |
+| **v2** | Keep revision A and the same profiles; change the prompt to P2. | Reuses A’s materialization. No new embeddings are needed for this prompt-only change. |
+| **v3** | Change one source document and select the resulting revision B. | Reuses unchanged ready generations and prepares the changed document’s chunks and vectors, then verifies B’s full expected scope. |
 
 For v3, the durable build freezes revision B, its profiles, and its requested configuration. Later edits do not change those inputs while the build runs.
 
@@ -168,13 +164,13 @@ A reserved pending version ID is not a pipeline that can serve requests. Buildin
 
 A ready materialization records that its build passed verification. It does not prove that storage will remain healthy forever.
 
-| Situation                                                              | Required behavior                                                                                                           |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Backend outage, missing published records, or integrity conflict**   | Make the affected dependencies unavailable. Historical readiness does not authorize serving from damaged or missing data.   |
-| **An unrelated candidate’s immutable insert has an uncertain outcome** | Keep healthy existing generations available. Do not mark the entire healthy index unavailable or force a Chroma restart.    |
-| **Safe candidate-write retry**                                         | Retry the same frozen IDs and bytes within the configured budget. Current release A can continue while candidate B retries. |
-| **Retry budget exhausted**                                             | Fail B’s job visibly, retaining its identity and exhausted-budget reason. An explicit safe resume follows ADR-0007.         |
-| **Published numerical data is missing**                                | Use backup/restore or intervention. Do not silently reconstruct the index by calling the embedding model again.             |
+| Situation | Required behavior |
+| --- | --- |
+| **Backend outage, missing published records, or integrity conflict** | Make the affected dependencies unavailable. Historical readiness does not authorize serving from damaged or missing data. |
+| **An unrelated candidate’s immutable insert has an uncertain outcome** | Keep healthy existing generations available. Do not mark the entire healthy index unavailable or force a Chroma restart. |
+| **Safe candidate-write retry** | Retry the same frozen IDs and bytes within the configured budget. Current release A can continue while candidate B retries. |
+| **Retry budget exhausted** | Fail B’s job visibly, retaining its identity and exhausted-budget reason. An explicit safe resume follows ADR-0007. |
+| **Published numerical data is missing** | Use backup/restore or intervention. Do not silently reconstruct the index by calling the embedding model again. |
 
 An uncertain insert means its response did not establish whether Chroma completed it. Because the payload is immutable, any earlier accepted insert and its safe retry carry the same generation data.
 
@@ -274,15 +270,15 @@ The representation avoids writes to unchanged vectors. It still has **O(D)** aut
 
 #### Provisional qualification target
 
-| Dimension                         | Proposed test workload                                                      |
-| --------------------------------- | --------------------------------------------------------------------------- |
-| **Current documents**             | 25,000.                                                                     |
-| **Current chunks**                | Approximately 500,000.                                                      |
-| **Profile scope**                 | One profile, within the one-processing/one-embedding-profile pipeline rule. |
-| **Retained collection revisions** | Three.                                                                      |
-| **Physical shards**               | Two.                                                                        |
-| **Concurrent requests**           | Five.                                                                       |
-| **Proposed host**                 | 64 GiB RAM and 16 vCPUs.                                                    |
+| Dimension | Proposed test workload |
+| --- | --- |
+| **Current documents** | 25,000. |
+| **Current chunks** | Approximately 500,000. |
+| **Profile scope** | One profile, within the one-processing/one-embedding-profile pipeline rule. |
+| **Retained collection revisions** | Three. |
+| **Physical shards** | Two. |
+| **Concurrent requests** | Five. |
+| **Proposed host** | 64 GiB RAM and 16 vCPUs. |
 
 These are **qualification targets, not performance guarantees**. ADR-0004 defines the calculations, benchmark phases, tentative numerical goals, and criteria for stopping or reconsidering the design. Its separate modest local trial is not a production-capacity benchmark.
 
@@ -304,16 +300,16 @@ A collection may have several profile-specific materializations available. **The
 
 These are implementation acceptance requirements, not completed test results.
 
-| Area                                  | Required verification                                                                                                                                                                                   |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Source/profile independence**       | Admit a source once and reuse it across compatible processing/embedding work. Provision profiles asynchronously without requiring the corpus to be uploaded again.                                      |
-| **Binding compatibility**             | Reject incompatible profiles/layouts. A pipeline cannot serve while any required shard or materialization is incomplete.                                                                                |
-| **Reuse without historical mutation** | Prompt-only changes reuse ready materializations. Membership-only changes write zero surviving vector records and leave historical hashes unchanged.                                                    |
-| **Physical identity**                 | Record IDs include the execution incarnation. A new numerical response never overwrites retained records under an existing semantic reuse key.                                                          |
-| **Retry and publication**             | Lost insert responses and worker crashes retry frozen bytes within budgets, preserve healthy current serving, and cannot publish stale-attempt or partial candidates.                                   |
-| **Authorized retrieval**              | Generation filters combine exact membership with current permissions. Forged identities, empty scopes, and revoked groups cannot broaden retrieval or evidence access.                                  |
-| **Retention and erasure**             | Query pins prevent ordinary garbage-collection races. Tombstoned generations never become live again, and unresolved late writes remain visibly pending physical cleanup.                               |
-| **Shards and measured limits**        | Exercise the same paths with one- and two-shard fixtures. Fail required-shard errors explicitly, and pass complete lifecycle, resource, and recall tests before publishing a supported operating range. |
+| Area | Required verification |
+| --- | --- |
+| **Source/profile independence** | Admit a source once and reuse it across compatible processing/embedding work. Provision profiles asynchronously without requiring the corpus to be uploaded again. |
+| **Binding compatibility** | Reject incompatible profiles/layouts. A pipeline cannot serve while any required shard or materialization is incomplete. |
+| **Reuse without historical mutation** | Prompt-only changes reuse ready materializations. Membership-only changes write zero surviving vector records and leave historical hashes unchanged. |
+| **Physical identity** | Record IDs include the execution incarnation. A new numerical response never overwrites retained records under an existing semantic reuse key. |
+| **Retry and publication** | Lost insert responses and worker crashes retry frozen bytes within budgets, preserve healthy current serving, and cannot publish stale-attempt or partial candidates. |
+| **Authorized retrieval** | Generation filters combine exact membership with current permissions. Forged identities, empty scopes, and revoked groups cannot broaden retrieval or evidence access. |
+| **Retention and erasure** | Query pins prevent ordinary garbage-collection races. Tombstoned generations never become live again, and unresolved late writes remain visibly pending physical cleanup. |
+| **Shards and measured limits** | Exercise the same paths with one- and two-shard fixtures. Fail required-shard errors explicitly, and pass complete lifecycle, resource, and recall tests before publishing a supported operating range. |
 
 These responsibilities belong inside the modular application. Separate lifecycle states, asynchronous work, temporary retry storage, and cleanup evidence are not a reason to introduce an event bus, event sourcing, or a second search engine prematurely.
 
@@ -357,14 +353,14 @@ The following approaches are excluded, superseded, or deferred by this decision.
 
 ## References
 
-| Reference                                                                             | Responsibility                                                                                                  |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [Canonical architecture guide](../ARCHITECTURE.md)                                    | Overall product architecture and the relationship between ingestion, indexing, pipelines, and serving.          |
-| [ADR-0003: Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md)         | Immutable source/configuration lineage and separate physical numerical identities.                              |
+| Reference | Responsibility |
+| --- | --- |
+| [Canonical architecture guide](../ARCHITECTURE.md) | Overall product architecture and the relationship between ingestion, indexing, pipelines, and serving. |
+| [ADR-0003: Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md) | Immutable source/configuration lineage and separate physical numerical identities. |
 | [ADR-0004: Vector protocol](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md) | Exact writes/retries, verification, layouts, query filters, retention gates, cleanup, and qualification limits. |
-| [ADR-0005: Authorization](ADR-0005-api-enforced-tenancy-and-authorization.md)         | Current application permissions, document groups, and fixed integration authority.                              |
-| [ADR-0006: Model gateway](ADR-0006-byok-provider-boundary.md)                         | Model-call routing and the distinction between semantic configuration and credentials.                          |
-| [ADR-0007: Durable jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md)           | Job identity, bounded retries, ownership, failure, and explicit safe resume.                                    |
-| [ADR-0009: Releases](ADR-0009-sticky-logical-canary-deployments.md)                   | Serving transitions, expected Deployment revisions, and rollback availability.                                  |
-| [ADR-0016: Processing](ADR-0016-docling-processing-and-cross-encoder-reranking.md)    | Supported processing profiles, source-to-chunk work, and reranking.                                             |
-| [ADR-0019: Default onboarding](ADR-0019-default-onboarding-and-first-publication.md)  | Default setup and authorized automatic-update callers of the ordinary build/release operations.                 |
+| [ADR-0005: Authorization](ADR-0005-api-enforced-tenancy-and-authorization.md) | Current application permissions, document groups, and fixed integration authority. |
+| [ADR-0006: Model gateway](ADR-0006-byok-provider-boundary.md) | Model-call routing and the distinction between semantic configuration and credentials. |
+| [ADR-0007: Durable jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Job identity, bounded retries, ownership, failure, and explicit safe resume. |
+| [ADR-0009: Releases](ADR-0009-sticky-logical-canary-deployments.md) | Serving transitions, expected Deployment revisions, and rollback availability. |
+| [ADR-0016: Processing](ADR-0016-docling-processing-and-cross-encoder-reranking.md) | Supported processing profiles, source-to-chunk work, and reranking. |
+| [ADR-0019: Default onboarding](ADR-0019-default-onboarding-and-first-publication.md) | Default setup and authorized automatic-update callers of the ordinary build/release operations. |

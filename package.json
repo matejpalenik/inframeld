@@ -25,12 +25,22 @@
       "path": "cz-conventional-changelog"
     }
   },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,jsonc,css,scss,less,md,mdx,yaml,yml}": [
+      "pnpm exec prettier --write"
+    ],
+    "apps/backend/**/*.py": [
+      "uv run --project apps/backend ruff check --fix",
+      "uv run --project apps/backend ruff format"
+    ]
+  },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
     "commitizen": "^4.3.2",
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "turbo": "^2.10.13"

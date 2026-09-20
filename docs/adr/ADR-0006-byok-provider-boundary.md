@@ -1,15 +1,12 @@
 # ADR-0006: OSS model gateway, BYOK, and custom endpoints
 
-**Status:** Accepted — gateway boundary, OSS scope, persistent application-entered provider credentials, and PostgreSQL/PyNaCl credential storage. Implementation tests remain necessary.
-**Revised:** 19 September 2026.
-**Required approach:** One application-owned gateway for every LLM call; custom endpoints and customer-supplied credentials available in OSS.
-**Related:** [Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md), [evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md), [ingestion](ADR-0010-secure-document-ingestion-boundary.md).
+**Status:** Accepted — gateway boundary, OSS scope, persistent application-entered provider credentials, and PostgreSQL/PyNaCl credential storage. Implementation tests remain necessary. **Revised:** 19 September 2026. **Required approach:** One application-owned gateway for every LLM call; custom endpoints and customer-supplied credentials available in OSS. **Related:** [Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md), [evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md), [ingestion](ADR-0010-secure-document-ingestion-boundary.md).
 
 ## Context
 
 Inframeld needs models for several tasks. A **generation model** produces an answer from instructions and retrieved evidence. An **embedding model** converts text into numerical vectors used for similarity search. Evaluation also uses a **faithfulness judge**: a model that checks whether an answer is supported by its supplied evidence.
 
-These tasks may use a public provider, a local model, or a customer's private model gateway. **BYOK**, or *bring your own key*, means the customer supplies the credentials needed to use their provider rather than depending on a provider account funded by Inframeld.
+These tasks may use a public provider, a local model, or a customer's private model gateway. **BYOK**, or _bring your own key_, means the customer supplies the credentials needed to use their provider rather than depending on a provider account funded by Inframeld.
 
 From first principles, each model call needs a defined operation, an approved destination, and the appropriate credentials. Those responsibilities remain the same whether the call generates a customer answer, embeds a document, or judges an evaluation result. Letting each feature configure its own provider client would make it possible to bypass the shared endpoint, credential, and retry rules.
 
@@ -27,14 +24,14 @@ A **port** is an application-owned interface describing a capability the applica
 
 `ModelGateway` is the typed port for chat/generation and embeddings. Its requests and results have defined application types rather than requiring business modules to work directly with provider clients.
 
-| Operation                                         | Required path                                                                            |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Generate an answer to a user query**            | Generation through `ModelGateway`.                                                       |
-| **Embed a query for search**                      | Embeddings through `ModelGateway`.                                                       |
+| Operation | Required path |
+| --- | --- |
+| **Generate an answer to a user query** | Generation through `ModelGateway`. |
+| **Embed a query for search** | Embeddings through `ModelGateway`. |
 | **Embed document chunks while building an index** | Embeddings through `ModelGateway`. A chunk is a document excerpt prepared for retrieval. |
-| **Generate answers during an evaluation**         | Generation through `ModelGateway`.                                                       |
-| **Run the v1 faithfulness judge**                 | A model call through `ModelGateway`, even when an evaluation library coordinates it.     |
-| **Classify content using an LLM**                 | The same gateway rule applies whenever classification uses a large language model (LLM). |
+| **Generate answers during an evaluation** | Generation through `ModelGateway`. |
+| **Run the v1 faithfulness judge** | A model call through `ModelGateway`, even when an evaluation library coordinates it. |
+| **Classify content using an LLM** | The same gateway rule applies whenever classification uses a large language model (LLM). |
 
 The initial path is:
 
@@ -77,12 +74,12 @@ Credentials are separate, replaceable capabilities associated with the connectio
 
 An endpoint's **origin** is its scheme, hostname, and port. Its base path identifies the API path beneath that origin.
 
-| Change                                                        | Required behavior                                                                                                                                                                               |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Rotate a credential without changing model semantics**      | Preserve connection and pipeline lineage. The replacement credential does not inherit the old role-validation status.                                                                           |
-| **Change embedding semantics**                                | Create a new embedding profile and materialization rather than change the meaning of existing vectors. A materialization is the prepared searchable index for the selected inputs and profiles. |
-| **Change the chat model, prompt, or retrieval configuration** | Create a new pipeline version.                                                                                                                                                                  |
-| **Change the endpoint origin**                                | Create a new connection and require explicit credential entry. Never forward an existing key to the new origin implicitly.                                                                      |
+| Change | Required behavior |
+| --- | --- |
+| **Rotate a credential without changing model semantics** | Preserve connection and pipeline lineage. The replacement credential does not inherit the old role-validation status. |
+| **Change embedding semantics** | Create a new embedding profile and materialization rather than change the meaning of existing vectors. A materialization is the prepared searchable index for the selected inputs and profiles. |
+| **Change the chat model, prompt, or retrieval configuration** | Create a new pipeline version. |
+| **Change the endpoint origin** | Create a new connection and require explicit credential entry. Never forward an existing key to the new origin implicitly. |
 
 An **embedding profile** records the model identity or alias, connection revision, dimensions, normalization, and distance metric. Dimensions specify how many numerical values each embedding contains; normalization and the metric define how those vectors are prepared and compared.
 
@@ -94,13 +91,13 @@ A gateway alias can change outside Inframeld. Recording the alias identifies wha
 
 ### 4. Approve endpoint destinations before allowing model calls
 
-Supporting customer endpoints creates an **SSRF**, or *server-side request forgery*, boundary. The application must not let an ordinary caller turn a model request into an arbitrary outbound request from the server.
+Supporting customer endpoints creates an **SSRF**, or _server-side request forgery_, boundary. The application must not let an ordinary caller turn a model request into an arbitrary outbound request from the server.
 
 There are two distinct configuration responsibilities:
 
-| Who                          | What they may configure                                                                    |
-| ---------------------------- | ------------------------------------------------------------------------------------------ |
-| **Deployment administrator** | Approves the allowed endpoint origins through deployment configuration.                    |
+| Who | What they may configure |
+| --- | --- |
+| **Deployment administrator** | Approves the allowed endpoint origins through deployment configuration. |
 | **Authorized project owner** | Creates a connection within that deployment policy. A project connection cannot expand it. |
 
 A query or evaluation selects configured model access; **it cannot supply its own endpoint URL**.
@@ -109,17 +106,17 @@ This allows private Enterprise or other customer endpoints without granting ordi
 
 #### Validate both the configured URL and the actual destination
 
-| Boundary                      | Required behavior                                                                                                                                                                                                                   |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **URL structure**             | Validate the scheme, hostname, port, and normalized base path. Also validate the actual destination, not just the displayed URL.                                                                                                    |
-| **Remote transport**          | Require TLS certificate verification. TLS protects the connection and verifies the endpoint's certificate. Mount a customer certificate authority (CA) when its private service requires custom trust; do not disable verification. |
-| **Local HTTP exception**      | Explicitly operator-approved local Ollama over HTTP is a narrow exception. It is not permission to use unverified remote endpoints.                                                                                                 |
-| **Credentials in URLs**       | Reject URL user-info, such as an embedded username/password, and credential-bearing query strings.                                                                                                                                  |
-| **Redirects**                 | Reject redirects to a different origin.                                                                                                                                                                                             |
-| **Forbidden destinations**    | Reject link-local and cloud-metadata addresses. These are not made acceptable merely by supporting private endpoints.                                                                                                               |
-| **Private networks**          | Permit private address ranges only through explicit deployment allowlisting. A blanket ban on private addresses would prevent the approved customer-gateway use case.                                                               |
-| **Caller-controlled proxies** | Do not accept arbitrary proxy settings from API callers.                                                                                                                                                                            |
-| **DNS and network routing**   | Revalidate destinations resolved through the Domain Name System (DNS), and enforce the permitted route through host/network egress restrictions.                                                                                    |
+| Boundary | Required behavior |
+| --- | --- |
+| **URL structure** | Validate the scheme, hostname, port, and normalized base path. Also validate the actual destination, not just the displayed URL. |
+| **Remote transport** | Require TLS certificate verification. TLS protects the connection and verifies the endpoint's certificate. Mount a customer certificate authority (CA) when its private service requires custom trust; do not disable verification. |
+| **Local HTTP exception** | Explicitly operator-approved local Ollama over HTTP is a narrow exception. It is not permission to use unverified remote endpoints. |
+| **Credentials in URLs** | Reject URL user-info, such as an embedded username/password, and credential-bearing query strings. |
+| **Redirects** | Reject redirects to a different origin. |
+| **Forbidden destinations** | Reject link-local and cloud-metadata addresses. These are not made acceptable merely by supporting private endpoints. |
+| **Private networks** | Permit private address ranges only through explicit deployment allowlisting. A blanket ban on private addresses would prevent the approved customer-gateway use case. |
+| **Caller-controlled proxies** | Do not accept arbitrary proxy settings from API callers. |
+| **DNS and network routing** | Revalidate destinations resolved through the Domain Name System (DNS), and enforce the permitted route through host/network egress restrictions. |
 
 **A one-time hostname string check is insufficient.** A hostname can resolve to a different destination later. Application validation and network restrictions must enforce the approved route together.
 
@@ -191,13 +188,13 @@ A retry is not made safe merely because a library performs it. Application modul
 
 Using a customer-managed gateway does not remove the need to explain what is sent. Display the actual connection, operation, and data path.
 
-| Activity                                   | Data path that must be disclosed                                                                                                                                            |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Build an index using OpenAI embeddings** | Newly embedded chunk text is sent to OpenAI. Across the build, this may cover the whole corpus—the selected body of documents.                                              |
-| **Ask a question**                         | The question is sent for embedding. Selected permitted excerpts and instructions are sent to the configured generation endpoint.                                            |
-| **Run the faithfulness judge**             | The configured question, answer, and evidence go through `ModelGateway` to the judge connection. These are additional model operations that must be explicitly disclosed.   |
-| **Store and search in Chroma**             | Chroma receives embeddings and the configured chunk text/metadata. Local Chroma keeps them on the self-hosted server; future Chroma Cloud is a separate external processor. |
-| **Use a local model endpoint**             | Model processing stays within the configured local environment. Identity setup or model-asset setup may still involve network activity.                                     |
+| Activity | Data path that must be disclosed |
+| --- | --- |
+| **Build an index using OpenAI embeddings** | Newly embedded chunk text is sent to OpenAI. Across the build, this may cover the whole corpus—the selected body of documents. |
+| **Ask a question** | The question is sent for embedding. Selected permitted excerpts and instructions are sent to the configured generation endpoint. |
+| **Run the faithfulness judge** | The configured question, answer, and evidence go through `ModelGateway` to the judge connection. These are additional model operations that must be explicitly disclosed. |
+| **Store and search in Chroma** | Chroma receives embeddings and the configured chunk text/metadata. Local Chroma keeps them on the self-hosted server; future Chroma Cloud is a separate external processor. |
+| **Use a local model endpoint** | Model processing stays within the configured local environment. Identity setup or model-asset setup may still involve network activity. |
 
 **Do not describe all local use as universally “no egress.”** The claim must match the actual installation and operation, not just the fact that one model endpoint is local.
 
@@ -207,15 +204,15 @@ The local processing ports described earlier do not change this rule: any future
 
 Choose and pin the LiteLLM release during implementation, then verify the behavior against that release. This ADR does not pin an untested SDK version.
 
-| Area                            | Required verification                                                                                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Private endpoint support**    | Exercise an OpenAI-compatible private test server using a custom CA and configured egress allowlists.                                                              |
-| **Provider mappings**           | Exercise the selected OpenAI and Ollama mappings through the embedded adapter.                                                                                     |
-| **Response validation**         | Reject malformed or incompatible responses, wrong embedding dimensions, non-finite values, invalid identities, and unsupported operations.                         |
-| **Independent role validation** | Verify chat and embeddings separately. Successful generation must not be treated as proof of working embeddings or correct dimensions.                             |
-| **Credential lifecycle**        | Test persistent storage and rotation. Replacing/removing a credential invalidates old role-validation status without rewriting pipeline semantics.                 |
-| **No implicit rerouting**       | Verify that missing credentials and provider failures do not select another provider/model, and that an origin change does not implicitly forward an existing key. |
-| **Gateway ownership**           | Test evaluator attempts to bypass `ModelGateway`; no independent provider client or framework retry may evade the shared rules.                                    |
+| Area | Required verification |
+| --- | --- |
+| **Private endpoint support** | Exercise an OpenAI-compatible private test server using a custom CA and configured egress allowlists. |
+| **Provider mappings** | Exercise the selected OpenAI and Ollama mappings through the embedded adapter. |
+| **Response validation** | Reject malformed or incompatible responses, wrong embedding dimensions, non-finite values, invalid identities, and unsupported operations. |
+| **Independent role validation** | Verify chat and embeddings separately. Successful generation must not be treated as proof of working embeddings or correct dimensions. |
+| **Credential lifecycle** | Test persistent storage and rotation. Replacing/removing a credential invalidates old role-validation status without rewriting pipeline semantics. |
+| **No implicit rerouting** | Verify that missing credentials and provider failures do not select another provider/model, and that an origin change does not implicitly forward an existing key. |
+| **Gateway ownership** | Test evaluator attempts to bypass `ModelGateway`; no independent provider client or framework retry may evade the shared rules. |
 
 These are acceptance requirements, not claims that implementation qualification has already passed.
 
@@ -223,15 +220,15 @@ These are acceptance requirements, not claims that implementation qualification 
 
 ### Positive
 
-* **Model access has one application-owned boundary.** Generation, embeddings, classification using an LLM, and evaluation calls follow the same connection, credential, and retry rules rather than maintaining competing provider integrations.
-* **Customers can use their own infrastructure in OSS.** Public providers, approved private gateways, local endpoints, custom CA trust, and customer credentials do not require an EE license, a separate proxy service, or an Inframeld-funded provider account.
-* **Credential maintenance does not rewrite configuration history.** Immutable connection revisions preserve model meaning, while credentials can be replaced separately. Embedding and generation can share a connection without duplicate credential entry when their origin and authentication match.
+- **Model access has one application-owned boundary.** Generation, embeddings, classification using an LLM, and evaluation calls follow the same connection, credential, and retry rules rather than maintaining competing provider integrations.
+- **Customers can use their own infrastructure in OSS.** Public providers, approved private gateways, local endpoints, custom CA trust, and customer credentials do not require an EE license, a separate proxy service, or an Inframeld-funded provider account.
+- **Credential maintenance does not rewrite configuration history.** Immutable connection revisions preserve model meaning, while credentials can be replaced separately. Embedding and generation can share a connection without duplicate credential entry when their origin and authentication match.
 
 ### Negative
 
-* **Custom endpoint support requires security and compatibility work.** URL checks alone are insufficient, and an OpenAI-compatible label does not prove every required operation works. Destination enforcement, custom trust, capability probes, and response validation must be implemented and tested.
-* **Persistent credentials create storage and operational responsibilities.** The encrypted adapter, persistent deployment key, authorized management operations, and secret-free jobs/logs/responses all need verification. Rotation can invalidate a role's previously working access.
-* **Availability cannot be preserved by silently changing the request.** Missing credentials, incompatible responses, or provider failures remain visible failures rather than triggering another model. A recorded external alias also cannot guarantee an unchanged underlying model.
+- **Custom endpoint support requires security and compatibility work.** URL checks alone are insufficient, and an OpenAI-compatible label does not prove every required operation works. Destination enforcement, custom trust, capability probes, and response validation must be implemented and tested.
+- **Persistent credentials create storage and operational responsibilities.** The encrypted adapter, persistent deployment key, authorized management operations, and secret-free jobs/logs/responses all need verification. Rotation can invalidate a role's previously working access.
+- **Availability cannot be preserved by silently changing the request.** Missing credentials, incompatible responses, or provider failures remain visible failures rather than triggering another model. A recorded external alias also cannot guarantee an unchanged underlying model.
 
 ## Alternatives considered
 
@@ -267,14 +264,14 @@ The selected implementation uses PostgreSQL/PyNaCl and a separately supplied per
 
 ### Related decisions
 
-| Reference                                                                                | Responsibility                                                                                              |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [ADR-0003: Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md)            | Immutable model/configuration lineage and the distinction between semantic changes and credential rotation. |
-| ADR-0007                                                                                 | Central retry policy, ambiguous provider calls, key-creation response exceptions, and keyed fingerprints.   |
-| [ADR-0008: Evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md)       | Faithfulness evaluation, OpenEvals, and the configurable judge selected for qualification.                  |
-| [ADR-0010: Ingestion](ADR-0010-secure-document-ingestion-boundary.md)                    | Document-processing boundaries.                                                                             |
-| [ADR-0019: Default onboarding](ADR-0019-default-onboarding-and-first-publication.md)     | Initial embedding/generation setup without a required judge role or benchmark.                              |
-| [ADR-0020: Persistent outbound credentials](ADR-0020-persistent-outbound-credentials.md) | The narrow encrypted PostgreSQL/PyNaCl credential adapter.                                                  |
+| Reference | Responsibility |
+| --- | --- |
+| [ADR-0003: Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md) | Immutable model/configuration lineage and the distinction between semantic changes and credential rotation. |
+| ADR-0007 | Central retry policy, ambiguous provider calls, key-creation response exceptions, and keyed fingerprints. |
+| [ADR-0008: Evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md) | Faithfulness evaluation, OpenEvals, and the configurable judge selected for qualification. |
+| [ADR-0010: Ingestion](ADR-0010-secure-document-ingestion-boundary.md) | Document-processing boundaries. |
+| [ADR-0019: Default onboarding](ADR-0019-default-onboarding-and-first-publication.md) | Initial embedding/generation setup without a required judge role or benchmark. |
+| [ADR-0020: Persistent outbound credentials](ADR-0020-persistent-outbound-credentials.md) | The narrow encrypted PostgreSQL/PyNaCl credential adapter. |
 
 ### Recorded external evidence
 

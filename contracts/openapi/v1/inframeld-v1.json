@@ -4,7 +4,7 @@
     "title": "Inframeld API",
     "version": "0.1.0"
   },
-  "openapi": "3.0.3",
+  "openapi": "3.2.1",
   "paths": {
     "/health": {
       "get": {

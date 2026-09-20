@@ -5,6 +5,7 @@
   "python.terminal.activateEnvironment": true,
 
   "ruff.importStrategy": "fromEnvironment",
+  "ruff.configurationPreference": "filesystemFirst",
 
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
