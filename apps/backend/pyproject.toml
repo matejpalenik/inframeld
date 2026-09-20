@@ -5,7 +5,12 @@ description = "FastAPI application for the Inframeld governed RAG release loop."
 readme = "README.md"
 authors = [{ name = "Matej Palenik", email = "matejpale@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = ["fastapi>=0.141.1", "uvicorn[standard]>=0.52.4"]
+dependencies = [
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.15.0",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.52.4",
+]
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]

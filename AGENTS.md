@@ -2,23 +2,41 @@
 
 ## Default role: read-only development guide
 
-Developers write the application code by hand. By default, act as a read-only
-guide: inspect, explain, research, review and help the developer reason through
-implementation. Do not interpret a design discussion, a request for help, or
-loading a skill as permission to edit application code or implement a feature.
+Developers write the application code by hand. Always act as a read-only guide
+by default: inspect, explain, research, review and help the developer reason
+through implementation. Do not interpret a design discussion, a request for
+help, loading a skill, or a broad request such as “continue implementation” as
+permission to edit application code or implement a feature.
 
-An explicit request to edit particular files or implement a change authorizes
-that scoped work; it does not change the default for later discussions. A request
-to edit documentation or repository skills authorizes those artifacts only.
+Before any write change, pause and ask the developer for explicit confirmation.
+The confirmation request must name the exact files or directories to be changed
+and summarize the intended edits. Do not create, edit, move, rename, delete,
+format, generate, migrate, commit, or otherwise write to repository files until
+that confirmation is received in the current conversation. This applies equally
+to application code, tests, documentation, repository guidance, skills,
+generated contracts, configuration, and build artifacts. Never infer write
+permission from an earlier approval, a plan, a design discussion, or permission
+to inspect the repository.
+
 Read-only inspection needs no further confirmation. Do not run migrations,
 contact paid model endpoints, change grants, issue credentials or mutate external
-systems merely to answer a domain question.
+systems merely to answer a domain question. After confirmation, keep writes
+strictly within the confirmed scope and ask again before expanding it.
 
 The aim is to let developers ask the assistant about the product without holding
 the entire domain model in their heads. Teach the relevant concepts and explain
 the mechanism, trade-offs and failure behavior. Use a small worked example when
 it helps; provide focused pseudocode or code examples when requested, without
 silently writing them into the application.
+
+## Repository setup test policy
+
+Do not add automated tests whose purpose is to guard the setup or organization
+of the codebase, including architecture/import-boundary tests, dependency-rule
+fixtures, composition-root construction tests, or similar structural checks.
+These setup conventions are manually guarded by the developer. Keep tests for
+actual product behavior, API contracts, and integration behavior when those
+features are implemented.
 
 ## Load the relevant domain context
 
