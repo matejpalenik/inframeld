@@ -188,7 +188,7 @@ Answer feedback is part of v1. Its ownership follows the existing business bound
 
 The detailed feedback contract is accepted in [ADR-0017](ADR-0017-answer-feedback.md).
 
-### 7. Default onboarding coordinates existing application behavior
+### 7. Default onboarding and publication modes use existing application behavior
 
 The default first-use experience is:
 
@@ -198,15 +198,27 @@ Configure models -> Upload documents -> Ask a question
 
 This uses the ordinary resources owned by Access, Knowledge, Indexing, Pipelines, and Releases. It does not create a parallel, simplified implementation of the product.
 
-The first-use coordinator described in [ADR-0019](ADR-0019-default-onboarding-and-first-publication.md) is accepted. It:
+[ADR-0019](ADR-0019-default-onboarding-and-first-publication.md) accepts reversible **Automatic updates** and **Manual releases** for each Deployment. The default onboarding path starts automatic. An explicitly created Deployment starts manual unless its creator chooses automatic. The mode belongs to the Deployment, so two endpoints using the same Pipeline can have different release controls.
 
-1. **Freezes the initial intent:** records a fixed first-use request for the work being started.
-2. **Calls the ordinary build behavior:** uses the same application operations as other builds.
-3. **Separately requests conditional first publication:** asks for the first version to be published only when the required conditions hold.
+#### Automatic updates compose normal build and release operations
 
-Building and publishing remain separate operations. The coordinator connects them for first use; it is not a seventh business domain, an alternative retriever, or a general workflow engine.
+A completed, authorized upload batch or explicit **Save and apply** action freezes a complete corpus and the selected configuration. Application code records that update through the existing durable jobs, calls the ordinary build behavior, and then separately asks Releases to publish the ready result. The actor needs the relevant source/configuration permissions and build/deploy authority for the selected target; automatic mode grants no additional rights.
 
-A **project-default binding** records which existing resource the project uses by default. These bindings are small, project-scoped application configuration.
+**A successful build establishes readiness, not permission to change traffic.** Releases checks that Automatic updates is still selected, along with current authorization, readiness, deletion state, job ownership, the captured control and serving revisions, the newest authorized update identity, and the absence of an attached candidate before committing publication and history together. A failed or superseded update leaves the healthy serving version unchanged. Failure of newer work cannot revive an older update's publication authority.
+
+For example, replacing one document can prepare P13 while P12 continues serving. The automatic update can publish P13 only after its complete build succeeds and those release checks still pass. This same application composition supports first publication and later updates; there is no separate Prepare and ask command, first-use-only coordinator, or workflow engine.
+
+#### Switching modes preserves the endpoint and its history
+
+Switching to **Manual releases** leaves the current version serving and invalidates pending automatic publication. A build may still finish and produce reusable ready artifacts. The **Enable automatic updates and apply pending changes** action freezes the displayed inputs into a fresh authorized request; it never restores an old job's authority. The current version remains available while that request is prepared. These commands use idempotency and expected-revision checks, and each successful mode switch advances the publication control revision.
+
+An attached candidate, even at 0% traffic, blocks enabling automation. Candidate attachment, canaries, promotion, rejection and rollback require manual mode. Rollback leaves the Deployment manual. Explicit comparisons remain available in either mode, but neither evaluation scores nor answer feedback authorize publication.
+
+#### Defaults identify ordinary resources without inventing readiness
+
+A **project-default binding** records stable resource IDs as small, project-scoped application configuration. Before a real Deployment exists, it also holds the selected publication mode and control revision, and the logical default route reports not ready. First successful publication creates a Deployment with one genuinely ready current version, no candidate and no previous target, transferring control state from the binding atomically. The binding and Deployment never become independent authorities for the same mode.
+
+Knowledge still owns source membership, Indexing owns materialization readiness, Pipelines owns frozen builds and answer execution, and Releases owns traffic changes. HTTP, Studio and workers invoke these application operations rather than introducing a separate onboarding domain or retrieval path. ADR-0019 contains the detailed concurrency and transition rules.
 
 #### Persistent outbound credentials
 
