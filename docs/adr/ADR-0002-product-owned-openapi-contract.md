@@ -32,20 +32,20 @@ The source consists of FastAPI route declarations, Pydantic request and response
 
 The responsibilities are distinct:
 
-| Part                           | Responsibility                                                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| **FastAPI source**             | The authoring authority: where developers define and change the API.                                                                          |
-| **Generated OpenAPI contract** | The client authority: what each operation means and how requests, responses, authentication, and errors are represented over HTTP.            |
-| **Committed JSON artifact**    | The generated, reviewable contract included with a release. SDK generators and Studio consume it rather than defining parallel public models. |
+| Part | Responsibility |
+| --- | --- |
+| **FastAPI source** | The authoring authority: where developers define and change the API. |
+| **Generated OpenAPI contract** | The client authority: what each operation means and how requests, responses, authentication, and errors are represented over HTTP. |
+| **Committed JSON artifact** | The generated, reviewable contract included with a release. SDK generators and Studio consume it rather than defining parallel public models. |
 
 The v1 generation and publication points are:
 
-| Purpose                               | Command or location                      |
-| ------------------------------------- | ---------------------------------------- |
-| Generate the runtime schema           | `create_app().openapi()`                 |
-| Store the generated artifact in Git   | `contracts/openapi/v1/inframeld-v1.json` |
-| Serve the schema from the running API | `/v1/openapi.json`                       |
-| Regenerate the committed artifact     | `pnpm openapi`                           |
+| Purpose | Command or location |
+| --- | --- |
+| Generate the runtime schema | `create_app().openapi()` |
+| Store the generated artifact in Git | `contracts/openapi/v1/inframeld-v1.json` |
+| Serve the schema from the running API | `/v1/openapi.json` |
+| Regenerate the committed artifact | `pnpm openapi` |
 
 The JSON artifact is generated output and must not be edited by hand. Generated clients are also downstream build artifacts and must not be edited by hand.
 
@@ -80,10 +80,10 @@ These endpoints do not change product state or expose organization data, source 
 
 The API serves different callers with different authority:
 
-| Caller                                     | What it does                                                                                                                                                                                     |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Customer AI application**                | Queries a stable Deployment endpoint using its scoped integration credential. It supplies a stable affinity key for canaries and does not choose the current pipeline version itself.            |
-| **Engineer using Studio**                  | Calls authorized configuration, build, test-case, evaluation, and release operations through the same application API.                                                                           |
+| Caller | What it does |
+| --- | --- |
+| **Customer AI application** | Queries a stable Deployment endpoint using its scoped integration credential. It supplies a stable affinity key for canaries and does not choose the current pipeline version itself. |
+| **Engineer using Studio** | Calls authorized configuration, build, test-case, evaluation, and release operations through the same application API. |
 | **Optional customer or future automation** | May call supported operations when explicitly granted the necessary build, evaluate, or deploy rights. This does not require a GitHub integration, external runner, or separate workflow engine. |
 
 **Kratos authenticates engineers.** Customer applications authenticate with fixed, scoped, opaque integration credentials: secrets that identify the application without being treated as a description of its permissions.
@@ -170,11 +170,11 @@ No benchmark or judge setup is required before the first answer.
 
 #### Which publication mode is used
 
-| Situation                         | Publication mode                                                                 |
-| --------------------------------- | -------------------------------------------------------------------------------- |
-| **Default onboarding path**       | Starts in **Automatic updates**.                                                 |
+| Situation | Publication mode |
+| --- | --- |
+| **Default onboarding path** | Starts in **Automatic updates**. |
 | **Explicitly created Deployment** | Starts in **Manual releases**, unless Automatic updates is selected at creation. |
-| **Existing Deployment**           | Can switch in either direction through authorized mode commands.                 |
+| **Existing Deployment** | Can switch in either direction through authorized mode commands. |
 
 In Automatic updates, an authorized source or configuration action can request the ordinary build and conditional publication of an eligible, complete result. Publication remains a separate operation; build completion alone does not change serving pointers.
 
@@ -190,10 +190,10 @@ Creation accepts an explicit mode selection, with Manual releases as the ordinar
 
 Mode commands require an idempotency key and an expected revision:
 
-| Command                       | Required behavior                                                                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Switch to Manual releases** | Preserve the current version and invalidate pending publication.                                                                           |
-| **Enable Automatic updates**  | Validate the inputs displayed to the user and atomically admit a fresh apply request, or report that the Deployment is already up to date. |
+| Command | Required behavior |
+| --- | --- |
+| **Switch to Manual releases** | Preserve the current version and invalidate pending publication. |
+| **Enable Automatic updates** | Validate the inputs displayed to the user and atomically admit a fresh apply request, or report that the Deployment is already up to date. |
 
 Report conflicts clearly when an operation is incompatible with the mode, a candidate is active, the expected revision is stale, or a required version is not ready. Long-running work uses the existing `202` and job contract.
 
@@ -311,14 +311,14 @@ A startup and a large enterprise use the same pages and application operations. 
 
 **Admission** is the point at which Inframeld durably accepts the requested work. After that point, the backend performs the required steps without depending on an open browser.
 
-| Step                                    | Explicit engineer decision in Manual releases                                                        | Work Inframeld performs after admission                                                                                                        |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Configure and build**                 | Select the inputs to freeze and request a build.                                                     | Reuse compatible artifacts; perform missing parsing, embedding, and indexing; validate; report progress; publish readiness only when complete. |
-| **Maintain a benchmark**                | Add, edit, or remove cases and select a saved revision.                                              | Preserve snapshots used by past runs and enforce scope and validation.                                                                         |
-| **Compare**                             | Select the baseline, candidate, benchmark, and evaluator, then start the run.                        | Execute both versions, score results, retain evidence and history, aggregate comparable paired cases, and show regressions and failures.       |
-| **Canary**                              | Attach a ready version and explicitly select or change its percentage.                               | Check authorization, readiness, and concurrency; route stable cohorts; record per-version operating observations.                              |
-| **Release**                             | Explicitly promote, abort, or roll back, acknowledging missing or regressed evidence where required. | Validate the transition, atomically update pointers and audit state, protect retained dependencies, and preserve the endpoint.                 |
-| **Return after an interrupted session** | Reopen the same pipeline, job, or run; explicitly resume only recoverable failed work.               | Continue already-admitted jobs within their budgets and display durable results without silently executing them again.                         |
+| Step | Explicit engineer decision in Manual releases | Work Inframeld performs after admission |
+| --- | --- | --- |
+| **Configure and build** | Select the inputs to freeze and request a build. | Reuse compatible artifacts; perform missing parsing, embedding, and indexing; validate; report progress; publish readiness only when complete. |
+| **Maintain a benchmark** | Add, edit, or remove cases and select a saved revision. | Preserve snapshots used by past runs and enforce scope and validation. |
+| **Compare** | Select the baseline, candidate, benchmark, and evaluator, then start the run. | Execute both versions, score results, retain evidence and history, aggregate comparable paired cases, and show regressions and failures. |
+| **Canary** | Attach a ready version and explicitly select or change its percentage. | Check authorization, readiness, and concurrency; route stable cohorts; record per-version operating observations. |
+| **Release** | Explicitly promote, abort, or roll back, acknowledging missing or regressed evidence where required. | Validate the transition, atomically update pointers and audit state, protect retained dependencies, and preserve the endpoint. |
+| **Return after an interrupted session** | Reopen the same pipeline, job, or run; explicitly resume only recoverable failed work. | Continue already-admitted jobs within their budgets and display durable results without silently executing them again. |
 
 Build and Compare are separate explicit actions in Manual releases. Automatic updates can request a build and conditional publication from an authorized source/configuration action, but does not make Compare automatic.
 
@@ -371,14 +371,14 @@ The detailed contracts are defined in [ADR-0018: first-party MCP](ADR-0018-first
 
 The minimum product views are:
 
-| View                                    | Information and actions it provides                                                               |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **Pipeline configuration and versions** | Pipeline settings, versions, and build progress or failure.                                       |
-| **Pipeline tests**                      | Test cases and the saved benchmark revision.                                                      |
-| **Run history**                         | Evaluation runs associated with each pipeline version.                                            |
-| **Comparison and case detail**          | Paired results, individual case details, and case history.                                        |
-| **Deployment**                          | Current, candidate, and previous targets; cohort allocation; explicit release-transition actions. |
-| **Answer feedback**                     | The feedback panel from ADR-0017, kept distinct from offline evaluation.                          |
+| View | Information and actions it provides |
+| --- | --- |
+| **Pipeline configuration and versions** | Pipeline settings, versions, and build progress or failure. |
+| **Pipeline tests** | Test cases and the saved benchmark revision. |
+| **Run history** | Evaluation runs associated with each pipeline version. |
+| **Comparison and case detail** | Paired results, individual case details, and case history. |
+| **Deployment** | Current, candidate, and previous targets; cohort allocation; explicit release-transition actions. |
+| **Answer feedback** | The feedback panel from ADR-0017, kept distinct from offline evaluation. |
 
 These screens read projections—data shaped for a particular view—from existing domain and application owners in PostgreSQL. They do not require separate services or new owners of business state.
 
@@ -412,16 +412,16 @@ These tests protect the backend contract independently of SDK Kit. They do not w
 
 Before release, demonstrate the Support Assistant example entirely inside Inframeld while a separate customer client continues using its original endpoint.
 
-| Area                                    | What to demonstrate                                                                                        |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Browser recovery**                    | Closing and reopening Studio follows existing work without duplicating it.                                 |
-| **Immutable inputs**                    | Later edits do not change the inputs of an admitted build or run.                                          |
-| **Evaluation history**                  | Changed benchmark and evaluator identities are labeled, and partial judge failure is handled.              |
-| **Permissions**                         | Permission changes are respected, and a query-only integration cannot invoke release commands.             |
-| **Canary routing**                      | Affinity cohorts remain stable under the required integration contract.                                    |
-| **Release transitions**                 | Rejection before promotion and rollback after promotion behave correctly; unavailable targets are handled. |
-| **Concurrent operators**                | Two operators racing cannot silently overwrite one another's release decisions.                            |
-| **Evaluation versus release authority** | Passing a metric never triggers a Deployment pointer change.                                               |
+| Area | What to demonstrate |
+| --- | --- |
+| **Browser recovery** | Closing and reopening Studio follows existing work without duplicating it. |
+| **Immutable inputs** | Later edits do not change the inputs of an admitted build or run. |
+| **Evaluation history** | Changed benchmark and evaluator identities are labeled, and partial judge failure is handled. |
+| **Permissions** | Permission changes are respected, and a query-only integration cannot invoke release commands. |
+| **Canary routing** | Affinity cohorts remain stable under the required integration contract. |
+| **Release transitions** | Rejection before promotion and rollback after promotion behave correctly; unavailable targets are handled. |
+| **Concurrent operators** | Two operators racing cannot silently overwrite one another's release decisions. |
+| **Evaluation versus release authority** | Passing a metric never triggers a Deployment pointer change. |
 
 ## Consequences
 

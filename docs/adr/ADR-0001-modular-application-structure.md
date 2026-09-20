@@ -72,14 +72,14 @@ The **composition root** is the startup code that creates the concrete implement
 
 Each area owns a defined set of business facts and rules. These are bounded areas inside one codebase, not separate microservices.
 
-| Area           | What it owns                                                                                                                                                                                                                |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Knowledge**  | Source identity; document lifecycle and versions; collection revisions and their document memberships.                                                                                                                      |
-| **Indexing**   | The settings and state needed to prepare searchable indexes: processing and embedding profiles, processing generations, vectorizations, layouts, materializations, publication, and reconciliation.                         |
-| **Pipelines**  | Immutable pipeline configuration and its links to prepared indexes (materialization bindings); retrieval and generation orchestration. It also owns answer receipts and their current feedback records, as explained below. |
-| **Evaluation** | Datasets, evaluation-run evidence, metric results, and comparisons.                                                                                                                                                         |
-| **Releases**   | Deployments, candidate cohorts (groups routed to a trial version), promotion, candidate abort, and rollback.                                                                                                                |
-| **Access**     | Mapping callers to application principals; organization and project scope; permission decisions.                                                                                                                            |
+| Area | What it owns |
+| --- | --- |
+| **Knowledge** | Source identity; document lifecycle and versions; collection revisions and their document memberships. |
+| **Indexing** | The settings and state needed to prepare searchable indexes: processing and embedding profiles, processing generations, vectorizations, layouts, materializations, publication, and reconciliation. |
+| **Pipelines** | Immutable pipeline configuration and its links to prepared indexes (materialization bindings); retrieval and generation orchestration. It also owns answer receipts and their current feedback records, as explained below. |
+| **Evaluation** | Datasets, evaluation-run evidence, metric results, and comparisons. |
+| **Releases** | Deployments, candidate cohorts (groups routed to a trial version), promotion, candidate abort, and rollback. |
+| **Access** | Mapping callers to application principals; organization and project scope; permission decisions. |
 
 A **principal** is the identity the application recognizes as the caller. An **index materialization** is a concrete searchable index prepared for particular knowledge and processing/embedding settings. **Reconciliation** checks and resolves inconsistencies between the recorded index state and the actual stored state.
 
@@ -179,12 +179,12 @@ OpenEvals and configurable GPT-6 Luna are the selected evaluation adapters for q
 
 Answer feedback is part of v1. Its ownership follows the existing business boundaries:
 
-| Area           | Responsibility for answers and feedback                                                                                            |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Pipelines**  | Owns the existing `AnswerReceipt`, the record associated with a served answer, and its current `Feedback` record.                  |
-| **Releases**   | Supplies the immutable routing selection that identifies which version served the answer, and owns subsequent release transitions. |
-| **Evaluation** | Owns offline evaluation evidence, rather than production answer feedback.                                                          |
-| **Studio**     | Reads authorized projections across these records. It does not become another authority for the underlying evidence.               |
+| Area | Responsibility for answers and feedback |
+| --- | --- |
+| **Pipelines** | Owns the existing `AnswerReceipt`, the record associated with a served answer, and its current `Feedback` record. |
+| **Releases** | Supplies the immutable routing selection that identifies which version served the answer, and owns subsequent release transitions. |
+| **Evaluation** | Owns offline evaluation evidence, rather than production answer feedback. |
+| **Studio** | Reads authorized projections across these records. It does not become another authority for the underlying evidence. |
 
 The detailed feedback contract is accepted in [ADR-0017](ADR-0017-answer-feedback.md).
 
@@ -238,12 +238,12 @@ Small functions can help readability, but there is no numerical rule for an acce
 
 Tests should demonstrate business behavior, not just that methods were called. Examples include:
 
-| Scenario                                                 | Behavior to verify                     |
-| -------------------------------------------------------- | -------------------------------------- |
-| A promotion uses an outdated deployment revision.        | The stale promotion is rejected.       |
-| A materialization has not been published.                | It is unavailable for serving.         |
+| Scenario | Behavior to verify |
+| --- | --- |
+| A promotion uses an outdated deployment revision. | The stale promotion is rejected. |
+| A materialization has not been published. | It is unavailable for serving. |
 | An operation references a resource from another project. | The cross-project reference is denied. |
-| A process restarts and retries publication.              | Publication is not duplicated.         |
+| A process restarts and retries publication. | Publication is not duplicated. |
 
 Add automated dependency checks for forbidden imports and dependency cycles.
 

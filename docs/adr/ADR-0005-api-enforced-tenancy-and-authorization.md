@@ -12,9 +12,9 @@ Inframeld has two main kinds of callers: engineers using its web console, **Stud
 
 Every protected operation needs to answer two separate questions:
 
-| Question                          | Responsibility                                                                           |
-| --------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Who is calling?**               | **Authentication:** verify a human session or an application credential.                 |
+| Question | Responsibility |
+| --- | --- |
+| **Who is calling?** | **Authentication:** verify a human session or an application credential. |
 | **What may this caller do here?** | **Authorization:** check the caller's current project, action, and document permissions. |
 
 A successful login answers only the first question. Alice can have a valid session without access to the Finance project. Removing her Finance membership must remove that access even while her login remains valid.
@@ -33,12 +33,12 @@ The initial document policy uses group allowlists. Integrations act with their o
 
 An **identity provider** authenticates users. **OpenID Connect (OIDC)** is the sign-in protocol used here to connect to an external provider. An **OAuth issuer** is a different responsibility: issuing access tokens that other applications present when calling an API.
 
-| Responsibility                                    | Example                                                                                           | Selected approach                                                                                                                                      |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Manage human identity and sessions**            | Alice signs in, uses multi-factor authentication (MFA), recovers her account, or logs out.        | Kratos owns credentials and sessions. Inframeld supplies the account-screen integration.                                                               |
-| **Sign in through an external provider**          | Alice signs in through the company's configured OIDC provider and receives a Kratos session.      | Kratos acts as an OIDC **client**. Deployment-level configuration is included in open-source v1; Hydra is not required.                                |
-| **Issue OAuth/OIDC tokens to other applications** | Inframeld issues scoped access tokens, potentially for an application acting on a user's behalf.  | Hydra is the corresponding Ory **issuer**. Its deployment, login/consent integration, and token lifecycle are deferred.                                |
-| **Authenticate and authorize API clients**        | A customer application queries permitted documents, or an authorized automation builds a version. | Inframeld verifies the supported credential and applies current project, action, and document rules. This does not inherently require an OAuth server. |
+| Responsibility | Example | Selected approach |
+| --- | --- | --- |
+| **Manage human identity and sessions** | Alice signs in, uses multi-factor authentication (MFA), recovers her account, or logs out. | Kratos owns credentials and sessions. Inframeld supplies the account-screen integration. |
+| **Sign in through an external provider** | Alice signs in through the company's configured OIDC provider and receives a Kratos session. | Kratos acts as an OIDC **client**. Deployment-level configuration is included in open-source v1; Hydra is not required. |
+| **Issue OAuth/OIDC tokens to other applications** | Inframeld issues scoped access tokens, potentially for an application acting on a user's behalf. | Hydra is the corresponding Ory **issuer**. Its deployment, login/consent integration, and token lifecycle are deferred. |
+| **Authenticate and authorize API clients** | A customer application queries permitted documents, or an authorized automation builds a version. | Inframeld verifies the supported credential and applies current project, action, and document rules. This does not inherently require an OAuth server. |
 
 An OAuth token could carry bounded grants in a future implementation. It would not replace current Inframeld document policy.
 
@@ -92,12 +92,12 @@ External sign-in is optional to configure. A local trial still requires authenti
 
 #### OSS capabilities and possible EE extensions
 
-| Scope                                                                             | Treatment                                                                                                                                                                                                      |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **First-party login, project API access, and CI/CD credentials**                  | Included in OSS v1. Here CI/CD covers the application's build, evaluation, and release operations.                                                                                                             |
-| **Basic access administration needed to use group allowlists safely**             | Included in OSS v1. Basic secure operation must not depend on EE.                                                                                                                                              |
-| **Deployment-level external OIDC sign-in**                                        | Included in OSS v1; configured by the installation operator.                                                                                                                                                   |
-| **Organization-managed federation policies and per-organization providers**       | Possible later EE packaging, not an implemented or guaranteed capability.                                                                                                                                      |
+| Scope | Treatment |
+| --- | --- |
+| **First-party login, project API access, and CI/CD credentials** | Included in OSS v1. Here CI/CD covers the application's build, evaluation, and release operations. |
+| **Basic access administration needed to use group allowlists safely** | Included in OSS v1. Basic secure operation must not depend on EE. |
+| **Deployment-level external OIDC sign-in** | Included in OSS v1; configured by the installation operator. |
+| **Organization-managed federation policies and per-organization providers** | Possible later EE packaging, not an implemented or guaranteed capability. |
 | **SAML/SCIM lifecycle integration, managed operation, and additional governance** | Possible later EE packaging. SAML concerns federated identity; SCIM concerns account provisioning and lifecycle integration. Verify the selected Ory edition's actual support before promising these features. |
 
 An internal organization ownership boundary does not require a multi-organization administration product now. The documented OSS starting experience is one provisioned organization, private starter projects, and project-local groups, as described in Section 7.
@@ -122,15 +122,15 @@ Existing query integrations remain query-only unless separately granted another 
 
 Use an **opaque credential**: a high-entropy random secret that Inframeld verifies and associates with a project service principal, rather than treating it as a caller-authored identity claim.
 
-| Requirement                 | Behavior                                                                                                                |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Secret generation**       | Generate a high-entropy random secret.                                                                                  |
-| **Stored representation**   | Store only a cryptographic verifier/hash, a safe identifier, and a safe display prefix—not the plaintext credential.    |
-| **Lifetime**                | Credentials expire and can be revoked. Check expiry, revocation, and current scope on every request.                    |
-| **Action grants**           | Select `query`, `build`, `evaluate`, and `deploy` explicitly. A query grant does not imply any of the others.           |
-| **Document scope**          | A query integration has an explicit document-group **ceiling**: the maximum document-group scope its authority permits. |
-| **Ordinary CI permissions** | Exclude membership administration and provider-secret access.                                                           |
-| **Issuance**                | Follow the show-once secret behavior in [ADR-0007](ADR-0007-durable-jobs-idempotency-and-recovery.md).                  |
+| Requirement | Behavior |
+| --- | --- |
+| **Secret generation** | Generate a high-entropy random secret. |
+| **Stored representation** | Store only a cryptographic verifier/hash, a safe identifier, and a safe display prefix—not the plaintext credential. |
+| **Lifetime** | Credentials expire and can be revoked. Check expiry, revocation, and current scope on every request. |
+| **Action grants** | Select `query`, `build`, `evaluate`, and `deploy` explicitly. A query grant does not imply any of the others. |
+| **Document scope** | A query integration has an explicit document-group **ceiling**: the maximum document-group scope its authority permits. |
+| **Ordinary CI permissions** | Exclude membership administration and provider-secret access. |
+| **Issuance** | Follow the show-once secret behavior in [ADR-0007](ADR-0007-durable-jobs-idempotency-and-recovery.md). |
 
 The exact administrative roles, maximum credential lifetime, and rules for who may issue which grants still need a decision. Selecting the mechanism does not give every user permission to create credentials.
 
@@ -190,12 +190,12 @@ There is no verified human subject in the request. The application's authority i
 
 Suppose `SupportBot` can read `SupportKnowledge` but not `HRPrivate`:
 
-| Request                                                                                  | Inframeld document authority                                                                                                   |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Alice asks through SupportBot.                                                           | SupportKnowledge only.                                                                                                         |
-| Bob asks through SupportBot.                                                             | SupportKnowledge only.                                                                                                         |
+| Request | Inframeld document authority |
+| --- | --- |
+| Alice asks through SupportBot. | SupportKnowledge only. |
+| Bob asks through SupportBot. | SupportKnowledge only. |
 | SupportBot supplies `userId: Alice`, an HR group name, or Alice's canary affinity value. | No additional access. Caller-supplied values cannot expand SupportBot's authority; unsupported delegation claims are rejected. |
-| An administrator explicitly adds HRPrivate to SupportBot's scope.                        | Every request using SupportBot's authority can potentially reach HRPrivate.                                                    |
+| An administrator explicitly adds HRPrivate to SupportBot's scope. | Every request using SupportBot's authority can potentially reach HRPrivate. |
 
 A **canary affinity key** is routing data used to keep requests in a consistent rollout group. It is not an authenticated end-user identity.
 
@@ -217,11 +217,11 @@ The protocol, issuer, and revocation behavior remain open. Hydra is an option if
 
 Suppose `StaffAssistant` is explicitly allowed to query on behalf of verified users and has a ceiling of SupportKnowledge and HRPrivate.
 
-| Application ceiling            | Verified user's rights              | Effective document access                                                      |
-| ------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------ |
-| SupportKnowledge and HRPrivate | Alice may read both.                | Both, provided project membership and the requested action are also permitted. |
-| SupportKnowledge and HRPrivate | Bob may read only SupportKnowledge. | SupportKnowledge only.                                                         |
-| SupportKnowledge only          | Alice may read both.                | SupportKnowledge only; her HR rights do not expand the application's ceiling.  |
+| Application ceiling | Verified user's rights | Effective document access |
+| --- | --- | --- |
+| SupportKnowledge and HRPrivate | Alice may read both. | Both, provided project membership and the requested action are also permitted. |
+| SupportKnowledge and HRPrivate | Bob may read only SupportKnowledge. | SupportKnowledge only. |
+| SupportKnowledge only | Alice may read both. | SupportKnowledge only; her HR rights do not expand the application's ceiling. |
 
 Effective access is the **intersection** of application grants, user rights, project membership, and the requested action—not their union. Both the application and the user must permit the access.
 
@@ -257,11 +257,11 @@ The detailed onboarding section identifies this work as implementable with boots
 
 The publication mode changes how updates are requested; it does not increase the initiating actor's authority.
 
-| Operation                                                  | Required authority                                                                                                                     |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Automatic source/configuration update**                  | The initiating actor needs the relevant source or configuration permission, plus build and deploy permissions for the explicit target. |
-| **Change publication mode**                                | Deploy authority is required.                                                                                                          |
-| **Enable Automatic updates and apply the selected inputs** | Build authority and valid inputs are also required.                                                                                    |
+| Operation | Required authority |
+| --- | --- |
+| **Automatic source/configuration update** | The initiating actor needs the relevant source or configuration permission, plus build and deploy permissions for the explicit target. |
+| **Change publication mode** | Deploy authority is required. |
+| **Enable Automatic updates and apply the selected inputs** | Build authority and valid inputs are also required. |
 
 The worker rechecks current authority. An upload-only or query-only principal is not upgraded because a project uses Automatic updates.
 
@@ -289,11 +289,11 @@ The proposed default selector must require project and query access **before rev
 
 The source ADR records the following observations as checked on **19 September 2026**. They are recorded upstream evidence, not a new verification, an Inframeld image lock, or completed deployment testing.
 
-| Recorded observation                                                                                  | Limit of the evidence                                                                                                                        |
-| ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recorded observation | Limit of the evidence |
+| --- | --- |
 | **Kratos OSS v26.2.0 and Hydra OSS v26.2.0**, both released on **20 March 2026**, use **Apache-2.0**. | These observed versions are not automatically the qualified Inframeld images. No load test, security audit, or migration test was performed. |
-| Ory documents identity/configuration import and compatible core APIs for Ory Network.                 | This describes a possible migration path, not a tested guarantee that sessions, IDs, and every feature transfer unchanged.                   |
-| Paid/cloud announcements describe **v26.3.3** capabilities.                                           | They do not establish that OSS v26.2.0 includes every advertised capability. Inspect the actual pinned OSS release during implementation.    |
+| Ory documents identity/configuration import and compatible core APIs for Ory Network. | This describes a possible migration path, not a tested guarantee that sessions, IDs, and every feature transfer unchanged. |
+| Paid/cloud announcements describe **v26.3.3** capabilities. | They do not establish that OSS v26.2.0 includes every advertised capability. Inspect the actual pinned OSS release during implementation. |
 
 Recorded references: [Kratos v26.2.0](https://github.com/ory/kratos/releases/tag/v26.2.0), [Hydra v26.2.0](https://github.com/ory/hydra/releases/tag/v26.2.0), [Apache-2.0 license](https://github.com/ory/kratos/blob/v26.2.0/LICENSE), [Ory Network](https://www.ory.com/network), and [v26.3.3 announcement](https://changelog.ory.com/announcements/ory-network-ory-hydra-ory-kratos-v26-3-3-released).
 
@@ -305,16 +305,16 @@ Keycloak and ZITADEL were considered previously. They are not alternative deploy
 
 These are required acceptance cases, not completed tests or functionality implemented by this record.
 
-| Area                                      | Required verification                                                                                                                                                                                                   |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Application scope**                     | Deny commands and queries outside the caller's permissions. Apply current group membership. Reject forged user, group, and issuer assertions.                                                                           |
-| **Session lifecycle**                     | Exercise local login, recovery, logout, disabled identities, required MFA, invalid/expired sessions, and an unavailable Kratos session check. Unverifiable sessions fail closed.                                        |
-| **Browser and administration boundaries** | Test CSRF protection and that identity administration remains private.                                                                                                                                                  |
-| **External OIDC**                         | Exercise configured sign-in, issuer and redirect validation, deliberate account linking, and upstream-provider unavailability.                                                                                          |
-| **Service credentials**                   | Reject expired or revoked credentials and test lost key-creation responses against the show-once behavior.                                                                                                              |
-| **Automation grants**                     | Prove that a CI principal with build/evaluate grants cannot deploy, administer membership, or access provider secrets.                                                                                                  |
-| **Fixed integration authority**           | Prove that caller-supplied identity cannot expand an integration's document scope and that v1 rejects delegation claims.                                                                                                |
-| **Future delegation**                     | When implemented, test actor/subject binding and both directions of the permission intersection: the user's rights cannot expand the application ceiling, and the application's rights cannot expand the user's access. |
+| Area | Required verification |
+| --- | --- |
+| **Application scope** | Deny commands and queries outside the caller's permissions. Apply current group membership. Reject forged user, group, and issuer assertions. |
+| **Session lifecycle** | Exercise local login, recovery, logout, disabled identities, required MFA, invalid/expired sessions, and an unavailable Kratos session check. Unverifiable sessions fail closed. |
+| **Browser and administration boundaries** | Test CSRF protection and that identity administration remains private. |
+| **External OIDC** | Exercise configured sign-in, issuer and redirect validation, deliberate account linking, and upstream-provider unavailability. |
+| **Service credentials** | Reject expired or revoked credentials and test lost key-creation responses against the show-once behavior. |
+| **Automation grants** | Prove that a CI principal with build/evaluate grants cannot deploy, administer membership, or access provider secrets. |
+| **Fixed integration authority** | Prove that caller-supplied identity cannot expand an integration's document scope and that v1 rejects delegation claims. |
+| **Future delegation** | When implemented, test actor/subject binding and both directions of the permission intersection: the user's rights cannot expand the application ceiling, and the application's rights cannot expand the user's access. |
 
 ## Consequences
 
@@ -362,15 +362,15 @@ Finer ACL behavior remains future work. Keeping the document policy separate fro
 
 ## References
 
-| Reference                                                        | Responsibility                                                                    |
-| ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| [Canonical architecture guide](../ARCHITECTURE.md)               | Overall architecture, document filtering, and in-flight authorization trade-offs. |
-| [ADR-0001](ADR-0001-modular-application-structure.md)            | Module ownership and application/infrastructure boundaries.                       |
-| [ADR-0002](ADR-0002-product-owned-openapi-contract.md)           | Public API contract and client integration.                                       |
-| [ADR-0007](ADR-0007-durable-jobs-idempotency-and-recovery.md)    | Durable operations, idempotency, and show-once credential issuance.               |
-| [ADR-0011](ADR-0011-hosted-vercel-and-aws-deployment-profile.md) | Deployment profile.                                                               |
-| [ADR-0017](ADR-0017-answer-feedback.md)                          | Answer-feedback permissions and API contract.                                     |
-| [ADR-0018](ADR-0018-first-party-mcp-adapter.md)                  | MCP's fixed-authority client profile and qualification.                           |
-| [ADR-0019](ADR-0019-default-onboarding-and-first-publication.md) | Private starter provisioning and reversible publication modes.                    |
+| Reference | Responsibility |
+| --- | --- |
+| [Canonical architecture guide](../ARCHITECTURE.md) | Overall architecture, document filtering, and in-flight authorization trade-offs. |
+| [ADR-0001](ADR-0001-modular-application-structure.md) | Module ownership and application/infrastructure boundaries. |
+| [ADR-0002](ADR-0002-product-owned-openapi-contract.md) | Public API contract and client integration. |
+| [ADR-0007](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Durable operations, idempotency, and show-once credential issuance. |
+| [ADR-0011](ADR-0011-hosted-vercel-and-aws-deployment-profile.md) | Deployment profile. |
+| [ADR-0017](ADR-0017-answer-feedback.md) | Answer-feedback permissions and API contract. |
+| [ADR-0018](ADR-0018-first-party-mcp-adapter.md) | MCP's fixed-authority client profile and qualification. |
+| [ADR-0019](ADR-0019-default-onboarding-and-first-publication.md) | Private starter provisioning and reversible publication modes. |
 
 The Ory documentation, source, release, and licensing links are retained beside the relevant integration and recorded-evidence sections. Exact administrative roles, credential-lifetime/issuance rules, future delegation protocol, broader organization administration, and EE packaging remain unresolved or outside this onboarding decision, as described above.

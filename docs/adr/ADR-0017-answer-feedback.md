@@ -1,10 +1,6 @@
 # ADR-0017: Answer feedback tied to the response that was served
 
-**Status:** Accepted — feedback contract; implementation qualification pending.
-**Date:** 19 September 2026.
-**Required approach:** One editable current rating per answer and originating principal, attributed through the original answer receipt and protected by current permissions.
-**Source:** [Canonical architecture guide](../ARCHITECTURE.md).
-**Related:** [Access](ADR-0005-api-enforced-tenancy-and-authorization.md), [receipts and retries](ADR-0007-durable-jobs-idempotency-and-recovery.md), [evaluations](ADR-0008-deterministic-evaluation-and-release-decisions.md), [releases](ADR-0009-sticky-logical-canary-deployments.md), [retention](ADR-0014-data-retention-deletion-and-external-processing.md).
+**Status:** Accepted — feedback contract; implementation qualification pending. **Date:** 19 September 2026. **Required approach:** One editable current rating per answer and originating principal, attributed through the original answer receipt and protected by current permissions. **Source:** [Canonical architecture guide](../ARCHITECTURE.md). **Related:** [Access](ADR-0005-api-enforced-tenancy-and-authorization.md), [receipts and retries](ADR-0007-durable-jobs-idempotency-and-recovery.md), [evaluations](ADR-0008-deterministic-evaluation-and-release-decisions.md), [releases](ADR-0009-sticky-logical-canary-deployments.md), [retention](ADR-0014-data-retention-deletion-and-external-processing.md).
 
 ## Context
 
@@ -26,12 +22,12 @@ Online feedback and offline evaluations remain separate evidence. Neither automa
 
 ### 1. Keep ownership with the existing application modules
 
-| Owner          | Responsibility                                                                                                                         |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Pipelines**  | Owns serving responses, their `AnswerReceipt` records, and answer feedback. Records the release selection supplied at query admission. |
-| **Releases**   | Owns Deployment transitions and the cohort selection made when a query is admitted. Feedback cannot change its serving pointers.       |
-| **Evaluation** | Continues to own offline benchmark results. A benchmark is a set of test cases, not the production feedback population.                |
-| **Studio**     | Reads authorized projections that combine receipts, feedback, and release history. It is not another source of truth.                  |
+| Owner | Responsibility |
+| --- | --- |
+| **Pipelines** | Owns serving responses, their `AnswerReceipt` records, and answer feedback. Records the release selection supplied at query admission. |
+| **Releases** | Owns Deployment transitions and the cohort selection made when a query is admitted. Feedback cannot change its serving pointers. |
+| **Evaluation** | Continues to own offline benchmark results. A benchmark is a set of test cases, not the production feedback population. |
+| **Studio** | Reads authorized projections that combine receipts, feedback, and release history. It is not another source of truth. |
 
 **Admission** means accepting a query for execution. A **read projection** is a view of existing records shaped for a screen or API response. Joining records for display does not transfer ownership of those records.
 
@@ -39,15 +35,15 @@ Online feedback and offline evaluations remain separate evidence. Neither automa
 
 The receipt preserves both the selected version and the circumstances of its selection. A candidate can produce an answer without ever becoming the Deployment’s current version.
 
-| Receipt information                                                               | Purpose                                                                                                                  |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Server-generated, unpredictable `answerId` and operation identity**             | Identify the response and its originating operation.                                                                     |
-| **Organization/project and originating stable principal**                         | Establish ownership and access scope. A principal is the verified human or application identity recognized by Inframeld. |
-| **Pipeline-version identity**                                                     | Identify the exact version that produced the response.                                                                   |
-| **Deployment identity and revision**                                              | Record which serving target and state selected that version.                                                             |
-| **Rollout identity and actual cohort**                                            | Preserve the particular canary assignment. The rollout may be absent when there is no canary.                            |
-| **Creation time, completion outcome, and expiry**                                 | Establish when the response originated, how execution finished, and how long the receipt remains eligible and retained.  |
-| **Bounded identities of every document/version used in final generation context** | Support current access checks, including for sources that were used but not cited.                                       |
+| Receipt information | Purpose |
+| --- | --- |
+| **Server-generated, unpredictable `answerId` and operation identity** | Identify the response and its originating operation. |
+| **Organization/project and originating stable principal** | Establish ownership and access scope. A principal is the verified human or application identity recognized by Inframeld. |
+| **Pipeline-version identity** | Identify the exact version that produced the response. |
+| **Deployment identity and revision** | Record which serving target and state selected that version. |
+| **Rollout identity and actual cohort** | Preserve the particular canary assignment. The rollout may be absent when there is no canary. |
+| **Creation time, completion outcome, and expiry** | Establish when the response originated, how execution finished, and how long the receipt remains eligible and retained. |
+| **Bounded identities of every document/version used in final generation context** | Support current access checks, including for sources that were used but not cited. |
 
 The **final generation context** is the evidence supplied to the model to generate the answer. Its source identities matter even when the model omits some of them from its citations: a later comment may quote that uncited material.
 
@@ -63,12 +59,12 @@ Admit query and reserve answer identity
 
 Only a successfully finalized, eligible serving receipt accepts feedback.
 
-| Execution outcome                                     | Feedback treatment                                                                                               |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Successfully completed answer**                     | Eligible while the receipt is retained and currently accessible.                                                 |
+| Execution outcome | Feedback treatment |
+| --- | --- |
+| **Successfully completed answer** | Eligible while the receipt is retained and currently accessible. |
 | **Completed explicit insufficient-evidence response** | Eligible and labelled as insufficient evidence. This is a deliberate completed response, not a provider failure. |
-| **Provider failure or uncertain operation**           | Not an answer to rate.                                                                                           |
-| **Offline evaluation execution**                      | Does not enter the production feedback denominator.                                                              |
+| **Provider failure or uncertain operation** | Not an answer to rate. |
+| **Offline evaluation execution** | Does not enter the production feedback denominator. |
 
 #### A receipt does not prove that someone saw the answer
 
@@ -114,11 +110,11 @@ Supply the normal **`Idempotency-Key`** header and this conceptual JSON body:
 
 The idempotency key identifies the requested command so its retry does not execute another mutation. **`expectedRevision` is the feedback revision**, not the Deployment revision recorded in the answer receipt.
 
-| Requested action                          | Required revision and result                                                                                                                                  |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Create the first rating**               | Send `expectedRevision: 0`. Success returns a safe Feedback DTO with revision `1`. A DTO is the structured data returned by the API.                          |
+| Requested action | Required revision and result |
+| --- | --- |
+| **Create the first rating** | Send `expectedRevision: 0`. Success returns a safe Feedback DTO with revision `1`. A DTO is the structured data returned by the API. |
 | **Deliberately edit that rating/comment** | Send a new command/key with `expectedRevision: 1`. Success atomically replaces the current values and returns revision `2`. Later edits follow the same rule. |
-| **Clear the comment**                     | Omit `comment` or send an empty comment. The rating is still required. Omitting the comment does not mean “keep the old comment.”                             |
+| **Clear the comment** | Omit `comment` or send an empty comment. The rating is still required. Omitting the comment does not mean “keep the old comment.” |
 
 Limit the comment to **2,000 Unicode code points**, and enforce a bounded request-byte limit as well. Code-point count and encoded byte size are different measurements; both limits apply. The source contract does not specify the numerical request-byte limit.
 
@@ -140,13 +136,13 @@ This lets the customer backend or browser-facing application reload the actual s
 
 **Idempotency recognizes the same command; revision checking prevents two different edits from unknowingly overwriting each other.** Both are required.
 
-| Situation                                                                          | Behavior                                                                                                        |
-| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Same idempotency key and same request**                                          | After current authorization, replay the safe original mutation result. Do not add another rating.               |
-| **Same key, changed rating/comment**                                               | Return **`409 idempotency_key_reused`**. A deliberate change requires a new command/key.                        |
-| **Two different commands use the same expected revision**                          | One commits; the other receives **`409 stale_revision`**. Reload before making a fresh decision.                |
-| **A new key tries to create a second initial rating**                              | Conflict with the existing resource. The answer still contributes one current rating.                           |
-| **A deliberate edit supplies the current revision**                                | Replace the rating/comment atomically and increment the revision.                                               |
+| Situation | Behavior |
+| --- | --- |
+| **Same idempotency key and same request** | After current authorization, replay the safe original mutation result. Do not add another rating. |
+| **Same key, changed rating/comment** | Return **`409 idempotency_key_reused`**. A deliberate change requires a new command/key. |
+| **Two different commands use the same expected revision** | One commits; the other receives **`409 stale_revision`**. Reload before making a fresh decision. |
+| **A new key tries to create a second initial rating** | Conflict with the existing resource. The answer still contributes one current rating. |
+| **A deliberate edit supplies the current revision** | Replace the rating/comment atomically and increment the revision. |
 | **Receipt expired, purged, outside the caller’s scope, or otherwise inaccessible** | Return the API’s non-enumerating unavailable/not-found response. Do not reveal the answer or an earlier rating. |
 
 A **non-enumerating response** avoids revealing whether an inaccessible answer or feedback record exists. Knowing its ID is not permission to inspect it.
@@ -163,12 +159,12 @@ A database uniqueness constraint on **answer/principal identity** prevents dupli
 
 An integration needs the dedicated **`feedback:write`** grant in addition to its serving **`query`** grant. Do not silently add feedback privileges to existing query credentials.
 
-| Caller and operation                                    | Required access                                                                                                                                                    |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Integration submitting or editing feedback**          | The same stable principal that originated the receipt, `query` and `feedback:write`, current project access, and current access to the bound evidence.             |
-| **Originating principal reading its own feedback**      | The narrow own-feedback permission included in `feedback:write`, with the same receipt, project, and evidence checks.                                              |
-| **Human rating a Studio test-query response**           | May submit for their own eligible Studio test-query receipt, subject to the applicable current permissions. This is distinct from an offline evaluation execution. |
-| **Engineer inspecting project-wide feedback in Studio** | An explicit Studio feedback-read action permission and current access to the evidence involved. The reader need not be the originating principal of each answer.   |
+| Caller and operation | Required access |
+| --- | --- |
+| **Integration submitting or editing feedback** | The same stable principal that originated the receipt, `query` and `feedback:write`, current project access, and current access to the bound evidence. |
+| **Originating principal reading its own feedback** | The narrow own-feedback permission included in `feedback:write`, with the same receipt, project, and evidence checks. |
+| **Human rating a Studio test-query response** | May submit for their own eligible Studio test-query receipt, subject to the applicable current permissions. This is distinct from an offline evaluation execution. |
+| **Engineer inspecting project-wide feedback in Studio** | An explicit Studio feedback-read action permission and current access to the evidence involved. The reader need not be the originating principal of each answer. |
 
 Onboarding and default-role assignments belong to Access. Feedback does not introduce another permission engine or select those defaults.
 
@@ -204,11 +200,11 @@ An explicit insufficient-evidence response may have no bound source evidence. Pr
 
 Consider this sequence:
 
-| Time      | Event                                                                                                                    |
-| --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Time | Event |
+| --- | --- |
 | **10:00** | SupportBot receives answer **A77** from **P13**, the **10% candidate** in rollout **C4**, at Deployment revision **42**. |
-| **10:05** | Mira rejects P13. New requests go to P12.                                                                                |
-| **10:20** | The user rates A77 negative through SupportBot.                                                                          |
+| **10:05** | Mira rejects P13. New requests go to P12. |
+| **10:20** | The user rates A77 negative through SupportBot. |
 
 **That rating belongs to P13 / C4 / revision 42.** It is not a complaint about P12 merely because P12 is current when the feedback arrives.
 
@@ -220,12 +216,12 @@ Late submission remains allowed only while the receipt is retained and currently
 
 Use one eligibility/retention window shared by the receipt and its feedback. Configure and expose its expiry. The initial duration is an implementation default to document, not permission to retain feedback permanently.
 
-| Lifecycle event                                              | Required behavior                                                                                                  |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| **Receipt expires or is purged**                             | Its feedback and comment expire or are purged with it.                                                             |
-| **Project deletion or relevant source erasure**              | Remove or redact affected feedback under ADR-0014. A tombstone blocks access before asynchronous cleanup finishes. |
-| **Ordinary permission revocation**                           | Prevent viewing and new submissions without necessarily deleting the project-owned feedback record.                |
-| **Deployment transition while the receipt remains eligible** | Preserve the original attribution and allow currently authorized feedback within the existing window.              |
+| Lifecycle event | Required behavior |
+| --- | --- |
+| **Receipt expires or is purged** | Its feedback and comment expire or are purged with it. |
+| **Project deletion or relevant source erasure** | Remove or redact affected feedback under ADR-0014. A tombstone blocks access before asynchronous cleanup finishes. |
+| **Ordinary permission revocation** | Prevent viewing and new submissions without necessarily deleting the project-owned feedback record. |
+| **Deployment transition while the receipt remains eligible** | Preserve the original attribution and allow currently authorized feedback within the existing window. |
 
 A **tombstone** records that a resource has been deleted or retired and must no longer be accessible. Do not leave orphaned comments that disclose deleted evidence after their receipt or related source has been removed.
 
@@ -267,13 +263,13 @@ A small, self-selected sample does not establish that one version is better. Sho
 
 P13 may have a better offline groundedness rate—more evaluated answers judged supported by their context—while its online feedback shows:
 
-| Observation                            | Count or calculation                                                       |
-| -------------------------------------- | -------------------------------------------------------------------------- |
-| **Eligible completed responses**       | 100.                                                                       |
-| **Current rated answers**              | 8.                                                                         |
-| **Negative ratings**                   | 6.                                                                         |
-| **Positive ratings**                   | 2.                                                                         |
-| **Feedback coverage**                  | 8 / 100 = **8%**.                                                          |
+| Observation | Count or calculation |
+| --- | --- |
+| **Eligible completed responses** | 100. |
+| **Current rated answers** | 8. |
+| **Negative ratings** | 6. |
+| **Positive ratings** | 2. |
+| **Feedback coverage** | 8 / 100 = **8%**. |
 | **Negative share among rated answers** | 6 / 8 = **75% of rated answers**, not a failure rate across all responses. |
 
 The 92 unrated responses have no feedback verdict. Mira inspects the comments and benchmark regressions before making an explicit release decision. The online sample and offline result remain distinct observations, not a combined automatic verdict.
@@ -282,17 +278,17 @@ The 92 unrated responses have no feedback verdict. Mira inspects the comments an
 
 The following are minimum implementation checks, not completed tests:
 
-| Area                         | Required verification                                                                                                                                                                           |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Receipt lifecycle**        | Exercise crashes around query admission and finalization. Only successfully finalized eligible receipts accept feedback; explicit insufficient-evidence responses remain labelled and eligible. |
-| **Identity and scope**       | Reject forged, cross-project, and other-principal answer IDs. Test credential rotation and revocation without changing ownership or accepting unverified end-user identity.                     |
-| **Edits and retries**        | Exercise duplicate commands, concurrent edits, stale revisions, lost update responses, and attempts at a second initial rating. Counts remain based on one current record.                      |
-| **Late feedback**            | Test submission after candidate abort, promotion, and rollback, preserving the original selected version and release context.                                                                   |
-| **Current access**           | Recheck document access for submission, detail, receipt reads, replay, and aggregate totals. Include uncited final-context sources and evidence-free abstentions.                               |
-| **Retention and deletion**   | Expire and purge receipts, apply project/source deletion, and confirm affected feedback disappears or is redacted without leaking through comments or counts.                                   |
-| **Rendering and bounds**     | Enforce comment/request bounds and render comments as escaped text.                                                                                                                             |
-| **Studio and calculations**  | Verify exact denominators, answer-creation windows, partial/unavailable coverage, and operation at 100% serving as well as during a canary.                                                     |
-| **Side effects and storage** | Confirm feedback never stores full production responses, repeats model work, or moves release pointers.                                                                                         |
+| Area | Required verification |
+| --- | --- |
+| **Receipt lifecycle** | Exercise crashes around query admission and finalization. Only successfully finalized eligible receipts accept feedback; explicit insufficient-evidence responses remain labelled and eligible. |
+| **Identity and scope** | Reject forged, cross-project, and other-principal answer IDs. Test credential rotation and revocation without changing ownership or accepting unverified end-user identity. |
+| **Edits and retries** | Exercise duplicate commands, concurrent edits, stale revisions, lost update responses, and attempts at a second initial rating. Counts remain based on one current record. |
+| **Late feedback** | Test submission after candidate abort, promotion, and rollback, preserving the original selected version and release context. |
+| **Current access** | Recheck document access for submission, detail, receipt reads, replay, and aggregate totals. Include uncited final-context sources and evidence-free abstentions. |
+| **Retention and deletion** | Expire and purge receipts, apply project/source deletion, and confirm affected feedback disappears or is redacted without leaking through comments or counts. |
+| **Rendering and bounds** | Enforce comment/request bounds and render comments as escaped text. |
+| **Studio and calculations** | Verify exact denominators, answer-creation windows, partial/unavailable coverage, and operation at 100% serving as well as during a canary. |
+| **Side effects and storage** | Confirm feedback never stores full production responses, repeats model work, or moves release pointers. |
 
 No application implementation or executed qualification accompanies this ADR. The accepted contract defines what the implementation must demonstrate.
 
@@ -336,11 +332,11 @@ The following approaches are excluded or deferred by the contract. No separate c
 
 ## References
 
-| Reference                                                                           | Responsibility                                                                                     |
-| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| [Canonical architecture guide](../ARCHITECTURE.md)                                  | Overall product workflow and ownership of serving, releases, and evidence.                         |
-| [ADR-0005: Access](ADR-0005-api-enforced-tenancy-and-authorization.md)              | Verified principals, fixed integration authority, action grants, and current evidence permissions. |
+| Reference | Responsibility |
+| --- | --- |
+| [Canonical architecture guide](../ARCHITECTURE.md) | Overall product workflow and ownership of serving, releases, and evidence. |
+| [ADR-0005: Access](ADR-0005-api-enforced-tenancy-and-authorization.md) | Verified principals, fixed integration authority, action grants, and current evidence permissions. |
 | [ADR-0007: Receipts and retries](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Answer-receipt lifecycle, idempotency, safe replay, and the absence of durable full-answer replay. |
-| [ADR-0008: Evaluations](ADR-0008-deterministic-evaluation-and-release-decisions.md) | Separate offline benchmark results and their bounded answer/evidence retention.                    |
-| [ADR-0009: Releases](ADR-0009-sticky-logical-canary-deployments.md)                 | Deployment transitions, original cohort selection, and explicit release authority.                 |
-| [ADR-0014: Retention](ADR-0014-data-retention-deletion-and-external-processing.md)  | Receipt-linked retention, current revocation, tombstones, and source/project erasure.              |
+| [ADR-0008: Evaluations](ADR-0008-deterministic-evaluation-and-release-decisions.md) | Separate offline benchmark results and their bounded answer/evidence retention. |
+| [ADR-0009: Releases](ADR-0009-sticky-logical-canary-deployments.md) | Deployment transitions, original cohort selection, and explicit release authority. |
+| [ADR-0014: Retention](ADR-0014-data-retention-deletion-and-external-processing.md) | Receipt-linked retention, current revocation, tombstones, and source/project erasure. |

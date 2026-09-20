@@ -30,19 +30,19 @@ The word **collection** has two meanings. An Inframeld collection is a managed s
 
 An **embedding** is a numerical representation of text used for similarity search. A vector record stores that representation and the information needed to identify its source chunk.
 
-| Term                                   | Meaning                                                                                                                                                                                       | Example used below                                                                 |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| **Document / document version**        | A stable source identity and one immutable version of its bytes. Updating the source creates another version.                                                                                 | Document B has versions B1 and B2.                                                 |
-| **Chunk / vector record**              | A chunk is an excerpt produced by parsing and splitting source content. Its vector record contains the numerical embedding and immutable identifiers needed to locate and verify the excerpt. | A1 produces two chunks, represented by a1.1 and a1.2.                              |
-| **Logical collection**                 | The application's name for a managed corpus: the body of documents used together.                                                                                                             | Collection L contains the team's manuals.                                          |
-| **Collection revision**                | An exact, immutable membership snapshot. It does not follow each document's newest version.                                                                                                   | R1 contains A1, B1, C1; R2 contains A1, B2, C1.                                    |
-| **PostgreSQL membership**              | The authoritative record of which document versions belong to a revision. Large lists may be held in referenced immutable manifests.                                                          | R1 still names B1 after R2 exists.                                                 |
-| **Immutable vectorization generation** | The exact numerical output for all chunks of one document processing generation under one embedding profile. Its physical identity is never reused.                                           | GB1 contains B1's two vectors; GB2 contains B2's two new vectors.                  |
-| **Application vector index**           | An organization/project-scoped, profile-specific search resource. The vector-index adapter hides its physical layout.                                                                         | Index I uses embedding profile E1.                                                 |
-| **Physical Chroma collection / shard** | One physical partition of an application vector index, not a logical revision or replica.                                                                                                     | S0 and S1 are shards of I. Each record goes to one shard.                          |
-| **Layout**                             | The saved placement rule and physical shard references. It determines where records belong and which shards must be searched.                                                                 | LAYOUT1 uses S0 and S1. R2 does not create another layout.                         |
-| **Index materialization**              | A verified mapping from an exact revision and its processing/embedding profiles to the physical generations needed in a layout.                                                               | M2 establishes that R2 uses GA, GB2, GC and that its required records are present. |
-| **Query filter**                       | A restriction built by the server from exact membership and current permissions.                                                                                                              | R2 permits GA, GB2, GC; a caller forbidden B permits only GA, GC.                  |
+| Term | Meaning | Example used below |
+| --- | --- | --- |
+| **Document / document version** | A stable source identity and one immutable version of its bytes. Updating the source creates another version. | Document B has versions B1 and B2. |
+| **Chunk / vector record** | A chunk is an excerpt produced by parsing and splitting source content. Its vector record contains the numerical embedding and immutable identifiers needed to locate and verify the excerpt. | A1 produces two chunks, represented by a1.1 and a1.2. |
+| **Logical collection** | The application's name for a managed corpus: the body of documents used together. | Collection L contains the team's manuals. |
+| **Collection revision** | An exact, immutable membership snapshot. It does not follow each document's newest version. | R1 contains A1, B1, C1; R2 contains A1, B2, C1. |
+| **PostgreSQL membership** | The authoritative record of which document versions belong to a revision. Large lists may be held in referenced immutable manifests. | R1 still names B1 after R2 exists. |
+| **Immutable vectorization generation** | The exact numerical output for all chunks of one document processing generation under one embedding profile. Its physical identity is never reused. | GB1 contains B1's two vectors; GB2 contains B2's two new vectors. |
+| **Application vector index** | An organization/project-scoped, profile-specific search resource. The vector-index adapter hides its physical layout. | Index I uses embedding profile E1. |
+| **Physical Chroma collection / shard** | One physical partition of an application vector index, not a logical revision or replica. | S0 and S1 are shards of I. Each record goes to one shard. |
+| **Layout** | The saved placement rule and physical shard references. It determines where records belong and which shards must be searched. | LAYOUT1 uses S0 and S1. R2 does not create another layout. |
+| **Index materialization** | A verified mapping from an exact revision and its processing/embedding profiles to the physical generations needed in a layout. | M2 establishes that R2 uses GA, GB2, GC and that its required records are present. |
+| **Query filter** | A restriction built by the server from exact membership and current permissions. | R2 permits GA, GB2, GC; a caller forbidden B permits only GA, GC. |
 
 An **embedding profile** fixes vector meaning, including the model, dimensions, and distance metric. A **processing profile** fixes how source bytes become chunks.
 
@@ -52,12 +52,12 @@ These definitions describe the design. They are not additional features or evide
 
 ### 2. Storage and module responsibilities
 
-| Component                             | Responsibility                                                                                                                                                                                    |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **PostgreSQL**                        | Owns document identities and versions, exact collection revisions, authorization, vector-generation references, materialization readiness, jobs, release pointers, retention, and deletion state. |
-| **Chroma**                            | Stores immutable derived vector records and searches the scope selected by the application. It does not own logical membership or permissions.                                                    |
-| **SeaweedFS through `ArtifactStore`** | Provides private S3-compatible artifact storage, including referenced manifests and temporary exact retry payloads. PostgreSQL owns their identity and publication.                               |
-| **`ModelGateway`**                    | Supplies every document and query embedding. Chroma receives explicit embeddings and must not invoke its own provider embedding function.                                                         |
+| Component | Responsibility |
+| --- | --- |
+| **PostgreSQL** | Owns document identities and versions, exact collection revisions, authorization, vector-generation references, materialization readiness, jobs, release pointers, retention, and deletion state. |
+| **Chroma** | Stores immutable derived vector records and searches the scope selected by the application. It does not own logical membership or permissions. |
+| **SeaweedFS through `ArtifactStore`** | Provides private S3-compatible artifact storage, including referenced manifests and temporary exact retry payloads. PostgreSQL owns their identity and publication. |
+| **`ModelGateway`** | Supplies every document and query embedding. Chroma receives explicit embeddings and must not invoke its own provider embedding function. |
 
 In production Docker Compose, Chroma runs as a **private HTTP server**. Clients must not open a shared embedded persistence directory.
 
@@ -79,11 +79,11 @@ An immutable processing profile identifies parser/chunker behavior and implement
 
 #### Keep compatibility separate from physical execution
 
-| Identity                              | Purpose                                                                                                                                                                          |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Semantic reuse key**                | Organization/project + document version + processing generation + embedding profile. It finds compatible, healthy, ready work without another model call.                        |
-| **Physical vectorization generation** | One immutable numerical execution, or incarnation, for that key. It has a unique, never-reused generation ID, an exact manifest, and frozen write batches.                       |
-| **Physical record ID**                | A versioned, deterministic encoding or hash of organization/project + vectorization-generation ID + chunk ID. The generation ID is part of the **record ID**, not only metadata. |
+| Identity | Purpose |
+| --- | --- |
+| **Semantic reuse key** | Organization/project + document version + processing generation + embedding profile. It finds compatible, healthy, ready work without another model call. |
+| **Physical vectorization generation** | One immutable numerical execution, or incarnation, for that key. It has a unique, never-reused generation ID, an exact manifest, and frozen write batches. |
+| **Physical record ID** | A versioned, deterministic encoding or hash of organization/project + vectorization-generation ID + chunk ID. The generation ID is part of the **record ID**, not only metadata. |
 
 **A fresh model response must never overwrite a retained generation.** Different numerical output requires a new physical generation and therefore different record IDs, even when the semantic reuse key is unchanged.
 
@@ -127,30 +127,30 @@ Collection L initially has revision R1. Document B changes from B1 to B2, creati
 
 These are conceptual records and inventories, not a prescribed SQL schema. Large immutable inventories may live in SeaweedFS manifests whose identities and publication PostgreSQL owns.
 
-| Application record or manifest    | R1                                                       | R2 after verification                                                           |
-| --------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **Logical collection**            | L                                                        | The same L.                                                                     |
-| **Exact membership**              | A1, B1, C1.                                              | New membership A1, B2, C1. R1 is unchanged.                                     |
-| **Selected physical generations** | M1 maps A1 → GA, B1 → GB1, C1 → GC.                      | M2 maps A1 → GA, B2 → GB2, C1 → GC.                                             |
-| **Profiles and layout**           | PP1 / E1 / I / LAYOUT1.                                  | The same PP1 / E1 / I / LAYOUT1.                                                |
-| **Expected chunks**               | GA: a1.1, a1.2; GB1: b1.1, b1.2; GC: c1.1, c1.2.         | Reuse GA and GC; use GB2: b2.1, b2.2 instead of GB1 **in M2's inventory only**. |
-| **Readiness evidence**            | M1 is ready after its six expected records are verified. | M2 becomes ready only after its six expected records are verified.              |
-| **Pipeline binding**              | P-V1 binds M1.                                           | P-V2 binds M2. This does not promote P-V2.                                      |
+| Application record or manifest | R1 | R2 after verification |
+| --- | --- | --- |
+| **Logical collection** | L | The same L. |
+| **Exact membership** | A1, B1, C1. | New membership A1, B2, C1. R1 is unchanged. |
+| **Selected physical generations** | M1 maps A1 → GA, B1 → GB1, C1 → GC. | M2 maps A1 → GA, B2 → GB2, C1 → GC. |
+| **Profiles and layout** | PP1 / E1 / I / LAYOUT1. | The same PP1 / E1 / I / LAYOUT1. |
+| **Expected chunks** | GA: a1.1, a1.2; GB1: b1.1, b1.2; GC: c1.1, c1.2. | Reuse GA and GC; use GB2: b2.1, b2.2 instead of GB1 **in M2's inventory only**. |
+| **Readiness evidence** | M1 is ready after its six expected records are verified. | M2 becomes ready only after its six expected records are verified. |
+| **Pipeline binding** | P-V1 binds M1. | P-V2 binds M2. This does not promote P-V2. |
 
 #### Physical storage
 
 S0 and S1 already exist. R2 inserts two records into them; it does not create an R2 Chroma collection. The final column explains the timeline and is not stored as mutable Chroma metadata.
 
-| Record | Immutable generation | Source chunk | Shard | Why it is present                  |
-| ------ | -------------------- | ------------ | ----- | ---------------------------------- |
-| a1.1   | GA                   | A1, chunk 1  | S0    | Inserted for R1; unchanged for R2. |
-| a1.2   | GA                   | A1, chunk 2  | S1    | Inserted for R1; unchanged for R2. |
-| b1.1   | GB1                  | B1, chunk 1  | S1    | Retained while R1 is needed.       |
-| b1.2   | GB1                  | B1, chunk 2  | S0    | Retained while R1 is needed.       |
-| c1.1   | GC                   | C1, chunk 1  | S0    | Inserted for R1; unchanged for R2. |
-| c1.2   | GC                   | C1, chunk 2  | S1    | Inserted for R1; unchanged for R2. |
-| b2.1   | GB2                  | B2, chunk 1  | S0    | Newly inserted for R2.             |
-| b2.2   | GB2                  | B2, chunk 2  | S1    | Newly inserted for R2.             |
+| Record | Immutable generation | Source chunk | Shard | Why it is present |
+| --- | --- | --- | --- | --- |
+| a1.1 | GA | A1, chunk 1 | S0 | Inserted for R1; unchanged for R2. |
+| a1.2 | GA | A1, chunk 2 | S1 | Inserted for R1; unchanged for R2. |
+| b1.1 | GB1 | B1, chunk 1 | S1 | Retained while R1 is needed. |
+| b1.2 | GB1 | B1, chunk 2 | S0 | Retained while R1 is needed. |
+| c1.1 | GC | C1, chunk 1 | S0 | Inserted for R1; unchanged for R2. |
+| c1.2 | GC | C1, chunk 2 | S1 | Inserted for R1; unchanged for R2. |
+| b2.1 | GB2 | B2, chunk 1 | S0 | Newly inserted for R2. |
+| b2.2 | GB2 | B2, chunk 2 | S1 | Newly inserted for R2. |
 
 There are **six records before the change, eight while both revisions are retained, and six after GB1 can safely be removed**.
 
@@ -158,14 +158,14 @@ GA and GC are not duplicated or given another membership field. Their values, me
 
 #### Separate the build and release steps
 
-| Phase                    | Application / PostgreSQL work                                                                                  | Processing, model, or Chroma work                                                                                                    |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Admit B2 and R2**      | Store the source version and exact R2 membership; request M2 as unready.                                       | No existing vectors change.                                                                                                          |
-| **Prepare missing work** | Resolve reuse keys, select GA/GC, admit GB2, and record bounded progress and frozen payload references.        | Parse/chunk B2 in the isolated processor; obtain two embeddings through `ModelGateway`; insert b2.1/b2.2 into their recorded shards. |
-| **Verify M2**            | Read the expected six-record inventory and check dependencies.                                                 | Verify the new numerical records; check expected IDs, immutable metadata, and placement for all six records, including GA/GC.        |
-| **Publish readiness**    | Conditionally mark M2 ready after every required check passes.                                                 | No membership metadata update.                                                                                                       |
-| **Evaluate and release** | Evaluate P-V2; authorized commands attach it, enable a canary, or promote its Deployment pointer.              | Queries use the selected version's filter. Promotion itself writes no vectors.                                                       |
-| **Retire R1 ordinarily** | Wait for deployment, build, rollback, and query references to end; revoke unused GB1's reuse and tombstone it. | Delete b1.1/b1.2 when safe. Do not write to GA/GC.                                                                                   |
+| Phase | Application / PostgreSQL work | Processing, model, or Chroma work |
+| --- | --- | --- |
+| **Admit B2 and R2** | Store the source version and exact R2 membership; request M2 as unready. | No existing vectors change. |
+| **Prepare missing work** | Resolve reuse keys, select GA/GC, admit GB2, and record bounded progress and frozen payload references. | Parse/chunk B2 in the isolated processor; obtain two embeddings through `ModelGateway`; insert b2.1/b2.2 into their recorded shards. |
+| **Verify M2** | Read the expected six-record inventory and check dependencies. | Verify the new numerical records; check expected IDs, immutable metadata, and placement for all six records, including GA/GC. |
+| **Publish readiness** | Conditionally mark M2 ready after every required check passes. | No membership metadata update. |
+| **Evaluate and release** | Evaluate P-V2; authorized commands attach it, enable a canary, or promote its Deployment pointer. | Queries use the selected version's filter. Promotion itself writes no vectors. |
+| **Retire R1 ordinarily** | Wait for deployment, build, rollback, and query references to end; revoke unused GB1's reuse and tombstone it. | Delete b1.1/b1.2 when safe. Do not write to GA/GC. |
 
 A **tombstone** permanently marks a physical identity as retired so it cannot be reused or made live again. The full retirement protocol appears below.
 
@@ -287,12 +287,12 @@ For each query, the application follows this sequence:
 
 “Eligible records” means records Chroma may consider. A nearest-neighbor query still returns only its bounded requested candidates, not every eligible record.
 
-| Revision and current permissions | Generation filter | Eligible in S0   | Eligible in S1   |
-| -------------------------------- | ----------------- | ---------------- | ---------------- |
-| R1; A, B, C permitted            | GA, GB1, GC       | a1.1, b1.2, c1.1 | a1.2, b1.1, c1.2 |
-| R2; A, B, C permitted            | GA, GB2, GC       | a1.1, b2.1, c1.1 | a1.2, b2.2, c1.2 |
-| R2; B forbidden                  | GA, GC            | a1.1, c1.1       | a1.2, c1.2       |
-| R2; nothing permitted            | Empty             | No query         | No query         |
+| Revision and current permissions | Generation filter | Eligible in S0 | Eligible in S1 |
+| --- | --- | --- | --- |
+| R1; A, B, C permitted | GA, GB1, GC | a1.1, b1.2, c1.1 | a1.2, b1.1, c1.2 |
+| R2; A, B, C permitted | GA, GB2, GC | a1.1, b2.1, c1.1 | a1.2, b2.2, c1.2 |
+| R2; B forbidden | GA, GC | a1.1, c1.1 | a1.2, c1.2 |
+| R2; nothing permitted | Empty | No query | No query |
 
 For the fully authorized R2 query, the adapter can construct this internal Chroma filter:
 
@@ -482,16 +482,16 @@ Use one Linux server with **16 vCPUs, 64 GiB RAM, and 1 TB usable local SSD/NVMe
 
 #### Proposed workload
 
-| Dimension                | Initial target and stress variants                                                                                                                                              |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Corpus**               | 25,000 current documents averaging 20 chunks: 500,000 current vectors. Test stages at 1,000, 10,000, then 25,000 documents; run a deliberate 50,000-document stress experiment. |
-| **Sources and text**     | Average source size 0.5 MiB; average chunk text 2 KiB. Test unusually large inputs with explicit per-source limits.                                                             |
-| **Profiles**             | One active 1,536-dimensional float32 profile. A second profile is a separate stress experiment.                                                                                 |
-| **Retention and change** | Three retained collection revisions; daily changes to 1% of documents at stable document count. Additional pins/builds consume admission budget.                                |
-| **Permissions**          | 20 groups; a typical user belongs to two. Test permitted fractions of 100%, 50%, 1%, and 0%, including permission changes during queries.                                       |
-| **Filters and metadata** | Measure against a metadata target of at most 1 KiB per record. A list of 25,000 UUID-style generation IDs is roughly 1 MB of JSON per shard, not a verified backend allowance.  |
-| **Work**                 | Initial ingestion target of one document per second. One build and one evaluation at a time, sharing resource limits with serving.                                              |
-| **Queries**              | Five concurrent end-to-end requests. Also test concurrency of 1 and 10, plus controlled arrival rates that expose queueing.                                                     |
+| Dimension | Initial target and stress variants |
+| --- | --- |
+| **Corpus** | 25,000 current documents averaging 20 chunks: 500,000 current vectors. Test stages at 1,000, 10,000, then 25,000 documents; run a deliberate 50,000-document stress experiment. |
+| **Sources and text** | Average source size 0.5 MiB; average chunk text 2 KiB. Test unusually large inputs with explicit per-source limits. |
+| **Profiles** | One active 1,536-dimensional float32 profile. A second profile is a separate stress experiment. |
+| **Retention and change** | Three retained collection revisions; daily changes to 1% of documents at stable document count. Additional pins/builds consume admission budget. |
+| **Permissions** | 20 groups; a typical user belongs to two. Test permitted fractions of 100%, 50%, 1%, and 0%, including permission changes during queries. |
+| **Filters and metadata** | Measure against a metadata target of at most 1 KiB per record. A list of 25,000 UUID-style generation IDs is roughly 1 MB of JSON per shard, not a verified backend allowance. |
+| **Work** | Initial ingestion target of one document per second. One build and one evaluation at a time, sharing resource limits with serving. |
+| **Queries** | Five concurrent end-to-end requests. Also test concurrency of 1 and 10, plus controlled arrival rates that expose queueing. |
 
 #### Storage and time calculations are not total-resource predictions
 
@@ -545,12 +545,12 @@ Resource budgets must reject admission visibly **before** out-of-memory failure,
 
 #### Provisional go/no-go goals
 
-| Measurement                                                             | Proposed goal                                                          |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Measurement | Proposed goal |
+| --- | --- |
 | **Database retrieval, including authorization and filter construction** | p95 at most 1 second at five concurrent requests during a small build. |
-| **Retrieval quality**                                                   | recall@10 of at least 0.95 on the declared fixture.                    |
-| **One-document release platform overhead**                              | At most 2 minutes.                                                     |
-| **1% change platform overhead**                                         | At most 15 minutes.                                                    |
+| **Retrieval quality** | recall@10 of at least 0.95 on the declared fixture. |
+| **One-document release platform overhead** | At most 2 minutes. |
+| **1% change platform overhead** | At most 15 minutes. |
 
 Report parser/model time and complete end-to-end time separately. These goals remain proposals for qualification, not accepted capacity claims.
 
@@ -618,13 +618,13 @@ That machinery is not required before measuring the accepted bounded-filter desi
 
 ## References
 
-| Reference                                                                                               | Responsibility                                                          |
-| ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| [Canonical architecture guide](../ARCHITECTURE.md)                                                      | Overall product and application architecture.                           |
-| [ADR-0015: Materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Profile-specific materializations and immutable pipeline bindings.      |
-| [ADR-0005: Authorization](ADR-0005-api-enforced-tenancy-and-authorization.md)                           | Current permissions, group allowlists, and service-principal authority. |
-| [ADR-0007: Jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md)                                     | Durable jobs, recovery, and explicit safe resume.                       |
-| [ADR-0013: Backup and restore](ADR-0013-minimal-hosted-observability-and-recovery.md)                   | Recovery requirements and deferred product-level reconstruction.        |
-| [ADR-0014: Retention and deletion](ADR-0014-data-retention-deletion-and-external-processing.md)         | Retention, erasure, and delayed external-write cleanup.                 |
+| Reference | Responsibility |
+| --- | --- |
+| [Canonical architecture guide](../ARCHITECTURE.md) | Overall product and application architecture. |
+| [ADR-0015: Materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Profile-specific materializations and immutable pipeline bindings. |
+| [ADR-0005: Authorization](ADR-0005-api-enforced-tenancy-and-authorization.md) | Current permissions, group allowlists, and service-principal authority. |
+| [ADR-0007: Jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Durable jobs, recovery, and explicit safe resume. |
+| [ADR-0013: Backup and restore](ADR-0013-minimal-hosted-observability-and-recovery.md) | Recovery requirements and deferred product-level reconstruction. |
+| [ADR-0014: Retention and deletion](ADR-0014-data-retention-deletion-and-external-processing.md) | Retention, erasure, and delayed external-write cleanup. |
 
 The Chroma documentation, release, and source references are retained beside the corresponding retry and recorded-evidence sections.

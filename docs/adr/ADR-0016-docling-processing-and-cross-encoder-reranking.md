@@ -1,9 +1,6 @@
 # ADR-0016: Docling processing and bounded reranking adapters
 
-**Status:** Accepted — built-in adapters and their boundaries. Qualification of the pinned implementation remains pending.
-**Revised:** 19 September 2026.
-**Required approach:** Application-owned processing and reranking contracts, isolated document conversion, bounded local inference, and one model gateway for every LLM call.
-**Related:** [Parser isolation](ADR-0010-secure-document-ingestion-boundary.md), [profiles and materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md), [model gateway](ADR-0006-byok-provider-boundary.md).
+**Status:** Accepted — built-in adapters and their boundaries. Qualification of the pinned implementation remains pending. **Revised:** 19 September 2026. **Required approach:** Application-owned processing and reranking contracts, isolated document conversion, bounded local inference, and one model gateway for every LLM call. **Related:** [Parser isolation](ADR-0010-secure-document-ingestion-boundary.md), [profiles and materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md), [model gateway](ADR-0006-byok-provider-boundary.md).
 
 ## Context
 
@@ -27,10 +24,10 @@ OpenEvals and configurable Luna remain the evaluation choices in ADR-0008. Custo
 
 A **port** is an application-owned interface describing a capability. An **adapter** implements that interface using a particular library or runtime.
 
-| Port                    | Responsibility                                                                                                                                                              |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Port | Responsibility |
+| --- | --- |
 | **`DocumentProcessor`** | Converts an admitted input into a canonical parsed artifact whose structure is defined by Inframeld. Admission means the application has accepted the input for processing. |
-| **`Chunker`**           | Produces bounded chunk candidates with source spans. A source span identifies where an excerpt came from in the original document.                                          |
+| **`Chunker`** | Produces bounded chunk candidates with source spans. A source span identifies where an excerpt came from in the original document. |
 
 A **canonical parsed artifact** is the application’s standard representation of a parsed document. Downstream code uses that representation rather than needing to understand Docling’s internal objects.
 
@@ -66,12 +63,12 @@ A **processing profile** records how a source is turned into parsed content and 
 
 The profile records supported formats, tokenizer and chunking behavior, processing limits, and parser/model identity. Supported bounded options include hybrid chunking, chunk-token limits, peer merging, and table-header behavior.
 
-| Option                    | What it controls                                                                              |
-| ------------------------- | --------------------------------------------------------------------------------------------- |
-| **Hybrid chunking**       | The supported chunking strategy that combines document structure with token-size constraints. |
-| **Chunk-token limits**    | How much text a chunk may contain, measured using the configured tokenizer.                   |
-| **Peer merging**          | Whether compatible peer chunks can be combined within the supported limits.                   |
-| **Table-header behavior** | How table-header information is handled in processing and chunk output.                       |
+| Option | What it controls |
+| --- | --- |
+| **Hybrid chunking** | The supported chunking strategy that combines document structure with token-size constraints. |
+| **Chunk-token limits** | How much text a chunk may contain, measured using the configured tokenizer. |
+| **Peer merging** | Whether compatible peer chunks can be combined within the supported limits. |
+| **Table-header behavior** | How table-header information is handled in processing and chunk output. |
 
 These are supported configuration choices, not permission to install an arbitrary chunking implementation.
 
@@ -91,10 +88,10 @@ Start the user experience with a tested preset. The profile editor can expose mo
 
 The supported choices are:
 
-| Choice                           | Behavior                                                                                                                                                     |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Choice | Behavior |
+| --- | --- |
 | **Built-in local cross-encoder** | Uses the selected local model to assess query/candidate relevance and return scores or ordering. A cross-encoder considers the query and candidate together. |
-| **Explicit `none`**              | Skips reranking as a deliberate pipeline configuration choice. It is not an error-recovery substitute for a missing model.                                   |
+| **Explicit `none`** | Skips reranking as a deliberate pipeline configuration choice. It is not an error-recovery substitute for a missing model. |
 
 Select **one pinned built-in model initially**, rather than supporting arbitrary runtime model downloads. This ADR does not name the checkpoint to select. A **checkpoint** is the particular set of trained model weights used for inference.
 
@@ -140,13 +137,13 @@ Broader supported processing and the built-in cross-encoder remain available thr
 
 Keep the existing typed internal contracts:
 
-| Contract                | Responsibility and v1 scope                                                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`DocumentProcessor`** | Document conversion, with a built-in adapter.                                                                                              |
-| **`Chunker`**           | Bounded chunk production, with a built-in adapter.                                                                                         |
-| **`Reranker`**          | Candidate scoring/ordering, with the built-in cross-encoder and explicit `none` choices.                                                   |
-| **`PipelineHook`**      | A synchronous, blocking stage contract with explicit timeout, egress, and failure behavior. It is not a privileged arbitrary-code runtime. |
-| **`WebhookDispatcher`** | An asynchronous notification contract. Subscriptions and delivery remain deferred.                                                         |
+| Contract | Responsibility and v1 scope |
+| --- | --- |
+| **`DocumentProcessor`** | Document conversion, with a built-in adapter. |
+| **`Chunker`** | Bounded chunk production, with a built-in adapter. |
+| **`Reranker`** | Candidate scoring/ordering, with the built-in cross-encoder and explicit `none` choices. |
+| **`PipelineHook`** | A synchronous, blocking stage contract with explicit timeout, egress, and failure behavior. It is not a privileged arbitrary-code runtime. |
+| **`WebhookDispatcher`** | An asynchronous notification contract. Subscriptions and delivery remain deferred. |
 
 **Synchronous and blocking** means the pipeline waits for a hook’s stage outcome. Its timeout and failure rules must therefore be explicit. Keeping that contract does not authorize remote hook execution or user-supplied privileged code.
 
@@ -170,17 +167,17 @@ The exact pinned implementation remains to be qualified. No new dependency was i
 
 The following are acceptance requirements, not completed test results.
 
-| Area                                      | Required verification                                                                                                                                                    |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Source evidence**                       | Verify source-span correctness and deterministic identities for fixed processing inputs.                                                                                 |
-| **Profile changes**                       | Verify that changed processing profiles produce new generations without requiring unchanged sources to be uploaded again.                                                |
-| **Parser isolation and output**           | Deny external fetches, reject invalid parser output, and verify the whole pinned image under ADR-0010.                                                                   |
-| **Local resource use**                    | Exercise bounded reranking execution, concurrency, timeout, and memory behavior without blocking the API event loop.                                                     |
-| **Reranker contract**                     | Reject changed or forged candidate IDs, invalid output shapes, non-finite scores, and outputs outside the configured bounds.                                             |
-| **Missing assets and failure**            | Exercise unavailable parser/reranker assets and prove that a selected cross-encoder never silently becomes `none`.                                                       |
+| Area | Required verification |
+| --- | --- |
+| **Source evidence** | Verify source-span correctness and deterministic identities for fixed processing inputs. |
+| **Profile changes** | Verify that changed processing profiles produce new generations without requiring unchanged sources to be uploaded again. |
+| **Parser isolation and output** | Deny external fetches, reject invalid parser output, and verify the whole pinned image under ADR-0010. |
+| **Local resource use** | Exercise bounded reranking execution, concurrency, timeout, and memory behavior without blocking the API event loop. |
+| **Reranker contract** | Reject changed or forged candidate IDs, invalid output shapes, non-finite scores, and outputs outside the configured bounds. |
+| **Missing assets and failure** | Exercise unavailable parser/reranker assets and prove that a selected cross-encoder never silently becomes `none`. |
 | **Permissions and model-call boundaries** | Verify authorization before candidate content reaches the reranker/provider and the required current checks before result release. The v1 judge must use `ModelGateway`. |
-| **Observable reranker effect**            | Use a fixture evaluation—a repeatable evaluation with defined inputs—to expose the effect of enabling the selected reranker.                                             |
-| **Default path**                          | Exercise the text-first, `none`-reranker scenario without requiring OCR, cross-encoder setup, or a judge, while preserving isolation and output validation.              |
+| **Observable reranker effect** | Use a fixture evaluation—a repeatable evaluation with defined inputs—to expose the effect of enabling the selected reranker. |
+| **Default path** | Exercise the text-first, `none`-reranker scenario without requiring OCR, cross-encoder setup, or a judge, while preserving isolation and output validation. |
 
 The fixture must show what enabling the reranker changes; this ADR does not assume it improves every case or assign an untested quality threshold.
 
@@ -226,10 +223,10 @@ No separate comparative evaluation is recorded. The following approaches are exc
 
 ## References
 
-| Reference                                                                                                            | Responsibility                                                                                                            |
-| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [ADR-0010: Parser isolation](ADR-0010-secure-document-ingestion-boundary.md)                                         | Offline per-attempt conversion, enforced sandbox restrictions, output validation, and whole-image security qualification. |
-| [ADR-0015: Profiles and materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Immutable processing profiles/generations and their relationship to indexed data and pipeline bindings.                   |
-| [ADR-0006: Model gateway](ADR-0006-byok-provider-boundary.md)                                                        | The shared boundary for every LLM operation, approved endpoints, and declared data egress.                                |
-| [ADR-0008: Evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md)                                   | OpenEvals, the configurable Luna faithfulness judge, and deferred custom evaluators.                                      |
-| [ADR-0019: Default onboarding](ADR-0019-default-onboarding-and-first-publication.md)                                 | The first-answer path and the two-small-file timing scenario using ordinary product behavior.                             |
+| Reference | Responsibility |
+| --- | --- |
+| [ADR-0010: Parser isolation](ADR-0010-secure-document-ingestion-boundary.md) | Offline per-attempt conversion, enforced sandbox restrictions, output validation, and whole-image security qualification. |
+| [ADR-0015: Profiles and materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Immutable processing profiles/generations and their relationship to indexed data and pipeline bindings. |
+| [ADR-0006: Model gateway](ADR-0006-byok-provider-boundary.md) | The shared boundary for every LLM operation, approved endpoints, and declared data egress. |
+| [ADR-0008: Evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md) | OpenEvals, the configurable Luna faithfulness judge, and deferred custom evaluators. |
+| [ADR-0019: Default onboarding](ADR-0019-default-onboarding-and-first-publication.md) | The first-answer path and the two-small-file timing scenario using ordinary product behavior. |

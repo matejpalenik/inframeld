@@ -4,8 +4,7 @@ The backend is a typed FastAPI application. It owns the HTTP API, its generated 
 
 ## Backend structure
 
-The backend is a domain-first modular monolith. The top-level domain packages
-own business state and rules; they are not separate services:
+The backend is a domain-first modular monolith. The top-level domain packages own business state and rules; they are not separate services:
 
 ```text
 src/inframeld_backend/
@@ -30,10 +29,7 @@ knowledge/
 └── api/             # HTTP/MCP-facing adapters for this owner
 ```
 
-Vertical slices live within those rings when a use case is implemented. Only
-create the slice's files when the corresponding use case is being implemented;
-do not pre-create generic repositories, services, or framework layers. Within a
-module, dependencies point inward:
+Vertical slices live within those rings when a use case is implemented. Only create the slice's files when the corresponding use case is being implemented; do not pre-create generic repositories, services, or framework layers. Within a module, dependencies point inward:
 
 ```text
 api -> application -> domain
@@ -41,21 +37,11 @@ infrastructure -> application-owned ports
 composition.py -> concrete implementations and configuration
 ```
 
-`shared` is restricted to capabilities used across domains, such as transport
-errors, configuration, database lifecycle, jobs, and idempotency. It must not
-become a second owner of domain state. The current health route is a
-cross-cutting HTTP adapter under `shared/http`; domain and application code may
-not import it. Shared technical capabilities use `domain/`, `application/`, and
-`infrastructure/` only where that separation is genuinely needed.
+`shared` is restricted to capabilities used across domains, such as transport errors, configuration, database lifecycle, jobs, and idempotency. It must not become a second owner of domain state. The current health route is a cross-cutting HTTP adapter under `shared/http`; domain and application code may not import it. Shared technical capabilities use `domain/`, `application/`, and `infrastructure/` only where that separation is genuinely needed.
 
-`main.py` is the process entry point. `composition.py` is the composition root:
-it constructs the application and explicitly wires concrete dependencies. HTTP,
-the future worker, Studio, and MCP must invoke the same application use cases;
-they must not implement parallel business behavior.
+`main.py` is the process entry point. `composition.py` is the composition root: it constructs the application and explicitly wires concrete dependencies. HTTP, the future worker, Studio, and MCP must invoke the same application use cases; they must not implement parallel business behavior.
 
-Architecture tests under `tests/architecture` protect these dependency rules.
-They use static import checks and fixtures that prove forbidden dependencies are
-rejected.
+Architecture tests under `tests/architecture` protect these dependency rules. They use static import checks and fixtures that prove forbidden dependencies are rejected.
 
 ## Development
 

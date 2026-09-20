@@ -1,10 +1,6 @@
 # ADR-0020: Persistent outbound model credentials
 
-**Status:** Accepted — persistent application-entered credentials and the PostgreSQL/PyNaCl storage boundary. Implementation qualification is pending.
-**Date:** 19 September 2026.
-**Required approach:** Project-scoped provider credentials, encrypted in PostgreSQL with a separately supplied persistent deployment key, and resolved only for authorized model calls.
-**Source:** [Canonical architecture guide](../ARCHITECTURE.md).
-**Related:** [Gateway and connections](ADR-0006-byok-provider-boundary.md), [Access](ADR-0005-api-enforced-tenancy-and-authorization.md), [idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md), [Compose deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md).
+**Status:** Accepted — persistent application-entered credentials and the PostgreSQL/PyNaCl storage boundary. Implementation qualification is pending. **Date:** 19 September 2026. **Required approach:** Project-scoped provider credentials, encrypted in PostgreSQL with a separately supplied persistent deployment key, and resolved only for authorized model calls. **Source:** [Canonical architecture guide](../ARCHITECTURE.md). **Related:** [Gateway and connections](ADR-0006-byok-provider-boundary.md), [Access](ADR-0005-api-enforced-tenancy-and-authorization.md), [idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md), [Compose deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md).
 
 ## Context
 
@@ -32,11 +28,11 @@ The persistence mechanism and security behavior are accepted. Exact endpoint nam
 
 Not every secret needs to be stored in a recoverable form.
 
-| Secret                                      | Purpose                                                                                          | Storage and ownership                                                                                                                                                                                               |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Outbound provider credential**            | Authorizes Inframeld to call a customer's model endpoint.                                        | The gateway must recover its original value. Store authenticated ciphertext and a safe reference; decrypt only for authorized dispatch. A one-way hash is insufficient.                                             |
+| Secret | Purpose | Storage and ownership |
+| --- | --- | --- |
+| **Outbound provider credential** | Authorizes Inframeld to call a customer's model endpoint. | The gateway must recover its original value. Store authenticated ciphertext and a safe reference; decrypt only for authorized dispatch. A one-way hash is insufficient. |
 | **Inframeld-issued integration credential** | Authenticates an incoming customer application or supported Model Context Protocol (MCP) client. | Inframeld only verifies the high-entropy value presented by the caller. Keep its cryptographic verifier/hash, safe prefix, ownership, scope, expiry, and revocation metadata. Return plaintext once under ADR-0007. |
-| **Human passwords and sessions**            | Authenticate people using Inframeld.                                                             | Kratos continues to own them. They do not move into the provider-credential store.                                                                                                                                  |
+| **Human passwords and sessions** | Authenticate people using Inframeld. | Kratos continues to own them. They do not move into the provider-credential store. |
 
 **High entropy** means a secret has enough unpredictability to resist guessing. A **verifier** lets the server check a presented secret without recovering the originally issued value.
 
@@ -46,12 +42,12 @@ The encrypted store is for outbound model credentials only. It does not change t
 
 A **port** is an application-owned interface describing a capability. An **adapter** implements it using specific technology. Credential persistence is a supporting application capability behind such a port, not a seventh business domain.
 
-| Owner                                       | Responsibility                                                                                     |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Model-connection commands**               | Own the stable credential reference and the behavior for replacement and removal.                  |
-| **Access**                                  | Decides who can manage a connection, use it for a particular action, or inspect its safe metadata. |
-| **Credential-store infrastructure adapter** | Owns the ciphertext format and interaction with the encryption library.                            |
-| **Domain entities and pipeline snapshots**  | Refer to the connection/configuration without containing plaintext or encryption-library objects.  |
+| Owner | Responsibility |
+| --- | --- |
+| **Model-connection commands** | Own the stable credential reference and the behavior for replacement and removal. |
+| **Access** | Decides who can manage a connection, use it for a particular action, or inspect its safe metadata. |
+| **Credential-store infrastructure adapter** | Owns the ciphertext format and interaction with the encryption library. |
+| **Domain entities and pipeline snapshots** | Refer to the connection/configuration without containing plaintext or encryption-library objects. |
 
 For v1, each **project-owned provider connection has one credential slot**. Do not create an installation-wide credential pool that is automatically shared across projects.
 
@@ -65,11 +61,11 @@ A **connection** identifies configured access to a provider endpoint. Its immuta
 
 The credential slot is separate. A pipeline or profile references a semantic connection revision; the gateway resolves that connection's permitted **current credential** when it needs to make a call.
 
-| Change                         | Required behavior                                                                                                                                                                      |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Replace the provider key**   | Keep the connection references and pipeline history. Advance the credential revision and invalidate role validation recorded for the old credential. The new value starts unvalidated. |
-| **Remove the credential**      | Make it unavailable for future required-key calls and invalidate its old validation status. Existing references remain explainable through non-secret identity metadata.               |
-| **Change the endpoint origin** | Create a new connection and require explicit credential provision. Never forward the saved key to another origin through a semantic revision alone.                                    |
+| Change | Required behavior |
+| --- | --- |
+| **Replace the provider key** | Keep the connection references and pipeline history. Advance the credential revision and invalidate role validation recorded for the old credential. The new value starts unvalidated. |
+| **Remove the credential** | Make it unavailable for future required-key calls and invalidate its old validation status. Existing references remain explainable through non-secret identity metadata. |
+| **Change the endpoint origin** | Create a new connection and require explicit credential provision. Never forward the saved key to another origin through a semantic revision alone. |
 
 An **origin** is the endpoint's scheme, hostname, and port. A related model name is not permission to send a credential to a different origin.
 
@@ -97,12 +93,12 @@ The recommended resource path is:
 
 These route shapes are **recommended implementation details**, not implemented endpoints. The accepted requirement is the behavior below.
 
-| Operation                         | Required behavior                                                                                                                                                                                                                                                                  |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`PUT`**                         | Create or replace a bounded opaque provider value. Require credential-management authority, an `Idempotency-Key`, and the expected credential revision. Revision **0** means no credential exists. Return only credential/connection identity, revision, presence, and timestamps. |
-| **`GET`**                         | Return authorized safe metadata and the current revision. There is no reveal flag, encrypted-value download, or plaintext field.                                                                                                                                                   |
-| **`DELETE`**                      | Require the same management authority, idempotency key, and expected revision. Mark the credential unavailable and remove its ciphertext in one transaction. Retain the non-secret identity needed to explain existing references.                                                 |
-| **Connection validation command** | Run bounded, explicitly requested role probes through `ModelGateway` using the saved credential. Record sanitized results against the semantic connection revision, credential revision, and tested role/model. Never echo provider headers or raw error bodies.                   |
+| Operation | Required behavior |
+| --- | --- |
+| **`PUT`** | Create or replace a bounded opaque provider value. Require credential-management authority, an `Idempotency-Key`, and the expected credential revision. Revision **0** means no credential exists. Return only credential/connection identity, revision, presence, and timestamps. |
+| **`GET`** | Return authorized safe metadata and the current revision. There is no reveal flag, encrypted-value download, or plaintext field. |
+| **`DELETE`** | Require the same management authority, idempotency key, and expected revision. Mark the credential unavailable and remove its ciphertext in one transaction. Retain the non-secret identity needed to explain existing references. |
+| **Connection validation command** | Run bounded, explicitly requested role probes through `ModelGateway` using the saved credential. Record sanitized results against the semantic connection revision, credential revision, and tested role/model. Never echo provider headers or raw error bodies. |
 
 An **idempotency key** identifies a retried command. An **expected revision** protects against overwriting a competing change. Their transaction behavior is described in Section 8.
 
@@ -124,11 +120,11 @@ Do not preserve an old plaintext value merely to make a rollback target appear h
 
 Use PyNaCl's maintained `Aead` API with the behavior recorded in the source:
 
-| Encryption component         | Selected behavior                                                                                                                       |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Algorithm**                | XChaCha20-Poly1305 authenticated encryption.                                                                                            |
-| **Key**                      | A separately supplied **32-byte** deployment encryption key.                                                                            |
-| **Nonce**                    | Let the library automatically generate a random **24-byte** nonce. Never derive it from a credential ID, timestamp, or retried command. |
+| Encryption component | Selected behavior |
+| --- | --- |
+| **Algorithm** | XChaCha20-Poly1305 authenticated encryption. |
+| **Key** | A separately supplied **32-byte** deployment encryption key. |
+| **Nonce** | Let the library automatically generate a random **24-byte** nonce. Never derive it from a credential ID, timestamp, or retried command. |
 | **Stored encrypted message** | Store the library's returned message, including its nonce and authentication tag. Do not invent a separate encryption/MAC construction. |
 
 A **nonce** is a per-encryption value required by the algorithm. An **authentication tag** is integrity-checking data produced by authenticated encryption. A MAC is a message authentication code; the selected API already supplies the required authenticated-encryption construction.
@@ -166,10 +162,10 @@ Docker mounts the file read-only into the API and worker only. The parser and we
 
 #### Keep the encryption key and request-fingerprint key distinct
 
-| Deployment key                         | Purpose                                                                                                                                        |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provider-credential encryption key** | Encrypts and decrypts saved provider credentials.                                                                                              |
-| **Idempotency HMAC fingerprint key**   | Supports ADR-0007's protected request fingerprints for detecting equivalent secret-bearing commands. It must be a **different** protected key. |
+| Deployment key | Purpose |
+| --- | --- |
+| **Provider-credential encryption key** | Encrypts and decrypts saved provider credentials. |
+| **Idempotency HMAC fingerprint key** | Supports ADR-0007's protected request fingerprints for detecting equivalent secret-bearing commands. It must be a **different** protected key. |
 
 HMAC is a keyed authentication hash. Keeping these keys separate preserves their different purposes.
 
@@ -235,13 +231,13 @@ A transaction rollback publishes none of these changes. There is no separate vau
 
 The request fingerprint includes the secret through ADR-0007's **domain-separated keyed HMAC**. Domain separation identifies the purpose of the fingerprint. Never store the request body or an unkeyed digest of a possibly guessable credential in idempotency metadata.
 
-| Situation                                                   | Required behavior                                                                                                           |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Same key and equivalent request**                         | After current authorization checks, return the safe recorded outcome without another mutation or revealing the saved value. |
-| **Same key with a different secret**                        | Conflict: this is not an equivalent retry.                                                                                  |
-| **Successful save response is lost**                        | Retrying can recover the metadata-only outcome. Decryption is never part of response replay.                                |
-| **Two genuine changes expect the same credential revision** | Only one conditional mutation succeeds; the other receives a stale-revision conflict.                                       |
-| **An old completed command is replayed after later edits**  | Return that command's historical safe outcome without reverting current state.                                              |
+| Situation | Required behavior |
+| --- | --- |
+| **Same key and equivalent request** | After current authorization checks, return the safe recorded outcome without another mutation or revealing the saved value. |
+| **Same key with a different secret** | Conflict: this is not an equivalent retry. |
+| **Successful save response is lost** | Retrying can recover the metadata-only outcome. Decryption is never part of response replay. |
+| **Two genuine changes expect the same credential revision** | Only one conditional mutation succeeds; the other receives a stale-revision conflict. |
+| **An old completed command is replayed after later edits** | Return that command's historical safe outcome without reverting current state. |
 
 #### Worked example: two operators replace revision 3
 
@@ -269,13 +265,13 @@ The smaller runtime therefore leaves real responsibilities with Inframeld: root-
 
 The minimum tests belong with the credential adapter and connection operations. They are planned acceptance tests, not evidence already collected.
 
-| Area                               | Required verification                                                                                                                                                                                                                                                                 |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Persistence and model roles**    | Save a key, restart the API/worker, and use the same saved key for real bounded embedding and generation calls through one connection. Keep failures in the two role validations distinct.                                                                                            |
-| **Integrity and resource binding** | Tamper with ciphertext, nonce, project/connection binding, credential revision, and key ID. Each case must prevent dispatch. Missing or wrong root keys must not generate replacement material.                                                                                       |
-| **Concurrent changes and retries** | Race replacements and repeat a lost-response request. Verify one conditional mutation, correct idempotency behavior, and metadata-only responses.                                                                                                                                     |
-| **Removal**                        | Remove a credential and deny subsequent dispatch without claiming to cancel a call already sent. Do not reuse a cached old plaintext value or fall back to another provider.                                                                                                          |
-| **Authorization and disclosure**   | Exercise unauthorized management/use, cross-project references, request-validation failures, provider exceptions, and library debug paths. Assert that submitted/saved keys never appear in responses, persisted jobs, receipts, snapshots, logs, or the parser's environment/mounts. |
+| Area | Required verification |
+| --- | --- |
+| **Persistence and model roles** | Save a key, restart the API/worker, and use the same saved key for real bounded embedding and generation calls through one connection. Keep failures in the two role validations distinct. |
+| **Integrity and resource binding** | Tamper with ciphertext, nonce, project/connection binding, credential revision, and key ID. Each case must prevent dispatch. Missing or wrong root keys must not generate replacement material. |
+| **Concurrent changes and retries** | Race replacements and repeat a lost-response request. Verify one conditional mutation, correct idempotency behavior, and metadata-only responses. |
+| **Removal** | Remove a credential and deny subsequent dispatch without claiming to cancel a call already sent. Do not reuse a cached old plaintext value or fall back to another provider. |
+| **Authorization and disclosure** | Exercise unauthorized management/use, cross-project references, request-validation failures, provider exceptions, and library debug paths. Assert that submitted/saved keys never appear in responses, persisted jobs, receipts, snapshots, logs, or the parser's environment/mounts. |
 
 These tests are focused enough for one developer and are necessary before relying on the credential path. This ADR adds no performance claim, implementation audit, or qualified image lock.
 
@@ -327,23 +323,23 @@ Use this approach for the root encryption key, the separate idempotency-fingerpr
 
 ### Related decisions
 
-| Reference                                                                            | Responsibility                                                                                                   |
-| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| [Canonical architecture guide](../ARCHITECTURE.md)                                   | Overall application structure and model-connection ownership.                                                    |
-| [ADR-0006: Gateway and connections](ADR-0006-byok-provider-boundary.md)              | Approved endpoints, semantic connection revisions, separate model roles, and outbound-request restrictions.      |
-| [ADR-0005: Access](ADR-0005-api-enforced-tenancy-and-authorization.md)               | Current management/use permissions, project scope, and the distinction between human and integration identities. |
-| [ADR-0007: Idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md)           | Secret-bearing request fingerprints, safe replay outcomes, incoming-key issuance, and uncertain provider calls.  |
-| [ADR-0011: Compose deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md) | Service-specific secret mounts and protected persistent deployment configuration.                                |
+| Reference | Responsibility |
+| --- | --- |
+| [Canonical architecture guide](../ARCHITECTURE.md) | Overall application structure and model-connection ownership. |
+| [ADR-0006: Gateway and connections](ADR-0006-byok-provider-boundary.md) | Approved endpoints, semantic connection revisions, separate model roles, and outbound-request restrictions. |
+| [ADR-0005: Access](ADR-0005-api-enforced-tenancy-and-authorization.md) | Current management/use permissions, project scope, and the distinction between human and integration identities. |
+| [ADR-0007: Idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Secret-bearing request fingerprints, safe replay outcomes, incoming-key issuance, and uncertain provider calls. |
+| [ADR-0011: Compose deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md) | Service-specific secret mounts and protected persistent deployment configuration. |
 
 ### Recorded external evidence
 
 The original ADR records the following observations from **19 September 2026**. They are retained as source evidence, not freshly verified releases or qualified Inframeld dependencies.
 
-| Component                               | Recorded observation and boundary                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **OpenBao 2.6.2**                       | The observed released version, under MPL-2.0. `2.7.0-beta20260909` is a prerelease and is not assumed here. Its maintained KV, authentication, and unseal APIs make it a realistic alternative, not a selected dependency. [Release](https://github.com/openbao/openbao/releases/tag/v2.6.2), [source license](https://github.com/openbao/openbao/blob/v2.6.2/LICENSE).                                                                                                                         |
-| **PyNaCl 1.6.2**                        | Released **1 January 2026**; the source records an updated bundled libsodium build and the inspected `Aead` interface. Its Apache-2.0 source license fits the intended dependency policy; retain packaging notices. This is an initial library candidate, not an installed or qualified image lock. [Changelog](https://pynacl.readthedocs.io/en/latest/changelog/), [published package](https://pypi.org/project/PyNaCl/1.6.2/), [license](https://github.com/pyca/pynacl/blob/1.6.2/LICENSE). |
-| **`cryptography` 50.0.1 documentation** | The observed stable documentation version. `AESGCM` supplies authenticated encryption and associated data and explicitly requires nonce non-reuse. It remains an alternative, not another framework to deploy. [Versioned API](https://cryptography.io/en/50.0.1/hazmat/primitives/aead/).                                                                                                                                                                                                      |
+| Component | Recorded observation and boundary |
+| --- | --- |
+| **OpenBao 2.6.2** | The observed released version, under MPL-2.0. `2.7.0-beta20260909` is a prerelease and is not assumed here. Its maintained KV, authentication, and unseal APIs make it a realistic alternative, not a selected dependency. [Release](https://github.com/openbao/openbao/releases/tag/v2.6.2), [source license](https://github.com/openbao/openbao/blob/v2.6.2/LICENSE). |
+| **PyNaCl 1.6.2** | Released **1 January 2026**; the source records an updated bundled libsodium build and the inspected `Aead` interface. Its Apache-2.0 source license fits the intended dependency policy; retain packaging notices. This is an initial library candidate, not an installed or qualified image lock. [Changelog](https://pynacl.readthedocs.io/en/latest/changelog/), [published package](https://pypi.org/project/PyNaCl/1.6.2/), [license](https://github.com/pyca/pynacl/blob/1.6.2/LICENSE). |
+| **`cryptography` 50.0.1 documentation** | The observed stable documentation version. `AESGCM` supplies authenticated encryption and associated data and explicitly requires nonce non-reuse. It remains an alternative, not another framework to deploy. [Versioned API](https://cryptography.io/en/50.0.1/hazmat/primitives/aead/). |
 
 These version and licensing observations come from the source ADR's recorded review.
 

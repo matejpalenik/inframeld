@@ -1,9 +1,6 @@
 # ADR-0012: Controlled database and runtime upgrades
 
-**Status:** Accepted — maintenance-upgrade baseline; implementation qualification pending.
-**Revised:** 19 September 2026.
-**Required approach:** Operator-controlled migrations and coordinated maintenance upgrades in production Docker Compose. Zero-downtime runtime upgrades are outside v1 scope.
-**Related:** [Runtime deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md), [recovery](ADR-0013-minimal-hosted-observability-and-recovery.md).
+**Status:** Accepted — maintenance-upgrade baseline; implementation qualification pending. **Revised:** 19 September 2026. **Required approach:** Operator-controlled migrations and coordinated maintenance upgrades in production Docker Compose. Zero-downtime runtime upgrades are outside v1 scope. **Related:** [Runtime deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md), [recovery](ADR-0013-minimal-hosted-observability-and-recovery.md).
 
 ## Context
 
@@ -27,11 +24,11 @@ The API and worker share a versioned database schema and run from a compatible a
 
 Database compatibility is only one part of the requirement. Make all three persisted-format versions explicit:
 
-| Versioned representation | What it describes                                                                                                                            |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Database schema**      | The structure of application data in the database.                                                                                           |
-| **Job payload**          | The stored instructions and inputs the worker uses to execute a job.                                                                         |
-| **Artifact format**      | The structure of stored outputs, such as processing results or manifests. A manifest records an inventory of artifacts or source identities. |
+| Versioned representation | What it describes |
+| --- | --- |
+| **Database schema** | The structure of application data in the database. |
+| **Job payload** | The stored instructions and inputs the worker uses to execute a job. |
+| **Artifact format** | The structure of stored outputs, such as processing results or manifests. A manifest records an inventory of artifacts or source identities. |
 
 A new worker must safely reject an old job shape it does not support. Starting successfully against the database is not permission to guess how to interpret an unfamiliar job payload.
 
@@ -62,13 +59,13 @@ An **additive change** introduces something new while preserving the existing re
 
 When old and new representations need to coexist, use the following sequence:
 
-| Phase            | What happens                                                                        |
-| ---------------- | ----------------------------------------------------------------------------------- |
-| **Expand**       | Add the new representation while keeping the old one available.                     |
-| **Backfill**     | Populate the new representation for existing records using bounded, resumable work. |
-| **Verify**       | Check the converted data before relying on it.                                      |
-| **Switch**       | Change the application to use the new representation.                               |
-| **Remove later** | Remove obsolete fields in a later release, not as part of the initial expansion.    |
+| Phase | What happens |
+| --- | --- |
+| **Expand** | Add the new representation while keeping the old one available. |
+| **Backfill** | Populate the new representation for existing records using bounded, resumable work. |
+| **Verify** | Check the converted data before relying on it. |
+| **Switch** | Change the application to use the new representation. |
+| **Remove later** | Remove obsolete fields in a later release, not as part of the initial expansion. |
 
 **Bounded** means each backfill step handles a limited amount of work. **Resumable** means an interruption does not require starting the entire conversion again.
 
@@ -106,14 +103,14 @@ If compatibility is not established, keep maintenance mode enabled. Either resto
 
 Use representative persisted jobs, source and artifact references, and Deployments. An upgrade test against an empty database alone does not exercise these compatibility requirements.
 
-| Area                               | Required verification                                                                                                                |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Upgrade**                        | Apply the upgrade against representative existing state and verify that the new API and worker can use it correctly.                 |
-| **Migration ownership**            | Verify migration locking and that API/worker startup cannot race to migrate the schema.                                              |
-| **Compatibility refusal**          | Verify that incompatible startup is rejected and that the new worker safely rejects unsupported old job shapes.                      |
-| **Backfill recovery**              | Interrupt a backfill and verify that its bounded work can resume.                                                                    |
+| Area | Required verification |
+| --- | --- |
+| **Upgrade** | Apply the upgrade against representative existing state and verify that the new API and worker can use it correctly. |
+| **Migration ownership** | Verify migration locking and that API/worker startup cannot race to migrate the schema. |
+| **Compatibility refusal** | Verify that incompatible startup is rejected and that the new worker safely rejects unsupported old job shapes. |
+| **Backfill recovery** | Interrupt a backfill and verify that its bounded work can resume. |
 | **Supported application rollback** | Exercise the claimed rollback path against persisted jobs, source/artifact references, and Deployments—not only the database schema. |
-| **Restore**                        | Validate the documented restore procedure and the restore point required for destructive changes.                                    |
+| **Restore** | Validate the documented restore procedure and the restore point required for destructive changes. |
 
 These are acceptance conditions. The maintenance-upgrade approach is accepted, but implementation qualification has not yet been completed.
 
@@ -153,9 +150,9 @@ Use a supported runtime rollback, a validated restore, or a corrective forward c
 
 ## References
 
-| Reference                                                                                | Responsibility                                                                            |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| [ADR-0011: Runtime deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md)     | The production Docker Compose installation and coordinated application-release procedure. |
-| [ADR-0013: Recovery](ADR-0013-minimal-hosted-observability-and-recovery.md)              | The documented backup and restore procedure used during upgrades and recovery.            |
-| [ADR-0004: Vector writes](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md)      | Handling vector operations whose external outcomes are uncertain.                         |
-| [ADR-0007: Durable jobs and recovery](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Safe job handling, retries, and uncertain provider outcomes.                              |
+| Reference | Responsibility |
+| --- | --- |
+| [ADR-0011: Runtime deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md) | The production Docker Compose installation and coordinated application-release procedure. |
+| [ADR-0013: Recovery](ADR-0013-minimal-hosted-observability-and-recovery.md) | The documented backup and restore procedure used during upgrades and recovery. |
+| [ADR-0004: Vector writes](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md) | Handling vector operations whose external outcomes are uncertain. |
+| [ADR-0007: Durable jobs and recovery](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Safe job handling, retries, and uncertain provider outcomes. |

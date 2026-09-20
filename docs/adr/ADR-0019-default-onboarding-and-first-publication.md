@@ -1,10 +1,6 @@
 # ADR-0019: Default onboarding and reversible publication modes
 
-**Status:** Accepted — private defaults and reversible Automatic updates / Manual releases. Implementation qualification is pending.
-**Date:** 19 September 2026.
-**Required approach:** Private first-use setup, persistent model credentials, and ordinary builds followed by separately authorized publication.
-**Source:** [Canonical architecture guide](../ARCHITECTURE.md).
-**Related:** [API contract](ADR-0002-product-owned-openapi-contract.md), [lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md), [Access](ADR-0005-api-enforced-tenancy-and-authorization.md), [models](ADR-0006-byok-provider-boundary.md), [jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md), [releases](ADR-0009-sticky-logical-canary-deployments.md), [bindings](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md), [credentials](ADR-0020-persistent-outbound-credentials.md).
+**Status:** Accepted — private defaults and reversible Automatic updates / Manual releases. Implementation qualification is pending. **Date:** 19 September 2026. **Required approach:** Private first-use setup, persistent model credentials, and ordinary builds followed by separately authorized publication. **Source:** [Canonical architecture guide](../ARCHITECTURE.md). **Related:** [API contract](ADR-0002-product-owned-openapi-contract.md), [lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md), [Access](ADR-0005-api-enforced-tenancy-and-authorization.md), [models](ADR-0006-byok-provider-boundary.md), [jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md), [releases](ADR-0009-sticky-logical-canary-deployments.md), [bindings](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md), [credentials](ADR-0020-persistent-outbound-credentials.md).
 
 ## Context
 
@@ -28,10 +24,10 @@ Application services connect existing builds to separate publication commands. N
 
 Both modes use the same source versions, build behavior, ready pipeline versions, and query path. They differ in how a change becomes authorized to serve.
 
-| Mode                  | Document changes                                                                                 | Pipeline configuration                                                                            | Release control                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Mode | Document changes | Pipeline configuration | Release control |
+| --- | --- | --- | --- |
 | **Automatic updates** | A completed, authorized batch requests a build and publication of its complete frozen selection. | **Save and apply** selects configuration and authorizes its update. Unrelated drafts are ignored. | Publish only the eligible, complete, ready result. Do not automatically run an evaluation or start a canary. |
-| **Manual releases**   | Admit new versions as unpublished inputs.                                                        | Save draft settings without changing traffic.                                                     | Use explicit Build, Compare, candidate/canary, promote/reject, and rollback actions.                         |
+| **Manual releases** | Admit new versions as unpublished inputs. | Save draft settings without changing traffic. | Use explicit Build, Compare, candidate/canary, promote/reject, and rollback actions. |
 
 A **batch** is a bounded, fixed selection of files. **Frozen inputs** record exactly which source versions and configuration an operation will use; they do not change while it runs. A **canary** tries a candidate with a selected portion of traffic before promotion.
 
@@ -89,19 +85,19 @@ A small **project-default binding** records stable resource IDs and an expected 
 
 Before the default Deployment exists, this binding holds the selected mode and publication control revision. First publication transfers that control state into the actual Deployment atomically. **There must never be two independent authorities for its mode.**
 
-| Resource                                     | State after authorized provisioning                                                   | What makes it usable or ready                                                                              |
-| -------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Organization, project, and private group** | Ordinary records and creator membership.                                              | Verified account/bootstrap authorization and the completed provisioning transaction.                       |
-| **Default Collection**                       | An empty named collection referenced by project defaults.                             | An admitted batch produces an exact usable CollectionRevision. An empty collection is not evidence.        |
-| **Built-in ProcessingProfile**               | An immutable conservative text-first preset.                                          | Its pinned parser and assets pass normal readiness checks. No per-user profile editor is required.         |
-| **Default Pipeline**                         | A named root with incomplete draft configuration linked to the collection and preset. | Model roles and exact inputs are selected, and a successful build produces a complete PipelineVersion.     |
-| **Provider connection and credential**       | No fictional valid credential or ready connection.                                    | Required credentials are saved, endpoint policy permits the origin, and role-specific validation succeeds. |
-| **EmbeddingProfile**                         | Absent until the model’s semantics and dimensions are established.                    | Validated embedding selection creates the immutable profile used for document and query embeddings.        |
-| **Generation configuration**                 | Incomplete until selected.                                                            | Connection revision, model, and settings are validated and frozen into build inputs.                       |
-| **Materialization and PipelineVersion**      | Absent.                                                                               | Parsing, chunking, embedding, and index verification succeed for the frozen corpus and profiles.           |
-| **Logical default route**                    | A stable project-scoped address, initially unbound, with Automatic updates selected.  | First publication creates and binds a genuinely ready Deployment.                                          |
-| **Deployment**                               | **Absent**, not an idle or fake-ready record.                                         | An authorized creation commits one ready current version, with no candidate or previous target.            |
-| **Benchmark and judge**                      | Neither required nor silently configured.                                             | The user later chooses comparison and configures its evaluator inputs.                                     |
+| Resource | State after authorized provisioning | What makes it usable or ready |
+| --- | --- | --- |
+| **Organization, project, and private group** | Ordinary records and creator membership. | Verified account/bootstrap authorization and the completed provisioning transaction. |
+| **Default Collection** | An empty named collection referenced by project defaults. | An admitted batch produces an exact usable CollectionRevision. An empty collection is not evidence. |
+| **Built-in ProcessingProfile** | An immutable conservative text-first preset. | Its pinned parser and assets pass normal readiness checks. No per-user profile editor is required. |
+| **Default Pipeline** | A named root with incomplete draft configuration linked to the collection and preset. | Model roles and exact inputs are selected, and a successful build produces a complete PipelineVersion. |
+| **Provider connection and credential** | No fictional valid credential or ready connection. | Required credentials are saved, endpoint policy permits the origin, and role-specific validation succeeds. |
+| **EmbeddingProfile** | Absent until the model’s semantics and dimensions are established. | Validated embedding selection creates the immutable profile used for document and query embeddings. |
+| **Generation configuration** | Incomplete until selected. | Connection revision, model, and settings are validated and frozen into build inputs. |
+| **Materialization and PipelineVersion** | Absent. | Parsing, chunking, embedding, and index verification succeed for the frozen corpus and profiles. |
+| **Logical default route** | A stable project-scoped address, initially unbound, with Automatic updates selected. | First publication creates and binds a genuinely ready Deployment. |
+| **Deployment** | **Absent**, not an idle or fake-ready record. | An authorized creation commits one ready current version, with no candidate or previous target. |
+| **Benchmark and judge** | Neither required nor silently configured. | The user later chooses comparison and configures its evaluator inputs. |
 
 A **ProcessingProfile** defines document conversion and chunking. A **chunk** is a source excerpt prepared for retrieval. An **EmbeddingProfile** fixes the model behavior and numerical vector dimensions used for search. A **materialization** is the verified searchable data for the selected collection revision and profiles. The **corpus** is the selected body of documents.
 
@@ -220,11 +216,11 @@ Progress distinguishes upload, preparation, ready version, and publication outco
 
 The publication command belongs to **Releases**. It checks scope, readiness, input/target compatibility, current authorization, absence of a candidate, and the concurrency guards below.
 
-| Publication case                         | Effect                                                                                                                                                                              |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **First default publication**            | Create the actual Deployment and bind the route in the same short SQL transaction, transferring publication-control state. It has one ready current version and no previous target. |
-| **Later eligible automatic publication** | Replace current and retain the former current as the designated one-step previous target. Do not manufacture a canary candidate or traffic ramp.                                    |
-| **Result identical to current**          | Do nothing to the serving pointers, including the previous target.                                                                                                                  |
+| Publication case | Effect |
+| --- | --- |
+| **First default publication** | Create the actual Deployment and bind the route in the same short SQL transaction, transferring publication-control state. It has one ready current version and no previous target. |
+| **Later eligible automatic publication** | Replace current and retain the former current as the designated one-step previous target. Do not manufacture a canary candidate or traffic ramp. |
+| **Result identical to current** | Do nothing to the serving pointers, including the previous target. |
 
 A **pointer** is a stored reference to the selected version. Record the initiating action, mode/control revision, exact versions, and automatic-publication outcome in ordinary history. Record that benchmark review was not part of this authorized update; do not invent a passed evaluation or manual approval. Scores and answer feedback never initiate publication.
 
@@ -246,10 +242,10 @@ No re-upload or index copy is needed. A successful switch leaves the version the
 
 Publication and switching can race:
 
-| Which transaction commits first? | Result                                                                                                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **The switch**                   | The old automatic publication fails its guard.                                                                                                                |
-| **The publication**              | It changes the Deployment revision. A switch expecting the old revision conflicts and leaves the mode unchanged. The user reloads and makes a fresh decision. |
+| Which transaction commits first? | Result |
+| --- | --- |
+| **The switch** | The old automatic publication fails its guard. |
+| **The publication** | It changes the Deployment revision. A switch expecting the old revision conflicts and leaves the mode unchanged. The user reloads and makes a fresh decision. |
 
 The client must not replace the expected revision and retry blindly. **A rejected switch must not be displayed as automation disabled.** Switching is not rollback and does not undo publication that already committed.
 
@@ -281,9 +277,9 @@ Re-enabling Automatic updates later explicitly applies the selected inputs again
 
 Keep two small release-control values alongside existing jobs:
 
-| Guard                                         | What changes it                                                                                               |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Monotonically increasing control revision** | Mode switches, changes to the automatic-update binding, and explicit invalidation.                            |
+| Guard | What changes it |
+| --- | --- |
+| **Monotonically increasing control revision** | Mode switches, changes to the automatic-update binding, and explicit invalidation. |
 | **Newest authorized update-request identity** | A newly authorized complete document batch or explicit apply action. Draft edits alone do not supersede work. |
 
 These are guards, not a new family of domain objects. Reuse existing revision mechanisms where they provide these semantics.
@@ -302,15 +298,15 @@ That newer request includes the chosen existing corpus as well as the new files.
 
 The final release transaction requires:
 
-| Check                            | Required condition                                                                                  |
-| -------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Publication mode**             | Automatic updates is still selected.                                                                |
-| **Control and request identity** | The captured control revision and newest authorized request identity still match.                   |
-| **Job ownership**                | This attempt still owns completion.                                                                 |
-| **Expected serving state**       | The current Deployment or default binding still matches the captured expectation.                   |
-| **Candidate**                    | No candidate is attached.                                                                           |
-| **Permissions and inputs**       | Current authorization and input lifecycle still permit the result.                                  |
-| **Readiness and retention**      | All required dependencies are ready, and relevant deletion/retention gates still allow publication. |
+| Check | Required condition |
+| --- | --- |
+| **Publication mode** | Automatic updates is still selected. |
+| **Control and request identity** | The captured control revision and newest authorized request identity still match. |
+| **Job ownership** | This attempt still owns completion. |
+| **Expected serving state** | The current Deployment or default binding still matches the captured expectation. |
+| **Candidate** | No candidate is attached. |
+| **Permissions and inputs** | Current authorization and input lifecycle still permit the result. |
+| **Readiness and retention** | All required dependencies are ready, and relevant deletion/retention gates still allow publication. |
 
 These checks, the pointer update, and history commit together. Initial default creation and mode switching lock/check the same binding so they cannot create competing mode authorities.
 
@@ -320,12 +316,12 @@ If newer work is admitted first, old publication is skipped. If old publication 
 
 #### Example: switching off and on does not revive an old update
 
-| Event                                            | Control revision and authority                                                       |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| **U1 is admitted for P13 in Automatic updates.** | U1 captures revision **10**.                                                         |
-| **The user switches to Manual releases.**        | Control advances to **11**; U1 loses publication authority.                          |
-| **The user enables Automatic updates again.**    | Control advances to **12**, and a fresh request U2 is admitted.                      |
-| **U1 finishes late.**                            | It still carries **10** and cannot publish, even though the mode is automatic again. |
+| Event | Control revision and authority |
+| --- | --- |
+| **U1 is admitted for P13 in Automatic updates.** | U1 captures revision **10**. |
+| **The user switches to Manual releases.** | Control advances to **11**; U1 loses publication authority. |
+| **The user enables Automatic updates again.** | Control advances to **12**, and a fresh request U2 is admitted. |
+| **U1 finishes late.** | It still carries **10** and cannot publish, even though the mode is automatic again. |
 
 U2 may reuse compatible P13 artifacts, but it owns a new decision and input snapshot. Checking only a boolean automatic-mode flag would wrongly permit U1 to publish.
 
@@ -387,16 +383,16 @@ The route, permissions, data, and historical evaluations remain the same ordinar
 
 Use real PostgreSQL concurrency tests and the existing adapter-qualification tests. These are requirements, not tests already passed by this design.
 
-| Area                                   | Required verification                                                                                                                                                                                                                        |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provisioning and creation**          | Defaults start automatic without a fake-ready Deployment. Explicit creation defaults manual and honors an explicit automatic choice. A failed or incomplete first batch never serves.                                                        |
-| **Successful and failed replacements** | Automatic publication uses complete ready bindings, records previous/history, and preserves answer/feedback attribution. Failed replacement preserves healthy current serving; erasure and unavailability retain their separate rules.       |
-| **Mode-switch races**                  | Exercise publication versus switching to manual in both commit orders, and automatic → manual → automatic while an old build runs. Only still-authorized work may publish.                                                                   |
-| **Overlapping batches**                | Supersede both queued and running work. Verify complete corpus membership, no stale overwrite, and no fallback to an older result when the newest request fails.                                                                             |
-| **Crashes and retries**                | Restart between build completion, publication, and acknowledgment. Retry mode/update commands with the same and different keys. Prevent duplicate admission, duplicate pointer transitions, and implicit repetition of uncertain paid calls. |
-| **Candidate and rollback rules**       | Reject enabling automation with a candidate at 0% or nonzero traffic. Reject manual canary/release commands in automatic mode. Rollback stays manual; re-enabling clearly authorizes the selected pending update.                            |
-| **Current access and lifecycle**       | Test revoked grants, upload-only/query-only actors, differing target permissions, erased inputs, default deletion/rebinding, and unavailable rollback targets. Neither mode nor an old job bypasses current policy.                          |
-| **Client parity**                      | Verify HTTP/Studio/SDK status and MCP query/receipt behavior through mode changes. Add no administrative MCP tools. A comparison neither pauses publication nor promotes its preferred version.                                              |
+| Area | Required verification |
+| --- | --- |
+| **Provisioning and creation** | Defaults start automatic without a fake-ready Deployment. Explicit creation defaults manual and honors an explicit automatic choice. A failed or incomplete first batch never serves. |
+| **Successful and failed replacements** | Automatic publication uses complete ready bindings, records previous/history, and preserves answer/feedback attribution. Failed replacement preserves healthy current serving; erasure and unavailability retain their separate rules. |
+| **Mode-switch races** | Exercise publication versus switching to manual in both commit orders, and automatic → manual → automatic while an old build runs. Only still-authorized work may publish. |
+| **Overlapping batches** | Supersede both queued and running work. Verify complete corpus membership, no stale overwrite, and no fallback to an older result when the newest request fails. |
+| **Crashes and retries** | Restart between build completion, publication, and acknowledgment. Retry mode/update commands with the same and different keys. Prevent duplicate admission, duplicate pointer transitions, and implicit repetition of uncertain paid calls. |
+| **Candidate and rollback rules** | Reject enabling automation with a candidate at 0% or nonzero traffic. Reject manual canary/release commands in automatic mode. Rollback stays manual; re-enabling clearly authorizes the selected pending update. |
+| **Current access and lifecycle** | Test revoked grants, upload-only/query-only actors, differing target permissions, erased inputs, default deletion/rebinding, and unavailable rollback targets. Neither mode nor an old job bypasses current policy. |
+| **Client parity** | Verify HTTP/Studio/SDK status and MCP query/receipt behavior through mode changes. Add no administrative MCP tools. A comparison neither pauses publication nor promotes its preferred version. |
 
 **Parity** means that different clients observe the same application behavior and state, not that they implement separate versions of it.
 
@@ -408,16 +404,16 @@ The first-answer scenario is a usability exercise. **Two minutes is an aspiratio
 
 A **fixture** is a defined set of test inputs used to repeat the scenario.
 
-| Part of the scenario        | Assumption or bound                                                                                                                                                                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Documents**               | Two UTF-8 Markdown/plain-text files, each at most **25 KiB**, about **10 chunks combined**, with a hard test cap of **20 chunks**. UTF-8 is the text encoding used by the files.                                         |
-| **Retrieval evidence**      | Include facts absent from the question, such as a fictional product’s exact refund period and installation port. Success must depend on retrieving them.                                                                 |
-| **Excluded document work**  | PDFs remain supported elsewhere, but scanned PDFs/OCR, tables, and larger documents are outside this timing scenario.                                                                                                    |
-| **Proposed host**           | A laptop with **16 GiB RAM**, roughly **four CPUs and 8 GiB available to Docker**, local SSD, and the existing small-trial disk allowance. These are proposed test assumptions, not measured minimum requirements.       |
-| **Concurrency**             | One user and one parser job, with no concurrent builds/evaluations and no local language-model or cross-encoder loading.                                                                                                 |
-| **Prepared installation**   | Product images and pinned parser text assets are already downloaded. Application volumes are empty, so migrations, account setup, and default provisioning still happen.                                                 |
+| Part of the scenario | Assumption or bound |
+| --- | --- |
+| **Documents** | Two UTF-8 Markdown/plain-text files, each at most **25 KiB**, about **10 chunks combined**, with a hard test cap of **20 chunks**. UTF-8 is the text encoding used by the files. |
+| **Retrieval evidence** | Include facts absent from the question, such as a fictional product’s exact refund period and installation port. Success must depend on retrieving them. |
+| **Excluded document work** | PDFs remain supported elsewhere, but scanned PDFs/OCR, tables, and larger documents are outside this timing scenario. |
+| **Proposed host** | A laptop with **16 GiB RAM**, roughly **four CPUs and 8 GiB available to Docker**, local SSD, and the existing small-trial disk allowance. These are proposed test assumptions, not measured minimum requirements. |
+| **Concurrency** | One user and one parser job, with no concurrent builds/evaluations and no local language-model or cross-encoder loading. |
+| **Prepared installation** | Product images and pinned parser text assets are already downloaded. Application volumes are empty, so migrations, account setup, and default provisioning still happen. |
 | **Protected configuration** | The operator supplies persistent encryption/bootstrap secret files through normal one-time installation preparation. This is a stated prerequisite, not a substitute for saving provider credentials in the application. |
-| **Model endpoint**          | An available, pre-approved endpoint, with valid credentials at hand. Configure embedding and generation separately, sharing a connection where appropriate. No judge is needed.                                          |
+| **Model endpoint** | An available, pre-approved endpoint, with valid credentials at hand. Configure embedding and generation separately, sharing a connection where appropriate. No judge is needed. |
 
 Origin and certificate-authority approval are already satisfied by the chosen launch configuration. An unfamiliar private gateway needing operator certificate/network setup has a separate measured setup cost and cannot be promised the same result.
 
@@ -425,11 +421,11 @@ Record role-probe, embedding, and generation latency, including throttling or a 
 
 #### Report three different journeys rather than substituting the easiest one
 
-| Journey                                                   | What its clock includes                                                                                                                                                                                                                                                                                                            |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Prepared installation launch → first answer**           | Start when the user launches the already-installed product, before services are healthy. Include startup/migrations, account/private-resource setup, model/credential entry and probes, upload, parsing/chunking, embeddings, index verification, authorized publication, and question generation. Include human interaction time. |
-| **Clean installation → first answer**                     | Also include obtaining Docker if absent, image/model downloads, generating initial protected configuration, and host/network setup. Report these real first-run costs rather than moving them outside both clocks.                                                                                                                 |
-| **Restart with existing accounts/configuration → answer** | A separate, easier case. It must not replace the empty-application-state journey.                                                                                                                                                                                                                                                  |
+| Journey | What its clock includes |
+| --- | --- |
+| **Prepared installation launch → first answer** | Start when the user launches the already-installed product, before services are healthy. Include startup/migrations, account/private-resource setup, model/credential entry and probes, upload, parsing/chunking, embeddings, index verification, authorized publication, and question generation. Include human interaction time. |
+| **Clean installation → first answer** | Also include obtaining Docker if absent, image/model downloads, generating initial protected configuration, and host/network setup. Report these real first-run costs rather than moving them outside both clocks. |
+| **Restart with existing accounts/configuration → answer** | A separate, easier case. It must not replace the empty-application-state journey. |
 
 Large image downloads can themselves exceed two minutes. Do not claim “two minutes from a fresh machine.” Record automated substep times separately, but do not treat an API test that supplies configuration instantly as a test of human onboarding.
 
@@ -489,17 +485,17 @@ The source records superseded or excluded approaches, not a separate comparative
 
 ## References
 
-| Reference                                                                                       | Responsibility                                                                                      |
-| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| [Canonical architecture guide](../ARCHITECTURE.md)                                              | Overall product architecture and existing resource ownership.                                       |
-| [ADR-0002: API contract](ADR-0002-product-owned-openapi-contract.md)                            | Authoritative HTTP contract, generated clients, and backend-first implementation.                   |
-| [ADR-0003: Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md)                   | Immutable source/configuration identities and historical attribution.                               |
-| [ADR-0005: Access](ADR-0005-api-enforced-tenancy-and-authorization.md)                          | Verified principals, controlled account admission, private groups, and fixed integration authority. |
-| [ADR-0006: Models](ADR-0006-byok-provider-boundary.md)                                          | Model roles, approved connections, independent capability checks, and credential changes.           |
-| [ADR-0007: Jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md)                             | Durable operations, safe retries, uncertain outcomes, and logical-route deduplication.              |
-| [ADR-0009: Releases](ADR-0009-sticky-logical-canary-deployments.md)                             | Initial Deployment creation, mode changes, pointer transitions, and one-step rollback.              |
-| [ADR-0015: Bindings](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Frozen builds, verified materializations, and complete ready pipeline bindings.                     |
-| [ADR-0020: Credentials](ADR-0020-persistent-outbound-credentials.md)                            | Accepted persistent application-entered credentials using PostgreSQL/PyNaCl.                        |
+| Reference | Responsibility |
+| --- | --- |
+| [Canonical architecture guide](../ARCHITECTURE.md) | Overall product architecture and existing resource ownership. |
+| [ADR-0002: API contract](ADR-0002-product-owned-openapi-contract.md) | Authoritative HTTP contract, generated clients, and backend-first implementation. |
+| [ADR-0003: Lineage](ADR-0003-immutable-rag-lineage-and-release-identities.md) | Immutable source/configuration identities and historical attribution. |
+| [ADR-0005: Access](ADR-0005-api-enforced-tenancy-and-authorization.md) | Verified principals, controlled account admission, private groups, and fixed integration authority. |
+| [ADR-0006: Models](ADR-0006-byok-provider-boundary.md) | Model roles, approved connections, independent capability checks, and credential changes. |
+| [ADR-0007: Jobs](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Durable operations, safe retries, uncertain outcomes, and logical-route deduplication. |
+| [ADR-0009: Releases](ADR-0009-sticky-logical-canary-deployments.md) | Initial Deployment creation, mode changes, pointer transitions, and one-step rollback. |
+| [ADR-0015: Bindings](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Frozen builds, verified materializations, and complete ready pipeline bindings. |
+| [ADR-0020: Credentials](ADR-0020-persistent-outbound-credentials.md) | Accepted persistent application-entered credentials using PostgreSQL/PyNaCl. |
 
 The source records an [inspection of the old repository](../reviews/onboarding-reference.md) that identified continuous managed-default publication code. That code was inspected, not executed. This design adopts the automatic experience while retaining the new application’s version, authorization, and job boundaries. It does not import the old `Context` hierarchy or treat the old implementation as proof of this protocol’s failure handling.
 

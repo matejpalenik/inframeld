@@ -1,9 +1,6 @@
 # ADR-0007: PostgreSQL jobs, idempotency, and honest retry semantics
 
-**Status:** Accepted — jobs and idempotency design; implementation qualification pending.
-**Revised:** 19 September 2026.
-**Required approach:** PostgreSQL-backed durable jobs, request deduplication, and explicit handling of uncertain external outcomes in the supported production Docker Compose deployment.
-**Related:** [Vector writes](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md), [release transitions](ADR-0009-sticky-logical-canary-deployments.md), [recovery](ADR-0013-minimal-hosted-observability-and-recovery.md).
+**Status:** Accepted — jobs and idempotency design; implementation qualification pending. **Revised:** 19 September 2026. **Required approach:** PostgreSQL-backed durable jobs, request deduplication, and explicit handling of uncertain external outcomes in the supported production Docker Compose deployment. **Related:** [Vector writes](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md), [release transitions](ADR-0009-sticky-logical-canary-deployments.md), [recovery](ADR-0013-minimal-hosted-observability-and-recovery.md).
 
 ## Context
 
@@ -15,11 +12,11 @@ These situations require different answers. We need to remember accepted work, d
 
 Three mechanisms address different problems:
 
-| Mechanism             | Question it answers                                                                                 |
-| --------------------- | --------------------------------------------------------------------------------------------------- |
-| **Idempotency key**   | Is this a retry of the same requested operation?                                                    |
-| **Job fence**         | Does this worker attempt still have authority to record progress or publish a result in PostgreSQL? |
-| **Expected revision** | Is this change based on the same application state the caller originally observed?                  |
+| Mechanism | Question it answers |
+| --- | --- |
+| **Idempotency key** | Is this a retry of the same requested operation? |
+| **Job fence** | Does this worker attempt still have authority to record progress or publish a result in PostgreSQL? |
+| **Expected revision** | Is this change based on the same application state the caller originally observed? |
 
 None of these, by itself, cancels an external request or proves that a remote side effect happened exactly once.
 
@@ -101,11 +98,11 @@ If that insertion’s outcome is unknown, the worker can retry **the same IDs an
 
 The retry stays inside the original job. It is neither a new public mutation nor a new provider request. The general rule against replaying uncertain external work does not prohibit this specifically safe protocol.
 
-| Situation                                                                           | Required handling                                                                                          |
-| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Model response lost; provider outcome unknown**                                   | Record `recovery_required`; do not automatically redispatch the chargeable call.                           |
-| **Chroma insert response lost; exact immutable IDs and payload retained**           | Retry or verify through ADR-0004’s bounded protocol, then publish only while the job still owns its fence. |
-| **Retry payload missing/corrupt, stored records mismatched, or failure persistent** | Use the explicit recovery path rather than invent replacement data or continue ordinary retries.           |
+| Situation | Required handling |
+| --- | --- |
+| **Model response lost; provider outcome unknown** | Record `recovery_required`; do not automatically redispatch the chargeable call. |
+| **Chroma insert response lost; exact immutable IDs and payload retained** | Retry or verify through ADR-0004’s bounded protocol, then publish only while the job still owns its fence. |
+| **Retry payload missing/corrupt, stored records mismatched, or failure persistent** | Use the explicit recovery path rather than invent replacement data or continue ordinary retries. |
 
 A delayed identical insert does not corrupt a live immutable generation. However, unresolved attempts still matter to final physical cleanup: an old external request may remain active after the application has moved on.
 
@@ -154,13 +151,13 @@ Changing a submitted credential must produce a conflicting fingerprint even when
 
 After checking current authentication and authorization, apply the following response contract:
 
-| Retry condition                                             | Response                                                                                                                              |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Same key and equivalent request; safe result complete**   | Replay the documented safe outcome without another mutation. An accepted asynchronous command follows the dedicated `202` rule below. |
-| **Same key, different request**                             | `409 idempotency_key_reused`.                                                                                                         |
-| **Same key for an unfinished synchronous command or query** | `409 idempotency_in_progress`, the operation identity, and a useful `Retry-After` header.                                             |
-| **External outcome uncertain, with no proven safe replay**  | The operation’s stable `recovery_required` status; no automatic redispatch.                                                           |
-| **Same accepted asynchronous command**                      | The same `202 Accepted`, job identity, and `Location` header.                                                                         |
+| Retry condition | Response |
+| --- | --- |
+| **Same key and equivalent request; safe result complete** | Replay the documented safe outcome without another mutation. An accepted asynchronous command follows the dedicated `202` rule below. |
+| **Same key, different request** | `409 idempotency_key_reused`. |
+| **Same key for an unfinished synchronous command or query** | `409 idempotency_in_progress`, the operation identity, and a useful `Retry-After` header. |
+| **External outcome uncertain, with no proven safe replay** | The operation’s stable `recovery_required` status; no automatic redispatch. |
+| **Same accepted asynchronous command** | The same `202 Accepted`, job identity, and `Location` header. |
 
 A **synchronous** operation returns its result through the request being executed. An **asynchronous** command accepts background work and returns a job to follow. `Location` identifies that job resource; `Retry-After` tells the client when to retry checking.
 
@@ -198,12 +195,12 @@ The request uses the same keyed fingerprint described above. The API never retur
 
 A production query has a durable **answer receipt**: a bounded record of what served the request and how it finished. It is not a saved response body.
 
-| Receipt information                                                            | Purpose                                                                                                                                          |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Receipt information | Purpose |
+| --- | --- |
 | **Selected pipeline version, deployment revision, rollout, and actual cohort** | Identify the configuration and routing selection actually used, not whichever version is current later. A cohort is the request’s rollout group. |
-| **Originating stable principal**                                               | Identify the human or application that requested the answer.                                                                                     |
-| **Citations and every document/version used in final generation context**      | Support current access checks, including for sources the model used but did not cite.                                                            |
-| **Safe outcome and timing**                                                    | Report the recorded result of the operation without storing the full answer or snippets.                                                         |
+| **Originating stable principal** | Identify the human or application that requested the answer. |
+| **Citations and every document/version used in final generation context** | Support current access checks, including for sources the model used but did not cite. |
+| **Safe outcome and timing** | Report the recorded result of the operation without storing the full answer or snippets. |
 
 Reserve the answer identity at admission. Finalize its safe outcome **before releasing the completed response**.
 
@@ -211,11 +208,11 @@ The recorded source identities are not a stored context body. They support curre
 
 #### First responses and completed retries are deliberately different
 
-| Request outcome                           | Returned content                                                                                                        |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **First successful query response**       | The answer, `answerId`, and operation identity.                                                                         |
-| **Completed retry with the same key**     | The receipt/status with **`responseAvailable: false`**. No new model call and no claimed replay of the original answer. |
-| **Deliberately new query with a new key** | A new requested operation, which may incur another provider call.                                                       |
+| Request outcome | Returned content |
+| --- | --- |
+| **First successful query response** | The answer, `answerId`, and operation identity. |
+| **Completed retry with the same key** | The receipt/status with **`responseAvailable: false`**. No new model call and no claimed replay of the original answer. |
+| **Deliberately new query with a new key** | A new requested operation, which may incur another provider call. |
 
 A client that needs the full answer must retain its successful response.
 
@@ -235,9 +232,9 @@ Idempotency prevents duplicate execution of one requested action. It does not re
 
 Suppose two requests both try to promote Deployment revision **12**. They use different idempotency keys, so they are genuinely separate commands.
 
-| Command                                           | Result                                                                                        |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **First conditional update against revision 12**  | Succeeds and advances the Deployment to revision **13**.                                      |
+| Command | Result |
+| --- | --- |
+| **First conditional update against revision 12** | Succeeds and advances the Deployment to revision **13**. |
 | **Second conditional update against revision 12** | Updates zero rows because revision 12 is no longer current; returns **`409 stale_revision`**. |
 
 Both mechanisms are required: **idempotency handles duplicate requests; revision checking handles competing requests**. A job fence handles the separate question of whether the worker attempt still owns publication.
@@ -272,14 +269,14 @@ Switching modes advances a **control revision**, which identifies the publicatio
 
 Final publication atomically checks:
 
-| Check                         | What must still hold                                                       |
-| ----------------------------- | -------------------------------------------------------------------------- |
-| **Captured control revision** | The operation still matches the current publication-control state.         |
-| **Newest request identity**   | A newer authorized request has not superseded its publication eligibility. |
-| **Job fence**                 | This execution attempt still owns publication.                             |
-| **Expected serving state**    | The Deployment still has the serving state the transition expects.         |
-| **Readiness**                 | The target version and its required resources are ready.                   |
-| **Current authorization**     | The action remains permitted now.                                          |
+| Check | What must still hold |
+| --- | --- |
+| **Captured control revision** | The operation still matches the current publication-control state. |
+| **Newest request identity** | A newer authorized request has not superseded its publication eligibility. |
+| **Job fence** | This execution attempt still owns publication. |
+| **Expected serving state** | The Deployment still has the serving state the transition expects. |
+| **Readiness** | The target version and its required resources are ready. |
+| **Current authorization** | The action remains permitted now. |
 
 Retries preserve their original update and child identities. If publication committed but its acknowledgement was lost, the recorded publication recovers that result without changing pointers twice.
 
@@ -301,18 +298,18 @@ The API and **MCP**, the Model Context Protocol interface, share this route norm
 
 The following acceptance cases verify the behavior above. They are implementation requirements, not completed qualification.
 
-| Area                              | Required verification                                                                                                                                                         |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Duplicate admission**           | Simultaneous equivalent requests with the same key create one job. Different payloads conflict, including changed submitted credentials.                                      |
-| **Replay authorization**          | Current permissions are rechecked; a remembered key does not bypass revocation or lost document access.                                                                       |
-| **Credential responses**          | Plaintext secrets never enter logs or SQL response caches. A lost issued-key response follows the documented revoke-and-reissue path without creating a duplicate credential. |
-| **Query retries**                 | Retrying does not repeat a model call. First-answer, receipt-only, in-progress, and uncertain outcomes remain distinguishable.                                                |
-| **Worker ownership**              | Stale fences cannot record authoritative progress or publish results.                                                                                                         |
-| **External uncertainty**          | Crashes between external dispatch and result persistence use the correct recovery path: exact captured vector writes differ from ambiguous model calls.                       |
-| **Retry lifecycle**               | Bounded attempts, exhausted-budget failure, safe authorized resume, preserved checkpoints/history, and cancellation follow the recorded rules.                                |
-| **Competing release changes**     | Independent commands cannot both update the same expected Deployment revision.                                                                                                |
-| **Automatic updates and aliases** | Superseded work cannot publish, lost publication acknowledgements do not repeat transitions, and alias changes do not turn retries into new queries.                          |
-| **Restore**                       | Restored queue state does not automatically authorize replay when later provider activity may be missing from the backup.                                                     |
+| Area | Required verification |
+| --- | --- |
+| **Duplicate admission** | Simultaneous equivalent requests with the same key create one job. Different payloads conflict, including changed submitted credentials. |
+| **Replay authorization** | Current permissions are rechecked; a remembered key does not bypass revocation or lost document access. |
+| **Credential responses** | Plaintext secrets never enter logs or SQL response caches. A lost issued-key response follows the documented revoke-and-reissue path without creating a duplicate credential. |
+| **Query retries** | Retrying does not repeat a model call. First-answer, receipt-only, in-progress, and uncertain outcomes remain distinguishable. |
+| **Worker ownership** | Stale fences cannot record authoritative progress or publish results. |
+| **External uncertainty** | Crashes between external dispatch and result persistence use the correct recovery path: exact captured vector writes differ from ambiguous model calls. |
+| **Retry lifecycle** | Bounded attempts, exhausted-budget failure, safe authorized resume, preserved checkpoints/history, and cancellation follow the recorded rules. |
+| **Competing release changes** | Independent commands cannot both update the same expected Deployment revision. |
+| **Automatic updates and aliases** | Superseded work cannot publish, lost publication acknowledgements do not repeat transitions, and alias changes do not turn retries into new queries. |
+| **Restore** | Restored queue state does not automatically authorize replay when later provider activity may be missing from the backup. |
 
 ## Consequences
 
@@ -362,11 +359,11 @@ A short full-answer replay window may be considered later under a separate reten
 
 ## References
 
-| Reference                                                                                            | Responsibility                                                                                    |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| [ADR-0004: Vector writes](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md)                  | Immutable vector generations, exact-payload retries, verification, and unresolved-write cleanup.  |
-| [ADR-0009: Release transitions](ADR-0009-sticky-logical-canary-deployments.md)                       | Deployment transitions and competing release changes.                                             |
-| [ADR-0013: Recovery](ADR-0013-minimal-hosted-observability-and-recovery.md)                          | Backup/restore limits and reconciliation before resuming restored work.                           |
-| [ADR-0017: Answer feedback](ADR-0017-answer-feedback.md)                                             | Editable feedback attached to the existing answer receipt.                                        |
-| [ADR-0019: Default onboarding and publication](ADR-0019-default-onboarding-and-first-publication.md) | Automatic updates, publication control, and the recommended project-default serving alias.        |
-| ADR-0020                                                                                             | Persistent encrypted provider credentials and atomic storage with sanitized idempotency outcomes. |
+| Reference | Responsibility |
+| --- | --- |
+| [ADR-0004: Vector writes](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md) | Immutable vector generations, exact-payload retries, verification, and unresolved-write cleanup. |
+| [ADR-0009: Release transitions](ADR-0009-sticky-logical-canary-deployments.md) | Deployment transitions and competing release changes. |
+| [ADR-0013: Recovery](ADR-0013-minimal-hosted-observability-and-recovery.md) | Backup/restore limits and reconciliation before resuming restored work. |
+| [ADR-0017: Answer feedback](ADR-0017-answer-feedback.md) | Editable feedback attached to the existing answer receipt. |
+| [ADR-0019: Default onboarding and publication](ADR-0019-default-onboarding-and-first-publication.md) | Automatic updates, publication control, and the recommended project-default serving alias. |
+| ADR-0020 | Persistent encrypted provider credentials and atomic storage with sanitized idempotency outcomes. |

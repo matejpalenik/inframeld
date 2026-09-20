@@ -1,11 +1,6 @@
 # ADR-0008: In-app pipeline evaluation and explicit release decisions
 
-**Status:** Accepted — OpenEvals, a configurable Luna judge, and the in-app evaluation workflow. Implementation qualification is pending.
-**Date:** 17 September 2026.
-**Updated:** 19 September 2026.
-**Required approach:** Inframeld owns test cases, evaluation history, comparisons, and release decisions. Every model call uses `ModelGateway`; no hosted evaluation-platform account is required.
-**Source:** [Canonical architecture guide](../ARCHITECTURE.md).
-**Related:** [API contract](ADR-0002-product-owned-openapi-contract.md), [model gateway](ADR-0006-byok-provider-boundary.md), [release transitions](ADR-0009-sticky-logical-canary-deployments.md), [processing and reranking](ADR-0016-docling-processing-and-cross-encoder-reranking.md).
+**Status:** Accepted — OpenEvals, a configurable Luna judge, and the in-app evaluation workflow. Implementation qualification is pending. **Date:** 17 September 2026. **Updated:** 19 September 2026. **Required approach:** Inframeld owns test cases, evaluation history, comparisons, and release decisions. Every model call uses `ModelGateway`; no hosted evaluation-platform account is required. **Source:** [Canonical architecture guide](../ARCHITECTURE.md). **Related:** [API contract](ADR-0002-product-owned-openapi-contract.md), [model gateway](ADR-0006-byok-provider-boundary.md), [release transitions](ADR-0009-sticky-logical-canary-deployments.md), [processing and reranking](ADR-0016-docling-processing-and-cross-encoder-reranking.md).
 
 ## Context
 
@@ -77,14 +72,14 @@ Later baseline reuse would require matching case/dataset semantics, pipeline, ev
 
 A stable identity lets the user follow an item over time. An immutable revision records what that item contained for a particular evaluation. Both are needed: the same case can have a history without pretending its question never changed.
 
-| Concept                | Minimum responsibility                                                                                                                                                                                                       |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Test case**          | A stable ID associated with one pipeline, its active/removed state, and its current case revision. Use this identity to browse history.                                                                                      |
-| **Case revision**      | The immutable question, expected-source labels, expected-abstention setting where supplied, and optional reference answer/notes. Editing produces a new revision; old runs retain their original input.                      |
-| **Benchmark revision** | An immutable, ordered snapshot of case IDs and exact case content/revisions. Save it explicitly or freeze it at comparison admission. Both runs use it.                                                                      |
-| **Evaluator revision** | The immutable scoring contract: library/version, prompt/rubric and schema hashes, metric definitions, judge alias/configuration revision, and generation settings.                                                           |
-| **Evaluation run**     | One pipeline version, benchmark revision, evaluator revision, initiating actor and effective authorization scope, durable job status, timestamps, and summary counts. A comparison references two runs.                      |
-| **Case result**        | Run and case-revision identities; execution and per-metric statuses; scores/reasons; answer and evidence artifact references; observed pipeline/model identities; durations and usage. Include failed and unattempted cases. |
+| Concept | Minimum responsibility |
+| --- | --- |
+| **Test case** | A stable ID associated with one pipeline, its active/removed state, and its current case revision. Use this identity to browse history. |
+| **Case revision** | The immutable question, expected-source labels, expected-abstention setting where supplied, and optional reference answer/notes. Editing produces a new revision; old runs retain their original input. |
+| **Benchmark revision** | An immutable, ordered snapshot of case IDs and exact case content/revisions. Save it explicitly or freeze it at comparison admission. Both runs use it. |
+| **Evaluator revision** | The immutable scoring contract: library/version, prompt/rubric and schema hashes, metric definitions, judge alias/configuration revision, and generation settings. |
+| **Evaluation run** | One pipeline version, benchmark revision, evaluator revision, initiating actor and effective authorization scope, durable job status, timestamps, and summary counts. A comparison references two runs. |
+| **Case result** | Run and case-revision identities; execution and per-metric statuses; scores/reasons; answer and evidence artifact references; observed pipeline/model identities; durations and usage. Include failed and unattempted cases. |
 
 A **rubric** is the set of rules the judge applies. A **schema** defines the required response structure. The initiating **actor** is the verified human or application requesting the run; effective scope records what that actor may access for the evaluation.
 
@@ -104,13 +99,13 @@ Faithfulness, retrieval, and citation checks are required in v1. The following a
 
 Return counts, applicability, and failures alongside scores. A zero denominator produces **`not_applicable`**, not an invented zero or perfect score.
 
-| Signal                                                    | Proposed calculation                                                                                                                                                                                                                             | What it does not establish                                                                                                                   |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Faithfulness / groundedness**                           | For each applicable answer, obtain a boolean support verdict and explanation. Aggregate supported answers divided by successfully judged applicable answers. Also show eligible, failed, and skipped counts.                                     | Not a percentage of extracted claims, a confidence score, or proof of truth.                                                                 |
-| **Expected-source hit rate at k**                         | Cases with at least one expected source among the first **k final evidence chunks**, divided by successfully scored cases with a nonempty expected-source set. Deduplicate source identities and show failed/unscored eligible cases separately. | Measures evidence discovery, not semantic correctness. Several expected sources still contribute at most one hit for a case.                 |
-| **Citation presence and validity**                        | Answered cases with at least one valid backend-derived citation divided by answered cases. Count invalid citations separately. A valid identity resolves to that version's permitted evidence.                                                   | A citation's presence and valid identity do not prove that it supports every claim in the answer.                                            |
-| **Answer, insufficient-evidence, and execution outcomes** | Count outcomes across all admitted cases, including failed, cancelled, and unattempted cases. Report execution failures divided by attempted cases as a separate rate.                                                                           | An answer is not automatically correct; abstention is not automatically wrong.                                                               |
-| **Latency and usage**                                     | Record per-case query duration and p50/p95 with sample counts for completed answers and abstentions. Report gateway calls, tokens, and cost; show failures/timeouts, judge time, and total time including queueing separately.                   | Small-sample percentiles describe those observations, not a reliable production distribution. Unknown token/cost data are unknown, not zero. |
+| Signal | Proposed calculation | What it does not establish |
+| --- | --- | --- |
+| **Faithfulness / groundedness** | For each applicable answer, obtain a boolean support verdict and explanation. Aggregate supported answers divided by successfully judged applicable answers. Also show eligible, failed, and skipped counts. | Not a percentage of extracted claims, a confidence score, or proof of truth. |
+| **Expected-source hit rate at k** | Cases with at least one expected source among the first **k final evidence chunks**, divided by successfully scored cases with a nonempty expected-source set. Deduplicate source identities and show failed/unscored eligible cases separately. | Measures evidence discovery, not semantic correctness. Several expected sources still contribute at most one hit for a case. |
+| **Citation presence and validity** | Answered cases with at least one valid backend-derived citation divided by answered cases. Count invalid citations separately. A valid identity resolves to that version's permitted evidence. | A citation's presence and valid identity do not prove that it supports every claim in the answer. |
+| **Answer, insufficient-evidence, and execution outcomes** | Count outcomes across all admitted cases, including failed, cancelled, and unattempted cases. Report execution failures divided by attempted cases as a separate rate. | An answer is not automatically correct; abstention is not automatically wrong. |
+| **Latency and usage** | Record per-case query duration and p50/p95 with sample counts for completed answers and abstentions. Report gateway calls, tokens, and cost; show failures/timeouts, judge time, and total time including queueing separately. | Small-sample percentiles describe those observations, not a reliable production distribution. Unknown token/cost data are unknown, not zero. |
 
 Here **k** is the number of final evidence chunks considered. A chunk is a retrieved source excerpt. **p50** is the median observed duration; **p95** is the 95th percentile. Always show how many observations contributed.
 
@@ -138,14 +133,14 @@ Show the original answer, context identities, and explanation so an engineer can
 
 #### Keep missing evidence and judge failures distinct from negative verdicts
 
-| Situation                                                         | Required treatment                                                                                                 |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **Explicit pipeline abstention**                                  | Groundedness is `not_applicable`; the abstention remains visible in outcome counts.                                |
-| **An answer appears to contain no factual claims**                | Do not automatically infer a special claim-free category or give it a perfect score.                               |
-| **Answered case with no usable bound evidence**                   | Record a visible input/missing-evidence failure.                                                                   |
-| **Valid boolean verdict that the answer is unsupported**          | Record an unsupported judgment, not an execution failure.                                                          |
-| **Judge refusal, malformed/truncated output, or missing verdict** | Record a judge failure, not an unsupported-answer judgment.                                                        |
-| **A string such as `"false"` instead of a boolean**               | Reject it. Accept only an actual boolean and a bounded explanation; do not coerce a string into a passing verdict. |
+| Situation | Required treatment |
+| --- | --- |
+| **Explicit pipeline abstention** | Groundedness is `not_applicable`; the abstention remains visible in outcome counts. |
+| **An answer appears to contain no factual claims** | Do not automatically infer a special claim-free category or give it a perfect score. |
+| **Answered case with no usable bound evidence** | Record a visible input/missing-evidence failure. |
+| **Valid boolean verdict that the answer is unsupported** | Record an unsupported judgment, not an execution failure. |
+| **Judge refusal, malformed/truncated output, or missing verdict** | Record a judge failure, not an unsupported-answer judgment. |
+| **A string such as `"false"` instead of a boolean** | Reject it. Accept only an actual boolean and a bounded explanation; do not coerce a string into a passing verdict. |
 
 Answers and excerpts are untrusted data. The judge receives no tools, arbitrary endpoints, or release authority. Schema validation can check response shape; it cannot prove semantic correctness or immunity to prompt injection. Include adversarial excerpts in calibration.
 
@@ -203,15 +198,15 @@ The inspected direct-client trace metadata hard-codes an OpenAI provider label. 
 
 Every model call must traverse the scoped `ModelGateway`: pipeline generation, judging, and any future claim extraction, scoring embeddings, schema repair, or nested judge. Preserving that rule does not add those deferred operations to v1.
 
-| Boundary                            | Required behavior and qualification                                                                                                                                                                                  |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Model-call routing**              | Exercise every exposed synchronous/asynchronous path through a recording gateway. No framework receives provider keys. Integration tests block other network destinations, including telemetry and export endpoints. |
-| **Whole-run resource limits**       | Bound cases, concurrency, deadlines, tokens, and model calls across the complete run. Any later permitted repair consumes the same budget and is recorded.                                                           |
-| **Retries**                         | The gateway owns retry policy. Framework/SDK retries must not multiply it. Ambiguous provider outcomes follow ADR-0007, not a silent replay of the evaluation.                                                       |
-| **Authorization and configuration** | Fail closed when authorization, connection, alias, required capability, or a valid response is missing. Fail closed means deny or fail the operation rather than continue with a weaker substitute.                  |
-| **Provider and context behavior**   | A provider refusal/error is an execution failure, not a quality verdict. No hidden model/provider fallback or silent judge-context truncation is allowed.                                                            |
-| **Evidence and logging**            | Preserve provenance and authorized evidence without credentials. Keep prompts, excerpts, and full answers out of ordinary logs.                                                                                      |
-| **Measured behavior**               | Measure actual calls, elapsed time, and dependency impact before declaring the integration qualified.                                                                                                                |
+| Boundary | Required behavior and qualification |
+| --- | --- |
+| **Model-call routing** | Exercise every exposed synchronous/asynchronous path through a recording gateway. No framework receives provider keys. Integration tests block other network destinations, including telemetry and export endpoints. |
+| **Whole-run resource limits** | Bound cases, concurrency, deadlines, tokens, and model calls across the complete run. Any later permitted repair consumes the same budget and is recorded. |
+| **Retries** | The gateway owns retry policy. Framework/SDK retries must not multiply it. Ambiguous provider outcomes follow ADR-0007, not a silent replay of the evaluation. |
+| **Authorization and configuration** | Fail closed when authorization, connection, alias, required capability, or a valid response is missing. Fail closed means deny or fail the operation rather than continue with a weaker substitute. |
+| **Provider and context behavior** | A provider refusal/error is an execution failure, not a quality verdict. No hidden model/provider fallback or silent judge-context truncation is allowed. |
+| **Evidence and logging** | Preserve provenance and authorized evidence without credentials. Keep prompts, excerpts, and full answers out of ordinary logs. |
+| **Measured behavior** | Measure actual calls, elapsed time, and dependency impact before declaring the integration qualified. |
 
 An **ambiguous provider outcome** means a request may have executed even though its response was lost. Repeating the whole evaluation could repeat chargeable work; the durable-job policy handles that uncertainty.
 
@@ -284,11 +279,11 @@ Preserve partial results, per-metric failures, and applicability. Calculate pair
 
 **Never claim an improvement by dropping failed candidate cases from view.**
 
-| Comparison type              | Required interpretation                                                                                                                                                                                          |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Same-corpus comparison**   | Benchmark/case semantics and evaluator revision match, corpus revisions match, and permitted document scope is equivalent. Declare the pipeline configuration changes being evaluated.                           |
+| Comparison type | Required interpretation |
+| --- | --- |
+| **Same-corpus comparison** | Benchmark/case semantics and evaluator revision match, corpus revisions match, and permitted document scope is equivalent. Declare the pipeline configuration changes being evaluated. |
 | **Corpus-change comparison** | Source revisions intentionally differ under the same benchmark and intended labels. Declare that change. Logical-document labels may survive the update; missing exact-version labels remain visible mismatches. |
-| **Incompatible comparison**  | Changed questions/expected meaning, metric definitions, or unsupported differences in authorization scope prevent a like-for-like improvement claim.                                                             |
+| **Incompatible comparison** | Changed questions/expected meaning, metric definitions, or unsupported differences in authorization scope prevent a like-for-like improvement claim. |
 
 An unchanged-case subset across benchmark revisions can still be useful when scoring definitions and effective scope match. Show the exclusions and coverage. Selecting unchanged questions does not make two different rubrics comparable: **rerun both pipeline versions under one evaluator**.
 
@@ -310,11 +305,11 @@ Measure agreement on undisputed applicable cases, false passes among human-label
 
 The proposed initial criteria remain open for agreement:
 
-| Proposed criterion                                               | Interpretation                                                                                           |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **At least 90% whole-answer agreement**                          | Report the numerator and denominator on the labelled sample. This is not a production-accuracy estimate. |
-| **No false pass on deliberately seeded critical contradictions** | Test the chosen critical examples explicitly; do not hide a miss inside an aggregate.                    |
-| **All invalid outputs and failures remain visible**              | Output failures are not discarded or converted into quality verdicts.                                    |
+| Proposed criterion | Interpretation |
+| --- | --- |
+| **At least 90% whole-answer agreement** | Report the numerator and denominator on the labelled sample. This is not a production-accuracy estimate. |
+| **No false pass on deliberately seeded critical contradictions** | Test the chosen critical examples explicitly; do not hide a miss inside an aggregate. |
+| **All invalid outputs and failures remain visible** | Output failures are not discarded or converted into quality verdicts. |
 
 These small-sample checks are not automatic deployment gates. Claim-extraction coverage is relevant only if a claim-extracting metric is later selected; it is not a requirement of this whole-answer judge.
 
@@ -330,10 +325,10 @@ Recalibrate after changes to the library, prompt, model, gateway capability, or 
 
 Evaluation is advisory. Neither an evaluator nor a completion webhook changes Deployment pointers—the references that select which version serves requests.
 
-| Publication mode      | Who authorizes publication                                                                                                    | How comparison behaves                                                                                  |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Manual releases**   | An engineer explicitly requests the release in Inframeld, or an authorized API client invokes the same application operation. | Results inform that decision; they do not make it.                                                      |
-| **Automatic updates** | The authorized source/configuration action described in ADR-0019 supplies publication authority independently of evaluation.  | Comparisons remain explicit and bind exact versions. Starting one does not pause automatic publication. |
+| Publication mode | Who authorizes publication | How comparison behaves |
+| --- | --- | --- |
+| **Manual releases** | An engineer explicitly requests the release in Inframeld, or an authorized API client invokes the same application operation. | Results inform that decision; they do not make it. |
+| **Automatic updates** | The authorized source/configuration action described in ADR-0019 supplies publication authority independently of evaluation. | Comparisons remain explicit and bind exact versions. Starting one does not pause automatic publication. |
 
 Manual release commands check permission, readiness, idempotency, and the expected revision. **Idempotency** prevents duplicate execution of the same request; an **expected revision** protects against overwriting a concurrent change.
 
@@ -387,11 +382,11 @@ The recorded licensing distinction also matters: OpenEvals's MIT license and Lan
 
 The source records inspection of PyPI metadata and exact released wheels on **19 September 2026**, without installing or executing them:
 
-| Package       | Inspected release                                            | Recorded release date |
-| ------------- | ------------------------------------------------------------ | --------------------- |
-| **OpenEvals** | [0.2.0 metadata](https://pypi.org/pypi/openevals/0.2.0/json) | 7 April 2026          |
-| **Ragas**     | [0.4.3 metadata](https://pypi.org/pypi/ragas/0.4.3/json)     | 13 January 2026       |
-| **DeepEval**  | [4.2.3 metadata](https://pypi.org/pypi/deepeval/4.2.3/json)  | 14 September 2026     |
+| Package | Inspected release | Recorded release date |
+| --- | --- | --- |
+| **OpenEvals** | [0.2.0 metadata](https://pypi.org/pypi/openevals/0.2.0/json) | 7 April 2026 |
+| **Ragas** | [0.4.3 metadata](https://pypi.org/pypi/ragas/0.4.3/json) | 13 January 2026 |
+| **DeepEval** | [4.2.3 metadata](https://pypi.org/pypi/deepeval/4.2.3/json) | 14 September 2026 |
 
 These are research versions, not automatically accepted dependency pins. OpenEvals's inspected main branch reported 0.2.1; the behavior described here comes from the published 0.2.0 wheel.
 
@@ -437,13 +432,13 @@ The selected direction prefers a maintained library. Reconsider a custom judge o
 
 ## References
 
-| Reference                                                              | Responsibility                                                                |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [Canonical architecture guide](../ARCHITECTURE.md)                     | Overall product workflow and application ownership.                           |
-| [ADR-0002](ADR-0002-product-owned-openapi-contract.md)                 | Application API and in-app comparison/release workflow.                       |
-| ADR-0005                                                               | Human identity, service credentials, and current authorization.               |
-| [ADR-0006](ADR-0006-byok-provider-boundary.md)                         | `ModelGateway`, configured customer/private endpoints, and model-call policy. |
-| ADR-0007                                                               | Durable jobs, idempotency, retries, and ambiguous provider outcomes.          |
-| [ADR-0009](ADR-0009-sticky-logical-canary-deployments.md)              | Authorized release transitions and serving pointers.                          |
-| [ADR-0016](ADR-0016-docling-processing-and-cross-encoder-reranking.md) | Processing and reranking behavior used by evaluated pipelines.                |
-| ADR-0019                                                               | Automatic updates, Manual releases, and independent publication authority.    |
+| Reference | Responsibility |
+| --- | --- |
+| [Canonical architecture guide](../ARCHITECTURE.md) | Overall product workflow and application ownership. |
+| [ADR-0002](ADR-0002-product-owned-openapi-contract.md) | Application API and in-app comparison/release workflow. |
+| ADR-0005 | Human identity, service credentials, and current authorization. |
+| [ADR-0006](ADR-0006-byok-provider-boundary.md) | `ModelGateway`, configured customer/private endpoints, and model-call policy. |
+| ADR-0007 | Durable jobs, idempotency, retries, and ambiguous provider outcomes. |
+| [ADR-0009](ADR-0009-sticky-logical-canary-deployments.md) | Authorized release transitions and serving pointers. |
+| [ADR-0016](ADR-0016-docling-processing-and-cross-encoder-reranking.md) | Processing and reranking behavior used by evaluated pipelines. |
+| ADR-0019 | Automatic updates, Manual releases, and independent publication authority. |

@@ -1,9 +1,6 @@
 # ADR-0009: Sticky canaries, candidate rejection, and promotion rollback
 
-**Status:** Accepted — release transitions, affinity, ready initial deployments, and reversible publication modes.
-**Revised:** 19 September 2026.
-**Required approach:** Stable Deployment endpoints, deterministic canary routing, and authorized publication through reversible Automatic updates or Manual releases.
-**Related:** [Evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md), [idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md), [materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md).
+**Status:** Accepted — release transitions, affinity, ready initial deployments, and reversible publication modes. **Revised:** 19 September 2026. **Required approach:** Stable Deployment endpoints, deterministic canary routing, and authorized publication through reversible Automatic updates or Manual releases. **Related:** [Evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md), [idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md), [materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md).
 
 ## Context
 
@@ -27,17 +24,17 @@ Each Deployment independently uses **Manual releases** or **Automatic updates**.
 
 A **pointer** is a stored reference to a pipeline version, not a copy of that version’s configuration.
 
-| Deployment state                 | Meaning                                                                                                                                          |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`current`**                    | The version selected when a request is not assigned to an active candidate. A real Deployment starts with a current version.                     |
-| **`candidate`**                  | An optional version attached for review or a canary. Attaching it starts at 0% traffic.                                                          |
-| **`previous`**                   | The optional, designated immediate rollback target. This is one target, not an unlimited stack of earlier releases.                              |
-| **Canary percentage**            | The allocation of routing buckets to the candidate. It does not promise an exact percentage of requests.                                         |
-| **Rollout identity**             | An immutable identity for the candidate rollout. Changing its percentage keeps this identity; attaching a replacement candidate creates another. |
-| **Deployment revision**          | A number that increases as Deployment state changes. Commands use it to detect that someone else changed the state.                              |
-| **Publication mode**             | Whether publication follows Automatic updates or Manual releases.                                                                                |
-| **Automatic-update binding**     | The selected document/configuration inputs used by automatic updates.                                                                            |
-| **Publication control revision** | The revision used to invalidate publication authority captured before a mode switch. Its role is explained below.                                |
+| Deployment state | Meaning |
+| --- | --- |
+| **`current`** | The version selected when a request is not assigned to an active candidate. A real Deployment starts with a current version. |
+| **`candidate`** | An optional version attached for review or a canary. Attaching it starts at 0% traffic. |
+| **`previous`** | The optional, designated immediate rollback target. This is one target, not an unlimited stack of earlier releases. |
+| **Canary percentage** | The allocation of routing buckets to the candidate. It does not promise an exact percentage of requests. |
+| **Rollout identity** | An immutable identity for the candidate rollout. Changing its percentage keeps this identity; attaching a replacement candidate creates another. |
+| **Deployment revision** | A number that increases as Deployment state changes. Commands use it to detect that someone else changed the state. |
+| **Publication mode** | Whether publication follows Automatic updates or Manual releases. |
+| **Automatic-update binding** | The selected document/configuration inputs used by automatic updates. |
+| **Publication control revision** | The revision used to invalidate publication authority captured before a mode switch. Its role is explained below. |
 
 Targets must be **complete immutable pipeline versions in the same project** and must satisfy the endpoint’s **query contract**: the request and response behavior expected by the consuming application.
 
@@ -47,9 +44,9 @@ A version’s required **materializations**—the prepared searchable indexes bo
 
 ### 2. Support two publication modes and require a ready initial version
 
-| Mode                  | How publication is authorized                                                                                                                                                             |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Manual releases**   | An engineer explicitly invokes candidate, canary, promotion, rejection, or rollback commands. An authorized service client can invoke the same operations.                                |
+| Mode | How publication is authorized |
+| --- | --- |
+| **Manual releases** | An engineer explicitly invokes candidate, canary, promotion, rejection, or rollback commands. An authorized service client can invoke the same operations. |
 | **Automatic updates** | A separately authorized document or configuration action requests a build and conditional publication of its complete, ready result. Build completion alone is not publication authority. |
 
 Modes are reversible and belong to the **Deployment**, not globally to its pipeline. Two Deployments of the same pipeline can use different modes.
@@ -92,10 +89,10 @@ An **affinity key** identifies the application’s user or session for routing. 
 
 #### Authenticate first, then determine routing affinity
 
-| Caller                            | Affinity input                                                                                                          |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Human querying through Studio** | The stable internal human principal ID. A principal is the identity Inframeld recognizes as the caller.                 |
-| **Customer application**          | A bounded opaque `affinityKey` supplied for its end user or session, scoped to the authenticated integration principal. |
+| Caller | Affinity input |
+| --- | --- |
+| **Human querying through Studio** | The stable internal human principal ID. A principal is the identity Inframeld recognizes as the caller. |
+| **Customer application** | A bounded opaque `affinityKey` supplied for its end user or session, scoped to the authenticated integration principal. |
 
 Authenticate the caller as an allowed query/service principal before routing. Human identity and scoped opaque service credentials follow ADR-0005.
 
@@ -130,9 +127,9 @@ current, otherwise
 #### Example: increase the allocation without reshuffling existing buckets
 
 | Affinity identity | Fixed bucket | At 10%: threshold 1,000 | At 25%: threshold 2,500 |
-| ----------------- | -----------: | ----------------------- | ----------------------- |
-| Alice             |          630 | Candidate               | Candidate               |
-| Bob               |        1,850 | Current                 | Candidate               |
+| --- | --: | --- | --- |
+| Alice | 630 | Candidate | Candidate |
+| Bob | 1,850 | Current | Candidate |
 
 Increasing the percentage includes more buckets while Alice remains in the candidate cohort.
 
@@ -158,13 +155,13 @@ Load the caller’s scope first, validate the requested transition, and atomical
 
 All five commands below require **Manual releases**. In Automatic updates, return a typed mode conflict instead of silently changing modes.
 
-| Command                   | Effect                                                                                                                                                         |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Attach candidate B**    | Keep current A. Set candidate B, create a new rollout identity, and start at **0%**. Reject an existing candidate unless it has first been explicitly aborted. |
-| **Set canary percentage** | Change the candidate allocation only. Current/candidate version identities and the rollout’s bucket assignments remain fixed.                                  |
-| **Abort candidate**       | Keep current and previous unchanged. Clear the candidate and its active rollout traffic. Retain build and evaluation evidence.                                 |
-| **Promote**               | Set previous to current A, then current to candidate B. Clear the candidate and candidate traffic. Preserve evidence.                                          |
-| **Roll back promotion**   | Restore previous A as current and clear `previous`, consuming that one-step rollback target. Retain B’s immutable evidence.                                    |
+| Command | Effect |
+| --- | --- |
+| **Attach candidate B** | Keep current A. Set candidate B, create a new rollout identity, and start at **0%**. Reject an existing candidate unless it has first been explicitly aborted. |
+| **Set canary percentage** | Change the candidate allocation only. Current/candidate version identities and the rollout’s bucket assignments remain fixed. |
+| **Abort candidate** | Keep current and previous unchanged. Clear the candidate and its active rollout traffic. Retain build and evaluation evidence. |
+| **Promote** | Set previous to current A, then current to candidate B. Clear the candidate and candidate traffic. Preserve evidence. |
+| **Roll back promotion** | Restore previous A as current and clear `previous`, consuming that one-step rollback target. Retain B’s immutable evidence. |
 
 These operations change release state, not the immutable versions or their evidence.
 
@@ -223,11 +220,11 @@ The client reloads the state and asks for a fresh decision. It must not silently
 
 Automatic updates uses the same ready pipeline versions and release ownership. It changes how publication is requested, not whether publication requires authorization and concurrency checks.
 
-| Command                                                | Preconditions and effect                                                                                                                                                                                                                                                                                                                     |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Switch to Manual releases**                          | Preserve current and previous. Advance the publication control revision and invalidate pending automatic publication. Completed external calls are not undone.                                                                                                                                                                               |
+| Command | Preconditions and effect |
+| --- | --- |
+| **Switch to Manual releases** | Preserve current and previous. Advance the publication control revision and invalidate pending automatic publication. Completed external calls are not undone. |
 | **Enable Automatic updates and apply pending changes** | Reject the request if any candidate is attached, including at 0%; require an explicit abort first. Freeze the displayed valid corpus/configuration, advance the control revision, and atomically admit a fresh update. Keep current until publication. If the selected inputs are already current, report up-to-date without new model work. |
-| **Publish an authorized automatic update**             | After all publication checks pass, set previous to current and current to the complete ready result. There is no candidate or rollout. Publishing a result identical to current is a no-op.                                                                                                                                                  |
+| **Publish an authorized automatic update** | After all publication checks pass, set previous to current and current to the complete ready result. There is no candidate or rollout. Publishing a result identical to current is a no-op. |
 
 The **corpus** is the selected set of source documents. Freezing the inputs means the update records exactly which corpus and configuration it is preparing; later edits do not silently change that work.
 
@@ -235,16 +232,16 @@ The **corpus** is the selected set of source documents. Freezing the inputs mean
 
 Automatic publication requires all of the following to remain true:
 
-| Check                | Required state                                                      |
-| -------------------- | ------------------------------------------------------------------- |
-| **Mode**             | The Deployment is still in Automatic updates.                       |
-| **Control revision** | It still matches the revision captured by this update.              |
-| **Requested update** | This is still the newest requested update identity.                 |
-| **Job ownership**    | The executing job still owns the right to publish.                  |
-| **Serving state**    | It still matches the state expected by the transition.              |
-| **Authorization**    | The initiating action remains authorized under current permissions. |
-| **Dependencies**     | The complete result and its required dependencies are ready.        |
-| **Candidate**        | No candidate is attached.                                           |
+| Check | Required state |
+| --- | --- |
+| **Mode** | The Deployment is still in Automatic updates. |
+| **Control revision** | It still matches the revision captured by this update. |
+| **Requested update** | This is still the newest requested update identity. |
+| **Job ownership** | The executing job still owns the right to publish. |
+| **Serving state** | It still matches the state expected by the transition. |
+| **Authorization** | The initiating action remains authorized under current permissions. |
+| **Dependencies** | The complete result and its required dependencies are ready. |
+| **Candidate** | No candidate is attached. |
 
 **Build completion alone never performs this publication.** Audit records distinguish automatic publication authorized by an update action from manual promotion. They retain the initiating actor and the frozen input references.
 
@@ -270,9 +267,9 @@ New enablement admits a fresh request. Compatible artifacts may be reused, but t
 
 Publication and switching both commit through conditional guards in PostgreSQL.
 
-| Which commits first?          | Result                                                                                                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **The mode switch**           | Its changed control revision makes the old automatic publication ineligible.                                                                                  |
+| Which commits first? | Result |
+| --- | --- |
+| **The mode switch** | Its changed control revision makes the old automatic publication ineligible. |
 | **The automatic publication** | It advances the Deployment revision. A switch expecting the earlier revision conflicts and leaves the mode unchanged. The user reloads before deciding again. |
 
 A successful switch preserves the **then-current version**. It does not reverse a publication that already committed, and it does not undo an external call that has finished.
@@ -295,10 +292,10 @@ Optional service clients invoke the same commands with their own permissions and
 
 #### Distinguish explicit decisions from work that runs automatically
 
-| Mode                  | Explicit action                                                                                                                   | Work performed after admission                                                                     |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Manual releases**   | Build, Compare, attach/change a candidate, change its percentage, promote, reject, or roll back are authorized actions in Studio. | Admitted work, progress tracking, safe retries, and cohort routing execute automatically.          |
-| **Automatic updates** | An authorized source/configuration action requests a build and conditional publication together. **Compare remains explicit.**    | The ordinary build runs, followed by a separate publication attempt subject to its current guards. |
+| Mode | Explicit action | Work performed after admission |
+| --- | --- | --- |
+| **Manual releases** | Build, Compare, attach/change a candidate, change its percentage, promote, reject, or roll back are authorized actions in Studio. | Admitted work, progress tracking, safe retries, and cohort routing execute automatically. |
+| **Automatic updates** | An authorized source/configuration action requests a build and conditional publication together. **Compare remains explicit.** | The ordinary build runs, followed by a separate publication attempt subject to its current guards. |
 
 **Admission** means durably accepting the requested work. In either mode, no GitHub runner, callback, webhook, or general workflow engine is required.
 
@@ -330,16 +327,16 @@ Document authorization is checked independently for whichever pipeline is select
 
 The following are acceptance conditions, not completed test results.
 
-| Area                                   | Required verification                                                                                                                                                                                                          |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Initial creation**                   | The first real Deployment has a ready, same-project, compatible current version and an authorized decision, with no candidate, previous target, or rollout. The default route returns not-ready without generation beforehand. |
-| **Deterministic routing**              | Check fixed bucket examples, identity-scoped affinity, credential-rotation stability, increasing percentages, and pausing/resuming the same rollout.                                                                           |
-| **Missing affinity and project scope** | Reject missing application affinity while candidate traffic is enabled. Reject cross-project targets.                                                                                                                          |
-| **Manual transitions**                 | Distinguish abort from rollback; reject unavailable targets and stale revisions; verify the one-step rollback rule and candidate guards.                                                                                       |
-| **Mode switching**                     | Test both directions, including rejection of the mode-change request when a 0% candidate is still attached. Preserve the current version and retain the correct automatic-publication rollback target.                         |
-| **Late or competing work**             | Test rapid switching with late completion, overlapping uploads, publication-versus-switch races, lost acknowledgments, and lifecycle checks after deletion or rebinding.                                                       |
-| **Permissions and in-flight requests** | Exercise permission changes and query completion across promotion without losing required retention protection or bypassing current access rules.                                                                              |
-| **Audit and feedback**                 | Record the actor, selected versions, rollout/revision, decision acknowledgment, and outcome. Preserve original receipt attribution for late feedback. Do not retain raw affinity values unnecessarily.                         |
+| Area | Required verification |
+| --- | --- |
+| **Initial creation** | The first real Deployment has a ready, same-project, compatible current version and an authorized decision, with no candidate, previous target, or rollout. The default route returns not-ready without generation beforehand. |
+| **Deterministic routing** | Check fixed bucket examples, identity-scoped affinity, credential-rotation stability, increasing percentages, and pausing/resuming the same rollout. |
+| **Missing affinity and project scope** | Reject missing application affinity while candidate traffic is enabled. Reject cross-project targets. |
+| **Manual transitions** | Distinguish abort from rollback; reject unavailable targets and stale revisions; verify the one-step rollback rule and candidate guards. |
+| **Mode switching** | Test both directions, including rejection of the mode-change request when a 0% candidate is still attached. Preserve the current version and retain the correct automatic-publication rollback target. |
+| **Late or competing work** | Test rapid switching with late completion, overlapping uploads, publication-versus-switch races, lost acknowledgments, and lifecycle checks after deletion or rebinding. |
+| **Permissions and in-flight requests** | Exercise permission changes and query completion across promotion without losing required retention protection or bypassing current access rules. |
+| **Audit and feedback** | Record the actor, selected versions, rollout/revision, decision acknowledgment, and outcome. Preserve original receipt attribution for late feedback. Do not retain raw affinity values unnecessarily. |
 
 These checks cover the routing and transition contract, including the additional publication-mode races.
 
@@ -387,13 +384,13 @@ No separate comparative evaluation is recorded. The following approaches are exc
 
 ## References
 
-| Reference                                                                                               | Responsibility                                                                                     |
-| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| ADR-0002                                                                                                | The accepted in-app build, comparison, canary, and release sequence.                               |
-| ADR-0004                                                                                                | Query pins, the retirement gate, and retention of resources used by in-flight requests.            |
-| ADR-0005                                                                                                | Kratos human identity, scoped opaque service credentials, and document authorization.              |
-| [ADR-0007: Idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md)                              | Durable jobs, idempotency, safe retry behavior, and competing state changes.                       |
-| [ADR-0008: Evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md)                      | Benchmark comparisons, OpenEvals, the configurable Luna judge, and explicit decision evidence.     |
-| [ADR-0015: Materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Complete, ready materializations and immutable pipeline bindings.                                  |
-| [ADR-0017: Answer feedback](ADR-0017-answer-feedback.md)                                                | Receipt-based feedback attribution and its record/API contract.                                    |
-| [ADR-0019: Default onboarding and publication](ADR-0019-default-onboarding-and-first-publication.md)    | Initial setup, serialized automatic updates, publication control, and deletion/rebinding behavior. |
+| Reference | Responsibility |
+| --- | --- |
+| ADR-0002 | The accepted in-app build, comparison, canary, and release sequence. |
+| ADR-0004 | Query pins, the retirement gate, and retention of resources used by in-flight requests. |
+| ADR-0005 | Kratos human identity, scoped opaque service credentials, and document authorization. |
+| [ADR-0007: Idempotency](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Durable jobs, idempotency, safe retry behavior, and competing state changes. |
+| [ADR-0008: Evaluation](ADR-0008-deterministic-evaluation-and-release-decisions.md) | Benchmark comparisons, OpenEvals, the configurable Luna judge, and explicit decision evidence. |
+| [ADR-0015: Materializations](ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) | Complete, ready materializations and immutable pipeline bindings. |
+| [ADR-0017: Answer feedback](ADR-0017-answer-feedback.md) | Receipt-based feedback attribution and its record/API contract. |
+| [ADR-0019: Default onboarding and publication](ADR-0019-default-onboarding-and-first-publication.md) | Initial setup, serialized automatic updates, publication control, and deletion/rebinding behavior. |

@@ -245,11 +245,11 @@ When Mira selects **Build candidate**, the server freezes the request and record
 
 The worker reuses compatible existing results and creates only what is missing:
 
-| Change                                                                  | Expected work                                                           |
-| ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Change the prompt or retrieval `top-k`, the number of results requested | Usually reuse the existing searchable data.                             |
-| Replace the refund document B1 with B2                                  | Process and embed B2; reuse compatible results for unchanged documents. |
-| Change the embedding model or profile                                   | Potentially embed the entire selected corpus again.                     |
+| Change | Expected work |
+| --- | --- |
+| Change the prompt or retrieval `top-k`, the number of results requested | Usually reuse the existing searchable data. |
+| Replace the refund document B1 with B2 | Process and embed B2; reuse compatible results for unchanged documents. |
+| Change the embedding model or profile | Potentially embed the entire selected corpus again. |
 
 The interface must show these differences. “Incremental build” must not imply that every type of change is cheap.
 
@@ -337,9 +337,9 @@ One benchmark per pipeline is enough initially.
 
 When Mira requests **Compare versions** for P12 and ready P13, the comparison freezes two things:
 
-| Snapshot              | What it records                                                                                         |
-| --------------------- | ------------------------------------------------------------------------------------------------------- |
-| **BenchmarkRevision** | The exact ordered test cases and their contents, not just IDs pointing to editable questions.           |
+| Snapshot | What it records |
+| --- | --- |
+| **BenchmarkRevision** | The exact ordered test cases and their contents, not just IDs pointing to editable questions. |
 | **EvaluatorRevision** | The evaluator library and prompt, metric definitions, model connection and settings, and result schema. |
 
 The comparison references two EvaluationRuns. The worker runs both exact pipeline versions through the normal retrieval, access-control, generation, and citation paths, then scores the applicable results.
@@ -457,11 +457,11 @@ Human Studio queries can use the verified human principal. If an application omi
 
 ### Promotion, rejection, and rollback
 
-| Action                        | Before                                   | After                                                  |
-| ----------------------------- | ---------------------------------------- | ------------------------------------------------------ |
-| Reject the attached candidate | Current P12; candidate P13; previous P11 | Current P12; no candidate; previous P11 unchanged      |
-| Promote the candidate         | Current P12; candidate P13               | Current P13; no candidate; previous P12                |
-| Roll back that promotion      | Current P13; previous P12; no candidate  | Current P12; the one-step previous pointer is consumed |
+| Action | Before | After |
+| --- | --- | --- |
+| Reject the attached candidate | Current P12; candidate P13; previous P11 | Current P12; no candidate; previous P11 unchanged |
+| Promote the candidate | Current P12; candidate P13 | Current P13; no candidate; previous P12 |
+| Roll back that promotion | Current P13; previous P12; no candidate | Current P12; the one-step previous pointer is consumed |
 
 A built version that was never attached can simply remain unreleased. It does not need a separate approval state machine.
 
@@ -640,10 +640,10 @@ Inframeld's first-party MCP support is a thin adapter over the same application 
 
 The design specifies protocol version **2026-07-28** and the official Python SDK **2.2.0**. The adapter runs at `/mcp/` inside the API service and exposes two tools:
 
-| Tool                 | Purpose                                                                                |
-| -------------------- | -------------------------------------------------------------------------------------- |
-| `query_deployment`   | Query a stable deployment through the existing permission and version-selection rules. |
-| `get_answer_receipt` | Read safe completion metadata without regenerating or replaying a lost full answer.    |
+| Tool | Purpose |
+| --- | --- |
+| `query_deployment` | Query a stable deployment through the existing permission and version-selection rules. |
+| `get_answer_receipt` | Read safe completion metadata without regenerating or replaying a lost full answer. |
 
 Results are bounded structured JSON. The original answer includes authorized citations, so a separate document-browsing or resource server is not required initially.
 
@@ -669,18 +669,18 @@ Hydra, universal OAuth discovery, and verified end-user delegation remain outsid
 
 The API and worker share one Python domain and application codebase and one backend image. They run with different entry commands.
 
-| Component                         | Responsibility                                                                                   |
-| --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **HTTPS ingress**                 | The public entry point for the production deployment.                                            |
-| **Next.js Studio**                | The human interface for setup, knowledge, pipelines, evaluations, and releases.                  |
-| **FastAPI and MCP adapter**       | Authenticate requests, validate transport inputs, and call application use cases.                |
-| **Worker**                        | Poll PostgreSQL for durable jobs and perform background work. One worker is supported initially. |
-| **Parser supervisor and sandbox** | Process untrusted documents in isolated, offline attempts.                                       |
-| **PostgreSQL**                    | Own authoritative application state.                                                             |
-| **SeaweedFS**                     | Store files and larger artifacts through an S3-compatible API.                                   |
-| **Chroma**                        | Store derived vectors and perform filtered similarity search.                                    |
-| **Kratos**                        | Manage human identities and sessions.                                                            |
-| **ModelGateway**                  | Control every outbound model call through an embedded LiteLLM adapter.                           |
+| Component | Responsibility |
+| --- | --- |
+| **HTTPS ingress** | The public entry point for the production deployment. |
+| **Next.js Studio** | The human interface for setup, knowledge, pipelines, evaluations, and releases. |
+| **FastAPI and MCP adapter** | Authenticate requests, validate transport inputs, and call application use cases. |
+| **Worker** | Poll PostgreSQL for durable jobs and perform background work. One worker is supported initially. |
+| **Parser supervisor and sandbox** | Process untrusted documents in isolated, offline attempts. |
+| **PostgreSQL** | Own authoritative application state. |
+| **SeaweedFS** | Store files and larger artifacts through an S3-compatible API. |
+| **Chroma** | Store derived vectors and perform filtered similarity search. |
+| **Kratos** | Manage human identities and sessions. |
+| **ModelGateway** | Control every outbound model call through an embedded LiteLLM adapter. |
 
 ```mermaid
 flowchart TB
@@ -754,14 +754,14 @@ The application uses Domain-Driven Design, Clean Architecture, and lightweight C
 
 **Domain-Driven Design** means organizing business behavior around the concepts and rules it owns.
 
-| Module         | Owns                                                                                                     | Does not own                                            |
-| -------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| **Knowledge**  | Documents and versions, collection membership and revisions, source observations                         | Vector readiness or deployment pointers                 |
-| **Indexing**   | Processing and embedding profiles, generations, layouts, materializations, and storage-mutation recovery | Human sign-in or release approval                       |
-| **Pipelines**  | Immutable RAG configuration and bindings, query orchestration, receipts, and feedback                    | Offline scoring definitions or canary cohort policy     |
-| **Evaluation** | Cases, benchmark and evaluator revisions, runs, comparisons, and bounded evidence                        | Automatic deployment changes                            |
-| **Releases**   | Deployment pointers, rollout cohorts, and valid release transitions                                      | Another query engine or mutable pipeline content        |
-| **Access**     | Verified principals, grants, and document-access decisions                                               | Provider credentials or third-party library data models |
+| Module | Owns | Does not own |
+| --- | --- | --- |
+| **Knowledge** | Documents and versions, collection membership and revisions, source observations | Vector readiness or deployment pointers |
+| **Indexing** | Processing and embedding profiles, generations, layouts, materializations, and storage-mutation recovery | Human sign-in or release approval |
+| **Pipelines** | Immutable RAG configuration and bindings, query orchestration, receipts, and feedback | Offline scoring definitions or canary cohort policy |
+| **Evaluation** | Cases, benchmark and evaluator revisions, runs, comparisons, and bounded evidence | Automatic deployment changes |
+| **Releases** | Deployment pointers, rollout cohorts, and valid release transitions | Another query engine or mutable pipeline content |
+| **Access** | Verified principals, grants, and document-access decisions | Provider credentials or third-party library data models |
 
 These are six modules in one backend, not six microservices.
 
@@ -830,12 +830,12 @@ Immutable vector writes have a different recovery path because their exact IDs a
 
 An **idempotency key** identifies one intended API action across retries. It is scoped to the stable verified principal, project, route, and HTTP method.
 
-| Request                                         | Behavior                                                    |
-| ----------------------------------------------- | ----------------------------------------------------------- |
-| Same key and same request                       | Return the documented safe outcome for the original action. |
-| Same key and different content                  | Return a conflict.                                          |
-| Retry an asynchronous build                     | Return the same recorded job, even if it has completed.     |
-| Retry a synchronous operation still in progress | Report its status rather than start another operation.      |
+| Request | Behavior |
+| --- | --- |
+| Same key and same request | Return the documented safe outcome for the original action. |
+| Same key and different content | Return a conflict. |
+| Retry an asynchronous build | Return the same recorded job, even if it has completed. |
+| Retry a synchronous operation still in progress | Report its status rather than start another operation. |
 
 Authentication and current permissions are checked again before returning a retry result. Knowing an old key does not restore revoked access.
 
@@ -851,10 +851,10 @@ Release changes and feedback edits need both mechanisms. A client cannot resolve
 
 Integration secrets and production answers are deliberately not retained for full-response replay.
 
-| Lost response                        | Safe retry behavior                                                                                                      |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Newly created integration credential | Return its existing ID with `secretAvailable: false`. Revoke and reissue if the plaintext secret was lost.               |
-| Completed production answer          | Return safe receipt metadata with `responseAvailable: false`, not the full answer and not a newly generated replacement. |
+| Lost response | Safe retry behavior |
+| --- | --- |
+| Newly created integration credential | Return its existing ID with `secretAvailable: false`. Revoke and reissue if the plaintext secret was lost. |
+| Completed production answer | Return safe receipt metadata with `responseAvailable: false`, not the full answer and not a newly generated replacement. |
 
 A completed answer retry lets the caller inspect the recorded outcome. An uncertain operation reports its uncertainty. A consciously new question uses a new key and can incur a new charge.
 
@@ -878,11 +878,11 @@ All document and question embedding calls go through ModelGateway. Chroma does n
 
 Three concepts keep these records understandable:
 
-| Concept              | Meaning                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Concept | Meaning |
+| --- | --- |
 | **EmbeddingProfile** | The model, connection revision, dimensions, normalization, and distance metric defining a compatible vector space. |
-| **Vectorization**    | The semantic combination of processing and embedding inputs.                                                       |
-| **VectorGeneration** | One physical numerical execution of those inputs, with its own immutable records.                                  |
+| **Vectorization** | The semantic combination of processing and embedding inputs. |
+| **VectorGeneration** | One physical numerical execution of those inputs, with its own immutable records. |
 
 The last distinction matters because a provider's model alias can change or produce different numbers. Repeating the same semantic request is not permission to overwrite the previous physical execution.
 
@@ -912,12 +912,12 @@ For this example, A and C happen to be in shard S0 and B in shard S1. This is an
 
 Before the change:
 
-| Store      | State                                                                                                         |
-| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| Store | State |
+| --- | --- |
 | PostgreSQL | R1 contains A1, B1, and C1. Its ready materialization selects GA, GB1, and GC. P12 uses that materialization. |
-| Chroma S0  | GA's two records and GC's two records.                                                                        |
-| Chroma S1  | GB1's two records.                                                                                            |
-| SeaweedFS  | Source versions, processing artifacts, manifests, and any retry payloads still needed.                        |
+| Chroma S0 | GA's two records and GC's two records. |
+| Chroma S1 | GB1's two records. |
+| SeaweedFS | Source versions, processing artifacts, manifests, and any retry payloads still needed. |
 
 Mira replaces the refund policy with B2 and builds P13. The worker processes B2, reuses GA and GC, obtains the new embeddings, and freezes them as generation GB2. It inserts GB2's two records into S1 while keeping GB1 because R1 still needs it.
 
@@ -1082,19 +1082,19 @@ Backup and restore remain in v1. Product-level index reconstruction, permanent n
 
 V1 includes the complete path from a secure installation to a cited answer, then controlled iteration on that answer-producing system.
 
-| Area                          | Included behavior                                                                                                                                                                |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Deployment and operations** | One supported Linux server using Compose, authenticated interfaces, private stores, bounded work, backups, and controlled upgrades.                                              |
-| **First use**                 | Minimum account and model setup, saved provider keys, private ordinary starter resources with Automatic updates selected, preparation progress, and a normal cited answer. |
-| **Knowledge**                 | Bounded PDF, Markdown, and text uploads; manual read-only S3 sync; immutable source versions; explicit corpus revisions.                                                         |
-| **Indexing**                  | Sandboxed Docling processing, explicit profiles, reusable generations, recorded shard layouts, and verified materializations.                                                    |
-| **Pipelines**                 | Frozen builds, immutable ready bindings, bounded retrieval and reranking, generation with authorized evidence, and stable deployment routes.                                     |
-| **Access and models**         | Kratos local and deployment-level OIDC sign-in, scoped expiring application credentials, group allowlists, persistent model keys, and approved public or private model gateways. |
-| **Evaluation**                | Test cases, frozen benchmark and evaluator revisions, fresh baseline/candidate runs, OpenEvals groundedness, source and citation signals, and inspectable history.               |
-| **Releases**                  | Reversible Automatic updates / Manual releases per deployment; new deployments default manual with an explicit automatic option. Manual canaries, promotion, rejection and rollback retain affinity, conflict checks and history. |
-| **Feedback**                  | Production ratings and comments attached to the actual answer, version, and cohort, whether or not a canary is running.                                                          |
-| **Clients**                   | Studio using the generated TypeScript SDK, the public HTTP API, and the constrained first-party MCP adapter.                                                                     |
-| **Reliability**               | PostgreSQL-backed jobs, visible progress, bounded safe retries, explicit uncertain outcomes, idempotency, and permission-aware deletion.                                         |
+| Area | Included behavior |
+| --- | --- |
+| **Deployment and operations** | One supported Linux server using Compose, authenticated interfaces, private stores, bounded work, backups, and controlled upgrades. |
+| **First use** | Minimum account and model setup, saved provider keys, private ordinary starter resources with Automatic updates selected, preparation progress, and a normal cited answer. |
+| **Knowledge** | Bounded PDF, Markdown, and text uploads; manual read-only S3 sync; immutable source versions; explicit corpus revisions. |
+| **Indexing** | Sandboxed Docling processing, explicit profiles, reusable generations, recorded shard layouts, and verified materializations. |
+| **Pipelines** | Frozen builds, immutable ready bindings, bounded retrieval and reranking, generation with authorized evidence, and stable deployment routes. |
+| **Access and models** | Kratos local and deployment-level OIDC sign-in, scoped expiring application credentials, group allowlists, persistent model keys, and approved public or private model gateways. |
+| **Evaluation** | Test cases, frozen benchmark and evaluator revisions, fresh baseline/candidate runs, OpenEvals groundedness, source and citation signals, and inspectable history. |
+| **Releases** | Reversible Automatic updates / Manual releases per deployment; new deployments default manual with an explicit automatic option. Manual canaries, promotion, rejection and rollback retain affinity, conflict checks and history. |
+| **Feedback** | Production ratings and comments attached to the actual answer, version, and cohort, whether or not a canary is running. |
+| **Clients** | Studio using the generated TypeScript SDK, the public HTTP API, and the constrained first-party MCP adapter. |
+| **Reliability** | PostgreSQL-backed jobs, visible progress, bounded safe retries, explicit uncertain outcomes, idempotency, and permission-aware deletion. |
 
 ### Deliberately outside v1
 
@@ -1220,26 +1220,26 @@ The credential ADR compares this design with OpenBao and other maintained encryp
 
 Use these records when implementing the corresponding area. They contain detailed invariants, failure scenarios, and validation requirements that complement this guide.
 
-| Area                                                                       | Reference                                                                                                                                                |
-| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Decision index                                                             | [Architecture decision records](adr/README.md)                                                                                                           |
-| Backend module and dependency boundaries                                   | [ADR-0001: Modular application structure](adr/ADR-0001-modular-application-structure.md)                                                                 |
-| Shared vectors, filtering, mutation recovery, deletion, and capacity tests | [ADR-0004: PostgreSQL source of truth and shared Chroma](adr/ADR-0004-postgresql-source-of-truth-and-shared-chroma.md)                                   |
-| Identity, tenancy, and permission boundaries                               | [ADR-0005: API-enforced tenancy and authorization](adr/ADR-0005-api-enforced-tenancy-and-authorization.md)                                               |
-| Jobs, idempotency, and uncertain outcomes                                  | [ADR-0007: Durable jobs, idempotency, and recovery](adr/ADR-0007-durable-jobs-idempotency-and-recovery.md)                                               |
-| Evaluation snapshots and result semantics                                  | [ADR-0008: Deterministic evaluation and release decisions](adr/ADR-0008-deterministic-evaluation-and-release-decisions.md)                               |
-| Canary routing and release transitions                                     | [ADR-0009: Sticky logical canary deployments](adr/ADR-0009-sticky-logical-canary-deployments.md)                                                         |
-| Parser isolation                                                           | [ADR-0010: Secure document-ingestion boundary](adr/ADR-0010-secure-document-ingestion-boundary.md)                                                       |
-| Single-server deployment                                                   | [ADR-0011: Deployment profile](adr/ADR-0011-hosted-vercel-and-aws-deployment-profile.md)                                                                 |
-| Runtime schema upgrades                                                    | [ADR-0012: Backward-compatible database migrations](adr/ADR-0012-backward-compatible-database-migrations.md)                                             |
-| Operational visibility, backup, and restore                                | [ADR-0013: Observability and recovery](adr/ADR-0013-minimal-hosted-observability-and-recovery.md)                                                        |
-| Ready index and pipeline bindings                                          | [ADR-0015: Profile-specific index materializations and pipeline bindings](adr/ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) |
-| Production ratings and comments                                            | [ADR-0017: Answer feedback](adr/ADR-0017-answer-feedback.md)                                                                                             |
-| MCP tools and supported client behavior                                    | [ADR-0018: First-party MCP adapter](adr/ADR-0018-first-party-mcp-adapter.md)                                                                             |
-| Accepted starter resources and reversible publication modes                 | [ADR-0019: Default onboarding and reversible publication modes](adr/ADR-0019-default-onboarding-and-first-publication.md)                                  |
-| Accepted provider-credential persistence design                             | [ADR-0020: Persistent outbound credentials](adr/ADR-0020-persistent-outbound-credentials.md)                                                             |
-| Existing external SDK dependency inspection                                | [SDK Kit feasibility review](reviews/sdk-kit-feasibility.md)                                                                                             |
-| Read-only AI development context and six installed skills                            | [Repository-skills plan](development/repository-skills-plan.md)                                                                                          |
-| Historical architecture assessment                                         | [Previous closing review](reviews/v1-architecture-review.md)                                                                                             |
+| Area | Reference |
+| --- | --- |
+| Decision index | [Architecture decision records](adr/README.md) |
+| Backend module and dependency boundaries | [ADR-0001: Modular application structure](adr/ADR-0001-modular-application-structure.md) |
+| Shared vectors, filtering, mutation recovery, deletion, and capacity tests | [ADR-0004: PostgreSQL source of truth and shared Chroma](adr/ADR-0004-postgresql-source-of-truth-and-shared-chroma.md) |
+| Identity, tenancy, and permission boundaries | [ADR-0005: API-enforced tenancy and authorization](adr/ADR-0005-api-enforced-tenancy-and-authorization.md) |
+| Jobs, idempotency, and uncertain outcomes | [ADR-0007: Durable jobs, idempotency, and recovery](adr/ADR-0007-durable-jobs-idempotency-and-recovery.md) |
+| Evaluation snapshots and result semantics | [ADR-0008: Deterministic evaluation and release decisions](adr/ADR-0008-deterministic-evaluation-and-release-decisions.md) |
+| Canary routing and release transitions | [ADR-0009: Sticky logical canary deployments](adr/ADR-0009-sticky-logical-canary-deployments.md) |
+| Parser isolation | [ADR-0010: Secure document-ingestion boundary](adr/ADR-0010-secure-document-ingestion-boundary.md) |
+| Single-server deployment | [ADR-0011: Deployment profile](adr/ADR-0011-hosted-vercel-and-aws-deployment-profile.md) |
+| Runtime schema upgrades | [ADR-0012: Backward-compatible database migrations](adr/ADR-0012-backward-compatible-database-migrations.md) |
+| Operational visibility, backup, and restore | [ADR-0013: Observability and recovery](adr/ADR-0013-minimal-hosted-observability-and-recovery.md) |
+| Ready index and pipeline bindings | [ADR-0015: Profile-specific index materializations and pipeline bindings](adr/ADR-0015-profile-specific-index-materializations-and-pipeline-bindings.md) |
+| Production ratings and comments | [ADR-0017: Answer feedback](adr/ADR-0017-answer-feedback.md) |
+| MCP tools and supported client behavior | [ADR-0018: First-party MCP adapter](adr/ADR-0018-first-party-mcp-adapter.md) |
+| Accepted starter resources and reversible publication modes | [ADR-0019: Default onboarding and reversible publication modes](adr/ADR-0019-default-onboarding-and-first-publication.md) |
+| Accepted provider-credential persistence design | [ADR-0020: Persistent outbound credentials](adr/ADR-0020-persistent-outbound-credentials.md) |
+| Existing external SDK dependency inspection | [SDK Kit feasibility review](reviews/sdk-kit-feasibility.md) |
+| Read-only AI development context and six installed skills | [Repository-skills plan](development/repository-skills-plan.md) |
+| Historical architecture assessment | [Previous closing review](reviews/v1-architecture-review.md) |
 
 Some ADR filenames refer to earlier deployment terminology. Their paths are retained for link stability; this guide describes the single-server v1 design.

@@ -1,9 +1,6 @@
 # ADR-0013: Production backup, restore, and deferred index reconstruction
 
-**Status:** Accepted — provisional operating baseline for later validation. Backup/restore is required; product-level index reconstruction is deferred.
-**Revised:** 19 September 2026.
-**Required approach:** A documented, tested recovery procedure for the complete production Docker Compose installation, including current security checks before service resumes.
-**Related:** [Vector storage](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md), [identity and authorization](ADR-0005-api-enforced-tenancy-and-authorization.md), [deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md), [retention and deletion](ADR-0014-data-retention-deletion-and-external-processing.md).
+**Status:** Accepted — provisional operating baseline for later validation. Backup/restore is required; product-level index reconstruction is deferred. **Revised:** 19 September 2026. **Required approach:** A documented, tested recovery procedure for the complete production Docker Compose installation, including current security checks before service resumes. **Related:** [Vector storage](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md), [identity and authorization](ADR-0005-api-enforced-tenancy-and-authorization.md), [deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md), [retention and deletion](ADR-0014-data-retention-deletion-and-external-processing.md).
 
 ## Context
 
@@ -23,14 +20,14 @@ A **cold backup** copies the stores while they are stopped. **Local staging** is
 
 The scope and degree of certainty are different for each part of this decision:
 
-| Part                                                | Status                                                                                                                                                           |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Production backup and restore**                   | Required in v1, with documented procedures and successful recovery tests before production claims.                                                               |
+| Part | Status |
+| --- | --- |
+| **Production backup and restore** | Required in v1, with documented procedures and successful recovery tests before production claims. |
 | **Operating procedure and numerical targets below** | Accepted as a provisional planning baseline for later validation and refinement. They are not measured guarantees or a production service-level agreement (SLA). |
-| **SeaweedFS as the S3 service**                     | Selected for v1. Its data and metadata belong in the recovery set.                                                                                               |
-| **Product-level index reconstruction**              | Deferred, including retained numerical embedding archives, a reconstruction API/UI, and a general reconstruction framework.                                      |
+| **SeaweedFS as the S3 service** | Selected for v1. Its data and metadata belong in the recovery set. |
+| **Product-level index reconstruction** | Deferred, including retained numerical embedding archives, a reconstruction API/UI, and a general reconstruction framework. |
 
-Preserve `ArtifactStore` and `VectorIndex`, the application-owned interfaces for artifact storage and vector indexing. This decision does not introduce another recovery platform or change those boundaries. No throughput benchmark or restore rehearsal has yet validated this operating baseline. 
+Preserve `ArtifactStore` and `VectorIndex`, the application-owned interfaces for artifact storage and vector indexing. This decision does not introduce another recovery platform or change those boundaries. No throughput benchmark or restore rehearsal has yet validated this operating baseline.
 
 ### 1. Define recovery targets by the state they actually protect
 
@@ -42,18 +39,18 @@ The **recovery-point objective (RPO)** describes the target age of recoverable d
 
 Every value below is a planning assumption or objective, not tested capacity.
 
-| Planning input or objective    | Proposed value and meaning                                                                                                                                                                                                                                                                          |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Initial workload**           | ADR-0004’s unmeasured workload: **25,000 documents**, approximately **500,000 current vectors**, one embedding profile, limited retained revisions, and remote model inference. An embedding profile identifies how numerical search vectors are produced and compared.                             |
-| **Protected state**            | Assume **100 GiB total** across PostgreSQL, SeaweedFS, Chroma, and configuration. This is an independent storage-budget assumption, not a conversion from vector count. Measure actual sources, histories, index overhead, and pending payloads.                                                    |
-| **Backup schedule and outage** | Start a consistent cut every **24 hours**. Budget **20 minutes of planned unavailability** per backup. API queries, releases, and login are unavailable during the cold-copy phase.                                                                                                                 |
-| **Local staging rate**         | Assume **200 MiB/s effective verified copying**, including the work needed to trust the staged copy. Copying 100 GiB takes about **512 seconds / 8.5 minutes**, leaving roughly **11.5 minutes** for draining, stopping, manifest checks, and restart. Shared or slower disks may not achieve this. |
-| **Off-host transfer rate**     | Assume **50 MiB/s effective encrypted transfer**, including normal overhead. Transferring 100 GiB takes about **2,048 seconds / 34.1 minutes**. Target completed off-host protection within **one hour of the cut**; service can run during this transfer.                                          |
-| **Recovery point**             | Target a **maximum 25-hour age of the latest completed off-host cut**, while daily backups and the one-hour completion budget succeed. A failed or missed backup increases exposure immediately. This is an operating/alert target, not a guaranteed bound.                                         |
-| **Recovery time**              | Target **four hours from the operator beginning restoration to validated service reopening**, with the required replacement host, disk, matching images, keys, off-host access, and complete security evidence already available.                                                                   |
-| **Retention and rehearsal**    | Propose **7 daily and 4 weekly completed sets**, a **monthly isolated restore**, and another rehearsal after material storage/schema changes. A schema is the database’s stored structure. Retention remains subject to ADR-0014’s deletion policy.                                                 |
+| Planning input or objective | Proposed value and meaning |
+| --- | --- |
+| **Initial workload** | ADR-0004’s unmeasured workload: **25,000 documents**, approximately **500,000 current vectors**, one embedding profile, limited retained revisions, and remote model inference. An embedding profile identifies how numerical search vectors are produced and compared. |
+| **Protected state** | Assume **100 GiB total** across PostgreSQL, SeaweedFS, Chroma, and configuration. This is an independent storage-budget assumption, not a conversion from vector count. Measure actual sources, histories, index overhead, and pending payloads. |
+| **Backup schedule and outage** | Start a consistent cut every **24 hours**. Budget **20 minutes of planned unavailability** per backup. API queries, releases, and login are unavailable during the cold-copy phase. |
+| **Local staging rate** | Assume **200 MiB/s effective verified copying**, including the work needed to trust the staged copy. Copying 100 GiB takes about **512 seconds / 8.5 minutes**, leaving roughly **11.5 minutes** for draining, stopping, manifest checks, and restart. Shared or slower disks may not achieve this. |
+| **Off-host transfer rate** | Assume **50 MiB/s effective encrypted transfer**, including normal overhead. Transferring 100 GiB takes about **2,048 seconds / 34.1 minutes**. Target completed off-host protection within **one hour of the cut**; service can run during this transfer. |
+| **Recovery point** | Target a **maximum 25-hour age of the latest completed off-host cut**, while daily backups and the one-hour completion budget succeed. A failed or missed backup increases exposure immediately. This is an operating/alert target, not a guaranteed bound. |
+| **Recovery time** | Target **four hours from the operator beginning restoration to validated service reopening**, with the required replacement host, disk, matching images, keys, off-host access, and complete security evidence already available. |
+| **Retention and rehearsal** | Propose **7 daily and 4 weekly completed sets**, a **monthly isolated restore**, and another rehearsal after material storage/schema changes. A schema is the database’s stored structure. Retention remains subject to ADR-0014’s deletion policy. |
 
-The copy estimates use `100 × 1024 / 200` and `100 × 1024 / 50`, because one GiB contains 1,024 MiB. They estimate only the stated phases, not the complete recovery duration. 
+The copy estimates use `100 × 1024 / 200` and `100 × 1024 / 50`, because one GiB contains 1,024 MiB. They estimate only the stated phases, not the complete recovery duration.
 
 #### Keep the availability and disk costs visible
 
@@ -75,7 +72,7 @@ The target excludes incident detection, finding the operator, purchasing/provisi
 
 At the assumed rate, downloading 100 GiB already takes about **34 minutes**. Integrity checks, extraction, database/index startup, and application/security validation take additional time; retain the remaining budget as margin and measure each phase in rehearsal.
 
-Restoring more data or manually establishing current permissions can exceed four hours. **Report the missed target rather than bypass security to meet it.** 
+Restoring more data or manually establishing current permissions can exceed four hours. **Report the missed target rather than bypass security to meet it.**
 
 ### 2. Treat the complete backup set as one recovery unit
 
@@ -85,17 +82,17 @@ Record the common cut time, backup ID, software image digests, schema/format ver
 
 **Do not mix yesterday’s PostgreSQL with today’s artifact or vector directories.** The following state belongs to one matching set:
 
-| State                                            | Required contents and purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Complete PostgreSQL cluster**                  | The application **and Kratos databases**, roles/grants, transaction state, write-ahead log (WAL), and configuration outside the data directory. This preserves projects/groups, service-token verifiers, jobs/attempts, answer receipts and idempotency records, artifact keys/checksums, index layouts/membership/readiness, and current/candidate/previous Deployment pointers. A Deployment selects which pipeline version serves requests. An application-only dump omits identity and cluster roles. |
-| **SeaweedFS namespace and data**                 | The entire configured filer store, volume directories, and master state, including the private/internal namespace. The proposed paths are `/data/filer`, `/data/volume`, and `/data/master`; include every directory actually configured, not just those example names.                                                                                                                                                                                                                                   |
-| **Chroma persistence**                           | The complete persistent directory for the selected server version: collection/system state, SQLite/WAL where used, vector index files, and metadata. Include every physical shard and profile referenced by retained releases and unfinished work. A shard is a physical partition of the index. Embeddings alone, collection names, or one SQLite file are not a complete restore.                                                                                                                       |
-| **Protected configuration and recovery secrets** | Compose/configuration files and exact dependency pins; PostgreSQL, Kratos, and SeaweedFS credentials; Kratos schemas, cookie/cipher secrets, and OIDC client registration/configuration/secret; TLS certificates/keys or a tested reissue path; model/provider credentials or restore references; application encryption and idempotency-fingerprint keys, including required versions. Back up operator-managed secret files even when Compose mounts them under `/run/secrets`.                         |
-| **Pending work and retention evidence**          | Durable job/attempt records, bounded pending payloads required for safe write retries, deletion tombstones, and retention/pin state. Preserve original statuses as evidence. Recovery also needs the separately maintained newer restriction evidence described in Section 6.                                                                                                                                                                                                                             |
+| State | Required contents and purpose |
+| --- | --- |
+| **Complete PostgreSQL cluster** | The application **and Kratos databases**, roles/grants, transaction state, write-ahead log (WAL), and configuration outside the data directory. This preserves projects/groups, service-token verifiers, jobs/attempts, answer receipts and idempotency records, artifact keys/checksums, index layouts/membership/readiness, and current/candidate/previous Deployment pointers. A Deployment selects which pipeline version serves requests. An application-only dump omits identity and cluster roles. |
+| **SeaweedFS namespace and data** | The entire configured filer store, volume directories, and master state, including the private/internal namespace. The proposed paths are `/data/filer`, `/data/volume`, and `/data/master`; include every directory actually configured, not just those example names. |
+| **Chroma persistence** | The complete persistent directory for the selected server version: collection/system state, SQLite/WAL where used, vector index files, and metadata. Include every physical shard and profile referenced by retained releases and unfinished work. A shard is a physical partition of the index. Embeddings alone, collection names, or one SQLite file are not a complete restore. |
+| **Protected configuration and recovery secrets** | Compose/configuration files and exact dependency pins; PostgreSQL, Kratos, and SeaweedFS credentials; Kratos schemas, cookie/cipher secrets, and OIDC client registration/configuration/secret; TLS certificates/keys or a tested reissue path; model/provider credentials or restore references; application encryption and idempotency-fingerprint keys, including required versions. Back up operator-managed secret files even when Compose mounts them under `/run/secrets`. |
+| **Pending work and retention evidence** | Durable job/attempt records, bounded pending payloads required for safe write retries, deletion tombstones, and retention/pin state. Preserve original statuses as evidence. Recovery also needs the separately maintained newer restriction evidence described in Section 6. |
 
 **WAL** records database changes needed by the database’s recovery process. **OIDC** is the external sign-in protocol; **TLS** protects HTTPS connections. An **idempotency record** identifies a repeated application request, and its fingerprint key supports safe request matching. A **tombstone** records a retired/deleted identity; a **pin** records that retained or active work still needs a resource.
 
-These records are part of recovery state. A backup does not turn an interrupted request into a completed job. 
+These records are part of recovery state. A backup does not turn an interrupted request into a completed job.
 
 ### 3. Preserve each store’s complete on-disk representation
 
@@ -123,7 +120,7 @@ Copy these paths while SeaweedFS is stopped. The provisional choice is a complet
 
 The inspected Chroma 1.5.9 local implementation has persistent configuration and separate local index state. Generate the backup inventory from the deployed configuration and verify it against that server version; do not assume an old example’s default directory is complete.
 
-The recorded PostgreSQL, SeaweedFS, and Chroma source links are retained in References. They support the inventory requirements, not a claim that Inframeld’s proposed 100-GiB restore has passed testing. 
+The recorded PostgreSQL, SeaweedFS, and Chroma source links are retained in References. They support the inventory requirements, not a claim that Inframeld’s proposed 100-GiB restore has passed testing.
 
 ### 4. Follow the proposed backup sequence without overstating success
 
@@ -144,7 +141,7 @@ Backup in progress
             -> New usable off-host recovery point
 ```
 
-Neither job startup nor local-copy completion advances the usable off-host recovery point. 
+Neither job startup nor local-copy completion advances the usable off-host recovery point.
 
 ### 5. Use an operator-managed backup tool, not a new product subsystem
 
@@ -158,7 +155,7 @@ An ordinary restic repository `check` is not a full read of all stored data. Sch
 
 The one-hour transfer budget does **not** include rereading the entire retained repository every day.
 
-Encryption also does not prevent a compromised backup writer from deleting backups. The destination operator should control retained snapshots and retention independently of application containers and test that protection. Encryption, integrity checking, and protection against deletion address different risks. 
+Encryption also does not prevent a compromised backup writer from deleting backups. The destination operator should control retained snapshots and retention independently of application containers and test that protection. Encryption, integrity checking, and protection against deletion address different risks.
 
 ### 6. Reconcile newer restrictions before restored data becomes accessible
 
@@ -176,25 +173,25 @@ Also record approved retention policies and their effective dates so automatic e
 
 An application audit export can help. However, a daily export from the same failed host cannot prove that all later changes survived. The operator must attest coverage **from the selected cut through the incident**, including outstanding requests and every administrator authorized to change access.
 
-This is manual work with a risk of mistakes, not an automatic durability guarantee. If the burden is unacceptable, consider a narrow automatic off-host restriction record through a separate decision; do not silently add a journal platform. 
+This is manual work with a risk of mistakes, not an automatic durability guarantee. If the burden is unacceptable, consider a narrow automatic off-host restriction record through a separate decision; do not silently add a journal platform.
 
 #### Apply current security before reads, jobs, or credential reissue
 
 Keep ingress closed while reconciling the restored installation:
 
-| Area                                              | Required restore behavior                                                                                                                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Human sessions and CI/integration credentials** | Invalidate the restored sessions and credentials. Reissue fresh, scoped credentials only after authorization review. CI credentials are those used by authorized automation.    |
-| **Accounts and local login credentials**          | Review disabled identities and account-security changes. Where current credentials cannot be established safely, require controlled recovery/reset before enabling the account. |
-| **Document and integration access**               | Reapply narrower memberships, document allowlists, and integration ceilings—the maximum document scope an integration may use.                                                  |
-| **Deletion and retention**                        | Reapply newer deletion tombstones and current retention expiry before retrieving or releasing content.                                                                          |
-| **Queued work**                                   | Do not execute normal queued work under a historical authorization decision. Review it as described in Sections 7–8.                                                            |
+| Area | Required restore behavior |
+| --- | --- |
+| **Human sessions and CI/integration credentials** | Invalidate the restored sessions and credentials. Reissue fresh, scoped credentials only after authorization review. CI credentials are those used by authorized automation. |
+| **Accounts and local login credentials** | Review disabled identities and account-security changes. Where current credentials cannot be established safely, require controlled recovery/reset before enabling the account. |
+| **Document and integration access** | Reapply narrower memberships, document allowlists, and integration ceilings—the maximum document scope an integration may use. |
+| **Deletion and retention** | Reapply newer deletion tombstones and current retention expiry before retrieving or releasing content. |
+| **Queued work** | Do not execute normal queued work under a historical authorization decision. Review it as described in Sections 7–8. |
 
 **Missing restriction evidence does not mean there were no restrictions.** Keep affected projects, data, or accounts inaccessible. If the affected scope cannot be identified, keep the entire installation inaccessible.
 
 An authorized owner must review retained content and reapprove current permissions before access resumes. Uncertain deletion status requires an explicit, recorded decision about that content, not merely fresh login. Invalidating credentials alone cannot establish that a restored document was not deleted after the cut.
 
-The four-hour recovery target is conditional on this reconciliation. It may be missed safely rather than met by reopening uncertain access. 
+The four-hour recovery target is conditional on this reconciliation. It may be missed safely rather than met by reopening uncertain access.
 
 ### 7. Restore privately, validate, then reopen only safe scopes
 
@@ -205,7 +202,7 @@ The four-hour recovery target is conditional on this reconciliation. It may be m
 5. **Classify unfinished work before enabling the worker.** Preserve original statuses as evidence, identify what can safely resume, and quarantine uncertain provider-capable work as `recovery_required`. A restored queued flag is not sufficient authority to execute it. Section 8 explains the distinction.
 6. **Verify application behavior and record the recovery.** Query a known retained release and check its authorized evidence. In the isolated rehearsal, exercise a safe release transition and rollback. Verify gateway routing, current document permissions, deleted-content exclusion, and idempotency behavior. Record cut age, data loss, phase timings, checks, and exceptions. Reopen only validated scopes, then resume normal backups.
 
-An uploaded object without a published application reference remains an **orphan**, not an admitted document. An interrupted candidate is not automatically ready. Published references must resolve to their required data before they can be treated as usable. 
+An uploaded object without a published application reference remains an **orphan**, not an admitted document. An interrupted candidate is not automatically ready. Published references must resolve to their required data before they can be treated as usable.
 
 ### 8. Do not replay uncertain work just because its completion was lost
 
@@ -231,7 +228,7 @@ Idempotency records admitted after the cut may also be lost. A restored installa
 
 Clients and operators must reconcile saved operation IDs and pending workflows against the documented restore cut. Do not blindly restart a build/evaluation/release sequence. A deliberately new chargeable operation requires explicit authorization with the uncertainty visible.
 
-This is a consequence of the accepted potential data-loss window. **The backup procedure does not provide exactly-once recovery of external operations across a disaster.** 
+This is a consequence of the accepted potential data-loss window. **The backup procedure does not provide exactly-once recovery of external operations across a disaster.**
 
 ### 9. Distinguish disposable trials from production recovery
 
@@ -241,7 +238,7 @@ A company production installation must configure the procedure, name its operato
 
 Emit redacted structured logs and audit release, credential, permission, and deletion decisions in PostgreSQL. Redaction removes sensitive content from logs. Expose the latest completed backup cut and age, transfer failures, restore-test date, disk headroom, worker/queue health, and dependency failures.
 
-An operator-readable status surface and **runbook**, written operating instructions, are sufficient. No mandatory telemetry warehouse, CloudWatch integration, or full tracing service is required. 
+An operator-readable status surface and **runbook**, written operating instructions, are sufficient. No mandatory telemetry warehouse, CloudWatch integration, or full tracing service is required.
 
 ### 10. Restore numerical indexes; do not claim to reconstruct them
 
@@ -253,41 +250,41 @@ Future reconstruction needs a separate design for cost, retention/deletion, mode
 
 Creating an ordinary new pipeline version is not sufficient numerical isolation. Likewise, ADR-0004’s bounded retry payloads protect unfinished writes; they are temporary protocol data, not a complete retained numerical archive.
 
-Product-level reconstruction, its API/UI, and a general framework remain deferred alongside high availability and additional distributed recovery infrastructure. 
+Product-level reconstruction, its API/UI, and a general framework remain deferred alongside high availability and additional distributed recovery infrastructure.
 
 ### 11. Rehearse host loss and security changes before production use
 
 Before calling this profile production-ready, restore onto another host with representative state and failures:
 
-| Acceptance case                                   | Required result                                                                                                                                                 |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Complete host loss**                            | Recover the matching stores, configuration, and keys, including a pending attempt and retained rollback target. Validate the retained release and its evidence. |
-| **Deletion after the cut**                        | Reapply the later deletion; the restored host must not disclose that content.                                                                                   |
-| **Credential and group revocation after the cut** | Deny the revoked access after restoration, even when the backup still contains the earlier grants.                                                              |
-| **Queued at the cut, paid/completed afterward**   | Do not automatically call the model again. Preserve uncertainty and the original backup status, and require safe recovery classification.                       |
-| **Corrupt/missing bytes or missing keys**         | Produce a visible failure, not a successful backup/restore marker.                                                                                              |
-| **Incomplete restriction evidence**               | Keep unvalidated scopes inaccessible rather than assume unchanged permissions.                                                                                  |
-| **Filled staging disk**                           | Fail visibly without reporting an incomplete set as a successful backup.                                                                                        |
+| Acceptance case | Required result |
+| --- | --- |
+| **Complete host loss** | Recover the matching stores, configuration, and keys, including a pending attempt and retained rollback target. Validate the retained release and its evidence. |
+| **Deletion after the cut** | Reapply the later deletion; the restored host must not disclose that content. |
+| **Credential and group revocation after the cut** | Deny the revoked access after restoration, even when the backup still contains the earlier grants. |
+| **Queued at the cut, paid/completed afterward** | Do not automatically call the model again. Preserve uncertainty and the original backup status, and require safe recovery classification. |
+| **Corrupt/missing bytes or missing keys** | Produce a visible failure, not a successful backup/restore marker. |
+| **Incomplete restriction evidence** | Keep unvalidated scopes inaccessible rather than assume unchanged permissions. |
+| **Filled staging disk** | Fail visibly without reporting an incomplete set as a successful backup. |
 
 Measure the **complete 100-GiB sequence**, downtime, effective copy/transfer rates, integrity checks, and restore phases. Refine storage, retention, and tool settings from those results. Repeat retained-release restoration, permission/deletion reconciliation, and safe handling of uncertain jobs.
 
 Operator availability, ready replacement resources, recoverable keys, and off-host restriction evidence are material assumptions of the four-hour estimate.
 
-**These tests remain to be performed.** Keep the provisional baseline until representative results justify changes. This ADR does not authorize a broader backup-design project or turn its estimates into production guarantees. 
+**These tests remain to be performed.** Keep the provisional baseline until representative results justify changes. This ADR does not authorize a broader backup-design project or turn its estimates into production guarantees.
 
 ## Consequences
 
 ### Positive
 
-* **Recovery protects a complete installation, not unrelated files.** One stopped, matching set includes application and identity state, object metadata and bytes, numerical indexes, pending-work evidence, and required configuration/keys.
-* **The operating procedure stays limited and understandable.** Local cold-copy staging followed by encrypted off-host transfer avoids requiring a distributed snapshot system or a continuously replicated cluster. Service can resume during transfer.
-* **Security and uncertain work remain explicit recovery concerns.** Reopening requires newer restrictions to be reconciled, and restored jobs cannot silently repeat chargeable calls merely because their completion records were lost.
+- **Recovery protects a complete installation, not unrelated files.** One stopped, matching set includes application and identity state, object metadata and bytes, numerical indexes, pending-work evidence, and required configuration/keys.
+- **The operating procedure stays limited and understandable.** Local cold-copy staging followed by encrypted off-host transfer avoids requiring a distributed snapshot system or a continuously replicated cluster. Service can resume during transfer.
+- **Security and uncertain work remain explicit recovery concerns.** Reopening requires newer restrictions to be reconciled, and restored jobs cannot silently repeat chargeable calls merely because their completion records were lost.
 
 ### Negative
 
-* **The provisional backup schedule causes substantial downtime.** Twenty minutes daily is about ten hours per 30-day month before other interruptions. A single host still needs replacement and restoration after host loss.
-* **Protection consumes disk, bandwidth, and operator time.** Complete local staging, remote retention, transfer verification, key recovery, and recurring restore rehearsals have real costs. Neither compression nor optimistic throughput is a safety prerequisite.
-* **Recovery targets depend on evidence and preparation.** Missing post-cut history limits deduplication; missing restriction evidence can prevent safe reopening. Manual reconciliation is fallible and may extend recovery beyond four hours. Lost vectors without a usable backup remain unavailable.
+- **The provisional backup schedule causes substantial downtime.** Twenty minutes daily is about ten hours per 30-day month before other interruptions. A single host still needs replacement and restoration after host loss.
+- **Protection consumes disk, bandwidth, and operator time.** Complete local staging, remote retention, transfer verification, key recovery, and recurring restore rehearsals have real costs. Neither compression nor optimistic throughput is a safety prerequisite.
+- **Recovery targets depend on evidence and preparation.** Missing post-cut history limits deduplication; missing restriction evidence can prevent safe reopening. Manual reconciliation is fallible and may extend recovery beyond four hours. Lost vectors without a usable backup remain unavailable.
 
 ## Alternatives considered
 
@@ -323,23 +320,23 @@ A fresh login does not resolve uncertain deletion history, and a new worker does
 
 ### Related decisions
 
-| Reference                                                                                       | Responsibility                                                                                                      |
-| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| [ADR-0004: Vector storage](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md)            | Immutable vector generations, ordinary exact-payload retries, pending-write evidence, and the provisional workload. |
-| [ADR-0005: Identity and authorization](ADR-0005-api-enforced-tenancy-and-authorization.md)      | Kratos identity, integration credentials, and application-owned permissions.                                        |
-| [ADR-0007: Durable jobs and recovery](ADR-0007-durable-jobs-idempotency-and-recovery.md)        | Safe retries, uncertain provider outcomes, operation identities, and deduplication limits.                          |
-| [ADR-0011: Deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md)                    | The supported single-server topology and explicit SeaweedFS storage layout.                                         |
-| [ADR-0014: Retention and deletion](ADR-0014-data-retention-deletion-and-external-processing.md) | Retention, deletion, and their application to backup and staging copies.                                            |
+| Reference | Responsibility |
+| --- | --- |
+| [ADR-0004: Vector storage](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md) | Immutable vector generations, ordinary exact-payload retries, pending-write evidence, and the provisional workload. |
+| [ADR-0005: Identity and authorization](ADR-0005-api-enforced-tenancy-and-authorization.md) | Kratos identity, integration credentials, and application-owned permissions. |
+| [ADR-0007: Durable jobs and recovery](ADR-0007-durable-jobs-idempotency-and-recovery.md) | Safe retries, uncertain provider outcomes, operation identities, and deduplication limits. |
+| [ADR-0011: Deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md) | The supported single-server topology and explicit SeaweedFS storage layout. |
+| [ADR-0014: Retention and deletion](ADR-0014-data-retention-deletion-and-external-processing.md) | Retention, deletion, and their application to backup and staging copies. |
 
 ### Recorded external evidence
 
 These are the documentation and source references retained from the original ADR. They support the proposed procedure; they are not a new verification, approved dependency pins, or a completed Inframeld restore test.
 
-| Reference                                                                                                                                                                                                                                                                                                             | Evidence and limitation recorded in the source                                                                                                                                                      |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **PostgreSQL 18:** [File-level backup](https://www.postgresql.org/docs/18/backup-file.html) and [cluster file layout](https://www.postgresql.org/docs/18/storage-file-layout.html)                                                                                                                                    | Ordinary file copying requires shutdown and the complete cluster inventory. A later logical-dump approach needs separate role/global-state coverage.                                                |
-| **SeaweedFS 4.47:** [Filer data model](https://github.com/seaweedfs/seaweedfs/blob/4.47/weed/pb/filer.proto) and [S3 bucket-path discovery](https://github.com/seaweedfs/seaweedfs/blob/4.47/weed/command/s3.go)                                                                                                      | Explain how object names map to ordered stored chunks and associated metadata.                                                                                                                      |
-| **SeaweedFS 4.47:** [LevelDB2 filer store](https://github.com/seaweedfs/seaweedfs/blob/4.47/weed/filer/leveldb2/leveldb2_store.go) and [volume filename rules](https://github.com/seaweedfs/seaweedfs/blob/4.47/weed/storage/volume.go)                                                                               | Support preserving complete metadata/volume directories and their recorded identities.                                                                                                              |
-| **SeaweedFS:** [Backup guidance](https://github.com/seaweedfs/seaweedfs/wiki/Data-Backup)                                                                                                                                                                                                                             | Separates volume and filer backups and requires changes to be paused for consistency. Its mirror example was tested only on a small deployment; it does not qualify this proposed 100-GiB recovery. |
-| **Chroma 1.5.9:** [Configuration](https://github.com/chroma-core/chroma/blob/1.5.9/rust/frontend/src/config.rs) and [local HNSW persistence](https://github.com/chroma-core/chroma/blob/1.5.9/rust/segment/src/local_hnsw.rs)                                                                                         | Identify configuration and local index persistence that the deployed-version inventory must cover.                                                                                                  |
-| **restic, documentation inspected as 0.19.1:** [Repository setup](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html), [repository keys](https://restic.readthedocs.io/en/stable/070_encryption.html), and [integrity checks](https://restic.readthedocs.io/en/stable/045_working_with_repos.html) | Describe encrypted repositories, SFTP, recovery keys, and the difference between ordinary checking and `check --read-data`. Tool behavior and full recovery still need qualification.               |
+| Reference | Evidence and limitation recorded in the source |
+| --- | --- |
+| **PostgreSQL 18:** [File-level backup](https://www.postgresql.org/docs/18/backup-file.html) and [cluster file layout](https://www.postgresql.org/docs/18/storage-file-layout.html) | Ordinary file copying requires shutdown and the complete cluster inventory. A later logical-dump approach needs separate role/global-state coverage. |
+| **SeaweedFS 4.47:** [Filer data model](https://github.com/seaweedfs/seaweedfs/blob/4.47/weed/pb/filer.proto) and [S3 bucket-path discovery](https://github.com/seaweedfs/seaweedfs/blob/4.47/weed/command/s3.go) | Explain how object names map to ordered stored chunks and associated metadata. |
+| **SeaweedFS 4.47:** [LevelDB2 filer store](https://github.com/seaweedfs/seaweedfs/blob/4.47/weed/filer/leveldb2/leveldb2_store.go) and [volume filename rules](https://github.com/seaweedfs/seaweedfs/blob/4.47/weed/storage/volume.go) | Support preserving complete metadata/volume directories and their recorded identities. |
+| **SeaweedFS:** [Backup guidance](https://github.com/seaweedfs/seaweedfs/wiki/Data-Backup) | Separates volume and filer backups and requires changes to be paused for consistency. Its mirror example was tested only on a small deployment; it does not qualify this proposed 100-GiB recovery. |
+| **Chroma 1.5.9:** [Configuration](https://github.com/chroma-core/chroma/blob/1.5.9/rust/frontend/src/config.rs) and [local HNSW persistence](https://github.com/chroma-core/chroma/blob/1.5.9/rust/segment/src/local_hnsw.rs) | Identify configuration and local index persistence that the deployed-version inventory must cover. |
+| **restic, documentation inspected as 0.19.1:** [Repository setup](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html), [repository keys](https://restic.readthedocs.io/en/stable/070_encryption.html), and [integrity checks](https://restic.readthedocs.io/en/stable/045_working_with_repos.html) | Describe encrypted repositories, SFTP, recovery keys, and the difference between ordinary checking and `check --read-data`. Tool behavior and full recovery still need qualification. |
