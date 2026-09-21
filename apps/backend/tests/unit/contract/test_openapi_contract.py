@@ -10,6 +10,8 @@ CONTRACT_PATH = (
 
 
 def test_openapi_contract_matches_application() -> None:
+    """Prove the committed OpenAPI document matches the current application."""
+
     assert CONTRACT_PATH.exists(), (
         "The OpenAPI contract is missing. Run `pnpm openapi` to generate it."
     )

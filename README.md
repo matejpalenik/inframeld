@@ -1,5 +1,7 @@
 # Inframeld
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/matejpalenik/inframeld?utm_source=oss&utm_medium=github&utm_campaign=matejpalenik%2Finframeld&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 Inframeld is an open-source MVP for configuring models, uploading knowledge and asking grounded questions, with versioned knowledge, benchmark comparisons and governed releases when users need them.
 
 The repository is intentionally structured as a small monorepo so the API, web client, generated contract, architecture decisions, and delivery checks can evolve together.

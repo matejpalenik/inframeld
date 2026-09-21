@@ -12,6 +12,7 @@ PoolOverflow = Annotated[int, Field(ge=0, le=100)]
 ConnectTimeoutSeconds = Annotated[int, Field(ge=1, le=60)]
 StartupTimeoutSeconds = Annotated[float, Field(gt=0, le=60)]
 PoolTimeoutSeconds = Annotated[float, Field(gt=0, le=300)]
+MigrationLockTimeoutSeconds = Annotated[float, Field(gt=0, le=300)]
 
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
@@ -35,6 +36,7 @@ class DatabaseSettings(BaseModel):
     connect_timeout_seconds: ConnectTimeoutSeconds = 5
     startup_timeout_seconds: StartupTimeoutSeconds = 10.0
     pool_timeout_seconds: PoolTimeoutSeconds = 30.0
+    migration_lock_timeout_seconds: MigrationLockTimeoutSeconds = 5.0
 
 
 class Settings(BaseSettings):
