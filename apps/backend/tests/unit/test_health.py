@@ -6,6 +6,8 @@ client = TestClient(app)
 
 
 def test_health() -> None:
+    """Prove the health endpoint returns the expected healthy response."""
+
     response = client.get("/health")
 
     assert response.status_code == 200

@@ -49,6 +49,8 @@ async def table_name(database: Database) -> AsyncGenerator[str]:
 
 
 async def test_commit_is_visible_to_a_new_session(database: Database, table_name: str) -> None:
+    """Prove committed data is visible from a separate database session."""
+
     async with database.session() as session, session.begin():
         await session.execute(
             text(f'INSERT INTO "{table_name}" (id, label) VALUES (:id, :label)'),
@@ -64,6 +66,8 @@ async def test_commit_is_visible_to_a_new_session(database: Database, table_name
 
 
 async def test_exception_rolls_back_the_transaction(database: Database, table_name: str) -> None:
+    """Prove an exception rolls back the whole explicit transaction."""
+
     with pytest.raises(RuntimeError, match="force rollback"):
         async with database.session() as session, session.begin():
             await session.execute(
@@ -81,6 +85,8 @@ async def test_exception_rolls_back_the_transaction(database: Database, table_na
 
 
 async def test_postgresql_enforces_unique_constraints(database: Database, table_name: str) -> None:
+    """Prove PostgreSQL rejects duplicate values and rolls back the transaction."""
+
     with pytest.raises(IntegrityError):
         async with database.session() as session, session.begin():
             await session.execute(
@@ -102,6 +108,8 @@ async def test_postgresql_enforces_unique_constraints(database: Database, table_
 async def test_sessions_do_not_see_each_others_uncommitted_data(
     database: Database, table_name: str
 ) -> None:
+    """Prove one session cannot read another session's uncommitted data."""
+
     async with database.session() as writer, writer.begin():
         await writer.execute(
             text(f'INSERT INTO "{table_name}" (id, label) VALUES (:id, :label)'),

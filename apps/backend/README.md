@@ -49,6 +49,7 @@ From the repository root:
 
 ```bash
 pnpm dev:db
+pnpm --filter @inframeld/backend migrate
 pnpm --filter @inframeld/backend dev
 ```
 
@@ -56,7 +57,29 @@ The development PostgreSQL service is managed by the root `compose.dev.yaml` fil
 
 The API is available at <http://127.0.0.1:8000>. FastAPI's interactive documentation is available at `/docs` and `/redoc`.
 
-### Development scripts
+## Configuration
+
+Runtime configuration is loaded from files under `apps/backend`:
+
+- `.env` is used for local development.
+- `.env.test` is used when `INFRAMELD_ENVIRONMENT=test`.
+- `INFRAMELD_TEST_ENV_FILE` can select another test environment file. Relative paths are resolved from `apps/backend`.
+- `INFRAMELD_*` environment variables override values from dotenv files.
+- `.env.example` documents the non-secret development defaults and may be copied to `.env` or `.env.test`.
+
+For the Compose database, the relevant local values are:
+
+```dotenv
+INFRAMELD_DATABASE__HOST=127.0.0.1
+INFRAMELD_DATABASE__PORT=15432
+INFRAMELD_DATABASE__NAME=inframeld
+INFRAMELD_DATABASE__USER=inframeld
+INFRAMELD_DATABASE__PASSWORD=inframeld-dev-only
+```
+
+Do not commit `.env` or `.env.test`. The development password above is only a local Compose credential and must not be reused in production.
+
+## Database
 
 Run these commands from the repository root:
 
@@ -92,27 +115,19 @@ pnpm dev:db:down
 
 This preserves the named PostgreSQL volume. Removing the volume is a destructive reset and should only be done deliberately with the Compose `down -v` command.
 
-## Configuration
+### Migrations
 
-Runtime configuration is loaded from files under `apps/backend`:
+Before you can run the development app, you need to start the migrations in the dev database.
 
-- `.env` is used for local development.
-- `.env.test` is used when `INFRAMELD_ENVIRONMENT=test`.
-- `INFRAMELD_TEST_ENV_FILE` can select another test environment file. Relative paths are resolved from `apps/backend`.
-- `INFRAMELD_*` environment variables override values from dotenv files.
-- `.env.example` documents the non-secret development defaults and may be copied to `.env` or `.env.test`.
-
-For the Compose database, the relevant local values are:
-
-```dotenv
-INFRAMELD_DATABASE__HOST=127.0.0.1
-INFRAMELD_DATABASE__PORT=15432
-INFRAMELD_DATABASE__NAME=inframeld
-INFRAMELD_DATABASE__USER=inframeld
-INFRAMELD_DATABASE__PASSWORD=inframeld-dev-only
+```bash
+pnpm --filter @inframeld/backend migrate
 ```
 
-Do not commit `.env` or `.env.test`. The development password above is only a local Compose credential and must not be reused in production.
+Migrations are operator-controlled, synchronous, and protected by a PostgreSQL migration lock. API startup checks schema compatibility but never runs migrations.
+
+`pnpm test:integration` runs this migration command automatically against `.env.test` before executing integration tests.
+
+Do not add migrations to `pnpm dev` or API startup.
 
 ## Checks
 

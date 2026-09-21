@@ -5,6 +5,8 @@ from inframeld_backend.shared.infrastructure.settings import DatabaseSettings, g
 
 
 def test_database_settings_rejects_non_positive_startup_timeout() -> None:
+    """Prove invalid startup timeout configuration is rejected."""
+
     with pytest.raises(ValidationError):
         DatabaseSettings(
             name="test", user="test", password=SecretStr("test"), startup_timeout_seconds=0
@@ -14,6 +16,8 @@ def test_database_settings_rejects_non_positive_startup_timeout() -> None:
 def test_invalid_configuration_error_does_not_expose_password(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Prove configuration errors identify invalid fields without exposing passwords."""
+
     values = {
         "INFRAMELD_DATABASE__HOST": "localhost",
         "INFRAMELD_DATABASE__PORT": "not-a-port",

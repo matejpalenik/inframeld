@@ -10,6 +10,8 @@ from inframeld_backend.shared.infrastructure.timing import elapsed_milliseconds
 
 @pytest.mark.asyncio
 async def test_startup_failure_is_bounded_and_secret_safe() -> None:
+    """Prove database startup fails quickly without exposing connection secrets."""
+
     settings = DatabaseSettings(
         host="127.0.0.1",
         port=1,
