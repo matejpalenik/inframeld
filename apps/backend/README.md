@@ -104,6 +104,7 @@ The normal development workflow is:
 
 ```bash
 pnpm dev:db
+pnpm --filter @inframeld/backend migrate
 pnpm dev
 ```
 
