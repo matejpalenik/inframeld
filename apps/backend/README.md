@@ -41,7 +41,13 @@ composition.py -> concrete implementations and configuration
 
 `main.py` is the process entry point. `composition.py` is the composition root: it constructs the application and explicitly wires concrete dependencies. HTTP, the future worker, Studio, and MCP must invoke the same application use cases; they must not implement parallel business behavior.
 
-Architecture tests under `tests/architecture` protect these dependency rules. They use static import checks and fixtures that prove forbidden dependencies are rejected.
+The developer manually reviews these dependency rules. Automated tests cover product behavior, API contracts, and integrations; do not add repository-structure, import-boundary, or composition-construction tests.
+
+## Error handling
+
+RFC 9457 Problem Details is the accepted HTTP error contract. Domain and application exceptions remain independent of HTTP, and transport adapters select safe public responses. Structured logs preserve correlation without recording submitted secrets or traceback locals.
+
+Read the [maintainer rules and error reference](../../docs/development/error-handling.md) before adding an error or changing a handler. The [implementation walkthrough](../../docs/development/error-handling-implementation.md) supplies the implementation order, documented exception definitions, response model, and behavioral test checkpoints. The new infrastructure is planned in issue 19; these documents do not claim it is already implemented or qualified.
 
 ## Development
 

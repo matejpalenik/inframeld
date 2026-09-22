@@ -604,6 +604,8 @@ We do not keep a separate OpenAPI 3.0.3 requirement or relabel a schema to prete
 
 Wire fields use lower camel case, identifiers are opaque, and list endpoints use bounded opaque cursors. The contract describes background jobs, typed failures, concurrency checks, and the distinction between an original answer and a safe retry response.
 
+HTTP errors use **RFC 9457 Problem Details** with the `application/problem+json` media type. Their stable type and code identify the failure, safe descriptions help the caller respond, and `requestId` connects the response to operational logs. Validation details never echo submitted secrets. Domain/application exceptions remain independent of HTTP; adapters translate supported failures explicitly. Logs exclude sensitive inputs and traceback locals and retain one diagnostic traceback per unexpected failure. This contract is accepted; its implementation and qualification remain work in issue 19. See the [maintainer guide](development/error-handling.md) and [ADR-0002](adr/ADR-0002-product-owned-openapi-contract.md).
+
 Backend contract tests cover nullable and union models, constraints, uploads, errors, asynchronous jobs, and safe replay behavior.
 
 ### Studio uses the official TypeScript SDK
@@ -802,7 +804,7 @@ A rich domain object is useful when it owns an invariant. A simple immutable val
 
 An **aggregate** is a consistency boundary with a root that controls changes. It is not an instruction to load every related row into memory. A Collection with a million members should use bounded streams and SQL set operations while a small root controls publication.
 
-Do not add a generic repository, command bus, or factory hierarchy for every concept. Use architectural import tests and behavior tests to protect boundaries. The number of classes or patterns is not a measure of clean design.
+Do not add a generic repository, command bus, or factory hierarchy for every concept. The developer manually guards import boundaries and repository organization; automated tests verify product behavior, API contracts, and integrations. Do not add architecture/import-boundary or composition-construction tests. The number of classes or patterns is not a measure of clean design.
 
 ## 13. Background jobs, retries, and conflicts
 

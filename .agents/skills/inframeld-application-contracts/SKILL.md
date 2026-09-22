@@ -13,6 +13,7 @@ Default to read-only assistance. Loading this skill grants no code edit, SDK ext
 
 - `docs/ARCHITECTURE.md` is the product explanation.
 - `docs/adr/ADR-0001-modular-application-structure.md` owns DDD/Clean Architecture and lightweight CQRS; `docs/adr/ADR-0002-product-owned-openapi-contract.md` owns the code-first public contract and generated TypeScript requirement.
+- For HTTP failures and exception logging, also read `docs/development/error-handling.md`. RFC 9457 is accepted; `docs/development/error-handling-implementation.md` distinguishes the planned infrastructure from code that exists.
 - `docs/adr/ADR-0007-durable-jobs-idempotency-and-recovery.md` owns admission, attempts, fingerprints, safe replay and uncertainty.
 - `docs/adr/ADR-0018-first-party-mcp-adapter.md` owns the accepted MCP surface.
 - Read ADR-0017 for feedback, ADR-0019 for default-route orchestration, and ADR-0020 for credential mutations when those operations are being exposed.
@@ -43,3 +44,5 @@ For the recommended default alias, find the original logical-route idempotency r
 Trace one request: validated transport DTO → verified context → owning use case → short transaction/external boundary → safe result. Ask which layer owns each decision. For a retry, compare lost response, concurrent same key and genuinely different command. For HTTP/MCP parity, compare scope, selected version, receipt identity and typed outcome rather than only schema names.
 
 Use behavioral contract fixtures for native schema unions/nullability, bounded uploads/cursors, errors, jobs, secret-safe responses and query replay. Proposed tests are not executed evidence. Do not add a bus, workflow engine, exporter, API gateway product or SDK-platform implementation to satisfy this skill.
+
+HTTP errors use actual RFC 9457 `application/problem+json`, with stable problem types/codes, safe descriptions, `requestId`, and bounded sanitized validation issues. Keep ordinary Python domain/application exceptions independent of HTTP and logging; only explicitly mapped failures get a public application problem. Do not expose arbitrary exception text. Disable traceback locals and exclude unreviewed exception messages/notes across cause chains. Preserve correlation through the outer 500 handler and avoid duplicate diagnostic tracebacks, including Uvicorn reports. Cancellation and operation-specific retry rules remain intact. Manually review import boundaries; do not add structural tests contrary to `AGENTS.md`.

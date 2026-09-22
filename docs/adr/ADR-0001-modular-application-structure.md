@@ -1,7 +1,7 @@
 # ADR-0001: Strict DDD, Clean Architecture, and lightweight CQRS
 
 **Status:** Accepted — modular structure, dependency rules, and feedback ownership.  
-**Revised:** 19 September 2026.  
+**Revised:** 22 September 2026.  
 **Required approach:** Strict DDD, Clean Architecture, lightweight CQRS, and Docker Compose-only delivery.  
 **Related:** [Architecture guide](../ARCHITECTURE.md), [durable jobs and recovery](ADR-0007-durable-jobs-idempotency-and-recovery.md), [deployment](ADR-0011-hosted-vercel-and-aws-deployment-profile.md).
 
@@ -245,7 +245,7 @@ Tests should demonstrate business behavior, not just that methods were called. E
 | An operation references a resource from another project. | The cross-project reference is denied. |
 | A process restarts and retries publication. | Publication is not duplicated. |
 
-Add automated dependency checks for forbidden imports and dependency cycles.
+The developer manually guards forbidden imports, dependency cycles, and repository organization, following the repository's setup-test policy. Do not add architecture/import-boundary tests, dependency-rule fixtures, or composition-root construction tests. Automated tests verify implemented product behavior, API contracts, and integrations.
 
 Boundary tests must use real PostgreSQL and the Chroma server shipped with the product. Mock-only tests cannot establish whether the actual database constraints, concurrency behavior, or Chroma operations satisfy the required semantics.
 
@@ -260,7 +260,7 @@ Boundary tests must use real PostgreSQL and the Chroma server shipped with the p
 ### Negative
 
 - **Separate processes add packaging work.** The API and worker need distinct runtime entry points even though they share a backend image.
-- **Module ownership requires discipline.** Developers must use the owning module's application operations rather than update its tables from elsewhere. Dependency checks and behavior tests are part of enforcing that boundary.
+- **Module ownership requires discipline.** Developers must use the owning module's application operations rather than update its tables from elsewhere. Manual dependency review and behavioral tests protect that boundary.
 - **Read and write models are deliberately different.** Developers maintain query DTOs alongside command-side domain behavior. Additional DTO layers are still unnecessary when they add no translation or responsibility.
 - **Future service extraction is not free.** Ports make dependencies explicit, but moving a module into a separate service later may still require refactoring.
 
