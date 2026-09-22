@@ -55,6 +55,20 @@ def test_openapi_contract_matches_application() -> None:
     assert generated_contract["openapi"].startswith("3.1."), (
         "The application must emit native OpenAPI 3.1.x."
     )
+    operation_ids: list[str | None] = []
+
+    for path_item in generated_contract["paths"].values():
+        for operation in path_item.values():
+            if not isinstance(operation, dict) or "responses" not in operation:
+                continue
+
+            typed_operation = cast(dict[str, Any], operation)
+            operation_ids.append(cast(str | None, typed_operation.get("operationId")))
+
+    assert all(isinstance(operation_id, str) and operation_id for operation_id in operation_ids), (
+        "Every public operation must define an operationId."
+    )
+    assert len(operation_ids) == len(set(operation_ids)), "Public operationIds must be unique."
 
 
 def test_schema_fixture_preserves_native_field_semantics() -> None:
