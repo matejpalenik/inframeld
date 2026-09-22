@@ -23,3 +23,7 @@ def test_openapi_contract_matches_application() -> None:
     assert committed_contract == generated_contract, (
         "The OpenAPI contract is stale. Run `pnpm openapi` to regenerate it."
     )
+
+    assert generated_contract["openapi"].startswith("3.1."), (
+        "The application must emit native OpenAPI 3.1.x."
+    )

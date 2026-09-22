@@ -1,9 +1,8 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, cast
+from typing import cast
 
 from fastapi import FastAPI
-from fastapi.openapi.utils import get_openapi
 
 from inframeld_backend.shared.http.health import router as health_router
 from inframeld_backend.shared.http.request_context import RequestContextMiddleware
@@ -13,7 +12,6 @@ from inframeld_backend.shared.infrastructure.settings import Settings, get_setti
 
 API_TITLE = "Inframeld API"
 API_VERSION = "0.1.0"
-OPENAPI_VERSION = "3.2.1"
 
 
 @asynccontextmanager
@@ -47,24 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    def custom_openapi() -> dict[str, Any]:
-        if application.openapi_schema is not None:
-            return application.openapi_schema
-
-        schema = get_openapi(
-            title=API_TITLE,
-            version=API_VERSION,
-            description=application.description,
-            routes=application.routes,
-            openapi_version=OPENAPI_VERSION,
-        )
-
-        application.openapi_schema = schema
-
-        return schema
-
     application.include_router(health_router)
-    application.openapi = custom_openapi
     application.add_middleware(RequestContextMiddleware)
 
     application.state.database = database
