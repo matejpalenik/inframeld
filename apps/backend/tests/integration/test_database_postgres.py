@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from inframeld_backend.shared.infrastructure.database import Database
 from inframeld_backend.shared.infrastructure.settings import get_settings
@@ -122,3 +122,20 @@ async def test_sessions_do_not_see_each_others_uncommitted_data(
             )
 
         assert result.scalar_one() == 0
+
+
+async def test_sql_error_does_not_render_bound_parameter(database: Database) -> None:
+    """Keep a bound private value out of a failed statement's text."""
+    private_value = "synthetic-private-sql-value"
+    missing_table = f"missing_{uuid4().hex}"
+
+    with pytest.raises(DBAPIError) as error:
+        async with database.session() as session:
+            await session.execute(
+                text(f'SELECT :private_value FROM "{missing_table}"'),
+                {"private_value": private_value},
+            )
+
+    rendered = str(error.value)
+    assert private_value not in rendered
+    assert "SQL parameters hidden" in rendered

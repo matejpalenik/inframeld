@@ -4,6 +4,7 @@ from typing import cast
 
 from fastapi import FastAPI
 
+from inframeld_backend.shared.http.error_handlers import register_error_handlers
 from inframeld_backend.shared.http.health import router as health_router
 from inframeld_backend.shared.http.request_context import RequestContextMiddleware
 from inframeld_backend.shared.infrastructure.database import Database
@@ -36,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     database = Database(resolved_settings.database)
 
     application = FastAPI(
+        debug=False,
         title=API_TITLE,
         version=API_VERSION,
         description="Governed retrieval and release workflows.",
@@ -44,6 +46,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
+
+    register_error_handlers(application)
 
     application.include_router(health_router)
     application.add_middleware(RequestContextMiddleware)

@@ -41,6 +41,7 @@ class Database:
 
         self._engine: AsyncEngine = create_async_engine(
             database_url,
+            hide_parameters=True,
             pool_size=settings.pool_size,
             max_overflow=settings.max_overflow,
             pool_timeout=settings.pool_timeout_seconds,

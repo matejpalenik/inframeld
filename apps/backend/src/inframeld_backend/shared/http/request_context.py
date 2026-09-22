@@ -15,9 +15,11 @@ from time import perf_counter
 from uuid import uuid4
 
 import structlog
+from starlette.routing import Route
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
+from inframeld_backend.shared.infrastructure.error_reporting import report_unexpected_error
 from inframeld_backend.shared.infrastructure.timing import elapsed_milliseconds
 
 logger = structlog.get_logger(__name__)
@@ -60,7 +62,8 @@ class RequestContextMiddleware:
         # request, then bind values that should appear in every log entry.
         clear_contextvars()
         bind_contextvars(
-            request_id=request_id, http_method=scope.get("method"), http_path=scope.get("path")
+            request_id=request_id,
+            http_method=scope.get("method"),
         )
 
         async def send_with_context(message: Message) -> None:
@@ -89,19 +92,30 @@ class RequestContextMiddleware:
 
         try:
             await self.app(scope, receive, send_with_context)
-        except Exception:
-            # Unhandled exceptions are logged with a traceback and then
-            # re-raised so FastAPI/Uvicorn can apply its normal error handling.
-            logger.exception("request_failed", duration_ms=elapsed_milliseconds(started_at))
+        except Exception as error:
+            # The request boundary owns the primary unexpected-error
+            # diagnostic. Marking the exact exception prevents an outer
+            # handler or server logger from reporting it again.
+            report_unexpected_error(
+                error,
+                event="request_failed",
+                duration_ms=elapsed_milliseconds(started_at),
+                status_code=status_code,
+            )
             raise
         else:
-            # Handled HTTP errors still produce a response and are recorded as
-            # completed requests with their actual status code.
-            logger.info(
-                "request_completed",
-                status_code=status_code,
-                duration_ms=elapsed_milliseconds(started_at),
-            )
+            # Routing has finished, so a matched route is now available in
+            # the scope. Its pattern is safe to log; the requested path is not.
+            route = scope.get("route")
+            context: dict[str, object] = {
+                "status_code": status_code,
+                "duration_ms": elapsed_milliseconds(started_at),
+            }
+
+            if isinstance(route, Route):
+                context["http_route"] = route.path_format
+
+            logger.info("request_completed", **context)
         finally:
             # Never allow request data to escape into a later request context.
             clear_contextvars()

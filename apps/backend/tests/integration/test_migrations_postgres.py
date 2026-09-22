@@ -1,13 +1,16 @@
 import os
 from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any
 from uuid import uuid4
 
 import psycopg
 import pytest
 from psycopg import sql
+from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from inframeld_backend.shared.infrastructure import migrations as migration_module
 from inframeld_backend.shared.infrastructure.database import (
     Database,
     DatabaseSchemaCompatibilityError,
@@ -207,3 +210,34 @@ def test_failed_migration_does_not_record_success(
     with _connect(migration_database_settings) as connection, connection.cursor() as cursor:
         cursor.execute("SELECT version_num FROM public.alembic_version")
         assert cursor.fetchall() == []
+
+
+def test_failed_migration_hides_bound_parameters(
+    migration_database_settings: DatabaseSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Check the Alembic engine hides an actual bound value on failure."""
+    private_value = "synthetic-private-migration-value"
+    missing_table = f"missing_{uuid4().hex}"
+
+    @contextmanager
+    def failing_lock(
+        connection: Connection,
+        _timeout_seconds: float,
+    ) -> Generator[None]:
+        connection.execute(
+            text(f'SELECT :private_value FROM "{missing_table}"'),
+            {"private_value": private_value},
+        )
+        yield
+
+    # Alembic imports this hook while loading env.py. The query runs through
+    # Alembic's real engine, but fails before any migration is applied.
+    monkeypatch.setattr(migration_module, "migration_lock", failing_lock)
+
+    with pytest.raises(SQLAlchemyError) as failure:
+        run_migrations(migration_database_settings)
+
+    rendered = str(failure.value)
+    assert private_value not in rendered
+    assert "[SQL parameters hidden due to hide_parameters=True]" in rendered

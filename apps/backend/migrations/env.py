@@ -66,6 +66,7 @@ def run_migrations_online() -> None:
 
     connectable = create_engine(
         _database_url(settings),
+        hide_parameters=True,
         poolclass=pool.NullPool,
         connect_args={"connect_timeout": settings.connect_timeout_seconds},
     )
