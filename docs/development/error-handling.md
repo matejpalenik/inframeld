@@ -252,7 +252,9 @@ This is an excerpt from a problem object, not a separate response. Preserve only
 
 `register_error_handlers(application)` is installed from composition. It handles request validation, supported application errors, Starlette HTTP exceptions, and unexpected exceptions. The shared builder constructs and serializes `ProblemDetails`, sets the media type and safe headers, and coordinates diagnostics.
 
-Routes still declare their applicable error responses in OpenAPI, including `application/problem+json` and the replacement 422 schema. Handler registration alone does not document them. Use the planned shared response-declaration helper rather than duplicating schemas. See [FastAPI's response documentation][fastapi-responses].
+Routes declare their applicable error responses using `problem_responses(definition)` from `shared/http/problem_openapi.py`. Routes that validate input must declare `VALIDATION_ERROR_PROBLEM` for HTTP 422. Handler registration does not update OpenAPI automatically. See [FastAPI's response documentation][fastapi-responses].
+
+Composition installs `configure_problem_openapi(application)` once. FastAPI generates the model components; the hook changes only explicitly marked problem responses to `application/problem+json`. Successful response media types remain unchanged. Regenerate the committed OpenAPI artifact whenever production response declarations change.
 
 ## 6. Logging, cleanup, and retries
 

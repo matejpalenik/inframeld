@@ -1,4 +1,144 @@
 {
+  "components": {
+    "schemas": {
+      "ProblemDetails": {
+        "additionalProperties": false,
+        "description": "Represent an Inframeld HTTP error using RFC 9457 Problem Details.\n\nAttributes:\n    type: Absolute problem URI; about:blank is used for generic HTTP errors.\n    title: Short public summary without occurrence-specific internal data.\n    status: Error status in the range 400 through 599.\n    detail: Safe public explanation selected by the HTTP adapter.\n    code: Stable public code; clients must tolerate unfamiliar future codes.\n    request_id: Correlation UUID serialized as requestId, never authorization.\n    errors: Optional bounded collection of already sanitized request issues.\n\nThe response builder enforces the selected definition's type/code/status\npairing and whether errors is appropriate. This model does not map Python\nexceptions, authenticate callers, authorize retries, or render tracebacks.\nServer-side extra fields are rejected; client parsers must still tolerate\nfuture RFC extension members.",
+        "properties": {
+          "code": {
+            "description": "Stable Inframeld code paired with the problem type.",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "description": "Reviewed explanation without internal or submitted sensitive values.",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Detail",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ValidationIssue"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "At most 20 sanitized issues; the list may be incomplete.",
+            "title": "Errors"
+          },
+          "requestId": {
+            "description": "Server request identifier, also returned in X-Request-ID.",
+            "format": "uuid",
+            "title": "Requestid",
+            "type": "string"
+          },
+          "status": {
+            "description": "HTTP error status, equal to the actual response status.",
+            "maximum": 599.0,
+            "minimum": 400.0,
+            "title": "Status",
+            "type": "integer"
+          },
+          "title": {
+            "description": "Stable human-readable summary of the problem type.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "description": "Primary RFC 9457 problem-type URI.",
+            "format": "uri",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "code",
+          "requestId"
+        ],
+        "title": "ProblemDetails",
+        "type": "object"
+      },
+      "ValidationIssue": {
+        "additionalProperties": false,
+        "description": "Describe one sanitized issue in an incoming request.\n\nAttributes:\n    location: Request component containing the issue.\n    path: Verified public field names or array indices, relative to that\n        component. An empty path identifies the component as a whole.\n    code: Product-owned validation category, independent of library names.\n    message: Reviewed corrective description without submitted values.\n\nThis model checks the output shape, not whether a string contains a secret.\nThe validation translator must sanitize locations and messages first.",
+        "properties": {
+          "code": {
+            "description": "Stable Inframeld validation category.",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Code",
+            "type": "string"
+          },
+          "location": {
+            "description": "Request component containing the issue.",
+            "enum": [
+              "body",
+              "path",
+              "query",
+              "header",
+              "cookie",
+              "request"
+            ],
+            "title": "Location",
+            "type": "string"
+          },
+          "message": {
+            "description": "Safe corrective description without submitted values.",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "path": {
+            "description": "Verified public fields and indices relative to the request component.",
+            "items": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "minimum": 0.0,
+                  "type": "integer"
+                }
+              ]
+            },
+            "maxItems": 8,
+            "title": "Path",
+            "type": "array"
+          }
+        },
+        "required": [
+          "location",
+          "path",
+          "code",
+          "message"
+        ],
+        "title": "ValidationIssue",
+        "type": "object"
+      }
+    }
+  },
   "info": {
     "description": "Governed retrieval and release workflows.",
     "title": "Inframeld API",
@@ -23,6 +163,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Internal server error"
           }
         },
         "summary": "Health",

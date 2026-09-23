@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from inframeld_backend.shared.http.error_handlers import register_error_handlers
 from inframeld_backend.shared.http.health import router as health_router
+from inframeld_backend.shared.http.problem_openapi import configure_problem_openapi
 from inframeld_backend.shared.http.request_context import RequestContextMiddleware
 from inframeld_backend.shared.infrastructure.database import Database
 from inframeld_backend.shared.infrastructure.logging import configure_logging
@@ -48,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     register_error_handlers(application)
+    configure_problem_openapi(application)
 
     application.include_router(health_router)
     application.add_middleware(RequestContextMiddleware)

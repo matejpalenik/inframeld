@@ -1,4 +1,7 @@
+import json
 import os
+import subprocess
+import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -17,6 +20,7 @@ from inframeld_backend.shared.infrastructure.database import (
     DatabaseStartupError,
 )
 from inframeld_backend.shared.infrastructure.migrations import (
+    BACKEND_ROOT,
     MIGRATION_LOCK_KEY,
     SUPPORTED_SCHEMA_REVISION,
     MigrationLockError,
@@ -241,3 +245,52 @@ def test_failed_migration_hides_bound_parameters(
     rendered = str(failure.value)
     assert private_value not in rendered
     assert "[SQL parameters hidden due to hide_parameters=True]" in rendered
+
+
+def test_migration_cli_does_not_disclose_driver_message(
+    migration_database_settings: DatabaseSettings,
+) -> None:
+    """Keep a driver-supplied message out of operator-visible output."""
+    private_value = "synthetic-private-migration-driver-message"
+    settings = migration_database_settings
+
+    with _connect(settings) as connection, connection.cursor() as cursor:
+        cursor.execute("CREATE TABLE public.alembic_version (version_num VARCHAR(32) NOT NULL)")
+        cursor.execute(
+            """
+            CREATE FUNCTION public.fail_migration_version() RETURNS trigger
+            LANGUAGE plpgsql AS $$
+            BEGIN
+                RAISE EXCEPTION 'synthetic-private-migration-driver-message';
+            END;
+            $$
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TRIGGER fail_migration_version
+            BEFORE INSERT ON public.alembic_version
+            FOR EACH ROW EXECUTE FUNCTION public.fail_migration_version()
+            """
+        )
+
+    environment = os.environ.copy()
+    environment["INFRAMELD_DATABASE__NAME"] = settings.name
+    environment["INFRAMELD_LOG_FORMAT"] = "json"
+
+    result = subprocess.run(
+        [sys.executable, "-m", "inframeld_backend.migrate"],
+        cwd=BACKEND_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert private_value not in result.stdout + result.stderr
+
+    diagnostic = json.loads(result.stdout.strip().splitlines()[-1])
+    assert diagnostic["event"] == "migration_failed"
+    assert "exception" in diagnostic

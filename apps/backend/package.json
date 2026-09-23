@@ -12,6 +12,6 @@
     "typecheck": "uv run pyright",
     "test": "uv run pytest",
     "build": "uv build",
-    "migrate": "uv run alembic -c alembic.ini upgrade head"
+    "migrate": "uv run python -m inframeld_backend.migrate"
   }
 }

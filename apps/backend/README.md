@@ -132,6 +132,10 @@ pnpm --filter @inframeld/backend migrate
 
 Migrations are operator-controlled, synchronous, and protected by a PostgreSQL migration lock. API startup checks schema compatibility but never runs migrations.
 
+The supported migration command runs `inframeld_backend.migrate`. Failed migrations return a nonzero exit status and emit a sanitized diagnostic through the shared logging infrastructure. Programmatic `run_migrations()` calls continue to raise exceptions for their caller to handle.
+
+Use the documented `pnpm --filter @inframeld/backend migrate` command for operator execution. Direct Alembic CLI invocations bypass this reporting boundary. SQLAlchemy parameter hiding is additional protection; it does not sanitize arbitrary database-driver messages.
+
 `pnpm test:integration` runs this migration command automatically against `.env.test` before executing integration tests.
 
 Do not add migrations to `pnpm dev` or API startup.
