@@ -6,6 +6,15 @@ The Inframeld backend is a typed FastAPI application. It owns the HTTP API, its 
 
 For normal local development, run PostgreSQL in Compose and the backend directly on your host.
 
+From a clean checkout, install the committed dependencies from the repository root:
+
+```bash
+pnpm install --frozen-lockfile
+uv sync --project apps/backend --locked
+```
+
+Use the Node and pnpm versions in the root `package.json` and the Python version in `apps/backend/.python-version`. CI's tool versions are pinned in `.github/workflows/ci.yml`.
+
 ### 1. Create your local environment
 
 On your first setup, copy the example environment file:
@@ -15,6 +24,14 @@ cp apps/backend/.env.example apps/backend/.env
 ```
 
 Keep your existing `.env` on subsequent setups.
+
+Create the separate backend test configuration before running checks:
+
+```bash
+cp apps/backend/.env.test.example apps/backend/.env.test
+```
+
+Keep `.env.test` in the ignored local configuration; it is not committed.
 
 ### 2. Start PostgreSQL
 
@@ -130,7 +147,8 @@ Runtime configuration is loaded from files under `apps/backend`:
 - `.env.test` — used when `INFRAMELD_ENVIRONMENT=test`
 - `INFRAMELD_TEST_ENV_FILE` — selects another test environment file; relative paths are resolved from `apps/backend`
 - `INFRAMELD_*` environment variables — override values loaded from dotenv files
-- `.env.example` — documents non-secret development defaults and may be copied to `.env` or `.env.test`
+- `.env.example` — documents non-secret local development defaults and may be copied to `.env`
+- `.env.test.example` — documents the isolated PostgreSQL integration-test defaults and may be copied to `.env.test`
 
 For the local Compose database, the relevant values are:
 
@@ -191,9 +209,11 @@ The script can also be run directly:
 ./scripts/dev-compose.sh status
 ./scripts/dev-compose.sh check
 ./scripts/dev-compose.sh down
+./scripts/dev-compose.sh test-db-up
+./scripts/dev-compose.sh test-db-down
 ```
 
-`check` verifies that PostgreSQL is accepting connections and is used before the integration test suite.
+`check` verifies that the development PostgreSQL service is accepting connections. The integration test runner uses the separate test-only PostgreSQL service.
 
 If PostgreSQL is unavailable, it reports the required dependency and startup commands.
 
@@ -347,27 +367,23 @@ The shared models define the transport contract. Each owning feature remains res
 Run backend checks from the repository root:
 
 ```bash
-pnpm --filter @inframeld/backend format:check
-pnpm --filter @inframeld/backend lint
-pnpm --filter @inframeld/backend typecheck
-pnpm --filter @inframeld/backend test
-pnpm --filter @inframeld/backend openapi:check
+pnpm check:backend
 pnpm test:integration
 ```
 
+`pnpm check:backend` runs backend formatting, linting, type checking, fast tests, and OpenAPI contract validation without PostgreSQL. It uses only the backend's locked Python environment and does not generate or install a Studio SDK.
+
 ### Unit and contract tests
 
-`pnpm test` keeps database integration tests skipped. This allows unit, health, and OpenAPI tests to run without PostgreSQL.
+`pnpm check:backend` keeps database integration tests skipped. Unit, health, and OpenAPI checks run without PostgreSQL.
 
 ### Integration tests
 
-`pnpm test:integration`:
+`pnpm test:integration` starts the test-only PostgreSQL service from `compose.test.yaml`, applies migrations, runs the real PostgreSQL integration tests, then stops the service. Its separate `inframeld_test_postgres_data` volume is not shared with the development database volume. The command forces the test service's host, port, database, and credentials, so a database target in `.env.test` cannot redirect integration migrations to the development database.
 
-1. Checks that the Compose PostgreSQL dependency is available.
-2. Runs migrations against `.env.test`.
-3. Runs the real PostgreSQL commit, rollback, constraint, and session-isolation tests.
+The test PostgreSQL service listens on `127.0.0.1:15433`; the development database remains on `127.0.0.1:15432`. The test volume is retained between runs and contains only test data.
 
-Ensure `apps/backend/.env.test` points to the Compose database before running integration tests.
+The integration tests create uniquely named tables and databases for their fixtures and clean them up after each test. Keep the database-specific values in `.env.test` aligned with `.env.test.example` when running tests directly with `pytest`.
 
 ---
 

@@ -5,6 +5,7 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd -- "${script_dir}/.." && pwd)"
 compose_file="${repository_root}/compose.dev.yaml"
+test_compose_file="${repository_root}/compose.test.yaml"
 
 usage() {
     cat <<'EOF'
@@ -19,6 +20,8 @@ Commands:
   down     Stop all development services without removing the database volume.
   status   Show the service status.
   check    Verify that PostgreSQL is accepting connections.
+  test-db-up     Start the isolated PostgreSQL integration-test service.
+  test-db-down   Stop and remove the integration-test service, keeping its test-only volume.
 EOF
 }
 
@@ -76,6 +79,10 @@ compose() {
     "${compose_command[@]}" -f "${compose_file}" "$@"
 }
 
+test_compose() {
+    "${compose_command[@]}" -p inframeld-test -f "${test_compose_file}" "$@"
+}
+
 wait_for_postgres() {
     local max_attempts=60
     local attempt
@@ -95,6 +102,28 @@ wait_for_postgres() {
     printf 'PostgreSQL did not become ready after %s attempts.\n' "${max_attempts}" >&2
     printf 'Required dependency: the postgres service from compose.dev.yaml.\n' >&2
     printf 'Inspect it with: pnpm dev:db:status\n' >&2
+    printf 'Last readiness check: %s\n' "${readiness_output}" >&2
+    return 1
+}
+
+wait_for_test_postgres() {
+    local max_attempts=60
+    local attempt
+    local readiness_output=""
+
+    for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+        if readiness_output="$(test_compose exec -T postgres pg_isready -U inframeld_test -d inframeld_test 2>&1)"; then
+            printf 'Test PostgreSQL is ready at 127.0.0.1:15433.\n'
+            return 0
+        fi
+
+        if ((attempt < max_attempts)); then
+            sleep 1
+        fi
+    done
+
+    printf 'Test PostgreSQL did not become ready after %s attempts.\n' "${max_attempts}" >&2
+    printf 'Required dependency: the postgres service from compose.test.yaml.\n' >&2
     printf 'Last readiness check: %s\n' "${readiness_output}" >&2
     return 1
 }
@@ -138,6 +167,13 @@ case "${command_name}" in
             printf 'Details: %s\n' "${readiness_output}" >&2
             exit 1
         fi
+        ;;
+    test-db-up)
+        test_compose up -d postgres
+        wait_for_test_postgres
+        ;;
+    test-db-down)
+        test_compose down --remove-orphans
         ;;
     *)
         usage >&2
