@@ -178,6 +178,8 @@ pnpm dev:compose:down      # Stop all development containers, preserving the dat
 
 These commands use [`scripts/dev-compose.sh`](../../scripts/dev-compose.sh), which automatically detects Podman Compose or Docker Compose.
 
+`pnpm dev:db` and `pnpm dev:db:reset` wait for PostgreSQL readiness, retrying up to 60 times with a one-second interval. If PostgreSQL does not become ready, the command exits with an error and reports the last readiness check.
+
 The script can also be run directly:
 
 ```bash

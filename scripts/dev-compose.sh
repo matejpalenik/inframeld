@@ -11,8 +11,8 @@ usage() {
 Usage: ./scripts/dev-compose.sh <command>
 
 Commands:
-  up       Start only the development PostgreSQL service in the background.
-  reset-db Delete the development database volume and recreate an empty PostgreSQL service.
+  up           Start PostgreSQL in the background and wait for readiness.
+  reset-db     Delete the database volume, recreate PostgreSQL, and wait for readiness.
   all      Build and start PostgreSQL and the backend image.
   restart-db   Restart PostgreSQL without removing its persistent volume.
   restart-all  Restart all currently created development containers.
@@ -76,16 +76,41 @@ compose() {
     "${compose_command[@]}" -f "${compose_file}" "$@"
 }
 
+wait_for_postgres() {
+    local max_attempts=60
+    local attempt
+    local readiness_output=""
+
+    for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+        if readiness_output="$(compose exec -T postgres pg_isready -U inframeld -d inframeld 2>&1)"; then
+            printf 'PostgreSQL is ready at 127.0.0.1:15432.\n'
+            return 0
+        fi
+
+        if ((attempt < max_attempts)); then
+            sleep 1
+        fi
+    done
+
+    printf 'PostgreSQL did not become ready after %s attempts.\n' "${max_attempts}" >&2
+    printf 'Required dependency: the postgres service from compose.dev.yaml.\n' >&2
+    printf 'Inspect it with: pnpm dev:db:status\n' >&2
+    printf 'Last readiness check: %s\n' "${readiness_output}" >&2
+    return 1
+}
+
 command_name="${1:-}"
 shift || true
 
 case "${command_name}" in
     up)
         compose up -d postgres
+        wait_for_postgres
         ;;
     reset-db)
         compose down -v
         compose up -d postgres
+        wait_for_postgres
         ;;
     all)
         compose up -d --build "$@"
