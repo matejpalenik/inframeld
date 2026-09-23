@@ -1,7 +1,7 @@
 # Error handling: a practical guide
 
 **For:** engineers adding an Inframeld backend feature.  
-**Status — 23 September 2026:** the shared error-handling foundation is implemented. See the [maintainer reference](error-handling-reference.md#qualification-checklist) for test coverage and verification commands. Issue 19 remains open for its separate pagination contract.
+**Status — 23 September 2026:** the shared error-handling foundation is implemented. See the [maintainer reference](error-handling-reference.md#qualification-checklist) for test coverage and verification commands. The separate [pagination guide](pagination.md) covers the implemented shared list contract; each owning feature validates cursor contents.
 
 Read this guide for everyday feature work. Use the [maintainer reference](error-handling-reference.md) for the current file map, wire-field reference, diagnostics policy, and checks when changing the shared machinery.
 
@@ -308,7 +308,7 @@ Also test the feature that actually raises the error, not just this fixture rout
 
 For a feature change, verify its rejection, public mapping, absence of secret disclosure, applicable OpenAPI response, and unchanged transactional/recovery behavior. Do not add tests that merely assert exception inheritance or file placement.
 
-For changes to the shared foundation, use the [full qualification checklist](error-handling-reference.md#qualification-checklist). Passing error-handling checks does not complete issue 19's separate pagination requirements or qualify future feature behavior.
+For changes to the shared foundation, use the [full qualification checklist](error-handling-reference.md#qualification-checklist). Passing error-handling checks does not qualify future feature behavior, including a list endpoint's cursor-content validation.
 
 ## Problem catalogue
 

@@ -48,7 +48,11 @@ The developer manually reviews these dependency rules. Automated tests cover pro
 
 The shared HTTP error foundation implements RFC 9457 Problem Details with `application/problem+json`, stable codes, safe descriptions, and matching body/header request IDs. Domain and application exceptions remain independent of HTTP, and transport adapters explicitly select supported public responses. The shared diagnostic renderer excludes exception messages, notes, source lines, and locals; feature logs must also avoid submitted secrets.
 
-Read the [practical error-handling guide](../../docs/development/error-handling.md) when adding a feature and the [maintainer reference](../../docs/development/error-handling-reference.md) when changing the foundation. The reference maps the implemented files and behavioral tests. The developer reported passing backend and integration tests at the 23 September 2026 closeout; issue 19's separate pagination contract remains unfinished.
+Read the [practical error-handling guide](../../docs/development/error-handling.md) when adding a feature and the [maintainer reference](../../docs/development/error-handling-reference.md) when changing the foundation. The reference maps the implemented files and behavioral tests. The developer reported passing backend and integration tests at the 23 September 2026 error-handling closeout.
+
+## Pagination
+
+The implemented shared HTTP pagination models define `limit` (default 25, maximum 100), an optional cursor with syntax validation, and responses with `items` and `nextCursor`. See the [pagination guide](../../docs/development/pagination.md) before adding a list endpoint. Each owning feature validates cursor contents, chooses ordering, checks authorization on every page, and implements the actual query.
 
 ## Development
 

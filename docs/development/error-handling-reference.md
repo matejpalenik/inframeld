@@ -2,7 +2,7 @@
 
 **Read this when changing the shared foundation.** The [practical guide](error-handling.md) explains ordinary usage and owns the stable public problem catalogue. This reference describes the implemented components and the rules their tests protect.
 
-**Status — 23 September 2026:** the error-handling foundation is implemented. The developer reported passing backend and integration tests during implementation closeout; this documentation update did not rerun them. The [qualification checklist](#qualification-checklist) identifies the regression coverage and commands to run for later changes. Issue 19's pagination contract remains unfinished. ADR-0002 owns the public contract and ADR-0001 owns dependency rules.
+**Status — 23 September 2026:** the error-handling foundation is implemented. The developer reported passing backend and integration tests during implementation closeout; this documentation update did not rerun them. The [qualification checklist](#qualification-checklist) identifies the regression coverage and commands to run for later changes. The separate [pagination guide](pagination.md) describes the implemented shared contract; each owning feature validates cursor contents. ADR-0002 owns the public contract and ADR-0001 owns dependency rules.
 
 ## Ownership and implementation scope
 
@@ -186,7 +186,7 @@ pnpm test:integration
 
 When production declarations change, run `pnpm --filter @inframeld/backend openapi` before the drift check; the command writes the generated contract. The integration command requires the local Compose database, runs migrations against `.env.test`, and exercises real PostgreSQL behavior. These are commands for future verification, not an assertion that this documentation edit executed them. Manually review dependency boundaries and repository organization; do not add automated architecture/import-boundary or composition-construction tests. Test observable behavior rather than importability or inheritance alone.
 
-Use Google-style docstrings for public exceptions, ports, use cases, HTTP models, builders, handlers, and diagnostics. Explain meaning, safe attributes, recovery implications, and relevant `Raises`; keep wire fields and OpenAPI descriptions consistent with this reference. Keep the guides, architecture, backend README, and affected skill aligned when changing the foundation. Issue 19 also has separate pagination acceptance criteria; error-handling work alone does not complete it.
+Use Google-style docstrings for public exceptions, ports, use cases, HTTP models, builders, handlers, and diagnostics. Explain meaning, safe attributes, recovery implications, and relevant `Raises`; keep wire fields and OpenAPI descriptions consistent with this reference. Keep the guides, architecture, backend README, and affected skill aligned when changing the foundation. For list endpoints, separately verify the owning feature's cursor-content validation and authorization on every page.
 
 ## Source basis
 

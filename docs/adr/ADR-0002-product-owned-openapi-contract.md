@@ -62,9 +62,15 @@ The SDK Kit assessment recorded in this ADR identifies 3.0-specific handling in 
 
 **SDK Kit must consume the authoritative contract correctly. Do not weaken schemas or introduce a down-conversion framework to accommodate the old generator.**
 
+#### Use bounded cursor pagination for lists
+
+List endpoints use an optional opaque `cursor` and a `limit` between 1 and 100, defaulting to 25. They return `items` and a nullable `nextCursor`. Ordering must be deterministic and end in a unique tie-breaker. Every page request receives the owning feature's authorization and scope checks; a cursor conveys position, never authority.
+
+The shared HTTP models enforce the request shape, validate cursor syntax, and describe the response in OpenAPI. The shared contract is implemented; the owning feature validates the cursor's contents against its sort, filters, and scope and implements the actual query when its list endpoint is built. See the [pagination guide](../development/pagination.md).
+
 #### Use RFC 9457 for HTTP errors
 
-The application uses **RFC 9457 Problem Details**, serialized as `application/problem+json`, for its HTTP error responses. The shared handlers, response models, diagnostic protections, and OpenAPI declarations are implemented. The [maintainer reference](../development/error-handling-reference.md#qualification-checklist) records behavioral coverage and developer-reported passing backend and integration tests as of 23 September 2026. This does not qualify future business endpoints or complete issue 19's pagination contract.
+The application uses **RFC 9457 Problem Details**, serialized as `application/problem+json`, for its HTTP error responses. The shared handlers, response models, diagnostic protections, and OpenAPI declarations are implemented. The [maintainer reference](../development/error-handling-reference.md#qualification-checklist) records behavioral coverage and developer-reported passing backend and integration tests as of 23 September 2026. This does not qualify future business endpoints.
 
 The Inframeld profile includes `type`, `title`, `status`, and safe `detail`, with `code` and `requestId` extensions. Request-validation problems also contain bounded, sanitized `errors`. The HTTP status and body status agree. The `type` URI is the primary problem identifier; a documented short `code` identifies the same problem for application clients. Problem identities remain stable independently of Python exception class names. Human-readable descriptions are not machine identifiers. The RFC's optional `instance` member is omitted initially.
 

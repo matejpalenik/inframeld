@@ -2,12 +2,13 @@ import json
 from pathlib import Path
 from typing import Annotated, Any, cast
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, Query, UploadFile
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
 
 from inframeld_backend.main import create_app
 from inframeld_backend.shared.http.error_handlers import register_error_handlers
+from inframeld_backend.shared.http.pagination import PageResponse, PaginationQuery
 from inframeld_backend.shared.http.problem_definitions import VALIDATION_ERROR_PROBLEM
 from inframeld_backend.shared.http.problem_openapi import (
     configure_problem_openapi,
@@ -52,6 +53,16 @@ def _create_schema_fixture_app() -> FastAPI:
         label: Annotated[str, Form(min_length=1, max_length=20)],
     ) -> dict[str, str]:
         return {"filename": file.filename or "", "label": label}
+
+    @application.get(
+        "/contract-fixture/page",
+        operation_id="contractFixturePage",
+        responses=problem_responses(VALIDATION_ERROR_PROBLEM),
+    )
+    async def contract_fixture_page(
+        pagination: Annotated[PaginationQuery, Query()],
+    ) -> PageResponse[int]:
+        return PageResponse[int](items=[pagination.limit], next_cursor=None)
 
     return application
 
@@ -253,3 +264,35 @@ def test_production_contract_excludes_fixture_routes() -> None:
     schema = create_app().openapi()
 
     assert not any(path.startswith("/contract-fixture/") for path in schema["paths"])
+
+
+def test_pagination_fixture_preserves_query_and_response_contract() -> None:
+    """Publish bounded query parameters and the camel-case page response."""
+    schema = _create_schema_fixture_app().openapi()
+    operation = schema["paths"]["/contract-fixture/page"]["get"]
+
+    parameters = {parameter["name"]: parameter["schema"] for parameter in operation["parameters"]}
+    assert set(parameters) == {"limit", "cursor"}
+    assert parameters["limit"]["default"] == 25
+    assert parameters["limit"]["minimum"] == 1
+    assert parameters["limit"]["maximum"] == 100
+
+    cursor_string = next(
+        variant for variant in parameters["cursor"]["anyOf"] if variant.get("type") == "string"
+    )
+    assert cursor_string["minLength"] == 1
+    assert cursor_string["maxLength"] == 1024
+    assert cursor_string["pattern"] == "^[A-Za-z0-9_-]+$"
+
+    response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    component_name = response_schema["$ref"].rsplit("/", maxsplit=1)[-1]
+    page_schema = schema["components"]["schemas"][component_name]
+
+    assert set(page_schema["required"]) == {"items", "nextCursor"}
+    assert page_schema["properties"]["items"]["items"]["type"] == "integer"
+    assert "next_cursor" not in page_schema["properties"]
+    assert any(
+        variant.get("type") == "null"
+        for variant in page_schema["properties"]["nextCursor"]["anyOf"]
+    )
+    assert set(operation["responses"]["422"]["content"]) == {"application/problem+json"}

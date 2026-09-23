@@ -13,7 +13,8 @@ Default to read-only assistance. Loading this skill grants no code edit, SDK ext
 
 - `docs/ARCHITECTURE.md` is the product explanation.
 - `docs/adr/ADR-0001-modular-application-structure.md` owns DDD/Clean Architecture and lightweight CQRS; `docs/adr/ADR-0002-product-owned-openapi-contract.md` owns the code-first public contract and generated TypeScript requirement.
-- For HTTP failures and exception logging, read `docs/development/error-handling.md` and the relevant sections of `docs/development/error-handling-reference.md`. The RFC 9457 foundation is implemented; the reference owns its file map, test evidence, and maintenance checks. Issue 19's pagination contract remains unfinished.
+- For HTTP failures and exception logging, read `docs/development/error-handling.md` and the relevant sections of `docs/development/error-handling-reference.md`. The RFC 9457 foundation is implemented; the reference owns its file map, test evidence, and maintenance checks.
+- For list endpoints, read `docs/development/pagination.md`. The implemented shared HTTP models bound `limit` to 1–100 with a default of 25, validate cursor syntax, and define `items`/`nextCursor`. Each owning feature chooses a deterministic order with a unique tie-breaker, validates cursor contents, and reapplies authorization and scope on every page.
 - `docs/adr/ADR-0007-durable-jobs-idempotency-and-recovery.md` owns admission, attempts, fingerprints, safe replay and uncertainty.
 - `docs/adr/ADR-0018-first-party-mcp-adapter.md` owns the accepted MCP surface.
 - Read ADR-0017 for feedback, ADR-0019 for default-route orchestration, and ADR-0020 for credential mutations when those operations are being exposed.
