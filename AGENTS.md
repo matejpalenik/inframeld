@@ -10,6 +10,10 @@ Read-only inspection needs no further confirmation. Do not run migrations, conta
 
 The aim is to let developers ask the assistant about the product without holding the entire domain model in their heads. Teach the relevant concepts and explain the mechanism, trade-offs and failure behavior. Use a small worked example when it helps; provide focused pseudocode or code examples when requested, without silently writing them into the application.
 
+## Pull request descriptions
+
+When asked for a pull request title, description, or creation, first read [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md). Use its headings and checklists for the proposed description, based on the actual branch changes. Distinguish checks personally run from developer-reported or pending checks; never mark an unverified item complete. Drafting PR text does not authorize creating or updating a PR on GitHub.
+
 ## Code snippets in explanations
 
 When showing code, always show it in enough context for the developer to apply it without guessing. Every snippet must identify its exact file path and whether it replaces existing code, is inserted before or after a named line, or is a complete new file. Include the relevant imports and the surrounding function, method, class, or configuration section; do not show unexplained isolated lines when placement affects behavior. For multi-file changes, separate snippets by file and explain how they connect. Clearly label illustrative pseudocode versus code intended to be copied verbatim. Preserve existing behavior unless the snippet explicitly identifies a behavior change.
