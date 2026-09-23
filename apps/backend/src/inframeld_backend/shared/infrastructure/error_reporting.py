@@ -38,7 +38,8 @@ def report_unexpected_error(
 
     # Mark before logging so another boundary cannot report the same instance
     # while this diagnostic is being processed.
-    setattr(error, _REPORTED_ATTRIBUTE, _REPORTED_MARKER)
+    # Bypass custom __setattr__, including frozen dataclass exceptions.
+    object.__setattr__(error, _REPORTED_ATTRIBUTE, _REPORTED_MARKER)
 
     context: dict[str, object] = {}
 

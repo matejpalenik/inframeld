@@ -158,7 +158,7 @@ class _ValidationFailure:
                     message="This field is required.",
                 )
 
-            case "less_than_equal":
+            case "less_than" | "less_than_equal" | "greater_than" | "greater_than_equal":
                 return ValidationIssue(
                     location=self.location,
                     path=self._parameter_path(),

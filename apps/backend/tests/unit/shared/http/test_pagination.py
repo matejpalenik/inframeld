@@ -46,6 +46,23 @@ def test_invalid_limit_returns_validation_problem(limit: int | str) -> None:
     assert response.json()["code"] == "validation_error"
 
 
+@pytest.mark.parametrize("limit", [0, -1, 101])
+def test_out_of_range_limit_identifies_the_query_parameter(limit: int) -> None:
+    """Tell clients which limit field failed at either bound."""
+    with TestClient(_fixture_app()) as client:
+        response = client.get("/fixture/items", params={"limit": limit})
+
+    assert response.status_code == 422
+    assert response.json()["errors"] == [
+        {
+            "location": "query",
+            "path": ["limit"],
+            "code": "out_of_range",
+            "message": "Use a value within the permitted range.",
+        }
+    ]
+
+
 @pytest.mark.parametrize("limit", [1, 100])
 def test_limit_accepts_inclusive_boundaries(limit: int) -> None:
     """Allow both the smallest and largest permitted page sizes."""

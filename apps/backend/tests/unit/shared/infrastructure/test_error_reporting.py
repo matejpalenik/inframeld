@@ -2,6 +2,7 @@
 
 import json
 import logging
+from dataclasses import dataclass
 from typing import cast
 
 import pytest
@@ -30,6 +31,13 @@ COMMAND_NAME = "synthetic_command"
 
 class _UnregisteredApplicationError(ApplicationError):
     """Represent an application failure with no reviewed public mapping."""
+
+
+@dataclass(frozen=True)
+class _FrozenFailure(Exception):
+    """Represent an exception whose class rejects ordinary attribute writes."""
+
+    message: str
 
 
 def _create_nested_failure_app() -> FastAPI:
@@ -204,6 +212,27 @@ def test_same_exception_instance_is_reported_only_once(
         "first_boundary_failed",
         "separate_failure",
     ]
+    assert SECRET not in rendered
+
+
+def test_frozen_exception_is_reported_once_without_exposing_message(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Preserve the original diagnostic when an exception rejects setattr."""
+    configure_logging(level="INFO", log_format="json")
+    error = _FrozenFailure(SECRET)
+
+    report_unexpected_error(error, event="first_boundary_failed")
+    report_unexpected_error(error, event="outer_boundary_failed")
+
+    rendered = capsys.readouterr().out
+    events = [
+        cast(dict[str, object], json.loads(line)) for line in rendered.splitlines() if line.strip()
+    ]
+
+    assert [event["event"] for event in events] == ["first_boundary_failed"]
+    assert "exception" in events[0]
+    assert "_FrozenFailure" in rendered
     assert SECRET not in rendered
 
 

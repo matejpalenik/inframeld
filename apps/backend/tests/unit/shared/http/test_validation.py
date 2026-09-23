@@ -1,5 +1,6 @@
 """Verify safe translation of request-validation failures."""
 
+import pytest
 from fastapi.exceptions import RequestValidationError
 
 from inframeld_backend.shared.http import validation
@@ -62,16 +63,25 @@ def test_missing_known_field_uses_required_issues() -> None:
     )
 
 
-def test_out_of_range_query_value_uses_fixed_issue() -> None:
+@pytest.mark.parametrize(
+    ("error_type", "constraint"),
+    [
+        ("less_than", "lt"),
+        ("less_than_equal", "le"),
+        ("greater_than", "gt"),
+        ("greater_than_equal", "ge"),
+    ],
+)
+def test_out_of_range_query_value_uses_fixed_issue(error_type: str, constraint: str) -> None:
     """Translate a bounded-number failure without reflecting its input."""
     error = RequestValidationError(
         [
             {
-                "type": "less_than_equal",
+                "type": error_type,
                 "loc": ("query", "limit"),
                 "msg": SECRET,
                 "input": SECRET,
-                "ctx": {"le": 100},
+                "ctx": {constraint: 100},
             }
         ]
     )
