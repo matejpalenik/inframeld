@@ -1,23 +1,34 @@
 # Error handling: maintainer reference
 
-**Read this when changing the shared foundation—not before writing your first feature.** The [practical guide](error-handling.md) explains ordinary usage and owns the stable public problem catalogue. The existing [implementation walkthrough](error-handling-implementation.md) supplies issue 19's implementation sequence.
+**Read this when changing the shared foundation.** The [practical guide](error-handling.md) explains ordinary usage and owns the stable public problem catalogue. This reference describes the implemented components and the rules their tests protect.
 
-**Status — 22 September 2026:** requirements and proposed behavior, not implementation evidence. This reference preserves the supplied policy while moving infrastructure detail out of the onboarding path. Owners remain ADR-0002 for the public contract and ADR-0001 for dependency rules.
+**Status — 23 September 2026:** the error-handling foundation is implemented. The developer reported passing backend and integration tests during implementation closeout; this documentation update did not rerun them. The [qualification checklist](#qualification-checklist) identifies the regression coverage and commands to run for later changes. Issue 19's pagination contract remains unfinished. ADR-0002 owns the public contract and ADR-0001 owns dependency rules.
 
 ## Ownership and implementation scope
 
 All paths below are relative to `apps/backend/src/inframeld_backend/`.
 
-| Location | Responsibility | Status in the supplied documentation |
-| --- | --- | --- |
-| `shared/domain/errors.py` | `DomainError`, `InvalidStateTransitionError` | Planned |
-| `shared/application/application_error.py` | Existing `ApplicationError`; clarify its diagnostic-only message contract | Existing base |
-| `shared/application/errors.py` | Five starter application failures from the practical guide | Planned |
-| `shared/http/problems.py` | `ProblemDetails`, `ValidationIssue`, frozen definitions, exact-type mapping, response builder and response declarations | Planned |
-| `shared/http/validation.py` | Bounded validation translator | Planned |
-| `shared/http/error_handlers.py` | One `register_error_handlers(application)` function | Planned |
-| `shared/infrastructure/error_reporting.py` | Shared diagnostic owner/deduplication helper | Planned |
-| Existing logging, command logging, request context, database, and `composition.py` | Connect and qualify the foundation | Changes planned |
+| Location | Responsibility |
+| --- | --- |
+| `shared/domain/errors.py` | `DomainError` and `InvalidStateTransitionError`; no automatic HTTP mapping |
+| `shared/application/application_error.py` | Transport-neutral `ApplicationError` and its diagnostic-only message |
+| `shared/application/errors.py` | Five starter application failures from the practical guide |
+| `shared/http/problems.py` | `ProblemDetails`, `ValidationIssue`, aliases, and output bounds |
+| `shared/http/problem_definitions.py` | `ProblemCode`, frozen `ProblemDefinition`, and the public problem catalogue |
+| `shared/http/problem_mapper.py` | Exact-type application mapping and generic HTTP-status definitions |
+| `shared/http/problem_response.py` | `build_problem_response()`: serialization, correlation, and allowed headers |
+| `shared/http/problem_openapi.py` | `problem_responses()` declarations and the narrow OpenAPI media-type hook |
+| `shared/http/validation.py` | `issues_from_request_error()`: bounded, sanitized validation issues |
+| `shared/http/error_handlers.py` | `register_error_handlers()`: request validation, application, HTTP, and unexpected failures |
+| `shared/http/request_context.py` | Request IDs, scoped log context, summaries, and request-boundary diagnostics |
+| `shared/infrastructure/error_reporting.py` | Report and mark the exact exception instance once |
+| `shared/infrastructure/logging.py` | Bounded safe diagnostics, JSON/console rendering, and stdlib/Uvicorn integration |
+| `shared/infrastructure/command_logging.py` | Command outcomes and operation metadata without duplicate tracebacks |
+| `shared/infrastructure/database.py` | API database lifecycle and SQLAlchemy parameter hiding |
+| `shared/infrastructure/migrations.py` and `migrate.py` | Migration locking/execution and the operator failure-reporting boundary |
+| `composition.py` | Install handlers, request middleware, and OpenAPI correction |
+
+The separate Alembic engine is configured in `apps/backend/migrations/env.py`; it also uses SQLAlchemy parameter hiding.
 
 Feature exceptions stay in their owner's domain/application package. Application ports own the failure contract offered by their infrastructure implementations. Domain/application code must not import HTTP models, FastAPI, database exceptions, or structlog. `DomainError` must not inherit from `ApplicationError`.
 
@@ -97,17 +108,25 @@ Approved context includes stable `event`, `request_id`, `operation_id`, `command
 
 The HTTP execution boundary owns unexpected diagnostics. Command scope emits its operation outcome and re-raises, without a second traceback. Expected client rejections normally emit informational outcomes. Known dependency failures warrant operational error reporting, with one sanitized diagnostic when a cause is available. A future worker owns its own execution boundary.
 
-A small shared reporter may mark the **exact exception instance** with a private runtime-only “already reported” attribute. Do not add it to the public exception contract, persist it, or mark unrelated causes. The outer handler reports an unreported failure with explicit request-state correlation. A narrowly scoped `uvicorn.error` filter may suppress a server traceback only for that same reported exception. Preserve unrelated messages, unreported exceptions, and startup failures. Verify this with the selected Uvicorn version, not only TestClient.
+`report_unexpected_error()` marks the **exact exception instance** with a private runtime-only “already reported” attribute. Do not add it to the public exception contract, persist it, or mark unrelated causes. The outer handler reports an unreported failure with explicit request-state correlation. The `uvicorn.error` filter suppresses a server traceback only for that same reported exception. Preserve unrelated messages, unreported exceptions, and startup failures. The Uvicorn integration test exercises the selected server's reporting path; retain it alongside TestClient tests.
 
 ### Sanitization covers more than local variables
 
-Replace the current default `dict_tracebacks` behavior with explicit `show_locals=False`. Structlog's exception transformer otherwise defaults to including locals; see its [API reference][structlog-api]. That change alone is insufficient.
+`logging.py` supplies a custom transformer to Structlog's `ExceptionRenderer`. It traverses exception structure without reading messages, notes, locals, or source lines. Do not replace it with unrestricted `dict_tracebacks` output. Disabling locals alone would still leave unreviewed exception text; see Structlog's [API reference][structlog-api].
 
 Keep bounded exception types, file/function/line locations, and cause/context/group relationships. Exclude arbitrary exception values, notes, source snippets, and locals **at every nesting level**. Use approved structured metadata for useful descriptions. Bound extraction work as well as the final output: frame counts, traversal depth, breadth, and total visited exceptions. Handle cycles without unbounded traversal.
 
 JSON and console renderers must consume the same sanitized diagnostic, rather than independently formatting the original exception. Standard-library integration must also clear or replace raw `exc_info` and cached exception text so a formatter cannot append an unsanitized traceback.
 
-Review third-party free-text logging separately; sanitizing exception fields does not sanitize arbitrary log messages. Add SQLAlchemy `hide_parameters=True` as defense in depth, not as a substitute for this policy. Regex redaction cannot establish that all secrets were removed.
+Review third-party free-text logging separately; sanitizing exception fields does not sanitize arbitrary log messages. Both the API and Alembic engines set SQLAlchemy `hide_parameters=True` as defense in depth. It does not sanitize driver messages or SQL literals. Regex redaction cannot establish that all secrets were removed.
+
+### Operator-controlled migrations
+
+Run `pnpm --filter @inframeld/backend migrate`. This invokes `inframeld_backend.migrate`, which calls the existing `run_migrations()` and reports caught failures as `migration_failed` before exiting with a nonzero status. It does not automatically retry. The programmatic function continues to raise for callers that own their own execution boundary.
+
+Alembic's `env.py` installs its own logging configuration. The command restores the shared sanitized formatter before reporting a caught failure. It uses the configured output format when settings loaded successfully, or JSON when settings could not be loaded. Direct Alembic CLI invocations bypass this boundary; do not use them as the documented operator command. The wrapper cannot retract text already emitted by migration code or a third-party logger.
+
+The real PostgreSQL tests cover parameter hiding and a synthetic driver message raised during migration, capturing both stdout and stderr. Failed migrations still fail; failed API startup still prevents serving requests. API startup checks compatibility and does not run migrations.
 
 ## Transactions and recovery
 
@@ -119,7 +138,11 @@ Keep `CancelledError`, `KeyboardInterrupt`, and `SystemExit` propagating. Prefer
 
 ## OpenAPI and client compatibility
 
-Each route declares its actual success model and applicable error responses. The shared response-declaration helper must reference the problem model and explicitly describe `application/problem+json`; replace the default 422 `HTTPValidationError` contract. Test that FastAPI does not also advertise an unsupported `application/json` error representation. Do not replace the OpenAPI generator to avoid checking the generated result.
+Each route declares its actual success model and applicable error responses with `problem_responses(definition)`. Input-validating routes declare `VALIDATION_ERROR_PROBLEM` to replace the default 422 `HTTPValidationError` contract. Handler registration alone does not declare a response. `/health` currently declares the applicable unexpected 500; JSON and multipart validation are exercised on test-only routes.
+
+The installed FastAPI version generates an additional response model under the route's default media type. `problem_responses()` therefore adds the model plus a private `x-inframeld-problem-response` marker. Composition calls `configure_problem_openapi()` once: it wraps the original bound `application.openapi` method, preserves native component generation and caching, moves each marked response's sole representation to `application/problem+json`, and removes the marker. It leaves successful and unmarked responses unchanged. A marked response with multiple representations is rejected rather than silently dropping one.
+
+Keep this adjustment limited to declared problem responses. Do not introduce a second schema generator or change the OpenAPI dialect. When upgrading FastAPI, rerun the contract tests and reassess whether the adjustment is still needed. Test the generated result for component references and the absence of an unsupported `application/json` error representation.
 
 Runtime and schema must agree on aliases, required/nullable fields, constraints, and optional-field omission. Models may remain absent from the committed production schema until a real production response references them. Test-only fixture routes must never be mounted in the product app or exported in its schema.
 
@@ -140,25 +163,34 @@ Use the existing native OpenAPI 3.1.x exporter and drift check. Do not hand-edit
 
 Use `TestClient(..., raise_server_exceptions=False)` to inspect unexpected 500 responses, and retain a normal propagation test for the server-error path. Capture **final rendered output through the production processors** for disclosure tests. Bare `structlog.testing.capture_logs()` disables configured processors and is not sufficient by itself; see [structlog testing][structlog-testing].
 
-Fixtures require no production credentials, provider calls, or database. Follow the repository's scaffold → behavioral red test → implementation → focused tests sequence where adding behavior. The existing test setup requires the non-production `apps/backend/.env.test`.
+HTTP and schema fixtures require no production credentials, provider calls, or database. PostgreSQL integration tests use the development test database. Follow the repository's scaffold → behavioral red test → implementation → focused tests sequence where adding behavior. The existing test setup requires the non-production `apps/backend/.env.test`.
 
-From the repository root, the supplied implementation plan lists:
+Regression coverage lives in:
+
+- [HTTP unit tests](../../apps/backend/tests/unit/shared/http/): models, builders, mappings, validation, handlers, correlation, late failures, and cancellation.
+- [Infrastructure unit tests](../../apps/backend/tests/unit/shared/infrastructure/): rendered diagnostic sanitization and reporting ownership.
+- [OpenAPI contract tests](../../apps/backend/tests/unit/contract/test_openapi_contract.py): media types, components, aliases, field constraints, multipart requests, drift, and exclusion of fixture routes.
+- [Uvicorn integration test](../../apps/backend/tests/integration/test_error_reporting_uvicorn.py): server-path diagnostic deduplication.
+- [Database integration tests](../../apps/backend/tests/integration/test_database_postgres.py) and [migration integration tests](../../apps/backend/tests/integration/test_migrations_postgres.py): transactions, lifecycle, engine parameter hiding, and migration-command disclosure.
+
+From the repository root, run the relevant checks after changing the foundation:
 
 ```bash
 pnpm --filter @inframeld/backend lint
+pnpm --filter @inframeld/backend format:check
 pnpm --filter @inframeld/backend typecheck
 pnpm --filter @inframeld/backend test
-pnpm --filter @inframeld/backend openapi
 pnpm --filter @inframeld/backend openapi:check
+pnpm test:integration
 ```
 
-Generate the contract when production declarations change. These are instructions, not a record of checks run. Manually review dependency boundaries and repository organization; do not add automated architecture/import-boundary or composition-construction tests. Test observable behavior rather than importability or inheritance alone.
+When production declarations change, run `pnpm --filter @inframeld/backend openapi` before the drift check; the command writes the generated contract. The integration command requires the local Compose database, runs migrations against `.env.test`, and exercises real PostgreSQL behavior. These are commands for future verification, not an assertion that this documentation edit executed them. Manually review dependency boundaries and repository organization; do not add automated architecture/import-boundary or composition-construction tests. Test observable behavior rather than importability or inheritance alone.
 
-Use Google-style docstrings for public exceptions, ports, use cases, HTTP models, builders, handlers, and diagnostics. Explain meaning, safe attributes, recovery implications, and relevant `Raises`; keep wire fields and OpenAPI descriptions consistent with this reference. After qualification, update status notes in the guides, architecture, backend README, and affected skill. Issue 19 also has separate pagination acceptance criteria; error-handling work alone does not complete it.
+Use Google-style docstrings for public exceptions, ports, use cases, HTTP models, builders, handlers, and diagnostics. Explain meaning, safe attributes, recovery implications, and relevant `Raises`; keep wire fields and OpenAPI descriptions consistent with this reference. Keep the guides, architecture, backend README, and affected skill aligned when changing the foundation. Issue 19 also has separate pagination acceptance criteria; error-handling work alone does not complete it.
 
 ## Source basis
 
-This reference reorganizes the supplied maintainer rules and implementation plan; it does not claim to inspect application source or establish installed dependency versions. The practical guide's new feature snippets are marked separately. Primary framework references were checked when preparing the rewrite.
+The file map and operational descriptions were reconciled with application source and test files on 23 September 2026. Test results above are developer-reported. Feature examples in the practical guide remain illustrative. The links below explain the underlying framework behavior; the repository's code and behavioral tests establish its selected integration.
 
 [rfc9457]: https://www.rfc-editor.org/rfc/rfc9457.html
 [pydantic-errors]: https://docs.pydantic.dev/latest/errors/errors/

@@ -16,6 +16,7 @@ src/inframeld_backend/
 ├── releases/     # deployments, cohorts, promotion, rejection, rollback
 ├── shared/       # cross-cutting capabilities; no business-state ownership
 ├── composition.py
+├── migrate.py    # operator-controlled migration entry point
 └── main.py
 ```
 
@@ -39,15 +40,15 @@ composition.py -> concrete implementations and configuration
 
 `shared` is restricted to capabilities used across domains, such as transport errors, configuration, database lifecycle, jobs, and idempotency. It must not become a second owner of domain state. The current health route is a cross-cutting HTTP adapter under `shared/http`; domain and application code may not import it. Shared technical capabilities use `domain/`, `application/`, and `infrastructure/` only where that separation is genuinely needed.
 
-`main.py` is the process entry point. `composition.py` is the composition root: it constructs the application and explicitly wires concrete dependencies. HTTP, the future worker, Studio, and MCP must invoke the same application use cases; they must not implement parallel business behavior.
+`main.py` is the API entry point; `migrate.py` is the separate operator-controlled migration entry point. `composition.py` is the API composition root: it constructs the application and explicitly wires concrete dependencies. HTTP, the future worker, Studio, and MCP must invoke the same application use cases; they must not implement parallel business behavior.
 
 The developer manually reviews these dependency rules. Automated tests cover product behavior, API contracts, and integrations; do not add repository-structure, import-boundary, or composition-construction tests.
 
 ## Error handling
 
-RFC 9457 Problem Details is the accepted HTTP error contract. Domain and application exceptions remain independent of HTTP, and transport adapters select safe public responses. Structured logs preserve correlation without recording submitted secrets or traceback locals.
+The shared HTTP error foundation implements RFC 9457 Problem Details with `application/problem+json`, stable codes, safe descriptions, and matching body/header request IDs. Domain and application exceptions remain independent of HTTP, and transport adapters explicitly select supported public responses. The shared diagnostic renderer excludes exception messages, notes, source lines, and locals; feature logs must also avoid submitted secrets.
 
-Read the [maintainer rules and error reference](../../docs/development/error-handling.md) before adding an error or changing a handler. The [implementation walkthrough](../../docs/development/error-handling-implementation.md) supplies the implementation order, documented exception definitions, response model, and behavioral test checkpoints. The new infrastructure is planned in issue 19; these documents do not claim it is already implemented or qualified.
+Read the [practical error-handling guide](../../docs/development/error-handling.md) when adding a feature and the [maintainer reference](../../docs/development/error-handling-reference.md) when changing the foundation. The reference maps the implemented files and behavioral tests. The developer reported passing backend and integration tests at the 23 September 2026 closeout; issue 19's separate pagination contract remains unfinished.
 
 ## Development
 
@@ -162,3 +163,5 @@ pnpm --filter @inframeld/backend openapi
 ```
 
 The exported document lives at `contracts/openapi/v1/inframeld-v1.json` and is checked into the repository so clients and CI can review contract changes as ordinary source changes.
+
+Routes declare applicable errors with `problem_responses(definition)` from `shared/http/problem_openapi.py`. Composition installs its narrow media-type correction hook once; FastAPI still generates the native schema and reusable model components. `/health` documents its possible 500 problem. JSON and multipart validation fixtures exercise 422 problems without exposing artificial production endpoints. See the [maintainer reference](../../docs/development/error-handling-reference.md#openapi-and-client-compatibility) for the hook's scope and upgrade checks.

@@ -1,11 +1,11 @@
 # Error handling: a practical guide
 
 **For:** engineers adding an Inframeld backend feature.  
-**Status — 22 September 2026:** this is the accepted design, not a report of completed implementation. The supplied implementation plan says `ApplicationError` exists; the shared errors, HTTP handlers, response models, and safe diagnostic changes still belong to issue 19. Check that foundation before relying on these examples.
+**Status — 23 September 2026:** the shared error-handling foundation is implemented. See the [maintainer reference](error-handling-reference.md#qualification-checklist) for test coverage and verification commands. Issue 19 remains open for its separate pagination contract.
 
-Read this guide for everyday feature work. Use the [maintainer reference](error-handling-reference.md) when changing the shared machinery, and the existing [implementation walkthrough](error-handling-implementation.md) when building it.
+Read this guide for everyday feature work. Use the [maintainer reference](error-handling-reference.md) for the current file map, wire-field reference, diagnostics policy, and checks when changing the shared machinery.
 
-Examples below are new teaching examples based on the supplied architecture. Feature method names and local variables are illustrative; they are not claims about existing repository symbols. Code labelled **excerpt** belongs inside the corresponding function. They show error handling, not complete authorization, persistence, or retry implementations.
+Feature examples below are illustrative; they do not claim that the corresponding business use cases exist. Code labelled **excerpt** belongs inside the described function. The examples show error handling, not complete authorization, persistence, or retry implementations.
 
 ## 1. The rule to remember
 
@@ -108,7 +108,7 @@ A feature can also explicitly expose and map a particular domain error as part o
 
 ### C. Translate a known provider failure in its adapter
 
-All model calls remain inside ModelGateway. The following is an **excerpt from its non-streaming LiteLLM adapter**, after admission, credential, destination, budget, and retry-policy checks. `approved_call_options` stands for options prepared by that gateway.
+All model calls remain inside ModelGateway. The following is an **illustrative excerpt for a future non-streaming LiteLLM adapter**, after admission, credential, destination, budget, and retry-policy checks. `approved_call_options` stands for options prepared by that gateway.
 
 ```python
 import litellm
@@ -178,36 +178,16 @@ if deployment.revision != command.expected_revision:
 
 Without that lock, enforce the revision in an atomic conditional update instead. A Python comparison followed by an unprotected write is not sufficient. A zero-row conditional update may also mean the resource is missing or outside the permitted scope; distinguish that from an actual revision mismatch.
 
-Next, add a reviewed HTTP definition and register the exact class. The planned foundation uses a frozen `ProblemDefinition` holding these five values:
+Next, decide whether callers need a new public problem or whether the existing `CONFLICT_PROBLEM` accurately describes the outcome. A distinct internal exception can reuse an existing public definition.
 
-```python
-# HTTP-owned metadata; illustrative addition to the planned definitions.
-DEPLOYMENT_REVISION_CONFLICT = ProblemDefinition(
-    type_uri=f"{TYPE_PREFIX}#deployment-revision-conflict",
-    code="deployment_revision_conflict",
-    title="Deployment revision conflict",
-    status=409,
-    detail="Reload the deployment and review its current state before submitting a new action.",
-)
-```
+If a new public problem is needed:
 
-Add this entry to the existing explicit mapping, alongside the five shared concrete application errors:
+1. Add its stable code to `ProblemCode` in `apps/backend/src/inframeld_backend/shared/http/problem_definitions.py`. This HTTP enum is separate from the application exception's `ClassVar[str]` code; application code must not import it.
+2. Add a frozen `ProblemDefinition` in that file. Its `code` is the enum member, and its `type_uri`, `title`, `status`, and `detail` are reviewed public metadata. Document the new URI anchor in this guide's problem catalogue before using it.
+3. In `apps/backend/src/inframeld_backend/shared/http/problem_mapper.py`, add the concrete exception class to `_APPLICATION_PROBLEMS`, pointing to the new or reused definition.
+4. Declare the applicable response on the feature route with `problem_responses(definition)` and test its runtime response and OpenAPI contract.
 
-```python
-# Entry in the HTTP mapper's ordinary dictionary, not a registration framework.
-DeploymentRevisionConflictError: DEPLOYMENT_REVISION_CONFLICT,
-```
-
-The lookup is by exact type:
-
-```python
-def problem_for(exc: ApplicationError) -> ProblemDefinition:
-    return APPLICATION_PROBLEMS.get(type(exc), INTERNAL_ERROR)
-```
-
-Here the definition constants, mapping name, and helper name illustrate the planned implementation. An unregistered subclass must become a reported 500, even when its parent has a 409 mapping. Do not infer public behavior from `exc.code`, the class name, or `str(exc)`.
-
-A distinct internal error can reuse an existing public definition when callers need no new public distinction. Creating an exception does not always require creating a new HTTP problem type.
+The existing `problem_mapper.for_application_error()` looks up the **exact concrete type** and falls back to `INTERNAL_ERROR_PROBLEM`. An unregistered subclass therefore becomes a reported 500 even when its parent has a 409 mapping. Do not infer public behavior from `exc.code`, the class name, or `str(exc)`.
 
 ## 5. What the HTTP client receives
 
@@ -256,6 +236,8 @@ Routes declare their applicable error responses using `problem_responses(definit
 
 Composition installs `configure_problem_openapi(application)` once. FastAPI generates the model components; the hook changes only explicitly marked problem responses to `application/problem+json`. Successful response media types remain unchanged. Regenerate the committed OpenAPI artifact whenever production response declarations change.
 
+For a complete production declaration, see [`shared/http/health.py`](../../apps/backend/src/inframeld_backend/shared/http/health.py), which documents its applicable unexpected 500. The [contract fixtures](../../apps/backend/tests/unit/contract/test_openapi_contract.py) show 422 declarations for JSON and multipart input. Do not add every possible error status to every route. The helper declares one definition per call; merge its response dictionaries for distinct statuses. A status can have only one response declaration, so failures sharing a status must use one common schema/description or an explicitly designed combined declaration.
+
 ## 6. Logging, cleanup, and retries
 
 **Feature code raises; the execution boundary reports.** Do not add `logger.exception()` before every re-raise. The request boundary owns unexpected-failure diagnostics; command logging records a bounded outcome and operation identity without another traceback. Known dependency failures also receive operational reporting. Routine client rejections normally need no traceback.
@@ -287,21 +269,27 @@ Then explicitly map any public failure, declare the route's applicable responses
 
 ### A concrete HTTP test
 
-`error_test_app` below is a **test-only fixture to implement with issue 19**. It installs the real request-context middleware and shared handlers, without database startup or provider calls. It is not the product application.
+The existing [handler tests](../../apps/backend/tests/unit/shared/http/test_error_handlers.py) build a test-only app with the real middleware and handlers. The following is a self-contained teaching example for a new test file, `apps/backend/tests/unit/shared/http/test_feature_error_example.py`; that example file is not part of the repository. It needs no database startup or provider calls.
 
 ```python
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from inframeld_backend.shared.application.errors import ConflictError
+from inframeld_backend.shared.http.error_handlers import register_error_handlers
+from inframeld_backend.shared.http.request_context import RequestContextMiddleware
 
 
-def test_conflict_is_safe_and_correlated(error_test_app: FastAPI) -> None:
-    @error_test_app.get("/_test/conflict")
+def test_conflict_is_safe_and_correlated() -> None:
+    application = FastAPI()
+    register_error_handlers(application)
+    application.add_middleware(RequestContextMiddleware)
+
+    @application.get("/_test/conflict")
     async def fail() -> None:
         raise ConflictError("synthetic-secret-must-not-leak")
 
-    with TestClient(error_test_app, raise_server_exceptions=False) as client:
+    with TestClient(application, raise_server_exceptions=False) as client:
         response = client.get("/_test/conflict")
 
     body = response.json()
@@ -314,13 +302,13 @@ def test_conflict_is_safe_and_correlated(error_test_app: FastAPI) -> None:
     assert "errors" not in body
 ```
 
-Also test the feature that actually raises the error, not just this fixture route. For example, a rejected rollback leaves the deployment unchanged; a dependency failure does not become an empty result. The foundation needs separate tests for unexpected 500s, raw-log disclosure, cancellation, and correlation under concurrency.
+Also test the feature that actually raises the error, not just this fixture route. For example, a rejected rollback leaves the deployment unchanged; a dependency failure does not become an empty result. The shared foundation has separate tests for unexpected 500s, raw-log disclosure, cancellation, and correlation under concurrency; preserve those when changing the infrastructure.
 
 ## Qualification checklist
 
 For a feature change, verify its rejection, public mapping, absence of secret disclosure, applicable OpenAPI response, and unchanged transactional/recovery behavior. Do not add tests that merely assert exception inheritance or file placement.
 
-For changes to the shared foundation, use the [full qualification checklist](error-handling-reference.md#qualification-checklist). The examples in this guide do not establish that issue 19 has passed it.
+For changes to the shared foundation, use the [full qualification checklist](error-handling-reference.md#qualification-checklist). Passing error-handling checks does not complete issue 19's separate pagination requirements or qualify future feature behavior.
 
 ## Problem catalogue
 
