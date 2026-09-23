@@ -1,0 +1,23 @@
+name: inframeld-test
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: inframeld_test
+      POSTGRES_USER: inframeld_test
+      POSTGRES_PASSWORD: inframeld-test-only
+    ports:
+      - "127.0.0.1:15433:5432"
+    volumes:
+      - inframeld_test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inframeld_test -d inframeld_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  inframeld_test_postgres_data:
+    name: inframeld_test_postgres_data
