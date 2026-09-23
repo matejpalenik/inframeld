@@ -11,8 +11,12 @@ usage() {
 Usage: ./scripts/dev-compose.sh <command>
 
 Commands:
-  up       Start the development PostgreSQL service in the background.
-  down     Stop the service without removing its persistent volume.
+  up       Start only the development PostgreSQL service in the background.
+  reset-db Delete the development database volume and recreate an empty PostgreSQL service.
+  all      Build and start PostgreSQL and the backend image.
+  restart-db   Restart PostgreSQL without removing its persistent volume.
+  restart-all  Restart all currently created development containers.
+  down     Stop all development services without removing the database volume.
   status   Show the service status.
   check    Verify that PostgreSQL is accepting connections.
 EOF
@@ -77,7 +81,20 @@ shift || true
 
 case "${command_name}" in
     up)
-        compose up -d "$@"
+        compose up -d postgres
+        ;;
+    reset-db)
+        compose down -v
+        compose up -d postgres
+        ;;
+    all)
+        compose up -d --build "$@"
+        ;;
+    restart-db)
+        compose restart postgres "$@"
+        ;;
+    restart-all)
+        compose restart "$@"
         ;;
     down)
         compose down "$@"

@@ -16,5 +16,22 @@ services:
       retries: 12
       start_period: 5s
 
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    environment:
+      INFRAMELD_ENVIRONMENT: local
+      INFRAMELD_DATABASE__HOST: postgres
+      INFRAMELD_DATABASE__PORT: "5432"
+      INFRAMELD_DATABASE__NAME: inframeld
+      INFRAMELD_DATABASE__USER: inframeld
+      INFRAMELD_DATABASE__PASSWORD: inframeld-dev-only
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   inframeld_postgres_data:
