@@ -33,6 +33,7 @@ export INFRAMELD_DATABASE__PORT=15433
 export INFRAMELD_DATABASE__NAME=inframeld_test
 export INFRAMELD_DATABASE__USER=inframeld_test
 export INFRAMELD_DATABASE__PASSWORD=inframeld-test-only
+export UV_LOCKED=1
 
 pnpm --filter @inframeld/backend migrate
 INFRAMELD_RUN_DB_INTEGRATION=1 uv run --project apps/backend pytest apps/backend/tests/integration -q

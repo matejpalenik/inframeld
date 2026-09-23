@@ -4,7 +4,7 @@
   "scripts": {
     "build": "turbo run build",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm openapi:check",
-    "check:backend": "pnpm --filter @inframeld/backend format:check && pnpm --filter @inframeld/backend lint && pnpm --filter @inframeld/backend typecheck && pnpm --filter @inframeld/backend test && pnpm --filter @inframeld/backend openapi:check",
+    "check:backend": "export UV_LOCKED=1 && pnpm --filter @inframeld/backend format:check && pnpm --filter @inframeld/backend lint && pnpm --filter @inframeld/backend typecheck && pnpm --filter @inframeld/backend test && pnpm --filter @inframeld/backend openapi:check",
     "dev": "turbo run dev --parallel",
     "dev:db": "./scripts/dev-compose.sh up",
     "dev:db:reset": "./scripts/dev-compose.sh reset-db",
