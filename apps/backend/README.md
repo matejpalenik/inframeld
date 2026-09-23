@@ -16,6 +16,7 @@ src/inframeld_backend/
 ├── releases/     # deployments, cohorts, promotion, rejection, rollback
 ├── shared/       # cross-cutting capabilities; no business-state ownership
 ├── composition.py
+├── migrate.py    # operator-controlled migration entry point
 └── main.py
 ```
 
@@ -39,9 +40,19 @@ composition.py -> concrete implementations and configuration
 
 `shared` is restricted to capabilities used across domains, such as transport errors, configuration, database lifecycle, jobs, and idempotency. It must not become a second owner of domain state. The current health route is a cross-cutting HTTP adapter under `shared/http`; domain and application code may not import it. Shared technical capabilities use `domain/`, `application/`, and `infrastructure/` only where that separation is genuinely needed.
 
-`main.py` is the process entry point. `composition.py` is the composition root: it constructs the application and explicitly wires concrete dependencies. HTTP, the future worker, Studio, and MCP must invoke the same application use cases; they must not implement parallel business behavior.
+`main.py` is the API entry point; `migrate.py` is the separate operator-controlled migration entry point. `composition.py` is the API composition root: it constructs the application and explicitly wires concrete dependencies. HTTP, the future worker, Studio, and MCP must invoke the same application use cases; they must not implement parallel business behavior.
 
-Architecture tests under `tests/architecture` protect these dependency rules. They use static import checks and fixtures that prove forbidden dependencies are rejected.
+The developer manually reviews these dependency rules. Automated tests cover product behavior, API contracts, and integrations; do not add repository-structure, import-boundary, or composition-construction tests.
+
+## Error handling
+
+The shared HTTP error foundation implements RFC 9457 Problem Details with `application/problem+json`, stable codes, safe descriptions, and matching body/header request IDs. Domain and application exceptions remain independent of HTTP, and transport adapters explicitly select supported public responses. The shared diagnostic renderer excludes exception messages, notes, source lines, and locals; feature logs must also avoid submitted secrets.
+
+Read the [practical error-handling guide](../../docs/development/error-handling.md) when adding a feature and the [maintainer reference](../../docs/development/error-handling-reference.md) when changing the foundation. The reference maps the implemented files and behavioral tests. The developer reported passing backend and integration tests at the 23 September 2026 error-handling closeout.
+
+## Pagination
+
+The implemented shared HTTP pagination models define `limit` (default 25, maximum 100), an optional cursor with syntax validation, and responses with `items` and `nextCursor`. See the [pagination guide](../../docs/development/pagination.md) before adding a list endpoint. Each owning feature validates cursor contents, chooses ordering, checks authorization on every page, and implements the actual query.
 
 ## Development
 
@@ -126,6 +137,10 @@ pnpm --filter @inframeld/backend migrate
 
 Migrations are operator-controlled, synchronous, and protected by a PostgreSQL migration lock. API startup checks schema compatibility but never runs migrations.
 
+The supported migration command runs `inframeld_backend.migrate`. Failed migrations return a nonzero exit status and emit a sanitized diagnostic through the shared logging infrastructure. Programmatic `run_migrations()` calls continue to raise exceptions for their caller to handle.
+
+Use the documented `pnpm --filter @inframeld/backend migrate` command for operator execution. Direct Alembic CLI invocations bypass this reporting boundary. SQLAlchemy parameter hiding is additional protection; it does not sanitize arbitrary database-driver messages.
+
 `pnpm test:integration` runs this migration command automatically against `.env.test` before executing integration tests.
 
 Do not add migrations to `pnpm dev` or API startup.
@@ -152,3 +167,5 @@ pnpm --filter @inframeld/backend openapi
 ```
 
 The exported document lives at `contracts/openapi/v1/inframeld-v1.json` and is checked into the repository so clients and CI can review contract changes as ordinary source changes.
+
+Routes declare applicable errors with `problem_responses(definition)` from `shared/http/problem_openapi.py`. Composition installs its narrow media-type correction hook once; FastAPI still generates the native schema and reusable model components. `/health` documents its possible 500 problem. JSON and multipart validation fixtures exercise 422 problems without exposing artificial production endpoints. See the [maintainer reference](../../docs/development/error-handling-reference.md#openapi-and-client-compatibility) for the hook's scope and upgrade checks.

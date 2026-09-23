@@ -21,7 +21,7 @@ Legacy filenames for ADR-0011/0013 remain for link stability and no longer imply
 | ADR | Subject | Current authority |
 | --- | --- | --- |
 | [0001](ADR-0001-modular-application-structure.md) | Modular domain/application structure | Strict DDD/Clean Architecture/lightweight CQRS accepted; no new service per domain |
-| [0002](ADR-0002-product-owned-openapi-contract.md) | Code-first API, official clients, in-app workflow | Workflow and generated TypeScript Studio integration accepted; native 3.1.x accepted; external SDK Kit blocks Studio only |
+| [0002](ADR-0002-product-owned-openapi-contract.md) | Code-first API, official clients, in-app workflow | Native 3.1.x and RFC 9457 errors accepted; generated TypeScript Studio integration accepted; external SDK Kit blocks Studio only |
 | [0003](ADR-0003-immutable-rag-lineage-and-release-identities.md) | Immutable identities and provenance | Source/revision/profile/pipeline distinctions retained; serving attribution extended for feedback |
 | [0004](ADR-0004-postgresql-source-of-truth-and-shared-chroma.md) | Immutable vectors, shards, membership and recovery | Accepted for qualification; explicit costs, ordinary retries and exceptional cleanup |
 | [0005](ADR-0005-api-enforced-tenancy-and-authorization.md) | Kratos and application authorization | Identity/group/fixed actor and private starter/access defaults accepted |

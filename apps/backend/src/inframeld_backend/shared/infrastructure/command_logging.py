@@ -59,8 +59,10 @@ async def command_logging_scope(context: CommandContext) -> AsyncGenerator[None]
             )
             raise
         except Exception:
-            # Unknown failures include their traceback for diagnosis.
-            logger.exception(
+            # The outer request or process boundary owns the traceback
+            # diagnostic. This scope records only the command outcome so one
+            # failure does not produce duplicate exception reports.
+            logger.error(
                 "command_failed",
                 failure_kind="unexpected",
                 duration_ms=elapsed_milliseconds(started_at),

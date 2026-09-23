@@ -1,9 +1,8 @@
 # ADR-0002: Product-owned code-first OpenAPI contract
 
-**Status:** Accepted — native OpenAPI 3.1.x, contract ownership, and the in-app workflow.  
+**Status:** Accepted — native OpenAPI 3.1.x, RFC 9457 HTTP errors, contract ownership, and the in-app workflow.  
 **Date:** 17 September 2026.  
-**Revised:** 19 September 2026.  
-**Source:** [Canonical architecture guide](../ARCHITECTURE.md).  
+**Revised:** 23 September 2026. **Source:** [Canonical architecture guide](../ARCHITECTURE.md).  
 **Related:** [Tenancy and authorization](ADR-0005-api-enforced-tenancy-and-authorization.md).
 
 ## Context
@@ -62,6 +61,28 @@ This replaces the earlier requirement to obtain OpenAPI 3.0.3 directly from `cre
 The SDK Kit assessment recorded in this ADR identifies 3.0-specific handling in its existing planner that can lose constraints. Its ability to consume the required 3.1 contract has not been established. This is a compatibility issue to resolve, not a reason to change the contract's meaning.
 
 **SDK Kit must consume the authoritative contract correctly. Do not weaken schemas or introduce a down-conversion framework to accommodate the old generator.**
+
+#### Use bounded cursor pagination for lists
+
+List endpoints use an optional opaque `cursor` and a `limit` between 1 and 100, defaulting to 25. They return `items` and a nullable `nextCursor`. Ordering must be deterministic and end in a unique tie-breaker. Every page request receives the owning feature's authorization and scope checks; a cursor conveys position, never authority.
+
+The shared HTTP models enforce the request shape, validate cursor syntax, and describe the response in OpenAPI. The shared contract is implemented; the owning feature validates the cursor's contents against its sort, filters, and scope and implements the actual query when its list endpoint is built. See the [pagination guide](../development/pagination.md).
+
+#### Use RFC 9457 for HTTP errors
+
+The application uses **RFC 9457 Problem Details**, serialized as `application/problem+json`, for its HTTP error responses. The shared handlers, response models, diagnostic protections, and OpenAPI declarations are implemented. The [maintainer reference](../development/error-handling-reference.md#qualification-checklist) records behavioral coverage and developer-reported passing backend and integration tests as of 23 September 2026. This does not qualify future business endpoints.
+
+The Inframeld profile includes `type`, `title`, `status`, and safe `detail`, with `code` and `requestId` extensions. Request-validation problems also contain bounded, sanitized `errors`. The HTTP status and body status agree. The `type` URI is the primary problem identifier; a documented short `code` identifies the same problem for application clients. Problem identities remain stable independently of Python exception class names. Human-readable descriptions are not machine identifiers. The RFC's optional `instance` member is omitted initially.
+
+Domain and application exceptions remain ordinary Python exceptions with no HTTP status, response model, logging implementation, or request context dependency. HTTP adapters explicitly map supported application failures to public problems. A domain rejection is translated into a public application failure only where its meaning is established; unknown failures use the safe internal-error response. Application exception text is not automatically public.
+
+The supporting logging policy preserves correlation while excluding submitted values, traceback locals, and unreviewed exception messages or notes from operational output. One unexpected failure has one diagnostic traceback; command and request summaries may still describe their separate outcomes. Cancellation propagates. An HTTP error response is not a retry authorization and does not replace ADR-0007's operation-specific recovery rules.
+
+The [error-handling guide](../development/error-handling.md) defines the selected profile, starter error vocabulary, safe logging, and feature workflow. The [maintainer reference](../development/error-handling-reference.md) maps the implemented components and regression checks. Registering exception handlers and declaring OpenAPI responses are separate responsibilities, verified with behavioral fixtures without exposing artificial business endpoints.
+
+Routes use `problem_responses(definition)` to declare applicable errors. A narrowly scoped hook wraps FastAPI's native OpenAPI method and corrects the media type only for these marked responses, preserving generated model components, caching, successful responses, and the native dialect. It removes its internal marker from the exported contract. This accommodates the installed FastAPI version's placement of additional response models under the route's default media type; reassess the hook when upgrading FastAPI. The existing exporter and drift check remain authoritative.
+
+Reference: [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html).
 
 ### 2. Keep public documentation separate from protected product operations
 

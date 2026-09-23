@@ -1,19 +1,26 @@
+import json
 import os
+import subprocess
+import sys
 from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any
 from uuid import uuid4
 
 import psycopg
 import pytest
 from psycopg import sql
+from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from inframeld_backend.shared.infrastructure import migrations as migration_module
 from inframeld_backend.shared.infrastructure.database import (
     Database,
     DatabaseSchemaCompatibilityError,
     DatabaseStartupError,
 )
 from inframeld_backend.shared.infrastructure.migrations import (
+    BACKEND_ROOT,
     MIGRATION_LOCK_KEY,
     SUPPORTED_SCHEMA_REVISION,
     MigrationLockError,
@@ -207,3 +214,83 @@ def test_failed_migration_does_not_record_success(
     with _connect(migration_database_settings) as connection, connection.cursor() as cursor:
         cursor.execute("SELECT version_num FROM public.alembic_version")
         assert cursor.fetchall() == []
+
+
+def test_failed_migration_hides_bound_parameters(
+    migration_database_settings: DatabaseSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Check the Alembic engine hides an actual bound value on failure."""
+    private_value = "synthetic-private-migration-value"
+    missing_table = f"missing_{uuid4().hex}"
+
+    @contextmanager
+    def failing_lock(
+        connection: Connection,
+        _timeout_seconds: float,
+    ) -> Generator[None]:
+        connection.execute(
+            text(f'SELECT :private_value FROM "{missing_table}"'),
+            {"private_value": private_value},
+        )
+        yield
+
+    # Alembic imports this hook while loading env.py. The query runs through
+    # Alembic's real engine, but fails before any migration is applied.
+    monkeypatch.setattr(migration_module, "migration_lock", failing_lock)
+
+    with pytest.raises(SQLAlchemyError) as failure:
+        run_migrations(migration_database_settings)
+
+    rendered = str(failure.value)
+    assert private_value not in rendered
+    assert "[SQL parameters hidden due to hide_parameters=True]" in rendered
+
+
+def test_migration_cli_does_not_disclose_driver_message(
+    migration_database_settings: DatabaseSettings,
+) -> None:
+    """Keep a driver-supplied message out of operator-visible output."""
+    private_value = "synthetic-private-migration-driver-message"
+    settings = migration_database_settings
+
+    with _connect(settings) as connection, connection.cursor() as cursor:
+        cursor.execute("CREATE TABLE public.alembic_version (version_num VARCHAR(32) NOT NULL)")
+        cursor.execute(
+            """
+            CREATE FUNCTION public.fail_migration_version() RETURNS trigger
+            LANGUAGE plpgsql AS $$
+            BEGIN
+                RAISE EXCEPTION 'synthetic-private-migration-driver-message';
+            END;
+            $$
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TRIGGER fail_migration_version
+            BEFORE INSERT ON public.alembic_version
+            FOR EACH ROW EXECUTE FUNCTION public.fail_migration_version()
+            """
+        )
+
+    environment = os.environ.copy()
+    environment["INFRAMELD_DATABASE__NAME"] = settings.name
+    environment["INFRAMELD_LOG_FORMAT"] = "json"
+
+    result = subprocess.run(
+        [sys.executable, "-m", "inframeld_backend.migrate"],
+        cwd=BACKEND_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert private_value not in result.stdout + result.stderr
+
+    diagnostic = json.loads(result.stdout.strip().splitlines()[-1])
+    assert diagnostic["event"] == "migration_failed"
+    assert "exception" in diagnostic
