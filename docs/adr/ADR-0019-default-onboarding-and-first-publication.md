@@ -47,9 +47,13 @@ The starter flow presents its default mode without adding another release questi
 
 Use one installation organization. **Kratos** verifies human identity; Inframeld maps that verified identity and creates its normal scoped resources.
 
-Secure bootstrap establishes the first verified human as installation administrator through a **one-time operator-controlled claim**. It does not give administration to the first arbitrary public registration. Later account admission follows the existing controlled account policy, not an assumed public SaaS signup flow.
+Secure bootstrap establishes the first verified human as an **in-app administrator** through a **one-time server-operator-controlled claim**. This assigns application permissions; it does not create an unrestricted UI superadministrator or grant host access. The server operator may use that same human account, whose ordinary application session remains subject to its grants. Bootstrap does not give administration to the first arbitrary public registration. Record explicit initial can-use-and-grant assignments for the separate installation-level **Admit users**, **Suspend users**, **Restore users**, and **Create projects** permissions, as defined in [ADR-0005 section 11](ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery). Later invitations/approvals require Admit users; this remains controlled admission, not an assumed public SaaS signup flow. Admission leads to the private starter setup below, without rights in other people's existing projects. Suspension and restoration require their own permissions and security conditions; admitting a person cannot bypass a suspension or permit taking over another person's identity.
 
-When an admitted human first enters setup, create a **starter project** and a **project-local private group containing that human**. Grant project administration and the actions needed for setup, document use, model-connection management, build, and release within that project.
+When an admitted human first enters setup, create a **starter project** and a **project-local private group containing that human**, with an explicit initial group-manager assignment. Grant project administration and the scoped actions needed for setup, document use, model-connection management, build, and release. Under the bounded-access decisions accepted on 23 September 2026 in [ADR-0005 section 11](ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery), Pipeline/Deployment grants identify individual resources; they do not cover all current and future resources in the project. Creating a Pipeline and creating a Deployment require separate project-scoped permissions, and authorized human creation records explicit initial permissions for that new resource.
+
+Under [ADR-0005 section 11](ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery), creating additional projects requires the separate human-only Create projects permission for the installation's organization. Automatic starter provisioning requires neither that permission nor a manual project-creation step, and does not grant the user Create projects. Record the starter creator's explicit project-level administration assignments, including Delete project, alongside the resource-specific assignments. Delete project authorizes erasing the whole project even if later private contents are unreadable to its holder; it grants no read access to those contents.
+
+Before the first real default Deployment exists, the initiating human's project-scoped **Create Deployment** permission authorizes its creation with the first ready serving version. Build on the selected Pipeline, ordinary mutation permissions, and input access remain separate checks. Creation records the creator's explicit initial can-use-and-grant permissions, including Manage releases on the new Deployment, in the same transaction as the Deployment and its initial serving version. Later releases require Manage releases on that specific Deployment. There is no separate first-release permission or grant to a placeholder Deployment. [ADR-0005 section 11](ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery) owns this accepted rule.
 
 Other users receive different starter projects/groups. There is no installation-wide knowledge pool, and installation administration does not bypass document-read checks. These are ordinary project-owned resources, not another personal-tenant domain. Existing ownership-transfer and deletion rules apply if the creator leaves.
 
@@ -71,11 +75,13 @@ Keep completion and removal markers so an intentional deletion is not mistaken f
 
 Apply the private group’s **nonempty allowlist** on the server. An allowlist identifies groups permitted to access a document. The first-upload screen need not ask the user to select it, but each Document receives an explicit stored grant.
 
-Changing the project’s upload default affects **future admissions only**. It must not rewrite existing document policies. A shared project can later select another permitted default through authorized access configuration. An empty allowlist never means public access.
+The initial upload permissions include an explicit **Add documents** grant on the private group. New-document admission checks this permission for every selected group, even when the server selects project defaults, together with project membership and any credential limits. Group managers can grant Add documents to contributors without appointing them as managers. This does not allow reading or replacing existing documents, changing their access groups, or publishing updates without the other required permissions. [ADR-0005 section 11](ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery) owns this policy.
+
+Changing the project’s upload default affects **future admissions only**. It must not rewrite existing document policies. The human making the change needs both the project-scoped **Manage upload defaults** permission and management of every group in the current or proposed defaults. This permission uses the usual can-use and can-use-and-grant levels; it does not grant group management. Keep the defaults nonempty and within the project, checking current configuration and authority at commit. Every upload still needs Add documents on every selected group, with no fallback audience when authorization fails. [ADR-0005 section 11](ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery) owns these grant rules. An empty allowlist never means public access.
 
 The first connector uses explicitly selected Inframeld groups, without importing source-system access-control lists (ACLs).
 
-No integration credential is issued or shared automatically. A project administrator may later create one with a document-group **ceiling**, the maximum scope safe for all of its consumers. It uses fixed application authority, not delegated end-user identity.
+No integration credential is issued or shared automatically. An appropriately authorized human may later create one with a document-group **ceiling**, the maximum scope safe for all of its consumers. Project administration alone does not authorize arbitrary grants or group access. Applications cannot manage permissions or incoming application credentials in v1. Each integration uses fixed application authority, not delegated end-user identity; its precise issuance-authority matrix remains owned by Access.
 
 This establishes the minimum private setup only. It adds no enterprise organization administration, external group synchronization, nested groups, or role designer. Both publication modes use these same permissions.
 
@@ -103,7 +109,7 @@ A **ProcessingProfile** defines document conversion and chunking. A **chunk** is
 
 #### Nondefault Deployments also start with a real ready version
 
-An explicitly created Deployment selects a ready, compatible initial PipelineVersion and requires an authorized creation decision. Choosing Automatic updates also selects its update binding and authorizes a fresh update for any explicitly displayed pending corpus/configuration.
+An explicitly created Deployment selects a ready, compatible initial PipelineVersion and requires Create Deployment on the project. Authorized human creation commits the Deployment, its initial current version, and the creator's explicit initial permissions together, including can-use-and-grant Manage releases on that Deployment. Choosing Automatic updates also selects its update binding and authorizes a fresh update for any explicitly displayed pending corpus/configuration, subject to the separate Build and input checks.
 
 The ready initial version remains current while that update runs. If the selected inputs already match, report up-to-date without another model call. Creation must never treat an unfinished build as current.
 
@@ -173,11 +179,11 @@ For **MCP**, the Model Context Protocol, retain the existing two tools. The reco
 
 ### 6. Authorize each complete update, not every uploader
 
-**Automatic mode enables a workflow; it does not grant extra permissions.** Enabling it requires the normal build/deploy grants for the target and access to the selected inputs. Each source or configuration action that applies an update also requires its ordinary mutation permissions and those build/deploy grants.
+**Automatic mode enables a workflow; it does not grant extra permissions.** For an existing Deployment, enabling it requires Build on the selected Pipeline, Manage releases on that Deployment, and access to the selected inputs. Each source or configuration action that applies an update also requires its ordinary mutation permissions and those Build/Manage releases grants. For the first default publication before a Deployment exists, the initiating human instead needs project-scoped Create Deployment for creation, alongside the same Build, mutation, and input checks. Manage releases groups publication, rollback, canaries, publication-mode switches, and automatic-update input selection under one permission per existing Deployment, as specified in [ADR-0005 section 11](ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery). Deployment Edit configuration covers non-serving details and cannot authorize these release changes.
 
 Capture the initiating verified principal and authorization in the durable update. Recheck current scope and required permissions before dispatch and publication. Revoking the actor’s authority must prevent a previously queued job from publishing.
 
-The starter creator already has the required project grants. A principal with ingestion-only permission can save source changes through the ingestion-only operation, but cannot publish them. Studio explains that applying them requires an authorized operator. Upload and query permissions never silently become deployment permission.
+The starter creator receives explicit permissions for the starter resources and required project-scoped creation actions. Build and publication authority must match the selected Pipeline and existing Deployment, or the explicit initial-creation intent described in Section 2. A principal with ingestion-only permission can save source changes through the ingestion-only operation, but cannot publish them. Studio explains that applying them requires an authorized operator. Upload and query permissions never silently become deployment permission.
 
 If several automatic Deployments select the same collection, the operation explicitly identifies the targets it is authorized to update. Each target has its own request and outcome; there is no cross-Deployment transaction or publication using another person’s authority.
 
@@ -308,7 +314,7 @@ The final release transaction requires:
 | **Permissions and inputs** | Current authorization and input lifecycle still permit the result. |
 | **Readiness and retention** | All required dependencies are ready, and relevant deletion/retention gates still allow publication. |
 
-These checks, the pointer update, and history commit together. Initial default creation and mode switching lock/check the same binding so they cannot create competing mode authorities.
+These checks, the pointer update, and history commit together. Initial default creation and mode switching lock/check the same binding so they cannot create competing mode authorities. Initial creation also rechecks the initiating human's current Create Deployment permission and commits the new Deployment's explicit initial grants in that transaction. If a competing request has already created a Deployment, creation intent does not authorize updating that existing Deployment; retain the ordinary expected-state and idempotency behavior. Do not refresh a queued job's authority or silently substitute another creator.
 
 If newer work is admitted first, old publication is skipped. If old publication commits first, it can serve while the newer request is prepared. Neither ordering permits an old job to overwrite a newer published version.
 
@@ -337,7 +343,7 @@ Studio marks ordinary default resources with a **Default** badge and shows publi
 
 Renaming a resource changes its display name, not its stable ID, binding, mode, or settings. Creating another Deployment uses the normal Manual releases default, with an explicit Automatic updates option and input binding.
 
-Changing an automatic-update binding requires build/deploy authority, an expected revision, and a fresh apply decision.
+Changing an automatic-update binding requires Build on the selected Pipeline, Manage releases on the target Deployment, access to the selected inputs, an expected revision, and a fresh apply decision.
 
 **Rebinding the default route is a serving change, not a label edit.** It cannot silently override an active candidate. It invalidates work aimed at the old binding and adopts the selected Deployment’s own mode. It must not copy the old default’s automatic setting onto an existing manual Deployment.
 

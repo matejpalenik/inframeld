@@ -396,6 +396,8 @@ During implementation, test the judge against representative human-labelled supp
 
 A Deployment controls customer traffic. It contains a current version, an optional candidate, a designated previous version, rollout settings, and a revision number for detecting concurrent edits.
 
+**Manage releases** authorizes serving changes on that specific Deployment: publication, rollback, canary control, switching publication mode, and selecting automatic-update inputs. V1 groups these under one permission. Editing the Deployment's name or description does not grant this authority. Build and document permissions remain separate requirements where needed; Delete remains separate too.
+
 The first Deployment starts with one ready version and an authorized release decision. It has no previous version, no baseline cohort, and no rollback target. A benchmark or judge is not required for that initial release.
 
 ### Choosing how updates reach users
@@ -550,6 +552,39 @@ Permissions apply to both comments and counts because a comment may quote protec
 
 ## 9. Users, integrations, and permissions
 
+### How access is recorded
+
+The accepted data model uses **one stable principal identity for each human or application**, with separate records for membership and permission. Human sign-in and application keys establish the caller's identity; both kinds then use the same application authorization rules. Applications still cannot perform human-only administration.
+
+| Record | What it tells us |
+| --- | --- |
+| Principal | Who the human or application is, and its account kind/status. |
+| Identity link | Which verified external authority and subject identify a local human. Email and display name are not identity keys. |
+| Organization and Project | Where resources belong. V1 has one installation organization containing projects. |
+| Project membership | Whether a principal belongs to a project. This alone gives no action or document permission. |
+| Access group | A document audience within one project. |
+| Group membership | Whether a principal has document access through that group. |
+| Group manager assignment | Whether an eligible human may administer that group. This is distinct from ordinary membership. |
+| Action grant | Which action a principal may perform on an exact target, whether they may grant it onward, and who assigned it and when. |
+
+An action grant is an individual database record, rather than part of one authoritative JSON permissions document on the account. For example, **Alice → Manage releases → Deployment A → can use and grant** is separate from **SupportBot → Query → Deployment A → can use**. Neither assignment authorizes releases on Deployment B. Keep the target and its owning project explicit so database constraints can reject relationships that cross project boundaries.
+
+There is exactly one current grant for each recipient, action, and target. Its required `can_grant` boolean distinguishes use-only (`false`) from use-and-grant (`true`); `false` never means an explicit denial. Applications cannot receive grant authority. Supported actions, their target kinds, and eligible recipient kinds are fixed in application code, with no runtime custom-action or role editor.
+
+Grant tables are separated by **target type**: organization, project, group, and each supported resource type. All actions on Deployments share the Deployment-grants table, for example. Each table can reference its real target and project directly. The application still uses one shared permission model. Tables for future resources arrive with those features.
+
+Current grant tables contain the current assignments. Revoking a grant removes its assignment; a separate audit record captures who changed what and when, and both changes commit together. Authorization never recovers permissions from history. Audit records follow the existing retention and access rules. Suspension still preserves assignments while blocking the account, and resource deletion may still need its ordinary tombstones.
+
+Suppose Alice and SupportBot both belong to the Support project and its Support-documents group. Alice separately manages that group. A valid SupportBot key identifies SupportBot; the query must still pass the bot's current account-status, project-membership, Query, and document-access checks. Alice's own permissions are not added merely because she is the human using the bot. The bot cannot release A or read an HR-only document from these relationships.
+
+Replacing the key leaves those permissions unchanged. Removing Query blocks querying even while the key is valid; removing group membership removes the corresponding document access even while Query remains. A group manager's assignment permits authorized access management, but ordinary reading is checked separately. Suspension preserves recorded rights while blocking use; project removal clears the departing human's own access so readmission cannot revive it.
+
+The logical model, target-specific grant tables, unique recipient/action/target assignments, `can_grant` boolean, code-owned action catalogue, and separate audit history are accepted design decisions, not claims that tables or endpoints exist. Database constraints preserve relationships; application policy decides whether a current caller may act. [ADR-0005 section 12](adr/ADR-0005-api-enforced-tenancy-and-authorization.md#12-persist-the-accepted-access-data-model) records the detailed rules and alternatives.
+
+[ADR-0005 section 13](adr/ADR-0005-api-enforced-tenancy-and-authorization.md#13-proposed-access-foundation-table-map) provides the complete Access foundation table map: 14 tables covering identities, ownership, membership, managers, four grant target types, and audit. The small application-account extension is now **accepted**: it records a bot's one owning project without creating a separate identity or permission system. Short project-scoped transactions and scope revisions are also **accepted**: permission changes within a project take turns, installation status changes coordinate with them, and stale administration saves are rejected. Different projects can make ordinary Access changes concurrently; ordinary permission reads do not take the exclusive administration locks. No lock is held across uploads, identity-provider calls, or model calls. The ADR details the protocol, scope constraints, deletion behavior, and later-feature integration points. Exact column/type details, indexes, and event-specific audit fields still need implementation review; no tables or guarantees are claimed to be implemented. Later credential and domain tables are not issue #24 placeholders.
+
+Authorization stays in **Inframeld's Access module and PostgreSQL**. The detailed model was reviewed against OpenFGA and an embedded library such as PyCasbin; neither is selected for v1. They can evaluate permissions, but Inframeld would still own workflows such as last-manager handover and safe key issuance. The current approach keeps relevant state changes within one database transaction and avoids another runtime service or policy model. Keep the rules product-specific, test revocation and concurrent changes, and measure capacity rather than assuming it. Deep inheritance, several independent applications sharing authorization, or demonstrated workload needs would justify reconsideration. [ADR-0005's engine comparison](adr/ADR-0005-api-enforced-tenancy-and-authorization.md#introduce-a-general-authorization-engine-or-policy-language-now) records the rationale and primary references.
+
 ### Human sign-in
 
 **Kratos** handles human identities and sessions. Inframeld provides the account screens, validates the Kratos session, and maps the verified identity to a stable local **principal**: the identity used for application permissions.
@@ -562,15 +597,97 @@ This does not make Inframeld an OAuth authorization server. Hydra, token exchang
 
 Browser flows use secure HTTP-only cookies and the supported CSRF protections. Kratos's administrative API stays private. An upstream email address or group claim does not automatically merge accounts or grant application privileges.
 
+**Admit users**, **Suspend users**, and **Restore users** are separate human-only permissions for the installation's organization, each with the usual can-use and can-use-and-grant levels. Secure first-administrator bootstrap records their initial grants explicitly. Admit users permits inviting or approving people to join; it gives them their private starter setup, with access to existing projects granted separately. Suspend users permits immediately blocking a human account, even an administrator or last manager, while retaining its recorded permissions. Restore users permits deliberately restoring the same person after the required identity verification and security review; removed permissions stay removed. The permissions do not imply each other, private-document access, or authority to take over another person's login. Current actor status, grant, and installation scope are checked for each operation. [ADR-0005 section 11](adr/ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery) owns these rules and the recovery conditions.
+
 ### Customer-application credentials
 
-Customer applications use high-entropy opaque credentials mapped to stable application principals. Credentials expire, can be revoked, and have explicit project and action limits.
+Customer applications use high-entropy opaque credentials mapped to stable application principals. Credentials expire and can be revoked; project, action, and document-group permissions belong to the application account. Its valid keys use the account's current permissions, including later authorized additions and removals, without key replacement. Check current authorization on every request and at the existing final dispatch/disclosure points. Credential validity, installation/audience binding, and adapter restrictions still apply.
 
 Inframeld stores only a hash and safe metadata. Plaintext is shown once at creation.
 
-Query, build, evaluate, deploy, and feedback-write are separate grants. Giving an application permission to submit feedback does not grant unrelated capabilities.
+**Create application accounts** is a separate human-only permission on each project, with the usual two grant levels. A new application starts with no document access, operational permissions, or automatically issued key; it does not inherit its creator's access. The human creator receives explicit can-use-and-grant authority to issue and revoke keys and delete this new application account only. Issuing a key still requires authority to grant all the application's current permissions. For example, creating SupportBot gives Alice these administration rights, but SupportBot cannot query Support documents until authorized people grant the necessary access. Human membership management does not include application creation, and creation gives no authority over existing applications.
+
+**Delete application account** is a separate human-only permission for that application, with the usual two grant levels and the explicit creator assignment above. Deletion permanently stops the account, revokes its keys, and removes its permissions and group access, including human administration grants scoped to that application. No replacement administrator is needed for the account being deleted. Project data it created remains, and historical attribution follows [ADR-0014](adr/ADR-0014-data-retention-deletion-and-external-processing.md)'s retention rules. Creating another account with the same name cannot revive its identity or keys. Issuing or revoking keys alone does not authorize deleting the account.
+
+Query, Build, Evaluate, Manage releases, and feedback-write are separate grants. Giving an application permission to submit feedback does not grant unrelated capabilities.
 
 Rotating a credential changes the secret, not the application's principal, canary identity, or ownership of idempotent operations.
+
+Allow at most **two usable keys per application**, counting all unexpired, non-revoked keys across audiences and enforcing the limit against concurrent issuance. For normal replacement, create the second key, update and test the integration, then explicitly revoke the old key. Each step uses the existing issuance or revocation permission; there is no separate Rotate permission. Creating a key never automatically revokes another. Expired/revoked metadata may remain without using a slot. Revoke a compromised key immediately even if its replacement is not ready.
+
+Issuing or replacing an application credential requires an authorized human with both permission to issue keys for that particular application and authority to grant **all its current permissions**, including every action, resource scope, and document-group access. Check current authority and application permissions when issuing the key, including concurrent grant changes. For example, once SupportBot has HR access, Alice cannot issue a SupportBot key unless she may grant that access as well as all its other permissions. These checks govern new issuance; they do not freeze the permissions of keys already issued.
+
+Granting HR access to SupportBot also enables everyone using an existing valid SupportBot key to use that access, even if its original issuer could not grant HR access. Removing an application permission removes it for all its keys. Use separate application accounts, such as SupportBot and HRBot, when integrations need different access. V1 has no separate per-key action or group limits; those remain a deferred option if a concrete need arises. Expiry and revocation remain specific to each key. Credential lifetime limits still need decisions. [ADR-0005 section 11](adr/ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery) owns this policy and its supporting references.
+
+**Revoke application keys** is a separate human-only permission on each application, with the usual two grant levels. It permits revoking its keys without issuance permission or authority to grant the application's underlying permissions. For example, Bob may stop a leaked HRBot key without being allowed to read HR documents or issue a replacement. Current membership, suspension status, scoped authority, and the key's application binding are checked at revocation. Even the last usable key may be revoked without a replacement; the integration then stops authenticating until an authorized key is issued. Revocation leaves the application account and its grants intact. Issuance and revocation do not imply each other, and neither revocation nor loss of access can recall already-dispatched work.
+
+### Bounded administration and resource permissions
+
+The following access decisions were accepted during issue #24's design analysis on 23–24 September 2026. They remain to be implemented and tested. [ADR-0005 section 11](adr/ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery) records the detailed rules, security references, and unresolved parts of the action matrix.
+
+Project and installation administrators do not automatically gain document access or authority to grant every permission. Each action grant has one of two levels: **can use**, or **can use and grant**. Sharing defaults to can use. Passing on grant authority requires an explicit choice and cannot exceed the grantor's action or resource scope.
+
+The **server operator** controls the host, Docker Compose deployment, database, storage, secrets, and backups. They are trusted with the infrastructure and can inspect data or override application state through privileged server access. An **in-app administrator** acts through assigned application permissions; installation scope does not mean unrestricted access. The same human may do both jobs, but their ordinary app session still follows its grants. V1 has no unrestricted UI superadministrator. Emergency server recovery is the separate maintenance path described below.
+
+Someone who can grant a permission may also remove it from others for that same action and scope, even if another person originally granted it. They may remove the ability to grant it onward while leaving ordinary use in place. For example, Carol can remove Bob's Manage releases permission on Test if she can grant it on Test; this gives her no control over Production. Changes must preserve the handover rule below.
+
+Pipeline and Deployment permissions identify individual resources. Alice can build the Support Pipeline and publish to Test without being allowed to publish to Production. V1 has no grant covering all current and future Pipelines or Deployments in a project. Document access remains a separate check, and automatic publication still needs authority for its exact target.
+
+**Delete** is a separate permission for each Pipeline or Deployment, with the same can-use and can-use-and-grant levels. Someone allowed to edit, build, or publish still needs an explicit Delete permission to delete that resource.
+
+**Manage releases** is the Deployment permission previously described as publishing or deploy authority. It groups publication, rollback, canaries, publication-mode changes, and automatic-update input selection, with the usual can-use and can-use-and-grant levels. There is no rollback-only grant in v1. Deployment Edit configuration covers non-serving details such as name and description; it cannot change what serves or how releases happen. Pipeline Build and document permissions remain necessary when the chosen operation needs them.
+
+Creating Pipelines and creating Deployments require separate project-scoped permissions. An authorized human creator receives explicit can-use-and-grant assignments for the new resource. Creation grants no additional access to other resources, documents, or model connections. Starter setup records its initial assignments explicitly.
+
+**Create Deployment** includes selecting its initial ready, same-project, compatible pipeline version. Create the Deployment, its initial serving version, and the creator's explicit initial permissions together, including **Manage releases on that Deployment**. Later releases use that resource-specific permission; creating Deployment A gives no release authority on Deployment B. These are ordinary permissions that can later be transferred or revoked under the handover rules, not permanent creator privileges. No separate first-release permission or empty placeholder Deployment is needed. Build and input access remain separate checks when required by the operation.
+
+The first automatic default publication follows that same creation rule. The initiating human needs current Create Deployment on the project, Build on the selected Pipeline, the ordinary mutation permissions, and access to the selected inputs. Recheck authority before dispatch and publication with the existing mode, revision, readiness, and lifecycle guards; commit initial grants with the new Deployment and default binding. A queued creation request cannot become permission to update a Deployment created by a competing request.
+
+Only appropriately authorized humans can change permissions or manage incoming application credentials in v1. Applications receive can-use permissions only. They cannot invite people, grant access, appoint managers, or create additional application credentials.
+
+**Manage project members** is a separate human-only permission on each project, with the same two grant levels. It permits adding already admitted Inframeld users to that project and removing human members. Adding Bob to Support gives him membership only; documents, groups and Pipeline/Deployment permissions must be shared separately by someone with the required authority. This permission does not admit accounts to the installation or manage another project's membership. Removing a member clears their own project access and must respect the replacement rules below.
+
+**Create projects** is a separate human-only permission for the installation's organization, with the usual two grant levels. It allows creating additional projects. The creator receives membership and explicit can-use-and-grant assignments for the new project's agreed administration actions: membership management, group/application/Pipeline/Deployment creation, upload-default management, and Delete project. Their additional checks still apply, and these grants give no authority over existing projects or automatic reading of their documents. Every admitted user's private starter project still comes from controlled onboarding without requiring or granting Create projects.
+
+Secure bootstrap explicitly gives the verified first in-app administrator **can use and grant Create projects**, alongside their separate Admit users, Suspend users, and Restore users grants. They can delegate it through ordinary permission changes; it is not an unrestricted administrator role. No separate server-operator assignment is needed after bootstrap.
+
+**Delete project** is a separate human-only permission for that project, at the usual two grant levels and initially granted to its creator. It authorizes deleting the entire project, **including private contents the person cannot read**, without collecting every contained resource's deletion permission. It does not permit reading or sharing those contents. Ordinary project or installation administration does not imply it. Follow [ADR-0014](adr/ADR-0014-data-retention-deletion-and-external-processing.md): block affected access/work before bounded, resumable cleanup, preserve out-of-scope data, and apply existing retention rules. No replacement administrator is needed for resources being deleted with the project. This whole-project authority does not change the rules for deleting individual resources from a surviving project.
+
+Document groups have **peer managers**. A manager can appoint another admitted human project member as a manager of that same group. Managing the project does not let someone appoint themselves to manage a private group. A group manager controls who may receive its documents, so the documents cannot be considered confidential from that manager merely because ordinary reading is a separate permission.
+
+**Create access groups** is a separate human-only permission on each project, with the usual two grant levels. The creator becomes the new group's first manager. Creation gives no control over existing groups or their documents; someone authorized to change a document's access policy must explicitly assign it to the new group. Creating Support Team therefore gives Alice no authority over HR documents.
+
+A human group manager may **delete an unused access group**. Any Document or active upload/source configuration referring to the group blocks deletion until those references are resolved through their normal authorized workflows. Deletion removes the group's memberships and grants; it never deletes or reassigns documents or selects replacement defaults. Check dependencies when committing deletion, including concurrent changes. The group itself is going away, so no replacement manager or action grantor is required.
+
+### Leaving, suspension, and recovery
+
+Permissions remain until explicitly removed, even when the person who granted them leaves. If Alice gave Bob access and Alice leaves, Bob keeps his access. Removing Alice from the project removes her own permissions and group memberships; inviting her back does not restore them. A last group manager deliberately leaving must appoint a replacement first.
+
+The handover rule also protects action permissions: while a resource exists, normal departures, removals and downgrades must leave at least one active human able to grant each affected permission. If Alice alone can grant Manage releases on Production, she must give that authority to a replacement before leaving. The replacement needs only that specific authority. Suspended accounts and applications do not count as replacements.
+
+Suspension is different: a compromised account is blocked immediately while its recorded permissions remain. This applies even to the last group manager or person able to grant an action permission. Securely recover the same person's account, invalidate old sessions, review suspicious changes, and deliberately lift the suspension. A password reset alone does not lift a security suspension, and explicitly removed permissions never return through recovery.
+
+If the person cannot return, the server operator may use a narrowly scoped emergency procedure to appoint a replacement group manager or restore the specific missing action-grant authority. It requires privileged server access, identifies the exact group or action/resource scope and verified replacement, and records the actor, reason, and change. The compromised account remains blocked. Ordinary in-app administrator status does not permit takeover. The infrastructure operator is trusted with this reassignment power; audit records make its use accountable, not impossible to misuse. This accepted recovery policy still needs an implemented and tested maintenance workflow.
+
+### Resource visibility
+
+Current project members can see that project's name and ID, subject to current status and applicable credential checks. This does not reveal every resource inside it. Installation actions such as Admit users or Create projects do not reveal other private projects.
+
+Humans with an administration permission on a specific application account—Issue application keys, Revoke application keys, or Delete application account—can see its name and ID, subject to current project membership and status. Authorized grantors can also see eligible applications in the limited recipient directory described below. Neither route reveals keys or unrelated application permissions, and project membership alone does not reveal every application account.
+
+Any currently effective permission on a Pipeline or Deployment lets the caller see its basic summary: name, ID and basic availability status. That resource can appear in their list without a separate visibility permission. Configuration, documents and other sensitive details require their own access checks. Access to a Deployment does not automatically reveal its underlying Pipeline or other linked resources. For example, someone allowed to query Production can find and select it without gaining permission to inspect its Pipeline configuration or browse documents.
+
+**View configuration** is a separate permission for each Pipeline or Deployment, with the usual can-use and can-use-and-grant levels. It allows read-only inspection of settings without permission to edit them or run operations. For example, Bob can review the Support Pipeline's settings without being able to change them or start a build. It grants no access to documents or linked private resources, and saved API keys remain hidden. Query permission alone does not grant configuration viewing.
+
+**Edit configuration includes viewing the same resource's configuration.** Alice with Edit on Support can inspect and change its settings without a separate View grant. Removing View alone does not hide those settings while Edit remains; removing Edit leaves read-only access only if View is still granted. Neither ordinary permission allows sharing. Someone authorized to grant Edit may pass on its combined viewing/editing capability, but needs View grant authority to manage standalone View assignments. Documents, linked private resources and secrets retain their own protections.
+
+An access group's name and ID are visible to its members, managers, and callers with an action permission on that group, such as Add documents. Seeing the group does not grant document reading or its membership list. Its managers may inspect its members and managers; other groups remain hidden. Current project membership, suspension, and credential validity still apply.
+
+Humans can inspect their own permissions. Someone who can grant an action can inspect its assignments within that exact scope, including grant levels, without seeing recipients' unrelated rights. Authorized project grantors also get a basic directory of eligible project users and applications so they can choose recipients. This view provides identity information for selection, not their other groups, resource permissions, or credentials. It does not expose the whole installation directory or make every resource's sharing list visible to all users.
+
+Humans with permission to issue or revoke an application's keys may list safe key metadata: identifier, display prefix, creation/expiry dates, and status. The extra authority needed to grant all the application's permissions applies to issuance, not this metadata view. Secrets and stored verifiers/hashes remain hidden; only authorized creation has its existing show-once secret result. Directory visibility or application-deletion permission alone does not grant key-metadata access. A separate read-only View application keys permission is deferred.
+
+Resources outside a caller's permitted visibility are omitted from lists. Direct references to them return the same safe **404 Not Found** as a missing resource. When a caller may know a resource exists but lacks the requested action, return **403 Access denied** instead. These use the existing RFC 9457 error format. Project membership alone does not reveal every resource. Exact readable/editable configuration fields and protected-reference handling, history visibility, and visibility of remaining resource types remain part of the action matrix.
 
 ### Document access
 
@@ -578,7 +695,19 @@ V1 uses **group allowlists**. A caller needs the relevant project and action per
 
 PostgreSQL owns group membership and document policy. The policy belongs to the stable Document and protects its historical DocumentVersions too.
 
-The same rules apply to retrieval, downloads, citations, evaluation evidence, receipts, and feedback. V1 does not need a general-purpose ACL language or an external permissions engine.
+A human changing an existing document's access groups must manage every group listed before or after the change, including groups being removed or retained. At least one same-project group must remain. Reading or editing the document is insufficient. For example, sharing an HR-only document with Support requires someone who manages both groups; managing Support alone cannot bring HR documents into that group. V1 requires one person with all the necessary manager authority, without adding a multi-person approval workflow.
+
+**Add documents** is a separate permission on each access group. Group managers can grant it without making someone a manager, using the existing two grant levels; applications receive can use only. A new document requires Add documents permission for every selected group, including automatically selected defaults, and at least one same-project group must be selected. Bob may upload a new handbook for Support if he has that permission on Support; selecting HR as well needs Add documents on HR too.
+
+Add documents grants no ability to read, replace, or delete existing documents, change their access groups, or manage members. Applications may use this bounded admission permission; changing an existing document's audience remains human-only. Uploading alone does not authorize building or publishing a release.
+
+Changing the groups automatically selected for new uploads requires the separate human-only, project-scoped **Manage upload defaults** permission and management of every group in the current or proposed defaults. This permission uses the usual two grant levels and never grants group management by itself. For example, changing HR to Support requires management of both groups and permission to change that project's setting. Keep the defaults nonempty and within the project; check current settings and authority when committing the change. It affects future admissions only. Existing documents keep their access policies, and each new upload still requires Add documents on every selected group, with no fallback audience if authorization fails.
+
+**Update documents** is a separate permission on each access group, which group managers may grant without appointing another manager. Replacing an existing document's content requires it for every group currently assigned to that document. For example, Bob needs Update documents on both HR and Support to update their shared handbook. The update preserves the document's access groups and creates a new immutable version when content changes; earlier versions remain unchanged. It grants no authority to delete the document or change its audience. Humans and applications may use it within their granted scopes, with reading, building and publication checked separately.
+
+**Delete documents** is a separate permission on each access group, explicitly grantable by its managers to humans or applications under the usual grant rules. Deleting a document requires it for every currently assigned group; Add and Update do not include it. Deletion covers all versions of that Document. Access is blocked and affected serving state invalidated before stored data is cleaned up, so dependent Deployments or historical evidence may become unavailable. Removing one group's access or leaving the document out of a future collection is a different operation. [ADR-0014](adr/ADR-0014-data-retention-deletion-and-external-processing.md) defines the deletion lifecycle and physical-cleanup limits.
+
+Current document-read authorization applies to retrieval, downloads, citations, evaluation evidence, receipts, and feedback. V1 does not need a general-purpose ACL language or an external permissions engine.
 
 Consider an integration called SupportBot. It can read SupportKnowledge but not HRPrivate. Alice and Bob both use SupportBot, so requests under that integration have the same authority.
 
@@ -1144,6 +1273,8 @@ The accepted setup uses one installation organization, with a creator-private st
 
 The first administrator is established through an operator-controlled claim. The first arbitrary person to sign up on an internet-facing installation must not become its administrator.
 
+The creator receives an explicit initial manager assignment for the private group and explicit permissions for the starter resources. Pipeline/Deployment permissions do not cover unrelated or future resources. Before the first default Deployment exists, project-scoped Create Deployment authorizes creating it with its initial ready version, alongside the separate Build and input checks. Creation records explicit initial permissions, including Manage releases on the new Deployment, in the same transaction. Later publication requires that Deployment's Manage releases permission, as defined in ADR-0005.
+
 The application creates an ordinary empty Collection, a conservative processing preset, and a named Pipeline with incomplete draft settings. It records their stable IDs as the project's defaults.
 
 Starter uploads automatically receive a real, nonempty allowlist for the private group. A user does not need to open a permissions editor before uploading, and other users receive no access merely because these resources are defaults.
@@ -1166,7 +1297,7 @@ A partial batch or failed build cannot publish a smaller corpus without an expli
 
 #### Authorization remains explicit
 
-The starter project's creator has the source, configuration, build and deploy permissions needed for this combined action. Automatic mode does not grant those rights to another user. A source-only operation can admit unpublished changes, but applying an automatic update requires the target's build and deploy authority too. The worker retains the initiating principal and rechecks current permissions before publication.
+The starter project's creator has the source, configuration, Pipeline Build and Deployment Manage releases permissions needed for this combined action. Automatic mode does not grant those rights to another user. A source-only operation can admit unpublished changes, but applying an automatic update requires Build on the selected Pipeline and Manage releases on the target Deployment too. The worker retains the initiating principal and rechecks current permissions before publication.
 
 Saving a document does not fan out publication to every deployment that happens to use it. An update identifies its authorized targets and selected inputs. A manually started S3 sync can use the same apply behavior once a complete selected revision is available; individual sync pages cannot trigger partial releases. Query-only application credentials never acquire release authority.
 

@@ -20,6 +20,8 @@ This decision defines those transitions, the routing rules, and how manual revie
 
 Each Deployment independently uses **Manual releases** or **Automatic updates**. Building a version and publishing it remain separate operations in both modes. Evaluation scores and answer feedback never authorize a release by themselves.
 
+As accepted during issue #24's access analysis, **Manage releases** is the single resource-specific permission for publishing, rollback, candidate/canary control, publication-mode switches, and automatic-update input selection on a Deployment. There are no separate grants for those release operations in v1. Deployment Edit configuration covers non-serving details such as name and description, not these serving changes. Delete, Pipeline Build, and document access remain separate permissions; combined operations must satisfy all applicable checks. [ADR-0005 section 11](ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery) owns the two grant levels and bounded administration. This policy still requires implementation and tests.
+
 ### 1. Give each Deployment explicit state and a stable contract
 
 A **pointer** is a stored reference to a pipeline version, not a copy of that version’s configuration.
@@ -58,6 +60,8 @@ The default onboarding path starts in **Automatic updates**. An explicitly creat
 #### Create a real Deployment only with a ready initial version
 
 Initial creation requires one genuinely ready, same-project, contract-compatible PipelineVersion and an authorized initial decision.
+
+Under [ADR-0005 section 11](ADR-0005-api-enforced-tenancy-and-authorization.md#11-bound-administration-grants-and-recovery), Create Deployment on the project authorizes a human to create a new Deployment with that initial serving version. Record the creator's explicit initial grants, including can-use-and-grant Manage releases on the new Deployment, in the creation transaction. Later releases require current Manage releases on that specific Deployment; creation grants no release authority elsewhere. Build and protected-input checks remain separate. For the first automatic default publication, recheck the initiating human's current Create Deployment permission with ADR-0019's existing publication guards.
 
 Create the initial Deployment revision atomically with that version as `current`. It has **no candidate, previous target, or rollout**. There is no baseline cohort or rollback target yet.
 
