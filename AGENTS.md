@@ -30,6 +30,14 @@ Follow test-driven development for new behavior and bug fixes, but make the test
 
 The symbol scaffold is a test seam and API outline, not a completed implementation. Do not use it to smuggle in the behavior being tested, and do not add interfaces merely because a future service might exist. Prefer an application-owned port when application or domain code must remain independent of an external adapter; otherwise a concrete infrastructure class is sufficient.
 
+## Test-code documentation
+
+Whenever generating or changing test code, include a concise module docstring in each new test module and a docstring on every test, fixture, and helper function or class. Explain in plain language what behavior or boundary the code verifies. Keep docstrings focused on purpose rather than narrating obvious implementation steps.
+
+## Implementing Python protocols
+
+Any concrete class, adapter, fake, or test double intended to implement a Python `Protocol` must explicitly name that protocol as a base class. Do not rely on structural typing alone in this repository. For example, write `class FixedActionFactsReader(ActionFactsReader):`. Implement every required protocol member with a compatible signature. Explicit inheritance documents the intended contract and lets static type checkers check member compatibility. When an implementation must provide a method, mark that protocol method with `@abstractmethod`; otherwise an IDE may treat the protocol method as an inherited default and may not flag its absence.
+
 ## Repository setup test policy
 
 Do not add automated tests whose purpose is to guard the setup or organization of the codebase, including architecture/import-boundary tests, dependency-rule fixtures, composition-root construction tests, or similar structural checks. These setup conventions are manually guarded by the developer. Keep tests for actual product behavior, API contracts, and integration behavior when those features are implemented.
