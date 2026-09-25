@@ -8,7 +8,6 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from inframeld_backend.shared.infrastructure.database import Database
-from inframeld_backend.shared.infrastructure.settings import get_settings
 
 pytestmark = [
     pytest.mark.asyncio,
@@ -17,17 +16,6 @@ pytestmark = [
         reason="Set INFRAMELD_RUN_DB_INTEGRATION=1 to run PostgreSQL integration tests",
     ),
 ]
-
-
-@pytest_asyncio.fixture
-async def database() -> AsyncGenerator[Database]:
-    database = Database(get_settings().database)
-    await database.startup()
-
-    try:
-        yield database
-    finally:
-        await database.shutdown()
 
 
 @pytest_asyncio.fixture

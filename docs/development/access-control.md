@@ -4,7 +4,7 @@ Inframeld lets teams upload documents and build pipelines that answer questions 
 
 This guide follows Alice and SupportBot through those decisions. Start with sections 1–3 for the basic model, then use the examples in sections 4–8 for sharing, application keys, releases, and recovery. Section 9 explains how the database keeps access changes consistent. Exact record definitions live in the [Access data model](data-model.md#access).
 
-> **Design status:** This is the accepted v1 design, including the member-plus-manager rule in [ADR-0049](../adr/ADR-0049-require-group-managers-to-be-ordinary-members.md). It does not claim that the endpoints, migrations, integrations, or security tests are complete. Permission names describe the intended actions. Some API names and workflow details still need to be specified.
+> **Design status:** This is the accepted v1 design, including the member-plus-manager rule in [ADR-0049](../adr/ADR-0049-require-group-managers-to-be-ordinary-members.md). The initial migration creates the 14-table Access foundation. The current PostgreSQL integration test confirms those tables exist; it does not yet verify every constraint or prove that endpoints, identity integrations, and Access workflows are complete. Permission names describe intended actions, and some API names and workflow details still need specification.
 
 ## Contents
 
@@ -513,7 +513,7 @@ flowchart TB
 
 The `application_accounts` record extends a principal with its one owning project. It shares the principal ID and the same permission model. Creation saves the principal, account, project membership, creator grants, and audit together.
 
-Every manager record needs a membership in that same group and project. Appointment, demotion, and removal preserve this relationship. The [14-table Access foundation](data-model.md#proposed-access-foundation-table-map) defines the constraints. The identity model, application extension, grant layout, and change protocol are accepted. Remaining physical details are proposals, not an implemented schema.
+Every manager record needs a membership in that same group and project. Appointment, demotion, and removal preserve this relationship. The [14-table Access foundation](data-model.md#proposed-access-foundation-table-map) is created by the initial migration. It has a foreign key from each manager assignment to the matching group membership, plus the human-only and same-project checks. The current integration test checks table presence, so a follow-up test still needs to prove PostgreSQL rejects a manager without that membership. The migration does not implement appointment, handover, or recovery workflows.
 
 ### One current assignment per permission
 
@@ -655,7 +655,7 @@ Future enterprise options could include federation, separate identity providers 
 - Remaining source, collection, contributor, project, group, and application administration details.
 - Credential lifetimes and the precise ways credentials are verified and tied to their intended installation and audience.
 - User admission, identity verification, handover, and recovery workflows.
-- Remaining physical schema details and representative tests of simultaneous changes, permitted retrieval, and deployment integration.
+- Database tests for scoped references and manager membership, plus representative tests of simultaneous changes, permitted retrieval, and deployment integration.
 
 An undecided detail never implies unrestricted administrator access or a permission covering every resource.
 

@@ -9,7 +9,6 @@ from uuid import uuid4
 
 import psycopg
 import pytest
-from psycopg import sql
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -26,7 +25,7 @@ from inframeld_backend.shared.infrastructure.migrations import (
     MigrationLockError,
     run_migrations,
 )
-from inframeld_backend.shared.infrastructure.settings import DatabaseSettings, get_settings
+from inframeld_backend.shared.infrastructure.settings import DatabaseSettings
 
 pytestmark = [
     pytest.mark.skipif(
@@ -49,35 +48,12 @@ def _connect(
     )
 
 
-@pytest.fixture
-def migration_database_settings() -> Generator[DatabaseSettings]:
-    base_settings = get_settings().database
-    database_name = f"inframeld_migration_{uuid4().hex}"
-
-    with (
-        _connect(base_settings, database_name="postgres", autocommit=True) as connection,
-        connection.cursor() as cursor,
-    ):
-        cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name)))
-
-    try:
-        yield base_settings.model_copy(update={"name": database_name})
-    finally:
-        with (
-            _connect(base_settings, database_name="postgres", autocommit=True) as connection,
-            connection.cursor() as cursor,
-        ):
-            cursor.execute(
-                sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(database_name))
-            )
-
-
 def test_empty_database_migration_records_supported_revision(
-    migration_database_settings: DatabaseSettings,
+    temporary_postgres_settings: DatabaseSettings,
 ) -> None:
     """Prove an empty database is initialized at the supported revision."""
 
-    settings = migration_database_settings
+    settings = temporary_postgres_settings
 
     with _connect(settings) as connection, connection.cursor() as cursor:
         cursor.execute("SELECT to_regclass('public.alembic_version')")
@@ -93,11 +69,11 @@ def test_empty_database_migration_records_supported_revision(
 
 
 def test_repeating_current_migration_preserves_existing_data(
-    migration_database_settings: DatabaseSettings,
+    temporary_postgres_settings: DatabaseSettings,
 ) -> None:
     """Prove rerunning the current migration preserves existing data."""
 
-    settings = migration_database_settings
+    settings = temporary_postgres_settings
 
     run_migrations(settings)
 
@@ -119,11 +95,11 @@ def test_repeating_current_migration_preserves_existing_data(
 
 
 def test_migration_command_refuses_a_contended_lock(
-    migration_database_settings: DatabaseSettings,
+    temporary_postgres_settings: DatabaseSettings,
 ) -> None:
     """Prove a second migration attempt exits when the migration lock is held."""
 
-    settings = migration_database_settings.model_copy(
+    settings = temporary_postgres_settings.model_copy(
         update={"migration_lock_timeout_seconds": 0.5}
     )
 
@@ -139,11 +115,11 @@ def test_migration_command_refuses_a_contended_lock(
 
 @pytest.mark.asyncio
 async def test_startup_rejects_an_unmigrated_database(
-    migration_database_settings: DatabaseSettings,
+    temporary_postgres_settings: DatabaseSettings,
 ) -> None:
     """Prove startup rejects an empty database without creating schema metadata."""
 
-    database = Database(migration_database_settings)
+    database = Database(temporary_postgres_settings)
 
     try:
         with pytest.raises(DatabaseSchemaCompatibilityError, match="schema is not initialized"):
@@ -151,20 +127,20 @@ async def test_startup_rejects_an_unmigrated_database(
     finally:
         await database.shutdown()
 
-    with _connect(migration_database_settings) as connection, connection.cursor() as cursor:
+    with _connect(temporary_postgres_settings) as connection, connection.cursor() as cursor:
         cursor.execute("SELECT to_regclass('public.alembic_version')")
         assert cursor.fetchone() == (None,)
 
 
 @pytest.mark.asyncio
 async def test_startup_accepts_supported_schema_revision(
-    migration_database_settings: DatabaseSettings,
+    temporary_postgres_settings: DatabaseSettings,
 ) -> None:
     """Prove startup accepts the exact schema revision supported by the application."""
 
-    run_migrations(migration_database_settings)
+    run_migrations(temporary_postgres_settings)
 
-    database = Database(migration_database_settings)
+    database = Database(temporary_postgres_settings)
 
     try:
         await database.startup()
@@ -175,18 +151,18 @@ async def test_startup_accepts_supported_schema_revision(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("unsupported_revision", ["0000_legacy", "9999_future"])
 async def test_startup_rejects_unsupported_schema_revision(
-    migration_database_settings: DatabaseSettings, unsupported_revision: str
+    temporary_postgres_settings: DatabaseSettings, unsupported_revision: str
 ) -> None:
     """Prove startup rejects schema revisions outside the supported compatibility window."""
 
-    run_migrations(migration_database_settings)
+    run_migrations(temporary_postgres_settings)
 
-    with _connect(migration_database_settings) as connection, connection.cursor() as cursor:
+    with _connect(temporary_postgres_settings) as connection, connection.cursor() as cursor:
         cursor.execute(
             "UPDATE public.alembic_version SET version_num = %s", (unsupported_revision,)
         )
 
-    database = Database(migration_database_settings)
+    database = Database(temporary_postgres_settings)
 
     try:
         with pytest.raises(DatabaseStartupError, match="Unsupported PostgreSQL schema revision"):
@@ -196,28 +172,28 @@ async def test_startup_rejects_unsupported_schema_revision(
 
 
 def test_failed_migration_does_not_record_success(
-    migration_database_settings: DatabaseSettings,
+    temporary_postgres_settings: DatabaseSettings,
 ) -> None:
     """Prove a failed migration does not leave a successful revision recorded."""
 
     # Create a deliberately invalid version table in the temporary database.
     # Alembic's attempt to insert the revision will fail.
 
-    with _connect(migration_database_settings) as connection, connection.cursor() as cursor:
+    with _connect(temporary_postgres_settings) as connection, connection.cursor() as cursor:
         cursor.execute(
             """CREATE TABLE public.alembic_version ( version_num VARCHAR(32) NOT NULL CHECK (false) )"""
         )
 
     with pytest.raises(SQLAlchemyError):
-        run_migrations(migration_database_settings)
+        run_migrations(temporary_postgres_settings)
 
-    with _connect(migration_database_settings) as connection, connection.cursor() as cursor:
+    with _connect(temporary_postgres_settings) as connection, connection.cursor() as cursor:
         cursor.execute("SELECT version_num FROM public.alembic_version")
         assert cursor.fetchall() == []
 
 
 def test_failed_migration_hides_bound_parameters(
-    migration_database_settings: DatabaseSettings,
+    temporary_postgres_settings: DatabaseSettings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Check the Alembic engine hides an actual bound value on failure."""
@@ -240,7 +216,7 @@ def test_failed_migration_hides_bound_parameters(
     monkeypatch.setattr(migration_module, "migration_lock", failing_lock)
 
     with pytest.raises(SQLAlchemyError) as failure:
-        run_migrations(migration_database_settings)
+        run_migrations(temporary_postgres_settings)
 
     rendered = str(failure.value)
     assert private_value not in rendered
@@ -248,11 +224,11 @@ def test_failed_migration_hides_bound_parameters(
 
 
 def test_migration_cli_does_not_disclose_driver_message(
-    migration_database_settings: DatabaseSettings,
+    temporary_postgres_settings: DatabaseSettings,
 ) -> None:
     """Keep a driver-supplied message out of operator-visible output."""
     private_value = "synthetic-private-migration-driver-message"
-    settings = migration_database_settings
+    settings = temporary_postgres_settings
 
     with _connect(settings) as connection, connection.cursor() as cursor:
         cursor.execute("CREATE TABLE public.alembic_version (version_num VARCHAR(32) NOT NULL)")

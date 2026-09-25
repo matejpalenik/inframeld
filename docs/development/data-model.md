@@ -2,7 +2,7 @@
 
 Use this reference to answer three questions: what does a record represent, which domain owns it, and which relationships must stay valid? Start with the [architecture introduction](../ARCHITECTURE.md) for the product journey. Topic guides explain operations, while this document owns record definitions and constraints.
 
-> **Design status:** The logical model is accepted but subject to updates based on engineering work. Access's application-account extension and write-coordination approach are accepted, but parts of its 14-table SQL proposal still need implementation review. Other domains do not prescribe one table per concept. This document is not an implemented schema or migration.
+> **Design status:** The logical model is accepted and may be refined as features are implemented. The 14-table Access foundation is implemented by [the initial migration](../../apps/backend/migrations/versions/0001_initial.py). It includes scoped relationships, principal and resource-kind checks, the one-project application binding, group-manager membership, unique current grants, and use-only application grants. The migration does not implement the Access workflows or enforce the code-owned action catalogue. Audit payload handling, indexes, and some lifecycle rules still need implementation and qualification. Other domains do not prescribe one table per concept, so this is not a complete application schema.
 
 A **primary key (`PK`)** identifies a row. A **foreign key (`FK`)** makes the database check a reference to another row. A **unique constraint** rejects duplicate combinations.
 
@@ -159,23 +159,25 @@ SupportBot can query Production using permitted evidence but cannot release Prod
 
 When Alice creates a Deployment, one transaction records it, its first ready serving version, and her explicit initial grants. Later releases use those ordinary grants. A creator ID cannot override a later removal of her permissions.
 
-### Proposed Access foundation table map
+<a id="proposed-access-foundation-table-map"></a>
 
-**Status:** The application-account extension and write coordination were accepted on 24 September 2026. Other physical details below remain proposed. The two accepted choices are:
+### Access foundation table map
+
+**Status:** The application-account extension and write coordination were accepted on 24 September 2026. The initial migration now implements the 14 foundation tables and their core keys and relationships. The two accepted choices are:
 
 1. Keep `application_accounts` as a small extension of the shared principal. Enforce its one owning project in membership relationships.
 2. Protect Access writes with short project-scoped transactions, the [organization/project lock protocol](access-control.md#persistence), and revisions that reject stale administration changes. Finer locks are deferred unless measured contention justifies them.
 
-The tables show how those choices fit together. Column names and types, action IDs, indexes, and event-specific audit fields still need implementation review. This is the Access foundation and its later integration points, not the complete schema for Epic 2 or the application.
+The map below describes the implemented foundation and its later integration points. Exact action IDs are not yet enforced by database checks. Audit payload limits, retention, and index needs still require implementation review. This is not the complete schema for the application.
 
-There are **14 proposed foundation tables**, mostly small relationship tables. They belong to one Access module in one PostgreSQL database. They do not require 14 services, repositories, or aggregates. Keys, Documents, Pipelines, and Deployments arrive with their own features.
+There are **14 foundation tables**, mostly small relationship tables. They belong to one Access module in one PostgreSQL database. They do not require 14 services, repositories, or aggregates. Keys, Documents, Pipelines, and Deployments arrive with their own features.
 
 ### Column conventions
 
 - Use stable UUIDs, PostgreSQL `timestamptz` for times, and a required boolean `can_grant`. Display names are editable labels, not permission keys. Do not require global name uniqueness or infer membership from names.
 - Organization/project ownership is required and immutable on live records. Foreign-key columns for current memberships, targets, and recipients are non-null unless a conditional relationship below explicitly allows null. Add the listed composite unique keys so scoped references have real database keys to target.
 - Restrict principal kind to `human` or `application`. If another table repeats that kind for a constraint, a foreign key must verify it against the principal's actual kind. Callers cannot choose the copy, and kind changes are unsupported.
-- Proposed principal statuses are `active`, `suspended`, and `retired`. Project statuses are `active` and `deleting`. These names represent accepted lifecycle differences, not new endpoints. Implement only authorized transitions for each kind. Application retirement is terminal, and retaining its row never makes its keys valid.
+- Principals accept `active`, `suspended`, and `retired`; projects accept `active` and `deleting`. Database checks restrict stored values, while application logic must still enforce valid transitions. Application retirement is terminal, and retaining its row never makes its keys valid.
 - Assignments record `assigned_at` and nullable `assigned_by_principal_id`. The latter records attribution, not continuing authority. Reference the stable principal without cascading deletion, and allow null under authorized erasure. Audit operator/bootstrap activity explicitly. Nullable attribution does not permit an ordinary caller to skip verified attribution.
 - Organizations and projects have a nonnegative integer `access_revision`. Advance the relevant scope's revision for each committed Access administration change. Administration requests carry the expected revision so stale changes are rejected, including removal followed by regrant. It is not a cached permission snapshot. A project change does not advance every other project's revision. The administration contract owns its request/response representation.
 
@@ -183,7 +185,7 @@ There are **14 proposed foundation tables**, mostly small relationship tables. T
 
 The table conventions use `PK`, `FK`, and `unique` as defined above. Add further timestamps or display fields only when a workflow needs them.
 
-| Proposed table | Core columns and keys | Required relationships and meaning |
+| Table | Core columns and keys | Required relationships and meaning |
 | --- | --- | --- |
 | `organizations` | `id` PK, `name`, `access_revision`, `created_at`. | One installation organization is provisioned in v1. No multi-organization administration follows from having this table. |
 | `principals` | `id` PK, `organization_id`, `kind`, `status`, `display_name`, `created_at`. Unique `(organization_id, id)` and `(organization_id, id, kind)`. | FK to organization. Stable identity shared by human and application authorization. A local admitted human is represented here. An unverified login or pending invitation does not create an active principal. Status is checked whenever authority is evaluated. |
@@ -213,7 +215,7 @@ An application's `can_grant` must be `false`. The recipient-kind foreign key pre
 
 Use recipient, action, and exact target together as the proposed primary key. A separate grant ID is unnecessary. Scope revisions detect stale changes even when removal and regrant create the same key again. Follow the [request retry rules](jobs-and-idempotency.md#requests) and [Access expected-revision checks](access-control.md#persistence). An unconditional upsert must not overwrite another change silently.
 
-| Proposed table | Primary key / exact assignment | Required foreign keys |
+| Table | Primary key / exact assignment | Required foreign keys |
 | --- | --- | --- |
 | `organization_action_grants` | `(organization_id, recipient_principal_id, action)`. | `(organization_id, recipient_principal_id, recipient_kind)` to principal. Currently accepted installation actions are human-only. Constrain the kind accordingly. No artificial project is needed. |
 | `project_action_grants` | `(project_id, recipient_principal_id, action)`. | `(project_id, recipient_principal_id, recipient_kind)` to project membership, plus project target. Enforce the catalogue's human-only administration restrictions. |
@@ -226,9 +228,9 @@ For example, Alice's permission to issue SupportBot's keys belongs in `applicati
 
 The four grant tables plus the nine identity/membership tables and this audit table make the 14-table foundation.
 
-| Proposed table | Core fields | Boundary |
+| Table | Core fields | Boundary |
 | --- | --- | --- |
-| `access_audit_events` | `id` PK, `occurred_at`, `organization_id`, nullable `project_id`, `actor_kind`, nullable `actor_principal_id`, narrow operator/bootstrap actor reference where applicable, affected principal ID where applicable, `event_type`, target kind and stable ID, action where applicable, relevant before/after values, reason when required, request/operation correlation when available. | A bounded historical record of an Access change. Write it in the same transaction as the state change. Normal APIs cannot edit history, but authorized retention/erasure still applies. It is never queried to grant access. |
+| `access_audit_events` | `id` PK, `occurred_at`, `organization_id`, nullable `project_id`, `actor_kind`, nullable `actor_principal_id`, nullable operator/bootstrap `actor_reference`, nullable affected principal, `event_type`, `target_kind`, stable `target_id`, nullable action, JSONB `before_values` and `after_values`, nullable reason and `correlation_id`. | A bounded historical record of an Access change. Write it in the same transaction as the state change. Normal APIs cannot edit history, but authorized retention/erasure still applies. It is never queried to grant access. |
 
 Audit records preserve historical identity and scope. Do not cascade their foreign keys to current grants, memberships, groups, or resources. Otherwise deleting a permission could erase its own evidence or become impossible.
 
@@ -270,11 +272,11 @@ Live foreign keys should normally **restrict parent deletion**. The authorized u
 
 ### Implementation boundary
 
-The shared Access foundation covers common permission rules and the records needed to enforce their scopes. Mapping later tables does not deliver every administration workflow. Kratos integration handles human sessions. Onboarding provisions private defaults. Access administration handles grants, handovers, and revisions. Knowledge checks document access as it prepares permitted content. The incoming-credential workflow handles application keys. Pipelines and Releases add their own resource tables and grants. These workflows build on the foundation, and describing them here does not mean they are implemented.
+The initial migration creates the shared Access records and their core relational constraints. It does not deliver every administration workflow. Kratos integration handles human sessions. Onboarding provisions private defaults. Access administration handles grants, handovers, and revisions. Knowledge checks document access as it prepares permitted content. The incoming-credential workflow handles application keys. Pipelines and Releases add their own resource tables and grants. These workflows build on the foundation, and describing them here does not mean they are implemented.
 
-The application-account extension and project-scoped write coordination are settled design choices. Exact action IDs and allowed status transitions still need checking before migrations. Ordinary field naming and index tuning do not require new product-policy decisions. Implementation should translate these choices into application-owned contracts, database constraints, and an ordered behavioral test plan.
+The migration stores nonempty action identifiers but does not yet restrict them to the code-owned action catalogue. Application policy must reject unsupported actions, and database checks can be added when stable action IDs are finalized. Status checks limit the values in the database, but application policy still decides which transitions are allowed. Index tuning and event-specific audit rules remain open engineering details.
 
-Verification must cover rejected cross-project and human-only assignments, managers without matching membership, current permission changes, and concurrent writes. Removal and readmission must restore neither old access nor removed management. These checks remain to be done. This document describes accepted design, not completed code or passing tests.
+The PostgreSQL integration test currently verifies that all 14 tables are created. Further tests must prove the database rejects cross-project relationships, non-human assignments to human-only records, managers without matching membership, and duplicate current grants. Application tests must verify current permission changes, handover, and concurrent writes. Removal and readmission must restore neither old access nor removed management.
 
 The [Access write protocol](access-control.md#persistence) keeps current checks, any required expected revision, the change, revision increment, and audit event in one short transaction. Ordinary permission reads do not take exclusive administration locks. External calls stay outside these transactions. Code defines the supported actions and eligible human/application recipients.
 
