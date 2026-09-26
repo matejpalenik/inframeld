@@ -1,15 +1,28 @@
 # Error handling: a practical guide
 
-**For:** engineers adding an Inframeld backend feature.  
-**Status — 23 September 2026:** the shared error-handling foundation is implemented. See the [maintainer reference](error-handling-reference.md#qualification-checklist) for test coverage and verification commands. The separate [pagination guide](pagination.md) covers the implemented shared list contract; each owning feature validates cursor contents.
+Use this guide when adding a backend feature and deciding how to report a failure. Start with the exception-selection table, then follow the examples. [API contracts](api-contracts.md) explains the surrounding public interface. [ADR-0004](../adr/ADR-0004-use-rfc-9457-problem-details-for-http-errors.md) explains the error-format decision.
 
-Read this guide for everyday feature work. Use the [maintainer reference](error-handling-reference.md) for the current file map, wire-field reference, diagnostics policy, and checks when changing the shared machinery.
+> **Status — 23 September 2026:** The shared error-handling foundation is implemented. The [maintainer reference](error-handling-reference.md#qualification-checklist) identifies its tests and verification commands. The separate [pagination guide](pagination.md) covers the implemented shared list contract. Each feature still validates its own cursor contents.
 
-Feature examples below are illustrative; they do not claim that the corresponding business use cases exist. Code labelled **excerpt** belongs inside the described function. The examples show error handling, not complete authorization, persistence, or retry implementations.
+For changes to shared error handling, use the [maintainer reference](error-handling-reference.md). It owns the file map, exact response-field limits, diagnostics rules, and checks. [Documentation maintenance](documentation-maintenance.md) explains how to keep these sources aligned.
+
+The feature examples are illustrative. They do not claim that these business operations are implemented. Each **excerpt** shows where error handling belongs, without providing a complete authorization, persistence, or retry implementation.
+
+## Contents
+
+| Reader's question | Start here |
+| --- | --- |
+| When should I catch a failure? | [The rule](#1-the-rule-to-remember) |
+| Which exception fits? | [Selection table](#2-which-error-should-i-use) |
+| How does this look in a feature? | [Examples](#3-everyday-examples) |
+| When is a new exception justified? | [New exceptions](#4-when-should-i-create-a-new-exception) |
+| What does a client receive? | [HTTP behavior](#5-what-the-http-client-receives) |
+| How do cleanup and retries behave? | [Execution boundaries](#6-logging-cleanup-and-retries) |
+| Which public types exist? | [Problem catalogue](#problem-catalogue) |
 
 ## 1. The rule to remember
 
-**Raise where you understand the failure. Catch only to recover deliberately or translate its meaning. Otherwise, let it propagate.**
+**Raise an exception where the failure's meaning is clear. Catch it only to recover deliberately or explain that meaning to the next caller. Otherwise, let it pass through.**
 
 In Python, “try/catch” is written `try/except`. An exception automatically travels back through callers until an appropriate handler catches it. You do not need to catch it in every function. See [Python exception handling][python-errors].
 
@@ -23,7 +36,7 @@ A provider rejects a call as unavailable
 
 The HTTP handler **builds a response**. It does not raise another wrapper exception.
 
-Avoid chains such as `ProviderError → RepositoryError → ServiceError → ControllerError` when each wrapper only means “something failed.” A new name is useful only when it tells a caller something different.
+For example, `ProviderError → RepositoryError → ServiceError → ControllerError` adds little if every name just means “something failed.” Add a new exception only when the distinction changes what a caller should do.
 
 ## 2. Which error should I use?
 
@@ -40,11 +53,11 @@ These shared application exceptions belong in `shared/application/errors.py`. Th
 
 The statuses belong to the **HTTP mapper**, not to these Python classes. The same application code must also work for MCP and workers.
 
-**Do not raise an error for a valid alternative outcome.** An empty document list is a list result. Insufficient evidence is an explicit query result, not an infrastructure failure. Conversely, a required search shard failing is not “no evidence”: the operation failed.
+**A valid result is not an error.** Alice's document list can be empty. A query can find insufficient evidence. But a required search shard failing is a real failure, because the application could not finish the search.
 
-FastAPI handles malformed request fields through `RequestValidationError`; do not manufacture one in business code. An internal Pydantic validation failure is not automatically the caller's mistake.
+FastAPI raises `RequestValidationError` when incoming fields are malformed. Business code must not manufacture one. A Pydantic error inside the application may indicate a bug rather than bad input from the caller.
 
-Authentication is separate from permission checks. `AccessDeniedError` does not verify credentials. A missing or invalid incoming credential belongs to the authentication adapter; an upstream provider rejecting its own credential is not automatically an HTTP 401 to our caller.
+Authentication establishes who called. Permission checks decide what that caller may do. `AccessDeniedError` expresses a completed permission decision and does not verify credentials. Missing or invalid caller credentials belong to the authentication adapter. A model provider rejecting Inframeld's provider key does not automatically mean our caller should receive HTTP 401.
 
 ## 3. Everyday examples
 
@@ -64,9 +77,9 @@ if document is None:
 return document
 ```
 
-There is nothing to catch here. A failed database read must not become `None`; that would incorrectly turn an outage into a 404.
+There is nothing to catch here. If the database read fails, let that failure continue. Returning `None` would turn an outage into a misleading 404.
 
-The error does not perform authorization. The owning feature decides when to conceal existence, so the response cannot reveal another tenant's document.
+The exception itself does not check access. The feature must decide when to hide a resource's existence so it cannot reveal another tenant's document.
 
 ### B. Translate a domain rejection only at the operation that understands it
 
@@ -100,15 +113,15 @@ except InvalidStateTransitionError as exc:
 await deployments.save(deployment)
 ```
 
-`from exc` retains the original cause for controlled diagnostics. It does not put the cause into the HTTP response.
+`from exc` preserves the original cause for controlled diagnostics. It does not expose that cause in the HTTP response.
 
-Do not put loading, rollback, and saving inside the same catch. An invalid domain state discovered while loading persisted data may indicate corruption or a bug. **There is no global `DomainError → 409` rule.**
+Keep loading and saving outside this catch. An invalid state found while loading stored data may indicate corruption or a bug, which is different from rejecting Alice's requested rollback. **Domain errors do not all map to HTTP 409.**
 
-A feature can also explicitly expose and map a particular domain error as part of its use-case contract. Do not add an application wrapper merely to satisfy a layer diagram.
+A use case can also document and directly expose a specific domain error. It need not add a wrapper solely to match a layer diagram.
 
 ### C. Translate a known provider failure in its adapter
 
-All model calls remain inside ModelGateway. The following is an **illustrative excerpt for a future non-streaming LiteLLM adapter**, after admission, credential, destination, budget, and retry-policy checks. `approved_call_options` stands for options prepared by that gateway.
+All model calls go through ModelGateway. This **illustrative excerpt for a future non-streaming LiteLLM adapter** runs after the gateway has checked admission, credentials, destination, budget, and retry policy. `approved_call_options` represents the options it prepared.
 
 ```python
 import litellm
@@ -124,11 +137,11 @@ except litellm.ServiceUnavailableError as exc:
 # An invalid response is not automatically an availability failure.
 ```
 
-LiteLLM documents this availability exception, but mappings vary by provider. Test the exception actually emitted by the selected provider/version; this is one supported branch, not a complete adapter. See [LiteLLM's mapping reference][litellm-errors].
+The recorded [LiteLLM mapping reference][litellm-errors] describes this availability exception. The selected provider and version still need a test proving which exception they emit. This example covers one failure, not a complete adapter.
 
-Do not replace that catch with `except Exception`. Invalid configuration, rejected credentials, provider policy rejections, timeouts, and programming mistakes need their own understood handling. Even a broadly named SDK connection error may be a fallback category rather than proof of an outage.
+Do not broaden this to `except Exception`. Bad configuration, rejected credentials, provider policy decisions, timeouts, and bugs need handling based on their actual meaning. Even an SDK error named “connection error” may be a catch-all category rather than proof of an outage.
 
-This branch makes **no retry decision**. A lost model response can leave paid work uncertain. Preserve the original operation and use its recovery rules; never add a retry, another provider, or a fallback answer here.
+This code makes **no retry decision**. A provider may have performed paid work even when its response was lost. Keep the original operation and follow its recovery rules. Do not silently retry, switch provider, or invent a fallback answer here.
 
 ### D. Let the route stay simple
 
@@ -145,7 +158,7 @@ Do not add a route-level `try/except` just to return a 404 or 409. The shared ha
 
 **Reuse an existing class unless someone needs to distinguish the new failure.** A separate `DocumentNotFoundError`, `CollectionNotFoundError`, and `PipelineNotFoundError` is unnecessary when all require identical handling.
 
-A deployment revision conflict is a useful distinction: the client must reload current state and ask for a new decision, not silently retry against the newer revision.
+A deployment revision conflict is a useful exception to that rule. Another change has happened since the client read the Deployment. The client must reload it and make a fresh decision, rather than retry the old decision against newer state.
 
 **Proposed feature example — not an additional accepted starter type:** place this in the Releases application package.
 
@@ -153,7 +166,6 @@ A deployment revision conflict is a useful distinction: the client must reload c
 from typing import ClassVar
 
 from inframeld_backend.shared.application.errors import ConflictError
-
 
 class DeploymentRevisionConflictError(ConflictError):
     """Reject an update whose expected deployment revision is stale.
@@ -176,22 +188,22 @@ if deployment.revision != command.expected_revision:
     raise DeploymentRevisionConflictError("Deployment revision changed.")
 ```
 
-Without that lock, enforce the revision in an atomic conditional update instead. A Python comparison followed by an unprotected write is not sufficient. A zero-row conditional update may also mean the resource is missing or outside the permitted scope; distinguish that from an actual revision mismatch.
+Hold that lock through the write, or put the revision check inside an atomic conditional database update. Comparing in Python and then writing without protection leaves room for another update in between. If a conditional update changes zero rows, establish why. The resource may be missing or outside the caller's scope rather than at a different revision.
 
 Next, decide whether callers need a new public problem or whether the existing `CONFLICT_PROBLEM` accurately describes the outcome. A distinct internal exception can reuse an existing public definition.
 
 If a new public problem is needed:
 
-1. Add its stable code to `ProblemCode` in `apps/backend/src/inframeld_backend/shared/http/problem_definitions.py`. This HTTP enum is separate from the application exception's `ClassVar[str]` code; application code must not import it.
+1. Add its stable code to `ProblemCode` in `apps/backend/src/inframeld_backend/shared/http/problem_definitions.py`. This HTTP enum is separate from the application exception's `ClassVar[str]` code. Application code must not import it.
 2. Add a frozen `ProblemDefinition` in that file. Its `code` is the enum member, and its `type_uri`, `title`, `status`, and `detail` are reviewed public metadata. Document the new URI anchor in this guide's problem catalogue before using it.
 3. In `apps/backend/src/inframeld_backend/shared/http/problem_mapper.py`, add the concrete exception class to `_APPLICATION_PROBLEMS`, pointing to the new or reused definition.
 4. Declare the applicable response on the feature route with `problem_responses(definition)` and test its runtime response and OpenAPI contract.
 
-The existing `problem_mapper.for_application_error()` looks up the **exact concrete type** and falls back to `INTERNAL_ERROR_PROBLEM`. An unregistered subclass therefore becomes a reported 500 even when its parent has a 409 mapping. Do not infer public behavior from `exc.code`, the class name, or `str(exc)`.
+`problem_mapper.for_application_error()` matches the **exact exception class**. If it is not registered, the mapper uses `INTERNAL_ERROR_PROBLEM` and reports a 500. That also applies to an unregistered subclass of a class mapped to 409. Neither its name, `exc.code`, nor `str(exc)` defines the public response.
 
 ## 5. What the HTTP client receives
 
-RFC 9457 is the **response format**, not an exception hierarchy. Inframeld's profile adds required fields and limits beyond the RFC. [RFC 9457][rfc9457] defines the standard format; the following shape is our project contract.
+[RFC 9457][rfc9457] defines the HTTP error response format. It does not prescribe Python exception classes. Inframeld adds the required fields and limits described here:
 
 ```http
 HTTP/1.1 409 Conflict
@@ -211,7 +223,7 @@ X-Request-ID: c66a2044-4e4f-4c07-983e-a3c221c7b1ad
 
 `type` identifies the problem kind. `code` is its documented Inframeld shorthand. `title` and `detail` are reviewed display text, not exception messages. `requestId` identifies this request and matches the response header. Our initial profile omits `instance`.
 
-There is no enclosing `error` or `detail` object and no extra top-level `message`. Clients must tolerate unfamiliar types and extensions; they must not parse display text for control flow.
+There is no surrounding `error` or `detail` object and no extra top-level `message`. Clients must tolerate unfamiliar problem types and extension fields. Use documented codes for decisions, never parsed display text.
 
 A request-validation problem also contains sanitized issues, for example:
 
@@ -226,27 +238,23 @@ A request-validation problem also contains sanitized issues, for example:
 ]
 ```
 
-This is an excerpt from a problem object, not a separate response. Preserve only verified public field names and safe indices; submitted dictionary keys can contain secrets. Never return FastAPI/Pydantic's raw error dictionaries. At most 20 issues are returned; the list may be incomplete.
+This fragment belongs inside the problem object. Return at most 20 sanitized issues, so the list can be incomplete. Include only verified public field names and safe indices. Submitted dictionary keys may contain secrets. Never return raw FastAPI or Pydantic error dictionaries.
 
-### The foundation does this once
+### Declare the actual route contract
 
-`register_error_handlers(application)` is installed from composition. It handles request validation, supported application errors, Starlette HTTP exceptions, and unexpected exceptions. The shared builder constructs and serializes `ProblemDetails`, sets the media type and safe headers, and coordinates diagnostics.
+Runtime handlers build the response, but each route still has to describe its possible responses in OpenAPI. Use `problem_responses(definition)` for each applicable status, including `VALIDATION_ERROR_PROBLEM` for input-validation 422s. One status has one declaration. Deliberately combine failures sharing a status rather than accidentally replacing a dictionary entry.
 
-Routes declare their applicable error responses using `problem_responses(definition)` from `shared/http/problem_openapi.py`. Routes that validate input must declare `VALIDATION_ERROR_PROBLEM` for HTTP 422. Handler registration does not update OpenAPI automatically. See [FastAPI's response documentation][fastapi-responses].
-
-Composition installs `configure_problem_openapi(application)` once. FastAPI generates the model components; the hook changes only explicitly marked problem responses to `application/problem+json`. Successful response media types remain unchanged. Regenerate the committed OpenAPI artifact whenever production response declarations change.
-
-For a complete production declaration, see [`shared/http/health.py`](../../apps/backend/src/inframeld_backend/shared/http/health.py), which documents its applicable unexpected 500. The [contract fixtures](../../apps/backend/tests/unit/contract/test_openapi_contract.py) show 422 declarations for JSON and multipart input. Do not add every possible error status to every route. The helper declares one definition per call; merge its response dictionaries for distinct statuses. A status can have only one response declaration, so failures sharing a status must use one common schema/description or an explicitly designed combined declaration.
+See [the production health route](../../apps/backend/src/inframeld_backend/shared/http/health.py) and [test-only JSON/multipart contract fixtures](../../apps/backend/tests/unit/contract/test_openapi_contract.py). Regenerate the native contract when production declarations change. The [maintainer reference](error-handling-reference.md#openapi-and-client-compatibility) owns the narrow media-type hook and handler installation.
 
 ## 6. Logging, cleanup, and retries
 
-**Feature code raises; the execution boundary reports.** Do not add `logger.exception()` before every re-raise. The request boundary owns unexpected-failure diagnostics; command logging records a bounded outcome and operation identity without another traceback. Known dependency failures also receive operational reporting. Routine client rejections normally need no traceback.
+**Feature code raises the failure. The request boundary reports it.** Do not add `logger.exception()` before every re-raise. The request handler owns unexpected-failure diagnostics. Command logging records a limited outcome and operation ID without another traceback. Report known dependency failures too. Ordinary client rejections usually need no traceback.
 
-Messages passed to exceptions must be controlled developer text. Neither those messages nor chained SDK messages are automatically safe to log. Use approved context such as request ID, operation ID, route template, and stable failure category—not document text, prompts, keys, SQL parameters, or provider bodies.
+Write exception messages as controlled developer text, but do not assume they or chained SDK messages are safe to log. Use approved fields such as request ID, operation ID, route template, and failure category. Exclude document text, prompts, keys, SQL parameters, and provider bodies.
 
-**Cleanup is not recovery.** Prefer context managers. Let an exception leave the transaction so rollback runs before the HTTP handler produces a response. Do not return a success result from an `except` or `finally` block after a failed command. Keep external calls outside short SQL transactions. When a catch is genuinely needed and the exception stays unchanged, re-raise with bare `raise`.
+**Cleaning up does not turn failure into success.** Prefer context managers and let exceptions leave the transaction so rollback happens before the HTTP response is built. Never return success from `except` or `finally` after a failed command. Keep external calls outside short SQL transactions. When a catch needs to pass on the same exception, use bare `raise`.
 
-**Cancellation is not a normal 500.** Do not catch `BaseException`; let cancellation, `KeyboardInterrupt`, and `SystemExit` propagate. Use `finally` for necessary cleanup without suppressing the original failure. See [asyncio cancellation][python-cancellation].
+**Cancellation is not an ordinary 500.** Do not catch `BaseException`. Let cancellation, `KeyboardInterrupt`, and `SystemExit` continue. Use `finally` for necessary cleanup without hiding the original failure. See [asyncio cancellation][python-cancellation].
 
 **A 503 is not permission to repeat an operation.** Idempotency, uncertain paid calls, recorded job state, and expected revisions retain their existing application rules. Never “fix” a revision conflict by replacing the client's revision and retrying automatically.
 
@@ -256,20 +264,20 @@ Messages passed to exceptions must be controlled developer text. Neither those m
 | --- | --- |
 | Catch every exception and raise `ApplicationError("Failed")` | Catch only a failure whose meaning you understand |
 | Catch a dependency error and return `[]`, `None`, or a fabricated answer | Propagate the failure unless a fallback is explicitly part of the result contract |
-| Map all `ValueError`, `IntegrityError`, or Pydantic errors to 422/409 | Classify narrowly; unknown failures remain 500 |
+| Map all `ValueError`, `IntegrityError`, or Pydantic errors to 422/409 | Classify narrowly. Unknown failures remain 500 |
 | Return `str(exc)` or `exc.detail` to the client | Use the reviewed problem definition |
 | Log the same traceback in the adapter, use case, and route | Report once at the execution boundary |
 | Use `assert` for a business precondition | Use an explicit condition and meaningful exception |
 
 ## Adding a failure
 
-Choose whether the outcome is a valid result or a failure. Reuse an accurate exception or add the smallest meaningful class in its owner. Document its meaning and important `Raises` cases using Google-style docstrings. Translate only at an understood boundary, preserving the cause.
+First decide whether the outcome is valid or a failure. Reuse an accurate exception, or add the smallest meaningful one in the owning package. Explain its meaning and relevant `Raises` cases in Google-style docstrings. Translate it only where its meaning is understood, preserving the original cause.
 
 Then explicitly map any public failure, declare the route's applicable responses, and test the real behavior. Regenerate OpenAPI through the existing exporter when the production declarations change. Do not hand-edit the contract artifact.
 
 ### A concrete HTTP test
 
-The existing [handler tests](../../apps/backend/tests/unit/shared/http/test_error_handlers.py) build a test-only app with the real middleware and handlers. The following is a self-contained teaching example for a new test file, `apps/backend/tests/unit/shared/http/test_feature_error_example.py`; that example file is not part of the repository. It needs no database startup or provider calls.
+The existing [handler tests](../../apps/backend/tests/unit/shared/http/test_error_handlers.py) use the real middleware and handlers in a test-only app. The example below is a complete illustrative file at `apps/backend/tests/unit/shared/http/test_feature_error_example.py`. That file does not exist in the repository. It needs no database startup or provider calls.
 
 ```python
 from fastapi import FastAPI
@@ -278,7 +286,6 @@ from fastapi.testclient import TestClient
 from inframeld_backend.shared.application.errors import ConflictError
 from inframeld_backend.shared.http.error_handlers import register_error_handlers
 from inframeld_backend.shared.http.request_context import RequestContextMiddleware
-
 
 def test_conflict_is_safe_and_correlated() -> None:
     application = FastAPI()
@@ -302,7 +309,7 @@ def test_conflict_is_safe_and_correlated() -> None:
     assert "errors" not in body
 ```
 
-Also test the feature that actually raises the error, not just this fixture route. For example, a rejected rollback leaves the deployment unchanged; a dependency failure does not become an empty result. The shared foundation has separate tests for unexpected 500s, raw-log disclosure, cancellation, and correlation under concurrency; preserve those when changing the infrastructure.
+Also test the feature that raises the failure. A rejected rollback must leave the Deployment unchanged. A failed dependency must not become an empty result. Preserve the shared tests for unexpected 500s, secret-free rendered logs, cancellation, and request IDs under concurrency.
 
 ## Qualification checklist
 
@@ -318,7 +325,7 @@ The seven named starter definitions below retain the accepted type fragments and
 https://github.com/matejpalenik/inframeld/blob/main/docs/development/error-handling.md
 ```
 
-Keep these identities stable even if documentation moves. They become published when merged; the server does not fetch them at runtime.
+Keep these identities stable if the documentation moves. They become published when merged. The server does not fetch them while handling a request.
 
 ### Validation error
 
@@ -334,7 +341,7 @@ For FastAPI `RequestValidationError`, with sanitized `errors`. The initial proje
 Title: **Invalid input**  
 Detail: **The supplied input is not valid for this operation.**
 
-For supported application input rejections; no raw Pydantic error list.
+For supported application input rejections. Do not include a raw Pydantic error list.
 
 ### Resource not found
 
@@ -358,7 +365,7 @@ Represents an already-made permission decision, not authentication.
 Title: **Operation conflicts with current state**  
 Detail: **The operation cannot be completed in the current state.**
 
-The caller must resolve the relevant state conflict; unchanged retries are not automatically useful or safe.
+The caller must resolve the state conflict. Repeating the same request is not automatically useful or safe.
 
 ### Dependency unavailable
 
@@ -380,7 +387,7 @@ For unexpected or unmapped failures. Report safe diagnostics with the request ID
 
 Use `type: "about:blank"`, `code: "http_error"`, the actual error status, its HTTP status phrase as the title, and fixed safe detail selected by status. This includes native router 404/405 responses. Do not automatically echo `HTTPException.detail`.
 
-Preserve trusted protocol headers such as `Allow`, an appropriate `WWW-Authenticate` challenge, and an intentionally supplied `Retry-After`. The authentication producer supplies the challenge; the shared handler does not invent one.
+Preserve trusted protocol headers such as `Allow`, an appropriate `WWW-Authenticate` challenge, and an intentionally supplied `Retry-After`. The authentication producer supplies the challenge. The shared handler does not invent one.
 
 [rfc9457]: https://www.rfc-editor.org/rfc/rfc9457.html
 [python-errors]: https://docs.python.org/3/tutorial/errors.html

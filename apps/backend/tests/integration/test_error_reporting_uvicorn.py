@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from typing import cast
 
 import httpx2
@@ -12,6 +13,11 @@ from fastapi import FastAPI
 from inframeld_backend.shared.http.error_handlers import register_error_handlers
 from inframeld_backend.shared.http.request_context import RequestContextMiddleware
 from inframeld_backend.shared.infrastructure.logging import configure_logging
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
+    reason="Set INFRAMELD_RUN_DB_INTEGRATION=1 to run integration tests",
+)
 
 SECRET = "synthetic-uvicorn-secret"
 

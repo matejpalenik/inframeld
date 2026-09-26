@@ -107,16 +107,15 @@ pnpm commit
 
 ## Architecture
 
-Start with the [developer architecture guide](docs/ARCHITECTURE.md) for an overview of the system and its boundaries.
+Start with [Understanding Inframeld](docs/ARCHITECTURE.md) for the product, its boundaries, and a worked journey from document to answer.
 
-For more detail:
+- [Topic guides](docs/ARCHITECTURE.md#reading-paths) explain current behavior, procedures, examples, and limitations.
+- [data-model.md](docs/development/data-model.md) defines records and relationships, separating accepted design, proposed tables, and implemented schema.
+- [Architecture decision records](docs/adr/README.md) explain 48 focused choices and their rationale.
+- [Documentation maintenance and skill routes](docs/development/documentation-maintenance.md) explain how to keep the six domain skills and specifications aligned.
+- [AGENTS.md](AGENTS.md) defines read-only AI guidance for developers who write the implementation by hand.
 
-- [Architecture decision records](docs/adr/README.md) document individual architectural decisions.
-- [v1 architecture review](docs/reviews/v1-architecture-review.md) records the v1 scope assessment and remaining bounded choices.
-- [AGENTS.md](AGENTS.md) defines the repository's read-only AI guidance for developers who write the implementation by hand.
-- [Repository skills plan](docs/development/repository-skills-plan.md) documents the coverage, usage, and maintenance of the six domain skills under `.agents/skills/`.
-
-Architecture documentation describes both implemented and planned behavior. An accepted design does not necessarily mean that behavior has already been implemented or qualified.
+Architecture documentation describes both implemented and planned behavior. Acceptance does not mean a feature has been implemented or qualified. The previously linked v1 review and skills plan are [unavailable historical material](docs/development/documentation-maintenance.md#unavailable-historical-material), not evidence recovered by this rewrite.
 
 Backend implementation comes first. External SDK Kit suitability blocks Studio development, whose primary client remains the official generated TypeScript SDK.
 

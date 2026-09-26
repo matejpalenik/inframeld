@@ -30,6 +30,14 @@ Follow test-driven development for new behavior and bug fixes, but make the test
 
 The symbol scaffold is a test seam and API outline, not a completed implementation. Do not use it to smuggle in the behavior being tested, and do not add interfaces merely because a future service might exist. Prefer an application-owned port when application or domain code must remain independent of an external adapter; otherwise a concrete infrastructure class is sufficient.
 
+## Test-code documentation
+
+Whenever generating or changing test code, include a concise module docstring in each new test module and a docstring on every test, fixture, and helper function or class. Explain in plain language what behavior or boundary the code verifies. Keep docstrings focused on purpose rather than narrating obvious implementation steps.
+
+## Implementing Python protocols
+
+Any concrete class, adapter, fake, or test double intended to implement a Python `Protocol` must explicitly name that protocol as a base class. Do not rely on structural typing alone in this repository. For example, write `class FixedActionFactsReader(ActionFactsReader):`. Implement every required protocol member with a compatible signature. Explicit inheritance documents the intended contract and lets static type checkers check member compatibility. When an implementation must provide a method, mark that protocol method with `@abstractmethod`; otherwise an IDE may treat the protocol method as an inherited default and may not flag its absence.
+
 ## Repository setup test policy
 
 Do not add automated tests whose purpose is to guard the setup or organization of the codebase, including architecture/import-boundary tests, dependency-rule fixtures, composition-root construction tests, or similar structural checks. These setup conventions are manually guarded by the developer. Keep tests for actual product behavior, API contracts, and integration behavior when those features are implemented.
@@ -47,17 +55,17 @@ Before answering an Inframeld domain or architectural question, select and read 
 | Identity, project/group permissions, integrations, model connections or provider credentials | [inframeld-access-models](.agents/skills/inframeld-access-models/SKILL.md) |
 | DDD/Clean Architecture boundaries, HTTP/MCP/SDK contracts, jobs or idempotency | [inframeld-application-contracts](.agents/skills/inframeld-application-contracts/SKILL.md) |
 
-Start with the skill whose invariant or behavior the question concerns. Read a neighboring ADR for a specific dependency; load another skill when its broader context matters. Do not load all six skills or every linked document for a small question. An unrelated styling or general programming question need not load a domain skill.
+Start with the skill whose invariant or behavior the question concerns. Read the relevant topic guide and neighboring decision for a specific dependency; load another skill when its broader context matters. Do not load all six skills or every linked document for a small question. An unrelated styling or general programming question need not load a domain skill.
 
 Use the client's skill invocation mechanism when available. If discovery misses a skill, read its linked `SKILL.md` directly rather than guessing or asking the developer to re-explain the domain. In Codex, the explicit fallback is, for example, `$inframeld-pipelines-releases`. Briefly identify the skill when first using it. Discovery and implicit selection are not guarantees of correct loading; actually read the body and the relevant source material.
 
 ## Ground answers in the accepted architecture
 
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the canonical product explanation. The owning [ADR](docs/adr/README.md) records the detailed decision and its status. Skills summarize vocabulary, ownership and fragile rules and point to those sources; they are not a competing specification.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the canonical product introduction. [Topic guides](docs/ARCHITECTURE.md#reading-paths) own current behavior, procedures, examples and limitations. [data-model.md](docs/development/data-model.md) owns record definitions, relationships and constraints, distinguishing logical design, proposed physical tables and implemented schema. The owning [ADR](docs/adr/README.md) explains one architectural choice, its rationale and status. Skills summarize essential boundaries and point to these sources; they are not a competing specification. Git history preserves historical evidence; use active guides and decisions for current rules.
 
 For a substantive domain answer:
 
-1. Read the applicable guide section and owning ADR identified by the skill.
+1. Read the applicable topic guide and owning ADR identified by the skill; read the relevant data-model section for records, fields or relationships.
 2. Explain the relevant concepts, owner and lifecycle in plain language. Connect the rule to the developer's concrete example instead of dumping the glossary.
 3. Cite the local source supporting the important rule. Separate accepted design, suggested implementation details, deferred features and untested assumptions.
 4. Inspect code when asked about what exists. Do not present planned classes, routes, tests, guarantees or capacity as implemented or verified.
@@ -76,4 +84,4 @@ Read applicable directory instructions before working there. Preserve [apps/web/
 
 ## Keep the guidance current
 
-When an authorized domain change is made, update the owning ADR, relevant guide explanation and affected skill in the same change. If this is a read-only review, report the needed correction instead of making it. Maintain one live body per skill under `.agents/skills/`; add code/test references only once they exist. Use [the skills plan](docs/development/repository-skills-plan.md) for coverage, maintenance and fresh-session checks. Loading any of this context never grants write authority.
+When an authorized domain change is made, update the current topic guide, affected data-model sections, navigation and relevant skill together. A change to an accepted architectural choice receives a new superseding ADR using [the template](docs/adr/template.md); preserve the earlier rationale and link both records. Ordinary corrections and navigation improvements may update an existing ADR. Do not turn proposed details or untested design into implemented guarantees. If this is a read-only review, report the needed correction instead of making it. Maintain one live body per skill under `.agents/skills/`; add code/test references only once they exist. Use [documentation maintenance](docs/development/documentation-maintenance.md) for ownership, coverage, reference checks and fresh-session skill walkthroughs. Follow the [Access guide’s writing pattern](docs/development/documentation-maintenance.md#writing-pattern) for topic guides, adapting short contracts and record references to their purpose. The previously referenced skills plan is unavailable; the maintenance guide records that limitation. Loading any of this context never grants write authority.
