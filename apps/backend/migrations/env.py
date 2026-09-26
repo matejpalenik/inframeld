@@ -1,43 +1,39 @@
+"""Run authoritative Alembic migrations online using validated settings and a migration lock."""
+
 from logging.config import fileConfig
 from typing import cast
 
 from alembic import context
 from sqlalchemy import URL, create_engine, pool
 
-from inframeld_backend.shared.infrastructure.migrations import migration_lock
-from inframeld_backend.shared.infrastructure.settings import DatabaseSettings, get_settings
+from inframeld_backend.bootstrap.application_settings import get_settings
+from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.postgres.migration_runner import migration_lock
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
 config = context.config
-
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
+# The historical migrations own DDL. Partial read mappings are not an
+# authoritative autogeneration model of all constraints and tables.
 target_metadata = None
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
 
 
 def _database_settings() -> DatabaseSettings:
-    configured_settings = config.attributes.get("database_settings")
+    """Use the migration command's injected settings or load the process configuration."""
+    # Alembic attributes are an untyped framework boundary.
+    configured_settings = cast(object, config.attributes.get("database_settings"))
 
+    if isinstance(configured_settings, DatabaseSettings):
+        return configured_settings
     if configured_settings is not None:
-        return cast(DatabaseSettings, configured_settings)
+        raise TypeError("Migration database settings must be validated DatabaseSettings.")
 
     return get_settings().database
 
 
 def _database_url(settings: DatabaseSettings) -> URL:
+    """Convert validated database settings into a driver URL without rendering its password."""
     return URL.create(
         drivername="postgresql+psycopg",
         username=settings.user,
@@ -49,18 +45,14 @@ def _database_url(settings: DatabaseSettings) -> URL:
 
 
 def run_migrations_offline() -> None:
+    """Reject offline migration execution because the lock and transaction require PostgreSQL."""
     raise RuntimeError(
         "Offline migrations are unsupported - use the synchronous online migration command."
     )
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
+    """Own a synchronous engine, hold the migration lock, and apply DDL in one transaction."""
 
     settings = _database_settings()
 

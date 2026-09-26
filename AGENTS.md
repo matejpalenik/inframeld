@@ -18,15 +18,49 @@ When asked for a pull request title, description, or creation, first read [.gith
 
 When showing code, always show it in enough context for the developer to apply it without guessing. Every snippet must identify its exact file path and whether it replaces existing code, is inserted before or after a named line, or is a complete new file. Include the relevant imports and the surrounding function, method, class, or configuration section; do not show unexplained isolated lines when placement affects behavior. For multi-file changes, separate snippets by file and explain how they connect. Clearly label illustrative pseudocode versus code intended to be copied verbatim. Preserve existing behavior unless the snippet explicitly identifies a behavior change.
 
+## Backend component conventions
+
+Follow [the application structure guide](docs/development/application-structure.md#component-conventions). Organize backend code by domain → layer → capability; keep authentication and authorization separate within Access. `bootstrap` owns aggregate settings, concrete dependency assembly, application construction, and resource lifecycle. Entry points stay small. Preserve the frontend's existing Next.js conventions.
+
+| Component | Required naming/role |
+| --- | --- |
+| Business orchestration | `*Service`; the complete workflow belongs here, through injected protocols |
+| Public application operation | Action-named `Protocol`, such as `HumanSessionAuthenticator` or `RequireAction` |
+| I/O capability | Specific `Protocol`, such as `BrowserSessionVerifier` or `HumanIdentityLinkReader` |
+| Infrastructure adapter | Technology-prefixed class, such as `PostgresHumanIdentityLinkReader` |
+| FastAPI dependency | `*Dependency`; extract inputs and invoke the operation |
+| Route registration | `*_routes.py`; translate HTTP input/output |
+| ASGI middleware | `*Middleware` in `*_middleware.py`; wrap the request lifecycle |
+| Transport DTO | `*Request` / `*Response`, using Pydantic; preserve published schema names |
+| Persistence mapping | `*Row`, under the adapter's `models` package |
+| Configuration | `*Settings`, beside the resource; aggregate in bootstrap |
+| Pure business decision | Descriptive function in `*_policy.py`, without I/O |
+
+Use one primary public behavioral component per module. Keep an entity and its closely related IDs/enums together, independently importable. Cohesive exception families and private helpers may remain grouped. Pure functions remain functions; do not add a static class merely as a namespace. Remove obsolete internal modules after migrating callers, without compatibility aliases for competing layouts.
+
+Entities have stable identity and cohesive state. Value objects represent immutable meaning and validate their own invariants. Frozen application DTOs carry named operation inputs/results. Use `Principal` when a workflow needs ID, organization, kind and status together; pass `PrincipalId` when it only needs identity. Principal equality/hash follow its ID. `AccessContext` retains identity, not a status or permission snapshot. Add lifecycle behavior only with the workflow that needs it.
+
+HTTP adapters parse, invoke operations, and serialize. Services coordinate business steps. Entities/value objects/policies express rules without I/O. Provider and persistence adapters perform their specific I/O and boundary conversions. Bootstrap constructs and releases resources. Authentication readers open independent short sessions after provider verification; transaction-bound authorization readers use the caller's session. Never share an `AsyncSession` across requests or keep one open while waiting for a provider.
+
+## Component documentation
+
+Every public component needs a plain-language purpose sentence. Expand contracts with input meaning and trust assumptions, result meaning, expected failures, I/O/state changes, and resource/transaction ownership where relevant. Protocols own complete shared behavior; concrete classes still need useful purpose summaries and implementation-specific details. DTOs explain their fields, and value objects state enforced invariants. Do not repeat a whole protocol contract on each implementation or substitute a vague class name for an explanation.
+
+Examples of useful openings: “Verifies a browser session, requires its linked principal to be an active human, and returns the caller's access context.” “Extracts the browser session credential and invokes the human-authentication service for a protected FastAPI route.” Keep the test/fixture/helper docstring requirements below.
+
 ## Typed database access
 
-Generated application and test code must use SQLAlchemy typed ORM mappings and expression APIs for database reads and writes. Do not generate raw SQL strings or `text()` queries. Use Alembic operations for schema changes. If a required operation cannot be expressed this way, explain the limitation and ask for an explicit exception.
+Generated application and test code must use SQLAlchemy typed ORM mappings and expression APIs for database reads and writes. Do not generate raw SQL strings or `text()` queries. Use Alembic operations for schema changes. Use `MappedAsDataclass` with keyword-only typed constructors; exclude database-generated fields from initialization and preserve database defaults. Query scalars, ORM records, or typed tuples and immediately convert them into named domain/application results. Do not use string-keyed SQL result mappings.
+
+The only approved raw-statement exception is isolated test database provisioning in `apps/backend/tests/support/postgres.py`: compose `CREATE DATABASE` / `DROP DATABASE` using `psycopg.sql.Identifier` and autocommit. This does not permit raw record queries, startup probes, advisory-lock strings, or application SQL. Use inspection, typed expressions, and Alembic operations for those. For any additional limitation, explain it and request a specific exception.
 
 ## Strongly typed application values
 
 In generated or suggested application code and tests, favor application-owned types over raw strings for values with defined meaning. Use enums or `Literal` types for closed vocabularies, such as principal kinds and statuses. Use distinct value types for semantically different identifiers and open values, such as identity authorities and subjects, when mixing them would be a meaningful error. Parse and validate strings at HTTP, provider, configuration, and persistence boundaries; convert typed values back to strings at those boundaries. Preserve existing wire and database values, and ensure ORM mappings perform real type conversion rather than only changing annotations. Keep plain strings for free-form text and vocabularies whose values are not yet defined.
 
-For UUID-backed identities, strongly prefer distinct application-owned ID types, such as `PrincipalId`, `ProjectId`, and `OrganizationId`, in domain and application contracts, call sites, and tests. Use a bare `UUID` when the entity kind is genuinely unknown. Parse external input as a UUID before constructing the appropriate ID type, and convert UUIDs returned by persistence adapters at that boundary. Keep ORM columns mapped as UUIDs. Run the static type checker to catch IDs passed to the wrong contract; entity existence, scope, and authorization still require their normal checks.
+For UUID-backed identities, use distinct application-owned frozen, slotted dataclasses containing `value: UUID`, such as `PrincipalId`, `ProjectId`, `OrganizationId`, and `AccessGroupId`, in domain and application contracts, call sites, and tests. Do not replace these runtime objects with aliases or `NewType`. Constructors require a UUID, and equality must distinguish identifier classes even for equal UUIDs. Preserve existing valid UUID versions and zero values unless a separately accepted invariant requires otherwise. Use a bare `UUID` when the entity kind is genuinely unknown. Parse external input as a UUID before constructing the appropriate ID type, and convert UUIDs returned by persistence adapters at that boundary. Keep ORM columns mapped as UUIDs. Run the static type checker to catch IDs passed to the wrong contract; entity existence, scope, and authorization still require their normal checks.
+
+Use UUID-backed `RequestId` for generated request correlation and opaque nonblank string-backed `OperationId` for operation correlation. Keep credentials in secret-safe value objects whose representations and validation messages never expose their contents. Dictionaries remain appropriate at ASGI, JSON/OpenAPI, configuration-framework, and logging serialization boundaries; narrow them there. Keep unavoidable SDK/framework `Any` and casts local and documented, outside application contracts.
 
 ## TDD sequencing
 
@@ -48,7 +82,7 @@ Whenever generating or changing test code, include a concise module docstring in
 
 Any concrete class, adapter, fake, or test double intended to implement a Python `Protocol` must explicitly name that protocol as a base class. Do not rely on structural typing alone in this repository. For example, write `class FixedActionFactsReader(ActionFactsReader):`. Implement every required protocol member with a compatible signature. Explicit inheritance documents the intended contract and lets static type checkers check member compatibility. When an implementation must provide a method, mark that protocol method with `@abstractmethod`; otherwise an IDE may treat the protocol method as an inherited default and may not flag its absence.
 
-Put shared purpose and behavior on `Protocol` classes and methods. Concrete implementations should document only details beyond that contract. Keep the existing docstring requirements for tests, fixtures, and helpers.
+Put the complete shared behavioral contract on `Protocol` classes and methods. Give concrete implementations a purpose summary and document their implementation-specific details. Mark overridden members with `@override`, including test doubles, and retain strict Pyright with `reportImplicitOverride` enabled. Keep the docstring requirements for tests, fixtures, and helpers.
 
 ## Repository setup test policy
 

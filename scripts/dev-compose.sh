@@ -20,8 +20,6 @@ Commands:
   down     Stop all development services without removing their database volumes.
   status   Show the service status.
   check    Verify that PostgreSQL is accepting connections.
-  test-db-up     Start the isolated PostgreSQL integration-test service.
-  test-db-down   Stop and remove the integration-test service, keeping its test-only volume.
   test-services-up    Start PostgreSQL and Kratos for the full integration suite.
   test-services-down  Stop the test services, keeping their test-only volumes.
 EOF
@@ -220,13 +218,6 @@ case "${command_name}" in
             printf 'Details: %s\n' "${readiness_output}" >&2
             exit 1
         fi
-        ;;
-    test-db-up)
-        test_compose up -d postgres
-        wait_for_test_postgres
-        ;;
-    test-db-down)
-        test_compose down --remove-orphans
         ;;
     test-services-up)
         test_compose up -d postgres kratos

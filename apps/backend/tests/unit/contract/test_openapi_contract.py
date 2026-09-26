@@ -1,3 +1,5 @@
+"""Verify committed OpenAPI output and generated HTTP schema conventions."""
+
 import json
 from pathlib import Path
 from typing import Annotated, Any, cast
@@ -6,15 +8,16 @@ from fastapi import FastAPI, File, Form, Query, UploadFile
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
 
-from inframeld_backend.main import create_app
-from inframeld_backend.shared.http.error_handlers import register_error_handlers
-from inframeld_backend.shared.http.pagination import PageResponse, PaginationQuery
-from inframeld_backend.shared.http.problem_definitions import VALIDATION_ERROR_PROBLEM
-from inframeld_backend.shared.http.problem_openapi import (
+from inframeld_backend.bootstrap.application_factory import create_app
+from inframeld_backend.shared.http.errors.error_handlers import register_error_handlers
+from inframeld_backend.shared.http.errors.problem_definitions import VALIDATION_ERROR_PROBLEM
+from inframeld_backend.shared.http.errors.problem_openapi import (
     configure_problem_openapi,
     problem_responses,
 )
-from inframeld_backend.shared.http.request_context import RequestContextMiddleware
+from inframeld_backend.shared.http.pagination.page_response import PageResponse
+from inframeld_backend.shared.http.pagination.pagination_query import PaginationQuery
+from inframeld_backend.shared.http.request_context_middleware import RequestContextMiddleware
 
 CONTRACT_PATH = (
     Path(__file__).resolve().parents[5] / "contracts" / "openapi" / "v1" / "inframeld-v1.json"
@@ -22,6 +25,8 @@ CONTRACT_PATH = (
 
 
 class ContractFixturePayload(BaseModel):
+    """Exercise required, nullable, union, and constrained fields on a test-only route."""
+
     required_name: str = Field(min_length=1, max_length=40, pattern="^[a-z]+$")
     required_nullable: str | None
     optional_nullable: str | None = None
@@ -30,6 +35,7 @@ class ContractFixturePayload(BaseModel):
 
 
 def _create_schema_fixture_app() -> FastAPI:
+    """Register test-only payload, upload, and pagination routes for schema assertions."""
     application = FastAPI()
     register_error_handlers(application)
     application.add_middleware(RequestContextMiddleware)
@@ -41,6 +47,7 @@ def _create_schema_fixture_app() -> FastAPI:
         responses=problem_responses(VALIDATION_ERROR_PROBLEM),
     )
     async def contract_fixture_payload(payload: ContractFixturePayload) -> ContractFixturePayload:
+        """Expose the fixture payload's request and response schemas."""
         return payload
 
     @application.post(
@@ -52,6 +59,7 @@ def _create_schema_fixture_app() -> FastAPI:
         file: Annotated[UploadFile, File(description="fixture upload")],
         label: Annotated[str, Form(min_length=1, max_length=20)],
     ) -> dict[str, str]:
+        """Exercise multipart upload schema generation."""
         return {"filename": file.filename or "", "label": label}
 
     @application.get(
@@ -62,6 +70,7 @@ def _create_schema_fixture_app() -> FastAPI:
     async def contract_fixture_page(
         pagination: Annotated[PaginationQuery, Query()],
     ) -> PageResponse[int]:
+        """Expose the common pagination query and response contract."""
         return PageResponse[int](items=[pagination.limit], next_cursor=None)
 
     return application

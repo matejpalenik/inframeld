@@ -67,79 +67,48 @@ The application database and Kratos identities are stored in separate named volu
 
 ---
 
-## Architecture
+## Architecture and component map
 
-The backend is a domain-first modular monolith. Top-level domain packages own their business state and rules; they are not separate services:
+The backend is organized by domain → layer → capability. Start with the [component map, naming conventions, and worked authentication flow](../../docs/development/application-structure.md#component-conventions) before adding or moving a component.
 
 ```text
 src/inframeld_backend/
-├── access/       # principals, project scope, grants, authorization
-├── knowledge/    # sources, document versions, collections, memberships
-├── indexing/     # processing, embeddings, generations, materializations
-├── pipelines/    # immutable RAG configuration, queries, receipts, feedback
-├── evaluation/   # offline cases, runs, evidence, metrics, comparisons
-├── releases/     # deployments, cohorts, promotion, rejection, rollback
-├── shared/       # cross-cutting capabilities; no business-state ownership
-├── composition.py
-├── migrate.py    # operator-controlled migration entry point
-└── main.py
+├── bootstrap/                     # factory, aggregate settings, assembly, lifecycle
+├── access/
+│   ├── domain/                    # Principal, IDs, enums, pure policies
+│   ├── application/
+│   │   ├── authentication/        # service, public operation, verifier/reader ports, DTOs
+│   │   └── authorization/         # service, public operation, target/facts DTOs, reader port
+│   ├── http/authentication/        # routes, response DTO, FastAPI dependency
+│   └── infrastructure/
+│       ├── kratos/                # SDK adapter and provider settings
+│       └── postgres/              # readers and typed row mappings
+├── shared/
+│   ├── application/               # errors, command context, correlation IDs
+│   ├── domain/                    # shared errors and value validation
+│   ├── http/                      # error handling, pagination, correlation, health
+│   └── infrastructure/            # PostgreSQL and observability
+├── main.py                        # executable ASGI entrypoint
+└── migrate.py                     # operator migration entrypoint
 ```
 
-### Package structure
+Knowledge, Indexing, Pipelines, Evaluation, and Releases retain their domain scaffolds. Add their capability modules with actual workflows. Keep shared code limited to genuinely shared technical responsibilities.
 
-Each business package follows onion architecture:
+Application services own business orchestration through explicit protocols. Domain entities, value objects, and policy functions express invariants without I/O. HTTP, PostgreSQL, and provider adapters translate at their boundaries. Bootstrap connects concrete implementations. Do not introduce generic repositories, a command bus, or a class that only provides a namespace.
 
-```text
-knowledge/
-├── domain/          # business rules and values
-├── application/     # commands, queries, and application-owned ports
-├── infrastructure/  # PostgreSQL and other external implementations
-└── api/             # HTTP/MCP-facing adapters for this owner
-```
+`HumanSessionDependency` extracts the cookie and calls `HumanSessionAuthenticator`. `HumanSessionAuthenticationService` verifies the provider session, reads the exact linked principal, applies the active-human policy, and returns `AccessContext`. The session route serializes its `PrincipalId` into the existing `principalId` response. `ActionAuthorizationService` separately requires current project visibility and the exact grant.
 
-Vertical slices live within these rings as use cases are implemented.
+`bootstrap/application_factory.py` constructs the application without network calls. Its lifespan owns database startup/shutdown and actual Kratos SDK pool cleanup, including failed startup. Authentication services and adapters are shared per application, but each identity lookup opens its own short session after Kratos verification. Authorization readers are bound to the caller's transaction session.
 
-Only create files when the corresponding use case requires them. Do not pre-create generic repositories, services, or framework layers.
+UUID identities are runtime value objects, not string or UUID aliases. ORM columns remain UUIDs and enum columns perform real conversion. Adapters explicitly wrap and unwrap values. The immutable `Principal` groups current account state; `AccessContext` retains only the principal ID. The [data model](../../docs/development/data-model.md#implemented-principal-model) explains these distinctions.
 
-Dependencies point inward:
-
-```text
-api -> application -> domain
-infrastructure -> application-owned ports
-composition.py -> concrete implementations and configuration
-```
-
-### Shared code
-
-`shared` is restricted to capabilities used across domains, such as:
-
-- transport errors
-- configuration
-- database lifecycle
-- jobs
-- idempotency
-
-It must not become a second owner of domain state.
-
-The current health route is a cross-cutting HTTP adapter under `shared/http`. Domain and application code may not import it.
-
-Shared technical capabilities use `domain/`, `application/`, and `infrastructure/` only where that separation is genuinely needed.
-
-### Composition
-
-`main.py` is the API entry point.
-
-`migrate.py` is the separate, operator-controlled migration entry point.
-
-`composition.py` is the API composition root. It constructs the application and explicitly wires concrete dependencies.
-
-HTTP, the future worker, Studio, and MCP must invoke the same application use cases. They must not implement parallel business behavior.
-
-These dependency rules are reviewed manually. Automated tests cover product behavior, API contracts, and integrations; do not add repository-structure, import-boundary, or composition-construction tests.
+Schema tools and contract tests import `create_app` directly, without executing `main.py` or running its lifespan. Architecture/import rules remain manually reviewed. Automated tests cover behavior, contracts, and integration outcomes.
 
 ---
 
 ## Configuration
+
+`bootstrap/application_settings.py` aggregates `ApplicationSettings`. `KratosSettings` lives beside the provider adapter, `DatabaseSettings` beside PostgreSQL infrastructure, and logging value definitions beside observability. Their existing environment-variable names and defaults are preserved.
 
 Runtime configuration is loaded from files under `apps/backend`:
 
@@ -213,8 +182,8 @@ The script can also be run directly:
 ./scripts/dev-compose.sh status
 ./scripts/dev-compose.sh check
 ./scripts/dev-compose.sh down
-./scripts/dev-compose.sh test-db-up
-./scripts/dev-compose.sh test-db-down
+./scripts/dev-compose.sh test-services-up
+./scripts/dev-compose.sh test-services-down
 ```
 
 `check` verifies that the development PostgreSQL service is accepting connections. The integration test runner uses separate test-only PostgreSQL and Kratos services.
@@ -342,7 +311,7 @@ When implementing a feature, read the [practical error-handling guide](../../doc
 
 When changing the error-handling foundation itself, read the [maintainer reference](../../docs/development/error-handling-reference.md), which maps the implementation files and behavioral tests.
 
-The backend and integration tests were reported passing at the 23 September 2026 error-handling closeout.
+The reorganization was checked on 26 September 2026 with `pnpm check:backend` (190 passed, 50 service-dependent tests skipped) and `pnpm test:integration` (50 passed). Formatting, strict Pyright, and OpenAPI drift checks passed. The existing Starlette/AnyIO deprecation warning remains.
 
 ---
 
@@ -379,15 +348,17 @@ pnpm test:integration
 
 ### Unit and contract tests
 
-`pnpm check:backend` keeps database integration tests skipped. Unit, health, and OpenAPI checks run without PostgreSQL.
+`pnpm check:backend` keeps service-dependent integration tests skipped. Unit directories mirror production capabilities; strict Pyright also requires explicit `@override`. Unit, health, and OpenAPI checks run without PostgreSQL.
 
 ### Integration tests
+
+CI runs the same `pnpm test:integration` command; there is no separate database-only CI suite.
 
 `pnpm test:integration` starts the application PostgreSQL and Kratos services from `compose.test.yaml`, waits for both, applies the application migrations, and runs all backend integration tests, including the real Kratos browser-flow test. Compose runs the Kratos migration before starting Kratos. The command stops the test services afterward and retains their test-only volumes. It forces the application test database's host, port, name, and credentials, so a database target in `.env.test` cannot redirect application migrations to the development database.
 
 The application test PostgreSQL service listens on `127.0.0.1:15433`; Kratos's public endpoint listens on `127.0.0.1:14433`. Kratos uses its own PostgreSQL service, database role, and `inframeld_test_kratos_postgres_data` volume. Neither test database shares a volume with the development database at `127.0.0.1:15432`.
 
-Application PostgreSQL integration tests create uniquely named tables and databases for their fixtures and clean them up after each test. The Kratos browser-flow test creates an identity with a unique email in Kratos's isolated test database; that identity remains in the retained test volume. Keep the database-specific values in `.env.test` aligned with `.env.test.example` when running tests directly with `pytest`.
+Integration scenarios live under `tests/integration/access`, `postgres`, `kratos`, and `observability`. Typed seed builders, validated browser-flow helpers, and isolated database provisioning live under `tests/support`. Application PostgreSQL tests use temporary databases and Alembic-created fixture tables, cleaned up after each test. The Kratos browser-flow test creates an identity with a unique email in Kratos's isolated test database; that identity remains in the retained test volume. Keep the database-specific values in `.env.test` aligned with `.env.test.example` when running tests directly with `pytest`.
 
 ---
 
@@ -417,7 +388,7 @@ Routes declare applicable errors using:
 problem_responses(definition)
 ```
 
-from `shared/http/problem_openapi.py`.
+from `shared/http/errors/problem_openapi.py`.
 
 Composition installs its narrow media-type correction hook once. FastAPI still generates the native schema and reusable model components.
 

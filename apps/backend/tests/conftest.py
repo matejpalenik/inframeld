@@ -1,3 +1,5 @@
+"""Resolve the backend source package for test imports."""
+
 import os
 from pathlib import Path
 

@@ -1,26 +1,11 @@
 """Verify Access values reject unusable identifiers before they reach persistence."""
 
-import pytest
-from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import class_mapper
+from typing import cast
 
-from inframeld_backend.access.domain.values import (
-    ActionId,
-    IdentityAuthority,
-    IdentitySubject,
-    PrincipalKind,
-    PrincipalStatus,
-    ProjectStatus,
-)
-from inframeld_backend.access.infrastructure.persistence_models import (
-    AccessPersistenceBase,
-    ApplicationAccountRow,
-    HumanIdentityLinkRow,
-    PrincipalRow,
-    ProjectActionGrantRow,
-    ProjectMembershipRow,
-    ProjectRow,
-)
+import pytest
+
+from inframeld_backend.access.domain.action_values import ActionId
+from inframeld_backend.access.domain.identity_values import IdentityAuthority, IdentitySubject
 
 
 @pytest.mark.parametrize("raw", ["", " ", "\t"])
@@ -50,28 +35,10 @@ def test_identity_values_preserve_exact_verified_text() -> None:
     assert IdentitySubject(" Alice ").value == " Alice "
 
 
-@pytest.mark.parametrize(
-    ("row_type", "column_name", "stored_value", "expected"),
-    [
-        (PrincipalRow, "kind", "human", PrincipalKind.HUMAN),
-        (PrincipalRow, "status", "suspended", PrincipalStatus.SUSPENDED),
-        (ProjectRow, "status", "deleting", ProjectStatus.DELETING),
-        (ApplicationAccountRow, "principal_kind", "application", PrincipalKind.APPLICATION),
-        (ProjectMembershipRow, "principal_kind", "application", PrincipalKind.APPLICATION),
-        (ProjectActionGrantRow, "recipient_kind", "human", PrincipalKind.HUMAN),
-        (HumanIdentityLinkRow, "principal_kind", "human", PrincipalKind.HUMAN),
-    ],
-)
-def test_access_enum_columns_round_trip_existing_string_values(
-    row_type: type[AccessPersistenceBase], column_name: str, stored_value: str, expected: object
+@pytest.mark.parametrize("value_type", [IdentityAuthority, IdentitySubject, ActionId])
+def test_string_values_reject_nontext_input(
+    value_type: type[IdentityAuthority] | type[IdentitySubject] | type[ActionId],
 ) -> None:
-    """ORM enum columns read typed members and keep their existing stored strings."""
-    column_type = class_mapper(row_type).columns[column_name].type
-    dialect = postgresql.dialect()
-    read_value = column_type.result_processor(dialect, None)
-    bind_value = column_type.bind_processor(dialect)
-
-    assert read_value is not None
-    assert bind_value is not None
-    assert read_value(stored_value) is expected
-    assert bind_value(expected) == stored_value
+    """Reject nontext input that bypasses static checks without accidentally coercing identity."""
+    with pytest.raises(TypeError):
+        value_type(cast(str, 42))

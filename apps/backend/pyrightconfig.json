@@ -13,5 +13,6 @@
       "root": ".",
       "extraPaths": ["src"]
     }
-  ]
+  ],
+  "reportImplicitOverride": "error"
 }

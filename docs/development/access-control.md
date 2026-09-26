@@ -12,6 +12,7 @@ This guide follows Alice and SupportBot through those decisions. Start with sect
 | --- | --- |
 | What does someone need to use a document? | [1. Three separate checks](#the-model) |
 | What do Kratos and Inframeld each do? | [2. Signing in and checking permissions](#architecture) |
+| Which human-session components exist now? | [Implemented authentication boundary](#implemented-human-authentication) |
 | How is a question answered safely? | [3. Follow a query](#query-flow) |
 | How can people share access? | [4. Membership, permissions, and visibility](#sharing) |
 | Who can upload, change, or delete documents? | [5. Document operations](#documents) |
@@ -91,7 +92,7 @@ flowchart TB
 
 **Access owns the permission rules.** An application use case, such as answering a question, asks Access for permission as it carries out the work. An adapter translates between application concepts and an external system. For example, the Kratos adapter checks a session, and the vector adapter turns the permitted document selection into search filters. HTTP endpoints, MCP tools, and workers use the same Access rules. Indexing, pipeline configuration, and model-provider integration keep their own responsibilities.
 
-The verified caller and the project or resources involved travel together in an application-owned **access context**. It is not a raw Kratos response, database object, or permission list supplied by a client. V1 integrations act as their application account. Acting on behalf of a separately verified person is a future feature.
+The verified caller travels in an application-owned **access context**. The current implementation retains only `PrincipalId`; typed operation inputs separately identify the project or resource. It is not a raw Kratos response, database object, or permission list supplied by a client. V1 integrations act as their application account. Acting on behalf of a separately verified person is a future feature.
 
 <a id="section-use-kratoss-browser-session-flow-for-studio"></a> <a id="section-include-deployment-level-external-sign-in-in-oss-v1"></a>
 
@@ -109,7 +110,26 @@ Kratos maintains these links. Inframeld identifies its verified Kratos identity 
 
 **Ory Hydra is not needed for this sign-in flow.** It addresses a different task, issuing OAuth/OIDC tokens. Issuing tokens, obtaining consent, exchanging tokens, and verified user delegation are deferred. Any future token would still lead to the same Inframeld permission checks.
 
-If a session is invalid, expired, or cannot be verified, Inframeld denies the request. It does not continue when Kratos is unavailable. Logout, account recovery, disabled identities, multi-factor authentication (MFA), secure first-administrator setup, and email configuration still need deployment integration and testing.
+If a session is invalid, expired, or cannot be verified, Inframeld denies the request. It does not continue when Kratos is unavailable. Browser logout rejection and disabled/expired session handling have backend coverage described below. Complete Studio logout and recovery, multi-factor authentication (MFA), secure first-administrator setup, and email configuration still need deployment integration and testing.
+
+<a id="implemented-human-authentication"></a>
+
+### Implemented human-session boundary
+
+The backend now exposes `GET /v1/session`. Its [component map and request flow](application-structure.md#authentication-flow) identify each service, protocol, adapter, and resource owner. `HumanSessionDependency` is a callable FastAPI dependency. `HumanSessionAuthenticationService` owns provider verification and local account admission.
+
+Kratos returns a verified authority/subject pair. An independent PostgreSQL lookup returns the [immutable Principal](data-model.md#implemented-principal-model) with ID, organization, kind, and current status. The service applies the pure active-human policy and returns an `AccessContext` containing only `PrincipalId`. It does not create an account, match an email, or cache a permission snapshot.
+
+| Condition | Current HTTP result |
+| --- | --- |
+| Missing, rejected, inactive, or expired browser session | Generic 401 problem |
+| Verified identity with no local link, suspended/retired human, or non-human principal | 403 `access_denied` |
+| Unavailable/malformed provider response or absent Kratos configuration | 503 `dependency_unavailable` |
+| Active provider identity linked to an active local human | 200 with the existing `principalId` field |
+
+Authentication services can be shared between requests: each lookup owns its short read session and starts after provider verification. `ActionAuthorizationService` separately reads current project facts in the caller's transaction. It preserves the hidden-target 404 / visible-but-denied 403 distinction and exact project/action matching. Other target types arrive with their owning behavior.
+
+The real [Kratos browser tests](../../apps/backend/tests/integration/kratos/test_kratos_browser_flow.py) cover registration, login, and logout rejection. [PostgreSQL identity tests](../../apps/backend/tests/integration/access/test_human_identity_resolution_postgres.py) cover exact pair matching, account-state refresh, and concurrent authentication. [API integration tests](../../apps/backend/tests/integration/access/test_current_human_session.py) exercise the cookie-to-local-principal route and missing configuration. This foundation does not complete Studio account screens, application-key authentication, application CSRF protection, recovery, or Access administration workflows.
 
 <a id="section-introduce-a-general-authorization-engine-or-policy-language-now"></a>
 

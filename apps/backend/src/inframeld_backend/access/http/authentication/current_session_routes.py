@@ -1,0 +1,45 @@
+"""Expose the authenticated local human to the browser client."""
+
+from http import HTTPStatus
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+
+from inframeld_backend.access.application.access_context import AccessContext
+from inframeld_backend.access.http.authentication.current_session_response import (
+    CurrentSessionResponse,
+)
+from inframeld_backend.access.http.authentication.human_session_dependency import (
+    HumanSessionDependency,
+)
+from inframeld_backend.shared.http.errors.problem_definitions import (
+    ACCESS_DENIED_PROBLEM,
+    DEPENDENCY_UNAVAILABLE_PROBLEM,
+)
+from inframeld_backend.shared.http.errors.problem_mapper import for_http_status
+from inframeld_backend.shared.http.errors.problem_openapi import problem_responses
+
+
+def create_session_router(authenticate: HumanSessionDependency) -> APIRouter:
+    """Register the current-session endpoint using the supplied authentication dependency."""
+    router = APIRouter(prefix="/v1")
+
+    @router.get(
+        "/session",
+        tags=["access"],
+        # Preserve the published schema while keeping internal purpose documentation.
+        openapi_extra={"description": None},
+        operation_id="getCurrentSession",
+        responses=(
+            problem_responses(for_http_status(HTTPStatus.UNAUTHORIZED))
+            | problem_responses(ACCESS_DENIED_PROBLEM)
+            | problem_responses(DEPENDENCY_UNAVAILABLE_PROBLEM)
+        ),
+    )
+    async def current_session(
+        access: Annotated[AccessContext, Depends(authenticate)],
+    ) -> CurrentSessionResponse:
+        """Convert the admitted caller's principal ID to the existing public session response."""
+        return CurrentSessionResponse(principal_id=access.actor_principal_id.value)
+
+    return router

@@ -1,11 +1,14 @@
+"""Verify the public health response remains available without authenticated identity."""
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from inframeld_backend.composition import create_app
+from inframeld_backend.bootstrap.application_factory import create_app
+from inframeld_backend.bootstrap.application_settings import get_settings
 from inframeld_backend.main import app
-from inframeld_backend.shared.infrastructure.database import DatabaseStartupError
-from inframeld_backend.shared.infrastructure.settings import DatabaseSettings, get_settings
+from inframeld_backend.shared.infrastructure.postgres.database import DatabaseStartupError
+from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
 
 client = TestClient(app)
 

@@ -2,6 +2,8 @@
 
 from typing import ClassVar
 
+from inframeld_backend.shared.application.application_error_code import ApplicationErrorCode
+
 
 class ApplicationError(Exception):
     """Represent a deliberate application-layer operation failure.
@@ -15,7 +17,7 @@ class ApplicationError(Exception):
         message: Developer-authored diagnostic explanation.
     """
 
-    code: ClassVar[str] = "application_error"
+    code: ClassVar[ApplicationErrorCode] = ApplicationErrorCode.APPLICATION_ERROR
 
     def __init__(self, message: str) -> None:
         """Initialize an application failure without transport side effects.

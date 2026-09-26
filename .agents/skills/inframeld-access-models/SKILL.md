@@ -21,6 +21,8 @@ Default to read-only guidance. Loading this skill grants no editing, grant chang
 
 - For manager appointment, demotion, removal, and recovery, read [group management](../../../docs/development/access-control.md#group-managers), its [record constraint](../../../docs/development/data-model.md#group-manager-membership-constraint), and [ADR-0049](../../../docs/adr/ADR-0049-require-group-managers-to-be-ordinary-members.md).
 
+- For code organization or component responsibilities, read [the component map and conventions](../../../docs/development/application-structure.md#component-conventions) and [the implemented authentication flow](../../../docs/development/application-structure.md#authentication-flow), together with root `AGENTS.md`. Services own orchestration; explicit protocols, immutable runtime IDs, cohesive entities, typed DTOs and boundary conversions keep contracts readable. Preserve the read-only default, required override checking, and manual architecture review.
+
 ## Essential boundaries
 
 A principal is a stable human or application identity. Project membership, document-group reading, group management, and action grants are separate. A caller needs current account/membership/credential validity as well as the required action and document access. Default to denial; do not accept caller-supplied authoritative groups or permissions. Kratos verifies human identity, not product grants.
@@ -36,6 +38,8 @@ The Access schema uses shared principals with a small project-bound application 
 Keep policy in Access and PostgreSQL for v1. OpenFGA and PyCasbin were considered but not selected. Do not add a generic policy language, speculative engine adapter, or authorization cache without a demonstrated need. The [recorded engine comparison](../../../docs/development/access-control.md#section-introduce-a-general-authorization-engine-or-policy-language-now) preserves the actual reconsideration criteria.
 
 All remote model calls use ModelGateway and approved destinations, including embeddings, generation, judges, probes, and repair calls. Check embedding and generation capabilities separately. The operator-approved local Ollama HTTP exception is credential-free; any connection needing an authentication secret uses certificate-verified HTTPS. Credential-only replacement preserves connection meaning but invalidates the relevant probe status. Changed endpoint origin needs a new connection and explicit credential provision; never forward a saved secret to it automatically. PostgreSQL/PyNaCl authenticated encryption with a separate persistent root key is accepted; fail closed and keep plaintext resolution narrow.
+
+The [implemented human-session boundary](../../../docs/development/access-control.md#implemented-human-authentication) records current outcomes and evidence. Read [the Principal model](../../../docs/development/data-model.md#implemented-principal-model) before changing account-state contracts. Authentication looks up state in a fresh session after provider verification; authorization readers remain bound to the caller's transaction. Do not put status or grants into `AccessContext`.
 
 ## Explain and review
 
