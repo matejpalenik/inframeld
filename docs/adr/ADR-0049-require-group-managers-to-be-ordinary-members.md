@@ -45,4 +45,4 @@ Use the existing Access records and write coordination. No new service, authoriz
 - [ADR-0019: scoped recovery](ADR-0019-permit-emergency-suspension-with-scoped-operator-recovery.md), retained.
 - [ADR-0022: transactional Access coordination](ADR-0022-coordinate-access-writes-by-project-with-scope-revisions.md), reused.
 
-Implementation and behavioral qualification are pending. This documentation change does not implement a migration or claim that the constraint and workflows have passed tests.
+The initial migration enforces matching group membership. PostgreSQL integration tests cover that constraint and the human-only manager rule. Appointment, demotion, removal, recovery, and concurrent-write workflows still need implementation and behavioral qualification.

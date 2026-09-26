@@ -2,7 +2,7 @@
 
 **Status:** Proposed | Accepted | Accepted provisional baseline | Superseded by ADR-NNNN
 
-**Date:** YYYY-MM-DD. Use the decision date when known. If it is unknown, use the date this ADR was written.
+**Date:** YYYY-MM-DD. Use the recorded decision date when known. If it was not recorded, use the date this ADR was written and say in Context that the original decision date is unknown. Do not present the writing date as a known historical decision date.
 
 ## Context and Problem Statement
 

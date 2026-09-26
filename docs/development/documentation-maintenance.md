@@ -35,7 +35,7 @@ For example, storing current permissions separately from audit history is an arc
 
 1. Check the [decision index](../adr/README.md) and the relevant guide. Find out whether the question is already decided, still proposed, or an implementation detail within an accepted choice.
 2. For a new architectural choice, copy the [ADR template](../adr/template.md), allocate the next unused ID, and give it a specific title. Explain the problem and the actual options in language a new contributor can follow.
-3. Record the status and the known decision date. If a date or historical comparison was not recorded, say so. Do not invent a rejected alternative, a benchmark result, or a precise date to fill the template.
+3. Record the status and the known decision date. If the original decision date was not recorded, use the ADR's writing date in the Date field and say in Context that the original date is unknown. Do not invent a rejected alternative, a benchmark result, or a historical date.
 4. Keep the decision focused. If two choices can change independently, consider separate ADRs. Length is a reason to review the scope, not a word limit. Move schemas, procedures, extensive examples, and teaching material into their owning references.
 5. When an accepted choice changes, create a new ADR that explicitly supersedes the old one. Update the old record’s status and links so readers can follow the history. Do not rewrite the old rationale to make the new choice look inevitable.
 6. Update the current guide, affected data-model sections, index, architecture introduction where needed, and relevant skills together. Ordinary corrections and navigation improvements can update an existing ADR without pretending a new decision was made.

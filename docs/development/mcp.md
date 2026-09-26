@@ -221,9 +221,11 @@ https://<installation>/mcp/
 
 TLS protects the HTTPS connection. The reverse proxy is the installation's existing public entry point.
 
-Use **`MCPServer.streamable_http_app()`** with **`json_response=True`**. Set **`stateless_http=True`** for the SDK's older-protocol compatibility path.
+Use the official SDK's low-level **`Server`** with only **`on_list_tools`** and **`on_call_tool`** handlers. In the [pinned SDK 2.2.0](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/advanced/low-level-server.md), the higher-level `MCPServer` advertises prompts, resources, and subscriptions even when Inframeld registers no such content. The low-level server advertises only the handler families it serves. Validate tool arguments against their advertised schemas before calling the application, because the low-level server does not do that validation automatically.
 
-Create the sub-application before accessing its session manager. Run **`mcp.session_manager.run()`** inside FastAPI's existing startup/shutdown lifecycle, called its lifespan. The mounted application's lifespan alone does not do this. Keep the normal API routes and shutdown order.
+Create the sub-application with **`server.streamable_http_app(json_response=True, stateless_http=True)`**. The stateless setting supports the SDK's older-protocol compatibility path.
+
+Create the sub-application before accessing its session manager. Run **`server.session_manager.run()`** inside FastAPI's existing startup/shutdown lifecycle, called its lifespan. The mounted application's lifespan alone does not do this. Keep the normal API routes and shutdown order.
 
 Use the official SDK rather than adding a second community wrapper framework.
 
@@ -281,7 +283,7 @@ Hydra and verified user delegation remain deferred unless separately approved. H
 | Area | Required qualification |
 | --- | --- |
 | **Hosting and lifecycle** | Run real HTTP tests through the TLS proxy and mounted FastAPI lifespan. Exercise startup, shutdown, and exact endpoint paths. An in-memory SDK test does not test the deployed authentication boundary. |
-| **Protocol and limits** | Test current-version metadata/header mismatches, unsupported versions, legacy stateless negotiation, bounded bodies/timeouts, and absence of unintended tools/capabilities. Verify JSON and structured-result handling with each supported client version. |
+| **Protocol and limits** | Test current-version metadata/header mismatches, unsupported versions, legacy stateless negotiation, and bounded bodies/timeouts. Confirm discovery advertises only tools, rejects unsupported prompt/resource/subscription calls, and validates malformed tool arguments. Verify JSON and structured-result handling with each supported client version. |
 | **Authentication and transport security** | Test missing, expired, revoked, wrong-resource, and insufficient-scope tokens, invalid Host/Origin, missing Origin with valid server-client credentials, and rejection of cookie-only access. |
 | **Scope and application parity** | Reject forged users/groups and cross-project Deployment/receipt IDs. Prove HTTP/MCP equivalence for group revocation, deleted citations, model-gateway routing, canary affinity, missing affinity, and credential rotation. |
 | **Retries and interrupted requests** | Race identical query keys, disconnect before and after provider dispatch, retry completed queries, and change input under the same key. Verify no automatic second model call and no durable full-answer replay cache. |

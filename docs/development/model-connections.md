@@ -95,7 +95,7 @@ This permits approved private customer gateways without giving ordinary users un
 | --- | --- |
 | **URL structure** | Validate the scheme, hostname, port, and normalized base path. Also validate the actual destination, not just the displayed URL. |
 | **Remote transport** | Require TLS certificate verification. TLS protects the connection and verifies the endpoint's certificate. Mount a customer certificate authority (CA) when its private service requires custom trust. Do not disable verification. |
-| **Local HTTP exception** | Explicitly operator-approved local Ollama over HTTP is a narrow exception. It is not permission to use unverified remote endpoints. |
+| **Local HTTP exception** | Explicitly operator-approved local Ollama over HTTP is allowed only without a provider credential or other authentication secret. Never attach a saved key or authorization header to this cleartext connection. If authentication is needed, create an approved HTTPS connection with certificate verification. This exception does not permit unverified remote endpoints. |
 | **Credentials in URLs** | Reject URL user-info, such as an embedded username/password, and credential-bearing query strings. |
 | **Redirects** | Reject redirects to a different origin. |
 | **Forbidden destinations** | Reject link-local and cloud-metadata addresses. These are not made acceptable merely by supporting private endpoints. |
@@ -217,6 +217,8 @@ Admitted build, query, or evaluation
 ```
 
 Resolve the key separately for each limited call. Avoid long-lived plaintext caches and unnecessary copies. Python cannot guarantee immediate erasure of every memory byte when a call finishes, so do not claim that guarantee.
+
+Check the transport again before dispatch. Reject a local HTTP call if it would carry a saved provider credential or another authentication secret, even if the connection was previously approved. A credential-free local endpoint may still be used through the narrow HTTP exception.
 
 Keep keys out of provider debug output, exception messages, and traces. Jobs carry connection references. Plaintext never belongs in Pipeline or profile snapshots, benchmark or evaluator revisions, logs, evaluation evidence, answer receipts, or API responses.
 
@@ -351,6 +353,7 @@ Choose and pin LiteLLM during implementation, then test that version. This guide
 | Area | Required verification |
 | --- | --- |
 | **Private endpoint support** | Exercise an OpenAI-compatible private test server using a custom CA and configured egress allowlists. |
+| **Local HTTP exception** | Permit an approved local Ollama endpoint without credentials. Reject configuration and dispatch that would send a provider key or authorization header over HTTP. |
 | **Provider mappings** | Exercise the selected OpenAI and Ollama mappings through the embedded adapter. |
 | **Response validation** | Reject malformed or incompatible responses, wrong embedding dimensions, non-finite values, invalid identities, and unsupported operations. |
 | **Independent role validation** | Verify chat and embeddings separately. Successful generation must not be treated as proof of working embeddings or correct dimensions. |

@@ -18,9 +18,9 @@ These options summarize the recorded choices, exclusions, and deferrals. They do
 
 ## Decision Outcome
 
-**Current qualification:** the original group-manager rule below permitted managers without ordinary membership. [ADR-0049](ADR-0049-require-group-managers-to-be-ordinary-members.md), accepted on 25 September 2026, replaces that eligibility rule. Every manager must now have an explicit ordinary membership in the same group. The bounded action grants, peer management, and handover rules remain accepted.
+**Current qualification:** an earlier version of this decision permitted group managers without ordinary membership. [ADR-0049](ADR-0049-require-group-managers-to-be-ordinary-members.md), accepted on 25 September 2026, replaces that eligibility rule. Every manager must now have an explicit ordinary membership in the same group. The bounded action grants, peer management, and handover rules remain accepted.
 
-Use the two accepted grant levels and the fixed action catalogue. Humans can receive grant authority; applications can only use eligible actions. Require current authority for the action and exact scope being changed. Keep peer group managers distinct from ordinary group members. Enforce ordinary last-manager/grantor handover and explicit creator assignments without implicit document-read access.
+Use the two accepted grant levels and the fixed action catalogue. Humans can receive grant authority; applications can only use eligible actions. Require current authority for the action and exact scope being changed. Keep group management authority separate from ordinary membership: every manager is also a member, but membership alone does not make someone a manager. Enforce ordinary last-manager/grantor handover and explicit creator assignments without an implicit document-read bypass.
 
 **Example.** Alice can grant Manage releases on A without being able to release B. Bob’s grant survives Alice’s departure unless an authorized operation separately removes Bob’s assignment.
 

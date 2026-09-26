@@ -18,7 +18,7 @@ These options summarize the recorded choices, exclusions, and deferrals. They do
 
 ## Decision Outcome
 
-Send model traffic only through approved connections and the documented destination checks. Validate the configured origin and actual destination, preserve TLS/custom-CA controls, and bound capabilities. A per-request URL is not a connection. Changing endpoint meaning requires deliberate connection handling and fresh credential provision, not forwarding an old secret automatically.
+Send model traffic only through approved connections and the documented destination checks. Validate the configured origin and actual destination, preserve TLS/custom-CA controls, and bound capabilities. The operator-approved local Ollama HTTP exception is credential-free; a connection that needs an authentication secret must use certificate-verified HTTPS. A per-request URL is not a connection. Changing endpoint meaning requires deliberate connection handling and fresh credential provision, not forwarding an old secret automatically.
 
 **Example.** Changing a connection from one origin to another must not silently send the first provider’s saved key to the second origin.
 

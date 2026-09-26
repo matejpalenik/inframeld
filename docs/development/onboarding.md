@@ -144,7 +144,7 @@ Manage releases covers publication, rollback, canaries, mode switches, and autom
 
 Save who requested the update and the authority under which it was accepted. Check current project or resource scope and permissions again before sending work and before publishing. A job cannot publish using permission its requester has since lost.
 
-The starter creator receives explicit permissions for the starter resources and required project creation actions. They must cover the selected Pipeline and Deployment, or the [initial creation](onboarding.md#model). Someone with upload-only permission may save source changes through that operation, but Studio must explain that applying them needs an authorized person. Upload or Query never includes release permission.
+The starter creator receives explicit permissions for the starter project and resources, including Build on the selected Pipeline. Before the first Deployment exists, publication also requires Create Deployment. Creating it assigns Manage releases on that new Deployment; later updates require current Manage releases on that exact Deployment. The installation-level Create projects permission is separate. Starter setup neither needs nor grants it. Someone with upload-only permission may save source changes, but Studio must explain that applying them needs an authorized person. Upload or Query never includes release permission.
 
 When several automatic Deployments use one collection, the operation names each target it may update. Each has its own request and outcome. There is no all-Deployment transaction or use of another person's release permissions.
 
