@@ -13,19 +13,25 @@ from inframeld_backend.access.application.access_authorizer import (
     CurrentActionFacts,
 )
 from inframeld_backend.access.domain.authorization import ActionAuthorizationFacts
+from inframeld_backend.access.domain.values import (
+    ActionId,
+    ActionTargetKind,
+    PrincipalId,
+    ProjectId,
+)
 from inframeld_backend.shared.application.errors import AccessDeniedError, ResourceNotFoundError
 
-PRINCIPAL_ID = UUID("00000000-0000-0000-0000-000000000001")
-PROJECT_ID = UUID("00000000-0000-0000-0000-000000000002")
+PRINCIPAL_ID = PrincipalId(UUID("00000000-0000-0000-0000-000000000001"))
+PROJECT_ID = ProjectId(UUID("00000000-0000-0000-0000-000000000002"))
 PIPELINE_ID = UUID("00000000-0000-0000-0000-000000000003")
 
 ACCESS = AccessContext(actor_principal_id=PRINCIPAL_ID)
 TARGET = ActionTarget(
     project_id=PROJECT_ID,
-    target_kind="pipeline",
+    target_kind=ActionTargetKind.PIPELINE,
     target_id=PIPELINE_ID,
 )
-ACTION = "build"
+ACTION = ActionId("build")
 
 
 @final
@@ -34,10 +40,10 @@ class MockActionFactsReader(ActionFactsReader):
 
     def __init__(self, facts: CurrentActionFacts) -> None:
         self._facts = facts
-        self.last_request: tuple[AccessContext, str, ActionTarget] | None = None
+        self.last_request: tuple[AccessContext, ActionId, ActionTarget] | None = None
 
     async def read_action_facts(
-        self, *, access: AccessContext, action: str, target: ActionTarget
+        self, *, access: AccessContext, action: ActionId, target: ActionTarget
     ) -> CurrentActionFacts:
         """Record the requested scope and return this test's configured facts."""
         self.last_request = (access, action, target)

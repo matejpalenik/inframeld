@@ -18,6 +18,16 @@ When asked for a pull request title, description, or creation, first read [.gith
 
 When showing code, always show it in enough context for the developer to apply it without guessing. Every snippet must identify its exact file path and whether it replaces existing code, is inserted before or after a named line, or is a complete new file. Include the relevant imports and the surrounding function, method, class, or configuration section; do not show unexplained isolated lines when placement affects behavior. For multi-file changes, separate snippets by file and explain how they connect. Clearly label illustrative pseudocode versus code intended to be copied verbatim. Preserve existing behavior unless the snippet explicitly identifies a behavior change.
 
+## Typed database access
+
+Generated application and test code must use SQLAlchemy typed ORM mappings and expression APIs for database reads and writes. Do not generate raw SQL strings or `text()` queries. Use Alembic operations for schema changes. If a required operation cannot be expressed this way, explain the limitation and ask for an explicit exception.
+
+## Strongly typed application values
+
+In generated or suggested application code and tests, favor application-owned types over raw strings for values with defined meaning. Use enums or `Literal` types for closed vocabularies, such as principal kinds and statuses. Use distinct value types for semantically different identifiers and open values, such as identity authorities and subjects, when mixing them would be a meaningful error. Parse and validate strings at HTTP, provider, configuration, and persistence boundaries; convert typed values back to strings at those boundaries. Preserve existing wire and database values, and ensure ORM mappings perform real type conversion rather than only changing annotations. Keep plain strings for free-form text and vocabularies whose values are not yet defined.
+
+For UUID-backed identities, strongly prefer distinct application-owned ID types, such as `PrincipalId`, `ProjectId`, and `OrganizationId`, in domain and application contracts, call sites, and tests. Use a bare `UUID` when the entity kind is genuinely unknown. Parse external input as a UUID before constructing the appropriate ID type, and convert UUIDs returned by persistence adapters at that boundary. Keep ORM columns mapped as UUIDs. Run the static type checker to catch IDs passed to the wrong contract; entity existence, scope, and authorization still require their normal checks.
+
 ## TDD sequencing
 
 Follow test-driven development for new behavior and bug fixes, but make the test workflow ergonomic and executable:
@@ -37,6 +47,8 @@ Whenever generating or changing test code, include a concise module docstring in
 ## Implementing Python protocols
 
 Any concrete class, adapter, fake, or test double intended to implement a Python `Protocol` must explicitly name that protocol as a base class. Do not rely on structural typing alone in this repository. For example, write `class FixedActionFactsReader(ActionFactsReader):`. Implement every required protocol member with a compatible signature. Explicit inheritance documents the intended contract and lets static type checkers check member compatibility. When an implementation must provide a method, mark that protocol method with `@abstractmethod`; otherwise an IDE may treat the protocol method as an inherited default and may not flag its absence.
+
+Put shared purpose and behavior on `Protocol` classes and methods. Concrete implementations should document only details beyond that contract. Keep the existing docstring requirements for tests, fixtures, and helpers.
 
 ## Repository setup test policy
 

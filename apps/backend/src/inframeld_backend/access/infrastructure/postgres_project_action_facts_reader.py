@@ -10,6 +10,12 @@ from inframeld_backend.access.application.access_authorizer import (
     CurrentActionFacts,
 )
 from inframeld_backend.access.domain.authorization import ActionAuthorizationFacts
+from inframeld_backend.access.domain.values import (
+    ActionId,
+    ActionTargetKind,
+    PrincipalStatus,
+    ProjectStatus,
+)
 from inframeld_backend.access.infrastructure.persistence_models import (
     PrincipalRow,
     ProjectActionGrantRow,
@@ -35,11 +41,14 @@ class PostgresProjectActionFactsReader(ActionFactsReader):
         self._session = session
 
     async def read_action_facts(
-        self, *, access: AccessContext, action: str, target: ActionTarget
+        self, *, access: AccessContext, action: ActionId, target: ActionTarget
     ) -> CurrentActionFacts:
         """Return current access facts for a project target"""
 
-        if target.target_kind != "project" or target.target_id != target.project_id:
+        if (
+            target.target_kind is not ActionTargetKind.PROJECT
+            or target.target_id != target.project_id
+        ):
             return _HIDDEN_TARGET_FACTS
 
         is_project_member = exists().where(
@@ -50,17 +59,17 @@ class PostgresProjectActionFactsReader(ActionFactsReader):
         has_exact_action_grant = exists().where(
             ProjectActionGrantRow.project_id == ProjectRow.id,
             ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
-            ProjectActionGrantRow.action == action,
+            ProjectActionGrantRow.action == action.value,
         )
 
         statement = (
             select(
-                (PrincipalRow.status == "active").label("principal_is_active"),
+                (PrincipalRow.status == PrincipalStatus.ACTIVE).label("principal_is_active"),
                 is_project_member.label("is_project_member"),
                 has_exact_action_grant.label("has_exact_action_grant"),
                 and_(
-                    ProjectRow.status == "active",
-                    PrincipalRow.status == "active",
+                    ProjectRow.status == ProjectStatus.ACTIVE,
+                    PrincipalRow.status == PrincipalStatus.ACTIVE,
                     is_project_member,
                 ).label("target_is_visible"),
             )

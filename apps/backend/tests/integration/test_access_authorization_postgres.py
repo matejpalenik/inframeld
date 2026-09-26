@@ -11,6 +11,7 @@ from inframeld_backend.access.application.access_authorizer import (
     ActionTarget,
 )
 from inframeld_backend.access.domain.authorization import ActionAuthorizationFacts
+from inframeld_backend.access.domain.values import ActionTargetKind, PrincipalKind, PrincipalStatus
 from inframeld_backend.access.infrastructure.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
 )
@@ -39,7 +40,7 @@ async def test_allows_member_with_exact_project_action_grant(database: Database)
             action=scenario.action,
             target=ActionTarget(
                 project_id=scenario.project_id,
-                target_kind="project",
+                target_kind=ActionTargetKind.PROJECT,
                 target_id=scenario.project_id,
             ),
         )
@@ -63,7 +64,7 @@ async def test_returns_hidden_facts_for_active_nonmember(database: Database) -> 
                 action=scenario.action,
                 target=ActionTarget(
                     project_id=scenario.project_id,
-                    target_kind="project",
+                    target_kind=ActionTargetKind.PROJECT,
                     target_id=scenario.project_id,
                 ),
             )
@@ -73,7 +74,7 @@ async def test_returns_hidden_facts_for_active_nonmember(database: Database) -> 
             action=scenario.action,
             target=ActionTarget(
                 project_id=scenario.project_id,
-                target_kind="project",
+                target_kind=ActionTargetKind.PROJECT,
                 target_id=scenario.project_id,
             ),
         )
@@ -103,7 +104,7 @@ async def test_denies_project_member_without_exact_action_grant(database: Databa
                 action=scenario.action,
                 target=ActionTarget(
                     project_id=scenario.project_id,
-                    target_kind="project",
+                    target_kind=ActionTargetKind.PROJECT,
                     target_id=scenario.project_id,
                 ),
             )
@@ -119,7 +120,7 @@ async def test_hides_suspended_project_member_even_with_an_action_grant(
             session,
             is_project_member=True,
             has_action_grant=True,
-            principal_status="suspended",
+            principal_status=PrincipalStatus.SUSPENDED,
         )
         authorizer = AccessAuthorizer(PostgresProjectActionFactsReader(session))
 
@@ -129,7 +130,7 @@ async def test_hides_suspended_project_member_even_with_an_action_grant(
                 action=scenario.action,
                 target=ActionTarget(
                     project_id=scenario.project_id,
-                    target_kind="project",
+                    target_kind=ActionTargetKind.PROJECT,
                     target_id=scenario.project_id,
                 ),
             )
@@ -148,7 +149,7 @@ async def test_project_action_grant_does_not_carry_to_another_project(database: 
             action=scenario.action,
             target=ActionTarget(
                 project_id=scenario.granted_project_id,
-                target_kind="project",
+                target_kind=ActionTargetKind.PROJECT,
                 target_id=scenario.granted_project_id,
             ),
         )
@@ -159,7 +160,7 @@ async def test_project_action_grant_does_not_carry_to_another_project(database: 
                 action=scenario.action,
                 target=ActionTarget(
                     project_id=scenario.ungranted_project_id,
-                    target_kind="project",
+                    target_kind=ActionTargetKind.PROJECT,
                     target_id=scenario.ungranted_project_id,
                 ),
             )
@@ -175,7 +176,7 @@ async def test_allows_application_principal_with_its_exact_project_action_grant(
             session,
             is_project_member=True,
             has_action_grant=True,
-            principal_kind="application",
+            principal_kind=PrincipalKind.APPLICATION,
         )
         authorizer = AccessAuthorizer(PostgresProjectActionFactsReader(session))
 
@@ -184,7 +185,7 @@ async def test_allows_application_principal_with_its_exact_project_action_grant(
             action=scenario.action,
             target=ActionTarget(
                 project_id=scenario.project_id,
-                target_kind="project",
+                target_kind=ActionTargetKind.PROJECT,
                 target_id=scenario.project_id,
             ),
         )
