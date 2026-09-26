@@ -4,7 +4,7 @@ The Inframeld backend is a typed FastAPI application. It owns the HTTP API, its 
 
 ## Quick start
 
-For normal local development, run PostgreSQL in Compose and the backend directly on your host.
+For normal local development, run PostgreSQL and Kratos in Compose and the backend directly on your host.
 
 From a clean checkout, install the committed dependencies from the repository root:
 
@@ -33,7 +33,7 @@ cp apps/backend/.env.test.example apps/backend/.env.test
 
 Keep `.env.test` in the ignored local configuration; it is not committed.
 
-### 2. Start PostgreSQL
+### 2. Start PostgreSQL and Kratos
 
 ```bash
 pnpm dev:db
@@ -63,7 +63,7 @@ When you're finished, stop the development containers with:
 pnpm dev:db:down
 ```
 
-Your PostgreSQL data is stored in a named volume and is preserved when the containers are stopped.
+The application database and Kratos identities are stored in separate named volumes and are preserved when the containers are stopped. Kratos's public endpoint is at http://127.0.0.1:14434.
 
 ---
 
@@ -147,8 +147,8 @@ Runtime configuration is loaded from files under `apps/backend`:
 - `.env.test` — used when `INFRAMELD_ENVIRONMENT=test`
 - `INFRAMELD_TEST_ENV_FILE` — selects another test environment file; relative paths are resolved from `apps/backend`
 - `INFRAMELD_*` environment variables — override values loaded from dotenv files
-- `.env.example` — documents non-secret local development defaults and may be copied to `.env`
-- `.env.test.example` — documents the isolated PostgreSQL integration-test defaults and may be copied to `.env.test`
+- `.env.example` — documents local development database and Kratos defaults and may be copied to `.env`
+- `.env.test.example` — documents isolated integration-test database and Kratos defaults and may be copied to `.env.test`
 
 For the local Compose database, the relevant values are:
 
@@ -158,17 +158,19 @@ INFRAMELD_DATABASE__PORT=15432
 INFRAMELD_DATABASE__NAME=inframeld
 INFRAMELD_DATABASE__USER=inframeld
 INFRAMELD_DATABASE__PASSWORD=inframeld-dev-only
+INFRAMELD_KRATOS__PUBLIC_URL=http://127.0.0.1:14434
+INFRAMELD_KRATOS__AUTHORITY=kratos:local
 ```
 
 Do not commit `.env` or `.env.test`.
 
-The development password above is only a local Compose credential and must not be reused in production.
+The development passwords and Kratos secrets are only for local Compose and must not be reused in production. Kratos settings are optional until the HTTP authentication dependency is wired into the backend application.
 
 ---
 
-## Database
+## Development services
 
-The development PostgreSQL service is managed by the root `compose.dev.yaml`.
+The application PostgreSQL and Kratos services are managed by the root `compose.dev.yaml`. Kratos uses its own PostgreSQL service, `kratos_dev` database role, and `inframeld_kratos_postgres_data` volume, separate from the application database. Its public API is available on `127.0.0.1:14434`; its admin API stays inside the Compose network.
 
 PostgreSQL is exposed to the host only at:
 
@@ -176,27 +178,29 @@ PostgreSQL is exposed to the host only at:
 127.0.0.1:15432
 ```
 
-Inside the Compose network, PostgreSQL listens on its standard port `5432`.
+Inside the Compose network, PostgreSQL listens on its standard port `5432` and Kratos's public API listens at `http://kratos:4433`. A host-run backend uses the public URL from `.env`; the backend Compose service overrides that URL with the internal address. Both use the `kratos:local` identity authority. The Kratos migration runs before the service starts.
+
+The development Kratos config enables password registration and login for local use. Its self-service UI URLs are placeholders until browser pages are implemented. Email delivery and deployment-level OIDC sign-in are not configured by this Compose setup.
 
 ### Development commands
 
 Run these commands from the repository root:
 
 ```bash
-pnpm dev:db               # Start only PostgreSQL in the background
-pnpm dev:db:reset         # Delete the database volume and start with an empty database
+pnpm dev:db               # Start PostgreSQL and Kratos in the background
+pnpm dev:db:reset         # Recreate the application database; keep Kratos identities
 pnpm dev:db:restart       # Restart PostgreSQL without removing its volume
 pnpm dev:db:status        # Show development container status
-pnpm dev:db:down          # Stop development containers, preserving the database volume
+pnpm dev:db:down          # Stop development containers, preserving both database volumes
 
-pnpm dev:compose           # Start PostgreSQL and the backend
+pnpm dev:compose           # Start PostgreSQL, Kratos, and the backend
 pnpm dev:compose:restart   # Restart all currently created Compose containers
-pnpm dev:compose:down      # Stop all development containers, preserving the database volume
+pnpm dev:compose:down      # Stop all development containers, preserving both database volumes
 ```
 
 These commands use [`scripts/dev-compose.sh`](../../scripts/dev-compose.sh), which automatically detects Podman Compose or Docker Compose.
 
-`pnpm dev:db` and `pnpm dev:db:reset` wait for PostgreSQL readiness, retrying up to 60 times with a one-second interval. If PostgreSQL does not become ready, the command exits with an error and reports the last readiness check.
+`pnpm dev:db`, `pnpm dev:db:reset`, and `pnpm dev:compose` wait for PostgreSQL and Kratos readiness, retrying up to 60 times with a one-second interval. If a service does not become ready, the command exits with an error and reports the last readiness check.
 
 The script can also be run directly:
 
@@ -213,17 +217,17 @@ The script can also be run directly:
 ./scripts/dev-compose.sh test-db-down
 ```
 
-`check` verifies that the development PostgreSQL service is accepting connections. The integration test runner uses the separate test-only PostgreSQL service.
+`check` verifies that the development PostgreSQL service is accepting connections. The integration test runner uses separate test-only PostgreSQL and Kratos services.
 
 If PostgreSQL is unavailable, it reports the required dependency and startup commands.
 
 Restart commands only apply to containers that Compose has already created. After running `down`, use the corresponding start command instead.
 
-### Resetting the database
+### Resetting the application database
 
-Restarting or stopping PostgreSQL does **not** remove its named volume.
+Restarting or stopping either service does **not** remove its named volume.
 
-To deliberately delete all local database data and start with an empty PostgreSQL instance:
+To deliberately clear the application database and start with an empty one:
 
 ```bash
 pnpm dev:db:reset
@@ -232,8 +236,8 @@ pnpm dev:db:reset
 This:
 
 1. Stops and removes the development Compose containers.
-2. Deletes the named PostgreSQL volume and all data stored in it.
-3. Starts a fresh PostgreSQL container with an empty database.
+2. Keeps both named volumes and drops and recreates only the `inframeld` database.
+3. Starts Kratos again with its existing identities.
 4. Leaves the Compose backend stopped.
 
 Migrations are not run automatically.
@@ -252,7 +256,7 @@ Running the backend image in Compose is an optional alternative to running the P
 
 The image uses the same source and locked dependencies as the host application, but it does not mount the source tree or run migrations during startup.
 
-Start PostgreSQL, apply migrations, and then start both Compose services:
+Start PostgreSQL and Kratos, apply application migrations, and then start the backend container:
 
 ```bash
 pnpm dev:db
@@ -266,11 +270,11 @@ The containerized API is available at:
 - Swagger UI: http://127.0.0.1:8001/docs
 - ReDoc: http://127.0.0.1:8001/redoc
 
-Inside the Compose network, the backend connects to PostgreSQL using the `postgres` service on port `5432`.
+Inside the Compose network, the backend connects to PostgreSQL using the `postgres` service on port `5432` and receives `http://kratos:4433` as its configured Kratos public URL.
 
 A backend running directly on the host instead connects to PostgreSQL at `127.0.0.1:15432`. This allows you to use the same database setup whether you run the API on the host or in Compose.
 
-`pnpm dev:compose` builds the backend image and starts both the backend and PostgreSQL containers.
+`pnpm dev:compose` builds the backend image and starts the backend, PostgreSQL, and Kratos containers.
 
 The backend binds inside the Compose network, with only its API port published to the host on the loopback interface.
 
@@ -379,11 +383,11 @@ pnpm test:integration
 
 ### Integration tests
 
-`pnpm test:integration` starts the test-only PostgreSQL service from `compose.test.yaml`, applies migrations, runs the real PostgreSQL integration tests, then stops the service. Its separate `inframeld_test_postgres_data` volume is not shared with the development database volume. The command forces the test service's host, port, database, and credentials, so a database target in `.env.test` cannot redirect integration migrations to the development database.
+`pnpm test:integration` starts the application PostgreSQL and Kratos services from `compose.test.yaml`, waits for both, applies the application migrations, and runs all backend integration tests, including the real Kratos browser-flow test. Compose runs the Kratos migration before starting Kratos. The command stops the test services afterward and retains their test-only volumes. It forces the application test database's host, port, name, and credentials, so a database target in `.env.test` cannot redirect application migrations to the development database.
 
-The test PostgreSQL service listens on `127.0.0.1:15433`; the development database remains on `127.0.0.1:15432`. The test volume is retained between runs and contains only test data.
+The application test PostgreSQL service listens on `127.0.0.1:15433`; Kratos's public endpoint listens on `127.0.0.1:14433`. Kratos uses its own PostgreSQL service, database role, and `inframeld_test_kratos_postgres_data` volume. Neither test database shares a volume with the development database at `127.0.0.1:15432`.
 
-The integration tests create uniquely named tables and databases for their fixtures and clean them up after each test. Keep the database-specific values in `.env.test` aligned with `.env.test.example` when running tests directly with `pytest`.
+Application PostgreSQL integration tests create uniquely named tables and databases for their fixtures and clean them up after each test. The Kratos browser-flow test creates an identity with a unique email in Kratos's isolated test database; that identity remains in the retained test volume. Keep the database-specific values in `.env.test` aligned with `.env.test.example` when running tests directly with `pytest`.
 
 ---
 

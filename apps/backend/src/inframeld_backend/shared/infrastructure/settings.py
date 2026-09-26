@@ -3,8 +3,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, SecretStr, ValidationError
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, Field, HttpUrl, SecretStr, ValidationError, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from inframeld_backend.access.domain.values import IdentityAuthority
 
 Port = Annotated[int, Field(ge=1, le=65_535)]
 PoolSize = Annotated[int, Field(ge=1, le=100)]
@@ -39,12 +41,27 @@ class DatabaseSettings(BaseModel):
     migration_lock_timeout_seconds: MigrationLockTimeoutSeconds = 5.0
 
 
+class KratosSettings(BaseModel):
+    public_url: HttpUrl
+    authority: Annotated[IdentityAuthority, NoDecode]
+
+    @field_validator("authority", mode="before")
+    @classmethod
+    def _parse_authority(cls, value: object) -> IdentityAuthority:
+        if isinstance(value, IdentityAuthority):
+            return value
+        if isinstance(value, str):
+            return IdentityAuthority(value)
+        raise ValueError("The Kratos authority must be a string.")
+
+
 class Settings(BaseSettings):
     environment: Literal["local", "test", "production"] = "local"
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "console"
 
     database: DatabaseSettings
+    kratos: KratosSettings | None = None
 
     model_config = SettingsConfigDict(
         env_file=DEFAULT_ENV_FILE,

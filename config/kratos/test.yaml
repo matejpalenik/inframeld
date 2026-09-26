@@ -1,0 +1,46 @@
+# Test-only Kratos configuration. Do not reuse these credentials or secrets in a deployment.
+version: v0.13.0
+dsn: postgres://kratos_test:kratos-test-only@kratos-postgres:5432/kratos_test?sslmode=disable
+
+serve:
+  public:
+    base_url: http://127.0.0.1:14433/
+  admin:
+    base_url: http://kratos:4434/
+
+selfservice:
+  default_browser_return_url: http://127.0.0.1:14433/
+  methods:
+    password:
+      enabled: true
+  flows:
+    error:
+      ui_url: http://127.0.0.1:14433/error
+    login:
+      ui_url: http://127.0.0.1:14433/login
+    registration:
+      ui_url: http://127.0.0.1:14433/registration
+      after:
+        password:
+          hooks:
+            - hook: session
+    settings:
+      ui_url: http://127.0.0.1:14433/settings
+
+secrets:
+  default:
+    - INFRAMELD-TEST-ONLY-CHANGE-ME-12345678
+  cookie:
+    - INFRAMELD-TEST-COOKIE-SECRET-12345678
+  cipher:
+    - INFRAMELD-TEST-CIPHER-SECRET-123
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
+
+courier:
+  smtp:
+    connection_uri: smtps://test:test@127.0.0.1:1025/?skip_ssl_verify=true

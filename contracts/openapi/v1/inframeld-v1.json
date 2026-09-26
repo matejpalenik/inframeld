@@ -1,6 +1,20 @@
 {
   "components": {
     "schemas": {
+      "CurrentSessionResponse": {
+        "properties": {
+          "principalId": {
+            "format": "uuid",
+            "title": "Principalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "principalId"
+        ],
+        "title": "CurrentSessionResponse",
+        "type": "object"
+      },
       "ProblemDetails": {
         "additionalProperties": false,
         "description": "Represent an Inframeld HTTP error using RFC 9457 Problem Details.\n\nAttributes:\n    type: Absolute problem URI; about:blank is used for generic HTTP errors.\n    title: Short public summary without occurrence-specific internal data.\n    status: Error status in the range 400 through 599.\n    detail: Safe public explanation selected by the HTTP adapter.\n    code: Stable public code; clients must tolerate unfamiliar future codes.\n    request_id: Correlation UUID serialized as requestId, never authorization.\n    errors: Optional bounded collection of already sanitized request issues.\n\nThe response builder enforces the selected definition's type/code/status\npairing and whether errors is appropriate. This model does not map Python\nexceptions, authenticate callers, authorize retries, or render tracebacks.\nServer-side extra fields are rejected; client parsers must still tolerate\nfuture RFC extension members.",
@@ -178,6 +192,57 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/v1/session": {
+      "get": {
+        "operationId": "getCurrentSession",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "summary": "Current Session",
+        "tags": [
+          "access"
         ]
       }
     }

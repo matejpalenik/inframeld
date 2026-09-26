@@ -12,16 +12,18 @@ usage() {
 Usage: ./scripts/dev-compose.sh <command>
 
 Commands:
-  up           Start PostgreSQL in the background and wait for readiness.
-  reset-db     Delete the database volume, recreate PostgreSQL, and wait for readiness.
-  all      Build and start PostgreSQL and the backend image.
+  up           Start PostgreSQL and Kratos in the background and wait for readiness.
+  reset-db     Recreate only the application database; keep Kratos identities.
+  all          Build and start PostgreSQL, Kratos, and the backend image.
   restart-db   Restart PostgreSQL without removing its persistent volume.
   restart-all  Restart all currently created development containers.
-  down     Stop all development services without removing the database volume.
+  down     Stop all development services without removing their database volumes.
   status   Show the service status.
   check    Verify that PostgreSQL is accepting connections.
   test-db-up     Start the isolated PostgreSQL integration-test service.
   test-db-down   Stop and remove the integration-test service, keeping its test-only volume.
+  test-services-up    Start PostgreSQL and Kratos for the full integration suite.
+  test-services-down  Stop the test services, keeping their test-only volumes.
 EOF
 }
 
@@ -106,6 +108,28 @@ wait_for_postgres() {
     return 1
 }
 
+wait_for_kratos() {
+    local max_attempts=60
+    local attempt
+    local readiness_output=""
+
+    for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+        if readiness_output="$(curl --fail --silent --show-error --max-time 2 http://127.0.0.1:14434/health/ready 2>&1)"; then
+            printf 'Kratos is ready at 127.0.0.1:14434.\n'
+            return 0
+        fi
+
+        if ((attempt < max_attempts)); then
+            sleep 1
+        fi
+    done
+
+    printf 'Kratos did not become ready after %s attempts.\n' "${max_attempts}" >&2
+    printf 'Required dependency: the kratos service from compose.dev.yaml.\n' >&2
+    printf 'Last readiness check: %s\n' "${readiness_output}" >&2
+    return 1
+}
+
 wait_for_test_postgres() {
     local max_attempts=60
     local attempt
@@ -128,21 +152,50 @@ wait_for_test_postgres() {
     return 1
 }
 
+wait_for_test_kratos() {
+    local max_attempts=60
+    local attempt
+    local readiness_output=""
+
+    for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+        if readiness_output="$(curl --fail --silent --show-error --max-time 2 http://127.0.0.1:14433/health/ready 2>&1)"; then
+            printf 'Test Kratos is ready at 127.0.0.1:14433.\n'
+            return 0
+        fi
+
+        if ((attempt < max_attempts)); then
+            sleep 1
+        fi
+    done
+
+    printf 'Test Kratos did not become ready after %s attempts.\n' "${max_attempts}" >&2
+    printf 'Required dependency: the kratos service from compose.test.yaml.\n' >&2
+    printf 'Last readiness check: %s\n' "${readiness_output}" >&2
+    return 1
+}
+
 command_name="${1:-}"
 shift || true
 
 case "${command_name}" in
     up)
-        compose up -d postgres
+        compose up -d postgres kratos
         wait_for_postgres
+        wait_for_kratos
         ;;
     reset-db)
-        compose down -v
+        compose down
         compose up -d postgres
         wait_for_postgres
+        compose exec -T postgres dropdb --maintenance-db=postgres --if-exists --force -U inframeld inframeld
+        compose exec -T postgres createdb --maintenance-db=postgres -U inframeld inframeld
+        compose up -d kratos
+        wait_for_kratos
         ;;
     all)
         compose up -d --build "$@"
+        wait_for_postgres
+        wait_for_kratos
         ;;
     restart-db)
         compose restart postgres "$@"
@@ -173,6 +226,14 @@ case "${command_name}" in
         wait_for_test_postgres
         ;;
     test-db-down)
+        test_compose down --remove-orphans
+        ;;
+    test-services-up)
+        test_compose up -d postgres kratos
+        wait_for_test_postgres
+        wait_for_test_kratos
+        ;;
+    test-services-down)
         test_compose down --remove-orphans
         ;;
     *)

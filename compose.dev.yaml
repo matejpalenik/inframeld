@@ -16,6 +16,50 @@ services:
       retries: 12
       start_period: 5s
 
+  kratos-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: kratos_dev
+      POSTGRES_USER: kratos_dev
+      POSTGRES_PASSWORD: kratos-dev-only
+    volumes:
+      - inframeld_kratos_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kratos_dev -d kratos_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  kratos-migrate:
+    image: docker.io/oryd/kratos:v25.4.0
+    command:
+      [
+        "-c",
+        "/etc/config/kratos/dev.yaml",
+        "migrate",
+        "sql",
+        "up",
+        "-e",
+        "--yes",
+      ]
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    depends_on:
+      kratos-postgres:
+        condition: service_healthy
+
+  kratos:
+    image: docker.io/oryd/kratos:v25.4.0
+    command: ["serve", "-c", "/etc/config/kratos/dev.yaml", "--dev"]
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    ports:
+      - "127.0.0.1:14434:4433"
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+
   backend:
     build:
       context: .
@@ -27,11 +71,16 @@ services:
       INFRAMELD_DATABASE__NAME: inframeld
       INFRAMELD_DATABASE__USER: inframeld
       INFRAMELD_DATABASE__PASSWORD: inframeld-dev-only
+      INFRAMELD_KRATOS__PUBLIC_URL: http://kratos:4433
+      INFRAMELD_KRATOS__AUTHORITY: kratos:local
     ports:
       - "127.0.0.1:8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      kratos:
+        condition: service_started
 
 volumes:
   inframeld_postgres_data:
+  inframeld_kratos_postgres_data:

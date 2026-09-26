@@ -18,6 +18,52 @@ services:
       retries: 12
       start_period: 5s
 
+  kratos-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: kratos_test
+      POSTGRES_USER: kratos_test
+      POSTGRES_PASSWORD: kratos-test-only
+    volumes:
+      - inframeld_test_kratos_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kratos_test -d kratos_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  kratos-migrate:
+    image: docker.io/oryd/kratos:v25.4.0
+    command:
+      [
+        "-c",
+        "/etc/config/kratos/test.yaml",
+        "migrate",
+        "sql",
+        "up",
+        "-e",
+        "--yes",
+      ]
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    depends_on:
+      kratos-postgres:
+        condition: service_healthy
+
+  kratos:
+    image: docker.io/oryd/kratos:v25.4.0
+    command: ["serve", "-c", "/etc/config/kratos/test.yaml", "--dev"]
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    ports:
+      - "127.0.0.1:14433:4433"
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+
 volumes:
   inframeld_test_postgres_data:
     name: inframeld_test_postgres_data
+  inframeld_test_kratos_postgres_data:
+    name: inframeld_test_kratos_postgres_data
