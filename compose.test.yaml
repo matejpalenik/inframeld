@@ -50,14 +50,75 @@ services:
     depends_on:
       kratos-postgres:
         condition: service_healthy
-
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.31.1
+    environment:
+      MP_SMTP_TLS_CERT: sans:mailpit
+      MP_SMTP_TLS_KEY: sans:mailpit
+      MP_SMTP_REQUIRE_STARTTLS: "true"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+    ports:
+      - "127.0.0.1:18025:8025"
   kratos:
     image: docker.io/oryd/kratos:v25.4.0
-    command: ["serve", "-c", "/etc/config/kratos/test.yaml", "--dev"]
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
     ports:
       - "127.0.0.1:14433:4433"
+    command:
+      [
+        "serve",
+        "-c",
+        "/etc/config/kratos/test.yaml",
+        "--dev",
+        "--watch-courier",
+      ]
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+  mock-oidc:
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.2
+    environment:
+      JSON_CONFIG: >-
+        {
+          "interactiveLogin": false,
+          "tokenCallbacks": [
+            {
+              "issuerId": "inframeld",
+              "requestMappings": [
+                {
+                  "requestParam": "code",
+                  "match": "*",
+                  "claims": {
+                    "sub": "oidc-test-user",
+                    "email": "oidc-test@example.test",
+                    "email_verified": true,
+                    "groups": ["administrators"],
+                    "aud": ["inframeld-kratos-test"]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+    ports:
+      - "127.0.0.1:15556:8080"
+
+  kratos-expiring:
+    image: docker.io/oryd/kratos:v25.4.0
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    ports:
+      - "127.0.0.1:14435:4433"
+    command:
+      - serve
+      - -c
+      - /etc/config/kratos/test.yaml
+      - -c
+      - /etc/config/kratos/test-expiring.yaml
+      - --dev
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully

@@ -13,6 +13,22 @@ selfservice:
   methods:
     password:
       enabled: true
+    code:
+      enabled: true
+    oidc:
+      enabled: true
+      config:
+        providers:
+          - id: company
+            provider: generic
+            client_id: inframeld-kratos-test
+            client_secret: test-only-client-secret
+            issuer_url: http://mock-oidc:8080/inframeld
+            mapper_url: file:///etc/config/kratos/oidc.email.jsonnet
+            claims_source: id_token
+            scope:
+              - openid
+              - email
   flows:
     error:
       ui_url: http://127.0.0.1:14433/error
@@ -26,6 +42,10 @@ selfservice:
             - hook: session
     settings:
       ui_url: http://127.0.0.1:14433/settings
+    recovery:
+      enabled: true
+      use: code
+      ui_url: http://127.0.0.1:14433/recovery
 
 secrets:
   default:
@@ -43,4 +63,4 @@ identity:
 
 courier:
   smtp:
-    connection_uri: smtps://test:test@127.0.0.1:1025/?skip_ssl_verify=true
+    connection_uri: smtp://test:test@mailpit:1025/?skip_ssl_verify=true

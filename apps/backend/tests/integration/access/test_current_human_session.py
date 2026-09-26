@@ -1,4 +1,4 @@
-"""Verify that the real API resolves a Kratos cookie to a local human."""
+"""Verify the session API's Kratos identity and failure boundaries."""
 
 import os
 
@@ -62,6 +62,36 @@ async def test_current_session_uses_kratos_cookie_and_local_identity_link(
 
         client.cookies.clear()
         assert client.get("/v1/session").status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_current_session_reports_kratos_outage(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+) -> None:
+    """Report a provider outage when a valid browser session cannot be verified."""
+    async with create_browser() as browser:
+        human = await register_human(browser)
+
+    settings = get_settings().model_copy(
+        update={
+            "database": temporary_postgres_settings,
+            "kratos": KratosSettings(
+                public_url=HttpUrl("http://127.0.0.1:1"),
+                authority=AUTHORITY,
+            ),
+        }
+    )
+
+    with TestClient(create_app(settings), raise_server_exceptions=False) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/docs").status_code == 200
+
+        client.cookies.set("ory_kratos_session", human.credential.value)
+        response = client.get("/v1/session")
+
+    assert response.status_code == 503, response.text
+    assert response.json()["code"] == "dependency_unavailable"
 
 
 @pytest.mark.parametrize("cookie", [None, "synthetic-session"])

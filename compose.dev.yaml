@@ -49,9 +49,20 @@ services:
       kratos-postgres:
         condition: service_healthy
 
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.31.1
+    environment:
+      MP_SMTP_TLS_CERT: sans:mailpit
+      MP_SMTP_TLS_KEY: sans:mailpit
+      MP_SMTP_REQUIRE_STARTTLS: "true"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+    ports:
+      - "127.0.0.1:18024:8025"
+
   kratos:
     image: docker.io/oryd/kratos:v25.4.0
-    command: ["serve", "-c", "/etc/config/kratos/dev.yaml", "--dev"]
+    command:
+      ["serve", "-c", "/etc/config/kratos/dev.yaml", "--dev", "--watch-courier"]
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
     ports:
@@ -59,6 +70,8 @@ services:
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_started
 
   backend:
     build:
@@ -73,6 +86,7 @@ services:
       INFRAMELD_DATABASE__PASSWORD: inframeld-dev-only
       INFRAMELD_KRATOS__PUBLIC_URL: http://kratos:4433
       INFRAMELD_KRATOS__AUTHORITY: kratos:local
+      INFRAMELD_CSRF__TRUSTED_ORIGINS: '["http://127.0.0.1:8001"]'
     ports:
       - "127.0.0.1:8001:8000"
     depends_on:

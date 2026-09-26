@@ -5,9 +5,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 from inframeld_backend.shared.infrastructure.types.logging_types import LogFormat, LogLevel
@@ -29,6 +30,7 @@ class ApplicationSettings(BaseSettings):
 
     database: DatabaseSettings
     kratos: KratosSettings | None = None
+    csrf: CSRFSettings = Field(default_factory=CSRFSettings)
 
     model_config = SettingsConfigDict(
         env_file=DEFAULT_ENV_FILE,

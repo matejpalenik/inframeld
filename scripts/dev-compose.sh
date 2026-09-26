@@ -151,13 +151,15 @@ wait_for_test_postgres() {
 }
 
 wait_for_test_kratos() {
+    local service_name="$1"
+    local host_port="$2"
     local max_attempts=60
     local attempt
     local readiness_output=""
 
     for ((attempt = 1; attempt <= max_attempts; attempt++)); do
-        if readiness_output="$(curl --fail --silent --show-error --max-time 2 http://127.0.0.1:14433/health/ready 2>&1)"; then
-            printf 'Test Kratos is ready at 127.0.0.1:14433.\n'
+        if readiness_output="$(curl --fail --silent --show-error --max-time 2 "http://127.0.0.1:${host_port}/health/ready" 2>&1)"; then
+            printf 'Test %s is ready at 127.0.0.1:%s.\n' "${service_name}" "${host_port}"
             return 0
         fi
 
@@ -166,9 +168,25 @@ wait_for_test_kratos() {
         fi
     done
 
-    printf 'Test Kratos did not become ready after %s attempts.\n' "${max_attempts}" >&2
-    printf 'Required dependency: the kratos service from compose.test.yaml.\n' >&2
+    printf 'Test %s did not become ready after %s attempts.\n' "${service_name}" "${max_attempts}" >&2
+    printf 'Required dependency: the %s service from compose.test.yaml.\n' "${service_name}" >&2
     printf 'Last readiness check: %s\n' "${readiness_output}" >&2
+    return 1
+}
+
+wait_for_test_mock_oidc() {
+    local attempt
+
+    for ((attempt = 1; attempt <= 60; attempt++)); do
+        if curl --fail --silent --show-error --max-time 2 \
+            http://127.0.0.1:15556/isalive >/dev/null 2>&1; then
+            printf 'Test OIDC provider is ready at 127.0.0.1:15556.\n'
+            return 0
+        fi
+        sleep 1
+    done
+
+    printf 'Test OIDC provider did not become ready.\n' >&2
     return 1
 }
 
@@ -220,9 +238,12 @@ case "${command_name}" in
         fi
         ;;
     test-services-up)
-        test_compose up -d postgres kratos
+        test_compose up -d postgres mailpit mock-oidc
         wait_for_test_postgres
-        wait_for_test_kratos
+        wait_for_test_mock_oidc
+        test_compose up -d kratos kratos-expiring
+        wait_for_test_kratos kratos 14433
+        wait_for_test_kratos kratos-expiring 14435
         ;;
     test-services-down)
         test_compose down --remove-orphans

@@ -4,7 +4,7 @@ The Inframeld backend is a typed FastAPI application. It owns the HTTP API, its 
 
 ## Quick start
 
-For normal local development, run PostgreSQL and Kratos in Compose and the backend directly on your host.
+For normal local development, run PostgreSQL, Kratos, and Mailpit in Compose and the backend directly on your host.
 
 From a clean checkout, install the committed dependencies from the repository root:
 
@@ -33,7 +33,7 @@ cp apps/backend/.env.test.example apps/backend/.env.test
 
 Keep `.env.test` in the ignored local configuration; it is not committed.
 
-### 2. Start PostgreSQL and Kratos
+### 2. Start PostgreSQL, Kratos, and Mailpit
 
 ```bash
 pnpm dev:db
@@ -63,7 +63,7 @@ When you're finished, stop the development containers with:
 pnpm dev:db:down
 ```
 
-The application database and Kratos identities are stored in separate named volumes and are preserved when the containers are stopped. Kratos's public endpoint is at http://127.0.0.1:14434.
+The application database and Kratos identities are stored in separate named volumes and are preserved when the containers are stopped. Kratos's public endpoint is at http://127.0.0.1:14434. Mailpit's development inbox is at http://127.0.0.1:18024.
 
 ---
 
@@ -106,7 +106,7 @@ Architecture and naming are reviewed manually. Unit tests mirror production role
 
 ## Configuration
 
-`bootstrap/application_settings.py` aggregates `ApplicationSettings`. `KratosSettings` and `DatabaseSettings` live in their owners’ infrastructure `settings` packages; logging value definitions live in shared infrastructure `types`. Their existing environment-variable names and defaults are preserved.
+`bootstrap/application_settings.py` aggregates `ApplicationSettings`. `KratosSettings`, `CSRFSettings`, and `DatabaseSettings` live in their owners’ infrastructure `settings` packages; logging value definitions live in shared infrastructure `types`.
 
 Runtime configuration is loaded from files under `apps/backend`:
 
@@ -114,10 +114,10 @@ Runtime configuration is loaded from files under `apps/backend`:
 - `.env.test` — used when `INFRAMELD_ENVIRONMENT=test`
 - `INFRAMELD_TEST_ENV_FILE` — selects another test environment file; relative paths are resolved from `apps/backend`
 - `INFRAMELD_*` environment variables — override values loaded from dotenv files
-- `.env.example` — documents local development database and Kratos defaults and may be copied to `.env`
+- `.env.example` — documents local development database, Kratos, and CSRF settings and may be copied to `.env`
 - `.env.test.example` — documents isolated integration-test database and Kratos defaults and may be copied to `.env.test`
 
-For the local Compose database, the relevant values are:
+For a backend running on the host with local Compose services, the relevant values are:
 
 ```dotenv
 INFRAMELD_DATABASE__HOST=127.0.0.1
@@ -127,17 +127,24 @@ INFRAMELD_DATABASE__USER=inframeld
 INFRAMELD_DATABASE__PASSWORD=inframeld-dev-only
 INFRAMELD_KRATOS__PUBLIC_URL=http://127.0.0.1:14434
 INFRAMELD_KRATOS__AUTHORITY=kratos:local
+INFRAMELD_CSRF__TRUSTED_ORIGINS='["http://127.0.0.1:8000"]'
 ```
+
+`INFRAMELD_CSRF__TRUSTED_ORIGINS` is a JSON array of exact browser origins: scheme, host, and optional port, without a path. The host-run example permits requests originating from `http://127.0.0.1:8000`; `compose.dev.yaml` uses `http://127.0.0.1:8001`, its published backend port. An omitted or empty list denies cookie-authenticated writes.
+
+After authentication, unsafe requests also need `X-Inframeld-CSRF: 1` and a matching `Origin` header. This is Inframeld's HTTP protection; Kratos checks its own CSRF values during browser account flows. The [Access guide](../../docs/development/access-control.md#implemented-human-authentication) describes the implemented boundary and its test coverage.
+
+The web scaffold currently runs on `localhost:3000`, while these backend and Kratos examples use `127.0.0.1`. Browser integration still needs a consistent hostname and routing so the Kratos cookie reaches the backend. The trusted-origin list alone does not configure that routing.
 
 Do not commit `.env` or `.env.test`.
 
-The development passwords and Kratos secrets are only for local Compose and must not be reused in production. Kratos settings are optional until the HTTP authentication dependency is wired into the backend application.
+The development passwords and Kratos secrets are only for local Compose and must not be reused in production. Kratos settings remain optional at startup; without them, the session route returns 503.
 
 ---
 
 ## Development services
 
-The application PostgreSQL and Kratos services are managed by the root `compose.dev.yaml`. Kratos uses its own PostgreSQL service, `kratos_dev` database role, and `inframeld_kratos_postgres_data` volume, separate from the application database. Its public API is available on `127.0.0.1:14434`; its admin API stays inside the Compose network.
+The application PostgreSQL, Kratos, and Mailpit services are managed by the root `compose.dev.yaml`. Kratos uses its own PostgreSQL service, `kratos_dev` database role, and `inframeld_kratos_postgres_data` volume, separate from the application database. Its public API is available on `127.0.0.1:14434`; its admin API stays inside the Compose network. Mailpit's SMTP port stays inside that network, while its inbox UI is exposed only on the host loopback interface at `127.0.0.1:18024`.
 
 PostgreSQL is exposed to the host only at:
 
@@ -147,20 +154,20 @@ PostgreSQL is exposed to the host only at:
 
 Inside the Compose network, PostgreSQL listens on its standard port `5432` and Kratos's public API listens at `http://kratos:4433`. A host-run backend uses the public URL from `.env`; the backend Compose service overrides that URL with the internal address. Both use the `kratos:local` identity authority. The Kratos migration runs before the service starts.
 
-The development Kratos config enables password registration and login for local use. Its self-service UI URLs are placeholders until browser pages are implemented. Email delivery and deployment-level OIDC sign-in are not configured by this Compose setup.
+The development Kratos config enables password registration, login, and code-based recovery. Kratos sends development email to Mailpit; view captured messages at `http://127.0.0.1:18024`. Its self-service UI URLs are placeholders until browser pages are implemented. Mailpit is for local development; an operator deployment needs its own SMTP configuration. Deployment-level OIDC sign-in is not configured by this Compose setup.
 
 ### Development commands
 
 Run these commands from the repository root:
 
 ```bash
-pnpm dev:db               # Start PostgreSQL and Kratos in the background
+pnpm dev:db               # Start PostgreSQL, Kratos, and Mailpit in the background
 pnpm dev:db:reset         # Recreate the application database; keep Kratos identities
 pnpm dev:db:restart       # Restart PostgreSQL without removing its volume
 pnpm dev:db:status        # Show development container status
 pnpm dev:db:down          # Stop development containers, preserving both database volumes
 
-pnpm dev:compose           # Start PostgreSQL, Kratos, and the backend
+pnpm dev:compose           # Start PostgreSQL, Kratos, Mailpit, and the backend
 pnpm dev:compose:restart   # Restart all currently created Compose containers
 pnpm dev:compose:down      # Stop all development containers, preserving both database volumes
 ```
@@ -223,7 +230,7 @@ Running the backend image in Compose is an optional alternative to running the P
 
 The image uses the same source and locked dependencies as the host application, but it does not mount the source tree or run migrations during startup.
 
-Start PostgreSQL and Kratos, apply application migrations, and then start the backend container:
+Start PostgreSQL, Kratos, and Mailpit, apply application migrations, and then start the backend container:
 
 ```bash
 pnpm dev:db
@@ -352,9 +359,9 @@ pnpm test:integration
 
 CI runs the same `pnpm test:integration` command; there is no separate database-only CI suite.
 
-`pnpm test:integration` starts the application PostgreSQL and Kratos services from `compose.test.yaml`, waits for both, applies the application migrations, and runs all backend integration tests, including the real Kratos browser-flow test. Compose runs the Kratos migration before starting Kratos. The command stops the test services afterward and retains their test-only volumes. It forces the application test database's host, port, name, and credentials, so a database target in `.env.test` cannot redirect application migrations to the development database.
+`pnpm test:integration` starts the application PostgreSQL and both Kratos test services from `compose.test.yaml`, waits for them, applies the application migrations, and runs all backend integration tests, including real Kratos browser-flow and session-expiry tests. Compose runs the Kratos migration before starting either Kratos service. The command stops the test services afterward and retains their test-only volumes. It forces the application test database's host, port, name, and credentials, so a database target in `.env.test` cannot redirect application migrations to the development database.
 
-The application test PostgreSQL service listens on `127.0.0.1:15433`; Kratos's public endpoint listens on `127.0.0.1:14433`. Kratos uses its own PostgreSQL service, database role, and `inframeld_test_kratos_postgres_data` volume. Neither test database shares a volume with the development database at `127.0.0.1:15432`.
+The application test PostgreSQL service listens on `127.0.0.1:15433`. Standard test Kratos listens on `127.0.0.1:14433`; an expiry-only Kratos process listens on `127.0.0.1:14435` and issues 15-second sessions. Both Kratos processes share the separate test Kratos PostgreSQL service, database role, and `inframeld_test_kratos_postgres_data` volume. Their admin endpoints stay inside Compose. Neither test database shares a volume with the development database at `127.0.0.1:15432`.
 
 Integration scenarios live under `tests/integration/access`, `postgres`, `kratos`, and `observability`. Typed seed builders, validated browser-flow helpers, and isolated database provisioning live under `tests/support`. Application PostgreSQL tests use temporary databases and Alembic-created fixture tables, cleaned up after each test. The Kratos browser-flow test creates an identity with a unique email in Kratos's isolated test database; that identity remains in the retained test volume. Keep the database-specific values in `.env.test` aligned with `.env.test.example` when running tests directly with `pytest`.
 

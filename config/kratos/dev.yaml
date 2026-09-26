@@ -13,6 +13,8 @@ selfservice:
   methods:
     password:
       enabled: true
+    code:
+      enabled: true
   flows:
     error:
       ui_url: http://127.0.0.1:14434/error
@@ -26,6 +28,10 @@ selfservice:
             - hook: session
     settings:
       ui_url: http://127.0.0.1:14434/settings
+    recovery:
+      enabled: true
+      use: code
+      ui_url: http://127.0.0.1:14434/recovery
 
 secrets:
   default:
@@ -43,4 +49,4 @@ identity:
 
 courier:
   smtp:
-    connection_uri: smtps://dev:dev@127.0.0.1:1025/?skip_ssl_verify=true
+    connection_uri: smtp://dev:dev@mailpit:1025/?skip_ssl_verify=true

@@ -1,7 +1,7 @@
 """Verify typed runtime configuration and sanitized validation errors."""
 
 import pytest
-from pydantic import SecretStr, ValidationError
+from pydantic import HttpUrl, SecretStr, ValidationError
 
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.bootstrap.application_settings import get_settings
@@ -62,6 +62,22 @@ def test_kratos_settings_parse_url_and_authority_from_environment(
         assert kratos is not None
         assert str(kratos.public_url) == "http://127.0.0.1:14433/"
         assert kratos.authority == IdentityAuthority("kratos:test")
+    finally:
+        get_settings.cache_clear()
+
+
+def test_csrf_origins_parse_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Parse the browser-origin allowlist from its nested environment value."""
+    monkeypatch.setenv(
+        "INFRAMELD_CSRF__TRUSTED_ORIGINS",
+        '["http://127.0.0.1:8000"]',
+    )
+    get_settings.cache_clear()
+
+    try:
+        assert get_settings().csrf.trusted_origins == (HttpUrl("http://127.0.0.1:8000"),)
     finally:
         get_settings.cache_clear()
 

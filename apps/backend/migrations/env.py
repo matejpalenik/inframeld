@@ -12,7 +12,7 @@ from inframeld_backend.shared.infrastructure.settings.database_settings import D
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # The historical migrations own DDL. Partial read mappings are not an
 # authoritative autogeneration model of all constraints and tables.

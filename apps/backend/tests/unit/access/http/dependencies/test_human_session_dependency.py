@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from pydantic import HttpUrl
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
@@ -29,6 +30,9 @@ from inframeld_backend.access.domain.value_objects.identity_authority import Ide
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
+    CSRFProtectionDependency,
+)
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
@@ -46,6 +50,7 @@ IDENTITY = VerifiedHumanIdentityDTO(
 )
 PRINCIPAL_ID = PrincipalId(UUID("00000000-0000-0000-0000-000000000002"))
 COOKIE_NAME = "ory_kratos_session"
+TRUSTED_ORIGINS: tuple[HttpUrl, ...] = (HttpUrl("http://testserver"),)
 
 
 class _MockVerifier(BrowserSessionVerifier):
@@ -99,7 +104,10 @@ def _test_app(verifier: _MockVerifier, reader: _MockLinkReader) -> FastAPI:
     application = FastAPI(debug=False)
     register_error_handlers(application)
     application.add_middleware(RequestContextMiddleware)
-    authenticate = HumanSessionDependency(HumanSessionAuthenticationService(verifier, reader))
+    authenticate = HumanSessionDependency(
+        HumanSessionAuthenticationService(verifier, reader),
+        CSRFProtectionDependency(TRUSTED_ORIGINS),
+    )
 
     @application.get("/_test/protected")
     async def protected(
@@ -124,6 +132,85 @@ def test_valid_session_resolves_local_principal() -> None:
     assert response.json() == {"principalId": str(PRINCIPAL_ID.value)}
     assert verifier.seen_cookies == ["valid-session"]
     assert reader.seen_identities == [IDENTITY]
+
+
+def test_cookie_authenticated_post_requires_csrf_header() -> None:
+    """Reject a browser write before its operation runs when the CSRF header is absent."""
+    verifier = _MockVerifier(IDENTITY)
+    reader = _MockLinkReader(PRINCIPAL_ID)
+    application = _test_app(verifier, reader)
+    authenticate = HumanSessionDependency(
+        HumanSessionAuthenticationService(verifier, reader),
+        CSRFProtectionDependency(TRUSTED_ORIGINS),
+    )
+    changes: list[PrincipalId] = []
+
+    @application.post("/_test/change")
+    async def change(access: Annotated[AccessContextDTO, Depends(authenticate)]) -> dict[str, bool]:
+        changes.append(access.actor_principal_id)
+        return {"changed": True}
+
+    with TestClient(application, raise_server_exceptions=False) as client:
+        client.cookies.set(COOKIE_NAME, "valid-session")
+        response = client.post("/_test/change", headers={"Origin": "http://testserver"})
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "access_denied"
+    assert changes == []
+
+
+def test_cookie_authenticated_post_rejects_untrusted_origin() -> None:
+    """Reject a write from another origin even when it supplies the CSRF header."""
+    verifier = _MockVerifier(IDENTITY)
+    reader = _MockLinkReader(PRINCIPAL_ID)
+    application = _test_app(verifier, reader)
+    authenticate = HumanSessionDependency(
+        HumanSessionAuthenticationService(verifier, reader),
+        CSRFProtectionDependency(TRUSTED_ORIGINS),
+    )
+    changes: list[PrincipalId] = []
+
+    @application.post("/_test/change")
+    async def change(access: Annotated[AccessContextDTO, Depends(authenticate)]) -> dict[str, bool]:
+        changes.append(access.actor_principal_id)
+        return {"changed": True}
+
+    with TestClient(application, raise_server_exceptions=False) as client:
+        client.cookies.set(COOKIE_NAME, "valid-session")
+        response = client.post(
+            "/_test/change", headers={"Origin": "https://attacker.example", "X-Inframeld-CSRF": "1"}
+        )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "access_denied"
+    assert changes == []
+
+
+def test_cookie_authenticated_post_accepts_trusted_origin() -> None:
+    """Run a write when authentication, the CSRF header, and origin all pass."""
+    verifier = _MockVerifier(IDENTITY)
+    reader = _MockLinkReader(PRINCIPAL_ID)
+    application = _test_app(verifier, reader)
+    authenticate = HumanSessionDependency(
+        HumanSessionAuthenticationService(verifier, reader),
+        CSRFProtectionDependency(TRUSTED_ORIGINS),
+    )
+    changes: list[PrincipalId] = []
+
+    @application.post("/_test/change")
+    async def change(access: Annotated[AccessContextDTO, Depends(authenticate)]) -> dict[str, bool]:
+        changes.append(access.actor_principal_id)
+        return {"changed": True}
+
+    with TestClient(application, raise_server_exceptions=False) as client:
+        client.cookies.set(COOKIE_NAME, "valid-session")
+        response = client.post(
+            "/_test/change", headers={"Origin": "http://testserver", "X-Inframeld-CSRF": "1"}
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"changed": True}
+    assert changes == [PRINCIPAL_ID]
 
 
 def test_missing_session_is_unauthorized_without_provider_lookup() -> None:

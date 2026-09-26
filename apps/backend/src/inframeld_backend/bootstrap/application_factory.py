@@ -4,6 +4,9 @@ from functools import partial
 
 from fastapi import FastAPI
 
+from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
+    CSRFProtectionDependency,
+)
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
@@ -55,7 +58,14 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
     register_error_handlers(application)
     configure_problem_openapi(application)
     application.include_router(health_router)
-    application.include_router(create_session_router(HumanSessionDependency(access.authenticator)))
+    application.include_router(
+        create_session_router(
+            HumanSessionDependency(
+                access.authenticator,
+                CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
+            )
+        )
+    )
     application.add_middleware(RequestContextMiddleware)
 
     return application

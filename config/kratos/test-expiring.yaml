@@ -1,0 +1,23 @@
+# Loaded after test.yaml by the expiry-only Kratos service.
+serve:
+  public:
+    base_url: http://127.0.0.1:14435/
+  admin:
+    base_url: http://kratos-expiring:4434/
+
+selfservice:
+  default_browser_return_url: http://127.0.0.1:14435/
+  flows:
+    error:
+      ui_url: http://127.0.0.1:14435/error
+    login:
+      ui_url: http://127.0.0.1:14435/login
+    registration:
+      ui_url: http://127.0.0.1:14435/registration
+    settings:
+      ui_url: http://127.0.0.1:14435/settings
+    recovery:
+      ui_url: http://127.0.0.1:14435/recovery
+
+session:
+  lifespan: 15s

@@ -68,10 +68,13 @@ class RegisteredHumanDTO:
     credential: BrowserSessionCredential
 
 
-def create_browser() -> httpx2.AsyncClient:
-    """Create an independent cookie jar for one browser session."""
+def create_browser(*, public_url: str = KRATOS_PUBLIC_URL) -> httpx2.AsyncClient:
+    """Create an independent cookie jar for the selected Kratos public endpoint."""
     return httpx2.AsyncClient(
-        base_url=KRATOS_PUBLIC_URL, follow_redirects=False, timeout=15.0, trust_env=False
+        base_url=public_url,
+        follow_redirects=False,
+        timeout=15.0,
+        trust_env=False,
     )
 
 
@@ -136,6 +139,33 @@ async def login_human(
     )
     assert completed.status_code in {200, 303}, completed.text
     return _credential(browser)
+
+
+async def begin_oidc_login(browser: httpx2.AsyncClient) -> str:
+    """Submit Kratos's browser form and return the upstream authorization URL."""
+    started = await browser.get(
+        "/self-service/login/browser",
+        headers={"Accept": "application/json"},
+    )
+    assert started.status_code == 200, started.text
+    flow = BrowserFlow.model_validate_json(started.text)
+
+    assert any(
+        node.attributes.name == "provider" and node.attributes.value == "company"
+        for node in flow.ui.nodes
+    ), flow.ui.nodes
+
+    submitted = await browser.post(
+        flow.ui.action,
+        data={
+            "csrf_token": _csrf_token(flow),
+            "provider": "company",
+            "method": "oidc",
+        },
+        headers={"Accept": "text/html"},
+    )
+    assert submitted.status_code in {302, 303}, submitted.text
+    return submitted.headers["location"]
 
 
 async def logout_human(browser: httpx2.AsyncClient) -> None:
