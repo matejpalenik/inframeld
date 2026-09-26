@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 import psycopg
 import pytest
 from psycopg import Connection
-from psycopg.errors import CheckViolation, ForeignKeyViolation
+from psycopg.errors import CheckViolation, ForeignKeyViolation, UniqueViolation
 
 from inframeld_backend.shared.infrastructure.migrations import run_migrations
 from inframeld_backend.shared.infrastructure.settings import DatabaseSettings
@@ -246,3 +246,245 @@ def test_human_group_member_can_become_a_group_manager(
     ).fetchone()
 
     assert manager_count_row == (1,)
+
+
+def test_verified_identity_pair_maps_to_only_one_human(
+    access_connection: Connection[Any], access_record_ids: AccessRecordIds
+) -> None:
+    """Keep each verified identity source and subject attached to one stable human."""
+    access_connection.execute(
+        """
+        INSERT INTO human_identity_links
+            (authority, subject, organization_id, principal_id, principal_kind)
+        VALUES (%s, %s, %s, %s, 'human')
+        """,
+        (
+            "kratos:local",
+            "alice-local-id",
+            access_record_ids.organization_id,
+            access_record_ids.human_id,
+        ),
+    )
+    access_connection.execute(
+        """
+        INSERT INTO human_identity_links
+            (authority, subject, organization_id, principal_id, principal_kind)
+        VALUES (%s, %s, %s, %s, 'human')
+        """,
+        (
+            "oidc:company",
+            "alice-company-id",
+            access_record_ids.organization_id,
+            access_record_ids.human_id,
+        ),
+    )
+
+    identity_count_row = access_connection.execute(
+        """
+        SELECT count(*), count(DISTINCT principal_id)
+        FROM human_identity_links
+        WHERE organization_id = %s AND principal_id = %s
+        """,
+        (access_record_ids.organization_id, access_record_ids.human_id),
+    ).fetchone()
+
+    assert identity_count_row == (2, 1)
+
+    with pytest.raises(UniqueViolation) as error:
+        access_connection.execute(
+            """
+            INSERT INTO human_identity_links
+                (authority, subject, organization_id, principal_id, principal_kind)
+            VALUES (%s, %s, %s, %s, 'human')
+            """,
+            (
+                "kratos:local",
+                "alice-local-id",
+                access_record_ids.organization_id,
+                access_record_ids.other_human_id,
+            ),
+        )
+
+    assert error.value.diag.constraint_name == "pk_human_identity_links"
+
+
+def test_human_identity_link_rejects_an_application_principal(
+    access_connection: Connection[Any], access_record_ids: AccessRecordIds
+) -> None:
+    """Prevent an application account from being treated as a verified human login."""
+    with pytest.raises(CheckViolation) as error:
+        access_connection.execute(
+            """
+            INSERT INTO human_identity_links
+                (authority, subject, organization_id, principal_id, principal_kind)
+            VALUES ('kratos:local', 'support-bot-id', %s, %s, 'application')
+            """,
+            (access_record_ids.organization_id, access_record_ids.application_id),
+        )
+
+    assert error.value.diag.constraint_name == "ck_identity_links_human_only"
+
+
+def test_application_membership_cannot_escape_its_owning_project(
+    access_connection: Connection[Any], access_record_ids: AccessRecordIds
+) -> None:
+    """Keep an application principal bound to the project recorded by its account."""
+    with pytest.raises(ForeignKeyViolation) as error:
+        access_connection.execute(
+            """
+            INSERT INTO project_memberships
+                (project_id, principal_id, organization_id, principal_kind, application_principal_id)
+            VALUES (%s, %s, %s, 'application', %s)
+            """,
+            (
+                access_record_ids.other_project_id,
+                access_record_ids.application_id,
+                access_record_ids.organization_id,
+                access_record_ids.application_id,
+            ),
+        )
+
+    assert error.value.diag.constraint_name == "fk_project_memberships_application_account"
+
+
+def test_group_action_grant_rejects_a_recipient_from_another_project(
+    access_connection: Connection[Any], access_record_ids: AccessRecordIds
+) -> None:
+    """Keep a group's action grants limited to members of the group's project."""
+    with pytest.raises(ForeignKeyViolation) as error:
+        access_connection.execute(
+            """
+            INSERT INTO group_action_grants
+                (project_id, group_id, recipient_principal_id, recipient_kind, action, can_grant)
+            VALUES (%s, %s, %s, 'human', 'add-documents', false)
+            """,
+            (
+                access_record_ids.project_id,
+                access_record_ids.group_id,
+                access_record_ids.other_human_id,
+            ),
+        )
+
+    assert error.value.diag.constraint_name == "fk_group_action_grants_recipient"
+
+
+def test_application_action_grant_rejects_an_application_from_another_project(
+    access_connection: Connection[Any], access_record_ids: AccessRecordIds
+) -> None:
+    """Keep human key-management grants attached to the application's owning project."""
+    with pytest.raises(ForeignKeyViolation) as error:
+        access_connection.execute(
+            """
+            INSERT INTO application_action_grants
+                (
+                    project_id,
+                    application_principal_id,
+                    recipient_principal_id,
+                    recipient_kind,
+                    action,
+                    can_grant
+                )
+            VALUES (%s, %s, %s, 'human', 'issue-keys', false)
+            """,
+            (
+                access_record_ids.other_project_id,
+                access_record_ids.application_id,
+                access_record_ids.other_human_id,
+            ),
+        )
+
+    assert error.value.diag.constraint_name == "fk_application_action_grants_application"
+
+
+def test_application_action_grant_cannot_target_an_application_principal(
+    access_connection: Connection[Any], access_record_ids: AccessRecordIds
+) -> None:
+    """Reserve application-account administration grants for human project members."""
+    with pytest.raises(CheckViolation) as error:
+        access_connection.execute(
+            """
+            INSERT INTO application_action_grants
+                (
+                    project_id,
+                    application_principal_id,
+                    recipient_principal_id,
+                    recipient_kind,
+                    action,
+                    can_grant
+                )
+            VALUES (%s, %s, %s, 'application', 'issue-keys', false)
+            """,
+            (
+                access_record_ids.project_id,
+                access_record_ids.application_id,
+                access_record_ids.application_id,
+            ),
+        )
+
+    assert error.value.diag.constraint_name == "ck_application_action_grants_human_only"
+
+
+def test_application_action_grant_rejects_a_recipient_from_another_project(
+    access_connection: Connection[Any], access_record_ids: AccessRecordIds
+) -> None:
+    """Require a human who manages an application's keys to belong to its project."""
+    with pytest.raises(ForeignKeyViolation) as error:
+        access_connection.execute(
+            """
+            INSERT INTO application_action_grants
+                (
+                    project_id,
+                    application_principal_id,
+                    recipient_principal_id,
+                    recipient_kind,
+                    action,
+                    can_grant
+                )
+            VALUES (%s, %s, %s, 'human', 'issue-keys', false)
+            """,
+            (
+                access_record_ids.project_id,
+                access_record_ids.application_id,
+                access_record_ids.other_human_id,
+            ),
+        )
+
+    assert error.value.diag.constraint_name == "fk_application_action_grants_recipient"
+
+
+def test_application_project_grant_cannot_delegate(
+    access_connection: Connection[Any], access_record_ids: AccessRecordIds
+) -> None:
+    """Keep an application principal from delegating its project action grants."""
+    with pytest.raises(CheckViolation) as error:
+        access_connection.execute(
+            """
+            INSERT INTO project_action_grants
+                (project_id, recipient_principal_id, recipient_kind, action, can_grant)
+            VALUES (%s, %s, 'application', 'build', true)
+            """,
+            (access_record_ids.project_id, access_record_ids.application_id),
+        )
+
+    assert error.value.diag.constraint_name == "ck_project_action_grants_application_use_only"
+
+
+def test_application_group_grant_cannot_delegate(
+    access_connection: Connection[Any], access_record_ids: AccessRecordIds
+) -> None:
+    """Keep an application principal from delegating its group action grants."""
+    with pytest.raises(CheckViolation) as error:
+        access_connection.execute(
+            """
+            INSERT INTO group_action_grants
+                (project_id, group_id, recipient_principal_id, recipient_kind, action, can_grant)
+            VALUES (%s, %s, %s, 'application', 'query', true)
+            """,
+            (
+                access_record_ids.project_id,
+                access_record_ids.group_id,
+                access_record_ids.application_id,
+            ),
+        )
+
+    assert error.value.diag.constraint_name == "ck_group_action_grants_application_use_only"
