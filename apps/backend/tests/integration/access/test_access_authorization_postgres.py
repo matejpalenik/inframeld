@@ -9,23 +9,26 @@ from tests.support.access_scenarios import (
     seed_project_authorization,
 )
 
-from inframeld_backend.access.application.access_context import AccessContext
-from inframeld_backend.access.application.authorization.action_authorization_service import (
+from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
+from inframeld_backend.access.application.dtos.project_action_target_dto import (
+    ProjectActionTargetDTO,
+)
+from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
 )
-from inframeld_backend.access.application.authorization.current_action_facts import (
-    CurrentActionFacts,
-)
-from inframeld_backend.access.application.authorization.project_action_target import (
-    ProjectActionTarget,
-)
-from inframeld_backend.access.domain.principal import PrincipalKind, PrincipalStatus
-from inframeld_backend.access.domain.project_values import ProjectId, ProjectStatus
-from inframeld_backend.access.infrastructure.postgres.postgres_project_action_facts_reader import (
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_status import ProjectStatus
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
 )
-from inframeld_backend.shared.application.errors import AccessDeniedError, ResourceNotFoundError
-from inframeld_backend.shared.infrastructure.postgres.database import Database
+from inframeld_backend.shared.application.errors.application_errors import (
+    AccessDeniedError,
+    ResourceNotFoundError,
+)
+from inframeld_backend.shared.infrastructure.resources.database import Database
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
@@ -45,9 +48,9 @@ async def test_allows_member_with_exact_project_action_grant(database: Database)
 
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
         await authorizer.require_action(
-            access=AccessContext(actor_principal_id=scenario.principal_id),
+            access=AccessContextDTO(actor_principal_id=scenario.principal_id),
             action=scenario.action,
-            target=ProjectActionTarget(
+            target=ProjectActionTargetDTO(
                 project_id=scenario.project_id,
             ),
         )
@@ -64,8 +67,8 @@ async def test_hides_project_from_active_nonmember(database: Database) -> None:
         )
         reader = PostgresProjectActionFactsReader(session)
         authorizer = ActionAuthorizationService(reader)
-        access = AccessContext(actor_principal_id=scenario.principal_id)
-        target = ProjectActionTarget(project_id=scenario.project_id)
+        access = AccessContextDTO(actor_principal_id=scenario.principal_id)
+        target = ProjectActionTargetDTO(project_id=scenario.project_id)
 
         with pytest.raises(ResourceNotFoundError):
             await authorizer.require_action(
@@ -80,7 +83,7 @@ async def test_hides_project_from_active_nonmember(database: Database) -> None:
             target=target,
         )
 
-    assert facts == CurrentActionFacts(
+    assert facts == ProjectActionFactsDTO(
         principal_status=PrincipalStatus.ACTIVE,
         project_status=ProjectStatus.ACTIVE,
         is_project_member=False,
@@ -101,9 +104,9 @@ async def test_denies_project_member_without_exact_action_grant(database: Databa
 
         with pytest.raises(AccessDeniedError):
             await authorizer.require_action(
-                access=AccessContext(actor_principal_id=scenario.principal_id),
+                access=AccessContextDTO(actor_principal_id=scenario.principal_id),
                 action=scenario.action,
-                target=ProjectActionTarget(
+                target=ProjectActionTargetDTO(
                     project_id=scenario.project_id,
                 ),
             )
@@ -125,9 +128,9 @@ async def test_hides_suspended_project_member_even_with_an_action_grant(
 
         with pytest.raises(ResourceNotFoundError):
             await authorizer.require_action(
-                access=AccessContext(actor_principal_id=scenario.principal_id),
+                access=AccessContextDTO(actor_principal_id=scenario.principal_id),
                 action=scenario.action,
-                target=ProjectActionTarget(
+                target=ProjectActionTargetDTO(
                     project_id=scenario.project_id,
                 ),
             )
@@ -139,12 +142,12 @@ async def test_project_action_grant_does_not_carry_to_another_project(database: 
     async with database.session() as session, session.begin():
         scenario = await seed_multi_project_authorization(session)
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
-        access = AccessContext(actor_principal_id=scenario.principal_id)
+        access = AccessContextDTO(actor_principal_id=scenario.principal_id)
 
         await authorizer.require_action(
             access=access,
             action=scenario.action,
-            target=ProjectActionTarget(
+            target=ProjectActionTargetDTO(
                 project_id=scenario.granted_project_id,
             ),
         )
@@ -153,7 +156,7 @@ async def test_project_action_grant_does_not_carry_to_another_project(database: 
             await authorizer.require_action(
                 access=access,
                 action=scenario.action,
-                target=ProjectActionTarget(
+                target=ProjectActionTargetDTO(
                     project_id=scenario.ungranted_project_id,
                 ),
             )
@@ -174,9 +177,9 @@ async def test_allows_application_principal_with_its_exact_project_action_grant(
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
 
         await authorizer.require_action(
-            access=AccessContext(actor_principal_id=scenario.principal_id),
+            access=AccessContextDTO(actor_principal_id=scenario.principal_id),
             action=scenario.action,
-            target=ProjectActionTarget(
+            target=ProjectActionTargetDTO(
                 project_id=scenario.project_id,
             ),
         )
@@ -192,8 +195,8 @@ async def test_missing_project_returns_no_facts_and_is_hidden(database: Database
             has_action_grant=True,
         )
         reader = PostgresProjectActionFactsReader(session)
-        access = AccessContext(caller.principal_id)
-        target = ProjectActionTarget(ProjectId(uuid4()))
+        access = AccessContextDTO(caller.principal_id)
+        target = ProjectActionTargetDTO(ProjectId(uuid4()))
 
         facts = await reader.read_action_facts(
             access=access,
@@ -226,8 +229,8 @@ async def test_another_organizations_project_is_hidden(database: Database) -> No
             has_action_grant=True,
         )
         reader = PostgresProjectActionFactsReader(session)
-        access = AccessContext(caller.principal_id)
-        target = ProjectActionTarget(foreign.project_id)
+        access = AccessContextDTO(caller.principal_id)
+        target = ProjectActionTargetDTO(foreign.project_id)
 
         facts = await reader.read_action_facts(
             access=access,

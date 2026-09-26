@@ -9,10 +9,10 @@ from psycopg import sql
 from sqlalchemy import URL, Connection, create_engine
 from sqlalchemy.orm import Session
 
-from inframeld_backend.access.infrastructure.postgres.models.access_persistence_base import (
+from inframeld_backend.access.infrastructure.rows.access_persistence_base import (
     AccessPersistenceBase,
 )
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 
 def database_url(settings: DatabaseSettings) -> URL:

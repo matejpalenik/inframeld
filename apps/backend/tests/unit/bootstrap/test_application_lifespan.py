@@ -8,8 +8,8 @@ from pydantic import SecretStr
 
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
-from inframeld_backend.shared.infrastructure.postgres.database import Database
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 
 class RecordingDatabase(Database):

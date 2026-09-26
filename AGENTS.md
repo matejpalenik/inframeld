@@ -20,33 +20,52 @@ When showing code, always show it in enough context for the developer to apply i
 
 ## Backend component conventions
 
-Follow [the application structure guide](docs/development/application-structure.md#component-conventions). Organize backend code by domain → layer → capability; keep authentication and authorization separate within Access. `bootstrap` owns aggregate settings, concrete dependency assembly, application construction, and resource lifecycle. Entry points stay small. Preserve the frontend's existing Next.js conventions.
+Follow [the application structure guide](docs/development/application-structure.md#component-conventions). Generated and suggested backend code must follow **domain → layer → component role**. Keep each domain's ownership and dependency boundaries, then group its components by their job. Do not recreate mixed authentication/authorization capability folders. `bootstrap` owns aggregate settings, concrete dependency assembly, application construction, and resource lifecycle. Entry points stay small. Preserve the frontend's existing Next.js conventions.
+
+| Layer | Role folders, created only when needed |
+| --- | --- |
+| Domain | `entities`, `value_objects`, `enums`, `policy_inputs`, `policies`, `errors`, `validation` |
+| Application | `services`, `protocols`, `dtos`, `value_objects`, `enums`, `errors` |
+| HTTP | `routes`, `dependencies`, `requests`, `responses`, `middleware`, `handlers`, `mappers`, `builders`, `openapi`, `definitions`, `types`, `validation` |
+| Infrastructure | `readers`, `verifiers`, `rows`, `settings`, `resources`, `migrations`, `logging`, `diagnostics`, `timing`, `errors`, `types` |
 
 | Component | Required naming/role |
 | --- | --- |
 | Business orchestration | `*Service`; the complete workflow belongs here, through injected protocols |
-| Public application operation | Action-named `Protocol`, such as `HumanSessionAuthenticator` or `RequireAction` |
+| Public application operation | Capability-named `Protocol`, such as `HumanSessionAuthenticator` or `ActionAuthorizer` |
 | I/O capability | Specific `Protocol`, such as `BrowserSessionVerifier` or `HumanIdentityLinkReader` |
 | Infrastructure adapter | Technology-prefixed class, such as `PostgresHumanIdentityLinkReader` |
 | FastAPI dependency | `*Dependency`; extract inputs and invoke the operation |
 | Route registration | `*_routes.py`; translate HTTP input/output |
 | ASGI middleware | `*Middleware` in `*_middleware.py`; wrap the request lifecycle |
-| Transport DTO | `*Request` / `*Response`, using Pydantic; preserve published schema names |
-| Persistence mapping | `*Row`, under the adapter's `models` package |
-| Configuration | `*Settings`, beside the resource; aggregate in bootstrap |
-| Pure business decision | Descriptive function in `*_policy.py`, without I/O |
+| Application transfer record | `*DTO` in `dtos/*_dto.py`; includes operation inputs, results, and caller/command contexts |
+| Dedicated domain policy input | `*PolicyInput` in `policy_inputs/*_policy_input.py` |
+| HTTP model | `*Request` / `*Response`, using Pydantic; preserve existing published schema names |
+| Persistence mapping | `*Row`, under `infrastructure/rows` |
+| Configuration | `*Settings`, under `infrastructure/settings`; aggregate in bootstrap |
+| Pure business decision | `*Policy` class in `policies/*_policy.py`, with pure `@staticmethod` methods |
 
-Use one primary public behavioral component per module. Keep an entity and its closely related IDs/enums together, independently importable. Cohesive exception families and private helpers may remain grouped. Pure functions remain functions; do not add a static class merely as a namespace. Remove obsolete internal modules after migrating callers, without compatibility aliases for competing layouts.
+Use one primary public type per production module. Give entities, identifiers, enums, and policy inputs separate files named after their type. Cohesive exception families, private helpers, constants, and framework type aliases may remain grouped. Import directly from defining modules. Remove obsolete modules after migrating callers, without compatibility aliases for competing layouts. Bootstrap assembly/resource records retain purpose-specific names such as `AccessComponents` and `ApplicationResources`; they are not application DTOs.
 
-Entities have stable identity and cohesive state. Value objects represent immutable meaning and validate their own invariants. Frozen application DTOs carry named operation inputs/results. Use `Principal` when a workflow needs ID, organization, kind and status together; pass `PrincipalId` when it only needs identity. Principal equality/hash follow its ID. `AccessContext` retains identity, not a status or permission snapshot. Add lifecycle behavior only with the workflow that needs it.
+Entities have stable identity and cohesive state. Value objects represent immutable meaning and validate their own invariants. Application DTOs carry named operation inputs/results. Dedicated policy inputs carry the values a domain decision consumes. Use standard `@dataclass(frozen=True, slots=True)` for DTOs, policy inputs, and immutable value objects; preserve entity-specific equality and secret-safe representations. Do not add custom record decorators, marker bases, empty protocols, or generic DTO/value-object frameworks. Field annotations alone do not perform runtime validation.
+
+Only the `PolicyInput` suffix identifies a dedicated policy input. `ProjectActionFactsDTO` is a persistence read result, despite having "Facts" in its name; the service converts it into `ActionAuthorizationPolicyInput`. A policy may instead accept an existing entity or typed parameters directly. Do not create extra input wrappers solely for naming symmetry.
+
+Use `Principal` when a workflow needs ID, organization, kind and status together; pass `PrincipalId` when it only needs identity. Principal equality/hash follow its ID. `AccessContextDTO` retains identity, not a status or permission snapshot. Add lifecycle behavior only with the workflow that needs it.
+
+Policy classes receive explicit inputs, have no mutable class state, and perform no I/O. Call them by their qualified class name, such as `ActionAuthorizationPolicy.may_perform_action(policy_input)`. Keep orchestration and injected collaborators in services. Ordinary conversion and validation helpers may remain functions.
 
 HTTP adapters parse, invoke operations, and serialize. Services coordinate business steps. Entities/value objects/policies express rules without I/O. Provider and persistence adapters perform their specific I/O and boundary conversions. Bootstrap constructs and releases resources. Authentication readers open independent short sessions after provider verification; transaction-bound authorization readers use the caller's session. Never share an `AsyncSession` across requests or keep one open while waiting for a provider.
 
+Before generating a component, identify its owner, layer, role, destination, name, declaration style, and behavioral contract. Check that the name and directory agree, conversions stay at the proper boundary, and new documentation adds useful information. Mirror production roles in unit tests; keep integration tests grouped by scenario with distinct filenames. Review organization manually rather than adding architecture or naming-enforcement tests.
+
 ## Component documentation
 
-Every public component needs a plain-language purpose sentence. Expand contracts with input meaning and trust assumptions, result meaning, expected failures, I/O/state changes, and resource/transaction ownership where relevant. Protocols own complete shared behavior; concrete classes still need useful purpose summaries and implementation-specific details. DTOs explain their fields, and value objects state enforced invariants. Do not repeat a whole protocol contract on each implementation or substitute a vague class name for an explanation.
+Add docstrings where they answer a question a maintainer would otherwise have to investigate: purpose, trust assumptions, result meaning, expected failures, non-obvious invariants, I/O/state changes, or resource/transaction ownership. Write approachable, concrete explanations. Protocols own the shared behavioral contract; implementations document additional details without repeating it. Explain what a DTO establishes or what a value object validates when the declaration alone does not make that clear.
 
-Examples of useful openings: “Verifies a browser session, requires its linked principal to be an active human, and returns the caller's access context.” “Extracts the browser session credential and invokes the human-authentication service for a protected FastAPI route.” Keep the test/fixture/helper docstring requirements below.
+Remove boilerplate that merely restates a name, signature, decorator, or obvious statement. Straightforward error subclasses need no individual docstring unless their use or handling has a meaningful distinction. Do not add repetitive documentation to reach blanket declaration coverage.
+
+Examples: “Loads the current account status and project grants using the caller’s transaction.” “Identifies the caller after authentication. Project permissions are checked separately.” “Closes resources created before startup failed.”
 
 ## Typed database access
 
@@ -76,13 +95,13 @@ The symbol scaffold is a test seam and API outline, not a completed implementati
 
 ## Test-code documentation
 
-Whenever generating or changing test code, include a concise module docstring in each new test module and a docstring on every test, fixture, and helper function or class. Explain in plain language what behavior or boundary the code verifies. Keep docstrings focused on purpose rather than narrating obvious implementation steps.
+Apply the same value-based documentation rule to tests, fixtures, helpers, and test modules. Preserve explanations of meaningful scenarios, boundaries, and unusual setup. Omit docstrings that only repeat the test name or assertions; there is no requirement to document every declaration. Public test-support transfer records use the `DTO` suffix, while scenario helpers may remain grouped.
 
 ## Implementing Python protocols
 
-Any concrete class, adapter, fake, or test double intended to implement a Python `Protocol` must explicitly name that protocol as a base class. Do not rely on structural typing alone in this repository. For example, write `class FixedActionFactsReader(ActionFactsReader):`. Implement every required protocol member with a compatible signature. Explicit inheritance documents the intended contract and lets static type checkers check member compatibility. When an implementation must provide a method, mark that protocol method with `@abstractmethod`; otherwise an IDE may treat the protocol method as an inherited default and may not flag its absence.
+Any concrete class, adapter, fake, or test double intended to implement a Python `Protocol` must explicitly name that protocol as a base class. Do not rely on structural typing alone in this repository. For example, write `class FixedProjectActionFactsReader(ProjectActionFactsReader):`. Implement every required protocol member with a compatible signature. Explicit inheritance documents the intended contract and lets static type checkers check member compatibility. When an implementation must provide a method, mark that protocol method with `@abstractmethod`; otherwise an IDE may treat the protocol method as an inherited default and may not flag its absence.
 
-Put the complete shared behavioral contract on `Protocol` classes and methods. Give concrete implementations a purpose summary and document their implementation-specific details. Mark overridden members with `@override`, including test doubles, and retain strict Pyright with `reportImplicitOverride` enabled. Keep the docstring requirements for tests, fixtures, and helpers.
+Put the shared behavioral contract on `Protocol` classes and methods. Describe implementation-specific details where they add value. Mark overridden members with `@override`, including test doubles, and retain strict Pyright with `reportImplicitOverride` enabled. Protocols describe behavioral capabilities; do not introduce one merely to label a record.
 
 ## Repository setup test policy
 

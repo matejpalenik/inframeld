@@ -8,12 +8,9 @@ from typing import Literal
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from inframeld_backend.access.infrastructure.kratos.kratos_settings import KratosSettings
-from inframeld_backend.shared.infrastructure.observability.logging_settings import (
-    LogFormat,
-    LogLevel,
-)
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
+from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.types.logging_types import LogFormat, LogLevel
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_ENV_FILE = BACKEND_ROOT / ".env"

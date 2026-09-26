@@ -12,42 +12,38 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from tests.support.postgres import database_session, insert_row
 
-from inframeld_backend.access.domain.action_values import ActionId
-from inframeld_backend.access.domain.group_values import AccessGroupId
-from inframeld_backend.access.domain.identity_values import IdentityAuthority, IdentitySubject
-from inframeld_backend.access.domain.organization_values import OrganizationId
-from inframeld_backend.access.domain.principal import PrincipalId, PrincipalKind, PrincipalStatus
-from inframeld_backend.access.domain.project_values import ProjectId, ProjectStatus
-from inframeld_backend.access.infrastructure.postgres.models.access_group_row import AccessGroupRow
-from inframeld_backend.access.infrastructure.postgres.models.application_account_row import (
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_status import ProjectStatus
+from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.rows.access_group_row import AccessGroupRow
+from inframeld_backend.access.infrastructure.rows.application_account_row import (
     ApplicationAccountRow,
 )
-from inframeld_backend.access.infrastructure.postgres.models.application_action_grant_row import (
+from inframeld_backend.access.infrastructure.rows.application_action_grant_row import (
     ApplicationActionGrantRow,
 )
-from inframeld_backend.access.infrastructure.postgres.models.group_action_grant_row import (
-    GroupActionGrantRow,
-)
-from inframeld_backend.access.infrastructure.postgres.models.group_manager_row import (
-    GroupManagerRow,
-)
-from inframeld_backend.access.infrastructure.postgres.models.group_membership_row import (
-    GroupMembershipRow,
-)
-from inframeld_backend.access.infrastructure.postgres.models.human_identity_link_row import (
+from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
+from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
+from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
+from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
 )
-from inframeld_backend.access.infrastructure.postgres.models.organization_row import OrganizationRow
-from inframeld_backend.access.infrastructure.postgres.models.principal_row import PrincipalRow
-from inframeld_backend.access.infrastructure.postgres.models.project_action_grant_row import (
+from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
+from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
+from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
 )
-from inframeld_backend.access.infrastructure.postgres.models.project_membership_row import (
-    ProjectMembershipRow,
-)
-from inframeld_backend.access.infrastructure.postgres.models.project_row import ProjectRow
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
-from inframeld_backend.shared.infrastructure.postgres.migration_runner import run_migrations
+from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
+from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import run_migrations
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",

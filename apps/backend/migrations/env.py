@@ -7,8 +7,8 @@ from alembic import context
 from sqlalchemy import URL, create_engine, pool
 
 from inframeld_backend.bootstrap.application_settings import get_settings
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
-from inframeld_backend.shared.infrastructure.postgres.migration_runner import migration_lock
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import migration_lock
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 config = context.config
 if config.config_file_name is not None:

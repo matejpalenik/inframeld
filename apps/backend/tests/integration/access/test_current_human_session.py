@@ -8,15 +8,15 @@ from pydantic import HttpUrl
 from tests.support.access_scenarios import seed_linked_human
 from tests.support.kratos_browser import create_browser, register_human
 
-from inframeld_backend.access.application.authentication.verified_human_identity import (
-    VerifiedHumanIdentity,
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
 )
-from inframeld_backend.access.domain.identity_values import IdentityAuthority
-from inframeld_backend.access.infrastructure.kratos.kratos_settings import KratosSettings
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import get_settings
-from inframeld_backend.shared.infrastructure.postgres.database import Database
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 KRATOS_PUBLIC_URL = "http://127.0.0.1:14433"
 AUTHORITY = IdentityAuthority("kratos:test")
@@ -38,7 +38,7 @@ async def test_current_session_uses_kratos_cookie_and_local_identity_link(
         human = await register_human(browser)
     subject, cookie = human.subject, human.credential.value
     async with database.session() as session, session.begin():
-        principal = await seed_linked_human(session, VerifiedHumanIdentity(AUTHORITY, subject))
+        principal = await seed_linked_human(session, VerifiedHumanIdentityDTO(AUTHORITY, subject))
 
     settings = get_settings().model_copy(
         update={

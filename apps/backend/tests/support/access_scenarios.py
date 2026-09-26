@@ -5,39 +5,36 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from inframeld_backend.access.application.authentication.verified_human_identity import (
-    VerifiedHumanIdentity,
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
 )
-from inframeld_backend.access.domain.action_values import ActionId
-from inframeld_backend.access.domain.organization_values import OrganizationId
-from inframeld_backend.access.domain.principal import (
-    Principal,
-    PrincipalId,
-    PrincipalKind,
-    PrincipalStatus,
-)
-from inframeld_backend.access.domain.project_values import ProjectId, ProjectStatus
-from inframeld_backend.access.infrastructure.postgres.models.application_account_row import (
+from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_status import ProjectStatus
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.rows.application_account_row import (
     ApplicationAccountRow,
 )
-from inframeld_backend.access.infrastructure.postgres.models.human_identity_link_row import (
+from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
 )
-from inframeld_backend.access.infrastructure.postgres.models.organization_row import OrganizationRow
-from inframeld_backend.access.infrastructure.postgres.models.principal_row import PrincipalRow
-from inframeld_backend.access.infrastructure.postgres.models.project_action_grant_row import (
+from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
+from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
+from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
 )
-from inframeld_backend.access.infrastructure.postgres.models.project_membership_row import (
-    ProjectMembershipRow,
-)
-from inframeld_backend.access.infrastructure.postgres.models.project_row import ProjectRow
+from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
+from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 
 TEST_PROJECT_ACTION = ActionId("test-project-action")
 
 
 @dataclass(frozen=True, slots=True)
-class ProjectAuthorizationSeed:
+class ProjectAuthorizationSeedDTO:
     """Identify the principal and project created for an authorization test."""
 
     principal_id: PrincipalId
@@ -46,7 +43,7 @@ class ProjectAuthorizationSeed:
 
 
 @dataclass(frozen=True, slots=True)
-class MultiProjectAuthorizationSeed:
+class MultiProjectAuthorizationSeedDTO:
     """Identify two projects with different grants for the same human principal."""
 
     principal_id: PrincipalId
@@ -62,7 +59,7 @@ async def seed_project_authorization(
     has_action_grant: bool,
     principal_kind: PrincipalKind = PrincipalKind.HUMAN,
     principal_status: PrincipalStatus = PrincipalStatus.ACTIVE,
-) -> ProjectAuthorizationSeed:
+) -> ProjectAuthorizationSeedDTO:
     """Create a human or application principal with optional project membership and grant."""
     if has_action_grant and not is_project_member:
         raise ValueError("A project action grant requires project membership.")
@@ -129,7 +126,7 @@ async def seed_project_authorization(
         )
         await session.flush()
 
-    return ProjectAuthorizationSeed(
+    return ProjectAuthorizationSeedDTO(
         principal_id=principal_id,
         project_id=project_id,
         action=TEST_PROJECT_ACTION,
@@ -138,7 +135,7 @@ async def seed_project_authorization(
 
 async def seed_multi_project_authorization(
     session: AsyncSession,
-) -> MultiProjectAuthorizationSeed:
+) -> MultiProjectAuthorizationSeedDTO:
     """Create Alice as a member of two projects with a grant in only one."""
     organization_id = OrganizationId(uuid4())
     principal_id = PrincipalId(uuid4())
@@ -194,7 +191,7 @@ async def seed_multi_project_authorization(
     )
     await session.flush()
 
-    return MultiProjectAuthorizationSeed(
+    return MultiProjectAuthorizationSeedDTO(
         principal_id=principal_id,
         granted_project_id=granted_project_id,
         ungranted_project_id=ungranted_project_id,
@@ -204,7 +201,7 @@ async def seed_multi_project_authorization(
 
 async def seed_linked_human(
     session: AsyncSession,
-    identity: VerifiedHumanIdentity,
+    identity: VerifiedHumanIdentityDTO,
     *,
     status: PrincipalStatus = PrincipalStatus.ACTIVE,
 ) -> Principal:

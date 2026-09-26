@@ -76,126 +76,207 @@ Startup code creates and connects these implementations. This is the **compositi
 
 ### Finding a component in the implemented backend
 
-Follow **domain → layer → capability**. Access owns identity and permission concepts; authentication and authorization are separate capabilities inside its layers. `bootstrap` constructs the process and its resources. The other domain packages remain small scaffolds until their workflows are implemented.
+Follow **domain → layer → component role**. First choose the owner, then the layer, then the job the component performs. To follow a business workflow, open its application service; to inspect a collaborator's contract, open its protocol. Authentication and authorization share these role folders inside Access.
 
-This is the maintained layout under `apps/backend/src/inframeld_backend/` (individual row mappings and shared error modules are abbreviated):
+The layout below shows the main components under `apps/backend/src/inframeld_backend/`. Individual row mappings and some shared adapters are abbreviated. Create a role folder only when implemented code needs it.
 
 ```text
 inframeld_backend/
-├── main.py                           # executable ASGI entrypoint
-├── migrate.py                        # operator migration entrypoint
-├── bootstrap/
-│   ├── application_factory.py        # create_app; no network calls
-│   ├── application_settings.py       # ApplicationSettings; environment loading
-│   ├── access_composition.py         # assemble concrete Access dependencies
-│   ├── application_resources.py      # owned database and SDK resources
-│   └── application_lifespan.py        # startup and cleanup, including failure
+├── main.py
+├── migrate.py
+├── bootstrap/                         # construction, assembly, settings, lifecycle
+│   ├── application_factory.py
+│   ├── application_settings.py
+│   ├── access_composition.py
+│   ├── access_components.py
+│   ├── application_resources.py
+│   └── application_lifespan.py
 ├── access/
 │   ├── domain/
-│   │   ├── principal.py              # Principal, PrincipalId, kind and status
-│   │   ├── organization_values.py
-│   │   ├── project_values.py
-│   │   ├── group_values.py
-│   │   ├── identity_values.py        # authority and subject
-│   │   ├── action_values.py          # exact ActionId
-│   │   ├── human_authentication_policy.py
-│   │   └── action_authorization_policy.py
+│   │   ├── entities/principal.py
+│   │   ├── value_objects/             # PrincipalId, ProjectId, ActionId, identity values
+│   │   ├── enums/                     # PrincipalKind, PrincipalStatus, ProjectStatus
+│   │   ├── policy_inputs/action_authorization_policy_input.py
+│   │   └── policies/                  # named classes with pure static methods
+│   │       ├── action_authorization_policy.py
+│   │       ├── human_authentication_policy.py
+│   │       └── project_visibility_policy.py
 │   ├── application/
-│   │   ├── access_context.py
-│   │   ├── authentication/
-│   │   │   ├── authenticate_human_session.py
+│   │   ├── services/
 │   │   │   ├── human_session_authentication_service.py
 │   │   │   ├── unavailable_human_session_authentication_service.py
+│   │   │   └── action_authorization_service.py
+│   │   ├── protocols/
+│   │   │   ├── human_session_authenticator.py
+│   │   │   ├── action_authorizer.py
 │   │   │   ├── browser_session_verifier.py
 │   │   │   ├── human_identity_link_reader.py
-│   │   │   ├── browser_session_credential.py
-│   │   │   └── verified_human_identity.py
-│   │   └── authorization/
-│   │       ├── require_action.py
-│   │       ├── action_authorization_service.py
-│   │       ├── action_facts_reader.py
-│   │       ├── current_action_facts.py
-│   │       └── project_action_target.py
-│   ├── http/authentication/
-│   │   ├── current_session_routes.py
-│   │   ├── current_session_response.py
-│   │   └── human_session_dependency.py
+│   │   │   └── project_action_facts_reader.py
+│   │   ├── dtos/
+│   │   │   ├── access_context_dto.py
+│   │   │   ├── verified_human_identity_dto.py
+│   │   │   ├── project_action_target_dto.py
+│   │   │   └── project_action_facts_dto.py
+│   │   └── value_objects/browser_session_credential.py
+│   ├── http/
+│   │   ├── routes/current_session_routes.py
+│   │   ├── dependencies/human_session_dependency.py
+│   │   └── responses/current_session_response.py
 │   └── infrastructure/
-│       ├── kratos/
-│       │   ├── kratos_browser_session_verifier.py
-│       │   └── kratos_settings.py
-│       └── postgres/
-│           ├── postgres_human_identity_link_reader.py
-│           ├── postgres_project_action_facts_reader.py
-│           └── models/               # one *Row mapping per module
+│       ├── readers/                   # PostgresHumanIdentityLinkReader, project facts reader
+│       ├── verifiers/kratos_browser_session_verifier.py
+│       ├── settings/kratos_settings.py
+│       ├── rows/                      # one ORM row or mapping base per module
+│       └── types/enum_types.py
 └── shared/
-    ├── domain/                       # shared errors and value validation
+    ├── domain/
+    │   ├── errors/domain_errors.py
+    │   └── validation/value_validation.py
     ├── application/
-    │   ├── application_error.py
-    │   ├── application_error_code.py
-    │   ├── errors.py
-    │   ├── commands/command_context.py
-    │   └── correlation/              # RequestId and OperationId
+    │   ├── errors/
+    │   ├── enums/application_error_code.py
+    │   ├── dtos/command_context_dto.py
+    │   └── value_objects/             # RequestId and OperationId
     ├── http/
-    │   ├── health_routes.py
-    │   ├── request_context_middleware.py
-    │   ├── request_identity.py
-    │   ├── errors/                   # problems, mapping, validation, handlers
-    │   └── pagination/               # PaginationQuery and PageResponse
+    │   ├── routes/health_routes.py
+    │   ├── dependencies/request_identity.py
+    │   ├── middleware/request_context_middleware.py
+    │   ├── requests/pagination_query.py
+    │   ├── responses/                 # PageResponse, ProblemDetails, ValidationIssue
+    │   ├── handlers/
+    │   ├── mappers/
+    │   ├── builders/
+    │   ├── openapi/
+    │   ├── definitions/               # problem definition and reviewed catalogue
+    │   ├── types/                     # problem codes and bounded field aliases
+    │   └── validation/
     └── infrastructure/
-        ├── postgres/                # Database, DatabaseSettings, migrations
-        └── observability/           # logging, safe diagnostics, timing
+        ├── resources/database.py
+        ├── settings/database_settings.py
+        ├── migrations/migration_runner.py
+        ├── rows/                      # Alembic's version row and mapping base
+        ├── errors/
+        ├── logging/
+        ├── diagnostics/
+        ├── timing/
+        └── types/logging_types.py
 ```
 
 ### Component roles and naming
 
-Use one primary public behavioral component per module. A model module can contain the entity and its closely related identifiers/enums. Exception families and private helpers can remain together. Pure functions stay functions; a class must have a responsibility beyond providing a namespace.
+Use one primary public type per production module, with a matching snake-case filename. Entities, IDs, enums, and policy inputs have separate defining modules. Cohesive exception families, private helpers, constants, and framework type aliases may remain grouped. Import from the defining module; do not retain compatibility aliases after an internal move.
 
-| Role | Naming and current example | Responsibility |
+| Role | Naming and example | Responsibility |
 | --- | --- | --- |
-| Application operation | Action-named `Protocol`: `HumanSessionAuthenticator`, `RequireAction` | Public input, result, failure and ownership contract, independent of HTTP and vendors. |
-| Application service | `*Service`: `HumanSessionAuthenticationService` | Orchestrate the business workflow through injected protocols. Read the complete workflow here. |
-| External capability | Specific `Protocol`: `BrowserSessionVerifier`, `HumanIdentityLinkReader` | Describe the I/O capability the application needs, using application/domain values. |
-| Entity | `Principal` | Cohesive state with stable identity. Equality follows its ID. |
-| Value object | `PrincipalId`, `IdentitySubject`, `BrowserSessionCredential` | Immutable meaning with validation. Equality follows value and semantic type. |
-| Application DTO | `VerifiedHumanIdentity`, `CurrentActionFacts`, `AccessContext` | Frozen, named fields crossing an operation boundary. No framework model or arbitrary result mapping. |
-| Pure policy | `may_authenticate_human` in `human_authentication_policy.py` | Decide a business rule from supplied values, without I/O. |
-| Persistence/provider adapter | Technology-prefixed `PostgresHumanIdentityLinkReader`, `KratosBrowserSessionVerifier` | Perform specific I/O and convert external values to application/domain values. |
-| HTTP dependency | `HumanSessionDependency` | Extract the credential and call the application operation for a protected route. |
-| Routes | `current_session_routes.py` | Register endpoints and convert operation results into transport responses. |
-| HTTP DTO | `*Request`, `*Response`: `CurrentSessionResponse` | Validate or serialize the wire contract using Pydantic. Published problem/schema names remain stable. |
-| ASGI middleware | `RequestContextMiddleware` in `request_context_middleware.py` | Wrap the request lifecycle, correlate logs, and add response headers. |
-| ORM row | `PrincipalRow` in `principal_row.py` | Map persisted fields with typed SQLAlchemy expressions and constructors. |
-| Configuration | `*Settings`: `KratosSettings`, `DatabaseSettings`, `ApplicationSettings` | Validate configuration beside its resource; aggregate it in bootstrap. |
-| Bootstrap function | `create_app`, `create_access_components`, `application_lifespan` | Construct resources, assemble dependencies, register HTTP behavior, and own process lifecycle. |
+| Application operation | Capability-named protocol: `HumanSessionAuthenticator`, `ActionAuthorizer` | Specify public inputs, results, failures, and ownership independently of HTTP and vendors. |
+| Application service | `*Service`: `HumanSessionAuthenticationService` | Coordinate the complete workflow through injected protocols. |
+| I/O capability | Specific protocol: `BrowserSessionVerifier`, `ProjectActionFactsReader` | State the external capability the application requires. |
+| Entity | `Principal` in `entities/principal.py` | Hold account state with stable identity; equality follows its ID. |
+| Value object | `PrincipalId`, `IdentitySubject`, `BrowserSessionCredential` in `value_objects` | Give a value its meaning and enforce its invariants. |
+| Enum | `PrincipalStatus` in `enums/principal_status.py` | Define a closed vocabulary. |
+| Application DTO | `*DTO` in `dtos/*_dto.py` | Carry named operation inputs, results, or caller/command context. |
+| Dedicated policy input | `*PolicyInput` in `policy_inputs/*_policy_input.py` | Supply the values a domain policy needs for its decision. |
+| Policy | `*Policy` in `policies/*_policy.py` | Make a pure decision through static methods with explicit inputs. |
+| Adapter | Technology-prefixed `PostgresHumanIdentityLinkReader`, `KratosBrowserSessionVerifier` | Perform I/O and convert external values at the boundary. |
+| HTTP dependency | `*Dependency` | Extract request inputs and invoke an application operation. |
+| Routes | `*_routes.py` | Register endpoints and translate their inputs and outputs. |
+| HTTP model | `*Request` / `*Response` | Validate or serialize the wire contract using Pydantic. |
+| Middleware | `*Middleware` in `*_middleware.py` | Wrap the ASGI request lifecycle. |
+| ORM mapping | `*Row` in `infrastructure/rows` | Map persisted fields using typed constructors and expressions. |
+| Settings | `*Settings` in `infrastructure/settings` | Validate resource configuration; bootstrap aggregates it. |
+| Bootstrap assembly | `AccessComponents`, `ApplicationResources` | Group constructed collaborators and owned resources. These are not application DTOs. |
 
-A dependency and middleware have different lifetimes. FastAPI invokes `HumanSessionDependency` for the route that declares it. `RequestContextMiddleware` wraps HTTP requests at the ASGI boundary. Neither owns the authentication business workflow.
+Existing published HTTP names such as `ProblemDetails` and `ValidationIssue` are preserved, including their OpenAPI descriptions. They do not acquire a DTO suffix. New HTTP models use Request/Response naming; application transfer records always use the uppercase `DTO` suffix.
 
-### Contracts and descriptive documentation
+A FastAPI dependency and ASGI middleware have different lifetimes. FastAPI invokes `HumanSessionDependency` for the route that declares it. `RequestContextMiddleware` wraps requests at the ASGI boundary. The authentication workflow belongs to `HumanSessionAuthenticationService`.
 
-Every operation and I/O port is an explicit `Protocol`. Required methods use `@abstractmethod`. Every intended implementation, including fakes, names its protocol as a base and marks overrides with `@override`. Strict Pyright checks implicit overrides as errors. Do not add an interface merely to wrap a pure function or a concrete resource that has no application-facing substitution boundary.
+### Record roles: DTO, policy input, entity, and value object
 
-Protocols own the complete shared contract: what the inputs mean, what must already be trusted, what is returned, what failures mean, and any session/transaction ownership requirement. Concrete classes still need a useful purpose summary and explain their technology or lifecycle details. A new maintainer should understand a component without reading every method body.
+A dataclass is an implementation mechanism, not a record's architectural role. Use standard `@dataclass(frozen=True, slots=True)` for application DTOs, policy inputs, and immutable value objects. Do not add custom decorators, marker bases, empty protocols, or generic record frameworks. Dataclass annotations do not perform runtime validation; value objects retain their explicit checks.
 
-For example, the service's opening sentence explains that it verifies a browser session, requires an active local human, and returns access context. The reader's docstring explains the exact authority/subject lookup and its independent session. The dependency describes cookie extraction and invocation of the service. DTOs explain their fields; value objects explain their enforced invariants. Document every test, fixture, and helper by the boundary or behavior it verifies.
+| Implemented record | What it means |
+| --- | --- |
+| `VerifiedHumanIdentityDTO` | The provider verified this authority/subject pair. Local account admission remains to be checked. |
+| `AccessContextDTO` | The authenticated caller's principal ID, without cached status or permissions. |
+| `ProjectActionTargetDTO` | The exact project selected for authorization; no proof of existence or visibility. |
+| `ProjectActionFactsDTO` | Stored project/account status, membership, and exact-grant existence returned by a reader. |
+| `ActionAuthorizationPolicyInput` | The eligibility and grant values the action policy consumes. |
+| `CommandContextDTO` | Trusted request and operation identities used in command diagnostics. |
+| `Principal` | A local account snapshot whose entity identity remains its `PrincipalId`. |
+| `PrincipalId` | A UUID belonging to the principal identifier type, without proof that an account exists. |
 
-### Entity, value object, and DTO examples
+Only `PolicyInput` identifies a dedicated policy input record. The word "Facts" in `ProjectActionFactsDTO` describes the reader's data; its DTO suffix makes its application boundary explicit. The service converts it into the policy input. Policies may also accept an existing entity or typed parameters directly: human admission accepts `Principal`, and project visibility accepts status and membership parameters.
 
-[`Principal`](../../apps/backend/src/inframeld_backend/access/domain/principal.py) contains `id`, `organization_id`, `kind`, and `status`. It is immutable, and equality/hash use only `PrincipalId`. Two observations of the same account remain the same entity if its status changes. This adds no lifecycle command, permission cache, or ORM relationship graph. Pass the whole principal when a policy needs its state together; pass `PrincipalId` when only identity is required.
+[`Principal`](../../apps/backend/src/inframeld_backend/access/domain/entities/principal.py) contains its ID, organization, kind, and status. Equality and hashing use only its ID. The identifiers and enums live in separate files without weakening that cohesive entity. Pass the entity when a rule needs its state together; pass its ID when only identity is needed.
 
-UUID identifiers are separate frozen, slotted dataclasses containing `value: UUID`. Their constructors reject unparsed strings. Equal UUIDs in `ProjectId` and `PrincipalId` remain distinct values, and the IDE rejects passing one to a contract requiring the other. Parse strings as UUIDs at the boundary, then construct the correct ID. These objects do not prove database existence, project scope, or authorization. Zero UUIDs and existing UUID versions remain valid.
+UUID IDs are frozen, slotted dataclasses wrapping a parsed UUID. Constructors reject raw strings, and equal UUIDs in different ID classes remain distinct. Preserve existing UUID versions and zero values. Parse and validate at external boundaries, then explicitly wrap/unwrap IDs at persistence and transport boundaries. Existence and authorization require their normal checks.
 
-`IdentityAuthority` and `IdentitySubject` belong together in `identity_values.py`; [`VerifiedHumanIdentity`](../../apps/backend/src/inframeld_backend/access/application/authentication/verified_human_identity.py) carries that pair after provider verification. It is a frozen DTO representing a verified result. It does not grant local account admission. `BrowserSessionCredential` wraps the opaque cookie and hides its contents from representations and validation messages. Never log its explicit `.value`.
+Identity authorities and subjects are separate value objects, grouped by `VerifiedHumanIdentityDTO` after provider verification. `BrowserSessionCredential` remains application-owned and hides its contents in representations and validation messages. Never log its explicit `.value`. `RequestId` and `OperationId` represent correlation, not authority.
 
-[`AccessContext`](../../apps/backend/src/inframeld_backend/access/application/access_context.py) carries only the local `PrincipalId`. It does not retain status or grants. [`ProjectActionTarget`](../../apps/backend/src/inframeld_backend/access/application/authorization/project_action_target.py) carries a `ProjectId` for the implemented authorization behavior. Add other target variants together with their actual reader and policy behavior.
+### Qualified policy calls
 
-`RequestId` is a generated UUID used for correlation. `OperationId` is nonblank opaque text. Neither is an identity or a grant. Logging and HTTP serialize their explicit values. Closed vocabularies use enums or `Literal`; free-form text remains a string.
+Call pure business decisions through their policy class:
+
+| Call | Decision |
+| --- | --- |
+| `HumanAuthenticationPolicy.may_authenticate(principal)` | Is the linked principal an active human? |
+| `ProjectVisibilityPolicy.may_view_project(...)` | May this caller learn that the organization-scoped project exists? |
+| `ActionAuthorizationPolicy.may_perform_action(policy_input)` | Does current eligibility include the exact requested grant? |
+
+Policy methods use `@staticmethod`, explicit inputs, and no I/O or mutable class state. Services own orchestration and their injected collaborators. Ordinary conversion and validation helpers remain functions; adding a static policy convention does not turn all helpers into classes.
+
+The following are the complete implemented declarations in `apps/backend/src/inframeld_backend/access/domain/policy_inputs/action_authorization_policy_input.py` and `apps/backend/src/inframeld_backend/access/domain/policies/action_authorization_policy.py`; they illustrate the convention and require no separate example files.
+
+**`access/domain/policy_inputs/action_authorization_policy_input.py`**
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
+class ActionAuthorizationPolicyInput:
+    """Supply the current eligibility and exact grant needed to decide action admission."""
+
+    principal_is_active: bool
+    is_project_member: bool
+    has_exact_action_grant: bool
+```
+
+**`access/domain/policies/action_authorization_policy.py`**
+
+```python
+from inframeld_backend.access.domain.policy_inputs.action_authorization_policy_input import (
+    ActionAuthorizationPolicyInput,
+)
+
+
+class ActionAuthorizationPolicy:
+    """Require an active project member with the exact action grant."""
+
+    @staticmethod
+    def may_perform_action(policy_input: ActionAuthorizationPolicyInput) -> bool:
+        return (
+            policy_input.principal_is_active
+            and policy_input.is_project_member
+            and policy_input.has_exact_action_grant
+        )
+```
+
+### Contracts and useful documentation
+
+Operation and I/O contracts are explicit protocols. Required methods use `@abstractmethod`; implementations and test doubles explicitly inherit their protocol and mark overrides with `@override`. Strict Pyright checks those contracts. Protocols describe behavior; records do not acquire protocols just to label their role.
+
+Document information a maintainer would otherwise have to infer: purpose, trusted inputs, what a result establishes, failure meaning, side effects, resource ownership, or a non-obvious invariant. Use direct human language, such as “Loads the current account status and project grants using the caller’s transaction.” Put the shared contract on the protocol and extra implementation details on the adapter.
+
+Remove comments and docstrings that only repeat a name, signature, decorator, or obvious statement. A straightforward error subclass does not need its own docstring. Explain exceptions when the distinction affects handling, such as a dependency failure that does not establish whether retrying is safe. Keep useful test/fixture explanations, especially for unusual setup; there is no blanket requirement to document every declaration.
+
+Before generating code, choose its owner, layer, role, destination, name, declaration style, and behavioral contract. Check its dependency direction and whether any documentation actually adds information. [AGENTS.md](../../AGENTS.md) makes these conventions mandatory for generated and suggested backend code.
 
 ### Typed persistence and boundary conversions
 
 ORM rows stay inside PostgreSQL adapters and test support. Use `MappedAsDataclass` with keyword-only construction, typed `Mapped` fields, and database-generated fields excluded from initialization. Keep UUID columns as UUIDs; unwrap `.value` when constructing predicates/rows and wrap returned UUIDs when creating domain results. Enum mappings convert real stored values to enum instances and preserve existing database strings.
 
-Use scalars, ORM records, or typed tuples and immediately construct named results. `PostgresProjectActionFactsReader` turns four typed expressions into `CurrentActionFacts`; it never indexes a SQL result by arbitrary string keys. SQLAlchemy describes this type propagation in its [typed result documentation](https://docs.sqlalchemy.org/en/20/changelog/whatsnew_20.html#sql-expression-statement-result-set-typing).
+Use scalars, ORM records, or typed tuples and immediately construct named results. `PostgresProjectActionFactsReader` turns typed status and relationship expressions into `ProjectActionFactsDTO`; it never indexes a SQL result by arbitrary string keys. SQLAlchemy describes this type propagation in its [typed result documentation](https://docs.sqlalchemy.org/en/20/changelog/whatsnew_20.html#sql-expression-statement-result-set-typing).
 
 Use SQLAlchemy inspection and typed expressions for connectivity, revision checks, and advisory locks. Alembic owns schema creation, including test-only constraints. Partial ORM read mappings are not a replacement schema or an autogeneration source for the authoritative initial migration.
 
@@ -216,8 +297,8 @@ flowchart TD
     Service --> Reader["HumanIdentityLinkReader"]
     Reader --> Postgres["PostgresHumanIdentityLinkReader<br/>Independent read session"]
     Reader --> Principal["Principal<br/>ID, organization, kind, status"]
-    Service --> Policy["may_authenticate_human"]
-    Service --> Context["AccessContext<br/>PrincipalId"]
+    Service --> Policy["HumanAuthenticationPolicy.may_authenticate"]
+    Service --> Context["AccessContextDTO<br/>PrincipalId"]
 ```
 
 Arrows represent calls or returned data inside one backend. Kratos and PostgreSQL are external services; the protocol and implementation boxes describe the same capability at two code boundaries.
@@ -225,18 +306,18 @@ Arrows represent calls or returned data inside one backend. Kratos and PostgreSQ
 1. Alice calls `GET /v1/session`. The FastAPI dependency reads the session cookie and creates an optional `BrowserSessionCredential`.
 2. `HumanSessionAuthenticationService.authenticate` rejects an absent credential, then calls the injected verifier. The Kratos adapter runs the synchronous SDK call in a worker thread, checks expiry and provider identity state, and returns the verified authority/subject.
 3. After verification completes, the reader opens a short independent database session. It finds the exact identity pair, constructs a `Principal`, and closes the session. No SQL session is held while waiting for Kratos, and concurrent requests never share an `AsyncSession`.
-4. The service applies `may_authenticate_human`. A verified upstream identity needs an existing active local human account. The service returns `AccessContext` containing that account's ID.
+4. The service applies `HumanAuthenticationPolicy.may_authenticate`. A verified upstream identity needs an existing active local human account. The service returns `AccessContextDTO` containing that account's ID.
 5. The route unwraps the ID into `CurrentSessionResponse`. The existing wire result remains `{"principalId": "<uuid>"}`.
 
 Missing/rejected/expired credentials produce generic 401; absent links or ineligible local principals produce 403; unavailable/malformed provider responses produce 503. An explicit unavailable authentication implementation preserves 503 when Kratos configuration is absent. These outcomes use the shared [HTTP problem boundary](error-handling.md).
 
-Authentication establishes the caller. A later `ActionAuthorizationService.require_action` reads current visibility, membership, account, and exact-grant facts. The pure policy decides admission. Hidden targets stay 404; visible targets without authority stay 403. Its PostgreSQL reader is bound to the caller's transaction session, unlike the independently scoped authentication reader.
+Authentication establishes the caller. A later `ActionAuthorizationService.require_action` reads current visibility, membership, account, and exact-grant facts. The service checks `ProjectVisibilityPolicy`, converts the reader DTO into `ActionAuthorizationPolicyInput`, then checks `ActionAuthorizationPolicy`. Hidden targets stay 404; visible targets without authority stay 403. Its PostgreSQL reader is bound to the caller's transaction session, unlike the independently scoped authentication reader.
 
 ### Resource ownership and test organization
 
 Bootstrap creates stateless authentication services and adapters once per application. `Database` owns the pool and produces operation-local sessions. The lifespan starts the database compatibility check and always disposes the database and clears the actual Kratos SDK pool, including failed startup. The installed SDK context-manager exit does not release that pool. Construction and OpenAPI export perform no network calls; schema tools import `create_app` directly.
 
-Unit tests mirror the production layers and capabilities. Integration tests are grouped under `access`, `postgres`, `kratos`, and `observability`, with distinct scenario filenames. Shared typed seed builders, isolated database provisioning, and validated browser-flow DTOs live under `tests/support`. Tests assert public JSON explicitly when the wire representation is the behavior under test.
+Unit tests mirror production layers and component roles. Integration tests are grouped under `access`, `postgres`, `kratos`, and `observability`, with distinct scenario filenames. Shared typed seed builders, isolated database provisioning, and validated browser-flow DTOs live under `tests/support`. Tests assert public JSON explicitly when the wire representation is the behavior under test.
 
 `pnpm check:backend` runs formatting, lint, strict Pyright, fast behavioral/contract tests, and OpenAPI comparison. `pnpm test:integration` starts the isolated application PostgreSQL and Kratos stack, runs the complete suite, and cleans up services. CI invokes that same command. Review architecture and documentation manually; automated tests cover behavior, API contracts, resource cleanup, and actual integrations.
 

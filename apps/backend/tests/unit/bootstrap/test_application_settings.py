@@ -3,9 +3,9 @@
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from inframeld_backend.access.domain.identity_values import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.bootstrap.application_settings import get_settings
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 
 def test_database_settings_rejects_non_positive_startup_timeout() -> None:

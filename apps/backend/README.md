@@ -69,46 +69,44 @@ The application database and Kratos identities are stored in separate named volu
 
 ## Architecture and component map
 
-The backend is organized by domain → layer → capability. Start with the [component map, naming conventions, and worked authentication flow](../../docs/development/application-structure.md#component-conventions) before adding or moving a component.
+The backend follows **domain → layer → component role**. Start with the [component map, record conventions, and worked authentication flow](../../docs/development/application-structure.md#component-conventions) before adding a component.
 
 ```text
 src/inframeld_backend/
-├── bootstrap/                     # factory, aggregate settings, assembly, lifecycle
+├── bootstrap/                 # factory, aggregate settings, assembly, lifecycle
 ├── access/
-│   ├── domain/                    # Principal, IDs, enums, pure policies
-│   ├── application/
-│   │   ├── authentication/        # service, public operation, verifier/reader ports, DTOs
-│   │   └── authorization/         # service, public operation, target/facts DTOs, reader port
-│   ├── http/authentication/        # routes, response DTO, FastAPI dependency
-│   └── infrastructure/
-│       ├── kratos/                # SDK adapter and provider settings
-│       └── postgres/              # readers and typed row mappings
+│   ├── domain/                # entities, value_objects, enums, policy_inputs, policies
+│   ├── application/           # services, protocols, dtos, value_objects
+│   ├── http/                  # routes, dependencies, responses
+│   └── infrastructure/        # readers, verifiers, rows, settings, types
 ├── shared/
-│   ├── application/               # errors, command context, correlation IDs
-│   ├── domain/                    # shared errors and value validation
-│   ├── http/                      # error handling, pagination, correlation, health
-│   └── infrastructure/            # PostgreSQL and observability
-├── main.py                        # executable ASGI entrypoint
-└── migrate.py                     # operator migration entrypoint
+│   ├── domain/                # errors, validation
+│   ├── application/           # errors, enums, dtos, value_objects
+│   ├── http/                  # handlers, responses, builders, mappers, middleware, etc.
+│   └── infrastructure/        # resources, migrations, logging, diagnostics, settings, etc.
+├── main.py
+└── migrate.py
 ```
 
-Knowledge, Indexing, Pipelines, Evaluation, and Releases retain their domain scaffolds. Add their capability modules with actual workflows. Keep shared code limited to genuinely shared technical responsibilities.
+Knowledge, Indexing, Pipelines, Evaluation, and Releases retain their domain scaffolds. Add role folders with actual workflows. Shared code contains genuinely shared technical responsibilities.
 
-Application services own business orchestration through explicit protocols. Domain entities, value objects, and policy functions express invariants without I/O. HTTP, PostgreSQL, and provider adapters translate at their boundaries. Bootstrap connects concrete implementations. Do not introduce generic repositories, a command bus, or a class that only provides a namespace.
+Application services own business orchestration through explicit protocols. Domain entities, value objects, and named policy classes express rules without I/O. Policies expose pure static methods; ordinary conversion and validation helpers can remain functions. HTTP, PostgreSQL, and provider adapters convert values at their boundaries. Bootstrap constructs concrete dependencies and owns resource lifecycle.
 
-`HumanSessionDependency` extracts the cookie and calls `HumanSessionAuthenticator`. `HumanSessionAuthenticationService` verifies the provider session, reads the exact linked principal, applies the active-human policy, and returns `AccessContext`. The session route serializes its `PrincipalId` into the existing `principalId` response. `ActionAuthorizationService` separately requires current project visibility and the exact grant.
+Application records use the `DTO` suffix, such as `VerifiedHumanIdentityDTO`. Dedicated policy inputs use `PolicyInput`, such as `ActionAuthorizationPolicyInput`. `ProjectActionFactsDTO` is a reader result, despite the word “Facts.” Use standard frozen, slotted dataclasses; no record marker protocols or custom decorators. Keep docstrings where they explain meaningful behavior or ownership, and omit repetitive boilerplate.
 
-`bootstrap/application_factory.py` constructs the application without network calls. Its lifespan owns database startup/shutdown and actual Kratos SDK pool cleanup, including failed startup. Authentication services and adapters are shared per application, but each identity lookup opens its own short session after Kratos verification. Authorization readers are bound to the caller's transaction session.
+`HumanSessionDependency` extracts the cookie and calls `HumanSessionAuthenticator`. `HumanSessionAuthenticationService` verifies the provider session, reads the exact linked principal, applies `HumanAuthenticationPolicy`, and returns `AccessContextDTO`. The route serializes its ID into the existing `principalId` response. `ActionAuthorizationService` separately checks project visibility and the exact action grant through `ProjectVisibilityPolicy` and `ActionAuthorizationPolicy`.
 
-UUID identities are runtime value objects, not string or UUID aliases. ORM columns remain UUIDs and enum columns perform real conversion. Adapters explicitly wrap and unwrap values. The immutable `Principal` groups current account state; `AccessContext` retains only the principal ID. The [data model](../../docs/development/data-model.md#implemented-principal-model) explains these distinctions.
+Application construction and OpenAPI export perform no network calls. The lifespan owns database startup/shutdown and actual Kratos SDK pool cleanup, including failed startup. Authentication adapters are shared per application, but each identity lookup opens its own short session after provider verification. Authorization readers use the caller's transaction session. This organization change preserves that lifecycle.
 
-Schema tools and contract tests import `create_app` directly, without executing `main.py` or running its lifespan. Architecture/import rules remain manually reviewed. Automated tests cover behavior, contracts, and integration outcomes.
+UUID identities remain runtime value objects. ORM columns remain UUIDs and enum columns perform real conversion. The immutable `Principal` holds account state; `AccessContextDTO` carries only its identity. The [data model](../../docs/development/data-model.md#implemented-principal-model) explains these distinctions.
+
+Architecture and naming are reviewed manually. Unit tests mirror production roles; integration tests remain grouped by scenario. Automated checks cover behavior, typing, contracts, and integration outcomes.
 
 ---
 
 ## Configuration
 
-`bootstrap/application_settings.py` aggregates `ApplicationSettings`. `KratosSettings` lives beside the provider adapter, `DatabaseSettings` beside PostgreSQL infrastructure, and logging value definitions beside observability. Their existing environment-variable names and defaults are preserved.
+`bootstrap/application_settings.py` aggregates `ApplicationSettings`. `KratosSettings` and `DatabaseSettings` live in their owners’ infrastructure `settings` packages; logging value definitions live in shared infrastructure `types`. Their existing environment-variable names and defaults are preserved.
 
 Runtime configuration is loaded from files under `apps/backend`:
 
@@ -388,7 +386,7 @@ Routes declare applicable errors using:
 problem_responses(definition)
 ```
 
-from `shared/http/errors/problem_openapi.py`.
+from `shared/http/openapi/problem_openapi.py`.
 
 Composition installs its narrow media-type correction hook once. FastAPI still generates the native schema and reusable model components.
 

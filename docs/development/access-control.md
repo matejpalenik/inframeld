@@ -118,7 +118,7 @@ If a session is invalid, expired, or cannot be verified, Inframeld denies the re
 
 The backend now exposes `GET /v1/session`. Its [component map and request flow](application-structure.md#authentication-flow) identify each service, protocol, adapter, and resource owner. `HumanSessionDependency` is a callable FastAPI dependency. `HumanSessionAuthenticationService` owns provider verification and local account admission.
 
-Kratos returns a verified authority/subject pair. An independent PostgreSQL lookup returns the [immutable Principal](data-model.md#implemented-principal-model) with ID, organization, kind, and current status. The service applies the pure active-human policy and returns an `AccessContext` containing only `PrincipalId`. It does not create an account, match an email, or cache a permission snapshot.
+Kratos returns a verified authority/subject pair. An independent PostgreSQL lookup returns the [immutable Principal](data-model.md#implemented-principal-model) with ID, organization, kind, and current status. The service applies the pure active-human policy and returns an `AccessContextDTO` containing only `PrincipalId`. It does not create an account, match an email, or cache a permission snapshot.
 
 | Condition | Current HTTP result |
 | --- | --- |

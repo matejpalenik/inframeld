@@ -10,11 +10,11 @@ import pytest
 import uvicorn
 from fastapi import FastAPI
 
-from inframeld_backend.shared.http.errors.error_handlers import register_error_handlers
-from inframeld_backend.shared.http.request_context_middleware import RequestContextMiddleware
-from inframeld_backend.shared.infrastructure.observability.logging_configuration import (
-    configure_logging,
+from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
+from inframeld_backend.shared.http.middleware.request_context_middleware import (
+    RequestContextMiddleware,
 )
+from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",

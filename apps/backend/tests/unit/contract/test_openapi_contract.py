@@ -9,15 +9,17 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
 
 from inframeld_backend.bootstrap.application_factory import create_app
-from inframeld_backend.shared.http.errors.error_handlers import register_error_handlers
-from inframeld_backend.shared.http.errors.problem_definitions import VALIDATION_ERROR_PROBLEM
-from inframeld_backend.shared.http.errors.problem_openapi import (
+from inframeld_backend.shared.http.definitions.problem_catalogue import VALIDATION_ERROR_PROBLEM
+from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
+from inframeld_backend.shared.http.middleware.request_context_middleware import (
+    RequestContextMiddleware,
+)
+from inframeld_backend.shared.http.openapi.problem_openapi import (
     configure_problem_openapi,
     problem_responses,
 )
-from inframeld_backend.shared.http.pagination.page_response import PageResponse
-from inframeld_backend.shared.http.pagination.pagination_query import PaginationQuery
-from inframeld_backend.shared.http.request_context_middleware import RequestContextMiddleware
+from inframeld_backend.shared.http.requests.pagination_query import PaginationQuery
+from inframeld_backend.shared.http.responses.page_response import PageResponse
 
 CONTRACT_PATH = (
     Path(__file__).resolve().parents[5] / "contracts" / "openapi" / "v1" / "inframeld-v1.json"

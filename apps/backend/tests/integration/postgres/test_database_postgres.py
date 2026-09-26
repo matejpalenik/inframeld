@@ -12,7 +12,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 from tests.support.database_rows import DatabaseTestRow, MissingTestRow
 
-from inframeld_backend.shared.infrastructure.postgres.database import Database
+from inframeld_backend.shared.infrastructure.resources.database import Database
 
 pytestmark = [
     pytest.mark.asyncio,

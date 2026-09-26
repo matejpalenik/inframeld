@@ -14,14 +14,14 @@ from tests.support.kratos_browser import (
     register_human,
 )
 
-from inframeld_backend.access.application.authentication.browser_session_credential import (
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
+)
+from inframeld_backend.access.application.value_objects.browser_session_credential import (
     BrowserSessionCredential,
 )
-from inframeld_backend.access.application.authentication.verified_human_identity import (
-    VerifiedHumanIdentity,
-)
-from inframeld_backend.access.domain.identity_values import IdentityAuthority
-from inframeld_backend.access.infrastructure.kratos.kratos_browser_session_verifier import (
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.infrastructure.verifiers.kratos_browser_session_verifier import (
     KratosBrowserSessionVerifier,
 )
 
@@ -32,7 +32,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-async def _verify(credential: BrowserSessionCredential) -> VerifiedHumanIdentity | None:
+async def _verify(credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
     """Verify the saved credential through the SDK and release its HTTP pools."""
     client = ApiClient(Configuration(host=KRATOS_PUBLIC_URL))
     try:
@@ -46,7 +46,7 @@ async def test_browser_registration_cookie_verifies_identity() -> None:
     """Resolve the identity behind a cookie issued during registration."""
     async with create_browser() as browser:
         human = await register_human(browser)
-        assert await _verify(human.credential) == VerifiedHumanIdentity(AUTHORITY, human.subject)
+        assert await _verify(human.credential) == VerifiedHumanIdentityDTO(AUTHORITY, human.subject)
 
 
 @pytest.mark.asyncio
@@ -56,7 +56,7 @@ async def test_password_login_cookie_verifies_same_identity() -> None:
         human = await register_human(registration_browser)
     async with create_browser() as browser:
         credential = await login_human(browser, human)
-        assert await _verify(credential) == VerifiedHumanIdentity(AUTHORITY, human.subject)
+        assert await _verify(credential) == VerifiedHumanIdentityDTO(AUTHORITY, human.subject)
 
 
 @pytest.mark.asyncio
@@ -66,6 +66,6 @@ async def test_logout_revokes_previous_browser_cookie() -> None:
         human = await register_human(registration_browser)
     async with create_browser() as browser:
         credential = await login_human(browser, human)
-        assert await _verify(credential) == VerifiedHumanIdentity(AUTHORITY, human.subject)
+        assert await _verify(credential) == VerifiedHumanIdentityDTO(AUTHORITY, human.subject)
         await logout_human(browser)
         assert await _verify(credential) is None

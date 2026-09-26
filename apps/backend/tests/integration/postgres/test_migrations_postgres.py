@@ -27,21 +27,21 @@ from sqlalchemy.exc import SQLAlchemyError
 from tests.support.database_rows import MigrationSentinelRow, MissingTestRow
 from tests.support.postgres import database_connection, database_session
 
-from inframeld_backend.shared.infrastructure.postgres import migration_runner as migration_module
-from inframeld_backend.shared.infrastructure.postgres.alembic_version_row import AlembicVersionRow
-from inframeld_backend.shared.infrastructure.postgres.database import (
-    Database,
+from inframeld_backend.shared.infrastructure.errors.database_errors import (
     DatabaseSchemaCompatibilityError,
     DatabaseStartupError,
 )
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
-from inframeld_backend.shared.infrastructure.postgres.migration_runner import (
+from inframeld_backend.shared.infrastructure.errors.migration_errors import MigrationLockError
+from inframeld_backend.shared.infrastructure.migrations import migration_runner as migration_module
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
     BACKEND_ROOT,
     MIGRATION_LOCK_KEY,
     SUPPORTED_SCHEMA_REVISION,
-    MigrationLockError,
     run_migrations,
 )
+from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from ory_kratos_client.api_client import ApiClient
 
-from inframeld_backend.shared.infrastructure.postgres.database import Database
+from inframeld_backend.shared.infrastructure.resources.database import Database
 
 
 @dataclass(frozen=True, slots=True)

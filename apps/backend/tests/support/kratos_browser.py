@@ -6,10 +6,10 @@ from uuid import UUID, uuid4
 import httpx2
 from pydantic import BaseModel
 
-from inframeld_backend.access.application.authentication.browser_session_credential import (
+from inframeld_backend.access.application.value_objects.browser_session_credential import (
     BrowserSessionCredential,
 )
-from inframeld_backend.access.domain.identity_values import IdentitySubject
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 
 KRATOS_PUBLIC_URL = "http://127.0.0.1:14433"
 
@@ -59,7 +59,7 @@ class LogoutFlow(BaseModel):
 
 
 @dataclass(frozen=True, slots=True)
-class RegisteredHuman:
+class RegisteredHumanDTO:
     """Group the test account identity and credentials without exposing its secrets."""
 
     subject: IdentitySubject
@@ -90,7 +90,7 @@ def _credential(browser: httpx2.AsyncClient) -> BrowserSessionCredential:
     return BrowserSessionCredential(cookie)
 
 
-async def register_human(browser: httpx2.AsyncClient) -> RegisteredHuman:
+async def register_human(browser: httpx2.AsyncClient) -> RegisteredHumanDTO:
     """Register a unique test human and capture its verified subject and session."""
     email, password = f"test-{uuid4().hex}@example.test", f"TestPassphrase-{uuid4().hex}!"
     started = await browser.get(
@@ -112,11 +112,11 @@ async def register_human(browser: httpx2.AsyncClient) -> RegisteredHuman:
     whoami = await browser.get("/sessions/whoami")
     assert whoami.status_code == 200, whoami.text
     subject = IdentitySubject(str(WhoamiResponse.model_validate_json(whoami.text).identity.id))
-    return RegisteredHuman(subject, email, password, _credential(browser))
+    return RegisteredHumanDTO(subject, email, password, _credential(browser))
 
 
 async def login_human(
-    browser: httpx2.AsyncClient, human: RegisteredHuman
+    browser: httpx2.AsyncClient, human: RegisteredHumanDTO
 ) -> BrowserSessionCredential:
     """Authenticate an existing test human in an independent browser session."""
     started = await browser.get(

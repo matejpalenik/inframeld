@@ -79,7 +79,7 @@ Suspension keeps both records but blocks their use. Foreign keys cannot prove th
 
 ### Implemented Principal and typed values
 
-[`access/domain/principal.py`](../../apps/backend/src/inframeld_backend/access/domain/principal.py) defines the current immutable domain entity:
+[`access/domain/entities/principal.py`](../../apps/backend/src/inframeld_backend/access/domain/entities/principal.py) defines the current immutable domain entity:
 
 | Field | Application type | Meaning |
 | --- | --- | --- |
@@ -92,7 +92,7 @@ Equality and hashing follow `PrincipalId`, so snapshots of one account remain th
 
 `PrincipalId`, `OrganizationId`, `ProjectId`, and `AccessGroupId` are distinct frozen, slotted objects wrapping a parsed UUID. They preserve all existing UUID values, while preventing accidental interchange in application contracts. ORM mappings keep UUID columns and adapters explicitly convert values. The historical initial migration remains authoritative; this reorganization adds no schema migration.
 
-`IdentityAuthority` and `IdentitySubject` remain validated exact strings carried together in `VerifiedHumanIdentity`. The identity reader returns current principal state without applying admission in SQL. `AccessContext` retains only `PrincipalId`; current account and grant checks still run when authorizing an operation. The implemented project target is `ProjectActionTarget(ProjectId)`; no generic bare-UUID resource target is implied.
+`IdentityAuthority` and `IdentitySubject` remain validated exact strings carried together in `VerifiedHumanIdentityDTO`. The identity reader returns current principal state without applying admission in SQL. `AccessContextDTO` retains only `PrincipalId`; current account and grant checks still run when authorizing an operation. The implemented project target is `ProjectActionTargetDTO(ProjectId)`; no generic bare-UUID resource target is implied.
 
 For component responsibilities and conversion examples, use [application conventions](application-structure.md#component-conventions). For HTTP outcomes and verification scope, use [the implemented authentication boundary](access-control.md#implemented-human-authentication).
 

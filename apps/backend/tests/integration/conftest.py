@@ -7,9 +7,9 @@ import pytest_asyncio
 from tests.support.postgres import temporary_database
 
 from inframeld_backend.bootstrap.application_settings import get_settings
-from inframeld_backend.shared.infrastructure.postgres.database import Database
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
-from inframeld_backend.shared.infrastructure.postgres.migration_runner import run_migrations
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import run_migrations
+from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 
 @pytest.fixture

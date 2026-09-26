@@ -6,8 +6,8 @@ import pytest
 from sqlalchemy import inspect
 from tests.support.postgres import database_connection
 
-from inframeld_backend.shared.infrastructure.postgres.database_settings import DatabaseSettings
-from inframeld_backend.shared.infrastructure.postgres.migration_runner import run_migrations
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import run_migrations
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
