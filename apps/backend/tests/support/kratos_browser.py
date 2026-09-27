@@ -93,29 +93,40 @@ def _credential(browser: httpx2.AsyncClient) -> BrowserSessionCredential:
     return BrowserSessionCredential(cookie)
 
 
-async def register_human(browser: httpx2.AsyncClient) -> RegisteredHumanDTO:
+async def register_human(
+    browser: httpx2.AsyncClient, *, email: str | None = None
+) -> RegisteredHumanDTO:
     """Register a unique test human and capture its verified subject and session."""
-    email, password = f"test-{uuid4().hex}@example.test", f"TestPassphrase-{uuid4().hex}!"
+    resolved_email = email if email is not None else f"test-{uuid4().hex}@example.test"
+    password = f"TestPassphrase-{uuid4().hex}!"
+
     started = await browser.get(
         "/self-service/registration/browser", headers={"Accept": "application/json"}
     )
+
     assert started.status_code == 200, started.text
     flow = BrowserFlow.model_validate_json(started.text)
+
     completed = await browser.post(
         flow.ui.action,
         data={
             "csrf_token": _csrf_token(flow),
-            "traits.email": email,
+            "traits.email": resolved_email,
             "password": password,
             "method": "password",
         },
         headers={"Accept": "application/json"},
     )
+
     assert completed.status_code in {200, 303}, completed.text
+
     whoami = await browser.get("/sessions/whoami")
+
     assert whoami.status_code == 200, whoami.text
+
     subject = IdentitySubject(str(WhoamiResponse.model_validate_json(whoami.text).identity.id))
-    return RegisteredHumanDTO(subject, email, password, _credential(browser))
+
+    return RegisteredHumanDTO(subject, resolved_email, password, _credential(browser))
 
 
 async def login_human(

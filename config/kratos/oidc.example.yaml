@@ -15,3 +15,9 @@ selfservice:
             scope:
               - openid
               - email
+  flows:
+    registration:
+      after:
+        oidc:
+          hooks:
+            - hook: session

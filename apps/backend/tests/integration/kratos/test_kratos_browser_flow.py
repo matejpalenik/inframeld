@@ -2,7 +2,9 @@
 
 import asyncio
 import os
+import subprocess
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from ory_kratos_client.api.frontend_api import FrontendApi
@@ -119,3 +121,31 @@ async def test_logout_revokes_previous_browser_cookie() -> None:
         assert await _verify(credential) == VerifiedHumanIdentityDTO(AUTHORITY, human.subject)
         await logout_human(browser)
         assert await _verify(credential) is None
+
+
+@pytest.mark.asyncio
+async def test_disabled_kratos_identity_rejects_existing_browser_cookie() -> None:
+    """Reject an already issued session after kratos disables its identity."""
+
+    async with create_browser() as browser:
+        human = await register_human(browser)
+        assert await _verify(human.credential) == VerifiedHumanIdentityDTO(AUTHORITY, human.subject)
+
+        repository_root = Path(__file__).resolve().parents[5]  # noqa: ASYNC240
+
+        result = await asyncio.to_thread(
+            subprocess.run,
+            [
+                str(repository_root / "scripts/dev-compose.sh"),
+                "test-kratos-disable-identity",
+                human.subject.value,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
+
+        assert await _verify(human.credential) is None

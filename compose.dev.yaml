@@ -61,8 +61,13 @@ services:
 
   kratos:
     image: docker.io/oryd/kratos:v25.4.0
+    # Optional company sign-in: follow apps/backend/README.md to create the
+    # Git-ignored config/kratos/dev.local.yaml and register the OIDC callback.
+    # Comment out the default command and uncomment the local-config command.
     command:
       ["serve", "-c", "/etc/config/kratos/dev.yaml", "--dev", "--watch-courier"]
+    # command:
+    #   ["serve", "-c", "/etc/config/kratos/dev.local.yaml", "--dev", "--watch-courier"]
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
     ports:

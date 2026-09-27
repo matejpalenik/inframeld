@@ -40,6 +40,9 @@ selfservice:
         password:
           hooks:
             - hook: session
+        oidc:
+          hooks:
+            - hook: session
     settings:
       ui_url: http://127.0.0.1:14433/settings
     recovery:

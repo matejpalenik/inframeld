@@ -78,6 +78,13 @@ services:
         condition: service_completed_successfully
       mailpit:
         condition: service_started
+
+  kratos-admin-client:
+    image: docker.io/curlimages/curl:8.16.0
+    profiles: ["test-admin"]
+    entrypoint: ["curl"]
+    # Runs only on demand inside the Compose network. Publish no ports.
+
   mock-oidc:
     image: ghcr.io/navikt/mock-oauth2-server:6.0.2
     environment:
@@ -92,8 +99,8 @@ services:
                   "requestParam": "code",
                   "match": "*",
                   "claims": {
-                    "sub": "oidc-test-user",
-                    "email": "oidc-test@example.test",
+                    "sub": "oidc-$${code}",
+                    "email": "oidc-$${code}@example.test",
                     "email_verified": true,
                     "groups": ["administrators"],
                     "aud": ["inframeld-kratos-test"]

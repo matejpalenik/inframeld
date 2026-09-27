@@ -156,6 +156,48 @@ Inside the Compose network, PostgreSQL listens on its standard port `5432` and K
 
 The development Kratos config enables password registration, login, and code-based recovery. Kratos sends development email to Mailpit; view captured messages at `http://127.0.0.1:18024`. Its self-service UI URLs are placeholders until browser pages are implemented. Mailpit is for local development; an operator deployment needs its own SMTP configuration. Deployment-level OIDC sign-in is not configured by this Compose setup.
 
+To enable company OIDC locally, register `http://127.0.0.1:14434/self-service/methods/oidc/callback/company` as the provider's redirect URI. Copy the development config to a private file, which Git ignores:
+
+```bash
+cp config/kratos/dev.yaml config/kratos/dev.local.yaml
+```
+
+In `dev.local.yaml`, add this block under the existing `selfservice.methods` key, using your provider's values:
+
+<!-- prettier-ignore -->
+```yaml
+    oidc:
+      enabled: true
+      config:
+        providers:
+          - id: company
+            provider: generic
+            client_id: YOUR_CLIENT_ID
+            client_secret: YOUR_CLIENT_SECRET
+            issuer_url: https://YOUR_PROVIDER_ISSUER
+            mapper_url: file:///etc/config/kratos/oidc.email.jsonnet
+            claims_source: id_token
+            scope:
+              - openid
+              - email
+```
+
+Under the existing `selfservice.flows.registration.after` key in that same file, add the OIDC session hook:
+
+<!-- prettier-ignore -->
+```yaml
+        oidc:
+          hooks:
+            - hook: session
+```
+
+The same settings are in [`oidc.example.yaml`](../../config/kratos/oidc.example.yaml). Finally, under `kratos` in `compose.dev.yaml`, comment out the default `command` and uncomment the `dev.local.yaml` command, then restart the services:
+
+```bash
+pnpm dev:db:down
+pnpm dev:db
+```
+
 ### Development commands
 
 Run these commands from the repository root:
@@ -359,7 +401,7 @@ pnpm test:integration
 
 CI runs the same `pnpm test:integration` command; there is no separate database-only CI suite.
 
-`pnpm test:integration` starts the application PostgreSQL and both Kratos test services from `compose.test.yaml`, waits for them, applies the application migrations, and runs all backend integration tests, including real Kratos browser-flow and session-expiry tests. Compose runs the Kratos migration before starting either Kratos service. The command stops the test services afterward and retains their test-only volumes. It forces the application test database's host, port, name, and credentials, so a database target in `.env.test` cannot redirect application migrations to the development database.
+`pnpm test:integration` starts the application PostgreSQL, two Kratos test processes, Mailpit, and the mock OIDC provider from `compose.test.yaml`, waits for the required services, applies the application migrations, and runs all backend integration tests. The real browser tests cover registration, password login, session expiry, logout, disabled identities, code recovery, OIDC login, and password-confirmed OIDC account linking. They also check that matching email alone does not link an account. Compose runs the Kratos migration before starting either Kratos process. The command stops the test services afterward and retains their test-only volumes. It forces the application test database's host, port, name, and credentials, so a database target in `.env.test` cannot redirect application migrations to the development database.
 
 The application test PostgreSQL service listens on `127.0.0.1:15433`. Standard test Kratos listens on `127.0.0.1:14433`; an expiry-only Kratos process listens on `127.0.0.1:14435` and issues 15-second sessions. Both Kratos processes share the separate test Kratos PostgreSQL service, database role, and `inframeld_test_kratos_postgres_data` volume. Their admin endpoints stay inside Compose. Neither test database shares a volume with the development database at `127.0.0.1:15432`.
 

@@ -20,5 +20,8 @@ __pycache__/
 !.env.example
 !.env.test.example
 
+# A local Kratos config may contain a company OIDC client secret.
+config/kratos/dev.local.yaml
+
 data/
 .DS_Store

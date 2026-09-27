@@ -22,6 +22,8 @@ Commands:
   check    Verify that PostgreSQL is accepting connections.
   test-services-up    Start PostgreSQL and Kratos for the full integration suite.
   test-services-down  Stop the test services, keeping their test-only volumes.
+  test-kratos-disable-identity <id>  Disable one test identity through Kratos's private admin API.
+  test-kratos-get-identity <id>  Read one test identity through Kratos's private admin API.
 EOF
 }
 
@@ -244,6 +246,31 @@ case "${command_name}" in
         test_compose up -d kratos kratos-expiring
         wait_for_test_kratos kratos 14433
         wait_for_test_kratos kratos-expiring 14435
+        ;;
+    test-kratos-disable-identity)
+        if [[ "$#" -ne 1 || ! "$1" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]]; then
+            printf 'Expected one Kratos identity UUID.\n' >&2
+            exit 2
+        fi
+
+        test_compose --profile test-admin run --rm --no-deps -T \
+            kratos-admin-client \
+            --fail-with-body --silent --show-error --max-time 10 \
+            --request PATCH \
+            --header 'Content-Type: application/json' \
+            --data '[{"op":"replace","path":"/state","value":"inactive"}]' \
+            "http://kratos:4434/admin/identities/$1" >/dev/null
+        ;;
+    test-kratos-get-identity)
+        if [[ "$#" -ne 1 || ! "$1" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]]; then
+            printf 'Expected one Kratos identity UUID.\n' >&2
+            exit 2
+        fi
+
+        test_compose --profile test-admin run --rm --no-deps -T \
+            kratos-admin-client \
+            --fail-with-body --silent --show-error --max-time 10 \
+            "http://kratos:4434/admin/identities/$1"
         ;;
     test-services-down)
         test_compose down --remove-orphans
