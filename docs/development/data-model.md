@@ -67,13 +67,34 @@ An application account belongs to one project. It begins with no document access
 
 The [25 September 2026 decision](../adr/ADR-0049-require-group-managers-to-be-ordinary-members.md) requires each manager assignment to reference ordinary membership for the same `(project_id, group_id, principal_id)`. Alice therefore has two records when she manages a group. Removing management can leave her an ordinary member. Membership alone does not make someone a manager.
 
-The proposed `group_managers` table has a foreign key from that three-column key to the matching `group_memberships` primary key. Keep its human-only check and scoped project-membership reference too. The database must reject removing membership while the manager row remains.
+The implemented `group_managers` table has a foreign key from that three-column key to the matching `group_memberships` primary key. Keep its human-only check and scoped project-membership reference too. The database must reject removing membership while the manager row remains.
 
 When an authorized operation removes both, it checks handover and removes management first. Automatic cascading deletion cannot replace those checks or the audit record.
 
 Creating a group, appointing a manager, or recovering a stranded group saves both assignments together. Demotion removes only management. Removing membership also removes management, and rejoining does not restore it. Save each change, scope revision, and audit event in the same protected Access transaction. See the [group workflow](access-control.md#group-managers).
 
-Suspension keeps both records but blocks their use. Foreign keys cannot prove that Alice is active, may make this change, or will leave another eligible manager. Application policy still checks those conditions. These are accepted rules with a proposed database constraint, not an implemented migration or reported test pass.
+Suspension keeps both records but blocks their use. Foreign keys cannot prove that Alice is active, may make this change, or will leave another eligible manager. Application policy still checks those conditions. The initial migration implements the membership constraint, and the PostgreSQL constraint tests exercise it. The surrounding administration workflows remain to be implemented.
+
+<a id="implemented-principal-model"></a>
+
+### Implemented Principal and typed values
+
+[`access/domain/entities/principal.py`](../../apps/backend/src/inframeld_backend/access/domain/entities/principal.py) defines the current immutable domain entity:
+
+| Field | Application type | Meaning |
+| --- | --- | --- |
+| `id` | `PrincipalId` | Stable identity of the local actor. |
+| `organization_id` | `OrganizationId` | Organization owning that actor. |
+| `kind` | `PrincipalKind` | `HUMAN` or `APPLICATION`, stored as the existing lowercase strings. |
+| `status` | `PrincipalStatus` | `ACTIVE`, `SUSPENDED`, or `RETIRED`, stored as the existing lowercase strings. |
+
+Equality and hashing follow `PrincipalId`, so snapshots of one account remain the same entity after a status change. Authentication uses the state together to require an active human. This model adds no lifecycle command or speculative aggregate. Display names, audit attribution, memberships, and grants retain their separate existing records.
+
+`PrincipalId`, `OrganizationId`, `ProjectId`, and `AccessGroupId` are distinct frozen, slotted objects wrapping a parsed UUID. They preserve all existing UUID values, while preventing accidental interchange in application contracts. ORM mappings keep UUID columns and adapters explicitly convert values. The historical initial migration remains authoritative; this reorganization adds no schema migration.
+
+`IdentityAuthority` and `IdentitySubject` remain validated exact strings carried together in `VerifiedHumanIdentityDTO`. The identity reader returns current principal state without applying admission in SQL. `AccessContextDTO` retains only `PrincipalId`; current account and grant checks still run when authorizing an operation. The implemented project target is `ProjectActionTargetDTO(ProjectId)`; no generic bare-UUID resource target is implied.
+
+For component responsibilities and conversion examples, use [application conventions](application-structure.md#component-conventions). For HTTP outcomes and verification scope, use [the implemented authentication boundary](access-control.md#implemented-human-authentication).
 
 ### Keep identity and credential lifecycles separate
 

@@ -4,7 +4,7 @@ The Inframeld backend is a typed FastAPI application. It owns the HTTP API, its 
 
 ## Quick start
 
-For normal local development, run PostgreSQL in Compose and the backend directly on your host.
+For normal local development, run PostgreSQL, Kratos, and Mailpit in Compose and the backend directly on your host.
 
 From a clean checkout, install the committed dependencies from the repository root:
 
@@ -33,7 +33,7 @@ cp apps/backend/.env.test.example apps/backend/.env.test
 
 Keep `.env.test` in the ignored local configuration; it is not committed.
 
-### 2. Start PostgreSQL
+### 2. Start PostgreSQL, Kratos, and Mailpit
 
 ```bash
 pnpm dev:db
@@ -63,83 +63,50 @@ When you're finished, stop the development containers with:
 pnpm dev:db:down
 ```
 
-Your PostgreSQL data is stored in a named volume and is preserved when the containers are stopped.
+The application database and Kratos identities are stored in separate named volumes and are preserved when the containers are stopped. Kratos's public endpoint is at http://127.0.0.1:14434. Mailpit's development inbox is at http://127.0.0.1:18024.
 
 ---
 
-## Architecture
+## Architecture and component map
 
-The backend is a domain-first modular monolith. Top-level domain packages own their business state and rules; they are not separate services:
+The backend follows **domain → layer → component role**. Start with the [component map, record conventions, and worked authentication flow](../../docs/development/application-structure.md#component-conventions) before adding a component.
 
 ```text
 src/inframeld_backend/
-├── access/       # principals, project scope, grants, authorization
-├── knowledge/    # sources, document versions, collections, memberships
-├── indexing/     # processing, embeddings, generations, materializations
-├── pipelines/    # immutable RAG configuration, queries, receipts, feedback
-├── evaluation/   # offline cases, runs, evidence, metrics, comparisons
-├── releases/     # deployments, cohorts, promotion, rejection, rollback
-├── shared/       # cross-cutting capabilities; no business-state ownership
-├── composition.py
-├── migrate.py    # operator-controlled migration entry point
-└── main.py
+├── bootstrap/                 # factory, aggregate settings, assembly, lifecycle
+├── access/
+│   ├── domain/                # entities, value_objects, enums, policy_inputs, policies
+│   ├── application/           # services, protocols, dtos, value_objects
+│   ├── http/                  # routes, dependencies, responses
+│   └── infrastructure/        # readers, verifiers, rows, settings, types
+├── shared/
+│   ├── domain/                # errors, validation
+│   ├── application/           # errors, enums, dtos, value_objects
+│   ├── http/                  # handlers, responses, builders, mappers, middleware, etc.
+│   └── infrastructure/        # resources, migrations, logging, diagnostics, settings, etc.
+├── main.py
+└── migrate.py
 ```
 
-### Package structure
+Knowledge, Indexing, Pipelines, Evaluation, and Releases retain their domain scaffolds. Add role folders with actual workflows. Shared code contains genuinely shared technical responsibilities.
 
-Each business package follows onion architecture:
+Application services own business orchestration through explicit protocols. Domain entities, value objects, and named policy classes express rules without I/O. Policies expose pure static methods; ordinary conversion and validation helpers can remain functions. HTTP, PostgreSQL, and provider adapters convert values at their boundaries. Bootstrap constructs concrete dependencies and owns resource lifecycle.
 
-```text
-knowledge/
-├── domain/          # business rules and values
-├── application/     # commands, queries, and application-owned ports
-├── infrastructure/  # PostgreSQL and other external implementations
-└── api/             # HTTP/MCP-facing adapters for this owner
-```
+Application records use the `DTO` suffix, such as `VerifiedHumanIdentityDTO`. Dedicated policy inputs use `PolicyInput`, such as `ActionAuthorizationPolicyInput`. `ProjectActionFactsDTO` is a reader result, despite the word “Facts.” Use standard frozen, slotted dataclasses; no record marker protocols or custom decorators. Keep docstrings where they explain meaningful behavior or ownership, and omit repetitive boilerplate.
 
-Vertical slices live within these rings as use cases are implemented.
+`HumanSessionDependency` extracts the cookie and calls `HumanSessionAuthenticator`. `HumanSessionAuthenticationService` verifies the provider session, reads the exact linked principal, applies `HumanAuthenticationPolicy`, and returns `AccessContextDTO`. The route serializes its ID into the existing `principalId` response. `ActionAuthorizationService` separately checks project visibility and the exact action grant through `ProjectVisibilityPolicy` and `ActionAuthorizationPolicy`.
 
-Only create files when the corresponding use case requires them. Do not pre-create generic repositories, services, or framework layers.
+Application construction and OpenAPI export perform no network calls. The lifespan owns database startup/shutdown and actual Kratos SDK pool cleanup, including failed startup. Authentication adapters are shared per application, but each identity lookup opens its own short session after provider verification. Authorization readers use the caller's transaction session. This organization change preserves that lifecycle.
 
-Dependencies point inward:
+UUID identities remain runtime value objects. ORM columns remain UUIDs and enum columns perform real conversion. The immutable `Principal` holds account state; `AccessContextDTO` carries only its identity. The [data model](../../docs/development/data-model.md#implemented-principal-model) explains these distinctions.
 
-```text
-api -> application -> domain
-infrastructure -> application-owned ports
-composition.py -> concrete implementations and configuration
-```
-
-### Shared code
-
-`shared` is restricted to capabilities used across domains, such as:
-
-- transport errors
-- configuration
-- database lifecycle
-- jobs
-- idempotency
-
-It must not become a second owner of domain state.
-
-The current health route is a cross-cutting HTTP adapter under `shared/http`. Domain and application code may not import it.
-
-Shared technical capabilities use `domain/`, `application/`, and `infrastructure/` only where that separation is genuinely needed.
-
-### Composition
-
-`main.py` is the API entry point.
-
-`migrate.py` is the separate, operator-controlled migration entry point.
-
-`composition.py` is the API composition root. It constructs the application and explicitly wires concrete dependencies.
-
-HTTP, the future worker, Studio, and MCP must invoke the same application use cases. They must not implement parallel business behavior.
-
-These dependency rules are reviewed manually. Automated tests cover product behavior, API contracts, and integrations; do not add repository-structure, import-boundary, or composition-construction tests.
+Architecture and naming are reviewed manually. Unit tests mirror production roles; integration tests remain grouped by scenario. Automated checks cover behavior, typing, contracts, and integration outcomes.
 
 ---
 
 ## Configuration
+
+`bootstrap/application_settings.py` aggregates `ApplicationSettings`. `KratosSettings`, `CSRFSettings`, and `DatabaseSettings` live in their owners’ infrastructure `settings` packages; logging value definitions live in shared infrastructure `types`.
 
 Runtime configuration is loaded from files under `apps/backend`:
 
@@ -147,10 +114,10 @@ Runtime configuration is loaded from files under `apps/backend`:
 - `.env.test` — used when `INFRAMELD_ENVIRONMENT=test`
 - `INFRAMELD_TEST_ENV_FILE` — selects another test environment file; relative paths are resolved from `apps/backend`
 - `INFRAMELD_*` environment variables — override values loaded from dotenv files
-- `.env.example` — documents non-secret local development defaults and may be copied to `.env`
-- `.env.test.example` — documents the isolated PostgreSQL integration-test defaults and may be copied to `.env.test`
+- `.env.example` — documents local development database, Kratos, and CSRF settings and may be copied to `.env`
+- `.env.test.example` — documents isolated integration-test database and Kratos defaults and may be copied to `.env.test`
 
-For the local Compose database, the relevant values are:
+For a backend running on the host with local Compose services, the relevant values are:
 
 ```dotenv
 INFRAMELD_DATABASE__HOST=127.0.0.1
@@ -158,17 +125,26 @@ INFRAMELD_DATABASE__PORT=15432
 INFRAMELD_DATABASE__NAME=inframeld
 INFRAMELD_DATABASE__USER=inframeld
 INFRAMELD_DATABASE__PASSWORD=inframeld-dev-only
+INFRAMELD_KRATOS__PUBLIC_URL=http://127.0.0.1:14434
+INFRAMELD_KRATOS__AUTHORITY=kratos:local
+INFRAMELD_CSRF__TRUSTED_ORIGINS='["http://127.0.0.1:8000"]'
 ```
+
+`INFRAMELD_CSRF__TRUSTED_ORIGINS` is a JSON array of exact browser origins: scheme, host, and optional port, without a path. The host-run example permits requests originating from `http://127.0.0.1:8000`; `compose.dev.yaml` uses `http://127.0.0.1:8001`, its published backend port. An omitted or empty list denies cookie-authenticated writes.
+
+After authentication, unsafe requests also need `X-Inframeld-CSRF: 1` and a matching `Origin` header. This is Inframeld's HTTP protection; Kratos checks its own CSRF values during browser account flows. The [Access guide](../../docs/development/access-control.md#implemented-human-authentication) describes the implemented boundary and its test coverage.
+
+The web scaffold currently runs on `localhost:3000`, while these backend and Kratos examples use `127.0.0.1`. Browser integration still needs a consistent hostname and routing so the Kratos cookie reaches the backend. The trusted-origin list alone does not configure that routing.
 
 Do not commit `.env` or `.env.test`.
 
-The development password above is only a local Compose credential and must not be reused in production.
+The development passwords and Kratos secrets are only for local Compose and must not be reused in production. Kratos settings remain optional at startup; without them, the session route returns 503.
 
 ---
 
-## Database
+## Development services
 
-The development PostgreSQL service is managed by the root `compose.dev.yaml`.
+The application PostgreSQL, Kratos, and Mailpit services are managed by the root `compose.dev.yaml`. Kratos uses its own PostgreSQL service, `kratos_dev` database role, and `inframeld_kratos_postgres_data` volume, separate from the application database. Its public API is available on `127.0.0.1:14434`; its admin API stays inside the Compose network. Mailpit's SMTP port stays inside that network, while its inbox UI is exposed only on the host loopback interface at `127.0.0.1:18024`.
 
 PostgreSQL is exposed to the host only at:
 
@@ -176,27 +152,71 @@ PostgreSQL is exposed to the host only at:
 127.0.0.1:15432
 ```
 
-Inside the Compose network, PostgreSQL listens on its standard port `5432`.
+Inside the Compose network, PostgreSQL listens on its standard port `5432` and Kratos's public API listens at `http://kratos:4433`. A host-run backend uses the public URL from `.env`; the backend Compose service overrides that URL with the internal address. Both use the `kratos:local` identity authority. The Kratos migration runs before the service starts.
+
+The development Kratos config enables password registration, login, and code-based recovery. Kratos sends development email to Mailpit; view captured messages at `http://127.0.0.1:18024`. Its self-service UI URLs are placeholders until browser pages are implemented. Mailpit is for local development; an operator deployment needs its own SMTP configuration. Deployment-level OIDC sign-in is not configured by this Compose setup.
+
+To enable company OIDC locally, register `http://127.0.0.1:14434/self-service/methods/oidc/callback/company` as the provider's redirect URI. Copy the development config to a private file, which Git ignores:
+
+```bash
+cp config/kratos/dev.yaml config/kratos/dev.local.yaml
+```
+
+In `dev.local.yaml`, add this block under the existing `selfservice.methods` key, using your provider's values:
+
+<!-- prettier-ignore -->
+```yaml
+    oidc:
+      enabled: true
+      config:
+        providers:
+          - id: company
+            provider: generic
+            client_id: YOUR_CLIENT_ID
+            client_secret: YOUR_CLIENT_SECRET
+            issuer_url: https://YOUR_PROVIDER_ISSUER
+            mapper_url: file:///etc/config/kratos/oidc.email.jsonnet
+            claims_source: id_token
+            scope:
+              - openid
+              - email
+```
+
+Under the existing `selfservice.flows.registration.after` key in that same file, add the OIDC session hook:
+
+<!-- prettier-ignore -->
+```yaml
+        oidc:
+          hooks:
+            - hook: session
+```
+
+The same settings are in [`oidc.example.yaml`](../../config/kratos/oidc.example.yaml). Finally, under `kratos` in `compose.dev.yaml`, comment out the default `command` and uncomment the `dev.local.yaml` command, then restart the services:
+
+```bash
+pnpm dev:db:down
+pnpm dev:db
+```
 
 ### Development commands
 
 Run these commands from the repository root:
 
 ```bash
-pnpm dev:db               # Start only PostgreSQL in the background
-pnpm dev:db:reset         # Delete the database volume and start with an empty database
+pnpm dev:db               # Start PostgreSQL, Kratos, and Mailpit in the background
+pnpm dev:db:reset         # Recreate the application database; keep Kratos identities
 pnpm dev:db:restart       # Restart PostgreSQL without removing its volume
 pnpm dev:db:status        # Show development container status
-pnpm dev:db:down          # Stop development containers, preserving the database volume
+pnpm dev:db:down          # Stop development containers, preserving both database volumes
 
-pnpm dev:compose           # Start PostgreSQL and the backend
+pnpm dev:compose           # Start PostgreSQL, Kratos, Mailpit, and the backend
 pnpm dev:compose:restart   # Restart all currently created Compose containers
-pnpm dev:compose:down      # Stop all development containers, preserving the database volume
+pnpm dev:compose:down      # Stop all development containers, preserving both database volumes
 ```
 
 These commands use [`scripts/dev-compose.sh`](../../scripts/dev-compose.sh), which automatically detects Podman Compose or Docker Compose.
 
-`pnpm dev:db` and `pnpm dev:db:reset` wait for PostgreSQL readiness, retrying up to 60 times with a one-second interval. If PostgreSQL does not become ready, the command exits with an error and reports the last readiness check.
+`pnpm dev:db`, `pnpm dev:db:reset`, and `pnpm dev:compose` wait for PostgreSQL and Kratos readiness, retrying up to 60 times with a one-second interval. If a service does not become ready, the command exits with an error and reports the last readiness check.
 
 The script can also be run directly:
 
@@ -209,21 +229,21 @@ The script can also be run directly:
 ./scripts/dev-compose.sh status
 ./scripts/dev-compose.sh check
 ./scripts/dev-compose.sh down
-./scripts/dev-compose.sh test-db-up
-./scripts/dev-compose.sh test-db-down
+./scripts/dev-compose.sh test-services-up
+./scripts/dev-compose.sh test-services-down
 ```
 
-`check` verifies that the development PostgreSQL service is accepting connections. The integration test runner uses the separate test-only PostgreSQL service.
+`check` verifies that the development PostgreSQL service is accepting connections. The integration test runner uses separate test-only PostgreSQL and Kratos services.
 
 If PostgreSQL is unavailable, it reports the required dependency and startup commands.
 
 Restart commands only apply to containers that Compose has already created. After running `down`, use the corresponding start command instead.
 
-### Resetting the database
+### Resetting the application database
 
-Restarting or stopping PostgreSQL does **not** remove its named volume.
+Restarting or stopping either service does **not** remove its named volume.
 
-To deliberately delete all local database data and start with an empty PostgreSQL instance:
+To deliberately clear the application database and start with an empty one:
 
 ```bash
 pnpm dev:db:reset
@@ -232,8 +252,8 @@ pnpm dev:db:reset
 This:
 
 1. Stops and removes the development Compose containers.
-2. Deletes the named PostgreSQL volume and all data stored in it.
-3. Starts a fresh PostgreSQL container with an empty database.
+2. Keeps both named volumes and drops and recreates only the `inframeld` database.
+3. Starts Kratos again with its existing identities.
 4. Leaves the Compose backend stopped.
 
 Migrations are not run automatically.
@@ -252,7 +272,7 @@ Running the backend image in Compose is an optional alternative to running the P
 
 The image uses the same source and locked dependencies as the host application, but it does not mount the source tree or run migrations during startup.
 
-Start PostgreSQL, apply migrations, and then start both Compose services:
+Start PostgreSQL, Kratos, and Mailpit, apply application migrations, and then start the backend container:
 
 ```bash
 pnpm dev:db
@@ -266,11 +286,11 @@ The containerized API is available at:
 - Swagger UI: http://127.0.0.1:8001/docs
 - ReDoc: http://127.0.0.1:8001/redoc
 
-Inside the Compose network, the backend connects to PostgreSQL using the `postgres` service on port `5432`.
+Inside the Compose network, the backend connects to PostgreSQL using the `postgres` service on port `5432` and receives `http://kratos:4433` as its configured Kratos public URL.
 
 A backend running directly on the host instead connects to PostgreSQL at `127.0.0.1:15432`. This allows you to use the same database setup whether you run the API on the host or in Compose.
 
-`pnpm dev:compose` builds the backend image and starts both the backend and PostgreSQL containers.
+`pnpm dev:compose` builds the backend image and starts the backend, PostgreSQL, and Kratos containers.
 
 The backend binds inside the Compose network, with only its API port published to the host on the loopback interface.
 
@@ -338,7 +358,7 @@ When implementing a feature, read the [practical error-handling guide](../../doc
 
 When changing the error-handling foundation itself, read the [maintainer reference](../../docs/development/error-handling-reference.md), which maps the implementation files and behavioral tests.
 
-The backend and integration tests were reported passing at the 23 September 2026 error-handling closeout.
+The reorganization was checked on 26 September 2026 with `pnpm check:backend` (190 passed, 50 service-dependent tests skipped) and `pnpm test:integration` (50 passed). Formatting, strict Pyright, and OpenAPI drift checks passed. The existing Starlette/AnyIO deprecation warning remains.
 
 ---
 
@@ -375,15 +395,17 @@ pnpm test:integration
 
 ### Unit and contract tests
 
-`pnpm check:backend` keeps database integration tests skipped. Unit, health, and OpenAPI checks run without PostgreSQL.
+`pnpm check:backend` keeps service-dependent integration tests skipped. Unit directories mirror production capabilities; strict Pyright also requires explicit `@override`. Unit, health, and OpenAPI checks run without PostgreSQL.
 
 ### Integration tests
 
-`pnpm test:integration` starts the test-only PostgreSQL service from `compose.test.yaml`, applies migrations, runs the real PostgreSQL integration tests, then stops the service. Its separate `inframeld_test_postgres_data` volume is not shared with the development database volume. The command forces the test service's host, port, database, and credentials, so a database target in `.env.test` cannot redirect integration migrations to the development database.
+CI runs the same `pnpm test:integration` command; there is no separate database-only CI suite.
 
-The test PostgreSQL service listens on `127.0.0.1:15433`; the development database remains on `127.0.0.1:15432`. The test volume is retained between runs and contains only test data.
+`pnpm test:integration` starts the application PostgreSQL, two Kratos test processes, Mailpit, and the mock OIDC provider from `compose.test.yaml`, waits for the required services, applies the application migrations, and runs all backend integration tests. The real browser tests cover registration, password login, session expiry, logout, disabled identities, code recovery, OIDC login, and password-confirmed OIDC account linking. They also check that matching email alone does not link an account. Compose runs the Kratos migration before starting either Kratos process. The command stops the test services afterward and retains their test-only volumes. It forces the application test database's host, port, name, and credentials, so a database target in `.env.test` cannot redirect application migrations to the development database.
 
-The integration tests create uniquely named tables and databases for their fixtures and clean them up after each test. Keep the database-specific values in `.env.test` aligned with `.env.test.example` when running tests directly with `pytest`.
+The application test PostgreSQL service listens on `127.0.0.1:15433`. Standard test Kratos listens on `127.0.0.1:14433`; an expiry-only Kratos process listens on `127.0.0.1:14435` and issues 15-second sessions. Both Kratos processes share the separate test Kratos PostgreSQL service, database role, and `inframeld_test_kratos_postgres_data` volume. Their admin endpoints stay inside Compose. Neither test database shares a volume with the development database at `127.0.0.1:15432`.
+
+Integration scenarios live under `tests/integration/access`, `postgres`, `kratos`, and `observability`. Typed seed builders, validated browser-flow helpers, and isolated database provisioning live under `tests/support`. Application PostgreSQL tests use temporary databases and Alembic-created fixture tables, cleaned up after each test. The Kratos browser-flow test creates an identity with a unique email in Kratos's isolated test database; that identity remains in the retained test volume. Keep the database-specific values in `.env.test` aligned with `.env.test.example` when running tests directly with `pytest`.
 
 ---
 
@@ -413,7 +435,7 @@ Routes declare applicable errors using:
 problem_responses(definition)
 ```
 
-from `shared/http/problem_openapi.py`.
+from `shared/http/openapi/problem_openapi.py`.
 
 Composition installs its narrow media-type correction hook once. FastAPI still generates the native schema and reusable model components.
 

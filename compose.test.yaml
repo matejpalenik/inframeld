@@ -18,6 +18,120 @@ services:
       retries: 12
       start_period: 5s
 
+  kratos-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: kratos_test
+      POSTGRES_USER: kratos_test
+      POSTGRES_PASSWORD: kratos-test-only
+    volumes:
+      - inframeld_test_kratos_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kratos_test -d kratos_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  kratos-migrate:
+    image: docker.io/oryd/kratos:v25.4.0
+    command:
+      [
+        "-c",
+        "/etc/config/kratos/test.yaml",
+        "migrate",
+        "sql",
+        "up",
+        "-e",
+        "--yes",
+      ]
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    depends_on:
+      kratos-postgres:
+        condition: service_healthy
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.31.1
+    environment:
+      MP_SMTP_TLS_CERT: sans:mailpit
+      MP_SMTP_TLS_KEY: sans:mailpit
+      MP_SMTP_REQUIRE_STARTTLS: "true"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+    ports:
+      - "127.0.0.1:18025:8025"
+  kratos:
+    image: docker.io/oryd/kratos:v25.4.0
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    ports:
+      - "127.0.0.1:14433:4433"
+    command:
+      [
+        "serve",
+        "-c",
+        "/etc/config/kratos/test.yaml",
+        "--dev",
+        "--watch-courier",
+      ]
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+
+  kratos-admin-client:
+    image: docker.io/curlimages/curl:8.16.0
+    profiles: ["test-admin"]
+    entrypoint: ["curl"]
+    # Runs only on demand inside the Compose network. Publish no ports.
+
+  mock-oidc:
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.2
+    environment:
+      JSON_CONFIG: >-
+        {
+          "interactiveLogin": false,
+          "tokenCallbacks": [
+            {
+              "issuerId": "inframeld",
+              "requestMappings": [
+                {
+                  "requestParam": "code",
+                  "match": "*",
+                  "claims": {
+                    "sub": "oidc-$${code}",
+                    "email": "oidc-$${code}@example.test",
+                    "email_verified": true,
+                    "groups": ["administrators"],
+                    "aud": ["inframeld-kratos-test"]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+    ports:
+      - "127.0.0.1:15556:8080"
+
+  kratos-expiring:
+    image: docker.io/oryd/kratos:v25.4.0
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    ports:
+      - "127.0.0.1:14435:4433"
+    command:
+      - serve
+      - -c
+      - /etc/config/kratos/test.yaml
+      - -c
+      - /etc/config/kratos/test-expiring.yaml
+      - --dev
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+
 volumes:
   inframeld_test_postgres_data:
     name: inframeld_test_postgres_data
+  inframeld_test_kratos_postgres_data:
+    name: inframeld_test_kratos_postgres_data

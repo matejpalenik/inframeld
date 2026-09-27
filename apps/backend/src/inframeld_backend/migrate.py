@@ -1,9 +1,11 @@
 """Run operator-controlled migrations with safe failure reporting."""
 
-from inframeld_backend.shared.infrastructure.error_reporting import report_unexpected_error
-from inframeld_backend.shared.infrastructure.logging import configure_logging
-from inframeld_backend.shared.infrastructure.migrations import run_migrations
-from inframeld_backend.shared.infrastructure.settings import get_settings
+from inframeld_backend.bootstrap.application_settings import get_settings
+from inframeld_backend.shared.infrastructure.diagnostics.error_reporting import (
+    report_unexpected_error,
+)
+from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import run_migrations
 
 
 def main() -> int:
