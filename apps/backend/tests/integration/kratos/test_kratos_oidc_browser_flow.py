@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from ory_kratos_client.models.identity import Identity as KratosIdentity
 from pydantic import HttpUrl
-from tests.support.access_scenarios import seed_linked_human, seed_project_authorization
+from tests.support.access_scenarios import MockAccessScenarios
 from tests.support.kratos_browser import (
     KRATOS_PUBLIC_URL,
     BrowserFlow,
@@ -196,7 +196,7 @@ async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
 
         # The same subject under another authority must not match.
         async with database.session() as session, session.begin():
-            await seed_linked_human(
+            await MockAccessScenarios.seed_linked_human(
                 session,
                 VerifiedHumanIdentityDTO(
                     IdentityAuthority("kratos:another-installation"),
@@ -207,7 +207,7 @@ async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
 
         # Admit the exact verified pair to a project, without an action grant.
         async with database.session() as session, session.begin():
-            scenario = await seed_project_authorization(
+            scenario = await MockAccessScenarios.seed_project_authorization(
                 session,
                 is_project_member=True,
                 has_action_grant=False,
@@ -237,7 +237,7 @@ async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
         with pytest.raises(AccessDeniedError):
             await authorizer.require_action(
                 access=AccessContextDTO(actor_principal_id=scenario.principal_id),
-                action=scenario.action,
+                action_id=scenario.action,
                 target=ProjectActionTargetDTO(project_id=scenario.project_id),
             )
 

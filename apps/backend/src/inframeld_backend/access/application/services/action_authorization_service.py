@@ -21,6 +21,7 @@ from inframeld_backend.access.domain.policy_inputs.action_authorization_policy_i
     ActionAuthorizationPolicyInput,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ResourceNotFoundError,
@@ -36,11 +37,11 @@ class ActionAuthorizationService(ActionAuthorizer):
 
     @override
     async def require_action(
-        self, *, access: AccessContextDTO, action: ActionId, target: ProjectActionTargetDTO
-    ) -> None:
+        self, *, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
+    ) -> OrganizationId:
         """Apply visibility before action admission to preserve the 404/403 distinction."""
         facts = await self._facts_reader.read_action_facts(
-            access=access, action=action, target=target
+            access=access, action_id=action_id, target=target
         )
 
         if facts is None or not ProjectVisibilityPolicy.may_view_project(
@@ -58,3 +59,5 @@ class ActionAuthorizationService(ActionAuthorizer):
 
         if not ActionAuthorizationPolicy.may_perform_action(policy_input):
             raise AccessDeniedError()
+
+        return facts.organization_id

@@ -3,10 +3,11 @@
 import asyncio
 import os
 from dataclasses import replace
+from datetime import timedelta
 
 import pytest
-from sqlalchemy import func, select
-from tests.support.access_scenarios import seed_project_authorization
+from sqlalchemy import func, select, update
+from tests.support.access_scenarios import MockAccessScenarios
 
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
@@ -41,7 +42,7 @@ pytestmark = pytest.mark.skipif(
 
 async def _request(database: Database) -> OperationReservationRequestDTO:
     async with database.session() as session, session.begin():
-        scenario = await seed_project_authorization(
+        scenario = await MockAccessScenarios.seed_project_authorization(
             session,
             is_project_member=True,
             has_action_grant=True,
@@ -124,6 +125,68 @@ async def test_writer_does_not_commit_the_callers_transaction(database: Database
 
     result = await _reserve(database, request)
     assert result.created
+
+
+@pytest.mark.asyncio
+async def test_completed_safe_result_starts_24_hour_retention(database: Database) -> None:
+    """Start expiry when a safe synchronous outcome is recorded."""
+    request = await _request(database)
+
+    async with database.session() as session, session.begin():
+        writer = PostgresOperationReservationWriter(session)
+        reservation = await writer.reserve(request)
+        before_completion = await session.scalar(select(func.clock_timestamp()))
+        assert before_completion is not None
+
+        await writer.mark_replayable(
+            reservation.operation_id,
+            OperationReplayKind.SAFE_RESULT,
+        )
+
+        expires_at = await session.scalar(
+            select(IdempotencyReservationRow.expires_at).where(
+                IdempotencyReservationRow.operation_id == reservation.operation_id.value
+            )
+        )
+
+    assert expires_at is not None
+    assert expires_at >= before_completion + timedelta(hours=24)
+
+
+@pytest.mark.asyncio
+async def test_expired_completed_scope_is_replaced_once_under_concurrency(
+    database: Database,
+) -> None:
+    """After retention, concurrent requests still establish only one new operation."""
+    request = await _request(database)
+
+    async with database.session() as session, session.begin():
+        writer = PostgresOperationReservationWriter(session)
+        original = await writer.reserve(request)
+        await writer.mark_replayable(original.operation_id, OperationReplayKind.SAFE_RESULT)
+        await session.execute(
+            update(IdempotencyReservationRow)
+            .where(IdempotencyReservationRow.operation_id == original.operation_id.value)
+            .values(expires_at=func.clock_timestamp() - timedelta(seconds=1))
+        )
+
+    changed_request = replace(request, fingerprint=b"\x02" * 32)
+    barrier = asyncio.Barrier(2)
+
+    async def retry() -> OperationReservationResultDTO:
+        async with database.session() as session, session.begin():
+            await barrier.wait()
+            return await PostgresOperationReservationWriter(session).reserve(changed_request)
+
+    first, second = await asyncio.gather(retry(), retry())
+
+    assert first.operation_id == second.operation_id
+    assert first.operation_id != original.operation_id
+    assert sorted((first.created, second.created)) == [False, True]
+
+    async with database.session() as session:
+        count = await session.scalar(select(func.count()).select_from(IdempotencyReservationRow))
+    assert count == 1
 
 
 @pytest.mark.asyncio

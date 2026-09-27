@@ -8,6 +8,7 @@ from inframeld_backend.access.application.dtos.project_action_target_dto import 
     ProjectActionTargetDTO,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 
 
 class ActionAuthorizer(Protocol):
@@ -15,14 +16,14 @@ class ActionAuthorizer(Protocol):
 
     @abstractmethod
     async def require_action(
-        self, *, access: AccessContextDTO, action: ActionId, target: ProjectActionTargetDTO
-    ) -> None:
+        self, *, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
+    ) -> OrganizationId:
         """Read current facts and deny hidden targets with ResourceNotFoundError.
 
         Raise `AccessDeniedError` for visible targets lacking authority. Grant
         decisions are never cached on the caller's authentication context.
-        Success returns None and means the current facts permitted this exact
-        action. It grants no future authority after the caller's state changes.
+        Success returns the matched project's organization for this authorized
+        attempt. It grants no future authority after the caller's state changes.
         The caller owns the surrounding transaction; this operation does not
         open a transaction, commit changes, or provision permissions.
         """
