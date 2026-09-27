@@ -194,7 +194,7 @@ Next, decide whether callers need a new public problem or whether the existing `
 
 If a new public problem is needed:
 
-1. Add its stable code to `ProblemCode` in `apps/backend/src/inframeld_backend/shared/http/definitions/problem_catalogue.py`. This HTTP enum is separate from the application exception's `ClassVar[str]` code. Application code must not import it.
+1. Add its stable code to `ProblemCode` in `apps/backend/src/inframeld_backend/shared/http/types/problem_code.py`. This HTTP enum is separate from the application exception's `ClassVar[str]` code. Application code must not import it.
 2. Add a frozen `ProblemDefinition` in that file. Its `code` is the enum member, and its `type_uri`, `title`, `status`, and `detail` are reviewed public metadata. Document the new URI anchor in this guide's problem catalogue before using it.
 3. In `apps/backend/src/inframeld_backend/shared/http/mappers/problem_mapper.py`, add the concrete exception class to `_APPLICATION_PROBLEMS`, pointing to the new or reused definition.
 4. Declare the applicable response on the feature route with `problem_responses(definition)` and test its runtime response and OpenAPI contract.
