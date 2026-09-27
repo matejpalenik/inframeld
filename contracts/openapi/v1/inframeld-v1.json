@@ -50,6 +50,19 @@
             "description": "At most 20 sanitized issues; the list may be incomplete.",
             "title": "Errors"
           },
+          "operationId": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Original operation identity for an in-progress idempotency retry.",
+            "title": "Operationid"
+          },
           "requestId": {
             "description": "Server request identifier, also returned in X-Request-ID.",
             "format": "uuid",

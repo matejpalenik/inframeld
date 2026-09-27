@@ -13,7 +13,10 @@ from inframeld_backend.shared.application.errors.application_error import (
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
+    IdempotencyInProgressError,
+    IdempotencyKeyReusedError,
 )
+from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.errors.domain_errors import DomainError
 from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
 from inframeld_backend.shared.http.middleware.request_context_middleware import (
@@ -64,6 +67,18 @@ def _create_error_test_app() -> FastAPI:
     async def conflict() -> None:
         """Raise an application conflict whose private text must stay out of the response."""
         raise ConflictError(SECRET)
+
+    @application.post("/_test/idempotency-key-reused")
+    async def idempotency_key_reused() -> None:
+        raise IdempotencyKeyReusedError(SECRET)
+
+    @application.post("/_test/idempotency-in-progress")
+    async def idempotency_in_progress() -> None:
+        raise IdempotencyInProgressError(
+            operation_id=OperationId("original-operation-123"),
+            retry_after_seconds=3,
+            message=SECRET,
+        )
 
     @application.get("/_test/authentication-required")
     async def authentication_required() -> None:
@@ -289,3 +304,49 @@ def test_unexpected_failure_still_propagates_to_server() -> None:
 
     with TestClient(application) as client, pytest.raises(RuntimeError, match=SECRET):
         client.get("/_test/runtime-error")
+
+
+def test_idempotency_key_reuse_has_specific_safe_problem() -> None:
+    application = _create_error_test_app()
+
+    with TestClient(application, raise_server_exceptions=False) as client:
+        response = client.post("/_test/idempotency-key-reused")
+
+    assert response.status_code == 409
+
+    body: dict[str, object] = response.json()
+    assert body["code"] == "idempotency_key_reused"
+    assert body["type"] == (
+        "https://github.com/matejpalenik/inframeld/blob/main/"
+        "docs/development/error-handling.md#idempotency-key-reused"
+    )
+    assert body["requestId"] == response.headers["x-request-id"]
+    assert response.headers["content-type"] == "application/problem+json"
+    assert SECRET not in response.text
+
+
+def test_unfinished_retry_returns_original_operation_and_retry_hint() -> None:
+    application = _create_error_test_app()
+
+    with TestClient(application, raise_server_exceptions=False) as client:
+        response = client.post("/_test/idempotency-in-progress")
+
+    assert response.status_code == 409
+    assert response.headers["content-type"] == "application/problem+json"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["retry-after"] == "3"
+
+    body: dict[str, object] = response.json()
+    assert body == {
+        "type": (
+            "https://github.com/matejpalenik/inframeld/blob/main/"
+            "docs/development/error-handling.md#idempotency-in-progress"
+        ),
+        "title": "Operation in progress",
+        "status": 409,
+        "detail": "The original request is still in progress.",
+        "code": "idempotency_in_progress",
+        "requestId": response.headers["x-request-id"],
+        "operationId": "original-operation-123",
+    }
+    assert SECRET not in response.text

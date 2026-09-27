@@ -9,9 +9,13 @@ from starlette.responses import Response
 from inframeld_backend.shared.application.errors.application_error import (
     ApplicationError,
 )
+from inframeld_backend.shared.application.errors.application_errors import (
+    IdempotencyInProgressError,
+)
 from inframeld_backend.shared.http.builders.problem_response import build_problem_response
 from inframeld_backend.shared.http.definitions.problem_catalogue import (
     DEPENDENCY_UNAVAILABLE_PROBLEM,
+    IDEMPOTENCY_IN_PROGRESS_PROBLEM,
     INTERNAL_ERROR_PROBLEM,
     VALIDATION_ERROR_PROBLEM,
 )
@@ -51,6 +55,17 @@ async def _application_error_handler(
         report_unexpected_error(error, event="request_failed")
     elif definition == DEPENDENCY_UNAVAILABLE_PROBLEM and error.__cause__ is not None:
         report_unexpected_error(error, event="request_failed", error_code=error.code)
+
+    if (
+        isinstance(error, IdempotencyInProgressError)
+        and definition == IDEMPOTENCY_IN_PROGRESS_PROBLEM
+    ):
+        return build_problem_response(
+            request,
+            definition,
+            operation_id=error.operation_id,
+            protocol_headers={"Retry-After": str(error.retry_after_seconds)},
+        )
 
     return build_problem_response(request, definition)
 

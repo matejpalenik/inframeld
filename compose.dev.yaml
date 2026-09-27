@@ -84,6 +84,7 @@ services:
       dockerfile: apps/backend/Dockerfile
     environment:
       INFRAMELD_ENVIRONMENT: local
+      INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE: /run/secrets/idempotency_fingerprint_hmac
       INFRAMELD_DATABASE__HOST: postgres
       INFRAMELD_DATABASE__PORT: "5432"
       INFRAMELD_DATABASE__NAME: inframeld
@@ -92,6 +93,8 @@ services:
       INFRAMELD_KRATOS__PUBLIC_URL: http://kratos:4433
       INFRAMELD_KRATOS__AUTHORITY: kratos:local
       INFRAMELD_CSRF__TRUSTED_ORIGINS: '["http://127.0.0.1:8001"]'
+    secrets:
+      - idempotency_fingerprint_hmac
     ports:
       - "127.0.0.1:8001:8000"
     depends_on:
@@ -103,3 +106,7 @@ services:
 volumes:
   inframeld_postgres_data:
   inframeld_kratos_postgres_data:
+
+secrets:
+  idempotency_fingerprint_hmac:
+    file: ${INFRAMELD_FINGERPRINT_KEY_HOST_FILE:-/etc/inframeld/secrets/idempotency_fingerprint_hmac.key}

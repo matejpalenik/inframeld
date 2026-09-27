@@ -33,6 +33,8 @@ cp apps/backend/.env.test.example apps/backend/.env.test
 
 Keep `.env.test` in the ignored local configuration; it is not committed.
 
+[Create the idempotency fingerprint key](#idempotency-fingerprint-key) and set its absolute path in both local environment files before running migrations or starting the backend.
+
 ### 2. Start PostgreSQL, Kratos, and Mailpit
 
 ```bash
@@ -114,8 +116,64 @@ Runtime configuration is loaded from files under `apps/backend`:
 - `.env.test` — used when `INFRAMELD_ENVIRONMENT=test`
 - `INFRAMELD_TEST_ENV_FILE` — selects another test environment file; relative paths are resolved from `apps/backend`
 - `INFRAMELD_*` environment variables — override values loaded from dotenv files
-- `.env.example` — documents local development database, Kratos, and CSRF settings and may be copied to `.env`
-- `.env.test.example` — documents isolated integration-test database and Kratos defaults and may be copied to `.env.test`
+- `.env.example` — documents local development database, Kratos, CSRF, and fingerprint-key path settings and may be copied to `.env`
+- `.env.test.example` — documents isolated integration-test database, Kratos defaults, and the fingerprint-key path and may be copied to `.env.test`
+
+### Idempotency fingerprint key
+
+`RequestFingerprintService` uses a deployment HMAC key to calculate fingerprints for requests containing secrets. PostgreSQL stores the resulting fingerprints and idempotency reservations, not the HMAC key. Keep the key stable while those reservations are retained, and keep it separate from the provider-credential encryption key. See [Background jobs, retries, and competing changes](../../docs/development/jobs-and-idempotency.md#fingerprint-secret-bearing-requests-without-exposing-the-secret) for the request rule.
+
+For local macOS development with Podman, create one raw 32-byte key outside the source checkout, under your home directory:
+
+```bash
+python3 - <<'PY'
+import os
+from pathlib import Path
+from secrets import token_bytes
+
+os.umask(0o077)
+key_file = Path.home() / ".config/inframeld/secrets/idempotency_fingerprint_hmac.key"
+key_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+descriptor = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "wb") as output:
+    output.write(token_bytes(32))
+PY
+```
+
+On a Linux VM with rootful Docker, use the host-managed path `/etc/inframeld/secrets/idempotency_fingerprint_hmac.key` instead. Provision it as an administrator for the backend image's UID 10001:
+
+```bash
+sudo python3 - <<'PY'
+import os
+from pathlib import Path
+from secrets import token_bytes
+
+os.umask(0o077)
+key_file = Path("/etc/inframeld/secrets/idempotency_fingerprint_hmac.key")
+key_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+descriptor = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "wb") as output:
+    output.write(token_bytes(32))
+os.chown(key_file, 10001, 10001)
+os.chmod(key_file, 0o400)
+PY
+```
+
+Both commands print no key material and refuse to overwrite an existing file. If an earlier setup already has a fingerprint key, move that exact file to the new host path instead of generating another. Include the host-managed file in the installation's [protected backup set](../../docs/development/upgrades-and-recovery.md#backup). Restore the same key on a replacement VM; do not generate a new one on restart or after losing the file.
+
+Set the absolute host path in both `apps/backend/.env` and `apps/backend/.env.test`. The checked-in examples show the Linux VM path:
+
+```dotenv
+INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE=/etc/inframeld/secrets/idempotency_fingerprint_hmac.key
+```
+
+On macOS, use the absolute path under your home directory instead. For the Compose backend, also set `INFRAMELD_FINGERPRINT_KEY_HOST_FILE` in the repository-root `.env` file to that same host path. [Podman Machine](https://docs.podman.io/en/latest/markdown/podman-machine-init.1.html) shares the home directory by default; it does not automatically share macOS `/etc`.
+
+Only paths go in the environment files. For `pnpm dev:compose`, `compose.dev.yaml` defaults to the Linux VM's `/etc/inframeld/secrets` host file; the root `.env` value overrides that source on macOS. Compose mounts the selected file read-only as `/run/secrets/idempotency_fingerprint_hmac` and sets that container path automatically. The host-run backend and the container's UID 10001 must each be able to read the file when they run. [File-backed Compose secrets](https://docs.docker.com/reference/compose-file/services/#secrets) keep host ownership and permission bits; grant the required runtime identities read access through restricted ownership, group membership, or ACLs. Do not make the key world-readable. Use a separate key for a separate installation, including an isolated test deployment.
+
+Configuration currently validates the path, and the file reader validates its contents when called. No production operation loads the fingerprint key at startup yet.
 
 For a backend running on the host with local Compose services, the relevant values are:
 
