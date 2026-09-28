@@ -723,7 +723,9 @@ This has a limit: an attacker able to rewrite the entire database record could r
 
 Validation evidence records the semantic connection revision, credential revision, tested role/model, and embedding dimensions when relevant. A successful generation test does not validate embeddings. [Model connections](model-connections.md) owns saving, replacement, removal, probes, and dispatch.
 
-An idempotency reservation identifies the stable principal, organization/project, logical method/route, request key, canonical request fingerprint, operation/job, state, expiry, and safe outcome. Save it together with acceptance of the work and required audit. Fingerprints of secret-bearing requests use a separate protected HMAC key. The exact schema belongs to that feature. [Jobs](jobs-and-idempotency.md) owns replay and retention.
+Migration [0002](../../apps/backend/migrations/versions/0002_idempotency_reservations.py) implements `idempotency_reservations`. Each row stores an opaque `operation_id`, stable `principal_id`, `organization_id`, optional `project_id`, HTTP `method`, logical `requested_route`, `request_key`, binary `request_fingerprint`, `state`, optional `replay_kind`, and creation and expiry times. A unique constraint covers principal, organization, project, method, route, and key, treating an absent project as one shared scope. A completed row classifies the safe replay outcome; it does not store an HTTP response body or plaintext secret.
+
+The owning command saves its accepted change and required audit in the same transaction as the reservation. The implemented project grant command follows this rule; other outcome kinds await their owning workflows. Fingerprints of secret-bearing requests use a separate protected HMAC key. [Jobs](jobs-and-idempotency.md) owns replay and retention.
 
 ### Maintainer checks
 

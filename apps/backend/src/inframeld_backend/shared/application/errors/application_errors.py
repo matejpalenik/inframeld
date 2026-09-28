@@ -37,6 +37,18 @@ class ConflictError(ApplicationError):
         super().__init__(message)
 
 
+class StaleRevisionError(ConflictError):
+    """The caller must reload state before making a new decision."""
+
+    code: ClassVar[ApplicationErrorCode] = ApplicationErrorCode.STALE_REVISION
+
+    def __init__(
+        self,
+        message: str = "The expected revision is no longer current.",
+    ) -> None:
+        super().__init__(message)
+
+
 class DependencyUnavailableError(ApplicationError):
     """Raised for a recognized availability failure in a required dependency.
 

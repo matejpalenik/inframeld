@@ -1,6 +1,6 @@
 """Reserve operation identities using the caller's PostgreSQL transaction."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from hmac import compare_digest
 from typing import final, override
 from uuid import uuid4
@@ -41,12 +41,12 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
+    @override
     async def mark_replayable(
         self,
         operation_id: OperationId,
         replay_kind: OperationReplayKind,
-    ) -> None:
-
+    ) -> datetime | None:
         expires_at = (
             None
             if replay_kind is OperationReplayKind.ASYNC_JOB
@@ -64,13 +64,18 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
                 replay_kind=replay_kind,
                 expires_at=expires_at,
             )
-            .returning(IdempotencyReservationRow.operation_id)
+            .returning(
+                IdempotencyReservationRow.operation_id,
+                IdempotencyReservationRow.expires_at,
+            )
         )
 
-        updated_id = (await self._session.execute(statement)).scalar_one_or_none()
+        updated = (await self._session.execute(statement)).tuples().one_or_none()
+        if updated is None:
+            raise ConflictError()
 
-        if updated_id is None:
-            raise ConflictError
+        _, stored_expiry = updated
+        return stored_expiry
 
     async def mark_recovery_required(self, operation_id: OperationId) -> None:
         """Record uncertainty only before a safe replay outcome exists."""
@@ -148,6 +153,7 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
                 created=True,
                 state=state,
                 replay_kind=replay_kind,
+                expires_at=None,
             )
 
         # 3. If another request won, read its committed operation and decision.
@@ -158,6 +164,7 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
                 IdempotencyReservationRow.request_fingerprint,
                 IdempotencyReservationRow.state,
                 IdempotencyReservationRow.replay_kind,
+                IdempotencyReservationRow.expires_at,
             ).where(
                 IdempotencyReservationRow.principal_id == request.principal_id.value,
                 IdempotencyReservationRow.organization_id == request.organization_id.value,
@@ -172,7 +179,7 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
         if existing is None:
             raise RuntimeError("Conflicting operation reservation was not found after insert.")
 
-        operation_id, saved_fingerprint, state, replay_kind = existing
+        operation_id, saved_fingerprint, state, replay_kind, expires_at = existing
         # The key alone is insufficient: changed input must not inherit the
         # first request's operation, even when its scope and route match.
         if not compare_digest(saved_fingerprint, request.fingerprint):
@@ -184,4 +191,5 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
             created=False,
             state=state,
             replay_kind=replay_kind,
+            expires_at=expires_at,
         )

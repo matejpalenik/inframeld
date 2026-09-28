@@ -49,6 +49,14 @@ CONFLICT_PROBLEM = ProblemDefinition(
     detail="The operation cannot be completed in the current state.",
 )
 
+STALE_REVISION_PROBLEM = ProblemDefinition(
+    type_uri=f"{TYPE_PREFIX}#stale-revision",
+    code=ProblemCode.STALE_REVISION,
+    title="Revision is no longer current",
+    status=409,
+    detail="Reload the current state before making a new change.",
+)
+
 IDEMPOTENCY_KEY_REUSED_PROBLEM = ProblemDefinition(
     type_uri=f"{TYPE_PREFIX}#idempotency-key-reused",
     code=ProblemCode.IDEMPOTENCY_KEY_REUSED,

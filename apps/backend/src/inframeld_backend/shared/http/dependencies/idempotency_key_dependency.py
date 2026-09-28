@@ -8,8 +8,24 @@ from inframeld_backend.shared.application.value_objects.idempotency_key import I
 
 
 class IdempotencyKeyDependency:
+    """Reject ambiguous headers and convert one key at the HTTP boundary."""
+
     def __call__(
-        self, request: Request, raw_key: Annotated[str, Header(alias="Idempotency-Key")]
+        self,
+        request: Request,
+        raw_key: Annotated[
+            str,
+            Header(
+                alias="Idempotency-Key",
+                # These document the value object's constraints in OpenAPI.
+                # IdempotencyKey performs validation so errors use invalid_input.
+                json_schema_extra={
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": r".*\S.*",
+                },
+            ),
+        ],
     ) -> IdempotencyKey:
         if len(request.headers.getlist("Idempotency-Key")) != 1:
             raise InvalidInputError("Exactly one Idempotency-Key header is required.")

@@ -25,7 +25,13 @@ from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
     IdempotencyKeyReusedError,
 )
+from inframeld_backend.shared.application.services.request_fingerprint_service import (
+    RequestFingerprintService,
+)
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
+    RequestFingerprintKey,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
@@ -112,6 +118,70 @@ async def test_changed_input_under_one_key_conflicts(database: Database) -> None
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("purpose", "route", "original_bytes", "changed_bytes"),
+    [
+        (
+            "provider-credential-update:v1",
+            "/v1/projects/{project_id}/provider-credentials",
+            b'{"revision":1,"secret":"alpha"}',
+            b'{"revision":1,"secret":"beta"}',
+        ),
+        (
+            "knowledge-upload:v1",
+            "/v1/projects/{project_id}/uploads",
+            b"filename=notes.txt\x00file contents A",
+            b"filename=notes.txt\x00file contents B",
+        ),
+    ],
+)
+async def test_changed_secret_or_file_bytes_cannot_reuse_an_operation(
+    database: Database,
+    purpose: str,
+    route: str,
+    original_bytes: bytes,
+    changed_bytes: bytes,
+) -> None:
+    """Changed sensitive input cannot inherit the original operation."""
+    request = replace(
+        await _request(database),
+        requested_route=route,
+    )
+    fingerprints = RequestFingerprintService(RequestFingerprintKey(b"K" * 32))
+
+    original_fingerprint = fingerprints.fingerprint(
+        purpose=purpose,
+        canonical_request=original_bytes,
+    )
+    changed_fingerprint = fingerprints.fingerprint(
+        purpose=purpose,
+        canonical_request=changed_bytes,
+    )
+
+    original = await _reserve(
+        database,
+        replace(request, fingerprint=original_fingerprint),
+    )
+
+    with pytest.raises(IdempotencyKeyReusedError):
+        await _reserve(
+            database,
+            replace(request, fingerprint=changed_fingerprint),
+        )
+
+    async with database.session() as session:
+        saved = await session.scalar(
+            select(IdempotencyReservationRow).where(
+                IdempotencyReservationRow.operation_id == original.operation_id.value
+            )
+        )
+
+    assert saved is not None
+    assert saved.request_fingerprint == original_fingerprint
+    assert len(saved.request_fingerprint) == 32
+
+
+@pytest.mark.asyncio
 async def test_writer_does_not_commit_the_callers_transaction(database: Database) -> None:
     request = await _request(database)
 
@@ -129,7 +199,7 @@ async def test_writer_does_not_commit_the_callers_transaction(database: Database
 
 @pytest.mark.asyncio
 async def test_completed_safe_result_starts_24_hour_retention(database: Database) -> None:
-    """Start expiry when a safe synchronous outcome is recorded."""
+    """Return the same expiry PostgreSQL saved when the result completed."""
     request = await _request(database)
 
     async with database.session() as session, session.begin():
@@ -138,19 +208,19 @@ async def test_completed_safe_result_starts_24_hour_retention(database: Database
         before_completion = await session.scalar(select(func.clock_timestamp()))
         assert before_completion is not None
 
-        await writer.mark_replayable(
+        returned_expiry = await writer.mark_replayable(
             reservation.operation_id,
             OperationReplayKind.SAFE_RESULT,
         )
-
-        expires_at = await session.scalar(
+        stored_expiry = await session.scalar(
             select(IdempotencyReservationRow.expires_at).where(
                 IdempotencyReservationRow.operation_id == reservation.operation_id.value
             )
         )
 
-    assert expires_at is not None
-    assert expires_at >= before_completion + timedelta(hours=24)
+    assert stored_expiry is not None
+    assert returned_expiry == stored_expiry
+    assert stored_expiry >= before_completion + timedelta(hours=24)
 
 
 @pytest.mark.asyncio

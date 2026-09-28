@@ -1,4 +1,5 @@
 from dataclasses import replace
+from datetime import datetime
 from typing import override
 from uuid import UUID
 
@@ -11,6 +12,9 @@ from inframeld_backend.access.application.dtos.project_grant_change_facts_dto im
 from inframeld_backend.access.application.protocols.project_grant_change_facts_reader import (
     ProjectGrantChangeFactsReader,
 )
+from inframeld_backend.access.application.protocols.project_grant_change_writer import (
+    ProjectGrantChangeWriter,
+)
 from inframeld_backend.access.application.services.project_grant_change_service import (
     ProjectGrantChangeService,
 )
@@ -22,14 +26,25 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
+    OperationReservationRequestDTO,
+)
+from inframeld_backend.shared.application.dtos.operation_reservation_result_dto import (
+    OperationReservationResultDTO,
+)
 from inframeld_backend.shared.application.dtos.project_operation_admission_request_dto import (
     ProjectOperationAdmissionRequestDTO,
 )
+from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ResourceNotFoundError,
 )
+from inframeld_backend.shared.application.protocols.operation_reservation_writer import (
+    OperationReservationWriter,
+)
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 
 ACTOR_ID = PrincipalId(UUID(int=1))
 RECIPIENT_ID = PrincipalId(UUID(int=2))
@@ -74,14 +89,54 @@ class FixedGrantFactsReader(ProjectGrantChangeFactsReader):
         return self._facts
 
 
+class UnexpectedReservations(OperationReservationWriter):
+    @override
+    async def reserve(
+        self, request: OperationReservationRequestDTO
+    ) -> OperationReservationResultDTO:
+        raise AssertionError("A denied grant must not reserve an operation.")
+
+    @override
+    async def mark_replayable(
+        self,
+        operation_id: OperationId,
+        replay_kind: OperationReplayKind,
+    ) -> datetime | None:
+        raise AssertionError("A denied grant must not become replayable.")
+
+
+class UnexpectedGrantChanges(ProjectGrantChangeWriter):
+    @override
+    async def create_use_only(
+        self,
+        *,
+        organization_id: OrganizationId,
+        project_id: ProjectId,
+        actor_principal_id: PrincipalId,
+        recipient_principal_id: PrincipalId,
+        action_id: ActionId,
+        expected_access_revision: int,
+        operation_id: OperationId,
+    ) -> None:
+        raise AssertionError("A denied grant must not change Access records.")
+
+
+def _service(facts: ProjectGrantChangeFactsDTO | None) -> ProjectGrantChangeService:
+    return ProjectGrantChangeService(
+        FixedGrantFactsReader(facts),
+        UnexpectedReservations(),
+        UnexpectedGrantChanges(),
+    )
+
+
 @pytest.mark.asyncio
 async def test_use_only_authority_cannot_assign_a_grant() -> None:
     """A current use grant does not give its holder delegation authority."""
-    service = ProjectGrantChangeService(FixedGrantFactsReader(FACTS))
+    service = _service(FACTS)
     request = ProjectOperationAdmissionRequestDTO(
         project_id=PROJECT_ID,
-        method="PUT",
-        requested_route="/projects/{project_id}/grants",
+        method="POST",
+        requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("assign-bob-1"),
         fingerprint=b"x" * 32,
     )
@@ -113,11 +168,11 @@ async def test_missing_or_invisible_project_is_not_found(
     facts: ProjectGrantChangeFactsDTO | None,
 ) -> None:
     """Hide an unavailable project before reporting the caller's grant authority."""
-    service = ProjectGrantChangeService(FixedGrantFactsReader(facts))
+    service = _service(facts)
     request = ProjectOperationAdmissionRequestDTO(
         project_id=PROJECT_ID,
-        method="PUT",
-        requested_route="/projects/{project_id}/grants",
+        method="POST",
+        requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("assign-bob-1"),
         fingerprint=b"x" * 32,
     )
@@ -151,11 +206,11 @@ async def test_missing_recipient_is_disclosed_only_to_grantor(
         recipient_is_project_member=False,
         actor_can_grant_action=actor_can_grant,
     )
-    service = ProjectGrantChangeService(FixedGrantFactsReader(facts))
+    service = _service(facts)
     request = ProjectOperationAdmissionRequestDTO(
         project_id=PROJECT_ID,
-        method="PUT",
-        requested_route="/projects/{project_id}/grants",
+        method="POST",
+        requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("assign-bob-1"),
         fingerprint=b"x" * 32,
     )

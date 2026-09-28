@@ -48,6 +48,7 @@ These shared application exceptions belong in `shared/application/errors/applica
 | A requested resource is unavailable within the caller's permitted scope | `ResourceNotFoundError` | 404 |
 | An authorization check has denied an operation | `AccessDeniedError` | 403 |
 | Current state prevents the requested operation | `ConflictError` | 409 |
+| A new command uses an expected revision that is no longer current | `StaleRevisionError` | 409 `stale_revision` |
 | An idempotency key is reused for a different request | `IdempotencyKeyReusedError` | 409 |
 | The same request is retried while its synchronous operation is unfinished | `IdempotencyInProgressError` | 409 |
 | An adapter has identified a required dependency's availability failure | `DependencyUnavailableError` | 503 |
@@ -368,6 +369,14 @@ Title: **Operation conflicts with current state**
 Detail: **The operation cannot be completed in the current state.**
 
 The caller must resolve the state conflict. Repeating the same request is not automatically useful or safe.
+
+### Stale revision
+
+**409 · `stale_revision` · `#stale-revision`**\
+Title: **Revision is no longer current**\
+Detail: **Reload the current state before making a new change.**
+
+A new command supplied an expected revision that another accepted change has advanced. The caller must reload the current state and make a fresh decision. A retry with the original idempotency key instead recovers the original operation; it does not become a new stale command.
 
 ### Idempotency key reused
 
