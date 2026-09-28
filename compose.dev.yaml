@@ -16,22 +16,97 @@ services:
       retries: 12
       start_period: 5s
 
+  kratos-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: kratos_dev
+      POSTGRES_USER: kratos_dev
+      POSTGRES_PASSWORD: kratos-dev-only
+    volumes:
+      - inframeld_kratos_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kratos_dev -d kratos_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  kratos-migrate:
+    image: docker.io/oryd/kratos:v25.4.0
+    command:
+      [
+        "-c",
+        "/etc/config/kratos/dev.yaml",
+        "migrate",
+        "sql",
+        "up",
+        "-e",
+        "--yes",
+      ]
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    depends_on:
+      kratos-postgres:
+        condition: service_healthy
+
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.31.1
+    environment:
+      MP_SMTP_TLS_CERT: sans:mailpit
+      MP_SMTP_TLS_KEY: sans:mailpit
+      MP_SMTP_REQUIRE_STARTTLS: "true"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+    ports:
+      - "127.0.0.1:18024:8025"
+
+  kratos:
+    image: docker.io/oryd/kratos:v25.4.0
+    # Optional company sign-in: follow apps/backend/README.md to create the
+    # Git-ignored config/kratos/dev.local.yaml and register the OIDC callback.
+    # Comment out the default command and uncomment the local-config command.
+    command:
+      ["serve", "-c", "/etc/config/kratos/dev.yaml", "--dev", "--watch-courier"]
+    # command:
+    #   ["serve", "-c", "/etc/config/kratos/dev.local.yaml", "--dev", "--watch-courier"]
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    ports:
+      - "127.0.0.1:14434:4433"
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+
   backend:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
     environment:
       INFRAMELD_ENVIRONMENT: local
+      INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE: /run/secrets/idempotency_fingerprint_hmac
       INFRAMELD_DATABASE__HOST: postgres
       INFRAMELD_DATABASE__PORT: "5432"
       INFRAMELD_DATABASE__NAME: inframeld
       INFRAMELD_DATABASE__USER: inframeld
       INFRAMELD_DATABASE__PASSWORD: inframeld-dev-only
+      INFRAMELD_KRATOS__PUBLIC_URL: http://kratos:4433
+      INFRAMELD_KRATOS__AUTHORITY: kratos:local
+      INFRAMELD_CSRF__TRUSTED_ORIGINS: '["http://127.0.0.1:8001"]'
+    secrets:
+      - idempotency_fingerprint_hmac
     ports:
       - "127.0.0.1:8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      kratos:
+        condition: service_started
 
 volumes:
   inframeld_postgres_data:
+  inframeld_kratos_postgres_data:
+
+secrets:
+  idempotency_fingerprint_hmac:
+    file: ${INFRAMELD_FINGERPRINT_KEY_HOST_FILE:-/etc/inframeld/secrets/idempotency_fingerprint_hmac.key}

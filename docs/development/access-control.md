@@ -12,6 +12,7 @@ This guide follows Alice and SupportBot through those decisions. Start with sect
 | --- | --- |
 | What does someone need to use a document? | [1. Three separate checks](#the-model) |
 | What do Kratos and Inframeld each do? | [2. Signing in and checking permissions](#architecture) |
+| Which human-session components exist now? | [Implemented authentication boundary](#implemented-human-authentication) |
 | How is a question answered safely? | [3. Follow a query](#query-flow) |
 | How can people share access? | [4. Membership, permissions, and visibility](#sharing) |
 | Who can upload, change, or delete documents? | [5. Document operations](#documents) |
@@ -91,7 +92,7 @@ flowchart TB
 
 **Access owns the permission rules.** An application use case, such as answering a question, asks Access for permission as it carries out the work. An adapter translates between application concepts and an external system. For example, the Kratos adapter checks a session, and the vector adapter turns the permitted document selection into search filters. HTTP endpoints, MCP tools, and workers use the same Access rules. Indexing, pipeline configuration, and model-provider integration keep their own responsibilities.
 
-The verified caller and the project or resources involved travel together in an application-owned **access context**. It is not a raw Kratos response, database object, or permission list supplied by a client. V1 integrations act as their application account. Acting on behalf of a separately verified person is a future feature.
+The verified caller travels in an application-owned **access context**. The current implementation retains only `PrincipalId`; typed operation inputs separately identify the project or resource. It is not a raw Kratos response, database object, or permission list supplied by a client. V1 integrations act as their application account. Acting on behalf of a separately verified person is a future feature.
 
 <a id="section-use-kratoss-browser-session-flow-for-studio"></a> <a id="section-include-deployment-level-external-sign-in-in-oss-v1"></a>
 
@@ -109,7 +110,30 @@ Kratos maintains these links. Inframeld identifies its verified Kratos identity 
 
 **Ory Hydra is not needed for this sign-in flow.** It addresses a different task, issuing OAuth/OIDC tokens. Issuing tokens, obtaining consent, exchanging tokens, and verified user delegation are deferred. Any future token would still lead to the same Inframeld permission checks.
 
-If a session is invalid, expired, or cannot be verified, Inframeld denies the request. It does not continue when Kratos is unavailable. Logout, account recovery, disabled identities, multi-factor authentication (MFA), secure first-administrator setup, and email configuration still need deployment integration and testing.
+If a session is invalid, expired, or cannot be verified, Inframeld denies the request. It does not continue when Kratos is unavailable. Browser logout rejection and disabled/expired session handling have backend coverage described below. Complete Studio logout and recovery, multi-factor authentication (MFA), secure first-administrator setup, and email configuration still need deployment integration and testing.
+
+<a id="implemented-human-authentication"></a>
+
+### Implemented human-session boundary
+
+The backend now exposes `GET /v1/session`. Its [component map and request flow](application-structure.md#authentication-flow) identify each service, protocol, adapter, and resource owner. `HumanSessionDependency` is a callable FastAPI dependency. `HumanSessionAuthenticationService` owns provider verification and local account admission.
+
+Kratos returns a verified authority/subject pair. An independent PostgreSQL lookup returns the [immutable Principal](data-model.md#implemented-principal-model) with ID, organization, kind, and current status. The service applies the pure active-human policy and returns an `AccessContextDTO` containing only `PrincipalId`. It does not create an account, match an email, or cache a permission snapshot.
+
+| Condition | Current HTTP result |
+| --- | --- |
+| Missing, rejected, inactive, or expired browser session | Generic 401 problem |
+| Verified identity with no local link, suspended/retired human, or non-human principal | 403 `access_denied` |
+| Unavailable/malformed provider response or absent Kratos configuration | 503 `dependency_unavailable` |
+| Active provider identity linked to an active local human | 200 with the existing `principalId` field |
+
+For cookie-authenticated writes, [`HumanSessionDependency`](../../apps/backend/src/inframeld_backend/access/http/dependencies/human_session_dependency.py) invokes [`CSRFProtectionDependency`](../../apps/backend/src/inframeld_backend/access/http/dependencies/csrf_protection_dependency.py) after authenticating the caller and before running the route. Methods other than `GET`, `HEAD`, and `OPTIONS` require `X-Inframeld-CSRF: 1` and an `Origin` matching a configured trusted browser origin. Missing or untrusted values produce the generic 403 `access_denied` problem. An empty origin list denies all such writes. Kratos separately protects its own browser account flows.
+
+The [HTTP dependency tests](../../apps/backend/tests/unit/access/http/dependencies/test_human_session_dependency.py) exercise this boundary with a test-only POST route. The implemented [`POST /v1/projects/{project_id}/grants`](../../apps/backend/src/inframeld_backend/access/http/routes/project_grant_routes.py) also uses it. Its [HTTP integration tests](../../apps/backend/tests/integration/access/test_project_grant_http_postgres.py) exercise the route with a browser cookie, CSRF marker, and trusted origin, using a fixed test authenticator rather than a live Kratos session. Future cookie-authenticated write routes must use the same dependency.
+
+Authentication services can be shared between requests: each lookup owns its short read session and starts after provider verification. `ActionAuthorizationService` separately reads current project facts in the caller's transaction. It preserves the hidden-target 404 / visible-but-denied 403 distinction and exact project/action matching. Other target types arrive with their owning behavior.
+
+The real [Kratos browser tests](../../apps/backend/tests/integration/kratos/test_kratos_browser_flow.py) cover registration, password login, expired sessions, logout rejection, and disabled identities. The [recovery tests](../../apps/backend/tests/integration/kratos/test_kratos_recovery_boundary.py) check that starting recovery does not authenticate the browser and that a valid recovery code authenticates the same identity. The [OIDC tests](../../apps/backend/tests/integration/kratos/test_kratos_oidc_browser_flow.py) cover provider login, local admission and grant boundaries, refusal to link on matching email alone, and linking after proof with the existing password. [PostgreSQL identity tests](../../apps/backend/tests/integration/access/test_human_identity_resolution_postgres.py) cover exact authority/subject matching, account-state refresh, and concurrent authentication. [API integration tests](../../apps/backend/tests/integration/access/test_current_human_session.py) exercise the cookie-to-local-principal route and missing configuration. Studio account screens, browser deployment, application-key authentication, and most Access administration workflows remain unfinished; the Kratos recovery tests do not supply a Studio recovery screen.
 
 <a id="section-introduce-a-general-authorization-engine-or-policy-language-now"></a>
 
@@ -536,6 +560,8 @@ For example, these are three different relationships:
 Revoking a grant deletes its current row. Downgrading changes its level. Giving it back later creates a fresh assignment, rather than reviving an inactive row or reading permission from history. Suspension is different because the assignments remain while account status prevents their use.
 
 Each change and its audit event are saved in the **same transaction**, meaning either both succeed or neither does. Audit records who changed what, using limited, safe before-and-after values. They exclude secrets, key verifiers, sessions, document text, and whole permission snapshots. Operator and initial-setup events identify their real actor rather than inventing a human account. Audit history has its own access and erasure rules.
+
+The first implemented grant command assigns use-only `create-access-groups` permission to an eligible human project member. It checks the actor's authority and the expected project access revision, then saves the grant, new revision, audit event, and [idempotency reservation](jobs-and-idempotency.md#requests) together. A retry checks current authority and returns the original operation if the caller is still allowed; a new key with an old revision is rejected. The [PostgreSQL tests](../../apps/backend/tests/integration/access/test_project_grant_change_postgres.py) cover these outcomes. Other grant-change workflows and audit retention still need implementation.
 
 Database constraints reject duplicate and cross-project records. A Support grant cannot name a Finance Deployment, and SupportBot cannot join another project. They also block deletion of a parent record while live relationships depend on it. Application logic checks who may make the change, arranges required handover, and removes dependencies deliberately. Automatic deletion of related database rows cannot replace those steps.
 

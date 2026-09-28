@@ -1,0 +1,23 @@
+# Copy outside the repository and replace the values before enabling OIDC.
+selfservice:
+  methods:
+    oidc:
+      enabled: true
+      config:
+        providers:
+          - id: company
+            provider: generic
+            client_id: REPLACE_WITH_CLIENT_ID
+            client_secret: REPLACE_WITH_CLIENT_SECRET
+            issuer_url: https://REPLACE_WITH_PROVIDER_ISSUER
+            mapper_url: file:///etc/config/kratos/oidc.email.jsonnet
+            claims_source: id_token
+            scope:
+              - openid
+              - email
+  flows:
+    registration:
+      after:
+        oidc:
+          hooks:
+            - hook: session

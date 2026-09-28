@@ -21,6 +21,8 @@ Default to read-only assistance. Loading this skill grants no code edits, SDK ex
 
 - Follow [a command and query](../../../docs/development/application-structure.md#operation), then [request identity](../../../docs/development/jobs-and-idempotency.md#requests) and [lost-answer recovery](../../../docs/development/jobs-and-idempotency.md#answers). For MCP parity, read [its tool contract](../../../docs/development/mcp.md#tools).
 
+- For code organization or component responsibilities, read [the component map and conventions](../../../docs/development/application-structure.md#component-conventions) and [the implemented authentication flow](../../../docs/development/application-structure.md#authentication-flow), together with root `AGENTS.md`. Follow domain → layer → component role. Services own orchestration; application records end in `DTO`, dedicated domain decision records end in `PolicyInput`, and named `*Policy` classes expose pure static methods. Use standard frozen dataclasses and behavioral protocols, without custom record decorators or marker interfaces. Keep docstrings that explain trust, results, failures, or ownership; remove repeated boilerplate. Preserve the read-only default, required override checking, and manual architecture review.
+
 ## Essential boundaries
 
 Knowledge owns sources; Indexing owns verified search data; Pipelines owns builds, query, receipts and feedback; Evaluation owns offline evidence; Releases owns serving pointers; Access owns authorization. Entry points call their public application use cases. Read projections may join owners without becoming additional writers. Jobs and audit are supporting records, not a seventh domain or event-sourcing framework.

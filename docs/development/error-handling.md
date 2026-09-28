@@ -40,7 +40,7 @@ For example, `ProviderError → RepositoryError → ServiceError → ControllerE
 
 ## 2. Which error should I use?
 
-These shared application exceptions belong in `shared/application/errors.py`. Their base remains in `shared/application/application_error.py`.
+These shared application exceptions belong in `shared/application/errors/application_errors.py`. Their base remains in `shared/application/errors/application_error.py`.
 
 | Situation | Raise | Shared HTTP mapping |
 | --- | --- | --- |
@@ -48,6 +48,9 @@ These shared application exceptions belong in `shared/application/errors.py`. Th
 | A requested resource is unavailable within the caller's permitted scope | `ResourceNotFoundError` | 404 |
 | An authorization check has denied an operation | `AccessDeniedError` | 403 |
 | Current state prevents the requested operation | `ConflictError` | 409 |
+| A new command uses an expected revision that is no longer current | `StaleRevisionError` | 409 `stale_revision` |
+| An idempotency key is reused for a different request | `IdempotencyKeyReusedError` | 409 |
+| The same request is retried while its synchronous operation is unfinished | `IdempotencyInProgressError` | 409 |
 | An adapter has identified a required dependency's availability failure | `DependencyUnavailableError` | 503 |
 | A bug or an unclassified failure occurs | Let the original exception propagate | Safe 500 |
 
@@ -66,7 +69,7 @@ Authentication establishes who called. Permission checks decide what that caller
 **Application use-case excerpt:** `find_visible` represents a read that enforces the verified actor's project and document scope.
 
 ```python
-from inframeld_backend.shared.application.errors import ResourceNotFoundError
+from inframeld_backend.shared.application.errors.application_errors import ResourceNotFoundError
 
 # Inside the read use case; actor comes from verified authentication.
 document = await documents.find_visible(actor, project_id, document_id)
@@ -83,12 +86,12 @@ The exception itself does not check access. The feature must decide when to hide
 
 ### B. Translate a domain rejection only at the operation that understands it
 
-Domain errors live in the owning domain package. Shared bases are in `shared/domain/errors.py`. They do not inherit from `ApplicationError` or import FastAPI.
+Domain errors live in the owning domain package. Shared bases are in `shared/domain/errors/domain_errors.py`. They do not inherit from `ApplicationError` or import FastAPI.
 
 **Domain method excerpt:** a rollback cannot proceed while a candidate is attached.
 
 ```python
-from inframeld_backend.shared.domain.errors import InvalidStateTransitionError
+from inframeld_backend.shared.domain.errors.domain_errors import InvalidStateTransitionError
 
 # Inside the deployment's rollback method.
 if self.candidate is not None:
@@ -98,8 +101,8 @@ if self.candidate is not None:
 **Application use-case excerpt:** this particular rejection means the caller requested an operation that conflicts with current state.
 
 ```python
-from inframeld_backend.shared.application.errors import ConflictError
-from inframeld_backend.shared.domain.errors import InvalidStateTransitionError
+from inframeld_backend.shared.application.errors.application_errors import ConflictError
+from inframeld_backend.shared.domain.errors.domain_errors import InvalidStateTransitionError
 
 # Inside the authorized command's short transaction.
 # The full command also checks idempotency, expected revision,
@@ -126,7 +129,7 @@ All model calls go through ModelGateway. This **illustrative excerpt for a futur
 ```python
 import litellm
 
-from inframeld_backend.shared.application.errors import DependencyUnavailableError
+from inframeld_backend.shared.application.errors.application_errors import DependencyUnavailableError
 
 try:
     provider_response = await litellm.acompletion(**approved_call_options)
@@ -165,7 +168,7 @@ A deployment revision conflict is a useful exception to that rule. Another chang
 ```python
 from typing import ClassVar
 
-from inframeld_backend.shared.application.errors import ConflictError
+from inframeld_backend.shared.application.errors.application_errors import ConflictError
 
 class DeploymentRevisionConflictError(ConflictError):
     """Reject an update whose expected deployment revision is stale.
@@ -194,9 +197,9 @@ Next, decide whether callers need a new public problem or whether the existing `
 
 If a new public problem is needed:
 
-1. Add its stable code to `ProblemCode` in `apps/backend/src/inframeld_backend/shared/http/problem_definitions.py`. This HTTP enum is separate from the application exception's `ClassVar[str]` code. Application code must not import it.
+1. Add its stable code to `ProblemCode` in `apps/backend/src/inframeld_backend/shared/http/types/problem_code.py`. This HTTP enum is separate from the application exception's `ClassVar[str]` code. Application code must not import it.
 2. Add a frozen `ProblemDefinition` in that file. Its `code` is the enum member, and its `type_uri`, `title`, `status`, and `detail` are reviewed public metadata. Document the new URI anchor in this guide's problem catalogue before using it.
-3. In `apps/backend/src/inframeld_backend/shared/http/problem_mapper.py`, add the concrete exception class to `_APPLICATION_PROBLEMS`, pointing to the new or reused definition.
+3. In `apps/backend/src/inframeld_backend/shared/http/mappers/problem_mapper.py`, add the concrete exception class to `_APPLICATION_PROBLEMS`, pointing to the new or reused definition.
 4. Declare the applicable response on the feature route with `problem_responses(definition)` and test its runtime response and OpenAPI contract.
 
 `problem_mapper.for_application_error()` matches the **exact exception class**. If it is not registered, the mapper uses `INTERNAL_ERROR_PROBLEM` and reports a 500. That also applies to an unregistered subclass of a class mapped to 409. Neither its name, `exc.code`, nor `str(exc)` defines the public response.
@@ -244,7 +247,7 @@ This fragment belongs inside the problem object. Return at most 20 sanitized iss
 
 Runtime handlers build the response, but each route still has to describe its possible responses in OpenAPI. Use `problem_responses(definition)` for each applicable status, including `VALIDATION_ERROR_PROBLEM` for input-validation 422s. One status has one declaration. Deliberately combine failures sharing a status rather than accidentally replacing a dictionary entry.
 
-See [the production health route](../../apps/backend/src/inframeld_backend/shared/http/health.py) and [test-only JSON/multipart contract fixtures](../../apps/backend/tests/unit/contract/test_openapi_contract.py). Regenerate the native contract when production declarations change. The [maintainer reference](error-handling-reference.md#openapi-and-client-compatibility) owns the narrow media-type hook and handler installation.
+See [the production health route](../../apps/backend/src/inframeld_backend/shared/http/routes/health_routes.py) and [test-only JSON/multipart contract fixtures](../../apps/backend/tests/unit/contract/test_openapi_contract.py). Regenerate the native contract when production declarations change. The [maintainer reference](error-handling-reference.md#openapi-and-client-compatibility) owns the narrow media-type hook and handler installation.
 
 ## 6. Logging, cleanup, and retries
 
@@ -271,21 +274,21 @@ Write exception messages as controlled developer text, but do not assume they or
 
 ## Adding a failure
 
-First decide whether the outcome is valid or a failure. Reuse an accurate exception, or add the smallest meaningful one in the owning package. Explain its meaning and relevant `Raises` cases in Google-style docstrings. Translate it only where its meaning is understood, preserving the original cause.
+First decide whether the outcome is valid or a failure. Reuse an accurate exception, or add the smallest meaningful one in the owning package. Explain its meaning and relevant failure handling where that adds information beyond its name and base contract; do not add a boilerplate docstring to every error subclass. Translate it only where its meaning is understood, preserving the original cause.
 
 Then explicitly map any public failure, declare the route's applicable responses, and test the real behavior. Regenerate OpenAPI through the existing exporter when the production declarations change. Do not hand-edit the contract artifact.
 
 ### A concrete HTTP test
 
-The existing [handler tests](../../apps/backend/tests/unit/shared/http/test_error_handlers.py) use the real middleware and handlers in a test-only app. The example below is a complete illustrative file at `apps/backend/tests/unit/shared/http/test_feature_error_example.py`. That file does not exist in the repository. It needs no database startup or provider calls.
+The existing [handler tests](../../apps/backend/tests/unit/shared/http/handlers/test_error_handlers.py) use the real middleware and handlers in a test-only app. The example below is a complete illustrative file at `apps/backend/tests/unit/shared/http/test_feature_error_example.py`. That file does not exist in the repository. It needs no database startup or provider calls.
 
 ```python
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from inframeld_backend.shared.application.errors import ConflictError
-from inframeld_backend.shared.http.error_handlers import register_error_handlers
-from inframeld_backend.shared.http.request_context import RequestContextMiddleware
+from inframeld_backend.shared.application.errors.application_errors import ConflictError
+from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
+from inframeld_backend.shared.http.middleware.request_context_middleware import RequestContextMiddleware
 
 def test_conflict_is_safe_and_correlated() -> None:
     application = FastAPI()
@@ -319,7 +322,7 @@ For changes to the shared foundation, use the [full qualification checklist](err
 
 ## Problem catalogue
 
-The seven named starter definitions below retain the accepted type fragments and exact public wording. Append each heading's fragment to this fixed `TYPE_PREFIX`:
+The named problem definitions below retain their type fragments and exact public wording. Append each heading's fragment to this fixed `TYPE_PREFIX`:
 
 ```text
 https://github.com/matejpalenik/inframeld/blob/main/docs/development/error-handling.md
@@ -366,6 +369,30 @@ Title: **Operation conflicts with current state**
 Detail: **The operation cannot be completed in the current state.**
 
 The caller must resolve the state conflict. Repeating the same request is not automatically useful or safe.
+
+### Stale revision
+
+**409 · `stale_revision` · `#stale-revision`**\
+Title: **Revision is no longer current**\
+Detail: **Reload the current state before making a new change.**
+
+A new command supplied an expected revision that another accepted change has advanced. The caller must reload the current state and make a fresh decision. A retry with the original idempotency key instead recovers the original operation; it does not become a new stale command.
+
+### Idempotency key reused
+
+**409 · `idempotency_key_reused` · `#idempotency-key-reused`**\
+Title: **Idempotency key reused**\
+Detail: **This key was already used for a different request.**
+
+The caller reused a key within the same request scope for different meaningful input. The original reservation remains authoritative; a different intended operation needs a new key. Do not include request bodies or fingerprints in the public response.
+
+### Idempotency in progress
+
+**409 · `idempotency_in_progress` · `#idempotency-in-progress`**\
+Title: **Operation in progress**\
+Detail: **The original request is still in progress.**
+
+The response includes the original `operationId` and a `Retry-After` header. The caller may retry with the same key after that delay. An accepted asynchronous job instead replays its original `202` and job identity.
 
 ### Dependency unavailable
 

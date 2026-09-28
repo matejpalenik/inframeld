@@ -1,7 +1,9 @@
+"""Export or compare the OpenAPI contract without executing the ASGI entrypoint or lifespan."""
+
 import json
 from pathlib import Path
 
-from inframeld_backend.main import create_app
+from inframeld_backend.bootstrap.application_factory import create_app
 
 CONTRACT_PATH = (
     Path(__file__).resolve().parents[3] / "contracts" / "openapi" / "v1" / "inframeld-v1.json"

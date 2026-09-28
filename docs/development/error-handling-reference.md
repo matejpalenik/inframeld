@@ -2,7 +2,7 @@
 
 Use this reference when changing shared error handling. For ordinary feature work, start with the [practical guide](error-handling.md), which also owns the public problem catalogue. This document explains which component to change, what its output must contain, and which tests protect it.
 
-> **Status — 23 September 2026:** The shared foundation is implemented. Passing backend and integration tests were developer-reported during implementation closeout. They were not rerun for this documentation edit. The [qualification checklist](#qualification-checklist) lists coverage and commands for future changes.
+> **Status — 26 September 2026:** The shared foundation is implemented and its reorganized modules preserve the existing HTTP/OpenAPI contract. Backend and full PostgreSQL/Kratos integration checks are part of this reorganization; the [qualification checklist](#qualification-checklist) identifies the protected behaviors and repeatable commands.
 
 [ADR-0004](../adr/ADR-0004-use-rfc-9457-problem-details-for-http-errors.md) owns the RFC 9457 decision. [ADR-0003](../adr/ADR-0003-generate-the-authoritative-openapi-contract-from-backend-code.md) owns the code-first API contract. Use [Application structure](application-structure.md) for dependency rules and [Pagination](pagination.md) for the shared list contract. Each list feature still validates its own cursor contents.
 
@@ -23,25 +23,30 @@ All paths below are relative to `apps/backend/src/inframeld_backend/`.
 
 | Location | Responsibility |
 | --- | --- |
-| [shared/domain/errors.py](../../apps/backend/src/inframeld_backend/shared/domain/errors.py) | `DomainError` and `InvalidStateTransitionError`. No automatic HTTP mapping |
-| [shared/application/application_error.py](../../apps/backend/src/inframeld_backend/shared/application/application_error.py) | Transport-neutral `ApplicationError` and its diagnostic-only message |
-| [shared/application/errors.py](../../apps/backend/src/inframeld_backend/shared/application/errors.py) | Five starter application failures from the practical guide |
-| [shared/http/problems.py](../../apps/backend/src/inframeld_backend/shared/http/problems.py) | `ProblemDetails`, `ValidationIssue`, aliases, and output bounds |
-| [shared/http/problem_definitions.py](../../apps/backend/src/inframeld_backend/shared/http/problem_definitions.py) | `ProblemCode`, frozen `ProblemDefinition`, and the public problem catalogue |
-| [shared/http/problem_mapper.py](../../apps/backend/src/inframeld_backend/shared/http/problem_mapper.py) | Exact-type application mapping and generic HTTP-status definitions |
-| [shared/http/problem_response.py](../../apps/backend/src/inframeld_backend/shared/http/problem_response.py) | `build_problem_response()`: serialization, correlation, and allowed headers |
-| [shared/http/problem_openapi.py](../../apps/backend/src/inframeld_backend/shared/http/problem_openapi.py) | `problem_responses()` declarations and the narrow OpenAPI media-type hook |
-| [shared/http/validation.py](../../apps/backend/src/inframeld_backend/shared/http/validation.py) | `issues_from_request_error()`: bounded, sanitized validation issues |
-| [shared/http/error_handlers.py](../../apps/backend/src/inframeld_backend/shared/http/error_handlers.py) | `register_error_handlers()`: request validation, application, HTTP, and unexpected failures |
-| [shared/http/request_context.py](../../apps/backend/src/inframeld_backend/shared/http/request_context.py) | Request IDs, scoped log context, summaries, and request-boundary diagnostics |
-| [shared/infrastructure/error_reporting.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/error_reporting.py) | Report and mark the exact exception instance once |
-| [shared/infrastructure/logging.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/logging.py) | Bounded safe diagnostics, JSON/console rendering, and stdlib/Uvicorn integration |
-| [shared/infrastructure/command_logging.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/command_logging.py) | Command outcomes and operation metadata without duplicate tracebacks |
-| [shared/infrastructure/database.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/database.py) | API database lifecycle and SQLAlchemy parameter hiding |
-| [shared/infrastructure/migrations.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/migrations.py) and [migrate.py](../../apps/backend/src/inframeld_backend/migrate.py) | Migration locking/execution and the operator failure-reporting boundary |
-| [composition.py](../../apps/backend/src/inframeld_backend/composition.py) | Install handlers, request middleware, and OpenAPI correction |
+| [shared/domain/errors/domain_errors.py](../../apps/backend/src/inframeld_backend/shared/domain/errors/domain_errors.py) | `DomainError` and `InvalidStateTransitionError`. No automatic HTTP mapping |
+| [shared/application/errors/application_error.py](../../apps/backend/src/inframeld_backend/shared/application/errors/application_error.py) | Transport-neutral `ApplicationError` and its diagnostic-only message |
+| [shared/application/errors/application_errors.py](../../apps/backend/src/inframeld_backend/shared/application/errors/application_errors.py) | Reviewed application failures, including transport-neutral authentication rejection |
+| [shared/http/responses/problem_details.py](../../apps/backend/src/inframeld_backend/shared/http/responses/problem_details.py) | Published `ProblemDetails` response |
+| [shared/http/responses/validation_issue.py](../../apps/backend/src/inframeld_backend/shared/http/responses/validation_issue.py) | Sanitized `ValidationIssue` response component |
+| [shared/http/types/problem_field_types.py](../../apps/backend/src/inframeld_backend/shared/http/types/problem_field_types.py) | Bounded field aliases and output limits |
+| [shared/http/types/problem_code.py](../../apps/backend/src/inframeld_backend/shared/http/types/problem_code.py) | Public `ProblemCode` vocabulary |
+| [shared/http/definitions/problem_definition.py](../../apps/backend/src/inframeld_backend/shared/http/definitions/problem_definition.py) | Immutable catalogue entry used by mappers and builders |
+| [shared/http/definitions/problem_catalogue.py](../../apps/backend/src/inframeld_backend/shared/http/definitions/problem_catalogue.py) | Reviewed public problem catalogue |
+| [shared/http/mappers/problem_mapper.py](../../apps/backend/src/inframeld_backend/shared/http/mappers/problem_mapper.py) | Exact-type application mapping and generic HTTP-status definitions |
+| [shared/http/builders/problem_response.py](../../apps/backend/src/inframeld_backend/shared/http/builders/problem_response.py) | `build_problem_response()`: serialization, correlation, and allowed headers |
+| [shared/http/openapi/problem_openapi.py](../../apps/backend/src/inframeld_backend/shared/http/openapi/problem_openapi.py) | `problem_responses()` declarations and the narrow OpenAPI media-type hook |
+| [shared/http/validation/request_validation_translator.py](../../apps/backend/src/inframeld_backend/shared/http/validation/request_validation_translator.py) | `issues_from_request_error()`: bounded, sanitized validation issues |
+| [shared/http/handlers/error_handlers.py](../../apps/backend/src/inframeld_backend/shared/http/handlers/error_handlers.py) | `register_error_handlers()`: request validation, application, HTTP, and unexpected failures |
+| [shared/http/middleware/request_context_middleware.py](../../apps/backend/src/inframeld_backend/shared/http/middleware/request_context_middleware.py) | Request IDs, scoped log context, summaries, and request-boundary diagnostics |
+| [shared/infrastructure/diagnostics/error_reporting.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/diagnostics/error_reporting.py) | Report and mark the exact exception instance once |
+| [shared/infrastructure/diagnostics/safe_exception_diagnostic.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/diagnostics/safe_exception_diagnostic.py) | Bounded serialization of exception structure without messages, locals, or source text |
+| [shared/infrastructure/logging/logging_configuration.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/logging/logging_configuration.py) | Configure JSON/console rendering and stdlib/Uvicorn integration |
+| [shared/infrastructure/logging/command_logging.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/logging/command_logging.py) | Command outcomes and operation metadata without duplicate tracebacks |
+| [shared/infrastructure/resources/database.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/resources/database.py) | API database lifecycle and SQLAlchemy parameter hiding |
+| [shared/infrastructure/migrations/migration_runner.py](../../apps/backend/src/inframeld_backend/shared/infrastructure/migrations/migration_runner.py) and [migrate.py](../../apps/backend/src/inframeld_backend/migrate.py) | Migration locking/execution and the operator failure-reporting boundary |
+| [bootstrap/application_factory.py](../../apps/backend/src/inframeld_backend/bootstrap/application_factory.py) | Install handlers, request middleware, and OpenAPI correction |
 
-The separate Alembic engine in `apps/backend/migrations/env.py` also hides SQLAlchemy parameters.
+The separate Alembic engine in `apps/backend/migrations/env.py` also hides SQLAlchemy parameters. `RequestId` is a UUID value object in application and request state; HTTP/logging explicitly serialize its value. `OperationId` remains validated opaque text. `ApplicationErrorCode` is a typed application vocabulary; `AuthenticationRequiredError` maps to the existing generic 401 `http_error` response.
 
 Keep feature exceptions in the domain or application package that owns their meaning. Application interfaces define which failures an infrastructure adapter may expose. Domain and application code must not import HTTP models, FastAPI, database exceptions, or structlog. `DomainError` remains separate from `ApplicationError`.
 
@@ -149,7 +154,7 @@ Run `pnpm --filter @inframeld/backend migrate`. This invokes `inframeld_backend.
 
 Alembic's `env.py` installs its own logging settings. Before reporting a caught migration failure, the wrapper restores the shared safe formatter. It uses the configured output format if settings loaded, otherwise JSON. Direct Alembic CLI calls bypass this wrapper and are not the documented operator command. The wrapper cannot undo text already emitted by migration code or third-party logs.
 
-The PostgreSQL tests cover hidden parameters and a synthetic driver message raised during migration, inspecting stdout and stderr. A failed migration still fails. API startup checks compatibility without running migrations, and a failed startup cannot begin serving.
+The PostgreSQL tests cover hidden parameters and a failing constraint carrying a synthetic marker in the real driver diagnostic during migration, inspecting stdout and stderr. A failed migration still fails. API startup checks compatibility without running migrations, and a failed startup cannot begin serving.
 
 ## Transactions and recovery
 
@@ -188,15 +193,15 @@ Use the existing OpenAPI 3.1.x exporter and drift check. Do not hand-edit `contr
 
 Use `TestClient(..., raise_server_exceptions=False)` to inspect unexpected 500 responses. Also keep a normal test proving that the server-error path still propagates the exception. To test secret disclosure, capture the **final rendered logs through production processors**. Bare `structlog.testing.capture_logs()` disables those processors and cannot establish safety by itself. See [structlog testing][structlog-testing].
 
-HTTP and schema fixtures require no production credentials, provider calls, or database. PostgreSQL integration tests use the development test database. Follow the repository's scaffold → behavioral red test → implementation → focused tests sequence where adding behavior. The existing test setup requires the non-production `apps/backend/.env.test`.
+HTTP and schema fixtures require no production credentials, provider calls, or database. PostgreSQL integration tests use isolated temporary databases on the Compose test service. Follow the repository's scaffold → behavioral red test → implementation → focused tests sequence where adding behavior. The existing test setup requires the non-production `apps/backend/.env.test`.
 
 Regression coverage lives in:
 
 - [HTTP unit tests](../../apps/backend/tests/unit/shared/http): models, builders, mappings, validation, handlers, correlation, late failures, and cancellation.
 - [Infrastructure unit tests](../../apps/backend/tests/unit/shared/infrastructure): rendered diagnostic sanitization and reporting ownership.
 - [OpenAPI contract tests](../../apps/backend/tests/unit/contract/test_openapi_contract.py): media types, components, aliases, field constraints, multipart requests, drift, and exclusion of fixture routes.
-- [Uvicorn integration test](../../apps/backend/tests/integration/test_error_reporting_uvicorn.py): server-path diagnostic deduplication.
-- [Database integration tests](../../apps/backend/tests/integration/test_database_postgres.py) and [migration integration tests](../../apps/backend/tests/integration/test_migrations_postgres.py): transactions, lifecycle, engine parameter hiding, and migration-command disclosure.
+- [Uvicorn integration test](../../apps/backend/tests/integration/observability/test_error_reporting_uvicorn.py): server-path diagnostic deduplication.
+- [Database integration tests](../../apps/backend/tests/integration/postgres/test_database_postgres.py) and [migration integration tests](../../apps/backend/tests/integration/postgres/test_migrations_postgres.py): transactions, lifecycle, engine parameter hiding, and migration-command disclosure.
 
 From the repository root, run the relevant checks after changing the foundation:
 
@@ -209,17 +214,17 @@ pnpm --filter @inframeld/backend openapi:check
 pnpm test:integration
 ```
 
-After changing production declarations, run `pnpm --filter @inframeld/backend openapi` before checking drift. It writes the generated contract. Integration tests require the local Compose database, migrate the non-production `.env.test` database, and exercise actual PostgreSQL behavior. These are future verification instructions, not commands run for this documentation edit.
+After changing production declarations, run `pnpm --filter @inframeld/backend openapi` before checking drift. It writes the generated contract. Integration tests require the local Compose database, migrate the non-production `.env.test` database, and exercise actual PostgreSQL behavior. CI uses the same complete integration command as local development.
 
 Review dependency boundaries and repository organization manually. Do not add automated architecture, import-boundary, or composition-construction tests. Test observable behavior rather than importability or inheritance alone.
 
-Use Google-style docstrings for public exceptions, interfaces, use cases, HTTP models, builders, handlers, and diagnostics. Explain meaning, safe attributes, recovery behavior, and relevant `Raises` cases. Keep response fields and OpenAPI descriptions consistent with this reference.
+Use approachable docstrings where they explain failure meaning, safe attributes, handling, or ownership that a maintainer would otherwise have to infer. Shared contracts belong on protocols. Straightforward error subclasses do not need repetitive descriptions; keep the important distinctions on their base or on errors with different handling. Preserve public response fields and OpenAPI descriptions.
 
 When the foundation changes, update affected guides, architecture, backend README, and skills together. List endpoints also need their own checks of cursor contents and authorization on every page.
 
 ## Source basis
 
-The file map and implementation descriptions were checked against source and tests on 23 September 2026. Passing test results were developer-reported. The practical guide's feature examples remain illustrative. The references below explain framework behavior, while repository code and behavioral tests define Inframeld's integration.
+The file map and implementation descriptions were reconciled with the reorganized source and tests on 26 September 2026. `pnpm check:backend` passed formatting, lint, strict Pyright, 190 fast tests, and OpenAPI comparison. The full integration command passed 50 PostgreSQL, Kratos, and HTTP scenarios. The practical guide's feature examples remain illustrative. The references below explain framework behavior, while repository code and behavioral tests define Inframeld's integration.
 
 [rfc9457]: https://www.rfc-editor.org/rfc/rfc9457.html
 [pydantic-errors]: https://docs.pydantic.dev/latest/errors/errors/

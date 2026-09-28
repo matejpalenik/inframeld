@@ -6,7 +6,7 @@ Use this reference when a list is too large to return at once. A **cursor** mark
 
 A request sends `limit` and, for a later page, an opaque `cursor`. The response contains `items` and `nextCursor`. Clients pass the cursor back without interpreting or changing it. A null `nextCursor` means the list has ended.
 
-[pagination.py](../../apps/backend/src/inframeld_backend/shared/http/pagination.py) defines `PaginationQuery` and `PageResponse[Item]`. The exact limits are:
+[`pagination_query.py`](../../apps/backend/src/inframeld_backend/shared/http/requests/pagination_query.py) defines `PaginationQuery`; [`page_response.py`](../../apps/backend/src/inframeld_backend/shared/http/responses/page_response.py) defines `PageResponse[Item]`. The exact limits are:
 
 | Field | Rule |
 | --- | --- |
