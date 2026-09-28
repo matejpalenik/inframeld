@@ -20,6 +20,7 @@ from inframeld_backend.access.application.services.action_authorization_service 
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -30,8 +31,10 @@ from inframeld_backend.shared.application.errors.application_errors import (
 ACCESS = AccessContextDTO(PrincipalId(UUID(int=1)))
 TARGET = ProjectActionTargetDTO(ProjectId(UUID(int=2)))
 ACTION = ActionId("build")
+ORGANIZATION_ID = OrganizationId(UUID(int=3))
 
 ALLOWED_FACTS = ProjectActionFactsDTO(
+    organization_id=ORGANIZATION_ID,
     principal_status=PrincipalStatus.ACTIVE,
     project_status=ProjectStatus.ACTIVE,
     is_project_member=True,
@@ -49,10 +52,10 @@ class FixedProjectActionFactsReader(ProjectActionFactsReader):
 
     @override
     async def read_action_facts(
-        self, *, access: AccessContextDTO, action: ActionId, target: ProjectActionTargetDTO
+        self, *, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
     ) -> ProjectActionFactsDTO | None:
         """Record the lookup and return its configured state without I/O."""
-        self.last_request = (access, action, target)
+        self.last_request = (access, action_id, target)
         return self._facts
 
 
@@ -61,10 +64,11 @@ async def test_allows_current_member_with_exact_grant() -> None:
     """Admit eligible callers using facts for the exact actor, action, and project."""
     reader = FixedProjectActionFactsReader(ALLOWED_FACTS)
 
-    await ActionAuthorizationService(reader).require_action(
-        access=ACCESS, action=ACTION, target=TARGET
+    authorized_organization_id = await ActionAuthorizationService(reader).require_action(
+        access=ACCESS, action_id=ACTION, target=TARGET
     )
 
+    assert authorized_organization_id == ORGANIZATION_ID
     assert reader.last_request == (ACCESS, ACTION, TARGET)
 
 
@@ -75,7 +79,7 @@ async def test_visible_project_without_grant_is_forbidden() -> None:
 
     with pytest.raises(AccessDeniedError):
         await ActionAuthorizationService(reader).require_action(
-            access=ACCESS, action=ACTION, target=TARGET
+            access=ACCESS, action_id=ACTION, target=TARGET
         )
 
 
@@ -98,5 +102,5 @@ async def test_hidden_project_is_not_found_even_with_a_grant(
 
     with pytest.raises(ResourceNotFoundError):
         await ActionAuthorizationService(reader).require_action(
-            access=ACCESS, action=ACTION, target=TARGET
+            access=ACCESS, action_id=ACTION, target=TARGET
         )

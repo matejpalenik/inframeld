@@ -62,3 +62,10 @@ class ProblemDetails(BaseModel):
         max_length=MAX_VALIDATION_ISSUES,
         description="At most 20 sanitized issues; the list may be incomplete.",
     )
+
+    operation_id: str | None = Field(
+        default=None,
+        alias="operationId",
+        min_length=1,
+        description="Original operation identity for an in-progress idempotency retry.",
+    )

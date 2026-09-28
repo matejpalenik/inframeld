@@ -11,6 +11,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.settings.request_fingerprint_settings import (
+    RequestFingerprintSettings,
+)
 from inframeld_backend.shared.infrastructure.types.logging_types import LogFormat, LogLevel
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
@@ -29,6 +32,7 @@ class ApplicationSettings(BaseSettings):
     log_format: LogFormat = "console"
 
     database: DatabaseSettings
+    request_fingerprint: RequestFingerprintSettings
     kratos: KratosSettings | None = None
     csrf: CSRFSettings = Field(default_factory=CSRFSettings)
 

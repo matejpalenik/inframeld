@@ -10,16 +10,22 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
     ConflictError,
     DependencyUnavailableError,
+    IdempotencyInProgressError,
+    IdempotencyKeyReusedError,
     InvalidInputError,
     ResourceNotFoundError,
+    StaleRevisionError,
 )
 from inframeld_backend.shared.http.definitions.problem_catalogue import (
     ACCESS_DENIED_PROBLEM,
     CONFLICT_PROBLEM,
     DEPENDENCY_UNAVAILABLE_PROBLEM,
+    IDEMPOTENCY_IN_PROGRESS_PROBLEM,
+    IDEMPOTENCY_KEY_REUSED_PROBLEM,
     INTERNAL_ERROR_PROBLEM,
     INVALID_INPUT_PROBLEM,
     RESOURCE_NOT_FOUND_PROBLEM,
+    STALE_REVISION_PROBLEM,
 )
 from inframeld_backend.shared.http.definitions.problem_definition import ProblemDefinition
 from inframeld_backend.shared.http.types.problem_code import ProblemCode
@@ -37,6 +43,9 @@ _APPLICATION_PROBLEMS: dict[type[ApplicationError], ProblemDefinition] = {
     ResourceNotFoundError: RESOURCE_NOT_FOUND_PROBLEM,
     AccessDeniedError: ACCESS_DENIED_PROBLEM,
     ConflictError: CONFLICT_PROBLEM,
+    StaleRevisionError: STALE_REVISION_PROBLEM,
+    IdempotencyKeyReusedError: IDEMPOTENCY_KEY_REUSED_PROBLEM,
+    IdempotencyInProgressError: IDEMPOTENCY_IN_PROGRESS_PROBLEM,
     DependencyUnavailableError: DEPENDENCY_UNAVAILABLE_PROBLEM,
 }
 

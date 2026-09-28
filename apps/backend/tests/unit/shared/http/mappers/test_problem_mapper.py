@@ -11,6 +11,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
     InvalidInputError,
     ResourceNotFoundError,
+    StaleRevisionError,
 )
 from inframeld_backend.shared.http.definitions.problem_catalogue import (
     ACCESS_DENIED_PROBLEM,
@@ -19,6 +20,7 @@ from inframeld_backend.shared.http.definitions.problem_catalogue import (
     INTERNAL_ERROR_PROBLEM,
     INVALID_INPUT_PROBLEM,
     RESOURCE_NOT_FOUND_PROBLEM,
+    STALE_REVISION_PROBLEM,
 )
 from inframeld_backend.shared.http.definitions.problem_definition import ProblemDefinition
 from inframeld_backend.shared.http.mappers import problem_mapper
@@ -31,6 +33,7 @@ from inframeld_backend.shared.http.mappers import problem_mapper
         (ResourceNotFoundError("Diagnostic only."), RESOURCE_NOT_FOUND_PROBLEM),
         (AccessDeniedError("Diagnostic only."), ACCESS_DENIED_PROBLEM),
         (ConflictError("Diagnostic only."), CONFLICT_PROBLEM),
+        (StaleRevisionError("Diagnostic only."), STALE_REVISION_PROBLEM),
         (
             DependencyUnavailableError("Diagnostic only."),
             DEPENDENCY_UNAVAILABLE_PROBLEM,

@@ -48,6 +48,9 @@ These shared application exceptions belong in `shared/application/errors/applica
 | A requested resource is unavailable within the caller's permitted scope | `ResourceNotFoundError` | 404 |
 | An authorization check has denied an operation | `AccessDeniedError` | 403 |
 | Current state prevents the requested operation | `ConflictError` | 409 |
+| A new command uses an expected revision that is no longer current | `StaleRevisionError` | 409 `stale_revision` |
+| An idempotency key is reused for a different request | `IdempotencyKeyReusedError` | 409 |
+| The same request is retried while its synchronous operation is unfinished | `IdempotencyInProgressError` | 409 |
 | An adapter has identified a required dependency's availability failure | `DependencyUnavailableError` | 503 |
 | A bug or an unclassified failure occurs | Let the original exception propagate | Safe 500 |
 
@@ -319,7 +322,7 @@ For changes to the shared foundation, use the [full qualification checklist](err
 
 ## Problem catalogue
 
-The seven named starter definitions below retain the accepted type fragments and exact public wording. Append each heading's fragment to this fixed `TYPE_PREFIX`:
+The named problem definitions below retain their type fragments and exact public wording. Append each heading's fragment to this fixed `TYPE_PREFIX`:
 
 ```text
 https://github.com/matejpalenik/inframeld/blob/main/docs/development/error-handling.md
@@ -366,6 +369,30 @@ Title: **Operation conflicts with current state**
 Detail: **The operation cannot be completed in the current state.**
 
 The caller must resolve the state conflict. Repeating the same request is not automatically useful or safe.
+
+### Stale revision
+
+**409 · `stale_revision` · `#stale-revision`**\
+Title: **Revision is no longer current**\
+Detail: **Reload the current state before making a new change.**
+
+A new command supplied an expected revision that another accepted change has advanced. The caller must reload the current state and make a fresh decision. A retry with the original idempotency key instead recovers the original operation; it does not become a new stale command.
+
+### Idempotency key reused
+
+**409 · `idempotency_key_reused` · `#idempotency-key-reused`**\
+Title: **Idempotency key reused**\
+Detail: **This key was already used for a different request.**
+
+The caller reused a key within the same request scope for different meaningful input. The original reservation remains authoritative; a different intended operation needs a new key. Do not include request bodies or fingerprints in the public response.
+
+### Idempotency in progress
+
+**409 · `idempotency_in_progress` · `#idempotency-in-progress`**\
+Title: **Operation in progress**\
+Detail: **The original request is still in progress.**
+
+The response includes the original `operationId` and a `Retry-After` header. The caller may retry with the same key after that delay. An accepted asynchronous job instead replays its original `202` and job identity.
 
 ### Dependency unavailable
 

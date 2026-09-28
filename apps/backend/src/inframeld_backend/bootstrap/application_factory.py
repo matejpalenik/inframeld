@@ -4,6 +4,9 @@ from functools import partial
 
 from fastapi import FastAPI
 
+from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
+    ProjectGrantChangeFingerprintService,
+)
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
@@ -11,10 +14,16 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
     HumanSessionDependency,
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
+from inframeld_backend.access.http.routes.project_grant_routes import (
+    create_project_grant_router,
+)
 from inframeld_backend.bootstrap.access_composition import create_access_components
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
+from inframeld_backend.shared.application.services.request_fingerprint_service import (
+    RequestFingerprintService,
+)
 from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
 from inframeld_backend.shared.http.middleware.request_context_middleware import (
     RequestContextMiddleware,
@@ -22,6 +31,9 @@ from inframeld_backend.shared.http.middleware.request_context_middleware import 
 from inframeld_backend.shared.http.openapi.problem_openapi import configure_problem_openapi
 from inframeld_backend.shared.http.routes.health_routes import router as health_router
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
+from inframeld_backend.shared.infrastructure.readers.file_request_fingerprint_key_reader import (
+    FileRequestFingerprintKeyReader,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 
 API_TITLE = "Inframeld API"
@@ -42,6 +54,12 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
 
     access = create_access_components(resolved_settings.kratos, database)
 
+    fingerprints = ProjectGrantChangeFingerprintService(
+        RequestFingerprintService(
+            FileRequestFingerprintKeyReader(resolved_settings.request_fingerprint.key_file).read()
+        )
+    )
+
     resources = ApplicationResources(database, access.kratos_client)
 
     application = FastAPI(
@@ -58,14 +76,14 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
     register_error_handlers(application)
     configure_problem_openapi(application)
     application.include_router(health_router)
-    application.include_router(
-        create_session_router(
-            HumanSessionDependency(
-                access.authenticator,
-                CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
-            )
-        )
+
+    human_session = HumanSessionDependency(
+        access.authenticator,
+        CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
     )
+    application.include_router(create_session_router(human_session))
+    application.include_router(create_project_grant_router(human_session, database, fingerprints))
+
     application.add_middleware(RequestContextMiddleware)
 
     return application

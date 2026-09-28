@@ -50,6 +50,19 @@
             "description": "At most 20 sanitized issues; the list may be incomplete.",
             "title": "Errors"
           },
+          "operationId": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Original operation identity for an in-progress idempotency retry.",
+            "title": "Operationid"
+          },
           "requestId": {
             "description": "Server request identifier, also returned in X-Request-ID.",
             "format": "uuid",
@@ -88,6 +101,81 @@
           "requestId"
         ],
         "title": "ProblemDetails",
+        "type": "object"
+      },
+      "ProjectUseOnlyGrantRequest": {
+        "properties": {
+          "actionId": {
+            "const": "create-access-groups",
+            "title": "Actionid",
+            "type": "string"
+          },
+          "expectedAccessRevision": {
+            "minimum": 0.0,
+            "title": "Expectedaccessrevision",
+            "type": "integer"
+          },
+          "recipientPrincipalId": {
+            "format": "uuid",
+            "title": "Recipientprincipalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipientPrincipalId",
+          "actionId",
+          "expectedAccessRevision"
+        ],
+        "title": "ProjectUseOnlyGrantRequest",
+        "type": "object"
+      },
+      "ProjectUseOnlyGrantResponse": {
+        "description": "Describe the original change - current grants require a fresh authorized read.",
+        "properties": {
+          "accessRevision": {
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "actionId": {
+            "const": "create-access-groups",
+            "title": "Actionid",
+            "type": "string"
+          },
+          "canGrant": {
+            "const": false,
+            "default": false,
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          },
+          "recipientPrincipalId": {
+            "format": "uuid",
+            "title": "Recipientprincipalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId",
+          "projectId",
+          "recipientPrincipalId",
+          "actionId",
+          "accessRevision",
+          "idempotencyExpiresAt"
+        ],
+        "title": "ProjectUseOnlyGrantResponse",
         "type": "object"
       },
       "ValidationIssue": {
@@ -192,6 +280,121 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/grants": {
+      "post": {
+        "operationId": "assignProjectUseOnlyGrant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUseOnlyGrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectUseOnlyGrantResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Conflict: stale_revision, idempotency_key_reused, idempotency_in_progress, or conflict."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "summary": "Assign Use Only",
+        "tags": [
+          "access"
         ]
       }
     },

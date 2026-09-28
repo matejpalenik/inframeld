@@ -6,7 +6,7 @@ Alice starts a Support build, but the response never reaches her browser. Sendin
 
 Start with the worker's normal flow, then compare a lost model response with a safe storage retry. Later sections cover keys, receipts, competing edits, and restoration.
 
-> **Design status:** These are accepted v1 rules. Job workflows, endpoints, persistence, and integration tests still need implementation and verification where noted.
+> **Implementation status:** Scoped PostgreSQL reservations and the first Access project-grant command are implemented with focused tests. Worker execution, issued-secret and answer-receipt responses, and default-route resolution remain accepted design awaiting their owning workflows.
 
 ## Contents
 
@@ -108,6 +108,8 @@ A delayed write of identical data does not change an immutable generation. It st
 
 Every state-changing command requires an opaque **`Idempotency-Key`**, at most **128 characters**. Queries that call a provider need it too, because repeating them can repeat paid work. GET requests do not require this header.
 
+An HTTP command must receive exactly one `Idempotency-Key` header. Duplicate headers are invalid and must be rejected before reserving an operation.
+
 The caller chooses the key to identify this requested operation. It carries no permissions and has no business meaning.
 
 The application recognizes the key together with:
@@ -162,6 +164,59 @@ Once an asynchronous command is accepted, its retries return the original **`202
 Read the job resource for current progress and outcome. Safe vector-write retries remain attempts inside that same job.
 
 Client libraries must reuse the original key and honor `Retry-After`. ModelGateway also controls provider-library retries, so a library cannot silently repeat a paid call underneath the application's own retry policy.
+
+### Trace one grant and its retries
+
+Alice assigns Bob use-only `create-access-groups` permission with key `grant-bob-1` and expected project access revision `0`. The diagram abbreviates the key as K and the saved operation ID as O. The implemented grant command fingerprints the meaningful fields and checks current authority on every attempt. Its reservation, grant, new revision, and audit event commit together.
+
+```mermaid
+sequenceDiagram
+    actor Alice
+    participant HTTP as Grant HTTP route
+    participant Service as Grant command service
+    participant DB as PostgreSQL
+
+    Alice->>HTTP: POST grant with key K and expected revision 0
+    HTTP->>HTTP: Authenticate, validate one key, check CSRF, fingerprint input
+    HTTP->>DB: Begin transaction
+    HTTP->>Service: Assign use-only grant
+    Service->>DB: Read current actor, recipient, and project facts
+    Service->>Service: Check current Access policies
+    alt Caller no longer allowed
+        Service-->>HTTP: Deny or hide project
+        HTTP->>DB: Roll back
+        HTTP-->>Alice: 403 or 404, no replay
+    else Caller allowed
+        Service->>DB: Reserve principal, organization/project, method, route, K, and fingerprint
+        Note over DB: Unique scope makes concurrent equal requests share one operation
+        alt New key or expired completed reservation
+            DB-->>Service: New operation O
+            Service->>Service: Compare expected and current revision
+            alt Revision stale
+                Service-->>HTTP: Stale revision
+                HTTP->>DB: Roll back new reservation
+                HTTP-->>Alice: 409 stale_revision
+            else Revision current
+                Service->>DB: Save grant, revision, and audit
+                Service->>DB: Mark O replayable and store expiry
+                HTTP->>DB: Commit all changes
+                HTTP-->>Alice: 201 with O and idempotencyExpiresAt
+            end
+        else Existing key with changed fingerprint
+            DB-->>Service: Request meaning differs
+            HTTP->>DB: Roll back
+            HTTP-->>Alice: 409 idempotency_key_reused
+        else Existing key with same fingerprint and safe result
+            DB-->>Service: Original O and expiry
+            HTTP->>DB: Commit without another grant change
+            HTTP-->>Alice: 201 with original O and expiry
+        end
+    end
+```
+
+For example, if Carol is also an eligible project member, changing Bob to Carol while keeping `grant-bob-1` conflicts. Losing permission blocks a replay before the saved result is returned. Once completed history expires, the same key is treated as a new request. Alice's old expected revision would then fail the grant's revision check. Expiry limits duplicate detection, not the lifetime of Bob's grant.
+
+The grant route exercises the safe-result path. The in-progress, asynchronous `202`, uncertain, issued-secret, and answer-receipt outcomes above retain their separate contracts. Their owning workflows still need implementation where noted.
 
 <a id="secrets"></a>
 
@@ -244,6 +299,8 @@ Each protection answers a different question: the idempotency key identifies a r
 ### Limit guarantees to retained, authoritative history
 
 Keep completed duplicate-detection records for **at least 24 hours** and for as long as their work remains active. Publish their expiry time. After expiry, the server no longer promises to recognize that old request.
+
+The implemented project-grant response publishes the stored deadline as `idempotencyExpiresAt`. An authorized replay returns that same timestamp; retrying does not extend the retention window. The deadline limits duplicate detection; it does not delete the grant.
 
 A new idempotency key always identifies a new requested operation, even when its input equals a previous request. Clients must not generate new keys merely because the original response was lost.
 

@@ -5,7 +5,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
-from tests.support.access_scenarios import seed_linked_human
+from tests.support.access_scenarios import MockAccessScenarios
 from tests.support.kratos_browser import create_browser, register_human
 
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
@@ -38,7 +38,9 @@ async def test_current_session_uses_kratos_cookie_and_local_identity_link(
         human = await register_human(browser)
     subject, cookie = human.subject, human.credential.value
     async with database.session() as session, session.begin():
-        principal = await seed_linked_human(session, VerifiedHumanIdentityDTO(AUTHORITY, subject))
+        principal = await MockAccessScenarios.seed_linked_human(
+            session, VerifiedHumanIdentityDTO(AUTHORITY, subject)
+        )
 
     settings = get_settings().model_copy(
         update={

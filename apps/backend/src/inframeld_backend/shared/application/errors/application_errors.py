@@ -6,6 +6,7 @@ from inframeld_backend.shared.application.enums.application_error_code import Ap
 from inframeld_backend.shared.application.errors.application_error import (
     ApplicationError,
 )
+from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 
 
 class InvalidInputError(ApplicationError):
@@ -36,6 +37,18 @@ class ConflictError(ApplicationError):
         super().__init__(message)
 
 
+class StaleRevisionError(ConflictError):
+    """The caller must reload state before making a new decision."""
+
+    code: ClassVar[ApplicationErrorCode] = ApplicationErrorCode.STALE_REVISION
+
+    def __init__(
+        self,
+        message: str = "The expected revision is no longer current.",
+    ) -> None:
+        super().__init__(message)
+
+
 class DependencyUnavailableError(ApplicationError):
     """Raised for a recognized availability failure in a required dependency.
 
@@ -56,3 +69,32 @@ class AuthenticationRequiredError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("Authentication is required.")
+
+
+class IdempotencyKeyReusedError(ConflictError):
+    code: ClassVar[ApplicationErrorCode] = ApplicationErrorCode.IDEMPOTENCY_KEY_REUSED
+
+    def __init__(
+        self,
+        message: str = "The idempotency key was already used for a different request.",
+    ) -> None:
+        super().__init__(message)
+
+
+class IdempotencyInProgressError(ConflictError):
+    """Identify an unfinished original operation and when its caller may check again."""
+
+    code: ClassVar[ApplicationErrorCode] = ApplicationErrorCode.IDEMPOTENCY_IN_PROGRESS
+
+    def __init__(
+        self,
+        operation_id: OperationId,
+        retry_after_seconds: int,
+        message: str = "The original operation is still in progress.",
+    ) -> None:
+        if type(retry_after_seconds) is not int or retry_after_seconds < 1:
+            raise ValueError("Retry delay must be a positive whole number of seconds.")
+
+        self.operation_id = operation_id
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__(message)

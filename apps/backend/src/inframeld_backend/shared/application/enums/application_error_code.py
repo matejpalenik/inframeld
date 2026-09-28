@@ -12,4 +12,7 @@ class ApplicationErrorCode(StrEnum):
     RESOURCE_NOT_FOUND = "resource_not_found"
     ACCESS_DENIED = "access_denied"
     CONFLICT = "conflict"
+    STALE_REVISION = "stale_revision"
+    IDEMPOTENCY_KEY_REUSED = "idempotency_key_reused"
+    IDEMPOTENCY_IN_PROGRESS = "idempotency_in_progress"
     DEPENDENCY_UNAVAILABLE = "dependency_unavailable"

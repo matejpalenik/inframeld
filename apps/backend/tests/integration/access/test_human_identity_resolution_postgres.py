@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import update
-from tests.support.access_scenarios import seed_linked_human
+from tests.support.access_scenarios import MockAccessScenarios
 
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
@@ -57,7 +57,7 @@ async def test_exact_identity_link_returns_principal_state(
     """Return linked state without applying the application's active-human policy in SQL."""
     identity = VerifiedHumanIdentityDTO(AUTHORITY, IdentitySubject(str(uuid4())))
     async with database.session() as session, session.begin():
-        seeded = await seed_linked_human(session, identity, status=status)
+        seeded = await MockAccessScenarios.seed_linked_human(session, identity, status=status)
     principal = await PostgresHumanIdentityLinkReader(database).find_principal(identity)
     assert principal is not None
     assert principal.id == seeded.id
@@ -74,7 +74,7 @@ async def test_identity_lookup_requires_both_exact_values(
     """Reject near matches when either verified authority or subject differs."""
     identity = VerifiedHumanIdentityDTO(AUTHORITY, IdentitySubject("Alice "))
     async with database.session() as session, session.begin():
-        await seed_linked_human(session, identity)
+        await MockAccessScenarios.seed_linked_human(session, identity)
     mismatch = VerifiedHumanIdentityDTO(
         IdentityAuthority("kratos:Test") if change_authority else identity.authority,
         identity.subject if change_authority else IdentitySubject("Alice"),
@@ -89,7 +89,10 @@ async def test_shared_service_authenticates_concurrent_callers(database: Databas
         VerifiedHumanIdentityDTO(AUTHORITY, IdentitySubject(str(uuid4()))) for _ in range(12)
     ]
     async with database.session() as session, session.begin():
-        principals = [await seed_linked_human(session, identity) for identity in identities]
+        principals = [
+            await MockAccessScenarios.seed_linked_human(session, identity)
+            for identity in identities
+        ]
     service = HumanSessionAuthenticationService(
         CredentialSubjectVerifier(), PostgresHumanIdentityLinkReader(database)
     )
@@ -109,7 +112,7 @@ async def test_shared_service_reads_account_status_on_each_request(database: Dat
     """Deny the next authentication after a principal is suspended by another transaction."""
     identity = VerifiedHumanIdentityDTO(AUTHORITY, IdentitySubject(str(uuid4())))
     async with database.session() as session, session.begin():
-        principal = await seed_linked_human(session, identity)
+        principal = await MockAccessScenarios.seed_linked_human(session, identity)
     service = HumanSessionAuthenticationService(
         CredentialSubjectVerifier(), PostgresHumanIdentityLinkReader(database)
     )

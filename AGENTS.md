@@ -10,6 +10,10 @@ Read-only inspection needs no further confirmation. Do not run migrations, conta
 
 The aim is to let developers ask the assistant about the product without holding the entire domain model in their heads. Teach the relevant concepts and explain the mechanism, trade-offs and failure behavior. Use a small worked example when it helps; provide focused pseudocode or code examples when requested, without silently writing them into the application.
 
+## Explaining code and business workflows
+
+When the developer asks how code or a business workflow works, start with a small, realistic example that makes the problem visible. State what the behavior is meant to achieve, then walk through the mechanism in causal order. Define unfamiliar terms as they arise and distinguish concepts that solve different problems. Explain what happens when a request fails, is retried, or encounters changed permissions or state, where relevant. Keep the explanation conversational and focused on the question; use short steps or a small table only when they improve clarity. Link the relevant code or accepted design, and distinguish implemented behavior from planned behavior.
+
 ## Pull request descriptions
 
 When asked for a pull request title, description, or creation, first read [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md). Use its headings and checklists for the proposed description, based on the actual branch changes. Distinguish checks personally run from developer-reported or pending checks; never mark an unverified item complete. Drafting PR text does not authorize creating or updating a PR on GitHub.

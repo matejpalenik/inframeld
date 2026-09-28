@@ -16,7 +16,7 @@ class ProjectActionFactsReader(Protocol):
 
     @abstractmethod
     async def read_action_facts(
-        self, *, access: AccessContextDTO, action: ActionId, target: ProjectActionTargetDTO
+        self, *, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
     ) -> ProjectActionFactsDTO | None:
         """Return stored facts for this exact principal, project, and action.
 
@@ -24,6 +24,7 @@ class ProjectActionFactsReader(Protocol):
         Return `None` when the principal or project is missing, or the project
         belongs to another organization. Include inactive status and absent
         membership in the returned facts; policies decide their consequences.
+        The organization ID comes from the matched project row.
 
         The caller owns the transaction. Do not commit it, cache permissions,
         or treat a returned facts object as proof of visibility or authority.

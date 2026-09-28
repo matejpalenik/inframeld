@@ -1,11 +1,16 @@
 """Verify typed runtime configuration and sanitized validation errors."""
 
+from pathlib import Path
+
 import pytest
 from pydantic import HttpUrl, SecretStr, ValidationError
 
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.bootstrap.application_settings import get_settings
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.settings.request_fingerprint_settings import (
+    RequestFingerprintSettings,
+)
 
 
 def test_database_settings_rejects_non_positive_startup_timeout() -> None:
@@ -108,3 +113,23 @@ def test_invalid_kratos_settings_are_rejected(
         assert invalid_field in str(error.value)
     finally:
         get_settings.cache_clear()
+
+
+def test_fingerprint_key_path_is_read_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Give the process a file location without putting key bytes in its environment."""
+    path = Path("/run/secrets/idempotency_fingerprint_hmac")
+    monkeypatch.setenv("INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE", str(path))
+    get_settings.cache_clear()
+
+    try:
+        assert get_settings().request_fingerprint.key_file == path
+    finally:
+        get_settings.cache_clear()
+
+
+def test_fingerprint_key_path_must_be_absolute() -> None:
+    """Avoid resolving a deployment secret relative to an unpredictable working directory."""
+    with pytest.raises(ValidationError, match="absolute"):
+        RequestFingerprintSettings(key_file=Path("relative/fingerprint.key"))

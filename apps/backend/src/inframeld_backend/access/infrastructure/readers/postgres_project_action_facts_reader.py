@@ -14,6 +14,7 @@ from inframeld_backend.access.application.protocols.project_action_facts_reader 
     ProjectActionFactsReader,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
@@ -32,7 +33,7 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
 
     @override
     async def read_action_facts(
-        self, *, access: AccessContextDTO, action: ActionId, target: ProjectActionTargetDTO
+        self, *, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
     ) -> ProjectActionFactsDTO | None:
         """Project stored facts into a DTO without deciding visibility or admission."""
         is_project_member = exists().where(
@@ -43,13 +44,14 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
         has_exact_action_grant = exists().where(
             ProjectActionGrantRow.project_id == ProjectRow.id,
             ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
-            ProjectActionGrantRow.action == action.value,
+            ProjectActionGrantRow.action == action_id.value,
         )
 
         statement = (
             select(
                 PrincipalRow.status,
                 ProjectRow.status,
+                ProjectRow.organization_id,
                 is_project_member,
                 has_exact_action_grant,
             )
@@ -70,9 +72,10 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
         if row is None:
             return None
 
-        principal_status, project_status, member, granted = row
+        principal_status, project_status, organization_id, member, granted = row
 
         return ProjectActionFactsDTO(
+            organization_id=OrganizationId(organization_id),
             principal_status=principal_status,
             project_status=project_status,
             is_project_member=member,
