@@ -173,7 +173,7 @@ On macOS, use the absolute path under your home directory instead. For the Compo
 
 Only paths go in the environment files. For `pnpm dev:compose`, `compose.dev.yaml` defaults to the Linux VM's `/etc/inframeld/secrets` host file; the root `.env` value overrides that source on macOS. Compose mounts the selected file read-only as `/run/secrets/idempotency_fingerprint_hmac` and sets that container path automatically. The host-run backend and the container's UID 10001 must each be able to read the file when they run. [File-backed Compose secrets](https://docs.docker.com/reference/compose-file/services/#secrets) keep host ownership and permission bits; grant the required runtime identities read access through restricted ownership, group membership, or ACLs. Do not make the key world-readable. Use a separate key for a separate installation, including an isolated test deployment.
 
-Configuration currently validates the path, and the file reader validates its contents when called. No production operation loads the fingerprint key at startup yet.
+Application startup requires an absolute fingerprint-key path. `create_app()` reads the file and validates its 32-byte contents during construction, so a missing, unreadable, or malformed key prevents the backend from starting.
 
 For a backend running on the host with local Compose services, the relevant values are:
 
