@@ -6,19 +6,50 @@ Use this reference to answer three questions: what does a record represent, whic
 
 A **primary key (`PK`)** identifies a row. A **foreign key (`FK`)** makes the database check a reference to another row. A **unique constraint** rejects duplicate combinations.
 
-An immutable version keeps its recorded meaning. It can still become unavailable through expiry, erasure, corruption, or lost storage. Keeping an old version does not preserve old permissions.
-
 ## Contents
 
 | Question | Records |
 | --- | --- |
+| How do resource names differ from display names and IDs? | [Resource naming](#resource-naming) |
 | Who can act, and in which project? | [Access](#access) |
 | Which source bytes belong to a corpus? | [Knowledge](#knowledge) |
 | Which prepared data can a build reuse? | [Indexing](#indexing) |
 | What produced an answer or rating? | [Pipelines](#pipelines) |
+| How do working settings and direct queries differ from release versions? | [Direct Pipeline querying records](#experimental-execution-records) |
 | Which version is selected for traffic? | [Releases](#releases) |
 | What did a comparison actually execute? | [Evaluation](#evaluation) |
 | How are connections, credentials, and work recorded? | [Supporting records](#supporting-records) |
+| Which records support spending, tracing and import? | [Cross-workflow records](#cli-first-supporting-records) |
+
+<a id="resource-naming"></a>
+
+## Resource names, display names and permanent IDs
+
+Alice sees a project displayed as **Legal Research** and selects it with `--project legal-research`. The backend resolves that name under the current installation and permissions, then uses the project's permanent ID for saved selection and relationships. Another project may share the display name, but not the resource name in the same naming scope.
+
+| Term | Meaning | Example and constraint |
+| --- | --- | --- |
+| **Name** (`name`) | Exact, command-friendly resource selector. | `legal-research`. Unique in the resource's defined scope. It is not a display-name lookup, fuzzy match or permission. |
+| **Display name** (`display_name`) | Human-readable presentation label. | `Legal Research`. Editable and non-unique; never use it to resolve a resource or establish identity. |
+| **ID** (`id`) | Permanent application-owned identity. | A UUID for these named resources. Stored relationships, saved selection and admitted operations retain this identity through renames. |
+
+This is the accepted product vocabulary, not a claim that all current fields or selectors implement it. Project names are unique across the installation's single organization. Pipelines, Deployments and model connections have names unique per project and resource type. Uniqueness includes inaccessible resources without disclosing their owners. Other configurable resources use this vocabulary when their named interfaces are specified; their exact naming scope, reference schemas and administration contracts must be settled explicitly. Do not add names to every internal version, job or derived artifact by implication.
+
+Changing a display name alone preserves the name and ID. An explicit resource-name change preserves the ID and stored bindings. Retired names cannot be reassigned to a different resource in the same scope. Requests using an old name stop, with current-name guidance only when authorized, rather than silently redirecting. Current authorization and availability checks still apply to IDs and names. Configuration references resolve to exact resource identities and required immutable revisions; execution does not continually reinterpret their names. Renaming profile metadata must not change its immutable processing or embedding meaning.
+
+Names use lowercase ASCII letters, digits and hyphens, start with a letter and end with a letter or digit. Exact length, reserved words and display-name-to-ASCII suggestion rules remain specification work. Display labels may be richer and duplicated. Lookup never silently normalizes a misspelling, matches a prefix/display name or chooses a fuzzy result. An unusable suggestion requires explicit valid input. Name/ID selectors are mutually exclusive even when both identify the same resource.
+
+An explicit user-selected name that collides must fail or return to review; never silently suffix it. A clean available suggestion is preferred for a deliberately created project, with a reviewed alternative only when necessary. Availability checks are advisory until atomic backend allocation. Report unavailability without disclosing the private resource, owner or deletion history. Automatically generated starter names alone have bounded collision retries inside ordinary atomic provisioning.
+
+Changing Name and Display name together is atomic under current authority and expected-state checks. A collision, invalid input, revoked authority or stale review leaves both unchanged. An uncertain rename is reconciled through the resource ID/original operation, not by resolving its old name to another object. Deletion retires the current name even without a previous rename.
+
+Across multiple renames, authorized guidance identifies the current name without automatically following an alias chain. Minimal reservation/history metadata needs a specified erasure/minimization policy; it must not preserve deleted content or survive a complete local factory reset as a global registry. Same-resource restoration details remain unspecified.
+
+Deployment names such as `contracts-development` and `contracts-production` are project-scoped, not Pipeline-relative paths such as `contracts/production`. Bare `production` is not newly reserved. A Pipeline and Deployment may share a name because their types differ. Names confer no environment isolation, grant, publication mode or default selection. Every Deployment serves a ready version; direct Pipeline querying needs no development Deployment. Renaming a Deployment preserves its customer endpoint, live pointers and policy; renaming a connection changes neither provider model ID nor endpoint/credentials. The exact endpoint schema is not prescribed by naming.
+
+Saved project preferences use UUIDs and remain separate per target/account. Admitted jobs retain their original resource IDs through rename. Deleted/inaccessible selections fail without creating another starter or selecting a substitute. [CLI context](api-contracts.md#cli-context) specifies resolution and one-shot overrides; [starter provisioning](onboarding.md#starter-naming) specifies generated names.
+
+Keep existing code and physical field spellings accurate when describing implementation. For example, the inspected [ProjectRow](../../apps/backend/src/inframeld_backend/access/infrastructure/rows/project_row.py) and [initial migration](../../apps/backend/migrations/versions/0001_initial.py) have one text `name` field, not separate `name`/`display_name` fields or the selected resource-name contract. The physical table map below preserves those spellings. Do not infer unique selector behavior from the column name or silently reinterpret existing values. Field mapping, compatibility, allocation, migration and rename enforcement still require implementation design and tests. This documentation update changes no database, public wire field or application code.
 
 <a id="access"></a>
 
@@ -98,11 +129,29 @@ For component responsibilities and conversion examples, use [application convent
 
 ### Keep identity and credential lifecycles separate
 
-A verified Kratos identity maps through an explicit identity link to the human principal. Kratos owns passwords and sessions, so permission records do not contain them. Verify the identity source and subject before using the link. Matching email addresses alone do not join accounts.
+A verified Kratos identity maps through an explicit identity link to the human principal. Kratos owns passwords and browser sessions, so permission records do not contain them. Verify the identity source and subject before using the link. Matching email addresses alone do not join accounts. Hydra adds the accepted human CLI token lifecycle, not another human account or a replacement grant store.
 
 An application key identifies the application principal. The incoming-credential workflow owns its verifier, safe metadata, expiry, revocation, and audience/resource binding. Those records are separate from current grants and group membership. Replacing a key keeps the same principal and permissions. Both usable keys, at most **two per application**, use the account's current authority. Expired and revoked key history is counted separately.
 
 Changing a name or credential does not change the principal. Creating another account with an old display name does not give it the retired account's identity or permissions. Historical attribution follows [retention rules](retention-and-deletion.md) and never authorizes new work.
+
+<a id="human-cli-identity"></a>
+
+### Resolve browser and CLI login to the same human
+
+Alice's Kratos browser cookie and Hydra CLI access token must ultimately resolve to the same local human principal. [ADR-0053](../adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md) extends the authentication path, not the meaning of identity or grants. [Access](access-control.md#human-cli-authentication) owns verification order and current-state checks.
+
+| Logical value or state | Owner and constraint |
+| --- | --- |
+| Trusted CLI issuer/client/API audience | Operator-defined installation configuration and target binding. Never derive trust from a token or an authentication error. |
+| Verified human subject | The trusted Ory integration supplies the stable Kratos identity ID. Map through the configured Kratos authority to the existing identity link, not an email or a new Hydra-named person. |
+| OAuth authorization codes, grants, access/refresh token state | Hydra's isolated persistence and protocol APIs. Do not duplicate token issuance, a revocation database or permission snapshots in Inframeld's domain model. |
+| Local principal, admission, active state and grants | Existing Access records, checked currently. Neither OAuth scope nor successful consent creates membership or authority. |
+| CLI account binding and credential set | Local CLI settings plus a qualified OS credential store, bound to immutable target identity, API/issuer/client/audience configuration and verified account. Secrets are not backend job, trace, audit or response-cache records. |
+
+Introspection/identity-provider response types stay at infrastructure boundaries. The application still receives `AccessContextDTO` with `PrincipalId`, not a token, mutable permission cache or vendor user object. Identity lookup follows external verification without holding a database transaction across provider waits. Replacing or refreshing a CLI credential preserves principal identity; changing trusted endpoint/issuer bindings requires fresh login rather than credential forwarding.
+
+These are logical responsibilities, not new table definitions or schema changes. The existing Principal/browser-session implementation does not provide the Hydra bearer path. The selected integration still needs exact credential dispatch, subject-mapping, lifecycle, protected-storage and recovery tests. Incoming application-key records and their two-usable-key limit remain separate and unchanged.
 
 ### What one action grant means
 
@@ -195,7 +244,7 @@ There are **14 foundation tables**, mostly small relationship tables. They belon
 
 ### Column conventions
 
-- Use stable UUIDs, PostgreSQL `timestamptz` for times, and a required boolean `can_grant`. Display names are editable labels, not permission keys. Do not require global name uniqueness or infer membership from names.
+- Use stable UUIDs, PostgreSQL `timestamptz` for times, and a required boolean `can_grant`. Display names are editable labels, not permission keys, and need not be unique. Resource-name uniqueness follows the [defined scope](#resource-naming), not a global namespace across all resource types. Never infer membership from either value.
 - Organization/project ownership is required and immutable on live records. Foreign-key columns for current memberships, targets, and recipients are non-null unless a conditional relationship below explicitly allows null. Add the listed composite unique keys so scoped references have real database keys to target.
 - Restrict principal kind to `human` or `application`. If another table repeats that kind for a constraint, a foreign key must verify it against the principal's actual kind. Callers cannot choose the copy, and kind changes are unsupported.
 - Principals accept `active`, `suspended`, and `retired`; projects accept `active` and `deleting`. Database checks restrict stored values, while application logic must still enforce valid transitions. Application retirement is terminal, and retaining its row never makes its keys valid.
@@ -203,6 +252,8 @@ There are **14 foundation tables**, mostly small relationship tables. They belon
 - Organizations and projects have a nonnegative integer `access_revision`. Advance the relevant scope's revision for each committed Access administration change. Administration requests carry the expected revision so stale changes are rejected, including removal followed by regrant. It is not a cached permission snapshot. A project change does not advance every other project's revision. The administration contract owns its request/response representation.
 
 ### Identity, ownership, and membership tables
+
+Column spellings here describe the current Access foundation, not a completed implementation of the [resource-naming convention](#resource-naming). In particular, existing text `name` columns must not be mistaken for the new distinct selector/display-name contract.
 
 The table conventions use `PK`, `FK`, and `unique` as defined above. Add further timestamps or display fields only when a workflow needs them.
 
@@ -340,9 +391,11 @@ A **chunk** is an excerpt produced by processing a document. An **embedding** is
 
 ### Profiles describe behavior, not just names
 
-An immutable embedding profile identifies its organization/project, gateway and semantic configuration revision, model alias, dimensions, normalization, and distance metric.
+An immutable embedding profile identifies its organization/project, selected connection ID, expected provider/model identity or alias, dimensions, normalization, and distance metric. It does not select a historical connection access revision. Numerical executions record the actual access revision and observed provider model identity separately under [shared connectivity](#shared-current-connections).
 
 A change that can alter vector meaning creates a new profile. Credential rotation alone does not, provided the semantics remain unchanged.
+
+The connection's current access configuration must remain compatible with prepared and in-progress data. Reject an incompatible or unproven shared update before mutation under [Indexing's compatibility rule](indexing.md#embedding-compatibility). A new profile does not make old vectors compatible; ordinary preparation must supply verified matching data before retrieval.
 
 An immutable processing profile identifies parser/chunker behavior and implementation. Its processing generation identifies the resulting chunks.
 
@@ -464,9 +517,33 @@ The [Indexing guide](indexing.md) explains verification, saved-write retries, se
 
 ## Pipelines: configuration, answers, and feedback
 
-A **Pipeline** is a stable named configuration. Each immutable **PipelineVersion** saves exact collection revisions, one processing profile, one embedding profile, an optional configured reranker, retrieval limits, prompt, generation settings, and the complete configuration fingerprint. `PipelineIndexBindings` point to compatible ready materializations without copying them.
+A **Pipeline** is a stable named configuration with one current saved working revision. Each immutable **PipelineVersion** is a release-build result saving exact collection revisions, one processing profile, one embedding profile, an optional configured reranker, retrieval limits, prompt, generation settings, and the complete configuration fingerprint. `PipelineIndexBindings` point to compatible ready materializations without copying them. Direct Pipeline querying uses the records below without creating a PipelineVersion or Deployment.
 
 Missing, stale, failed, retired, or incomplete dependencies block serving. Changing a prompt, retrieval setting, or reranker can reuse compatible vectors. Changing source bytes or model meaning creates new history. Replacing a credential alone does not. The [serving guide](pipelines-and-releases.md#serving) owns live permission and health checks.
+
+<a id="experimental-execution-records"></a> <a id="query-execution-records"></a>
+
+### Keep working revisions, execution snapshots and release versions distinct
+
+Alice saves configuration revision 18 and queries it directly with an override. If she likes the result, she saves those settings as revision 19 before Build. The query itself creates neither revision 19 nor a release version.
+
+The following are accepted **logical record responsibilities**, not implemented tables or classes. Captured inputs record what a query or evaluation used, within the required storage bounds. There is no separate Experiment aggregate, resource, lifecycle or permission. The older section anchor is retained for existing links.
+
+| Concept | Minimum responsibility |
+| --- | --- |
+| **Working configuration revision** | Pipeline/project identity, revision identity, predecessor and optional restored-from reference, actor/time, saved corpus selection, processing/embedding profiles, reranker, retrieval limits, prompt, selected connection IDs and model settings. The Pipeline identifies one current revision. Save/restore uses an expected current revision and creates new history. Shared access configurations are not pinned by this record. |
+| **Captured execution inputs** | Pipeline/project, originating working revision where applicable, explicit overrides and complete effective configuration/fingerprint, exact resolved source/collection revisions, profiles, initiating actor and operation identity. No release version or Deployment is required. |
+| **Prepared query bindings** | Exact compatible materialization/generation references established before question execution, readiness/progress outcome and bounded artifact retention references. Freeze chosen execution bindings once complete; preparation cannot mutate live artifacts or change admitted source/settings. Failed preparation does not create an executable snapshot. |
+| **Direct-query outcome** | Snapshot and operation identities, direct-query/evaluation purpose, outcome, timestamps, bounded safe usage/error metadata and references to separately protected result/trace records where applicable. No fictional live version, cohort or publication authority. |
+| **Policy-controlled Build admission** | Current saved configuration revision and resolved corpus, expected reviewed revisions, chosen Deployment or explicit absence, captured mode/control/request identity and initiating authority, plus ordinary build/publication child-operation identities. It does not use a run ID as configuration. |
+
+The Pipeline owner records configuration and execution provenance. Indexing owns readiness and reusable data; Evaluation owns benchmark runs and evidence; Releases owns any live target selection. An execution input distinguishes a ready PipelineVersion from an execution-input snapshot. The shared execution path receives complete fixed Pipeline inputs from either, not an untyped bag of overrides or a mutable working-configuration lookup during retrieval. Both forms select stable connection IDs. Admission records current access revisions as execution preconditions; subsequent calls must satisfy [shared-connectivity freshness](model-connections.md#dispatch-freshness), not execute historical access settings. Safe actual observations belong to the execution outcome, independently of diagnostic trace capture.
+
+Policy-controlled Build admission in the table describes the explicit CLI workflow. The underlying readiness-only build instead retains whichever exact authorized saved configuration and corpus its owning caller captured. Automatic document-update admission supplies the Deployment-selected configuration, which can differ from the current working revision. Neither operation follows a mutable configuration pointer after admission, and neither treats an evaluation run or unsaved override as a release-build source.
+
+Keep configuration identity, effective input fingerprints and actual physical bindings distinct. Equal settings with a different corpus, scope or fresh numerical generation are not proof of identical evaluated inputs. Build can reuse verified artifacts but must disclose mismatches with referenced evaluation evidence. Retained snapshots can support fresh comparisons; they are not release targets or a build-from-run API.
+
+Secrets never belong in these records. History is bounded by retention and current access. Restoring configuration creates a new current revision and does not resurrect erased content, expired artifacts or credentials. Snapshot retention does not pin every historical index forever; active operations use ordinary bounded pins. Explicit evaluation evidence and diagnostic traces keep their separate capture, inspection and erasure rules. Exact physical storage, API schemas, resource bounds and Pipeline Query permission identifiers remain implementation work under their owning guides.
 
 ### Record the actual serving selection before accepting feedback
 
@@ -477,6 +554,7 @@ An answer receipt records the version that answered and why it was selected. For
 | **Server-generated, unpredictable `answerId` and operation identity** | Identify the response and its originating operation. |
 | **Organization/project and originating stable principal** | Establish ownership and access scope. A principal is the verified human or application identity recognized by Inframeld. |
 | **Pipeline-version identity** | Identify the exact version that produced the response. |
+| **Safe actual connection observations** | Record selected connection IDs and the access/credential revisions and model identities actually used, where available. A version can run before and after a shared access update without becoming a new version. These observations contain no secrets, full model inputs or hidden diagnostic trace stream. |
 | **Deployment identity and revision** | Record which serving target and state selected that version. |
 | **Rollout identity and actual cohort** | Preserve the particular canary assignment. The rollout may be absent when there is no canary. |
 | **Creation time, completion outcome, and expiry** | Establish when the response originated, how execution finished, and how long the receipt remains eligible and retained. |
@@ -504,6 +582,7 @@ Only a successfully finalized, eligible serving receipt accepts feedback.
 | **Completed explicit insufficient-evidence response** | Eligible and labelled as insufficient evidence. This is a deliberate completed response, not a provider failure. |
 | **Provider failure or uncertain operation** | Not an answer to rate. |
 | **Offline evaluation execution** | Does not enter the production feedback denominator. |
+| **Direct Pipeline query execution** | Does not create a live serving receipt eligible for production feedback or enter its denominator. Snapshot/operation attribution remains separate. |
 
 ### Store one current rating, not a stream of votes
 
@@ -514,6 +593,8 @@ Feedback refers to the original receipt to establish which version produced the 
 Credential rotation preserves the stable principal and therefore its feedback ownership. A credential for a different integration does not inherit another integration’s rights.
 
 Editing replaces the current rating and comment. Keep the normal minimal audit record, without a feedback event stream or indefinite copies of every old comment. Counts use the latest rating, not the number of requests or edits.
+
+CLI v1 reporting and own-answer corrections use these same records under [CLI feedback capability](https://github.com/matejpalenik/inframeld/issues/191). They create no CLI-owned feedback store, do not transfer receipt ownership between accounts, and cannot add direct-query/evaluation executions to live coverage. Reporting authority remains separate from permission to change an originating principal's own rating.
 
 A unique answer/originating-principal pair prevents duplicate ratings even after request-deduplication history expires. A receipt proves the response was produced, not that someone saw it. It keeps no full production question, answer, or final-context text. A caller-supplied end-user ID creates neither another principal nor an extra vote.
 
@@ -536,18 +617,18 @@ A **pointer** is a stored reference to a pipeline version, not a copy of that ve
 | **Rollout identity** | An immutable identity for the candidate rollout. Changing its percentage keeps this identity. Attaching a replacement candidate creates another. |
 | **Deployment revision** | A number that increases as Deployment state changes. Commands use it to detect that someone else changed the state. |
 | **Publication mode** | Whether publication follows Automatic updates or Manual releases. |
-| **Automatic-update binding** | The selected document/configuration inputs used by automatic updates. |
+| **Automatic-update binding** | The explicitly selected document/configuration inputs used by automatic updates, separate from the Pipeline's current working revision. Working edits and direct queries do not move this binding. |
 | **Publication control revision** | The revision used to invalidate publication authority captured before a mode switch. See [publication guards](pipelines-and-releases.md#modes). |
 
 A pointer must target a **complete immutable PipelineVersion in the same project**. That version must satisfy the endpoint's query contract, the request and response behavior its clients expect.
 
-Clients continue using the same endpoint while an engineer changes its selected version through Studio or the API. This stability applies only to versions with compatible query contracts.
+Clients continue using the same endpoint while an engineer changes its selected version through the CLI, API or future Studio. This stability applies only to versions with compatible query contracts.
 
 Check that the version's required materializations are available when a release transition uses them. A past successful build or an old readiness display cannot prove they are usable now.
 
 ### Distinguish resources that exist from resources that are ready
 
-The **project-default binding** stores stable resource IDs and an expected revision for detecting competing changes. It is configuration on the ordinary project, not a second set of domain resources. Editable names are never lookup keys.
+The **project-default binding** stores stable resource IDs and an expected revision for detecting competing changes. It is configuration on the ordinary project, not a second set of domain resources. Display names are never lookup keys. Resource names can select a resource through authorized resolution, but the saved default binding retains its ID rather than re-resolving a name on every request.
 
 Before the default Deployment exists, the binding stores its selected mode and publication control revision. First publication transfers that state into the real Deployment in one transaction. **Only one record may control its mode at a time.**
 
@@ -557,9 +638,9 @@ Before the default Deployment exists, the binding stores its selected mode and p
 | **Default Collection** | An empty named collection referenced by project defaults. | An admitted batch produces an exact usable CollectionRevision. An empty collection is not evidence. |
 | **Built-in ProcessingProfile** | An immutable conservative text-first preset. | Its pinned parser and assets pass normal readiness checks. No per-user profile editor is required. |
 | **Default Pipeline** | A named root with incomplete draft configuration linked to the collection and preset. | Model roles and exact inputs are selected, and a successful build produces a complete PipelineVersion. |
-| **Provider connection and credential** | No fictional valid credential or ready connection. | Required credentials are saved, endpoint policy permits the origin, and role-specific validation succeeds. |
-| **EmbeddingProfile** | Absent until the model’s semantics and dimensions are established. | Validated embedding selection creates the immutable profile used for document and query embeddings. |
-| **Generation configuration** | Incomplete until selected. | Connection revision, model, and settings are validated and frozen into build inputs. |
+| **Provider connection and credential** | No fictional credential or successful validation. | Complete configuration, a usable required credential and permitted destination allow a real call without prior preflight. Successful use can then establish role-specific validation evidence. |
+| **EmbeddingProfile** | Absent until the model's semantics and dimensions are established. | Supported metadata, explicit validated configuration or an optional probe supplies the immutable profile. Every real embedding result must match it before index readiness. |
+| **Generation configuration** | Incomplete until selected. | Connection revision, model and structurally valid settings are frozen into build inputs. Prior synthetic success is not required. |
 | **Materialization and PipelineVersion** | Absent. | Parsing, chunking, embedding, and index verification succeed for the frozen corpus and profiles. |
 | **Logical default route** | A stable project-scoped address, initially unbound, with Automatic updates selected. | First publication creates and binds a genuinely ready Deployment. |
 | **Deployment** | **Absent**, not an idle or fake-ready record. | An authorized creation commits one ready current version, with no candidate or previous target. |
@@ -575,7 +656,7 @@ If Alice selects Automatic updates, she also selects its update inputs. Any pend
 
 The ready initial version remains current while that update runs. If the selected inputs already match, report up-to-date without another model call. Creation must never treat an unfinished build as current.
 
-Keep three kinds of change separate. A new complete authorized batch or explicit apply creates a newer update-request identity, replacing older work. A mode or input-binding change advances the publication control revision, invalidating old permission to publish. The job also records its expected serving revision and attempt fence, which identifies the attempt still allowed to finish. [Releases](pipelines-and-releases.md#modes) checks these together before publication.
+Keep three kinds of change separate. A new complete authorized live-input batch or policy-controlled automatic Build creates a newer update-request identity, replacing older work. A mode or input-binding change advances the publication control revision, invalidating old permission to publish. Working saves/restores and direct-query/evaluation do neither. The job also records its expected serving revision and attempt fence, which identifies the attempt still allowed to finish. [Releases](pipelines-and-releases.md#modes) checks these together before publication.
 
 <a id="evaluation"></a>
 
@@ -583,28 +664,39 @@ Keep three kinds of change separate. A new complete authorized batch or explicit
 
 ### Preserve history with a small application-owned model
 
-Alice can edit a test question without losing its history. The stable case ID connects that history. An immutable revision records the exact question and expectations used in a particular evaluation.
+Alice generates starter questions, accepts one, and later edits its reference answer. The stable case ID connects its history. The edit creates a new unreviewed revision; a previously frozen benchmark still names the exact older revision. Evaluation owns these logical records. They are accepted design, not a statement that physical tables or APIs have been implemented.
 
 | Concept | Minimum responsibility |
 | --- | --- |
-| **Test case** | A stable ID associated with one pipeline, its active/removed state, and its current case revision. Use this identity to browse history. |
-| **Case revision** | The immutable question, expected-source labels, expected-abstention setting where supplied, and optional reference answer/notes. Editing produces a new revision. Old runs retain their original input. |
-| **Benchmark revision** | An immutable, ordered snapshot of case IDs and exact case content/revisions. Save it explicitly or freeze it at comparison admission. Both runs use it. |
-| **Evaluator revision** | The immutable scoring contract: library/version, prompt/rubric and schema hashes, metric definitions, judge alias/configuration revision, and generation settings. |
-| **Evaluation run** | One pipeline version, benchmark revision, evaluator revision, initiating actor and effective authorization scope, durable job status, timestamps, and summary counts. A comparison references two runs. |
-| **Case result** | Run and case-revision identities, execution and per-metric statuses, scores/reasons, answer and evidence artifact references, observed pipeline/model identities, durations and usage. Include failed and unattempted cases. |
+| **Generation provenance** | Pipeline/corpus snapshot, sampling policy/seed where applicable, requested count, selected source versions/artifacts/spans, preset/personas, Ragas version and prompts, generator connection ID/model settings, admitted and actual access-revision observations, actor/scope, durable job and unit outcomes, gateway calls/usage. Preserve scenario-to-source attribution, including partial generation and rejected candidates. |
+| **Test case** | Stable pipeline-associated identity, active/removed state, current case revision, and generation provenance. Use it to browse history; it is not a separate generic dataset product. |
+| **Case revision** | Immutable question, proposed reference answer, passage expectation, and bounded notes. Generated and edited content begins unreviewed. Editing never overwrites a revision already used in a benchmark. Manual blank-form authoring and automatic negative-case synthesis are deferred. |
+| **Revision review** | Unreviewed, accepted, or rejected state for an exact revision, plus reviewer identity/kind, time, and bounded reason/history. Accepted is not automatically human-reviewed. Deferral preserves unreviewed state and review position. Content immutability does not mean the review decision cannot be recorded afterward. |
+| **Passage expectation** | One source DocumentVersion, immutable parsed-artifact identity, typed source-coordinate spans, and protected excerpt or artifact reference sufficient to reconstruct it. The initial preset expects one complete passage. Generation-scoped chunk IDs, filenames, and text hashes alone are insufficient. |
+| **Benchmark revision** | Immutable ordered case IDs and exact content revisions, review states at admission, and explicit regression/exploratory purpose. Default membership uses current accepted revisions of active cases only; exploratory inclusion of unreviewed content must be explicit. Both comparison runs use the same snapshot. |
+| **Evaluator revision** | Immutable library/version, prompt/rubric/schema identities, metric definitions and aggregation/failure rules, judge connection ID/model/settings. A run separately observes current access revisions and enforces their consistency. Generator provenance remains separate from judge configuration and pipeline generation settings. |
+| **Evaluation run** | Exactly identified ready PipelineVersion or captured execution inputs, benchmark/evaluator revisions, initiating actor/effective scope, durable job status, timestamps, and complete counts. A comparison references two fresh runs and their paired metric coverage; either side may use captured working settings. Neither a mutable working pointer nor an old score substitutes for fixed inputs and fresh execution. |
+| **Per-case observation** | Run/case-revision identities; execution outcome; expected-passage coverage at retrieval, reranking/selection, and final context; actual ordered evidence spans/chunks and cutoffs; per-metric eligibility/status/reason/value/denominator; bounded claim/verdict observations; answer/citations/final-context artifacts; observed model identities, gateway calls, duration and usage. Failed, cancelled, unscorable, and unattempted cases remain visible. |
 
-A **rubric** defines the judge's scoring rules. A **schema** defines its response structure. The initiating actor is the verified human or application requesting the run. Effective scope records the data that actor may use in the evaluation.
+A **rubric** defines scoring rules; a **schema** defines response structure. A **metric definition** names what is measured, its inputs, units, calculation, eligibility, and failure treatment. Ragas faithfulness is a claim fraction per case and a mean across successfully scored eligible cases, not the historical OpenEvals whole-answer boolean rate. Effective scope records the initiating actor's admitted access, not continuing permission to inspect content.
 
-Start with stable case IDs and a complete, immutable benchmark snapshot. A case revision can use snapshot content or a hash as its identity without requiring a separate aggregate or table. An evaluator revision can be saved configuration. These concepts need neither a plugin registry nor another execution engine.
+Start with stable case IDs and complete immutable snapshots. A revision can use a content hash as its identity, but the hash cannot replace protected content required for review. An evaluator revision can be saved configuration. These concepts need neither a table/aggregate per row in this list, a plugin registry, nor another execution engine. Physical schema, coordinate encoding, indexes, and API/permission identifiers remain to be designed within their owning boundaries.
+
+The [fixed-input example](evaluation.md#input-reliability) connects these records. A run accepted with configuration 17, 12 exact document versions and 20 case revisions keeps those identities after later edits. The reference answer and expected passage belong to Evaluation. They are not forwarded into the Pipeline's query.
+
+At a named measurement stage, 16 found cases, three not found and one unscorable case produce a passage score of 16/19. The run still contains its original 20 cases. Record why the missing mapping made that metric unscorable. Do not call it a retrieval miss or replace the benchmark with a smaller one. Other metrics have their own eligibility rules and denominators.
+
+These fixed identities do not freeze permissions or shared connectivity and do not guarantee indefinite availability. A missing execution binding prevents execution against that input; a missing scoring mapping makes the affected metric unscorable. Neither permits substitution of a newer source/index. Protected projections may withhold identities and counts after revocation or erasure; immutable membership is not a disclosure or content-retention bypass. These are constraints on the existing logical records, not new physical tables or wire fields.
 
 ### Do not replace earlier observations with later results
 
 A later run must not overwrite earlier observations. Preserve attempt history when retrying under the job rules. A retry cannot quietly replace an unfavorable judgment with a better one.
 
-Removed cases remain identifiable in authorized history until retention expires. Explicit erasure can remove their evidence sooner. Mark that evidence unavailable instead of promising reproducibility after deletion.
+Removed cases remain identifiable in authorized history until retention expires. Rejecting/removing content affects future selection, not old snapshots. Editing accepted content creates a new unreviewed revision and excludes it from new default benchmark assembly until accepted; never silently select the older revision instead.
 
-Changing a question or expected meaning changes the benchmark input even if its stable case ID is unchanged. Compare both versions against the same newly frozen benchmark, or select an unchanged subset and show how much it covers. Different case revisions are not the same regression test.
+Current access and explicit source erasure apply to derived questions, references, excerpts, answers, and judgments too. Erasure can remove protected content sooner than normal retention. Mark it unavailable instead of promising reproducibility or preserving secrets through immutable snapshots. Evaluation records are separate from diagnostic traces; neither store bypasses permission or retention policy.
+
+Changing a question or expected meaning changes the benchmark input even if its stable case ID is unchanged. Compare both selected execution inputs against the same newly frozen benchmark, or select an unchanged subset and show how much it covers. Different case revisions are not the same regression test.
 
 Each run keeps bounded final answers, final-context evidence or immutable artifacts from which it can be reconstructed, ordered source/chunk IDs, actual pipeline/model observations, call IDs, and usage. A hash alone cannot replace missing evidence bytes. Both comparison runs use the same frozen benchmark and evaluator revisions. Later edits do not relabel their history.
 
@@ -616,13 +708,71 @@ Each run keeps bounded final answers, final-context evidence or immutable artifa
 
 These records support the existing domains. Their presence does not add services or a generic workflow engine.
 
-### Preserve connection meaning while allowing credential rotation
+<a id="cli-first-supporting-records"></a>
 
-A **connection** is a project-owned configuration for reaching a model endpoint. It has a stable ID. Its immutable **semantic configuration revisions** record which endpoint and model behavior a pipeline or profile selected.
+### Records used across workflows
 
-Pipeline and profile records reference the selected revision. Serving must not look up a mutable “current endpoint” that can silently redirect an existing pipeline.
+The records below support spending controls, tracing, configuration transfer and evaluation datasets. They describe information the application must retain, not new migrations or a separate table for every concept. [The delivery plan](cli-delivery-plan.md) assigns the exact schemas, permission mappings and qualification work.
 
-A replaceable credential allows calls through that connection. It is separate from the model configuration and does not define the model's meaning.
+| Logical information | Owner and constraint |
+| --- | --- |
+| Spending policy, accounting period, call reservation and settlement | Gateway/application accounting in PostgreSQL; optional UTC-calendar-month project limit and cumulative operation limit. A reviewed policy mutation records its revision and audit without replacing accounting history. Uniquely attributed call/period, captured price basis, fixed-precision amounts and unresolved holds survive policy changes, retries and restart. No account-level ceiling, credentials or full prompts are needed for accounting. |
+| Operational span correlation and protected workload trace | Infrastructure and pipeline diagnostics under independent installation switches. Project opt-out suppresses all project-attributable tracing. Current inspection authority, configurable 30-day retention and erasure remain separate from mandatory audit and content-free receipts. Human/application inspection does not imply human-only policy mutation or separately authorized explicit history deletion. |
+| Coherent export capture and reviewed import | Existing resource owners retain definitions; ordinary jobs retain captured definition content/revisions, original context, destination IDs, reviewed choices and relevant expected state, per-resource outcomes and child/parent operation identity. Distinguish create/update effects from reuse and confirmed non-application from unknown write outcomes. No imported grant, credential, Deployment, version or vector state. Missing files are not deletion instructions. |
+| Source authentication binding | Knowledge source identity, explicit configured server identity or source-bound encrypted credential metadata, selected destination and expiry. Reuse encryption primitives without treating model/source credentials as interchangeable. |
+| Portable case identity and import provenance | Evaluation maps source namespace/case/revision to destination identity and preserves complete imported selection separately from local case pool/frozen benchmarks. Imported identifiers are untrusted until validated; exact encoding/comparison remains specification work. |
+| Imported case audience and source mapping | Protect content immediately with explicit destination group audience; verified source-version/artifact/span mapping adds current source checks without removing that audience. New/changed revisions are unreviewed; unchanged imports may reuse exact accepted revision. |
+
+For tracing, retain separate facts about the business result, whether recording was permitted, which diagnostics are confirmed available and any separately accepted deletion request. A deletion request identifies the selected history and cutoff, together with cleanup progress. A successful query can still have partial traces or unknown trace availability.
+
+Opt-out stops future capture and queued writes or delivery. It does not delete saved history, and re-enabling does not restart recording for a suppressed execution. Deletion instead blocks affected reads before physical cleanup completes and prevents late writers from restoring that history. It does not change future recording policy.
+
+These facts belong to the existing operation, policy, trace and job records. They do not require a new table or job state for each phrase. Do not infer permission to keep content or an extra full-answer replay cache when tracing is off or saving fails. The [tracing contract](https://github.com/matejpalenik/inframeld/issues/147) must specify schemas and enforcement under the [trace lifecycle rules](observability.md#trace-lifecycle).
+
+For imports, save the reviewed input so editing a local TOML file cannot change what the original operation means. Keep completed actions attributed to that operation. A newly reviewed import must not rewrite an earlier import's partial history.
+
+Whether unfinished work can resume depends on current access, dependencies, retained evidence and relevant revisions, not just its completed count. Derive counts and permitted details from existing per-resource outcomes rather than a new tracking store. Reuse is an outcome, not a resource change. [Import recovery](configuration-portability.md#import-recovery) owns the workflow. The [portability](https://github.com/matejpalenik/inframeld/issues/151) and [job](https://github.com/matejpalenik/inframeld/issues/124) contracts still need exact schemas and links between operations. This guide does not introduce physical tables or job-state names for them.
+
+See [spending](model-connections.md#spending), [observability](observability.md), [portability](configuration-portability.md) and [Evaluation transfer](evaluation.md#dataset-portability) for execution and failure behavior. These records cannot become a permission, tracing-policy or retention bypass.
+
+Trace policy describes whether and how to record. Retained evidence describes what was saved. A deletion cutoff identifies which history must become unreadable while cleanup continues. None of these records grants inspection permission, and the cutoff does not change future recording.
+
+Saved actor identity and audit records show who acted, not whether that person still has permission. Apply [current Access checks](access-control.md#trace-authority) before disclosing content or saving guarded changes. Automatic expiry and source cleanup use their ordinary workflows. Exact fields, physical storage and wire mappings remain work for the [Access](https://github.com/matejpalenik/inframeld/issues/116) and [tracing](https://github.com/matejpalenik/inframeld/issues/147) contracts.
+
+An immutable version keeps its recorded meaning. It can still become unavailable through expiry, erasure, corruption, or lost storage. Keeping an old version does not preserve old permissions.
+
+<a id="shared-current-connections"></a>
+
+### Separate stable connection identity, current access and observed history
+
+A **connection** is a project-owned resource for reaching a model service. It has a stable ID and one current committed **access configuration**. Its non-secret access revisions record approved changes, not multiple configurations consumers may select. [ADR-0054](../adr/ADR-0054-use-shared-current-model-connections.md) supersedes consumer-pinned connection meaning.
+
+Pipeline, profile and evaluator definitions select the connection ID and their own model settings. Gateway dispatch resolves the current permitted access configuration. Updating it is a separately authorized shared operation, not a Pipeline edit or release. Names are selectors only; repeated runtime name resolution must not replace a saved ID with another resource.
+
+A replaceable credential allows calls through that connection. It has its own lifecycle, independent of access revision history and immutable consumer settings. No secret is stored in a Pipeline, profile or execution snapshot.
+
+| Logical information | Meaning and lifetime |
+| --- | --- |
+| **Connection identity/current access** | Owning project and stable ID; current supported provider, endpoint/base path and applicable API/authentication settings. Metadata rename is separate from an access change. |
+| **Access revision history** | Non-secret settings, predecessor, actor/time and optional restored-from revision. Restoration creates new current history through ordinary checks. History is not a runtime selector or a promise of permanent retention. |
+| **Reviewed update** | Exact identity, expected access/credential state where relevant, proposed diff and reviewed dependency impact. Commit rechecks authority, compatibility and concurrent bindings; no physical review-token schema is selected here. |
+| **Execution observation** | Selected connection ID, admitted access revision and actual revision/model/credential observations for each dispatched call. These explain results and guard subsequent calls; they never authorize use of an old revision. |
+
+These are logical responsibilities, not a new table per row. [Model connections](model-connections.md#shared-current) owns activation and [Jobs](jobs-and-idempotency.md#connection-changes) owns interruption/replay. Current access and retention protect inspection of every historical record.
+
+<a id="model-metadata-provenance"></a>
+
+### Record suggestions separately from configuration and evidence
+
+A catalogue may suggest a 131,072-token context while Alice deliberately saves 32,768 for her gateway. Preserve her supported value and where the suggestion came from. The catalogue must not override saved settings at runtime. The following are logical distinctions, not new tables or published fields:
+
+| Information | Meaning |
+| --- | --- |
+| Suggested value and provenance | Exact provider/model/role context, source identity and snapshot/version or observation time; unknown and conflicting values remain identifiable. |
+| Reviewed effective configuration | Explicit saved values and supported unset/provider-controlled distinctions, with the ordinary owning resource revision. An explicit override is a declaration, not test evidence. |
+| Runtime observation | Actual model/access/credential attribution, usage, returned dimensions and validated outcome; callers cannot edit it to claim success. |
+
+Consumers still own their model settings; connections own current access and a separately protected credential slot. No metadata revision permits historical connection execution. A refresh proposes a diff, never overwrites saved settings or historical accounting. New processing/embedding meaning creates a new immutable profile; later output cannot rewrite expected dimensions. Private aliases remain scoped to the selected connection/model, not globally equated by spelling. Portable definitions retain effective supported configuration without credentials or validation history. [The model guide](model-connections.md#model-metadata) owns resolution/failure rules; #121/#151 must specify exact ownership, representation and equivalence before implementation.
 
 An endpoint's **origin** is its scheme, hostname, and port. Its base path identifies the API path beneath that origin.
 
@@ -630,10 +780,12 @@ An endpoint's **origin** is its scheme, hostname, and port. Its base path identi
 | --- | --- |
 | **Rotate a credential without changing model semantics** | Preserve connection and pipeline lineage. The replacement credential does not inherit the old role-validation status. |
 | **Change embedding semantics** | Create a new embedding profile and materialization rather than change the meaning of existing vectors. A materialization is the prepared searchable index for the selected inputs and profiles. |
-| **Change the chat model, prompt, or retrieval configuration** | Create a new pipeline version. |
-| **Change the endpoint origin** | Create a new connection and require explicit credential entry. Never forward an existing key to the new origin implicitly. |
+| **Change the chat model, prompt, or retrieval configuration** | Saving creates a working-configuration revision; temporary per-request overrides create only execution provenance. An explicit successful Build creates a release-ready PipelineVersion. Existing versions remain unchanged. |
+| **Change shared access settings** | Review all affected consumers and apply current authority, revision, destination and embedding-compatibility checks. Live impact requires explicit acknowledgment. Pipeline versions keep their connection IDs and use its current settings. |
+| **Change the endpoint origin** | A guarded in-place update requires explicit credential provision for the new destination, or an allowed credential-free transition that clears the old slot. Commit together. Never forward the old key implicitly. Another connection remains the isolated-migration alternative. |
+| **Shared update conflicts with prepared/in-progress embedding data, or compatibility is unknown** | Reject before changing configuration or credentials. Use another appropriate connection/profile and ordinary preparation. No force acknowledgment or automatic re-embedding. |
 
-Embedding profiles record model identity or alias, connection revision, dimensions, normalization, and distance metric. See their [record definition](#profiles-describe-behavior-not-just-names).
+Embedding profiles record expected model identity or alias, connection ID, dimensions, normalization, and distance metric. Numerical execution provenance records actual access revisions. See their [record definition](#profiles-describe-behavior-not-just-names).
 
 ### A recorded alias is not proof of an unchanged external model
 
@@ -667,23 +819,23 @@ Resume must not revive a permanently retired generation, change saved payload by
 
 Cancellation records a request to stop. The worker checks it between limited-size units of work. It cannot undo a completed model call or an already-published release.
 
-### Separate connection meaning from its replaceable credential
+### Keep current access and credentials separate
 
-The connection revisions described above keep the selected endpoint and model behavior fixed for pipelines and profiles.
+The access revisions above record the connection's history. They do not freeze its endpoint for retained Pipeline versions. Selected model behavior still belongs to immutable consumer configuration, subject to the external-alias limitation above.
 
-The credential slot changes independently. At call time, the gateway uses the selected connection's permitted **current credential**, while the pipeline still refers to its saved semantic revision.
+The credential slot changes independently. At call time, the gateway uses the selected connection's permitted **current access configuration and current credential**, while the Pipeline retains its selected connection ID and model settings. Relevant access changes stop further dispatches in already admitted work; credential-only rotation does not by itself do so.
 
 | Change | Required behavior |
 | --- | --- |
 | **Replace the provider key** | Keep the connection references and pipeline history. Advance the credential revision and invalidate role validation recorded for the old credential. The new value starts unvalidated. |
 | **Remove the credential** | Make it unavailable for future required-key calls and invalidate its old validation status. Existing references remain explainable through non-secret identity metadata. |
-| **Change the endpoint origin** | Create a new connection and require explicit credential provision. Never forward the saved key to another origin through a semantic revision alone. |
+| **Change the endpoint origin** | Apply the guarded update above, including explicit destination-bound credential provision and atomic activation. Historical restoration never restores old credential bytes. |
 
 The origin is the scheme, hostname, and port. A similar model name is not permission to send a saved key to a different origin.
 
 ### Saving a replacement does not certify that it works
 
-Initial setup checks validation for the **current credential revision** before first publication. A successful probe of the old key cannot validate its replacement.
+Initial setup and first publication do not require prior synthetic success or a validated-model marker under [ADR-0050](../adr/ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md). Complete configuration, required usable credentials, verified materializations and the ordinary authorization/publication checks still apply. A successful probe or real call using an old key cannot validate its replacement.
 
 Published versions may use a deliberately replaced key and report ordinary provider failures if it does not work. Do not silently restore the old secret or switch provider/model. Key rotation changes the ability to call the connection without rewriting historical pipeline configuration.
 
@@ -721,7 +873,26 @@ If someone copies ciphertext to another project or changes its connection, refer
 
 This has a limit: an attacker able to rewrite the entire database record could restore an older ciphertext together with all its matching values. AAD does not detect that complete rollback. Trust in the database and current permission checks remain necessary.
 
-Validation evidence records the semantic connection revision, credential revision, tested role/model, and embedding dimensions when relevant. A successful generation test does not validate embeddings. [Model connections](model-connections.md) owns saving, replacement, removal, probes, and dispatch.
+<a id="model-validation-evidence"></a>
+
+### Record validation evidence for the configuration actually used
+
+This is an accepted logical contract, not a new physical table or implemented schema. Successful optional preflight and successful real ModelGateway calls can establish the same role-specific compatibility evidence. The backend records it only after the full model result passes the required response checks.
+
+| Evidence | Required meaning |
+| --- | --- |
+| **Scope and connection** | Owning project, stable connection identity and the access revision actually used. Evidence cannot be borrowed from another project, endpoint or newer revision. |
+| **Credential revision** | The actual credential revision resolved for that call. A deliberately credential-free connection records that explicit configuration, not a fictional key or a missing required credential. |
+| **Role and model** | The exact requested role/model and relevant immutable configuration or profile reference. Changing the selected model or relevant settings does not inherit another selection's evidence. |
+| **Embedding facts** | Actual dimensions checked against the frozen profile and successful numerical/shape validation. One successful response does not establish a complete materialization. |
+| **Source and time** | Whether the success came from synthetic preflight or real use, with its call/operation attribution and time. Record the resolved provider model revision when supplied. |
+| **Outcome** | An accepted complete response, not merely HTTP success, a request being dispatched, or a partial/uncertain result. No plaintext credential or full input/output payload belongs in this evidence. |
+
+The current selection is **Not tested** before it has been tried, and **Validated** when it has applicable successful evidence. These are display meanings, not a finalized storage enum. Explain stale prior evidence after credential/configuration changes. Report a failed or uncertain attempt explicitly rather than mislabelling it Not tested or validated. Neither validation label is an authorization decision or proof of current provider health. Keep later failed attempts visible separately without erasing historical successes or allowing a late earlier result to hide them.
+
+Record evidence against the revisions captured by the actual call, not whatever revisions happen to be current when it finishes. A late result for credential revision 3 cannot validate revision 4 or restore a removed credential. Reading or replaying evidence cannot perform a new call, reattribute old success to new settings, or establish a new current success time. If evidence recording fails, never repeat a paid call merely to populate the marker or claim that unrecorded evidence was saved.
+
+A successful generation call does not validate embeddings, every model on its connection, the overall query/build, answer quality or permission to release. [Model connections](model-connections.md#roles) owns saving, replacement, removal, optional probes, runtime response checks and the evidence-recording workflow. Operation recovery continues under the existing job/idempotency rules.
 
 Migration [0002](../../apps/backend/migrations/versions/0002_idempotency_reservations.py) implements `idempotency_reservations`. Each row stores an opaque `operation_id`, stable `principal_id`, `organization_id`, optional `project_id`, HTTP `method`, logical `requested_route`, `request_key`, binary `request_fingerprint`, `state`, optional `replay_kind`, and creation and expiry times. A unique constraint covers principal, organization, project, method, route, and key, treating an absent project as one shared scope. A completed row classifies the safe replay outcome; it does not store an HTTP response body or plaintext secret.
 
@@ -738,6 +909,8 @@ The owning command saves its accepted change and required audit in the same tran
 | A feedback edit arrives after promotion | Original receipt attribution remains unchanged. |
 | A test or rubric changes | New immutable evaluation input. Old results remain identifiable. |
 | A provider credential is copied to another resource | Authenticated binding rejects dispatch. |
+| A real model call completes after credential replacement | Evidence retains the used revision and cannot validate the replacement. |
+| Preflight is skipped | No fabricated success and no marker-only readiness gate; real security, response and materialization checks remain mandatory. |
 
 ## Decision and reference map
 

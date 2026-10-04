@@ -1,6 +1,8 @@
 # ADR-0008: Preserve immutable versions and their provenance
 
-Status: Accepted
+Status: Accepted, partially superseded by [ADR-0054](ADR-0054-use-shared-current-model-connections.md) on 2026-09-30 for shared connection access settings.
+
+The original rationale below is preserved. Pipeline settings, selected connection identities and prepared-data bindings remain immutable; their referenced connections now use current operational access settings. Execution observations identify the actual settings used, not a promise to recreate the historical environment.
 
 **Date:** 2026-09-24
 

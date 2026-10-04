@@ -1,6 +1,6 @@
 # ADR-0006: Use official generated clients for application API access
 
-Status: Accepted
+Status: Accepted; external tooling prerequisite partially superseded by [ADR-0055](ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md).
 
 **Date:** 2026-09-17
 
@@ -18,7 +18,7 @@ These options summarize the recorded choices, exclusions, and deferrals. They do
 
 ## Decision Outcome
 
-Use the official generated TypeScript SDK in Studio. Keep client transports thin and preserve the acting user’s identity. Treat SDK Kit as an external project whose suitability must be established for the selected contract. Backend development proceeds independently; this decision does not authorize building a replacement generator here.
+The original decision selected the official generated TypeScript client in Studio, thin transports and preservation of the acting user's identity. It treated an external generator project's suitability as a prerequisite for Studio, while backend development proceeded independently. ADR-0055 replaces that delivery dependency with generator-neutral OpenAPI clients and CLI-first v1; it preserves generated contracts, thin transports and runtime compatibility qualification. No custom generator development is implied.
 
 **Example.** A server-rendered Studio request must preserve the user’s authority rather than use a global administrator credential to make the SDK call succeed.
 

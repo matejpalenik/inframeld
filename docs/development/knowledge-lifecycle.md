@@ -16,6 +16,7 @@ Start with the four identities below, then follow an upload, a build selection, 
 | When does an upload become accepted knowledge? | [2. Admit and replace content](#admission) |
 | Does uploading change the live answer? | [3. Freeze a corpus and prepare it](#corpus) |
 | How do repeated S3 imports behave? | [4. Synchronize a source safely](#source-sync) |
+| What does configuration import recreate? | [Portable collections and sources](#portable-knowledge) |
 | What remains true after later changes? | [5. Change sharing, defaults, or availability](#changes) |
 | Which lifecycle mistakes should I catch? | [6. Maintainer checks](#maintainer-checks) |
 | Why these choices, and what remains open? | [7. Decision and reference map](#decision-map) |
@@ -73,7 +74,7 @@ Alice uploads a supported PDF, Markdown, or text file.
 
 The API streams the file into private temporary storage, checks its size and format, and gives it server-generated storage IDs. An application command then saves the accepted upload.
 
-Saving acceptance is called **admission**. After that point, the application can track the work even if Alice closes Studio.
+Saving acceptance is called **admission**. After that point, the application can track the work even if Alice closes the CLI progress view or, later, Studio.
 
 A filename is a display label, never a filesystem path. Each upload is limited to **25 MiB** under the [upload rules](ingestion-security.md#admission). Parsing also needs time and output limits because a small compressed file can expand into much larger content.
 
@@ -93,7 +94,7 @@ Creating a Document needs Add documents on every selected initial group. That pe
 
 ## 3. Freeze a corpus and prepare it
 
-A build uses exact DocumentVersions selected for that request. It cannot switch to whatever happens to be newest when the worker starts.
+A build or direct Pipeline query uses exact DocumentVersions selected for that request. It cannot switch to whatever happens to be newest when the worker starts. [Pipelines](pipelines-and-releases.md#preview) owns capture of working settings; Knowledge supplies exact corpus membership, not publication authority.
 
 Alice can select versions in the collection editor. The first-use working design obtains the selection from one fixed upload batch.
 
@@ -101,13 +102,15 @@ PostgreSQL saves the CollectionRevision's complete membership. A separate immuta
 
 Uploading alone does not change live answers. Accepting the document, selecting a collection revision, preparing search data, and releasing a pipeline are separate steps.
 
+An authorized completed live-input upload can coordinate those steps automatically under the Deployment's existing input binding. Direct querying does not modify that binding or collection membership. For development-only uploads, explicitly select an ordinary collection outside the watched live inputs; do not silently create a copy or suppress a live collection's update behavior. Changing a working corpus selection alone affects future queries/builds, not existing deployments. Current access and source erasure still apply to every retained execution-input snapshot.
+
 ### Step 4: freeze and run the build
 
 A pipeline describes a limited **retrieval-augmented generation (RAG)** flow: find relevant document excerpts, then ask a model to answer from them. Its configuration selects the corpus, one processing profile, one embedding profile, retrieval limits, reranking, prompt, and generation settings.
 
 V1 does not support arbitrary pipeline graphs or user-supplied Python execution.
 
-When Alice selects Build candidate, the server saves the exact request and a background job. Later Studio edits cannot alter that job's inputs. A name such as P13 can be reserved immediately, but a pending build is not a ready PipelineVersion.
+When Alice selects Build, the server saves the current reviewed working configuration and exact corpus request with a background job. Later edits cannot alter that job's inputs. A name such as P13 can be reserved immediately, but a pending build is not a ready PipelineVersion. Direct-query/evaluation may prepare and use the same verified source data before this formal build, without creating P13 or granting release authority.
 
 The worker reuses compatible existing results and creates only what is missing:
 
@@ -140,6 +143,22 @@ The connector and normalized bucket/key identify the source across syncs. An S3 
 Unchanged content may reuse a DocumentVersion. A missing source object may be omitted from a new collection revision, but does not rewrite a revision already used by a Deployment.
 
 Imported documents receive an explicit list of Inframeld access groups. The source system's access-control lists, or ACLs, are not copied automatically.
+
+<a id="portable-knowledge"></a>
+
+<a id="portable-collections-and-sources"></a>
+
+### Recreate collections and sources from configuration
+
+Bob importing Alice's configuration receives empty collection definitions, not documents or vector data. Explicit reuse of an existing collection leaves its membership/history untouched. [Configuration portability](configuration-portability.md) specifies the complete export boundary and reviewed partial import.
+
+Source definitions contain the supported non-secret read-only S3 location, collection reference and required document audience. Before creating a source, explicitly map each audience to permitted destination group IDs. Matching names may help suggest a mapping, but do not prove equivalent access. Creating groups and granting permissions remain separate operations. Changing configuration does not silently change existing documents' audiences.
+
+Configure source authentication separately on the selected backend using protected input. Choose either an explicitly authorized operator-configured identity or credentials bound to that source. Do not borrow the CLI login, credentials found on the user's laptop or another source's identity. Saving configuration, supplying credentials, optionally testing access and starting synchronization are separate operations.
+
+Before an explicit sync, review the location, audience, limits, potential charges and effects on live updates. Then discover the inventory within those limits during execution. Keep accepted documents and report partial results if work stops. An incomplete inventory cannot prove that a source object disappeared.
+
+Report configuration, ingestion, preparation and publication separately. **Finish** is the default after import or sync. Optional continuation uses ordinary preparation and query operations. [The delivery plan](cli-delivery-plan.md) assigns the exact source-credential, action and limit contracts and their runtime qualification.
 
 <a id="changes"></a>
 

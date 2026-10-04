@@ -1,6 +1,8 @@
 # ADR-0031: Compare fresh executions against frozen benchmarks
 
-Status: Accepted
+Status: Accepted; partially superseded by [ADR-0052](ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md).
+
+ADR-0052 permits captured working configurations (operation inputs, not an Experiment resource) as well as ready PipelineVersions. The original rationale below is preserved. Its ready-version-only input restriction is historical; fresh execution, frozen benchmarks/evaluators, current access and separation from publication remain current.
 
 **Date:** 2026-09-17
 
@@ -22,6 +24,8 @@ An explicit Compare operation freezes the selected baseline and candidate, bench
 
 **Example.** If the candidate fails a case, keep that failure visible. Dropping it from the denominator would make the candidate appear better without comparable evidence.
 
+[ADR-0054](ADR-0054-use-shared-current-model-connections.md) makes selected connections shared current dependencies. A comparison observes their active access revisions and stops further model work if those change; it cannot execute against an old access revision to finish. Preserve partial evidence and label the interrupted comparison. Frozen benchmark/evaluator settings and fresh execution remain required; historical connectivity is not reproduced by choosing an old PipelineVersion.
+
 ## Consequences
 
 - Engineers can examine a like-for-like result and understand the conditions that produced it.
@@ -33,4 +37,4 @@ Implementation evidence and qualification limits are recorded in the current gui
 
 - [Current evaluation](../development/evaluation.md).
 - [Current data model](../development/data-model.md).
-- Related decisions: [ADR-0030](ADR-0030-use-openevals-for-groundedness-evaluation.md).
+- Related decisions: [ADR-0051](ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md) selects Ragas; [ADR-0030](ADR-0030-use-openevals-for-groundedness-evaluation.md) preserves the historical library choice. Neither changes this record's fresh-comparison policy.

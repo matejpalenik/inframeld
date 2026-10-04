@@ -6,7 +6,7 @@ Start with [how an answer is served](pipelines-and-releases.md#serving). The [Pi
 
 Sections 1–3 explain recording and changing a rating. Sections 4–5 explain what happens after a release, lost access, or expiry, and how to read the resulting counts.
 
-> **Design status:** This is the accepted v1 feedback contract. Endpoints, storage, UI, and the behavioral tests below still need implementation and verification.
+> **Design status:** This is the accepted v1 feedback contract. [CLI feedback capability](https://github.com/matejpalenik/inframeld/issues/191) includes reporting and own-answer rating/correction in CLI v1; Studio remains deferred. Endpoints, storage, clients and the behavioral tests below still need implementation and verification.
 
 ## Contents
 
@@ -28,6 +28,8 @@ An **AnswerReceipt** records that an eligible response was produced, who request
 
 Each answer and its originating principal have one current rating. A **principal** is the stable identity of the human or application that requested it. Editing a rating changes that record rather than adding another vote.
 
+Under [shared current connectivity](model-connections.md#shared-current), two answers from the same PipelineVersion may have used different connection access revisions. Preserve safe actual connection/model observations with execution/receipt attribution, independently of optional diagnostic tracing. Feedback remains attached to its original answer and serving version; never relabel it with the connection's current settings. Version-level reports may combine those environments and must disclose that limitation rather than imply identical execution conditions. This does not add a new feedback dimension or change rating/coverage arithmetic. Direct-query/evaluation still stay outside production feedback.
+
 ### Keep ownership with the existing application modules
 
 | Owner | Responsibility |
@@ -35,9 +37,9 @@ Each answer and its originating principal have one current rating. A **principal
 | **Pipelines** | Owns serving responses, their `AnswerReceipt` records, and answer feedback. Records the release selection supplied at query admission. |
 | **Releases** | Owns Deployment transitions and the cohort selection made when a query is admitted. Feedback cannot change its serving pointers. |
 | **Evaluation** | Continues to own offline benchmark results. A benchmark is a set of test cases, not the production feedback population. |
-| **Studio** | Reads authorized projections that combine receipts, feedback, and release history. It is not another source of truth. |
+| **CLI v1 and future Studio** | Read authorized projections that combine receipts, feedback, and release history; submit explicit own-answer changes through the same backend operation. Neither is another source of truth. |
 
-**Admission** means accepting a query to run. Studio's **read projection** combines existing records into a useful view. Displaying records together does not give Studio ownership of their changes.
+**Admission** means accepting a query to run. A **read projection** combines existing records into a useful view. Displaying records together does not give a client ownership of their changes.
 
 <a id="operation"></a>
 
@@ -79,7 +81,7 @@ Use the same resource path for reads:
 GET /v1/projects/{projectId}/answers/{answerId}/feedback
 ```
 
-The originating principal may read its current rating, comment, and revision while still passing the receipt, project, and evidence checks. `feedback:write` includes this narrow read of its own feedback. It does not open Studio's project-wide list.
+The originating principal may read its current rating, comment, and revision while still passing the receipt, project, and evidence checks. `feedback:write` includes this narrow read of its own feedback. It does not open the project-wide report in any client.
 
 For example, after a lost edit response, the customer application can fetch the actual current revision instead of guessing which number to send next.
 
@@ -116,8 +118,9 @@ An integration needs both `query` and the separate `feedback:write` permission t
 | --- | --- |
 | **Integration submitting or editing feedback** | The same stable principal that originated the receipt, `query` and `feedback:write`, current project access, and current access to the bound evidence. |
 | **Originating principal reading its own feedback** | The narrow own-feedback permission included in `feedback:write`, with the same receipt, project, and evidence checks. |
-| **Human rating a Studio test-query response** | May submit for their own eligible Studio test-query receipt, subject to the applicable current permissions. This is distinct from an offline evaluation execution. |
-| **Engineer inspecting project-wide feedback in Studio** | An explicit Studio feedback-read action permission and current access to the evidence involved. The reader need not be the originating principal of each answer. |
+| **Human querying a live Deployment through CLI or Studio** | May rate their own eligible live serving receipt, subject to the applicable current permissions. This does not include protected direct Pipeline queries or offline evaluation executions. |
+| **Direct Pipeline query or evaluation execution** | Not eligible for production feedback, even if the caller can also query the live Deployment. Direct-query evidence is inspected through its own authorized workflow. |
+| **Engineer inspecting project-wide feedback through CLI or future Studio** | Separate project-feedback inspection authority and current access to the evidence involved. The reader need not be the originating principal of each answer, but cannot edit those principals' ratings. Exact action mappings remain specification work. |
 
 Access owns default permissions and onboarding assignments. Feedback reuses its rules rather than choosing new defaults or adding another permission evaluator.
 
@@ -143,11 +146,11 @@ Do not give the bot extra document access because its UI appears to hide private
 
 Check current access to every source behind the receipt before returning it or its comment. A comment may quote private source text even though Inframeld never stored the answer.
 
-Apply the same access rules to records and totals. Otherwise a count could reveal hidden feedback. Label Studio's totals as the **visible authorized subset**.
+Apply the same access rules to records and totals. Otherwise a count could reveal hidden feedback. Label report totals as the **visible authorized subset** in human and machine output.
 
-The backend filters SQL reads and aggregate calculations through the existing Access policy. It must not send all feedback to the browser and rely on the browser to hide it.
+The backend filters SQL reads and aggregate calculations through the existing Access policy. It must not send all feedback to a client and rely on that client to hide it.
 
-An explicit insufficient-evidence answer can have no source evidence to check. Project and action permissions still apply. Submitting feedback or reading one's own receipt requires ownership. A Studio project-feedback reader instead needs the explicit feedback-read permission.
+An explicit insufficient-evidence answer can have no source evidence to check. Project and action permissions still apply. Submitting feedback or reading one's own receipt requires ownership. A project-feedback reader instead needs the separate inspection authority.
 
 <a id="lifecycle"></a>
 
@@ -180,7 +183,7 @@ The receipt and feedback share one configured lifetime. Expose the expiry time. 
 
 A **tombstone** is a saved deletion marker that blocks access before cleanup finishes. Comments must not survive in a form that reveals evidence erased with their receipt or source.
 
-Feedback does not add production questions, answer bodies, or full retrieved text to receipts. Studio can show the rating, comment, version, time, release context, and permitted citation IDs. It cannot replay the original answer text. A customer needing that text keeps its successful response.
+Feedback does not add production questions, answer bodies, or full retrieved text to receipts. CLI and future Studio can show the rating, comment, version, time, release context, and permitted citation IDs. They cannot replay the original answer text. A customer needing that text keeps its successful response.
 
 Offline evaluation saves limited-size answers and evidence for comparison. That separate purpose does not allow production-answer logging here.
 
@@ -188,13 +191,19 @@ Offline evaluation saves limited-size answers and evidence for comparison. That 
 
 ## 5. Read counts honestly
 
-Studio's Feedback panel belongs in the Pipeline or Deployment view. It offers a time range, version filter, current or previous rollout selection, positive and negative counts, total currently rated answers, and paginated comments.
+CLI v1 exposes a feedback report scoped to a Pipeline or Deployment. It offers a time range, version filter, current or previous rollout selection, positive and negative counts, total currently rated answers, and paginated comments. Future Studio's Feedback panel uses the same reporting contract.
 
-During a canary, show the two groups of requests that actually received each version side by side. Include request counts, failures, latency, and a link to the separate offline comparison. The panel also works when one version serves **100%** of traffic.
+During a canary, show the two groups of requests that actually received each version side by side. Include request counts, failures, latency, and a reference to the separate offline comparison. The report also works when one version serves **100%** of traffic. Keep query-operation signals distinct from the eligible-receipt feedback denominator.
+
+Reading a report never submits a rating, calls a model or changes release state. Submitting or correcting a rating on your own answer is a separate explicit operation. Do not require a rating after each query.
+
+Feedback commands follow the [shared CLI contract](api-contracts.md#cli-automation-outcomes): target/account/project overrides, bounded pages, one final JSON result by default, noninteractive inputs and descriptive dry-run. Exact command spelling and reporting schemas still need specification.
+
+Treat comments as untrusted plain text. Escape terminal controls in human output without changing the saved comment. Machine output uses normal JSON escaping.
 
 ### Group by answer creation time, not feedback arrival time
 
-Default the panel’s time range to **answer creation time**. Show feedback submission/update time separately in each row.
+Default the report's time range to **answer creation time**. Show feedback submission/update time separately in each row.
 
 A coverage percentage must compare ratings and eligible answers from the same population. A rating submitted today for yesterday's answer belongs with yesterday's answers. Do not divide today's incoming ratings by today's answer count.
 
@@ -210,7 +219,7 @@ Feedback coverage = unique rated answers / eligible completed serving receipts
 
 Show both numbers behind coverage, not just the percentage. A retry adds no vote. Editing negative to positive moves that answer between counts without increasing the number of rated answers.
 
-Coverage counts produced responses, not confirmed views. Unrated answers have no positive or negative verdict. Offline evaluations, failed requests, and uncertain outcomes are not eligible completed production answers.
+Coverage counts produced responses, not confirmed views. Unrated answers have no positive or negative verdict. Direct Pipeline queries, offline evaluations, failed requests, and uncertain outcomes are not eligible completed production answers.
 
 If part of the window has missing or expired receipts or totals, label coverage **partial or unavailable**. Do not invent the missing denominator.
 
@@ -218,7 +227,7 @@ People choose whether to rate, and a small sample may not represent everyone. Sh
 
 ### Worked example: eight ratings do not describe every answer
 
-Suppose more of P13's offline answers were judged supported by their evidence, giving it a better groundedness rate. Its online ratings could still look like this:
+Suppose P13 has a higher offline [faithfulness score](evaluation.md#metrics) under the same benchmark and evaluator. That evaluation may follow earlier experiments, but only answers actually served through a live Deployment contribute online ratings. Direct Pipeline queries and evaluation executions never enter the production feedback denominator or receive a fictional live version/cohort. Their protected evidence follows [the direct-query lifecycle](pipelines-and-releases.md#preview). P13's online ratings could still look like this:
 
 | Observation | Count or calculation |
 | --- | --- |
@@ -246,7 +255,7 @@ The following are minimum implementation checks, not completed tests:
 | **Current access** | Recheck document access for submission, detail, receipt reads, replay, and aggregate totals. Include uncited final-context sources and evidence-free abstentions. |
 | **Retention and deletion** | Expire and purge receipts, apply project/source deletion, and confirm affected feedback disappears or is redacted without leaking through comments or counts. |
 | **Rendering and bounds** | Enforce comment/request bounds and render comments as escaped text. |
-| **Studio and calculations** | Verify exact denominators, answer-creation windows, partial/unavailable coverage, and operation at 100% serving as well as during a canary. |
+| **CLI and calculations** | Verify exact denominators, answer-creation windows, partial/unavailable coverage, and operation at 100% serving as well as during a canary. Exercise human/JSON parity, bounded pagination, missing script inputs and side-effect-free dry-run. Studio qualification remains deferred. |
 | **Side effects and storage** | Confirm feedback never stores full production responses, repeats model work, or moves release pointers. |
 
 The contract defines what the implementation must demonstrate. This documentation does not claim those tests have run.

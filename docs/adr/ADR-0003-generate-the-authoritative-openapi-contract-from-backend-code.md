@@ -25,7 +25,7 @@ Generate the public versioned contract from backend code, using native OpenAPI 3
 ## Consequences
 
 - The contract used by clients comes from the application that handles their requests.
-- Schema generation, stable operation identifiers, error declarations, and client compatibility need qualification. External SDK Kit limitations can block Studio integration; they do not justify blocking backend work or changing valid contract meaning.
+- Schema generation, stable operation identifiers, error declarations, and client compatibility need qualification. Generator limitations do not justify blocking backend work or changing valid contract meaning; ADR-0055 records current CLI-first delivery.
 
 ## Links
 

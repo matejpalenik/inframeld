@@ -111,13 +111,13 @@ Start with [Understanding Inframeld](docs/ARCHITECTURE.md) for the product, its 
 
 - [Topic guides](docs/ARCHITECTURE.md#reading-paths) explain current behavior, procedures, examples, and limitations.
 - [data-model.md](docs/development/data-model.md) defines records and relationships, separating accepted design, proposed tables, and implemented schema.
-- [Architecture decision records](docs/adr/README.md) explain 48 focused choices and their rationale.
+- [Architecture decision records](docs/adr/README.md) explain the accepted choices and their rationale.
 - [Documentation maintenance and skill routes](docs/development/documentation-maintenance.md) explain how to keep the six domain skills and specifications aligned.
 - [AGENTS.md](AGENTS.md) defines read-only AI guidance for developers who write the implementation by hand.
 
 Architecture documentation describes both implemented and planned behavior. Acceptance does not mean a feature has been implemented or qualified. The previously linked v1 review and skills plan are [unavailable historical material](docs/development/documentation-maintenance.md#unavailable-historical-material), not evidence recovered by this rewrite.
 
-Backend implementation comes first. External SDK Kit suitability blocks Studio development, whose primary client remains the official generated TypeScript SDK.
+V1 is CLI-first, with a Rust CLI and the small Ory browser account UI needed for human login. The full Studio is deferred. Backend implementation continues first; application clients are generated from native OpenAPI without selecting a generator package here. The commands above run today's repository scaffolding, not an already delivered CLI. See the [delivery plan](docs/development/cli-delivery-plan.md) and [Definition of Done](docs/development/definition-of-done.md).
 
 ## Contributing
 

@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+**Scope clarification, 2026-09-29:** [ADR-0053](ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md) selects Hydra for first-party human CLI login. The exclusion below concerns MCP OAuth interoperability and delegated users, not installation-wide Hydra availability. This MCP client profile and its application credentials remain unchanged.
+
 **Date:** 2026-09-19
 
 ## Context and Problem Statement

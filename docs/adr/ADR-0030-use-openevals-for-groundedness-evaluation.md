@@ -1,6 +1,8 @@
 # ADR-0030: Use OpenEvals for groundedness evaluation
 
-Status: Accepted
+Status: Superseded by [ADR-0051](ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md).
+
+This record preserves the original narrower OpenEvals decision and its rationale. It is historical, not current implementation guidance. Ragas now supplies starter generation and claim-based faithfulness; see [the current Evaluation guide](../development/evaluation.md).
 
 **Date:** 2026-09-17
 
