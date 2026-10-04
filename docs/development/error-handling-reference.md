@@ -19,6 +19,8 @@ Use this reference when changing shared error handling. For ordinary feature wor
 
 ## Ownership and implementation scope
 
+The [accepted #116 authentication extension](error-handling.md#authentication-contract) specifies new dispatch/failure behavior separately from this implemented foundation. In particular, `invalid_authentication_request`, human bearer verification and application-session verification are accepted contracts, not existing handler/catalogue or generated-client evidence. Preserve current generic authentication bodies and trusted challenge handling when those adapters are implemented. The guide now defines the accepted 400 type/title/detail/code and Bearer realm/challenge literals. Add them through the normal definition/handler/route declarations when implementation is authorized, without replacing existing codes or reflecting provider messages. New Access bodies, maintenance input and private recovery callbacks have [separate bounds](access-contracts.md#mutation-profile); the [HTTP draft](access-contracts.md#http-operation-matrix) defines safe 413/415 and per-profile declarations for final review. Maintenance has its own bounded stdout/error/exit contract; private callbacks use ordinary safe problems without product authentication.
+
 All paths below are relative to `apps/backend/src/inframeld_backend/`.
 
 | Location | Responsibility |

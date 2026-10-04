@@ -97,6 +97,8 @@ The direct-query loop never reaches a serving pointer. The explicit Build workfl
 
 ### Edit one working configuration without changing traffic
 
+V1 Pipeline/Deployment provisioning is human-only. [Fixed creator assignments](access-contracts.md#initial-assignments) initialize thirteen Pipeline and seven Deployment actions. Applications may edit supported existing configuration, build versions and manage releases through separate explicit eligible grants. Producing revisions/versions is ordinary workflow output; it does not permit creating another Pipeline or Deployment. Before a default Deployment exists, first publication still requires the authorized human creation path.
+
 Alice starts with revision 17 using reranker A. Saving reranker B creates revision 18 and makes it the working configuration. Revision 17 stays identifiable within retention. Restoring revision 17 creates a new current revision with those settings; it does not rewrite revision 18 or roll back Production.
 
 Use expected revisions when saving or restoring. If Bob saved another change after Alice reviewed the settings, return a conflict and let her inspect it. Do not overwrite Bob's work or silently retry against a newer revision. Configuration history restores settings and exact references where retained, not erased documents, expired artifacts or revoked permissions. Unsupported old settings may be inspected but cannot execute until their ordinary requirements are satisfied.

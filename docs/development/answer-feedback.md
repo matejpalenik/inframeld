@@ -110,9 +110,13 @@ A database uniqueness rule allows only one record per answer and principal. It s
 
 <a id="authorization"></a>
 
+<a id="feedback-authority"></a>
+
 ## 3. Check the caller and bound evidence
 
-An integration needs both `query` and the separate `feedback:write` permission to submit feedback. Existing query credentials do not gain feedback permission automatically.
+New human Project creators receive explicit `inspect-feedback`, and new Deployment creators receive explicit `feedback:write`, through [fixed creator assignments](access-contracts.md#initial-assignments). Existing resources are not backfilled. These revocable grants do not permit editing another principal's rating or bypass current Query/receipt/evidence checks.
+
+An integration needs both `query` and the separate `feedback:write` permission on the exact Deployment to submit feedback. Existing query credentials do not gain feedback permission automatically. [Access](access-control.md#reviewed-capability-catalogue) records the accepted identifiers/targets; applications receive use only. Rotating an application key preserves the originating principal and therefore own-rating identity.
 
 | Caller and operation | Required access |
 | --- | --- |
@@ -120,7 +124,7 @@ An integration needs both `query` and the separate `feedback:write` permission t
 | **Originating principal reading its own feedback** | The narrow own-feedback permission included in `feedback:write`, with the same receipt, project, and evidence checks. |
 | **Human querying a live Deployment through CLI or Studio** | May rate their own eligible live serving receipt, subject to the applicable current permissions. This does not include protected direct Pipeline queries or offline evaluation executions. |
 | **Direct Pipeline query or evaluation execution** | Not eligible for production feedback, even if the caller can also query the live Deployment. Direct-query evidence is inspected through its own authorized workflow. |
-| **Engineer inspecting project-wide feedback through CLI or future Studio** | Separate project-feedback inspection authority and current access to the evidence involved. The reader need not be the originating principal of each answer, but cannot edit those principals' ratings. Exact action mappings remain specification work. |
+| **Human or application inspecting project-wide feedback through CLI or future Studio** | `inspect-feedback` on the exact Project and current access to the evidence involved. The reader need not be the originating principal of each answer, but cannot edit those principals' ratings. Reporting returns only the currently authorized evidence subset. |
 
 Access owns default permissions and onboarding assignments. Feedback reuses its rules rather than choosing new defaults or adding another permission evaluator.
 

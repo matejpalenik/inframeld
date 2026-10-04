@@ -9,6 +9,8 @@ Explain how admitted source versions become verified, reusable search data. Inde
 
 ## Scope and reading route
 
+For the accepted #116 catalogue, assignments and remaining schema/route/maintenance handoff, read [Access contracts](../../../docs/development/access-contracts.md). Guides own behavior; the new reference is accepted design, not implemented API or runtime evidence.
+
 Default to read-only assistance. Loading this skill grants no edit, model-call, or mutation permission. Start with the relevant protocol, then its record definitions; cite current sources and separate designed guarantees from verified code.
 
 - [Indexing](../../../docs/development/indexing.md) owns writes, filters, verification, reuse, retirement, and qualification calculations. [Indexing records](../../../docs/development/data-model.md#indexing) defines profiles, generations, saved layouts, and materializations.
@@ -22,7 +24,7 @@ Default to read-only assistance. Loading this skill grants no edit, model-call, 
 
 ## Essential boundaries
 
-For portable profiles, read [Indexing's profile contract](../../../docs/development/indexing.md#portable-profiles), [configuration portability](../../../docs/development/configuration-portability.md) and [delivery prerequisites](../../../docs/development/cli-delivery-plan.md). Use the supported Docling hybrid chunking option, preserve the complete embedding configuration and reject silent truncation. Changed meaning needs a distinct named immutable profile and ordinary preparation. Export transfers settings, not vectors or a guarantee that a provider alias stays unchanged. Exact schemas, assets and limits still need qualification. Do not reopen completed foundations to invent another engine.
+For portable profiles, read [Indexing's profile contract](../../../docs/development/indexing.md#portable-profiles), [configuration portability](../../../docs/development/configuration-portability.md) and [delivery prerequisites](../../../docs/development/cli-delivery-plan.md). Use the supported Docling hybrid chunking option, preserve the complete embedding configuration and reject silent truncation. Changed meaning needs a distinct named immutable profile and ordinary preparation. [Exact profile View/Use actions and creator assignments](../../../docs/development/access-contracts.md#initial-assignments) are accepted; no profile Edit or force-deletion workflow is introduced. Export transfers settings, not vectors or a guarantee that a provider alias stays unchanged. Exact schemas, assets and limits still need qualification. Do not reopen completed foundations to invent another engine.
 
 For pre-build Pipeline queries, follow [direct-query preparation](../../../docs/development/indexing.md#preparation-can-serve-an-experiment-without-creating-a-release-version), [Pipeline queries](../../../docs/development/pipelines-and-releases.md#preview) and [ADR-0052](../../../docs/adr/ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md). Complete captured working-configuration inputs can use verified materializations without creating a PipelineVersion. Reuse ordinary preparation and the single writer; never permit partial/incompatible search or mutate live generations. Preparation acquires no publication authority. Bounded active pins and current erasure rules apply; snapshot history is not a permanent numerical archive.
 

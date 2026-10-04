@@ -16,6 +16,7 @@ Permission to query a Pipeline or inspect its traces does not grant unrestricted
 
 | Reader's question | Start here |
 | --- | --- |
+| Which permissions cover these operations? | [Six Pipeline-scoped actions](#operation-authority) |
 | Where do cases come from? | [Generate starter cases](#generation) |
 | What does acceptance mean? | [Review case revisions](#review) |
 | What exactly executes? | [Freeze and execute](#comparison) |
@@ -30,6 +31,39 @@ Permission to query a Pipeline or inspect its traces does not grant unrestricted
 | Can a score publish a version? | [Release authority](#release) |
 | Which failures need a walkthrough? | [Maintainer checks](#maintainer-checks) |
 | What is deferred? | [Decisions and scope](#decision-map) |
+
+<a id="operation-authority"></a>
+
+### Six separate permissions on the owning Pipeline
+
+Alice may generate cases without being able to accept them, and SupportBot may run an evaluation without inspecting retained results. The [reviewed Access catalogue](access-control.md#reviewed-capability-catalogue) makes those independent grants on the exact Pipeline:
+
+| Action | Evaluation behavior |
+| --- | --- |
+| `generate-evaluation-cases` | Separately admit generation/model work and save unreviewed candidate revisions. It does not run an evaluation. |
+| `view-evaluation-cases` | Read protected cases/history and explicitly export permitted content. |
+| `edit-evaluation-cases` | Edit/import, verify source linking and remove cases from future selection. Changed revisions are unreviewed. |
+| `review-evaluation-cases` | Accept/reject an exact revision and record the actual reviewer identity/kind. Deferral does not accept it. |
+| `run-evaluation` | Run with Pipeline Query plus current case, source, evaluator/model and budget checks. |
+| `inspect-evaluation-results` | Read historical runs/comparisons under current audiences/sources, separately from diagnostic trace inspection. |
+
+Humans and applications can receive use for each action; applications cannot grant permissions or administer audiences. Do not create a permission row per case or a generic Dataset/Experiment target. Case visibility still checks current audiences and sources on every read; neither a Pipeline grant nor an immutable benchmark bypasses that check.
+
+Import requires editing authority and a reviewed protected destination audience, including for supported unresolved cases. Validate any supplied source links; unlinked content remains protected and cannot claim resolvable evidence. Imported acceptance claims never accept a revision. Export requires case-reading authority and current access to every exported item. Editing cannot widen an audience through its use grant. Human-only `manage-evaluation-case-audiences` on this Pipeline governs audience changes, with management of every old/new group. [Fixed creator assignments](access-contracts.md#initial-assignments) initialize all six operational actions and this separate administration action. The accepted action catalogue does not claim routes, tables or behavioral tests are implemented.
+
+<a id="case-audiences"></a>
+
+### Alice approves an audience and SupportBot imports cases
+
+Alice has `manage-evaluation-case-audiences` on the HR Pipeline and manages HRPrivate. She saves HRPrivate as its nonempty, project-local future-import audience. SupportBot has `edit-evaluation-cases` on that Pipeline and imports questions/reference answers into this saved protection. The backend protects content immediately, including unresolved cases without linked sources. The import grant does not give the bot audience administration or document-reading access.
+
+An application import must use the saved current human-approved audience; an explicit different audience is denied, not ignored or substituted. Review and capture the audience's identity/revision with the import. Recheck current binding, project/group state and required authority before saving; changed reviewed state conflicts rather than broadening disclosure. Human imports may explicitly review another protected destination audience only with the same Pipeline audience authority and group-management checks.
+
+Changing the default from HRPrivate to SupportKnowledge requires the Pipeline action and management of every group in the authoritative old and proposed audiences, including removed, retained and added groups. Both audiences must remain nonempty and project-local. The default change affects future imports only. Existing cases retain their saved protection until a separately reviewed change identifies exact cases/revisions and old/new audiences. Save the protected change, expected-state checks and audit together using normal Access coordination. Do not infer management from edit/review grants or imported metadata.
+
+Bob needs `view-evaluation-cases` on the Pipeline and access through the case's current audience to read it. Linking an HR-only source adds current source access: changing the case audience to SupportKnowledge cannot expose that source-backed case to a Support-only reader. Keep protection through edits/reimport and protect history, results and unresolved excerpts under the same current checks. Group deletion must not leave a live default or stored case protection dangling; relevant references must first be handled through their authorized lifecycle. Source erasure covers derived protected case content under the existing erasure rules.
+
+New/changed content creates unreviewed revisions. Audience administration is not acceptance and never imports a foreign review as local authority. Exact content-review behavior beyond these invariants remains with the case contract; this audience decision does not invent a new review-reset rule. [ADR-0061](../adr/ADR-0061-control-evaluation-audiences-through-pipeline-authority.md) records the choice. [Logical records](data-model.md#evaluation) and [Access operation contracts](access-contracts.md#operation-contracts) distinguish accepted meaning from pending physical/wire schemas.
 
 <a id="generation"></a>
 
@@ -76,7 +110,7 @@ A **TestCase** has a stable identity in one pipeline. Its immutable **case revis
 
 Record who reviewed the revision and whether that reviewer was a human or an application. A script must specify the exact revision and the review action. A general spending-confirmation flag does not accept a case, and an automated decision must never be labelled human review.
 
-An application may accept an exact case revision when it has explicit permission to do so. It still needs current access to the expected evidence, and that evidence must remain resolvable. These checks apply even without an interactive screen. The Access contract must define the concrete action and target mappings and the eligibility rules for other review actions. Application eligibility alone grants nothing.
+An application may accept an exact case revision when it has explicit permission to do so. It still needs current access to the expected evidence, and that evidence must remain resolvable. These checks apply even without an interactive screen. The [reviewed Access catalogue](access-control.md#reviewed-capability-catalogue) supplies `review-evaluation-cases` on the exact Pipeline, with human/application use eligibility for acceptance and rejection. Separate human-only [case-audience administration](#case-audiences) and [fixed creator assignments](access-contracts.md#initial-assignments) are accepted; exact public/physical schemas remain delivery work. Application eligibility alone grants nothing.
 
 Editing generated cases is in scope; manual authoring from a blank form is deferred. The initial expectation comes from generation. Any advanced evidence edit must select a resolvable source-backed passage through the application evidence contract, not substitute pasted text or a filename. It also creates an unreviewed revision. No terminal drag-selection interface is required for starter review.
 
@@ -321,7 +355,7 @@ The application-owned budget controls recorded in [Model spending controls](mode
 
 Save generation provenance, review decisions, exact case revisions, benchmark/evaluator revisions, the selected PipelineVersion or execution-input snapshot and its corpus/bindings, effective access conditions, per-stage evidence, bounded answers, and per-case observations. Keep final context bytes or a reconstructible immutable protected artifact; a hash cannot replace missing evidence. Record gateway call IDs, admitted and actual connection access revisions, observed model identity where available, usage, and safe errors without credentials. These observations do not manufacture a live Deployment receipt or enter production feedback statistics.
 
-**Current access governs every disclosure**, including generated questions/references derived from protected sources. Historic authorization is not a permission token. Recheck before sampling, model egress, and display/export. Revocation stops prohibited work and blocks protected results; preserve safe partial status. Access owns the eventual action mapping. Exact evaluation permission identifiers and HTTP endpoints remain to be specified before implementation, not invented in this guide.
+**Current access governs every disclosure**, including generated questions/references derived from protected sources. Historic authorization is not a permission token. Recheck before sampling, model egress, and display/export. Revocation stops prohibited work and blocks protected results; preserve safe partial status. Access owns the [six accepted exact-Pipeline action identifiers](access-control.md#reviewed-capability-catalogue). [Audience administration](#case-audiences) and [fixed creator assignments](access-contracts.md#initial-assignments) are accepted. HTTP/physical schemas and endpoint mappings still need specification before implementation.
 
 Source erasure and retention cover derived drafts, references, excerpts, answers, and judgments. Block access first, clean up resumably, and retain only permitted non-content markers showing unavailability. Immutability prevents silent edits, not authorized erasure. [Retention and deletion](retention-and-deletion.md) owns cleanup; evaluation retention periods are not implicitly the diagnostic trace default.
 

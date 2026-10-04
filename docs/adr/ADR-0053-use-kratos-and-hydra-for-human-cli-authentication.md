@@ -32,7 +32,11 @@ Production/network installations require HTTPS. The CLI-managed, same-machine, l
 
 Incoming application credentials remain Inframeld-issued opaque keys under ADR-0017/0018. The accepted MCP profile remains preconfigured, header-capable clients under ADR-0045. Adding Hydra for human CLI login does not add MCP OAuth discovery, third-party client onboarding, verified user delegation, machine client-credentials grants or a migration of application/provider keys into Hydra.
 
+**Maintenance proof clarification, 2026-10-04:** reuse the transient Hydra access token from the accepted CLI login for independent candidate identity verification over protected host stdin. The CLI does not export a Kratos browser cookie. The first claim can verify before local admission through its separately authorized host operation; ordinary product requests still require admission and all current grants. [The version 1 maintenance draft](../development/access-contracts.md#maintenance-wire) defines this boundary and pending runtime qualification.
+
 ## Consequences
+
+[ADR-0058](ADR-0058-block-product-access-during-identity-recovery-cleanup.md), accepted on 2026-10-04, clarifies the product-access block and independent provider-cleanup outcomes after verified recovery. [Accepted credential dispatch](../development/access-control.md#credential-dispatch) now selects one verifier without changing Ory token formats. Hook sequencing and pinned-release qualification remain open; existing cookie/recovery tests do not prove these extensions.
 
 - Humans get one identity across browser and CLI, while applications retain separate least-privilege identities.
 - Hydra, the login/consent UI integration, secure CLI storage, private introspection and cross-product recovery add deployment and qualification work. They are identity infrastructure beside one modular backend, not new business-domain services.

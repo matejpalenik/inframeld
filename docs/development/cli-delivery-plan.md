@@ -4,6 +4,8 @@ Alice should install the CLI, sign in through the small Ory account UI, configur
 
 Use this guide to find the issues that implement a capability and the prerequisite contracts they need. **GitHub issue bodies are the engineering source of truth for implementation requirements and acceptance tests.** Topic guides explain how the product works. ADRs explain the architectural choices.
 
+**Accepted #116 decisions, 2026-10-04:** [Access contracts](access-control.md#access-contract-review) now record reviewed credential dispatch, complete application-key verification/lifetimes, selected capability identifiers, seventeen initial Project grants and fixed resource creator assignments, recovery cleanup and maintenance/deletion boundaries. [ADR-0059](../adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md) owns the current initialization, superseding historical ADR-0057; [ADR-0058](../adr/ADR-0058-block-product-access-during-identity-recovery-cleanup.md) owns recovery blocking. ADR-0060 through ADR-0063 record provisioning, case audiences, invitations and diagnostic scope. This is a documentation-only capture: remaining #116 gaps and pinned-release/runtime qualification stay open. GitHub bodies have not been updated in this pass; requirements still referring to seven initial project grants must be reconciled before implementation. Earlier reconciliation reports remain historical evidence, not validation of this update.
+
 The [capability map](#decision-coverage) retains all 118 earlier requirement mappings and adds two explicit lifecycle mappings, for 120 in total. It is an index, not a competing specification. Preserve the [implementation template](../../.github/ISSUE_TEMPLATE/implementation.md) and [Definition of Done](definition-of-done.md). If sources conflict, resolve the conflict explicitly before implementation.
 
 | Reader's question | Start here |
@@ -53,6 +55,14 @@ The [capability map](#decision-coverage) retains all 118 earlier requirement map
 
 Other existing tickets retain coherent boundaries where splitting would merely create coding chores. For example, atomic provider-secret replacement and the gateway's dispatch checks belong to their own complete operations; DTOs, routes and tables are tasks within those operations, not separate tickets.
 
+### Accepted Access decisions and remaining handoff
+
+The 2026-10-04 #116 review accepts [ADR-0059](../adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md) through [ADR-0063](../adr/ADR-0063-defer-product-non-query-diagnostic-browsing.md). Humans provision resources in v1; applications retain explicitly granted supported updates and operations. Applications importing configuration must reuse existing compatible resources and report human provisioning prerequisites. Saved human-managed case-import audiences permit automated case import without audience administration. Invitation activation rechecks current authority.
+
+The final approved package also records compatible session fields and configurable 5/10/15-second verification/check/client budgets, exact authentication problem/challenge literals, new Access mutation/list bounds, invitation activation before local admission, show-once key recovery and bounded host/private recovery inputs. These are specification decisions, not generated contracts or runtime evidence.
+
+[The contract reference](access-contracts.md#review-and-remaining-work) now links the written [Access HTTP draft](access-contracts.md#http-operation-matrix), [version 1 maintenance/proof](access-contracts.md#maintenance-wire) and [private recovery handoff](access-contracts.md#recovery-wire). Final written-contract review and separately authorized issue reconciliation remain before #116 closure; #27/#30/#117 and the domain owners retain implementation/runtime qualification. This decision capture neither changes GitHub checklists nor qualifies provider/runtime behavior. Preserve original issue scope/implementation history while reconciling outdated seven/eleven-grant requirements in a separately authorized backlog update.
+
 ### Authentication handoff
 
 Alice's browser callback returns, but that alone does not mean her CLI login is ready. The account UI must complete Ory's required steps, the backend must verify her current identity and admission, and the CLI must save the validated credentials safely. Each step has an owner:
@@ -75,7 +85,7 @@ Alice needs a second project; Bob has imported a Pipeline but has no live endpoi
 
 | Work | Owning ticket and boundary |
 | --- | --- |
-| Create another project | [Ordinary Access administration](https://github.com/matejpalenik/inframeld/issues/28) checks Create projects and atomically saves the project, creator membership and seven initial project-action grants. [Starter provisioning](https://github.com/matejpalenik/inframeld/issues/27) remains independent. |
+| Create another project | [Ordinary Access administration](https://github.com/matejpalenik/inframeld/issues/28) checks Create projects and atomically saves the project, creator membership and [seventeen explicit initial Project-action grants](access-control.md#initial-project-grants). [Starter provisioning](https://github.com/matejpalenik/inframeld/issues/27) remains independent. |
 | Delete a whole project | [Deletion admission](https://github.com/matejpalenik/inframeld/issues/204) owns current Delete project checks, the authoritative block and application/key shutdown through [application lifecycle](https://github.com/matejpalenik/inframeld/issues/30). It admits exact-scope cleanup without granting access to private contents. |
 | Remove stored data and report progress | [Knowledge cleanup](https://github.com/matejpalenik/inframeld/issues/45) consumes that handoff. [Protected job status](https://github.com/matejpalenik/inframeld/issues/38) distinguishes accepted deletion, blocked access and physical completion after ordinary membership disappears. |
 | Present project lifecycle | [CLI access management](https://github.com/matejpalenik/inframeld/issues/178) presents creation and deletion. [Setup](https://github.com/matejpalenik/inframeld/issues/166) reuses ordinary creation; [import review](https://github.com/matejpalenik/inframeld/issues/153) requires a confirmed destination project and does not create it implicitly. |
@@ -95,7 +105,7 @@ For example, the application-key prefix is already settled: `ifm_app_`, with Ory
 
 The same distinction applies to tracing. Humans and applications may receive inspection permission. Only authorized humans may change project recording or retention, and explicit history deletion needs a separate permission. Query and query-inspection permissions name exact Pipelines or Deployments. There is no Experiment resource. Automatic expiry and source cleanup remain ordinary backend workflows.
 
-The Access and tracing contracts still need exact mappings, non-query scopes, initial grants, transitions, schemas and limits. The portability contract must represent these rules during import. Runtime qualification remains separate work.
+The [Access contract reference](access-contracts.md) now records fixed identifiers/targets/eligibility, creator assignments, human-only resource provisioning with application updates, case-audience administration/import defaults and invitation rules. Product-facing non-query diagnostic browsing is deferred. Concrete schemas, protected-operation credential/route mappings, maintenance proof/IPC bounds and recovery integration handoff still need review; tracing retains its domain transitions/storage/limits. The portability contract must represent these rules during import. Runtime qualification remains separate work.
 
 <!-- BEGIN GENERATED GATES -->
 
@@ -1183,7 +1193,7 @@ Repository preservation checks confirmed exactly the nine approved files changed
 
 Changed-file formatting, targeted Prettier checks, the Access Models skill validator, baseline-relative whitespace checks and `git diff --check` passed. These are editorial and preservation checks, not product tests. Earlier application-key and budget-permission evidence above remains historical and was not relabelled as newly executed trace permissions evidence.
 
-**Remaining gates:** #116/#147 still owe exact action/target mappings, grant bootstrap, experimental/non-query scope, policy transition boundaries, deletion/late-write fencing, bounded storage and wire contracts. #151 retains import schemas/recovery contracts; their implementation and #150/#155/#187 runtime qualification remain open. No application implementation, dependency installation, generated contracts, migrations, paid calls or commits are part of this update.
+**Remaining gates:** #116 now records the fixed action/target catalogue, creator grants, human-only provisioning and protected import audiences in [the Access reference](access-contracts.md). Product non-query diagnostic browsing is deferred. #116 still owes concrete route/schema/credential mapping and maintenance/recovery handoff; #147 retains policy transitions, deletion/late-write fencing, bounded storage and wire contracts. #151 retains import schemas/recovery contracts; their implementation and #150/#155/#187 runtime qualification remain open. No application implementation, dependency installation, generated contracts, migrations, paid calls or commits are part of this update.
 
 <a id="pipeline-query-reconciliation"></a>
 

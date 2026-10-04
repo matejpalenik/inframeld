@@ -24,6 +24,8 @@ Use the two accepted grant levels and the fixed action catalogue. Humans can rec
 
 **Example.** Alice can grant Manage releases on A without being able to release B. Bob’s grant survives Alice’s departure unless an authorized operation separately removes Bob’s assignment.
 
+**Project-creation refinement, 2026-10-04:** [ADR-0057](ADR-0057-seed-explicit-reviewed-project-creator-grants.md) replaces the earlier seven-action creator seed with eleven explicit project grants. This retains bounded exact-target delegation and does not grant future unnamed actions or an administrator bypass. [ADR-0059](ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md) subsequently supersedes that eleven-action seed with seventeen Project actions and fixed resource creator assignments.
+
 ## Consequences
 
 - Administration can be delegated in bounded pieces while the same current policy applies to peers and creators.

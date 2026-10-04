@@ -56,10 +56,12 @@ Configuration directories may be reused where environments are identical. Use se
 
 ## Destination Review
 
+V1 creation of configurable resources is human-only. An application may review/import eligible changes to existing resources and explicitly reuse compatible definitions. A missing dependency or changed immutable profile requiring creation makes its plan ineligible: reject the known-invalid plan before mutations and report the resource an authorized human must provision. A subsequent import uses a new reviewed plan against those destination IDs. Neither a Create grant record nor a saved human login makes application creation eligible. [The provisioning contract](access-contracts.md#provisioning) owns this boundary; ordinary operational output such as versions and cases remains supported.
+
 For Bob, `legal-research` names a candidate project in his selected installation, not Alice's UUID. He selects an existing destination or separately creates one. The importer validates local files offline first; destination-aware dry-run is a distinct read-only review.
 
 - Resolve dependencies by project/type name, then retain permanent IDs. A matching name proves neither semantic equivalence nor authority.
-- Propose creation for missing resources and explicit reuse for matching configuration. Different configuration is a conflict until deliberately resolved through a supported guarded update or corrected input.
+- For a human import, propose creation for missing resources; application imports require those resources to exist. Propose explicit reuse for matching configuration. Different configuration is a conflict until deliberately resolved through a supported guarded update or corrected input.
 - Changed immutable processing/embedding meaning requires a distinct named profile. Do not mutate an existing profile to satisfy an import.
 - Review each source audience requirement against permitted destination groups, even when names match. Group creation is separate; save destination IDs. Import neither copies memberships/grants nor changes existing document audiences.
 - Preserve destination project budget/tracing policies unless a separately authorized reviewed update explicitly changes them. Imported settings cannot override operator restrictions.

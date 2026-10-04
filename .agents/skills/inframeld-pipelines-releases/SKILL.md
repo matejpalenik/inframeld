@@ -9,6 +9,8 @@ Explain one user workflow while keeping two owners clear. Pipelines owns immutab
 
 ## Scope and reading route
 
+For the accepted #116 catalogue, assignments and remaining schema/route/maintenance handoff, read [Access contracts](../../../docs/development/access-contracts.md). Guides own behavior; the new reference is accepted design, not implemented API or runtime evidence.
+
 Default to read-only explanation and review. Loading this skill does not authorize code edits, releases, or external mutations. Read the relevant current section, identify its status, and report contradictions.
 
 - [Pipelines and Releases](../../../docs/development/pipelines-and-releases.md) owns builds, serving, modes, and transition examples. Read [Pipeline records](../../../docs/development/data-model.md#pipelines) and [Release records](../../../docs/development/data-model.md#releases) for definitions.
@@ -48,7 +50,7 @@ Its caller supplies the exact authorized saved configuration/corpus: current wor
 
 Canary affinity controls cohorts, not identity or permissions. Stable principal and rollout identities participate in assignment; rotating a key or changing percentage must not reshuffle callers. Ten percent is a share of identities, not an exact request count. Aborting B preserves current A and previous Z; promoting B makes A previous. Rollback consumes its one-step target and is blocked by an attached candidate or unusable target. Do not choose another target silently.
 
-Manage releases is one action per Deployment covering publication, candidate/canary control, rollback, mode switches, and automatic input selection. It replaces earlier Publish/deploy wording. Delete, Build, document access, and non-serving Edit configuration remain separate. Human creation uses project Create Deployment and atomically records the ready initial version, Deployment, and explicit creator grants. Creator history never overrides later grant removal.
+Manage releases is one action per Deployment covering publication, candidate/canary control, rollback, mode switches, and automatic input selection. It replaces earlier Publish/deploy wording. Delete, Build, document access, and non-serving Edit configuration remain separate. Human creation uses project Create Deployment and atomically records the ready initial version, Deployment, and explicit creator grants. Creator history never overrides later grant removal. [Fixed creator assignments](../../../docs/development/access-contracts.md#initial-assignments) enumerate thirteen Pipeline and seven Deployment actions, including separate query/evaluation inspection and Deployment own-feedback authority. Existing resources receive no automatic backfill.
 
 Private starter provisioning explicitly records the creator as both ordinary member and manager of its group under the [Access rule](../../../docs/development/access-control.md#group-managers). This does not replace separate build or release grants.
 

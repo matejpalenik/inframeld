@@ -135,6 +135,45 @@ An application key identifies the application principal. The incoming-credential
 
 Changing a name or credential does not change the principal. Creating another account with an old display name does not give it the retired account's identity or permissions. Historical attribution follows [retention rules](retention-and-deletion.md) and never authorizes new work.
 
+<a id="application-key-record-contract"></a>
+
+#### Logical application-key record contract
+
+The [accepted key contract](access-control.md#application-key-contract) requires the following values. This is a logical record specification for the incoming-credential workflow, not a new migration or implemented table map:
+
+| Value | Meaning and constraint |
+| --- | --- |
+| Public key ID | Generated UUIDv4 for lookup; separate from `PrincipalId`. Its presence does not authenticate. |
+| Verifier | SHA-256 digest bytes of the complete canonical `ifm_app_<key-UUID>_<secret>` key. Compare in constant time; never store/replay plaintext or expose the verifier as safe metadata. |
+| Account/principal/project bindings | Authoritative association to the exact application and project; verify current principal/account/project eligibility. Key rotation preserves the account principal. |
+| Installation binding | Associate verification with the trusted installation, rather than a caller-selected target label or a key prefix. The [maintenance draft](access-contracts.md#maintenance-wire) specifies one immutable installation UUID persisted during managed initialization and bound to the operator-controlled installation record. Physical persistence remains an implementation decision. |
+| Audience/adapter binding | Authoritative permitted incoming audience/resource/adapter restrictions, checked in addition to the prefix. The issuance input selects supported HTTP/MCP adapter restrictions; the server derives installation/project bindings and current account authority. Exact persistence/wire encoding remains to specify. |
+| Safe lifecycle metadata | Issuance attribution/time, expiry and revocation state/time sufficient for the authorized management workflow. Public metadata excludes the secret and digest. |
+
+The secret is 32 cryptographically random bytes encoded as 43 unpadded base64url characters. The default lifetime is 90 days and the maximum 365 days, both operator-configurable; validate default against maximum. The account has at most two usable keys across audiences. Issuance coordinates the current usable count, full issuer delegation/group-management authority, bindings and audit under the Access write protocol. Revocation and retirement use their independent current human Revoke keys/Delete application account authority and lifecycle checks; they do not require issuance delegation or document-reading authority. Keys use current grants, not a historical issuer ceiling or cached permission snapshot. General UUID identifier constructors retain their existing valid-version/zero-value rules.
+
+<a id="identity-cleanup-records"></a>
+
+#### Logical identity-cleanup and deletion obligations
+
+Verified recovery/reset records an original trusted flow/event identity, affected stable human principal, a temporary product-access block and independent Kratos/Hydra cleanup outcomes. Keep confirmed, failed and uncertain outcomes distinguishable, with bounded reconciliation/attempt evidence. Deduplication must preserve the original operation; its completion cannot release a newer pending block or start revocation of later logins. These facts are not a new `PrincipalStatus`, permission snapshot or duplicated OAuth-token database. [Recovery behavior](access-control.md#identity-recovery-cleanup) and [jobs](jobs-and-idempotency.md#identity-cleanup) own admission and release rules. [Private callback inputs](access-contracts.md#recovery-callbacks) are bounded to 8 KiB, authenticated by a dedicated rotatable service secret and deduplicated by installation/flow/event kind/phase. Callback credential material is not a record or audit field. The [private handoff draft](access-contracts.md#recovery-wire) defines original flow/identity/phase binding, durable acknowledgments and trusted-evidence requirements. Physical records and pinned hook evidence still need implementation/qualification.
+
+Project deletion similarly binds the original operation to the exact project and initiating principal, reviewed/admitted state, durable block, application/key shutdown obligations and resumable physical cleanup. Retained content-free status may be read by the currently eligible original human under the authoritative operation binding after membership removal. History is not permission to cancel, continue or inspect private contents. The [deletion contract](jobs-and-idempotency.md#project-deletion) owns outcomes and retries; these logical obligations do not select a new public job enum or additional physical tables.
+
+<a id="invitation-records"></a>
+
+### Logical invitation intent and activation
+
+An invitation records safe identity, issuer, exact intended admission/membership/group/action assignments, installation/project/target bindings, expiry/revocation/consumption state and original operation/activation outcome. Generate the invitation token from 32 cryptographically random bytes. Keep its digest separate from safe metadata; do not retain plaintext for replay. Activation binds verified Ory authority/subject to a stable principal and rechecks current issuer eligibility/authority for every effect. The seven-day default/thirty-day maximum are configurable. Consumption and guarded local assignments/audit commit together; Ory onboarding has separate evidence/outcomes. Activation alone accepts the verified Kratos cookie/CSRF identity before local admission and cannot release suspension/recovery blocks. These are logical obligations, not a new implemented table or approved provider schema. [The invitation contract](access-contracts.md#invitations) owns behavior, and the [HTTP draft](access-contracts.md#http-operation-matrix) defines its issue/preview/activation/revocation shapes and verified-subject reservation before a local principal exists. The non-consuming preview returns only authoritative intended-scope metadata; it creates no admission, assignment or original-operation reservation.
+
+<a id="installation-identity-record"></a>
+
+### Logical installation identity and maintenance outcomes
+
+Managed initialization creates one immutable installation UUID before user admission, persisted in authoritative backend metadata and bound into the operator-controlled managed-installation record through verified host access. The same identity survives restart/upgrade and target-label renaming. Factory reset/new installation creates a new identity; restore follows the normal retained-operation reconciliation. The identity is distinct from an Organization, principal, project and mutable URL/target label. Its new application-owned `InstallationId` must follow the same runtime UUID-wrapper convention as other known identities. No new table or migration is implemented by this record definition.
+
+A maintenance result binds original operation/mode, installation, verified Kratos authority/subject, exact responsibility and reviewed access revision to its safe assignment outcome. Retain no Hydra proof token. A keyed fingerprint covers stable request meaning and verified subject, excluding replaceable proof bytes; a fresh proof for the same identity can recover the original operation without regranting. [The maintenance wire draft](access-contracts.md#maintenance-wire) owns proof, fields, errors and scope checks.
+
 <a id="human-cli-identity"></a>
 
 ### Resolve browser and CLI login to the same human
@@ -151,9 +190,11 @@ Alice's Kratos browser cookie and Hydra CLI access token must ultimately resolve
 
 Introspection/identity-provider response types stay at infrastructure boundaries. The application still receives `AccessContextDTO` with `PrincipalId`, not a token, mutable permission cache or vendor user object. Identity lookup follows external verification without holding a database transaction across provider waits. Replacing or refreshing a CLI credential preserves principal identity; changing trusted endpoint/issuer bindings requires fresh login rather than credential forwarding.
 
-These are logical responsibilities, not new table definitions or schema changes. The existing Principal/browser-session implementation does not provide the Hydra bearer path. The selected integration still needs exact credential dispatch, subject-mapping, lifecycle, protected-storage and recovery tests. Incoming application-key records and their two-usable-key limit remain separate and unchanged.
+These are logical responsibilities, not new table definitions or schema changes. The existing Principal/browser-session implementation does not provide the Hydra bearer path. [Credential dispatch](access-control.md#credential-dispatch) is accepted; subject-mapping, lifecycle, protected-storage and recovery implementation/qualification remain. Incoming application-key records and their two-usable-key limit remain separate.
 
 ### What one action grant means
+
+The [fixed Access catalogue](access-contracts.md#capability-catalogue) defines supported action/target/principal-kind combinations; the [initial-assignment contract](access-contracts.md#initial-assignments) enumerates the seventeen Project and exact-resource human creator grants. No wildcard/creator field replaces current grants and no backfill is implied. Configurable resource creation is human-only in v1; authorized application operations may create ordinary workflow revisions, Documents, jobs and cases. These logical decisions do not add physical tables or migrate published/database identifiers.
 
 The logical contents of a grant are:
 
@@ -543,7 +584,7 @@ Policy-controlled Build admission in the table describes the explicit CLI workfl
 
 Keep configuration identity, effective input fingerprints and actual physical bindings distinct. Equal settings with a different corpus, scope or fresh numerical generation are not proof of identical evaluated inputs. Build can reuse verified artifacts but must disclose mismatches with referenced evaluation evidence. Retained snapshots can support fresh comparisons; they are not release targets or a build-from-run API.
 
-Secrets never belong in these records. History is bounded by retention and current access. Restoring configuration creates a new current revision and does not resurrect erased content, expired artifacts or credentials. Snapshot retention does not pin every historical index forever; active operations use ordinary bounded pins. Explicit evaluation evidence and diagnostic traces keep their separate capture, inspection and erasure rules. Exact physical storage, API schemas, resource bounds and Pipeline Query permission identifiers remain implementation work under their owning guides.
+Secrets never belong in these records. History is bounded by retention and current access. Restoring configuration creates a new current revision and does not resurrect erased content, expired artifacts or credentials. Snapshot retention does not pin every historical index forever; active operations use ordinary bounded pins. Explicit evaluation evidence and diagnostic traces keep their separate capture, inspection and erasure rules. Pipeline Query/inspection identifiers and creator grants are settled in the [Access contract](access-contracts.md). Exact physical storage, API schemas, resource bounds and runtime enforcement remain delivery work under their owning guides.
 
 ### Record the actual serving selection before accepting feedback
 
@@ -680,7 +721,9 @@ Alice generates starter questions, accepts one, and later edits its reference an
 
 A **rubric** defines scoring rules; a **schema** defines response structure. A **metric definition** names what is measured, its inputs, units, calculation, eligibility, and failure treatment. Ragas faithfulness is a claim fraction per case and a mean across successfully scored eligible cases, not the historical OpenEvals whole-answer boolean rate. Effective scope records the initiating actor's admitted access, not continuing permission to inspect content.
 
-Start with stable case IDs and complete immutable snapshots. A revision can use a content hash as its identity, but the hash cannot replace protected content required for review. An evaluator revision can be saved configuration. These concepts need neither a table/aggregate per row in this list, a plugin registry, nor another execution engine. Physical schema, coordinate encoding, indexes, and API/permission identifiers remain to be designed within their owning boundaries.
+Start with stable case IDs and complete immutable snapshots. A revision can use a content hash as its identity, but the hash cannot replace protected content required for review. An evaluator revision can be saved configuration. These concepts need neither a table/aggregate per row in this list, a plugin registry, nor another execution engine. Physical schema, coordinate encoding, indexes and API representations remain to be designed within their owning boundaries.
+
+Authorization uses six separately grantable actions on the exact owning Pipeline: `generate-evaluation-cases`, `view-evaluation-cases`, `edit-evaluation-cases`, `review-evaluation-cases`, `run-evaluation` and `inspect-evaluation-results`. Humans and applications may receive use; applications cannot administer grants or audiences. Use the target-specific Pipeline grant model, without per-case grant rows or a generic Dataset/Experiment resource. Every protected read still checks current case audiences/sources. Review binds the exact revision and actual reviewer kind; imported acceptance claims do not authorize acceptance. [Access](access-control.md#reviewed-capability-catalogue) owns eligibility; [Evaluation](evaluation.md#operation-authority) owns workflow checks. The [fixed creator assignments](access-contracts.md#initial-assignments) add all six actions and human-only `manage-evaluation-case-audiences`. [Evaluation](evaluation.md#case-audiences) owns current group-management and audience revision checks.
 
 The [fixed-input example](evaluation.md#input-reliability) connects these records. A run accepted with configuration 17, 12 exact document versions and 20 case revisions keeps those identities after later edits. The reference answer and expected passage belong to Evaluation. They are not forwarded into the Pipeline's query.
 
@@ -721,7 +764,7 @@ The records below support spending controls, tracing, configuration transfer and
 | Coherent export capture and reviewed import | Existing resource owners retain definitions; ordinary jobs retain captured definition content/revisions, original context, destination IDs, reviewed choices and relevant expected state, per-resource outcomes and child/parent operation identity. Distinguish create/update effects from reuse and confirmed non-application from unknown write outcomes. No imported grant, credential, Deployment, version or vector state. Missing files are not deletion instructions. |
 | Source authentication binding | Knowledge source identity, explicit configured server identity or source-bound encrypted credential metadata, selected destination and expiry. Reuse encryption primitives without treating model/source credentials as interchangeable. |
 | Portable case identity and import provenance | Evaluation maps source namespace/case/revision to destination identity and preserves complete imported selection separately from local case pool/frozen benchmarks. Imported identifiers are untrusted until validated; exact encoding/comparison remains specification work. |
-| Imported case audience and source mapping | Protect content immediately with explicit destination group audience; verified source-version/artifact/span mapping adds current source checks without removing that audience. New/changed revisions are unreviewed; unchanged imports may reuse exact accepted revision. |
+| Imported case audience and source mapping | Store nonempty project-local protection immediately, including unresolved content. A Pipeline has a human-managed saved future-import audience and revision; applications capture that current binding, while existing cases retain their saved audiences. Explicit changes identify exact cases/revisions and authoritative old/new groups. Verified source-version/artifact/span mapping adds current source checks. New/changed content is unreviewed; unchanged imports retain identity/review. Group references remain protected lifecycle dependencies. Physical fields/tables and wire spellings remain unimplemented. |
 
 For tracing, retain separate facts about the business result, whether recording was permitted, which diagnostics are confirmed available and any separately accepted deletion request. A deletion request identifies the selected history and cutoff, together with cleanup progress. A successful query can still have partial traces or unknown trace availability.
 

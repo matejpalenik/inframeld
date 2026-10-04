@@ -83,6 +83,8 @@ Keep the connection's access settings and replaceable secret separate from each 
 
 ### Operate one current connection, not several consumer-selected revisions
 
+Connection creation, management/credential changes and deletion are human-only in v1. Applications may receive `view-model-connection-configuration` and `use-model-connection` on an existing connection, without provider secret access or management. Creation uses Project `create-model-connections` and the [four fixed human creator assignments](access-contracts.md#initial-assignments).
+
 Alice uses `company-gateway` for Contracts and Support. Updating its supported access settings changes future calls from both Pipelines, including already released versions. It does not edit their prompts, change their selected model IDs, create versions or move Deployment pointers. Manual release mode controls Pipeline publication, not shared connection administration.
 
 | Owner | Settings and identity |
@@ -97,7 +99,7 @@ Alice uses `company-gateway` for Contracts and Support. Updating its supported a
 
 ### Review and commit a shared update
 
-1. Resolve the stable connection ID within the effective project and check current connection-management authority. This authority includes live impact; it does not additionally require Manage releases on each affected Deployment. Pipeline Edit or model-use authority alone never grants connection management. Exact permission identifiers remain API delivery work, not invented by this guide.
+1. Resolve the stable connection ID within the effective project and check current connection-management authority. This authority includes live impact; it does not additionally require Manage releases on each affected Deployment. Pipeline Edit or model-use authority alone never grants connection management. Use human-only `manage-model-connection` on that connection; the [fixed catalogue](access-contracts.md#capability-catalogue) separately names view, use, creation and deletion.
 2. Validate the complete proposed configuration against supported provider contracts, operator destination policy and the compatibility rule below. No model call is hidden in review, dry-run, import or save. Optional paid preflight remains a separately authorized operation.
 3. Review the diff, effective target/project, current access revision and affected Pipelines, live Deployments, retained embedding dependencies and active work. Show only permitted names/details; a filtered list cannot establish that no hidden dependency exists. Backend safety checks examine all relevant dependencies regardless of the manager's inspection rights.
 4. If live consumers are affected, require deliberate typed acknowledgment in the CLI and an explicit machine equivalent. The backend binds acknowledgment to the reviewed identity, revision and impact, not to a generic `yes`. Connection restoration and explicit import updates use the same operation. Any changed proposal, authorization or relevant dependency state requires fresh review, not silently broadened consent.
@@ -561,11 +563,11 @@ V1 separates three actions:
 
 | Action | Permission boundary |
 | --- | --- |
-| Inspect budget information | Humans and applications may read only the information they are currently permitted to see. |
+| Inspect budget information | Humans and applications need `inspect-budget` on the exact Project and may read only the information they are currently permitted to see. |
 | Execute model work | Authorized workloads may spend within all applicable limits. |
-| Set, increase, decrease or remove a project limit | Only an active human with the project's budget-management permission may do this. Being human is not enough. Applications cannot receive this capability through model-use or import grants. |
+| Set, increase, decrease or remove a project limit | Only an active human with `manage-budget` on the exact Project may do this. Being human is not enough. Applications cannot receive this capability through model-use or import grants. |
 
-The [Access contract](https://github.com/matejpalenik/inframeld/issues/116) owns exact actions and targets, coordinated with the [model contract](https://github.com/matejpalenik/inframeld/issues/121). [Budget management](https://github.com/matejpalenik/inframeld/issues/190) implements them.
+The [reviewed Access catalogue](access-control.md#reviewed-capability-catalogue) owns these accepted actions/targets. The [model contract](https://github.com/matejpalenik/inframeld/issues/121) still owns accounting visibility, policy schemas and transactional coordination; [budget management](https://github.com/matejpalenik/inframeld/issues/190) is the implementation ticket, not evidence that this design is implemented.
 
 Apply that same rule in setup, ordinary management and configuration import. An application import may keep the destination budget while recreating otherwise authorized resources. If it explicitly requests a budget change, report the human-only restriction before executing the known-invalid plan; do not silently drop that step, borrow a human login or claim the requested plan succeeded.
 
