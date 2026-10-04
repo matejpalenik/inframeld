@@ -94,6 +94,6 @@ The index contains 63 records. ADR-0001 through ADR-0048 retain the numbering es
 
 ## Maintaining these records
 
-Use the [ADR template](template.md) and [documentation-maintenance guide](../development/documentation-maintenance.md). Allocate ADR-0059 next. Keep current IDs stable; a changed architectural choice receives a new superseding record. Ordinary corrections and navigation improvements may amend an existing record.
+Use the [ADR template](template.md) and [documentation-maintenance guide](../development/documentation-maintenance.md). Keep current IDs stable; a changed architectural choice receives a new superseding record. Ordinary corrections and navigation improvements may amend an existing record.
 
 The six [skill reading routes](../development/documentation-maintenance.md#skill-reading-routes) lead to current guides. Documentation work does not authorize paid trials, code changes or migrations. Markdown and link checks establish editorial integrity, not runtime behavior. The [delivery plan](../development/cli-delivery-plan.md) tracks implementation and qualification separately.
