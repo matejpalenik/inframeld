@@ -388,3 +388,66 @@ Local validation passed for **414 local links/anchors**, including **83 document
 [Access contracts #116](https://github.com/matejpalenik/inframeld/issues/116) still needs reviewed wire fields, exact credential dispatch, permission mappings and verified recovery-completion integration. These are engineering deliverables for accepted behavior, not newly unresolved product choices. The owning implementation tickets must then build the behavior, and #96/#185 must qualify real Ory versions, account screens, CLI credentials and failure paths. Configured MFA support neither makes MFA mandatory nor chooses a new factor.
 
 Publish the maintained documentation overlay before handing another developer a clean checkout. This pass made no commit, application/configuration change, credential/grant mutation, dependency installation or product-test run. It does not claim that the authentication features are implemented or security-qualified.
+
+<a id="lifecycle-handoff-2026-10-04"></a>
+
+## Project and Deployment Handoff Corrections: 2026-10-04
+
+This separately approved pass closes three delivery gaps without changing product policy: ordinary project lifecycle ownership, the complete CLI Deployment journey and portability's prerequisite tracing contract. It preserves the earlier reports above as historical evidence.
+
+The fresh baseline captured **381 repository files and 178 GitHub issues**. It inspected the developer's newer documentation commit, `f968e81f4f660a750d5d8e5da58452e4ece4d86c`. Earlier tickets retain their real `b3bbfc438a6dbc390e4bd56210474bacaf177a49` baseline and dated overlay history. This correction adds an explicit **2026-10-04 uncommitted overlay**; it does not claim those additions existed at either commit. No commit was created by this pass.
+
+### Published ticket changes
+
+| Issues | What changed and why |
+| --- | --- |
+| [Access contracts #116](https://github.com/matejpalenik/inframeld/issues/116), [ordinary administration #28](https://github.com/matejpalenik/inframeld/issues/28), [starter provisioning #27](https://github.com/matejpalenik/inframeld/issues/27) | Ordinary creation checks Create projects and saves the project, creator membership and seven initial assignments together. The starter remains a separate path. Adds naming, denial, lost-response and changed-authority scenarios. |
+| [New project-deletion admission #204](https://github.com/matejpalenik/inframeld/issues/204) | Under Access Epic #2 and milestone v1. Owns current Delete project checks, the authoritative block, application/key shutdown and durable cleanup handoff. Alice can erase private project contents without gaining reading access or needing each item's Delete permission. |
+| [Application lifecycle #30](https://github.com/matejpalenik/inframeld/issues/30), [protected jobs #38](https://github.com/matejpalenik/inframeld/issues/38), [physical cleanup #45](https://github.com/matejpalenik/inframeld/issues/45) | Separates whole-project admission from individual-document deletion and physical cleanup. Reuses application/key enforcement and narrow status after membership removal; interruption cannot reopen access or expand scope. |
+| [CLI access #178](https://github.com/matejpalenik/inframeld/issues/178), [setup #166](https://github.com/matejpalenik/inframeld/issues/166), [import review #153](https://github.com/matejpalenik/inframeld/issues/153) | Exposes ordinary creation/deletion, preserves completed setup steps and requires a confirmed destination before import. No implicit project creation, starter recreation or private inventory disclosure. |
+| [CLI Deployment management #174](https://github.com/matejpalenik/inframeld/issues/174), [command contracts #156](https://github.com/matejpalenik/inframeld/issues/156) | Adds import-to-unpublished-Build-to-explicit-Deployment creation, both mode changes and default-route inspection/repair. Uses existing backend owners; explicit creation defaults to Manual, and a changed review is never accepted silently. |
+| [Portability contracts #151](https://github.com/matejpalenik/inframeld/issues/151) | Requires the owning tracing/retention specification #147 instead of allowing TOML to invent another policy model. |
+| [Security #96](https://github.com/matejpalenik/inframeld/issues/96), [first use #185](https://github.com/matejpalenik/inframeld/issues/185), [development/releases #186](https://github.com/matejpalenik/inframeld/issues/186), [whole CLI #187](https://github.com/matejpalenik/inframeld/issues/187) | Adds real lifecycle, race, denial and recovery evidence to the existing qualification requirements. Human, JSON, noninteractive and dry-run paths must work without Studio or handwritten API calls. |
+| [Access Epic #2](https://github.com/matejpalenik/inframeld/issues/2), [Knowledge Epic #5](https://github.com/matejpalenik/inframeld/issues/5), [Releases Epic #8](https://github.com/matejpalenik/inframeld/issues/8), [CLI Epic #114](https://github.com/matejpalenik/inframeld/issues/114), [portability Epic #115](https://github.com/matejpalenik/inframeld/issues/115) | Updates the relevant child map and cross-owner delivery descriptions. Keeps completed foundations and deferred Studio scope intact. |
+
+Eight native blockers and their issue-body declarations were added:
+
+- **#204 is blocked by #28, #30, #38 and #125.**
+- **#45 is blocked by #204.**
+- **#178 and #96 are blocked by #45.**
+- **#151 is blocked by #147.**
+
+The new issue uses the existing implementation template and unchanged shared Definition of Done. Existing issue headings, Definitions of Done and coordinator completion evidence are unchanged. No existing issue title, state, closure timestamp, label, assignee, milestone or parent was changed.
+
+### Publication verification
+
+All proposed issue bodies and relationships were prepared before publication. The current issues and graph were checked against the baseline, each changed issue was re-read immediately before its update, and each result was read back. The new issue number was journaled before dependent bodies were published, so an interrupted run could recover without creating a duplicate.
+
+Independent whole-backlog readback completed at **2026-10-04T07:46:06.642Z**:
+
+- **21 existing bodies updated**, **157 existing bodies unchanged**, and **one new issue, #204**.
+- **179 issues: 164 v1 and 15 deferred Studio.** The same **11 completed issues** remain closed.
+- **364 blocker edges and 163 parent links.** All **168 body dependency declarations** and **17 coordinator child maps** match native relationships.
+- **No dependency cycles and no v1 dependency path through Studio.** Release #102 reaches all **137 other open, non-container v1 issues**, including the new deletion capability.
+
+### Repository scope and reading walkthrough
+
+Only these five files were changed:
+
+- [Access control](access-control.md): ordinary project creation, deletion admission and their permission/recovery boundaries.
+- [Retention and deletion](retention-and-deletion.md): project shutdown before data cleanup, trusted scope handoff and honest protected progress.
+- [Onboarding](onboarding.md): reusable creation, preserved partial setup and the explicit CLI path from imported configuration to a live Deployment and repaired default route.
+- [CLI delivery plan](cli-delivery-plan.md): ownership/dependency guidance, all 118 earlier mappings plus two explicit lifecycle mappings, and a readable 179-issue inventory.
+- [This report](cli-reconciliation-report.md#lifecycle-handoff-2026-10-04): appends the correction and its evidence without rewriting earlier results.
+
+The junior-engineer walkthrough covers authorized and denied creation, naming conflicts, lost responses, private-project deletion, racing uploads/keys/publication, interrupted cleanup and safe status after membership removal. It also covers import, separately supplied credentials/documents, unpublished Build, explicit Manual/Automatic creation, mode changes, candidate-at-zero restrictions, stale reviews and default-route repair that preserves the selected Deployment's own mode. Tracing portability follows the owning contract. These are editorial scenario checks, not executed product tests.
+
+Local validation checked **1,715 local links/anchors**, including **1,306 document references across all 179 issue bodies**, with no missing files or anchors. Existing guide anchors and code examples remain intact. All **118 earlier capability owners and qualification mappings** are preserved; the two added lifecycle mappings bring the total to **120**. All prerequisite unions match the verified graph, including **55 updated earlier rows**. The previously collapsed inventory is now a valid 179-row Markdown table with the same existing issue identities plus #204.
+
+Targeted Prettier checks, `git diff --check` and the staged whitespace check passed. Against the fresh 381-file baseline, exactly the five approved files changed; the other **376 files**, staged state and HEAD remain unchanged. No repository file was added or removed. Earlier report text remains byte-identical. These checks establish editorial and dependency consistency, not runtime correctness.
+
+### Remaining engineering work
+
+[Access contracts #116](https://github.com/matejpalenik/inframeld/issues/116), [job contracts #124](https://github.com/matejpalenik/inframeld/issues/124) and [CLI contracts #156](https://github.com/matejpalenik/inframeld/issues/156) must define exact reviewed inputs, wire outcomes, permission mappings and concurrency/recovery contracts. The tracing contract #147 precedes portability #151. These are existing prerequisite engineering deliverables, not reopened product decisions or newly invented public schemas.
+
+Implement owners in dependency order and retain runtime qualification in #96/#185-187. No application code, tests, runtime settings, migrations, generated contracts, dependencies, credentials or grants were changed. No product tests or paid model calls ran. Publish the five documentation changes before handing another developer a clean checkout; this pass does not claim that the described features already work.

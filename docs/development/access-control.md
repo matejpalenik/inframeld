@@ -755,6 +755,15 @@ None of the user-administration permissions includes another or allows taking ov
 
 An additional project's creator receives membership and explicit can-use-and-grant assignments for the seven project actions in the [permission reference](#decision-map). Each action's extra checks still apply. These grants cover neither existing projects nor future unnamed actions.
 
+For example, Alice keeps her starter and creates Legal Research for a separate workload. [Ordinary project administration](https://github.com/matejpalenik/inframeld/issues/28) owns this creation operation:
+
+1. Check that Alice is an eligible human with current installation-level Create projects permission. There is no existing project membership to require yet.
+2. Check the reviewed Name and Display name. An unavailable Name fails without silently choosing a different one or revealing another project's owner.
+3. Save the project, Alice's membership, the seven explicit initial assignments, audit and original-request outcome together. If the transaction fails, none of these partial records remains.
+4. Return the committed identity. If the response is lost, recover that original result under current access; do not create another project or restore grants removed since creation.
+
+Creation alone does not create RAG resources, change the starter or change the CLI's saved selection. Setup and import are separate next operations. If either is interrupted, the completed project remains. [CLI access management](https://github.com/matejpalenik/inframeld/issues/178) presents ordinary creation and deletion; setup uses the same creation operation. [Starter provisioning](https://github.com/matejpalenik/inframeld/issues/27) remains a separate responsibility and does not depend on Create projects.
+
 Setup uses stable IDs and uniqueness checks so a retry does not create duplicate defaults. It must not recreate defaults that someone deliberately deleted.
 
 ### Alice leaves after granting Bob access
@@ -801,6 +810,12 @@ Delete project is a separate human permission, initially assigned to its creator
 Before accepting deletion, the backend checks the person's current status, project membership, and Delete project permission on that project. It then blocks affected access and new work, including adding members or content, creating keys, and publishing versions. The project's applications are stopped and their keys revoked before resumable cleanup. Data outside the project remains untouched.
 
 Resources being deleted need no replacement manager or grantor. History still follows retention and erasure rules, and deletion status must not expose private contents or promise immediate physical erasure. Deleting an individual resource in a project that remains active still follows that resource's narrower rules.
+
+For example, Alice may delete Legal Research while being unable to read its private HR documents. [Project-deletion admission](https://github.com/matejpalenik/inframeld/issues/204) checks her authority, commits the project block and records a durable cleanup obligation. It uses [application/key lifecycle enforcement](https://github.com/matejpalenik/inframeld/issues/30) to stop the project's applications and revoke their keys before [Knowledge cleanup](https://github.com/matejpalenik/inframeld/issues/45) removes data. It does not ask Alice to obtain Delete documents or Delete application account on every item. Her identity and other projects remain unchanged.
+
+The client must distinguish **deletion accepted**, **access blocked** and **physical cleanup complete**. Losing a response does not prove that deletion failed; inspect the original operation. A failed cleanup keeps the project blocked and records what remains to remove. The [protected deletion-status operation](https://github.com/matejpalenik/inframeld/issues/38) lets an eligible reader observe safe progress after ordinary membership disappears, without private inventory or content. Current identity checks still apply, and status access does not grant cancellation or continuation authority.
+
+The block, audit and recoverable cleanup obligation must survive interruption together. Racing uploads, key issuance and publication cannot reopen the project. Cleanup continues only within the original admitted scope; it cannot restore the project or affect a different one. [Access contracts](https://github.com/matejpalenik/inframeld/issues/116) and [job contracts](https://github.com/matejpalenik/inframeld/issues/124) specify the exact coordination and public outcomes before implementation. These are accepted requirements, not claims of completed lifecycle code.
 
 <a id="persistence"></a> <a id="section-accepted-access-data-model"></a> <a id="section-accepted-write-coordination-and-proposed-indexes"></a>
 

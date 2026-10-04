@@ -107,13 +107,21 @@ The [job and idempotency guide](jobs-and-idempotency.md) defines which safe outc
 Use the following sequence for an authorized deletion:
 
 1. **Check who may delete what.** Authenticate the caller, check the required permission, and establish exactly which owned data the request covers.
-2. **Record the deletion marker.** Commit a tombstone, a durable record that the data is deleted. Block new access and work, and invalidate affected serving references before removing bytes.
-3. **Account for unfinished work.** Cancel or reconcile queued and running jobs. Every later publication must check the marker, so a late job cannot make the data available again. This cannot cancel a request already accepted by another storage service.
+2. **Record the deletion marker and cleanup obligation.** Commit the authoritative block, audit and recoverable operation consistently. A tombstone records that the scope may no longer be used; it does not mean its bytes are already gone. Block new access and work, and invalidate affected serving references before removing bytes.
+3. **Establish shutdown and account for unfinished work.** For whole-project deletion, stop its applications and revoke their keys before data cleanup. Cancel or reconcile queued and running jobs. Every later publication must check the marker, so a late job cannot make the data available again. This cannot cancel a request already accepted by another storage service.
 4. **Remove owned data.** Delete artifacts and derived data in limited-size steps that can safely repeat. Save progress. All Chroma deletion uses the [existing single vector writer](indexing.md).
-5. **Handle identities and audit references.** Remove or anonymize them as required. Revoke relevant credentials and sessions through the selected identity adapter.
+5. **Handle remaining identity and audit references.** Remove or anonymize them as required by the admitted scope. Project deletion does not delete its members' shared Kratos/Hydra identities or affect other projects. Any separately authorized identity deletion uses the selected adapter for its remaining session/credential cleanup; project application shutdown has already happened before step 4.
 6. **Report what actually finished.** Mark deletion complete only after every supported step in scope succeeds. Otherwise return the defined outcome for the unfinished step.
 
 Each step must limit how much work it does at once. Retrying it must neither expand the deletion scope nor repeat its logical effect. These properties make cleanup bounded and idempotent.
+
+### Keep project admission separate from physical cleanup
+
+Alice may delete Legal Research without being able to read its private HR documents. [Access admission](https://github.com/matejpalenik/inframeld/issues/204) checks her current membership and Delete project permission, blocks the project and arranges application/key shutdown. It supplies a durable handoff that names the exact project. [Knowledge cleanup](https://github.com/matejpalenik/inframeld/issues/45) consumes that trusted handoff; it does not require Alice to acquire Delete documents on every audience or Delete application account on each application.
+
+Deleting one Document in a surviving project remains different: check Delete documents on every current audience group before committing that Document's marker. A caller cannot select the whole-project worker path by supplying a deletion marker or claiming that admission already happened.
+
+Admission, confirmed access blocking and physical completion are separate reported facts. If cleanup stops after membership removal, the project stays blocked and the original operation records the unfinished steps. [Protected job status](https://github.com/matejpalenik/inframeld/issues/38) exposes only safe progress to eligible readers, not private contents or general historical job payloads. It does not implicitly authorize cancellation or continuation. The exact contracts and recovery checks remain prerequisite engineering work; this guide does not claim the deletion workflow has been implemented.
 
 ### Example: delete a project while its embedding job is running
 

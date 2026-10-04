@@ -75,6 +75,8 @@ An explicit or saved unfinished project resumes its missing steps using current 
 
 For a first-time user without a project selection, offer **Your starter project** as the recommended choice and **A new project** as the advanced choice. Do not add a generic existing-project picker or an experience-level question. Existing unfinished work remains reachable through explicit/saved context. Selecting the starter reuses it; creating another project requires ordinary Create projects authority and leaves the starter untouched. Remembering context requires visible agreement and obeys [selection rules](api-contracts.md#cli-context).
 
+The New project choice calls [ordinary project creation](https://github.com/matejpalenik/inframeld/issues/28), not the [private-starter provisioner](https://github.com/matejpalenik/inframeld/issues/27). Creation saves the project, creator membership and seven explicit initial project-action grants together. It does not provision a Pipeline or start model work. Setup then continues as separate steps. A naming conflict or denied permission saves no partial project; a lost response is reconciled before retry. If Alice stops after successful creation, her new project remains and later setup resumes it without duplication. [CLI project management](https://github.com/matejpalenik/inframeld/issues/178) exposes the same operation outside setup.
+
 Offer the starter's saved Display name once. Enter keeps it and its Name; a new label does not change stable IDs, bindings or publication mode. Any suggested Name change is a separate explicit review. Do not ask for collection, Pipeline or access-group names in that step. Resume preserves subsequent renames without asking again. Naming is optional and does not imply an extra registration field.
 
 The starter is ordinary, not undeletable or permanently automatic. Creating/selecting another project and stop/start leave it intact. Deliberate mode changes remain unchanged on later setup. Authorized deliberate deletion records absence; setup explains it and requires explicit repair/creation rather than resurrecting it. Destructive review identifies the target/project and consequences; `--no-input` alone is not confirmation.
@@ -213,7 +215,7 @@ Manage releases covers publication, rollback, canaries, mode switches, and autom
 
 Save who requested the update and the authority under which it was accepted. Check current project or resource scope and permissions again before sending work and before publishing. A job cannot publish using permission its requester has since lost.
 
-The starter creator receives explicit permissions for the starter project and resources, including Build on the selected Pipeline. Before the first Deployment exists, publication also requires Create Deployment. Creating it assigns Manage releases on that new Deployment; later updates require current Manage releases on that exact Deployment. The installation-level Create projects permission is separate. Starter setup neither needs nor grants it. Someone with upload-only permission may save source changes, but Studio must explain that applying them needs an authorized person. Upload or Query never includes release permission.
+The starter creator receives explicit permissions for the starter project and resources, including Build on the selected Pipeline. Before the first Deployment exists, publication also requires Create Deployment. Creating it assigns Manage releases on that new Deployment; later updates require current Manage releases on that exact Deployment. The installation-level Create projects permission is separate. Starter setup neither needs nor grants it. Someone with upload-only permission may save source changes, but the CLI must explain that publishing them needs an authorized person. Future Studio follows the same rule. Upload or Query never includes release permission.
 
 When several automatic Deployments use one collection, the operation names each target it may update. Each has its own request and outcome. There is no all-Deployment transaction or use of another person's release permissions.
 
@@ -237,9 +239,21 @@ Editing/saving/restoring working settings, preparing direct-query dependencies, 
 
 This later development loop is not a new setup prerequisite. Initial private provisioning, authorized automatic first publication and optional Finish remain unchanged. An ordinary Build with no live Deployment creates an unpublished version; it does not impersonate setup's separately authorized create-and-bind operation. A direct query can execute without a Deployment once its own inputs and dependencies are ready, but it must never be labelled a live/default answer.
 
+### Take an imported Pipeline live explicitly
+
+Bob imports his colleague's configuration into an existing project. The import creates supported resource definitions, not documents, vectors, a release version or a Deployment. If he needs a new project, he creates it through the ordinary operation above before returning to a fresh import review.
+
+1. Supply credentials and documents through their existing authorized workflows. Import does not perform these steps or send model requests implicitly.
+2. Explicitly Build the saved Pipeline configuration and selected corpus. Review preparation, outgoing data and cost. With no Deployment, successful Build returns a ready **unpublished** version.
+3. Use [CLI Deployment management](https://github.com/matejpalenik/inframeld/issues/174) to create a Deployment from that exact ready, compatible version. [Backend creation](https://github.com/matejpalenik/inframeld/issues/59) checks current Create Deployment authority and readiness. Explicit creation defaults to **Manual**; **Automatic** and its input binding require an explicit choice.
+4. Show the endpoint and initial serving version only after creation is confirmed. A lost response requires original-operation recovery, not a second creation or a substituted version.
+5. Offer Finish. Creation alone does not change the project-default binding, issue an application key or send a paid test query. Those are separate choices with their own checks.
+
+This journey must be available in CLI v1 without Studio or handwritten API requests. The exact commands and human/JSON/noninteractive/dry-run contracts belong to [CLI contract work](https://github.com/matejpalenik/inframeld/issues/156); the sequence here does not invent final flags or claim the CLI is implemented. The initial starter's separately authorized Automatic create-and-bind flow remains unchanged.
+
 ### Make defaults discoverable, editable, and deliberately repairable
 
-Studio marks ordinary default resources with a **Default** badge and shows publication mode, current version, selected configuration, and pending update status.
+The CLI identifies ordinary default resources and shows publication mode, current version, selected configuration and pending update status. Future Studio presents the same facts, including a **Default** badge; it is not required to inspect or change them in v1.
 
 Renaming a default changes its label, not its ID, binding, mode, or settings. Another Deployment starts in Manual releases unless Automatic updates and its input binding are explicitly chosen.
 
@@ -250,6 +264,10 @@ Changing the default route changes what serves requests, not just a label. It ca
 After deliberate deletion, keep setup and removal markers so restart does not recreate defaults. Repair requires an authorized choice of resources and mode. Deletion cancels pending publication, and an old default-route job cannot bring the removed Deployment back.
 
 A missing default group blocks uploads. Repair follows normal lifecycle and permission rules, without a special one-time reset bypass.
+
+[CLI Deployment management](https://github.com/matejpalenik/inframeld/issues/174) owns the complete mode and default-route journey. It calls [publication-mode changes](https://github.com/matejpalenik/inframeld/issues/62) and [default-binding operations](https://github.com/matejpalenik/inframeld/issues/60), rather than writing release state itself. Switching Automatic to Manual invalidates pending publication authority. Re-enabling Automatic initially reviews the currently serving version's configuration; using different saved settings requires deliberate selection and fresh admission. An attached candidate, even at zero allocation, blocks enabling Automatic.
+
+For example, Bob deliberately deletes the old default and later selects a ready Manual Deployment as its replacement. Review the route change, current authority and candidate restrictions before saving the new binding. Preserve that Deployment's Manual mode and invalidate authority tied to the old binding. If state changes during review, stop and review again; do not silently accept newer state or recreate the deleted resource. Repairing a missing upload-default group belongs to [ordinary Access administration](https://github.com/matejpalenik/inframeld/issues/28), presented by [CLI access management](https://github.com/matejpalenik/inframeld/issues/178), not the release operation.
 
 <a id="journey"></a>
 

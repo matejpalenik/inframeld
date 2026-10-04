@@ -243,8 +243,10 @@ case "${command_name}" in
         test_compose up -d postgres mailpit mock-oidc
         wait_for_test_postgres
         wait_for_test_mock_oidc
-        test_compose up -d kratos kratos-expiring
+        # Initialize the shared Kratos database before starting its second instance.
+        test_compose up -d kratos
         wait_for_test_kratos kratos 14433
+        test_compose up -d kratos-expiring
         wait_for_test_kratos kratos-expiring 14435
         ;;
     test-kratos-disable-identity)
