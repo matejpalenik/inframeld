@@ -11,12 +11,15 @@ This guide follows Alice and SupportBot through those decisions. Start with sect
 | Reader's question | Start here |
 | --- | --- |
 | What does someone need to use a document? | [1. Three separate checks](#the-model) |
-| What do Kratos and Inframeld each do? | [2. Signing in and checking permissions](#architecture) |
+| What do Kratos, Hydra and Inframeld each do? | [2. Signing in and checking permissions](#architecture) |
+| How does a human sign into the CLI? | [Human CLI authentication](#human-cli-authentication) |
 | Which human-session components exist now? | [Implemented authentication boundary](#implemented-human-authentication) |
 | How is a question answered safely? | [3. Follow a query](#query-flow) |
 | How can people share access? | [4. Membership, permissions, and visibility](#sharing) |
 | Who can upload, change, or delete documents? | [5. Document operations](#documents) |
 | How do application accounts and keys work? | [6. SupportBot's lifecycle](#applications) |
+| Which workflows can an application automate? | [Application workflows](#cli-automation-authority) |
+| Who can inspect or change tracing? | [Trace permissions](#trace-authority) |
 | Who may build and publish a version? | [7. Pipelines and releases](#releases) |
 | What happens when someone leaves or an account is compromised? | [8. Administration and recovery](#recovery) |
 | What if two people change access at the same time? | [9. Storing access and handling simultaneous changes](#persistence) |
@@ -64,13 +67,14 @@ These permissions can change separately. Removing SupportBot's Query permission 
 
 ## 2. Signing in and checking permissions
 
-Humans sign in through **Ory Kratos**, which manages their sign-in methods and sessions. Applications use keys issued by Inframeld. Both paths identify a local principal, after which Inframeld checks permissions in the same way.
+Humans sign in through **Ory Kratos**, which manages their identity, sign-in methods and browser sessions. **Ory Hydra** provides the accepted first-party human CLI OAuth/OIDC flow and token lifecycle under [ADR-0053](../adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md). Applications use keys issued by Inframeld, not the human's cookies or CLI tokens. All paths resolve a local principal before the same current Inframeld permission checks.
 
 The diagram shows which components call each other. The boxes inside the backend are parts of one application, not separate deployed services. Background workers use the same permission rules.
 
 ```mermaid
 flowchart TB
     Studio["Studio / browser"]
+    CLI["Human CLI"]
     Bot["SupportBot / MCP client"]
 
     subgraph Backend["Inframeld backend"]
@@ -82,13 +86,16 @@ flowchart TB
     end
 
     Studio -->|"session cookie"| Verify
+    CLI -->|"opaque OAuth access token"| Verify
     Bot -->|"application key"| Verify
     Verify -->|"check human session"| Kratos["Ory Kratos"]
+    Verify -->|"private token introspection"| Hydra["Ory Hydra"]
+    Verify -->|"CLI identity eligibility"| Kratos
     Verify -->|"check application key"| DB[("Application PostgreSQL")]
     Access -->|"read and change permissions"| DB
 ```
 
-**Kratos answers “who is this person?”** Inframeld decides whether that person may join the installation, belongs to a project, is suspended, or may perform an action. Kratos's administrative API stays private. Its database and database role are separate from Inframeld's application tables.
+**Kratos answers “who is this person?” Hydra issues the CLI's protocol credentials.** Inframeld decides whether that person may join the installation, belongs to a project, is suspended, or may perform an action. Both products' administrative APIs stay private. Kratos, Hydra and Inframeld use separate databases/roles even when sharing one PostgreSQL server. The diagram shows the accepted request paths, not proof that every adapter exists.
 
 **Access owns the permission rules.** An application use case, such as answering a question, asks Access for permission as it carries out the work. An adapter translates between application concepts and an external system. For example, the Kratos adapter checks a session, and the vector adapter turns the permitted document selection into search filters. HTTP endpoints, MCP tools, and workers use the same Access rules. Indexing, pipeline configuration, and model-provider integration keep their own responsibilities.
 
@@ -100,7 +107,7 @@ The verified caller travels in an application-owned **access context**. The curr
 
 Alice completes Kratos's browser login flow. Kratos creates a secure, HTTP-only session cookie, which browser JavaScript cannot read. The backend checks it through `/sessions/whoami`, finds Alice's local principal, and checks her current Inframeld permissions.
 
-Studio provides the account screens. It displays the fields and errors supplied by Kratos and follows its cross-site request forgery (CSRF) protection. Kratos verifies passwords. This design does not need Auth.js or another service issuing browser tokens. Do not store bearer tokens in local storage or turn native-app session tokens into browser cookies.
+A small account UI supplies the browser login/recovery screens and Ory's documented login/consent integration for CLI login. It displays the fields and errors supplied by Kratos and follows its cross-site request forgery (CSRF) protection. It does not require the full Studio to exist. Kratos verifies passwords. Browser product requests keep their session cookies; adding Hydra for CLI login does not introduce Auth.js, bearer tokens in browser local storage or a native-token-to-cookie bridge.
 
 **Optional company sign-in is included in OSS v1.** The operator configures an OpenID Connect (OIDC) provider for the installation, including its client, redirect URI, and protected secret. Kratos signs Alice in through that provider and creates its own session. A local installation still requires authentication, but does not require a company provider or cloud identity account.
 
@@ -108,9 +115,181 @@ Alice can connect more than one sign-in method to the same account. Suppose she 
 
 Kratos maintains these links. Inframeld identifies its verified Kratos identity by **authority + subject**, meaning the identity source and the account ID within it. Email is not the identity key. Company login does not make Alice an administrator, and a token from her company is not automatically an Inframeld API credential. Importing company group memberships would need a separately designed policy.
 
-**Ory Hydra is not needed for this sign-in flow.** It addresses a different task, issuing OAuth/OIDC tokens. Issuing tokens, obtaining consent, exchanging tokens, and verified user delegation are deferred. Any future token would still lead to the same Inframeld permission checks.
+Kratos's browser-session flow does not itself require Hydra. **Hydra is nevertheless selected for human CLI login**, not deferred installation-wide. General third-party OAuth onboarding, arbitrary token exchange and verified user delegation remain outside this scope. The distinct accepted CLI flow follows below.
 
-If a session is invalid, expired, or cannot be verified, Inframeld denies the request. It does not continue when Kratos is unavailable. Browser logout rejection and disabled/expired session handling have backend coverage described below. Complete Studio logout and recovery, multi-factor authentication (MFA), secure first-administrator setup, and email configuration still need deployment integration and testing.
+If a session is invalid, expired, or cannot be verified, Inframeld denies the request. It does not continue when Kratos is unavailable. Browser logout rejection and disabled/expired session handling have backend coverage described below.
+
+The required standalone account UI still needs integration and testing for logout, recovery completion, password settings and configured multi-factor authentication (MFA) challenges. These are [account-UI work](https://github.com/matejpalenik/inframeld/issues/82), not deferred Studio features. Supporting a configured challenge does not make MFA mandatory or select a new factor. Secure first-administrator setup and email delivery also need their deployment integration and tests. [Hydra integration](https://github.com/matejpalenik/inframeld/issues/117) owns backend verification and recovery cleanup; displaying a completed form does not prove admission or cleanup succeeded.
+
+<a id="human-cli-authentication"></a>
+
+### Alice signs into the CLI with the same human identity
+
+Alice runs an explicit `login` or the guided setup login step. The system browser shows the installation and human account she is approving. Hydra delegates login to the Ory account UI integrated with Kratos. The CLI receives protocol credentials, not Alice's password or browser cookie. Access then resolves the same local human principal used by browser requests.
+
+This is **accepted design, not the implemented cookie adapter described below**. The [client registration](#cli-client-registration), [login transaction](#cli-login-transaction), [credential lifecycle](#cli-credential-lifecycle) and [qualification requirements](#cli-authentication-qualification) below specify the delivery profile. Terminal examples illustrate the experience; they do not establish unpublished HTTP schemas.
+
+| Caller | Credential and verifier | What it does not grant |
+| --- | --- | --- |
+| Human browser | Kratos session cookie, verified through Kratos; preserve CSRF on cookie-authenticated writes. | CLI tokens, application-key issuance or product permissions by sign-in alone. |
+| Human CLI | Opaque Hydra access token, verified privately; current Kratos identity eligibility and local human state. | Application identity, third-party delegation or authority derived from OAuth scopes. |
+| Application HTTP/MCP client | Inframeld-issued opaque application key, verified against its stored verifier and restrictions. | Human-only administration or acceptance on an unapproved audience/adapter. |
+
+Follow the CLI request in execution order:
+
+1. Resolve the trusted installation/issuer and official public client. Use maintained OAuth/OIDC libraries for Authorization Code with S256 PKCE, fresh state/nonce and complete response/issuer validation. No embedded client secret or implicit/password grant. A temporary callback binds to literal `127.0.0.1` and an ephemeral port, never the LAN. Headless device authorization needs its separate qualified release path.
+2. Use Ory's documented login/consent integration with Kratos, showing the verified account and requested installation access. Bind the returned credentials to that exact target configuration and human. Login does not silently select a different account, target or project. Operator bootstrap and product admission remain separate checks.
+3. On each API request, privately introspect the opaque access token against configured Hydra. Require active/unexpired access-token semantics, the canonical API audience, official CLI client and required API scope. Reject ID/refresh tokens and caller-supplied verification destinations. An active result alone is insufficient.
+4. Check the corresponding Kratos identity is currently eligible. Resolve the trusted stable Kratos identity ID to the existing authority/subject link, then the admitted active human principal. Do not create a second person from Hydra's issuer, merge by email or add grants. No positive introspection/eligibility cache is selected for v1.
+5. Return the existing principal-only access context and run the operation's current project/action/document checks. External identity calls precede the short application lookup transaction; never hold a transaction while waiting for Hydra or Kratos. Verification failure/unavailability denies execution without falling back to another identity.
+
+Reject competing credential mechanisms instead of trying cookies, OAuth tokens and application keys until one succeeds. The exact unambiguous HTTP dispatch contract remains a prerequisite to implementing bearer support. No application credential becomes a human token merely because both travel in an Authorization header. No human CLI token automatically becomes an MCP credential.
+
+Inframeld application keys reserve the `ifm_app_` prefix; Ory token formats remain unchanged. [Application-key recognition](#application-key-prefix) describes this accepted distinction. It narrows the dispatch specification in #116 but does not complete it: full syntax, errors, compatibility handling and runtime qualification remain open.
+
+The CLI stores tokens in the qualified OS credential store with target/account isolation. Refresh rotates tokens under a per-target/account lock and replaces the stored pair coherently. A lost refresh response requires explicit login unless qualified standard behavior proves recovery is safe; it does not permit blind replay or disabled rotation. Ordinary product commands do not open a browser unexpectedly. The credential lifecycle below defines the deployment-configurable defaults, including the seven-day rolling refresh window and no separately selected absolute session-age cap.
+
+Logout revokes the selected CLI credentials and removes that local account entry's credentials, not every browser session or application key. If revocation cannot be confirmed, report a nonzero partial outcome. Recovery/suspension must explicitly coordinate current Inframeld state, Kratos sessions and Hydra grants; neither product is assumed to revoke the other's credentials. Keep compromised access blocked while cleanup is unconfirmed. The lifecycle and qualification sections below specify ordering and required evidence.
+
+Ory supplies the [login/consent APIs](https://www.ory.com/docs/oauth2-oidc/custom-login-consent/flow), [private introspection](https://www.ory.com/docs/hydra/guides/oauth2-token-introspection) and [refresh mechanism](https://www.ory.com/docs/oauth2-oidc/refresh-token-grant). Identity mapping, product admission, bootstrap and cross-product cleanup are explicit Inframeld integration responsibilities, not guarantees provided by choosing the libraries.
+
+On 2026-09-29, repository inspection found the cookie/CSRF dependency and Kratos services in `compose.dev.yaml` and `compose.test.yaml`, not a Hydra service or human OAuth bearer adapter. This is a source-state observation, not a check of any deployed installation. Runtime tests for pinned releases, subject mapping, token-kind confusion, disabled identities, refresh races, recovery, private administration and managed-local transport remain required before release.
+
+<a id="cli-client-registration"></a>
+
+### Register one first-party public client
+
+Alice signs into local and dev with the same CLI executable. Each installation independently provisions `inframeld-cli` through Hydra's private administration interface. An ordinary user neither registers a client nor receives an administrator credential. A **public client** cannot keep a shared secret inside its executable; public does not mean that its users receive public access to data.
+
+| Setting | Accepted contract |
+| --- | --- |
+| Client authentication | `token_endpoint_auth_method=none`; no embedded client secret |
+| Desktop grants and response | `authorization_code`, `refresh_token`; response type `code`, not implicit/hybrid token delivery |
+| PKCE | S256 required by server policy and used by the CLI; reject missing, plain or incorrect proof |
+| Scopes | `openid`, `offline_access`, `inframeld:api` |
+| API audience | Installation's explicitly configured canonical API URL, matched exactly |
+| Subject | Actual stable Kratos identity ID through the trusted integration; no pairwise remapping for this first-party client |
+| Access token | Opaque; intended only for this installation's API |
+| Desktop callback | `http://127.0.0.1:<ephemeral-port>/oauth/callback`; fixed host/path with standard ephemeral-port variation only |
+| Consent | Show account, installation and requested access; recognizing the client ID alone never skips approval |
+| Device grant | Enable only after qualification of the selected OSS release |
+| Excluded grants | Password, client credentials, arbitrary token exchange and delegated-user grants |
+
+An **issuer** identifies the trusted Hydra installation; an **audience** identifies the API a token is for. Neither is a project selector. `offline_access` permits refresh, not unattended administration. Do not put current project or document grants into tokens. ID tokens describe authentication to the CLI, refresh tokens go only to Hydra, and only access tokens go to the business API.
+
+Target registration obtains the expected issuer/client/audience through validated one-server-URL discovery. Do not infer an issuer from the API hostname or replace it from an authentication error. Standard discovery must return exactly the expected issuer. Do not send existing credentials during discovery or forward credentials across origin-changing redirects.
+
+Credential binding includes immutable target identity, API URL, issuer, client, audience, managed-installation identity where applicable, and verified human identity. Renaming a target label preserves that binding. Changing a bound endpoint/issuer/client/audience/installation invalidates every affected saved login and requires fresh login. Equal URLs, email addresses or aliases do not authorize sharing credentials between targets. Only the separately verified managed-local runtime gets the [bounded HTTP exception](deployment.md#managed-local-http); manually registered HTTP targets do not.
+
+<a id="cli-login-transaction"></a>
+
+### Complete login before replacing credentials
+
+For example, Alice already has a saved dev login when a new attempt fails after Hydra issues tokens. The failure must not destroy the old login or leave the new tokens silently stored. Treat login as a coordinated protocol and local-storage operation, not as a single successful browser redirect.
+
+1. Freeze target configuration and account intent. Check the credential store before opening the browser where possible. A valid existing login may be reused. Login does not select a different target, account or project.
+2. A maintained OAuth/OIDC library generates fresh PKCE material, state and nonce. Bind them to this issuer/client/redirect/target and keep transient secrets in memory. Never reuse them across login attempts.
+3. Bind a temporary listener on literal `127.0.0.1` at an OS-assigned free port and the registered path. Open the system browser, not a WebView. No wildcard listener, LAN exposure or permanent authentication daemon.
+4. Kratos authenticates the human through the Ory account UI. Existing browser sign-in may avoid another password prompt, but identity and consent remain visible. The trusted UI integration uses documented Ory APIs and official clients; it does not issue its own tokens.
+5. Validate the callback's association with the pending transaction before exchanging the code. Validate the returned ID token's signature, issuer, audience, expiry and nonce through the maintained library. Tokens arrive at the token endpoint, not in a browser redirect.
+6. Where first-local-setup bootstrap is needed, perform the separately authorized host-maintenance claim after verified identity and before product admission. Then call the backend's current-human-session operation using the access token. Require an admitted, active human and use its stable principal ID. The existing cookie-only session operation needs explicit bearer contract work; do not assume it already supports this.
+7. An existing account alias must resolve to the same verified identity. A new alias requires visible confirmation. Atomically save the new coherent credential set only after validation and admission, and only if the captured local credential revision still matches.
+8. Close the listener and discard transient secrets. A minimal callback page may say to return to the terminal, but must not claim admission succeeded before the backend check. Use no third-party assets and redact callback query strings.
+
+For multiple issuers, qualify the standard issuer-response check or another standards-documented mix-up defense. State matching alone does not settle that defense. Reject malformed/repeated callbacks, bound waiting time and do not blindly retry an ambiguously consumed authorization code.
+
+| Outcome | Credential and user-visible result |
+| --- | --- |
+| Cancellation, denial or timeout | Preserve the previous login; close listener/stop polling; nonzero result |
+| Issuance followed by admission denial, storage failure, identity mismatch or concurrent local change | Attempt standard revocation of newly issued credentials at the already-trusted issuer; preserve previous login; report unconfirmed cleanup without persisting abandoned tokens |
+| Successful replacement | Commit the new login atomically, then revoke the superseded chain using standard token revocation, not account-wide consent deletion |
+| Old-chain revocation fails after replacement | Keep the new login; report `New login saved; previous session revocation unconfirmed` with a nonzero partial outcome; never restore a possibly revoked old token |
+| Crash after replacement but before old-chain revocation | Old server credentials may remain usable until expiry/operator revocation; document this limit, not a hidden persisted revocation queue |
+
+Keep old credentials only in protected memory while completing replacement cleanup. Failure cleanup must never revoke the previous login instead of the abandoned new one.
+
+Device authorization is an explicit alternative, not an automatic fallback after browser launch fails. The proposed `login --device-code` obtains the verification URI/user code from Hydra, asks the human to approve only the matching requested code, keeps the device credential private and respects polling intervals, slow-down, denial and expiry. Before qualification it returns unsupported without issuing credentials. The proposed `--no-browser` merely prints the desktop authorization URL while retaining its loopback callback; it is not a general SSH/remote-host solution. A local issuer is not exposed publicly to make either flow work.
+
+<a id="cli-credential-lifecycle"></a>
+
+### Store, refresh and revoke one bound login
+
+Use maintained adapters for macOS Keychain and Linux Secret Service. Initial qualification targets are macOS Apple Silicon/Intel and Ubuntu 24.04 LTS; exact minimum versions and Linux architectures belong in the release matrix. Native Windows is deferred. WSL2 and headless human persistence require independent qualification. A missing, locked or unusable store fails with repair guidance, never plaintext fallback.
+
+Non-secret settings may store labels, URLs, verified IDs and saved selections. They must not store passwords, tokens, PKCE verifiers, cookies or provider keys. Human OAuth login has no token-paste mode. Application-key hidden entry/file/stdin is a separate credential path. Lists, JSON, debug logs, HTTP traces and crash diagnostics must not expose secret values.
+
+Use one per-target/account lock and reload the latest credential value before refresh. Account aliases for the same bound principal resolve to one credential entry, not competing rotating-token copies. Selection/credential writes must be atomic. Do not hold the lock while a human is in the browser; compare the saved revision before committing a completed login. A concurrent logout or login causes a conflict instead of silently overwriting newer state.
+
+Ordinary commands refresh quietly when possible and otherwise print the exact target/account login instruction without opening a browser. Strictly rotate refresh tokens with **zero refresh reuse grace**. Commit the replacement access/refresh pair as one coherent value. A lost refresh response or crash after rotation but before saving requires login unless qualified standard behavior proves safe recovery; never blindly replay the old token, disable rotation or delete another process's newer credentials. Do not decode opaque tokens or extend expiry locally.
+
+| Lifetime | Accepted default | Owning service setting |
+| --- | --- | --- |
+| Access token | 5 minutes | Hydra `TTL_ACCESS_TOKEN=5m` |
+| Refresh token | 7 days from issuance or last successful refresh | Hydra `TTL_REFRESH_TOKEN=168h` |
+| Authorization code | 1 minute | Hydra `TTL_AUTH_CODE=1m` |
+| Browser session | 8 hours | Kratos `SESSION_LIFESPAN=8h` |
+| Interactive CLI wait | 10 minutes | CLI UX timeout; exact option remains a contract deliverable |
+
+These are service-container settings, not CLI secret-input environment variables. All server lifetimes remain operator-configurable. Inventory the pinned release's ID-token (`TTL_ID_TOKEN`), login/consent-request (`TTL_LOGIN_CONSENT_REQUEST`), self-service-flow, privileged-session and remembered-login/consent settings without inventing unselected numeric defaults. Validate finite positive durations. Inherit service defaults or derive grant-specific client settings from the same explicit policy, never a hidden override. Qualify issuance and refresh after overrides; document restart/reconciliation and clock/network behavior. A duration change does not revoke existing tokens.
+
+Alice logs in Monday at 09:00. Her access token expires at 09:05 and refresh token the following Monday at 09:00. A successful refresh Thursday at 09:00 issues a replacement expiring the next Thursday. Selecting a target, leaving a terminal open or doing work that needs no refresh does not move that deadline. There is no idle keepalive or separately selected absolute login-age cap.
+
+Repeated legitimate refresh can maintain login for weeks; a stolen current refresh token remains a risk until revocation, replay detection or another check stops it. A browser-session expiry does not cancel this separate OAuth grant. A future absolute cap needs qualified server enforcement, not a client timer.
+
+Authentication recovery never authorizes retrying a possibly paid/mutating operation. Retain the original business operation identity and uncertainty rules. Repeated refresh is not a remedy for permission denial.
+
+The proposed `logout --target dev --account alice` revokes and removes only this machine's selected dev/Alice credentials. Omitted selectors resolve the effective context, never all accounts. Do not delete all consent for the human/client: that could affect independently established logins. Qualify related-token invalidation and independence of logins on separate machines. If supported integration cannot provide that lifecycle, report the limitation before release rather than promising narrower revocation.
+
+Even when Hydra is unreachable, remove the selected local credentials and return a nonzero partial result explaining that remote revocation is unconfirmed. Do not retain a hidden plaintext retry copy. A pending login/refresh must not restore a logged-out entry. Leave selections intact and the account selectable but logged out; never switch automatically to another signed-in user. CLI logout does not sign out browsers, remove accounts, revoke application keys or log out other machines.
+
+Account switching uses `account use`, not `login --reauth`. Existing-alias reauthentication must prove the same identity; a reused browser session cannot rebind Alice to Bob. The Ory account UI handles changing browser identity, not cookie manipulation or an assumption that `prompt=login` chooses another user.
+
+Verified password recovery/reset explicitly invalidates old Kratos sessions and affected Hydra grants through documented OSS hooks/APIs. Requesting a recovery email anonymously must not revoke access. Distinguish the legitimate new recovery session so recovery can finish. Password reset neither removes Inframeld suspension nor restores grants. Suspension blocks subsequent authorization immediately; keep compromised accounts blocked until separately reported provider cleanup and authorized restoration checks succeed. Exact hook delivery, ordering and durable partial-failure recovery remain specification work, not a promise that either identity product revokes the other's credentials automatically.
+
+<a id="cli-application-key-input"></a>
+
+### Supply an existing application key deliberately
+
+Alice can paste a `rag-ci` key into a hidden terminal prompt to test that application's access. Requests then act only as `rag-ci`, not Alice or a union of their permissions. Browser login remains the human path; incoming application keys, human OAuth tokens and outgoing provider keys are distinct credentials.
+
+Application mode must be explicit. Conflicting human/application choices are usage errors. Accepting an existing key neither issues another key nor creates an account, grants authority, changes selected human state or revokes another credential. The application remains bound to its one project and current permissions. Target/project flags cannot expand that scope, and a failed application key cannot fall back to a saved human login or Hydra verification.
+
+Before accepting/transmitting a raw key, resolve the registered target and show its exact canonical API destination, not only its label. The person or automation supplying the opaque key asserts it belongs there: local inspection of a prefix or raw-key file cannot prove the issuing server. A wrong selected server may receive the key before verification fails. Never try other targets, follow an unapproved credential-bearing redirect or promise offline wrong-server detection. Preserve verified remote HTTPS and the separate managed-local exception.
+
+Interactive input disables echo before reading and restores terminal state on success, failure and cancellation. Allow user-initiated paste without accessing the clipboard automatically. Do not echo any part of the secret, including in validation errors. Hidden input does not protect against clipboard history, terminal interception or a compromised host.
+
+Unattended input uses an explicit protected file or stdin, with exactly one selected credential source. A qualified external secret-store integration may supply input; no vendor integration is selected here. Only the file path appears in arguments. Do not suggest a literal secret argument, shell substitution into argv, `echo SECRET` or a token environment variable. Do not opportunistically consume a piped document/question as a key. If another payload needs stdin, select a different credential source or fail before dispatch. Missing/unreadable/malformed input or a required interactive secret under `--no-input` fails without a prompt, browser, credential search or identity fallback.
+
+Verification uses an ordinary specified non-model authentication check and reports only authorized safe identity/project information. It does not query a Pipeline, test provider credentials, spend money or establish permission for every later action. A timeout remains unconfirmed. Concrete verification endpoint, flags, application-context defaults and handling of human account selectors remain #116/#156 contracts. Never borrow a human account's saved project for application execution.
+
+Input is not consent to persist. Keep the key out of settings, repository files, shell profiles, `.env`, logs, JSON, HTTP traces, crash reports and history. Any offered secure-store save requires explicit approval and destination/application binding; failure has no plaintext fallback. Application alias/save/select/forget/rotation details remain engineering work, not implicitly inherited human refresh semantics. Cancellation retains no hidden retry secret and restores the terminal. Reads, requests and retries remain bounded. Factory reset removes CLI-managed credential state, not user-owned external secret files or remote installations.
+
+Qualified tests must demonstrate hidden entry and echo restoration, no clipboard access, redaction, conflicting/missing input rejection, headless behavior, wrong destination/audience, expired/revoked keys, unavailable verification, no human fallback, no model call and no retained canceled/failed input. Key issuance/show-once delivery and the existing two-usable-key limit remain separate workflows; importing a key cannot recover a lost secret or silently revoke another key.
+
+<a id="cli-authentication-qualification"></a>
+
+### Qualify authentication without inventing another protocol
+
+The security baseline is RFC 9700 with the explicitly bounded local-development transport exception. Assess supported sender-constrained tokens such as DPoP and record bearer-token residual risk; do not invent DPoP or claim availability without qualification. Use maintained OAuth/OIDC libraries for protocol verification and generated application clients for business calls. No custom issuer, cookie scraping, token relay, embedded client secret, public client registration, new MCP OAuth discovery or permission-bearing OAuth scopes is introduced.
+
+Before release, #96 and #185 require evidence for all of these behaviors, not just a happy-path browser screenshot:
+
+- Password/configured existing OIDC methods resolve the intended stable Kratos-linked principal without email merging. Additional SSO onboarding remains deferred.
+- Configured MFA and verified recovery preserve admission/suspension boundaries; anonymous recovery requests cannot revoke credentials.
+- Missing/plain/wrong/cross-transaction PKCE proof and code reuse fail; wrong state/issuer/client/nonce and malformed discovery/ID tokens fail before credential commit.
+- Only the permitted loopback host/path/port variation works; canceled login closes its listener.
+- Wrong token audience/client/scope/kind, inactive/expired tokens, disabled Kratos identities, missing admission and suspended/retired/application-kind principals are rejected. Provider uncertainty fails closed without a held application transaction.
+- Concurrent login/refresh/logout, credential replacement cleanup, changed target bindings, strict rotation, lost responses and crash-before-save preserve the documented outcomes. No preference change retargets admitted work.
+- Every supported OS store, headless mode if offered and credential-input channel is tested for unavailable-store failure and secret-safe output. JSON and diagnostics contain no tokens.
+- Independent-login revocation, browser/CLI lifecycle separation, rolling expiry and deployment duration overrides are verified, not inferred from a generic Ory feature description.
+- Device approval/denial/expiry/slow-down/repeated or concurrent redemption and OIDC results pass for the selected OSS build before enabling that flow. Shared token failures still block all affected modes.
+- Managed-local isolation, private admin services, proxy bypass, hostile origins and remote HTTPS/cookie/CSRF behavior are qualified separately. Local HTTP success proves no production TLS behavior.
+- Bootstrap is operator-bound and one-time/concurrent-claim safe. Public first signup cannot claim administration.
+- Noninteractive commands never start human flows. Competing credential mechanisms fail; cookie CSRF is retained; human and application credentials cannot be confused.
+
+Use 0 for success, 2 for usage errors and 1 for other ordinary failures. Precise signal/JSON contracts remain #156 deliverables. Missing target/account/credentials produce explicit context-specific guidance, not fallback or surprise browser launch. `--no-input` is checked before interactive work. Invalid credentials map to 401, valid but unadmitted/ineligible humans to 403, and unavailable/malformed provider verification to 503 for the proposed session extension; ordinary product visibility rules remain unchanged. Saved-login replacement/logout cleanup uncertainty is a nonzero partial outcome, not success.
+
+Exact compatible version/digest pins, release advisories, managed origins, maintenance IPC, issuer mix-up defenses, remaining lifespan keys, wire dispatch, OS matrix and recovery-hook sequencing remain engineering/qualification deliverables. The historical inspection of Hydra v26.2.0 was a candidate observation, not a permanent pin or evidence that later fixes exist there. Qualify a suitable maintained OSS release without floating tags, surprise startup upgrades, private protocol forks or silently switching to a paid distribution.
 
 <a id="implemented-human-authentication"></a>
 
@@ -133,7 +312,11 @@ The [HTTP dependency tests](../../apps/backend/tests/unit/access/http/dependenci
 
 Authentication services can be shared between requests: each lookup owns its short read session and starts after provider verification. `ActionAuthorizationService` separately reads current project facts in the caller's transaction. It preserves the hidden-target 404 / visible-but-denied 403 distinction and exact project/action matching. Other target types arrive with their owning behavior.
 
-The real [Kratos browser tests](../../apps/backend/tests/integration/kratos/test_kratos_browser_flow.py) cover registration, password login, expired sessions, logout rejection, and disabled identities. The [recovery tests](../../apps/backend/tests/integration/kratos/test_kratos_recovery_boundary.py) check that starting recovery does not authenticate the browser and that a valid recovery code authenticates the same identity. The [OIDC tests](../../apps/backend/tests/integration/kratos/test_kratos_oidc_browser_flow.py) cover provider login, local admission and grant boundaries, refusal to link on matching email alone, and linking after proof with the existing password. [PostgreSQL identity tests](../../apps/backend/tests/integration/access/test_human_identity_resolution_postgres.py) cover exact authority/subject matching, account-state refresh, and concurrent authentication. [API integration tests](../../apps/backend/tests/integration/access/test_current_human_session.py) exercise the cookie-to-local-principal route and missing configuration. Studio account screens, browser deployment, application-key authentication, and most Access administration workflows remain unfinished; the Kratos recovery tests do not supply a Studio recovery screen.
+The real [Kratos browser tests](../../apps/backend/tests/integration/kratos/test_kratos_browser_flow.py) cover registration, password login, expired sessions, logout rejection, and disabled identities. The [recovery tests](../../apps/backend/tests/integration/kratos/test_kratos_recovery_boundary.py) check that starting recovery does not authenticate the browser and that a valid recovery code authenticates the same identity. The [OIDC tests](../../apps/backend/tests/integration/kratos/test_kratos_oidc_browser_flow.py) cover provider login, local admission and grant boundaries, refusal to link on matching email alone, and linking after proof with the existing password.
+
+[PostgreSQL identity tests](../../apps/backend/tests/integration/access/test_human_identity_resolution_postgres.py) cover exact authority/subject matching, account-state refresh, and concurrent authentication. [API integration tests](../../apps/backend/tests/integration/access/test_current_human_session.py) exercise the cookie-to-local-principal route and missing configuration.
+
+The standalone account screens and their deployed browser flows, the Hydra bearer extension, application-key authentication, and most Access administration workflows remain unfinished. Existing Kratos recovery tests prove neither the required account UI nor the complete browser-to-CLI login. Those need the [first-use qualification](https://github.com/matejpalenik/inframeld/issues/185) and [security qualification](https://github.com/matejpalenik/inframeld/issues/96). Full Studio remains separate, deferred work.
 
 <a id="section-introduce-a-general-authorization-engine-or-policy-language-now"></a>
 
@@ -206,9 +389,9 @@ The execution records who acted and the access revision (change number) it obser
 
 An **AnswerReceipt** records the execution, the principal who requested it, the selected version, and the sources sent to the model for the final answer. This includes sources the answer did not cite. They may still have influenced it. Operation records, receipts, and feedback must not expose those sources to someone who has since lost access.
 
-The separate `feedback:write` permission lets an integration submit and read its own current feedback for eligible answers while it retains access to the evidence. Query permission does not automatically include it. Studio readers need both feedback-read authority and current evidence access. Replacing SupportBot's key preserves its identity and feedback ownership. Another application does not inherit that ownership.
+The separate `feedback:write` permission lets an originating principal submit and read its own current feedback for eligible live answers while it retains access to the evidence. Query permission does not automatically include it. CLI v1 and future Studio reporting require separate project-feedback inspection authority and current evidence access; reporting alone cannot authorize correcting another principal's rating. Replacing SupportBot's key preserves its identity and feedback ownership. Another application or human login does not inherit that ownership. [CLI feedback capability](https://github.com/matejpalenik/inframeld/issues/191) selects the client experience, not new permission identifiers.
 
-The **Model Context Protocol (MCP)** provides another way to call the same application operations. V1 supports preconfigured clients that send an existing application key in authentication headers. It does not add delegated human identities, OAuth token issuance, or tools for administering keys. Even looking up a default Deployment requires project membership and Query permission before setup information is revealed.
+The **Model Context Protocol (MCP)** provides another way to call the same application operations. V1 supports preconfigured clients that send an existing application key in authentication headers. That profile does not add delegated human identities, MCP OAuth onboarding or tools for administering keys. Hydra's separate first-party human CLI flow does not change this limit. Even looking up a default Deployment requires project membership and Query permission before setup information is revealed.
 
 See [answer feedback](answer-feedback.md), [MCP](mcp.md), and [lost-response recovery](jobs-and-idempotency.md#answers) for their full contracts.
 
@@ -311,6 +494,18 @@ Every document must allow at least one group, and all its groups must belong to 
 
 An upload default, a matching filename, or duplicate content does not grant permission to replace an existing document. Unchanged content follows the existing retry rules instead of creating duplicate versions.
 
+<a id="empty-evidence-scope"></a>
+
+### A permitted query may have no readable evidence
+
+Alice has Query on the selected Pipeline or Deployment and passes its current project/action checks, but none of the selected documents is readable by her. Access returns an empty permitted source set. Indexing performs no Chroma search, and Pipelines returns its ordinary authorized no-evidence outcome. This is not a permission error for the query and must not reveal whether hidden documents exist.
+
+Keep three cases distinct in [#29](https://github.com/matejpalenik/inframeld/issues/29) and its callers:
+
+- Missing Query authority or invalid project/account eligibility denies the operation under the normal non-disclosing error contract.
+- A permitted query with zero authorized source versions follows the [Indexing no-evidence path](indexing.md#retrieval), without an unrestricted search or a fallback identity.
+- Reading a particular protected document or evidence bundle still requires access to every required source. An empty saved document allowlist, or revocation/erasure before disclosure, cannot be converted into a successful empty read or partial disclosure.
+
 ### Alice wants to share an HR handbook with Support
 
 The handbook currently allows HRPrivate. Alice manages SupportKnowledge but not HRPrivate. She cannot add SupportKnowledge to its audience just because she manages the destination group.
@@ -340,6 +535,72 @@ A manager may delete an **unused access group**. No Document, active upload or s
 ## 6. SupportBot's lifecycle
 
 SupportBot's account holds its permissions. Its key proves that a request comes from that account. Keeping these separate means replacing a key does not create a new identity or a new set of permissions.
+
+<a id="cli-automation-authority"></a>
+
+<a id="cli-delivery-and-automation-authority"></a>
+
+### Application workflows and human-only administration
+
+SupportBot can import ordinary configuration, upload documents, query Pipelines, run evaluations and accept specific evaluation-case revisions.
+
+These actions are not enabled automatically. SupportBot needs permission for each action on the relevant resources, together with access to any required documents and models. Being an application account makes it eligible to receive those permissions. It does not grant them.
+
+Building a version and publishing it require separate permissions. Managing identities, memberships, permissions and provider credentials remains restricted to authorized humans. Running a command from a script does not remove that restriction.
+
+#### An application cannot remove its own spending limit
+
+Project spending-policy changes are **human-only in v1**. Alice may set, increase, decrease or remove a project's limit only if she currently has permission to manage that project's spending policy. A human without that permission is denied too.
+
+SupportBot may inspect budget information it is allowed to see and run authorized work within the limits. It cannot change the policy, including through setup or TOML import. Otherwise an automated worker could remove the control intended to contain its spending.
+
+This restriction does not change the separate limits on individual operations or decide who may change unrelated project policies. [Budget management](model-connections.md#budget-policy-authority) explains the workflow. The [Access contract](https://github.com/matejpalenik/inframeld/issues/116) and [model contract](https://github.com/matejpalenik/inframeld/issues/121) must define the exact capabilities. [Budget-policy management](https://github.com/matejpalenik/inframeld/issues/190) implements them.
+
+#### Keep identity, resource names and imported access separate
+
+The existing cookie/CSRF and deployment OIDC implementation remains in place. Hydra adds human CLI login through a small standalone Ory browser account UI. Full Studio is not required. Additional SSO onboarding is deferred, but existing SSO-related code is not removed. Target discovery uses one server URL and publishes operator-configured public API and issuer information, never private administration endpoints or secrets.
+
+[Resource names](data-model.md#resource-naming) select resources, not permissions. Project names are unique within an installation. Pipeline, Deployment, connection, collection and profile names are scoped by project and resource type.
+
+For a source or imported evaluation dataset, the user must explicitly map its audience to destination groups. A matching group name or imported metadata cannot grant access. Imported case content needs protection before its source is linked. After linking, access must also satisfy the current source permissions.
+
+The [delivery plan](cli-delivery-plan.md) identifies remaining specification work: dispatching bearer tokens, cookies and application keys to the correct verifier, exact action identifiers and targets, invitations, naming changes and imported-evidence capabilities. These accepted rules do not imply that all those operations already exist.
+
+<a id="trace-authority"></a>
+
+### Trace inspection is not trace administration
+
+SupportBot may inspect a recorded answer when it has the appropriate inspection permission and is currently allowed to read the captured sources. It cannot turn recording off, change how long traces are kept or request deletion of past traces. Otherwise an automated consumer could change the history controls governing its own work.
+
+| Action | Who may perform it? |
+| --- | --- |
+| Inspect pipeline traces | Humans or applications with the appropriate inspection permission and current access to the captured sources. |
+| Enable or disable project tracing, or change retention | An active human with current permission to manage that project's trace policy. |
+| Explicitly delete past traces | An active human with the separate permission to delete that project's trace history. Inspection or policy-management permission is not enough. |
+
+These are descriptions of actions, not new published permission identifiers. [Project tracing](https://github.com/matejpalenik/inframeld/issues/149) implements this distinction.
+
+Inspection permission names the exact resource: a Deployment for live queries, or a Pipeline for direct queries. Neither grants inspection on the other. Inspection can reveal other callers' questions and answers on that resource, so every captured source must remain readable, including retrieved passages that were not used as final citations. Lists, stage details and JSON output obey the same checks.
+
+Query permission, having created the resource or knowing an execution ID does not grant inspection. No pipeline permission exposes the installation's full operational trace store. The [Access contract](https://github.com/matejpalenik/inframeld/issues/116) and [tracing contract](https://github.com/matejpalenik/inframeld/issues/147) still need exact permission mappings, initial grant rules and capabilities for non-query work.
+
+Recording is controlled by installation constraints and project preferences, not by the caller's inspection permission. Normal retention expiry, previously authorized cleanup and source erasure use their ordinary backend permissions. They do not require fresh human approval for each record. This does not change permissions for unrelated deletion operations. A retention change must warn when existing history will expire. [Observability](observability.md#trace-authority) explains these transitions and which history a deletion affects.
+
+CLI commands, HTTP calls and TOML imports use the same backend checks. An application can import otherwise permitted configuration while preserving destination tracing settings. If it explicitly requests a human-only change, reject that request. Do not silently omit the change or switch to a saved human login.
+
+Check the caller's current status, permissions and reviewed state again when saving a change. If access is lost partway through an import, keep earlier completed work and report the denial for the remaining work. These are accepted rules about who may act, not evidence that the remaining contracts or runtime tests are complete.
+
+<a id="application-key-prefix"></a>
+
+### Recognize the key family without trusting its appearance
+
+Alice signs into the human CLI through Ory. SupportBot instead receives an Inframeld-issued opaque key beginning with `ifm_app_`. The prefix makes the intended credential family recognizable; it is public and contributes no secret entropy. It encodes neither the installation nor the application's identity, project or permissions. `ifm_app_...` in an example is a placeholder, never a complete usable key.
+
+The backend verifies the **complete application key** against its stored verifier, then checks expiry, revocation, audience and current application-account eligibility before authorizing the operation. A fabricated or revoked prefixed key fails. Do not send it to Hydra as a second authentication attempt. Conversely, absence of this prefix is not proof that a value is a human access token. Human tokens retain private Hydra introspection, current Kratos eligibility and local-principal checks; their formats are not wrapped, renamed or replaced.
+
+Keep show-once delivery, high-entropy secrets, verifier-only storage, redaction and explicit rotation/revocation. Outbound model-provider credentials retain their own formats. #30 implements application-key issuance/verification using the reviewed #116 dispatch contract; #117 implements the separate human path. The prefix is accepted design, not evidence that those adapters or a migration exist. No enterprise-only Ory token-format customization is required.
+
+[CLI application-connection journey](https://github.com/matejpalenik/inframeld/issues/161) provides the accepted optional access-first connection journey for HTTP or MCP: review account and document/action scope, perform ordinary authorized grants, explicitly issue and deliver a credential, then optionally approve a paid live test as the application. It does not alter the rules below, issue keys during setup automatically or export the human's Hydra credentials.
 
 ### Alice creates SupportBot
 
@@ -402,6 +663,10 @@ Documents, pipelines, and Deployments created by SupportBot belong to the projec
 
 ### Provider keys are different
 
+Under [ADR-0054](../adr/ADR-0054-use-shared-current-model-connections.md), **connection-management authority includes the ability to approve shared live access changes**. Do not additionally require Manage releases on every affected Deployment, and do not grant this power through ordinary Pipeline Edit or model use. Keep any existing human-only administration restrictions. This is a capability contract, not a new permission identifier or an expanded application-account grant.
+
+The owning operation must validate current management authority and bind live-impact acknowledgment to the reviewed connection state and affected dependencies. Recheck at commit. It may inspect all dependencies internally for safety, while disclosing only permitted names/details to the manager. Hidden consumers must not be ignored or leaked. Neither acknowledgment nor connection-management authority bypasses operator destination policy, credential isolation or the embedding-compatibility veto. [Model connections](model-connections.md#shared-current) owns that workflow, including explicit import updates and restoration.
+
 Inframeld only needs to **verify** an incoming SupportBot key, so it stores a hash. It needs to **send** an outbound provider key when calling a model service, so that key must be recoverable. Provider keys are encrypted in PostgreSQL using PyNaCl and a separate root key.
 
 ModelGateway obtains the appropriate provider secret only when needed. Plaintext must stay out of Studio reads, jobs, snapshots, logs, receipts, evidence, and document-parser environments. A missing required credential causes failure, not a silent fallback. [Model connections](model-connections.md) owns provider-key management, endpoint changes, and validation for each model role.
@@ -412,9 +677,30 @@ ModelGateway obtains the appropriate provider secret only when needed. Plaintext
 
 Building prepares a version. Publishing makes it serve requests. Querying uses it. Permission for one of these actions does not grant the others, and a version being ready does not authorize anyone to publish it.
 
+<a id="preview-authority"></a> <a id="pipeline-query-authority"></a>
+
+### Query permission names its Pipeline or Deployment
+
+Alice may query Pipeline `contracts` using its current saved configuration without changing Deployment `contracts-production`. SupportBot may instead have Query on `contracts-production` only, so it uses that Deployment's serving selection and cannot query `contracts` directly. The distinction is the resource targeted by the grant, not an Experiment resource or an Execute experiments permission.
+
+| Requested operation | Required scope and meaning |
+| --- | --- |
+| Query a Pipeline | Query on that exact Pipeline; execute its current saved working configuration and any explicit supported per-request overrides |
+| Query a Deployment | Query on that exact Deployment; use its selected ready PipelineVersion and ordinary serving policy |
+| Inspect Pipeline query traces | Separate inspection authority on that exact Pipeline, including other callers' direct-query traces within current source access |
+| Inspect Deployment query traces | Separate inspection authority on that exact Deployment, including other callers' live-query traces within current source access |
+
+[direct Pipeline Query capability](https://github.com/matejpalenik/inframeld/issues/129) accepts these resource scopes. Active humans and applications are eligible when explicitly authorized; eligibility is not a grant. Query returns the permitted answer to that request, not blanket access to stored diagnostics or teammates' questions. Trace reads check all captured source candidates, not only final citations. Pipeline inspection does not include queries served through Deployments that reference the same Pipeline, and Deployment inspection does not include direct Pipeline queries. Neither grant is project-wide.
+
+Before direct execution, check current Pipeline Query authority, source/model access, compatible ready data and ordinary resource/budget limits. Capture the admitted effective settings and exact inputs once; later configuration edits do not alter that request. These are execution provenance, not a release build or a separate domain entity. Saving/restoring settings still needs Pipeline Edit configuration; Query does not save overrides, grant Build/Manage releases, or authorize publication. Current permissions and shared-connectivity checks continue at their normal boundaries.
+
+Lists, retained results, trace stages, safe errors and exports enforce current disclosure rules; knowing a request/snapshot ID or having created a Pipeline never bypasses them. Trace capture and retention remain separately controlled. Evaluation cases/results keep their own Access rules: this decision does not settle every evaluation or non-query job-diagnostic capability or make a query trace grant a general evaluation-history grant.
+
+These are accepted action meanings and target scopes, **not invented machine permission identifiers or schema changes**. #116/#128/#147 must specify concrete catalogue/wire mappings, grant bootstrap and remaining non-query capabilities, then qualify enforcement. Preserve existing implemented contracts when mapping them; this documentation does not claim Pipeline Query is already implemented. The old `preview-authority` anchor is retained only for existing links.
+
 ### Support CI builds a version and Carol publishes it
 
-An authorized automation account can build and evaluate versions without being allowed to publish them. It uses its own principal, not a developer's session. Those permissions give it neither membership-administration authority nor access to provider secrets. The API workflow does not require GitHub or an external CI runner.
+An authorized automation account can invoke the underlying readiness-only build and authorized evaluation operations without being allowed to publish. It uses its own principal, not a developer's session. The user-facing policy-controlled Build workflow is broader: when its selected Deployment is Automatic, it additionally requires Manage releases on that target. Missing authority fails that requested workflow, not a silent downgrade. Those permissions give it neither membership-administration authority nor access to provider secrets. The API workflow does not require GitHub or an external CI runner.
 
 Carol's Manage releases on Production covers publishing, rollback, candidate and canary control, publication-mode changes, and selecting inputs for automatic updates. V1 keeps these together as one permission on **that Deployment**. It does not split them into publish-only, rollback-only, or canary-only grants.
 
@@ -440,7 +726,9 @@ If another request creates the Deployment first, Alice's request to **create** o
 
 The default serving route starts in Automatic updates. Other Deployments start in Manual releases unless automatic mode is explicitly selected at creation.
 
-For an existing Deployment, automatically applying a source or configuration change requires permission to make that change, Build on the selected Pipeline, and Manage releases on **every selected target Deployment**. Sharing a collection between Deployments does not share release authority.
+For an existing Deployment, an automatic live-input source update requires permission to make that source change, Build on the selected Pipeline, and Manage releases on **every explicitly selected target Deployment**. A policy-controlled CLI Build captures already saved configuration and requires Build, current input access and Manage releases on its one selected Automatic Deployment; it does not edit the working configuration.
+
+A save/restore separately requires Edit configuration. Sharing a collection or Pipeline does not share release authority. The CLI resolves a sole Deployment or requires a choice, never implicitly publishes to all of them or infers the target from the first visible row.
 
 Changing publication mode requires Manage releases. Enabling automatic updates and applying their selected inputs also requires Build and valid inputs. Switching to manual cancels pending publication authority. Switching back does not revive it. Workers must still check the initiating caller's current permissions. The [pipelines and releases guide](pipelines-and-releases.md#modes) explains the full lifecycle.
 
@@ -466,6 +754,15 @@ The first administrator is established through a **one-time claim controlled by 
 None of the user-administration permissions includes another or allows taking over someone's sign-in identity. The initial administrator's grants can be transferred or removed under the same handover rules as other grants. They are not permanent special privileges.
 
 An additional project's creator receives membership and explicit can-use-and-grant assignments for the seven project actions in the [permission reference](#decision-map). Each action's extra checks still apply. These grants cover neither existing projects nor future unnamed actions.
+
+For example, Alice keeps her starter and creates Legal Research for a separate workload. [Ordinary project administration](https://github.com/matejpalenik/inframeld/issues/28) owns this creation operation:
+
+1. Check that Alice is an eligible human with current installation-level Create projects permission. There is no existing project membership to require yet.
+2. Check the reviewed Name and Display name. An unavailable Name fails without silently choosing a different one or revealing another project's owner.
+3. Save the project, Alice's membership, the seven explicit initial assignments, audit and original-request outcome together. If the transaction fails, none of these partial records remains.
+4. Return the committed identity. If the response is lost, recover that original result under current access; do not create another project or restore grants removed since creation.
+
+Creation alone does not create RAG resources, change the starter or change the CLI's saved selection. Setup and import are separate next operations. If either is interrupted, the completed project remains. [CLI access management](https://github.com/matejpalenik/inframeld/issues/178) presents ordinary creation and deletion; setup uses the same creation operation. [Starter provisioning](https://github.com/matejpalenik/inframeld/issues/27) remains a separate responsibility and does not depend on Create projects.
 
 Setup uses stable IDs and uniqueness checks so a retry does not create duplicate defaults. It must not recreate defaults that someone deliberately deleted.
 
@@ -504,6 +801,8 @@ The compromised account stays blocked. Recovery records the operator, reason, ch
 
 The audit record helps explain what the operator did. It cannot prevent misuse by a trusted host operator. The exact maintenance command, identity checks, and handling of simultaneous changes remain to be implemented and tested.
 
+Deliver suspension/restoration and scoped operator maintenance as explicit capabilities, separate from ordinary membership/grant administration. The immediate local block, external Kratos/Hydra cleanup and deliberate restoration have separate recorded outcomes: cleanup failure cannot lift the block. A retry inspects or continues the original cleanup; it never restores access merely to make another provider request. Operator maintenance uses a privileged host boundary, not an unrestricted token or hidden bypass in ordinary CLI authentication. The [delivery plan](cli-delivery-plan.md) assigns these workflows and their specification/security qualification prerequisites; no maintenance command is implemented by this guide.
+
 ### A project is retired while it contains private data
 
 Delete project is a separate human permission, initially assigned to its creator. It permits erasing **all project-owned contents, including documents the person cannot read**. The person does not need every resource's Delete permission or management of every group. This permission allows deletion, not reading or sharing those contents.
@@ -511,6 +810,12 @@ Delete project is a separate human permission, initially assigned to its creator
 Before accepting deletion, the backend checks the person's current status, project membership, and Delete project permission on that project. It then blocks affected access and new work, including adding members or content, creating keys, and publishing versions. The project's applications are stopped and their keys revoked before resumable cleanup. Data outside the project remains untouched.
 
 Resources being deleted need no replacement manager or grantor. History still follows retention and erasure rules, and deletion status must not expose private contents or promise immediate physical erasure. Deleting an individual resource in a project that remains active still follows that resource's narrower rules.
+
+For example, Alice may delete Legal Research while being unable to read its private HR documents. [Project-deletion admission](https://github.com/matejpalenik/inframeld/issues/204) checks her authority, commits the project block and records a durable cleanup obligation. It uses [application/key lifecycle enforcement](https://github.com/matejpalenik/inframeld/issues/30) to stop the project's applications and revoke their keys before [Knowledge cleanup](https://github.com/matejpalenik/inframeld/issues/45) removes data. It does not ask Alice to obtain Delete documents or Delete application account on every item. Her identity and other projects remain unchanged.
+
+The client must distinguish **deletion accepted**, **access blocked** and **physical cleanup complete**. Losing a response does not prove that deletion failed; inspect the original operation. A failed cleanup keeps the project blocked and records what remains to remove. The [protected deletion-status operation](https://github.com/matejpalenik/inframeld/issues/38) lets an eligible reader observe safe progress after ordinary membership disappears, without private inventory or content. Current identity checks still apply, and status access does not grant cancellation or continuation authority.
+
+The block, audit and recoverable cleanup obligation must survive interruption together. Racing uploads, key issuance and publication cannot reopen the project. Cleanup continues only within the original admitted scope; it cannot restore the project or affect a different one. [Access contracts](https://github.com/matejpalenik/inframeld/issues/116) and [job contracts](https://github.com/matejpalenik/inframeld/issues/124) specify the exact coordination and public outcomes before implementation. These are accepted requirements, not claims of completed lifecycle code.
 
 <a id="persistence"></a> <a id="section-accepted-access-data-model"></a> <a id="section-accepted-write-coordination-and-proposed-indexes"></a>
 
@@ -650,8 +955,8 @@ A permission's **scope** is the exact installation, project, group, or resource 
 | --- | --- |
 | Installation organization | Admit users, Suspend users, Restore users, Create projects. |
 | Project | Manage project members, Create access groups, Create application accounts, Create Pipeline, Create Deployment, Manage upload defaults, Delete project. |
-| Individual Pipeline | Build, View configuration, Edit configuration, Delete. |
-| Individual Deployment | Query, Manage releases, View configuration, Edit configuration, Delete. |
+| Individual Pipeline | Query, Inspect query traces, Build, View configuration, Edit configuration, Delete. |
+| Individual Deployment | Query, Inspect query traces, Manage releases, View configuration, Edit configuration, Delete. |
 | Access group | Add documents, Update documents, Delete documents. Manager assignment is separate from these grants. |
 | Individual application account | Issue application keys, Revoke application keys, Delete application account. |
 
@@ -662,7 +967,7 @@ Evaluation and feedback retain their own workflow contracts. This table does not
 | Topic | Owning decisions |
 | --- | --- |
 | Public documentation and protected operations | [ADR-0007](../adr/ADR-0007-keep-api-documentation-public-and-product-operations-protected.md). Public API documentation does not grant permission to use product operations. |
-| Human authentication and application-owned policy | [ADR-0012](../adr/ADR-0012-use-kratos-for-human-authentication.md), [ADR-0013](../adr/ADR-0013-keep-authorization-in-access-and-postgresql.md). |
+| Human authentication and application-owned policy | [ADR-0012](../adr/ADR-0012-use-kratos-for-human-authentication.md), [ADR-0053](../adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md), [ADR-0013](../adr/ADR-0013-keep-authorization-in-access-and-postgresql.md). |
 | Bounded grants, document audiences, and manager membership | [ADR-0014](../adr/ADR-0014-bound-permission-delegation-by-action-and-exact-target.md), [ADR-0015](../adr/ADR-0015-keep-document-group-access-separate-from-operational-permissions.md), [ADR-0049](../adr/ADR-0049-require-group-managers-to-be-ordinary-members.md). |
 | Shared principals and application credentials | [ADR-0016](../adr/ADR-0016-use-stable-shared-principals-with-an-application-account-extension.md), [ADR-0017](../adr/ADR-0017-let-valid-application-keys-use-current-account-permissions.md), [ADR-0018](../adr/ADR-0018-use-opaque-expiring-and-revocable-application-credentials.md). |
 | Recovery, relational grants, audit, and simultaneous changes | [ADR-0019](../adr/ADR-0019-permit-emergency-suspension-with-scoped-operator-recovery.md), [ADR-0020](../adr/ADR-0020-store-current-grants-in-target-specific-relational-tables.md), [ADR-0021](../adr/ADR-0021-separate-current-grants-from-transactional-audit-history.md), [ADR-0022](../adr/ADR-0022-coordinate-access-writes-by-project-with-scope-revisions.md). |
@@ -671,7 +976,7 @@ Evaluation and feedback retain their own workflow contracts. This table does not
 
 ### What remains outside this design
 
-**Deferred features:** verified user delegation, Hydra deployment, different permissions per key, nested groups, custom roles, general policy languages, and permissions for individual document chunks. Keycloak and ZITADEL are not alternative deployment profiles under the Kratos decision.
+**Deferred features:** verified user delegation, third-party OAuth/MCP onboarding, different permissions per key, nested groups, custom roles, general policy languages, and permissions for individual document chunks. Hydra for the first-party human CLI is accepted but still needs implementation and qualification. Keycloak and ZITADEL are not alternative deployment profiles under the Kratos-plus-Hydra decision.
 
 Future enterprise options could include federation, separate identity providers per organization, SAML/SCIM integration, managed operation, and governance features. These are possibilities, not shipped capabilities or reasons to restrict basic secure OSS operation. Enterprise deployments could use the same identity technology, but migration would still need its own validation. User delegation is deferred by sequencing, not declared permanently enterprise-only.
 
@@ -679,7 +984,7 @@ Future enterprise options could include federation, separate identity providers 
 
 - Remaining action names, exact configuration fields, treatment of links to private resources, and views of history and other resources.
 - Remaining source, collection, contributor, project, group, and application administration details.
-- Credential lifetimes and the precise ways credentials are verified and tied to their intended installation and audience.
+- Application-key lifetimes and exact credential dispatch/binding contracts. The [human CLI protocol](#cli-client-registration) and [primary duration defaults](#cli-credential-lifecycle) are accepted; their implementation, full setting inventory and release qualification remain.
 - User admission, identity verification, handover, and recovery workflows.
 - Behavioral tests for administration, handover, recovery, simultaneous changes, permitted document retrieval, and deployment integration, plus coverage for database constraints not exercised by the current relational tests.
 
@@ -687,4 +992,4 @@ An undecided detail never implies unrestricted administrator access or a permiss
 
 For database work, start with [Access records](data-model.md#access). [Application structure](application-structure.md) explains code ownership, and [API contracts](api-contracts.md) covers HTTP behavior and adapters. [Deployment](deployment.md) explains infrastructure boundaries, [model connections](model-connections.md) covers outbound secrets and destinations, and [retention](retention-and-deletion.md) covers cleanup and history. The [ADR index](../adr/README.md) preserves rationale and historical evidence.
 
-The shared Access foundation defines the permission rules, application contracts, and database constraints used by the surrounding workflows. Human sessions integrate through Kratos. Private defaults belong to onboarding. Grant changes and handovers use Access administration. Knowledge applies document-access checks when it builds a permitted corpus, and the incoming-credential workflow manages application keys. Each domain adds its own real resource tables and grants. Describing these workflows here does not mean they are all implemented.
+The shared Access foundation defines the permission rules, application contracts, and database constraints used by the surrounding workflows. Human browser sessions integrate through Kratos; the accepted CLI path adds Hydra with the qualification limits above. Private defaults belong to onboarding. Grant changes and handovers use Access administration. Knowledge applies document-access checks when it builds a permitted corpus, and the incoming-credential workflow manages application keys. Each domain adds its own real resource tables and grants. Describing these workflows here does not mean they are all implemented.

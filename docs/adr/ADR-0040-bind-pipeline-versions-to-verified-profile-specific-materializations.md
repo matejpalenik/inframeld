@@ -22,6 +22,8 @@ Keep source admission, processing, numerical generations, and materialization re
 
 **Example.** Changing a prompt may reuse the same materialization. Changing embedding meaning requires the matching profile and prepared numerical records before the version can serve.
 
+[ADR-0054](ADR-0054-use-shared-current-model-connections.md) preserves this numerical contract with shared current connections: reject a connection update when prepared or in-progress embedding data would become incompatible or compatibility is unproven. A deliberate embedding-model migration still creates the appropriate profile and prepared data before execution. See [Indexing](../development/indexing.md#embedding-compatibility).
+
 ## Consequences
 
 - The application can reuse existing work while retaining precise evidence that a selected version was prepared correctly.

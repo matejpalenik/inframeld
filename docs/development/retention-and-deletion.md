@@ -15,6 +15,7 @@ Use this guide when removing content, deciding how long to keep history, or expl
 | What exactly is being removed? | [1. Distinguish ownership, removal, and expiry](#scope) |
 | What happens if a job finishes late? | [2. Block access before cleanup](#operation) |
 | Can an old write recreate bytes? | [3. Report physical cleanup honestly](#completion) |
+| How do trace controls differ from deletion and reset? | [Trace history and reset scope](#cli-era-content-and-reset-boundaries) |
 | Who can inspect retained or deleted records? | [4. Authorize history and completion status](#history) |
 | Does a backup undo deletion? | [5. Preserve restrictions after restoration](#restoration) |
 | What can a deletion result promise? | [6. Explain remaining external copies](#external) |
@@ -63,6 +64,14 @@ The model includes an organization ownership boundary for future Enterprise Edit
 
 **Retention** defines how long data is kept and when routine cleanup may remove it. Configuration must document defaults for sources, processing and materialization artifacts, evaluations, answer receipts, jobs, idempotency records, and logs. Exact periods are not selected here.
 
+Generated evaluation questions and reference answers can disclose their source even when no excerpt is displayed. Track their source provenance and apply current access and erasure to drafts, accepted revisions, expected passages, answers, and claim judgments. Removing a case from future benchmarks is not the same operation as erasing this protected content. An immutable benchmark preserves identity and history, not permission to retain erased text.
+
+Evaluation evidence and diagnostic traces are distinct stores. A project trace opt-out does not erase an explicitly admitted evaluation, and an evaluation must not recreate an otherwise disabled trace stream. Disclose saved evaluation content at admission and do not silently give it the diagnostic trace retention period. On source erasure, block derived-content reads and new model sends before resumable cleanup; retain only permitted non-content unavailability markers. [Evaluation](evaluation.md#history) owns review/history behavior.
+
+Working configuration revisions and execution-input snapshots also have their own bounded lifecycle. Restoring configuration creates a new current revision; it does not restore erased source bytes, expired materializations or revoked credentials. A retained snapshot records what ran but does not keep every historical index alive forever. Active direct-query/preparation/evaluation operations use bounded pins, while routine cleanup preserves artifacts still referenced by a live release. Deleting a query-history reference must not delete shared vectors needed elsewhere.
+
+Direct-query answers and context may be captured only through the separately authorized, policy-controlled result/diagnostic behavior. Do not use snapshot provenance or idempotency storage as an undeclared full-answer archive when tracing is disabled. Explicit evaluation evidence remains governed by the paragraph above. Current access applies to configuration history, snapshot metadata, excerpts, list previews and exports. Missing historical dependencies produce an unavailable result, not silent re-embedding or reconstruction from a different corpus. Exact snapshot/history retention periods and storage bounds must be selected before implementation; this decision introduces no unlimited retention default.
+
 An **artifact** is stored content such as a source file, processing output, or manifest. A **materialization** is the prepared searchable index bound to exact source versions and processing settings. A **Deployment** selects which pipeline version serves requests.
 
 A **pin** records that current or retained work still needs some data. It prevents routine expiry while that reference is needed.
@@ -76,6 +85,10 @@ A **pin** records that current or retained work still needs some data. It preven
 **An immutable version is not a promise to keep its content forever.** Its recorded identity must not be silently rewritten, but explicit erasure can remove data it needs to serve.
 
 ### Keep audit and retry records useful without turning them into content archives
+
+Connection access revisions are non-secret administrative history under [ADR-0054](../adr/ADR-0054-use-shared-current-model-connections.md), not selectable historical runtime configurations or a permanent archive. Preserve only the permitted metadata needed to explain retained executions and current references under ordinary retention/access rules. Credential bytes never enter access-history, Pipeline, evaluation or receipt records; restoration proposes settings and does not restore old secrets.
+
+An existing connection's prepared or in-progress embedding dependencies include retained rollback data, not only live pointers. Ordinary retirement/deletion remains reference-aware and cannot be invoked implicitly to make a blocked update pass. History inspection, tracing opt-out and erasure remain separate: minimal execution attribution cannot recreate prohibited diagnostic payloads or authorize old endpoints. Missing retained settings make a historical restore proposal unavailable; they do not justify guessing them.
 
 Normal audit operations add new events instead of rewriting earlier ones. This is **append-only** history. It does not mean personal data must be retained forever.
 
@@ -94,13 +107,21 @@ The [job and idempotency guide](jobs-and-idempotency.md) defines which safe outc
 Use the following sequence for an authorized deletion:
 
 1. **Check who may delete what.** Authenticate the caller, check the required permission, and establish exactly which owned data the request covers.
-2. **Record the deletion marker.** Commit a tombstone, a durable record that the data is deleted. Block new access and work, and invalidate affected serving references before removing bytes.
-3. **Account for unfinished work.** Cancel or reconcile queued and running jobs. Every later publication must check the marker, so a late job cannot make the data available again. This cannot cancel a request already accepted by another storage service.
+2. **Record the deletion marker and cleanup obligation.** Commit the authoritative block, audit and recoverable operation consistently. A tombstone records that the scope may no longer be used; it does not mean its bytes are already gone. Block new access and work, and invalidate affected serving references before removing bytes.
+3. **Establish shutdown and account for unfinished work.** For whole-project deletion, stop its applications and revoke their keys before data cleanup. Cancel or reconcile queued and running jobs. Every later publication must check the marker, so a late job cannot make the data available again. This cannot cancel a request already accepted by another storage service.
 4. **Remove owned data.** Delete artifacts and derived data in limited-size steps that can safely repeat. Save progress. All Chroma deletion uses the [existing single vector writer](indexing.md).
-5. **Handle identities and audit references.** Remove or anonymize them as required. Revoke relevant credentials and sessions through the selected identity adapter.
+5. **Handle remaining identity and audit references.** Remove or anonymize them as required by the admitted scope. Project deletion does not delete its members' shared Kratos/Hydra identities or affect other projects. Any separately authorized identity deletion uses the selected adapter for its remaining session/credential cleanup; project application shutdown has already happened before step 4.
 6. **Report what actually finished.** Mark deletion complete only after every supported step in scope succeeds. Otherwise return the defined outcome for the unfinished step.
 
 Each step must limit how much work it does at once. Retrying it must neither expand the deletion scope nor repeat its logical effect. These properties make cleanup bounded and idempotent.
+
+### Keep project admission separate from physical cleanup
+
+Alice may delete Legal Research without being able to read its private HR documents. [Access admission](https://github.com/matejpalenik/inframeld/issues/204) checks her current membership and Delete project permission, blocks the project and arranges application/key shutdown. It supplies a durable handoff that names the exact project. [Knowledge cleanup](https://github.com/matejpalenik/inframeld/issues/45) consumes that trusted handoff; it does not require Alice to acquire Delete documents on every audience or Delete application account on each application.
+
+Deleting one Document in a surviving project remains different: check Delete documents on every current audience group before committing that Document's marker. A caller cannot select the whole-project worker path by supplying a deletion marker or claiming that admission already happened.
+
+Admission, confirmed access blocking and physical completion are separate reported facts. If cleanup stops after membership removal, the project stays blocked and the original operation records the unfinished steps. [Protected job status](https://github.com/matejpalenik/inframeld/issues/38) exposes only safe progress to eligible readers, not private contents or general historical job payloads. It does not implicitly authorize cancellation or continuation. The exact contracts and recovery checks remain prerequisite engineering work; this guide does not claim the deletion workflow has been implemented.
 
 ### Example: delete a project while its embedding job is running
 
@@ -162,6 +183,36 @@ Give each upload attempt an immutable key that identifies its ownership scope an
 
 Mark physical deletion complete only after earlier writes have finished or cannot finish, and final cleanup has been checked. **PostgreSQL can block access and publication, but cannot cancel a request already running in the object store.**
 
+<a id="cli-era-content-and-reset-boundaries"></a>
+
+### Trace history, imported evidence and local reset
+
+[Observability](observability.md) distinguishes operational telemetry, protected workload traces, mandatory audit and content-free receipts. Workload traces default to 30-day configurable retention. Project opt-out stops all future project-attributable tracing, including operational spans for that project; unrelated/projectless operation and mandatory audit remain separate. Explicit past-trace deletion is separate and may need durable cleanup. Neither trace history nor evaluation storage is an access/erasure bypass.
+
+Under [project tracing controls](https://github.com/matejpalenik/inframeld/issues/149), only an active, explicitly authorized human may change project tracing/retention; explicit past-trace deletion requires a separate human grant to delete traces for that project. This is not authority to delete the project itself. Authorized humans/applications may inspect permitted pipeline traces with current source access. Inspection does not grant policy management or deletion, and policy management does not grant the explicit deletion action.
+
+For example, Alice reduces retention and some old traces become expired. Warn about this consequence during review, but do not require a second deletion permission for ordinary retention management. Explicitly deleting existing history is a different operation. It requires its own deletion permission and a reviewed cutoff identifying the history to delete.
+
+Expired history and history blocked by deletion must be unreadable before physical cleanup finishes. Retries and late writers must not restore it. Automatic expiry, previously accepted cleanup and source erasure require no fresh human approval per record. This does not change who may perform unrelated source or project deletion.
+
+[Trace authority](observability.md#trace-authority) and the [trace lifecycle](observability.md#trace-lifecycle) own these rules. Their exact enforcement still needs specification and qualification.
+
+<a id="trace-history-deletion"></a>
+
+#### Trace opt-out is not deletion
+
+Alice turns tracing off while a query is running. Once the restriction takes effect, stop further capture for that project and prevent queued diagnostic data from being saved or delivered. The query may still finish if it remains permitted.
+
+Already saved history keeps its ordinary access and retention rules. Re-enabling tracing applies to newly accepted eligible executions. It does not restart capture for the running query or release its suppressed buffers. [Observability](observability.md#trace-lifecycle) owns these recording rules. Turning recording off is not erasure.
+
+If Alice separately has explicit trace-deletion authority, she may admit deletion of a reviewed history selection/cutoff. Block affected reads at that confirmed boundary, then perform bounded physical cleanup through the existing durable operation. While cleanup is pending or interrupted, affected content stays unreadable and late writers/retries cannot recreate it. Report "cleanup in progress" rather than "all bytes deleted" until completion is verified. Recover a lost acknowledgment using the original operation and cutoff, not a fresh broader deletion. Future recording policy remains unchanged.
+
+Retention increases and re-enabling cannot recover erased content. Mandatory audit, required receipts/accounting and separately admitted evaluation evidence retain their own lifecycles; explicit trace deletion is not authority to erase those stores. Nor may they become a hidden copy of missing diagnostics. Data already delivered outside Inframeld's control cannot be recalled merely by local opt-out/deletion; preserve the [external-copy limitations](#external).
+
+Imported evaluation questions, references and excerpts are protected even before source linking. Their explicit destination audience survives linking/reimport/edits; linked evidence additionally requires current source access. Retention and authorized erasure cover unresolved imported content too. Portable files already downloaded to another installation cannot be recalled; export permissions must account for that limitation.
+
+CLI factory reset removes the owned managed-local installation's data and the current OS user's CLI state, including local copies of remote target definitions/logins. It does not delete original source files, remote installations or unrelated/shared resources. Reset is not project deletion, backup/restore or merely stopping services. Partial cleanup must remain visible. The [delivery plan](cli-delivery-plan.md) tracks these distinct implementations and qualification.
+
 <a id="history"></a>
 
 ## 4. Authorize history and completion status
@@ -208,6 +259,7 @@ The selected model connection determines where document content goes for externa
 | --- | --- |
 | **Document embedding** | Chunk text goes to the selected model gateway. A chunk is a document excerpt prepared for retrieval. |
 | **Answer generation** | The query and permitted source excerpts go to the selected generation connection through the gateway. |
+| **Starter-case generation** | The sampled permitted passages and persona guidance go through the gateway to the explicitly selected generator, including extraction/synthesis steps. Generated references remain protected derived content. |
 | **Evaluation judging** | Any selected judge has its own explicitly disclosed evidence payload through the same gateway. A judge is a model that evaluates an answer. |
 | **Future Chroma Cloud use** | An external-processing option for future EE, not a selected v1 requirement. |
 

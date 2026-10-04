@@ -1,325 +1,416 @@
-# Comparing pipeline versions with useful evidence
+# Generating, reviewing, and comparing pipeline tests
 
-Alice wants to know whether Support's new version P13 handles her important questions better than P12. She compares both against the same saved **benchmark**, a fixed set of test cases. This guide explains what that comparison measures and what conclusions it can support.
+Alice has a working R.U.R. pipeline. She can finish setup now. Alternatively, she can ask Inframeld to propose 20 questions from her permitted documents, review their proposed answers and exact passages, and explicitly evaluate a ready version or her working configuration. Later, she can compare rerankers before building a release version, using the same saved questions.
 
-Both versions use the normal [serving flow](pipelines-and-releases.md#serving). The [Evaluation records](data-model.md#evaluation) define cases, revisions, runs, and comparisons. Production feedback has a separate purpose and is not this benchmark.
+This guide owns that behavior. **Evaluation** owns generation, review, benchmark snapshots, scoring, comparisons, and protected history. Knowledge owns source versions, Indexing owns processed text and source mappings, Pipelines owns execution, Access owns permissions, and ModelGateway owns model calls. Ragas is an embedded library, not another service or owner of application state.
 
-Follow one comparison first, then read the metric definitions. Later sections explain the model judge, cost limits, retained history, and the tests needed before relying on results.
+> **Status:** [ADR-0051](../adr/ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md) accepts this design. Inspection of Ragas **v0.4.3** supports the adapter approach; no integration or calibration was executed. Runtime qualification below is still required. These workflows are not a claim that the backend or CLI implements them today.
 
-> **Design status:** The evaluation approach is accepted. Metric edge cases, judge integration, calibration, and implementation still need the verification described below. Proposed thresholds are not measured results or release gates.
+[ADR-0052](../adr/ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md) additionally accepts evaluation of frozen working configurations before a release-ready build. It preserves the Ragas choice, scoring rules and fresh-comparison policy.
+
+Direct execution means **Query on a Pipeline**. There is no separate Experiment resource. Evaluation saves the exact settings and corpus it will use. A fresh comparison may reuse those saved inputs, but must execute them again rather than reuse old scores.
+
+Permission to query a Pipeline or inspect its traces does not grant unrestricted access to evaluation history. Evaluation evidence and query traces have separate access and retention rules.
 
 ## Contents
 
-| Reader’s question | Start here |
+| Reader's question | Start here |
 | --- | --- |
-| What exactly is compared? | [1. Freeze and execute a comparison](#comparison) |
-| What do the scores establish? | [2. Read each metric separately](#metrics) |
-| Which component calls the judge? | [3. Keep judging inside the model boundary](#gateway) |
-| What work can a comparison charge for? | [4. Choose explicit settings and bound cost](#cost) |
-| Can an old result still be inspected? | [5. Retain evidence and compare fairly](#history) |
-| Which results remain unverified? | [6. Calibrate before relying on the judge](#qualification) |
-| Can a score publish a version? | [7. Keep evidence separate from authority](#release) |
-| What must a comparison make visible? | [8. Maintainer checks](#maintainer-checks) |
-| Why these choices, and what remains open? | [9. Decision and reference map](#decision-map) |
+| Where do cases come from? | [Generate starter cases](#generation) |
+| What does acceptance mean? | [Review case revisions](#review) |
+| What exactly executes? | [Freeze and execute](#comparison) |
+| What if settings, cases or sources change? | [Fixed-input example](#input-reliability) |
+| What counts as the right passage? | [Passage identity](#passages) |
+| How are answers scored? | [Metrics](#metrics) |
+| Which models and adapters are used? | [ModelGateway integration](#gateway) |
+| What if a shared connection changes during a run? | [Connection consistency](#connection-consistency) |
+| What work can charge? | [Cost and limits](#cost) |
+| Can old results be inspected? | [Protected history](#history) |
+| What remains unverified? | [Qualification](#qualification) |
+| Can a score publish a version? | [Release authority](#release) |
+| Which failures need a walkthrough? | [Maintainer checks](#maintainer-checks) |
+| What is deferred? | [Decisions and scope](#decision-map) |
+
+<a id="generation"></a>
+
+## 1. Generate bounded starter cases
+
+A **starter case** is a proposed question, reference answer, and expected source passage. A reference answer is a review aid, not a trusted answer key merely because a model wrote it. **Single-passage** means one passage should contain the evidence needed to answer; Ragas calls the corresponding synthesis strategy single-hop.
+
+Generation is optional and separately admitted. Setup requires neither evaluation models nor tests. Its default completion action is **Finish**. Selecting generation does not start an evaluation or change the live pipeline.
+
+1. Resolve the exact corpus from a selected ready pipeline version or a captured working-configuration selection. Check current document and model access. A release-ready version is not a prerequisite for starter generation, but its sampled text must already be processed and attributable. Any necessary source preparation is separately disclosed and admitted, not hidden inside synthesis.
+2. Select a bounded sample from permitted, already processed text, distributed across documents and sections. Do not sample only the current retriever's successful results: that would omit retrieval failures from the proposed tests. Record the sampling policy, seed where applicable, selected spans, and unavailable or omitted sources.
+3. Freeze source versions, parsed-artifact identities, passages, generator configuration, preset, and resource limits. Show scope and outgoing data before admission. This snapshot does not grant permanent permission to use its contents.
+4. Run bounded keyphrase extraction and single-hop synthesis through the selected generator. Check cancellation and current access during preparation and before each model dispatch.
+5. Validate candidate structure, size limits, and source attribution. Persist usable candidates as **unreviewed** with provenance. Report invalid candidates, shortfalls, and unit failures separately.
+
+The default request is **20 cases**, not a guarantee of 20 valid or distinct cases. A small corpus may supply fewer suitable passages. Avoid exact duplicates within the batch; do not spend indefinitely regenerating to reach 20. Saved partial results remain reviewable.
+
+### Use an explicit minimal preset
+
+Configure `SingleHopSpecificQuerySynthesizer` with keyphrases as its selected property, explicit personas, and explicit gateway-backed model bindings. A **persona** describes the reader whose questions are being proposed. The preset supplies a general reader persona unless the user supplies bounded domain guidance; creating it must not invoke an undisclosed model.
+
+Reuse Inframeld's processed text, not a second parser. This preset has **no additional generation-time embeddings and no relationship graph** linking passages. Ragas may hold passage nodes in memory; that does not introduce an application graph database or authorize its default graph-building transforms. Its default transform recipe does more work than this preset needs.
+
+If a selected API requires an embedding object, bind a gateway adapter to the existing selected embedding connection rather than allowing a default client. The starter operation authorizes zero generation-time embedding calls: an unexpected call fails before dispatch, rather than spending outside the preset. Future embedding-assisted synthesis requires explicit model selection, disclosure, and budget.
+
+The sample aims to cover several parts of the corpus; it is not statistically representative or certified ground truth. Automatic multi-hop and negative-case synthesis are deferred.
+
+<a id="review"></a>
+
+## 2. Review immutable case revisions
+
+Alice sees a question about young Rossum, a proposed answer, and its actual excerpt with surrounding text. She need not type a passage from memory or select character offsets in the terminal.
+
+A **TestCase** has a stable identity in one pipeline. Its immutable **case revision** contains the question, reference, and expectation. Review decisions apply to an exact revision and record reviewer and time. [Evaluation records](data-model.md#evaluation) defines these logical records, not mandatory separate database tables.
+
+| Action | Result |
+| --- | --- |
+| **Accept** | Record an explicit authorized review decision for this exact revision. Interactive review displays the question, proposed answer, and resolvable exact passage first. Acceptance is not a model score or proof of correctness. |
+| **Edit** | Create a new unreviewed content revision, even if the previous revision was accepted. Preserve old benchmark memberships. |
+| **Reject** | Mark this revision rejected and exclude it from new benchmark admission; retain authorized history within retention. |
+| **Later** | Leave the revision unreviewed and save review position. Do not accept or reject it. |
+| **Remove** | Exclude the case from future benchmark selection without rewriting frozen snapshots. Removal is distinct from erasure. |
+| **Finish review** | Save completed actions and return to the shell. Review can resume; evaluation does not start. |
+
+Record who reviewed the revision and whether that reviewer was a human or an application. A script must specify the exact revision and the review action. A general spending-confirmation flag does not accept a case, and an automated decision must never be labelled human review.
+
+An application may accept an exact case revision when it has explicit permission to do so. It still needs current access to the expected evidence, and that evidence must remain resolvable. These checks apply even without an interactive screen. The Access contract must define the concrete action and target mappings and the eligibility rules for other review actions. Application eligibility alone grants nothing.
+
+Editing generated cases is in scope; manual authoring from a blank form is deferred. The initial expectation comes from generation. Any advanced evidence edit must select a resolvable source-backed passage through the application evidence contract, not substitute pasted text or a filename. It also creates an unreviewed revision. No terminal drag-selection interface is required for starter review.
+
+The default regression benchmark selects the **current accepted revision of each active case**. After an accepted case is edited, that case is excluded from newly assembled default benchmarks until the new revision is accepted. Do not silently fall back to the old accepted revision. Existing frozen benchmarks remain unchanged and may be selected explicitly while their evidence remains available and permitted.
+
+An explicit **exploratory** run may include unreviewed revisions. Label that fact and review states in admission, results, and exports. It does not promote their review state or constitute a reviewed regression benchmark. Rejected and removed cases are not silently restored.
+
+<a id="dataset-portability"></a>
+
+### Transfer datasets without transferring authority
+
+Alice can explicitly export and import the test cases themselves, not just evaluator settings. The versioned Inframeld JSONL dataset contains the complete selected questions, reference answers, exact passage expectations, portable case/revision identities and their provenance. Evaluator settings remain in separate TOML files.
+
+Dataset transfer excludes source documents, embeddings, runs, credentials and Deployment state. Ordinary configuration export contains no dataset content unless the user explicitly requests it.
+
+Imported content is protected immediately by an explicitly reviewed destination group audience, including before sources are linked. Linking adds current source-access checks; it never removes the original imported protection. Retain protection through edits and reimport. Erasure and retention cover unresolved questions/references/excerpts too; exported external copies cannot be recalled.
+
+Reuse unchanged previously imported revisions without duplication or resetting their review. New or deliberately adopted changed content creates unreviewed revisions. Local/incoming conflicts require a choice; old imports cannot silently roll back current content, and omission is not deletion. Imported selection is distinct from all locally stored cases and frozen benchmark membership. Provenance about source review never replaces explicit destination acceptance; eligible bulk acceptance identifies exact verified revisions.
+
+Source linking proposes only verified permitted source-version/artifact/coordinate matches. Ambiguity requires a choice; missing or incompatible proof remains unresolved, not a fuzzy match or ordinary retrieval miss. Review mappings in groups but validate each expected passage. Never silently reduce a requested benchmark because some imported cases are unresolved. Document loading/preparation, linking, review and paid evaluation remain separate operations; Finish is the default after import.
+
+See [configuration portability](configuration-portability.md) for packaging/orchestration and [the delivery plan](cli-delivery-plan.md) for specification gates covering exact JSONL identity, source proof, audience, action and recovery schemas. Evaluation owns these records and operations; the portability epic does not acquire a new domain.
 
 <a id="comparison"></a>
 
-## 1. Freeze and execute a comparison
+## 3. Freeze inputs and execute explicitly
 
-P12 is the **baseline**, the version used for comparison. P13 is the **candidate**, the proposed replacement. Both answer the benchmark's cases.
+A **benchmark revision** fixes an ordered set of case revisions. An **evaluator revision** fixes metric definitions, prompts, library, judge, and settings. **Admission** means validating and saving the operation before a durable worker starts it.
 
-### Maintain one benchmark per pipeline
+1. Select a ready PipelineVersion or explicit direct Pipeline query execution of the working configuration, optionally with bounded temporary overrides. A retained execution-input snapshot may also supply exact comparison inputs while its dependencies remain available. Select accepted cases or an existing benchmark. With no eligible cases, explain why and create no paid run.
+2. Select the judge explicitly, offering an existing connection. Show review coverage, configuration revision/overrides or version, corpus scope, required preparation, metrics, outgoing data, cost availability, and budget. Freeze effective execution inputs, benchmark/evaluator revisions and effective access conditions at admission. A later edit cannot change them.
+3. For newly captured working-configuration inputs, resolve complete verified bindings through [ordinary direct-query preparation](pipelines-and-releases.md#preview). For a ready version or retained execution-input snapshot, verify its recorded bindings are still available; do not rebuild or replace missing historical bindings to make that input runnable. Then execute each question through the same pipeline behavior as live queries: query embedding, permission-filtered retrieval, configured reranking, final context assembly, and generation. **Do not send the reference answer or expected passage to the pipeline.** That would leak the answer into the system being tested. No question runs against incomplete or incompatible indexes.
+4. Capture permitted evidence at each measured stage and the exact final context sent to generation. Calculate deterministic passage/citation signals, then judge eligible answers with Ragas faithfulness.
+5. Save per-case outcomes and summaries including incomplete and failed cases. Generation, review, save, and build actions never silently start this run.
 
-The Pipeline's Tests view lets Alice create, read, edit, and remove cases. Each has a question and optional expected sources, expected abstention, reference answer, and notes.
+A run executes one exact version or execution-input snapshot for all its cases. A comparison executes **both baseline and candidate freshly** under identical frozen benchmark and evaluator revisions. Here candidate means the proposed comparison input, not necessarily a release candidate attached to a Deployment.
 
-An **expected abstention** means the pipeline should say it lacks evidence rather than invent an answer. A reference answer helps a person inspect the result. Adding one does not enable another correctness judge automatically.
+| Comparison inputs | Meaning |
+| --- | --- |
+| **Two execution-input snapshots** | Try two configurations, such as reranker A versus B, without creating a release-ready PipelineVersion. |
+| **Ready version and execution-input snapshot** | Compare a fixed released/built baseline with the proposed working settings. Resolve a live baseline to its exact version before admission, not separately for each case. |
+| **Two ready versions** | Preserve the existing post-build comparison workflow. |
 
-Start with one benchmark per pipeline, not a separate dataset-management product.
+For example, evaluation A captures working revision 17 with reranker A. Alice then saves revision 18 with reranker B. A continues using its original inputs. A new comparison may reference both snapshots but must execute both sides again; it does not subtract their old scores. Reuse compatible ready materializations, not historical answers or a newer corpus substituted behind a selected input. Revoked access or lost dependencies remain failures/unavailability, even for a retained snapshot.
 
-### Explicitly build, then compare
+Working-configuration evaluation records its effective overrides without saving them into the Pipeline. To ship the change, Alice explicitly saves the desired settings, then invokes Build on the Pipeline's current saved configuration. Build is not sourced from this run. Its review shows any mismatch in configuration, corpus or prepared inputs, including a sample evaluation versus full-corpus build. Matching input identity is not an automatic quality approval, and a mismatch does not create a compulsory judge call. [Pipelines](pipelines-and-releases.md#build) owns that boundary.
 
-Build P13 explicitly. Once ready, choose Compare versions and select P12, P13, and the saved benchmark revision. Show the judge settings, permitted evaluation scope, and estimated budget before starting.
+The existing [durable jobs](jobs-and-idempotency.md) own continuation, attempts, cancellation, and uncertainty. Closing a watcher does not repeat or cancel work. Reopening by operation/job ID finds saved progress. Checkpoint bounded preparation units and cases; do not keep a database transaction open during a model call.
 
-Save or freeze the benchmark when the comparison is accepted. This saved acceptance is called **admission**. Both runs use the same fixed snapshot, so Alice's later test edits cannot change questions already queued.
+<a id="input-reliability"></a>
 
-A proposed quick preset contains **20–50 representative cases**. That is a useful starting sample, not a claim of statistical sufficiency or a product limit.
+### Keep the tested inputs fixed, not the caller's permissions
 
-### Execute the same paths used for serving
+Alice starts a run on `contracts` with saved configuration 17, 12 exact document versions, 20 already accepted case revisions and her explicitly selected `quality-judge` connection. These are illustrative values, not defaults or a promise that generation yields 20 accepted cases. The admission review also discloses preparation, outgoing data, cost availability and budget. If reviewed inputs change before admission, report the conflict instead of silently accepting newer state.
 
-The saved operation runs both exact versions afresh through normal permission checks, search, reranking, generation, citations, and failures. It then scores the results. Reranking reorders retrieved excerpts before the final evidence is chosen.
+After admission, a teammate saves configuration 18, uploads a newer contract and edits a case's reference answer. The admitted run still identifies configuration 17, its original corpus and the original case revision. An edit creates an unreviewed revision for future review. A newly assembled default benchmark excludes that case until its new revision is accepted; an existing frozen benchmark is not rewritten or silently replaced.
 
-Reuse the versions' ready materializations, their prepared search data. Do not rebuild the corpus or substitute newer documents silently. The corpus is the selected set of sources.
+For the question "How long is the cancellation period?", the case may store the reference answer "30 days" and the expected cancellation clause in contract v3. The Pipeline receives the question through its normal execution contract, not either of those evaluation-only fields. Its retrieval must find evidence normally. Passage scoring consumes the expectation separately. Faithfulness uses the actual answer and only the final context sent to generation, never the reference answer or unused expected text as extra support.
 
-The worker continues if Alice closes the browser. Reopening Studio finds the existing operation and run IDs instead of starting another paid comparison.
+| Change or missing input | Required behavior |
+| --- | --- |
+| Saved configuration, current case content or document latest-version pointer changes after admission | Keep the exact captured execution inputs and case revisions. Do not follow mutable pointers between cases. |
+| A required historical execution binding or index is unavailable | Do not execute against incomplete dependencies, rebuild missing historical bindings or substitute a newer corpus. Report the blocked/failed work through existing run/job outcomes and preserve permitted saved results. Newly captured working inputs may still use their separately admitted ordinary preparation. |
+| Execution dependencies are ready, but an expected passage lacks a verified source mapping | Mark the affected passage metric unscorable with its reason. This is not an ordinary retrieval miss or permission to declare other metrics successful. Each metric keeps its own eligibility checks. |
+| Source access is revoked or evidence erased | Stop prohibited work and protect questions, references, answers, evidence, identifiers and aggregates. An old snapshot grants no continuing access. Do not reconstruct erased content. |
+| A selected connection's access revision changes | Apply [connection consistency](#connection-consistency): stop further dispatch, retain actual observations and identify interrupted/changed-environment results. Do not use old connectivity or silently switch the remaining cases to new settings. Credential-only rotation and metadata-only rename retain their existing exceptions. |
 
-### Show paired results and keep their history
+Never silently remove a requested case because its evidence is unavailable. Preserve the admitted selection and unavailable outcomes under current access and retention, not an always-public count of that selection. A deliberate smaller selection is a new explicit admission, not a repair to the meaning of the old run. A fresh comparison executes both sides against the same frozen benchmark/evaluator and reports missing pairs rather than reusing earlier scores.
 
-For each case, display the baseline and candidate side by side: execution status, answer, citations/evidence, groundedness verdict and explanation, expected-source hit result, latency, and usage.
+These rules use the existing execution framework. The [Evaluation contract](https://github.com/matejpalenik/inframeld/issues/140) still needs exact inputs, proof of source coordinates, failure representations and rules for which saved results a caller may see.
 
-Show a previously supported answer becoming unsupported, a lost expected source, and a new execution or judge failure separately. A judge that failed to respond has not judged the answer unsupported.
+Implementation is divided into [execution](https://github.com/matejpalenik/inframeld/issues/143), [scoring](https://github.com/matejpalenik/inframeld/issues/69), [comparison](https://github.com/matejpalenik/inframeld/issues/68), [protected history](https://github.com/matejpalenik/inframeld/issues/70) and [CLI results](https://github.com/matejpalenik/inframeld/issues/180). [Evaluation qualification](https://github.com/matejpalenik/inframeld/issues/71) and the CLI qualification tickets must test the resulting behavior. This example defines no endpoint, permission identifier or physical table. [Evaluation records](data-model.md#evaluation) describes the logical relationships.
 
-History is reachable from a PipelineVersion and from each case's stable ID, with case and benchmark revisions visible. Editing or removing a case leaves its past results intact. Studio and API automation use the same saved operations. Neither needs an external runner, LangSmith, or Langfuse.
+<a id="passages"></a>
 
-Release is a separate authorized decision. Saving tests, editing settings, and finishing builds do not secretly run the judge. A combined build-and-compare action could be added later, but is not required.
+## 4. Preserve and measure passage identity
 
-### Run both versions freshly in the initial workflow
+Suppose an expected passage occupies positions 100 through 180 in one parsed artifact. A returned chunk covering 80 through 200 satisfies it. Two adjacent chunks covering 100 through 140 and 140 through 180 also satisfy it. A chunk covering only 100 through 150 does not. These positions illustrate a common coordinate system, not a selected physical offset encoding; Indexing must define its units and interpretation.
 
-Do not initially substitute a cached historical baseline for a fresh execution.
+Retain each expectation's DocumentVersion, immutable parsed-artifact identity, source spans, and protected excerpt or artifact reference sufficient to reconstruct it. Preserve the link from the sampled Inframeld passage to the Ragas scenario and returned case. Returned context text alone is not that link. Do not reconstruct identity by searching strings after generation: repeated sentences and parser changes make this ambiguous.
 
-Reusing an old baseline later would require matching case meaning, pipeline, evaluator settings, and effective access. Its age and reuse must be visible, with current permission checked before reuse or display. Even matching IDs or hashes cannot prove an external model alias still refers to unchanged behavior.
+Chunks are generation-specific retrieval units, not stable expectations. Indexing owns their source mappings; Evaluation consumes those mappings and owns the metric.
+
+### Measure complete coverage at a named stage
+
+For the initial single-passage preset, the passage is found only if the **union of permitted returned source spans completely covers the expectation** in the same proven coordinate system. Larger or adjacent chunks can satisfy it. Filenames, document IDs alone, chunk-ID equality, and fuzzy/semantic resemblance cannot substitute for coverage.
+
+Validly mapped passages from other documents do not cover the expectation. When mappings are known and comparable, finding only those other passages is absent coverage (Not found), not an unsupported-mapping outcome.
+
+Record three stages separately: initial retrieval, reranked or selected evidence, and the final context sent to generation. Include each stage's actual cutoff, passage count and reranking settings. If reranking is disabled, label the selection stage accordingly.
+
+Context assembly keeps whole passages in ranked order. It stops at the first passage that will not fit, rather than truncating, summarizing or skipping it to fit later passages. Coordinate validation also applies to any supported transformed source representation. Never claim coverage for text that was not actually retained.
+
+| Condition | Outcome |
+| --- | --- |
+| Comparable mappings and complete coverage | Found. |
+| Comparable mappings but incomplete or absent coverage | Not found, an ordinary passage miss. |
+| Expected source version/artifact unavailable, or parser output lacks verified coordinate mapping | Unscorable with a source/mapping reason, not a retrieval miss. |
+| Access revoked or source erased | Protected content unavailable; stop prohibited work and visibly exclude affected metrics without leaking excerpts in errors. |
+
+For each stage, report found cases divided by successfully scored eligible cases, alongside admitted, eligible, failed, excluded, and unscorable counts. Zero denominator means no numeric score. A different valid passage may support a correct answer while the expected passage is absent. Coverage measures this expectation, not every valid answer. This application-owned deterministic calculation is not Ragas's LLM context-recall metric.
+
+For example, at the **final-context stage**, 20 admitted cases can yield 16 found, three not found and one unscorable because its source mapping is unavailable. Report **16/19 scored cases**, plus the one unscorable case and its permitted reason. Do not report 16/20 as if the mapping problem were a retrieval miss, or silently present this as a complete 19-case benchmark. These counts assume the reader may inspect all 20 cases. If access has changed, protect the population as well as its details. This passage denominator does not determine the faithfulness or citation denominator.
 
 <a id="metrics"></a>
 
-## 2. Read each metric separately
+## 5. Keep metrics separate
 
-V1 requires faithfulness, retrieval, and citation checks. The table gives their proposed minimum calculations. Edge cases still need testing.
+Ragas **Faithfulness** extracts factual claims from an answer, then judges whether the supplied context supports them:
 
-Show counts, cases where a metric applies, and failures alongside each score. With no eligible denominator, return `not_applicable`, not zero or a perfect score.
+```text
+case faithfulness = supported claims / evaluated claims
+run faithfulness = mean of successfully scored eligible case scores
+```
 
-| Signal | Proposed calculation | What it does not establish |
-| --- | --- | --- |
-| **Faithfulness / groundedness** | For each applicable answer, obtain a boolean support verdict and explanation. Aggregate supported answers divided by successfully judged applicable answers. Also show eligible, failed, and skipped counts. | Not a percentage of extracted claims, a confidence score, or proof of truth. |
-| **Expected-source hit rate at k** | Cases with at least one expected source among the first **k final evidence chunks**, divided by successfully scored cases with a nonempty expected-source set. Deduplicate source identities and show failed/unscored eligible cases separately. | Measures evidence discovery, not semantic correctness. Several expected sources still contribute at most one hit for a case. |
-| **Citation presence and validity** | Answered cases with at least one valid backend-derived citation divided by answered cases. Count invalid citations separately. A valid identity resolves to that version's permitted evidence. | A citation's presence and valid identity do not prove that it supports every claim in the answer. |
-| **Answer, insufficient-evidence, and execution outcomes** | Count outcomes across all admitted cases, including failed, cancelled, and unattempted cases. Report execution failures divided by attempted cases as a separate rate. | An answer is not automatically correct. Abstention is not automatically wrong. |
-| **Latency and usage** | Record per-case query duration and p50/p95 with sample counts for completed answers and abstentions. Report gateway calls, tokens, and cost. Show failures/timeouts, judge time, and total time including queueing separately. | Small-sample percentiles describe those observations, not a reliable production distribution. Unknown token/cost data are unknown, not zero. |
+Case scores of 3/4 and 1/1 produce a run mean of 0.875, not the pooled fraction 4/5. Keep claim denominators. The mean weights cases equally; it is not a boolean whole-answer pass rate or a confidence score.
 
-Here, **k** counts final evidence chunks, which are source excerpts. **p50** is the median duration and **p95** the 95th percentile. Show how many observations contributed to either number.
+Judge **only the final context actually sent to generation**, after reranking and whole-passage fitting. The question assists claim interpretation; unused documents and generated reference answers cannot supply additional support. Reference-answer correctness scoring is not selected for v1.
 
-Expected-source labels must say whether they name a logical Document or an exact DocumentVersion. A deliberate source replacement may preserve the Document while changing its version, so the labels affect how the comparison is interpreted.
+| Signal | Interpretation |
+| --- | --- |
+| **Passage coverage** | Stage-specific full expected-passage coverage as defined above. |
+| **Faithfulness** | Per-case claim fraction and macro mean, with eligible, scored, failed, and unscorable counts. Support does not establish completeness, relevance, or truth outside the supplied source. |
+| **Citation presence/validity** | Answered cases with at least one valid backend-derived citation divided by answered cases; count invalid citations separately. Identities must resolve to that execution's permitted evidence. Valid IDs do not prove claim support. |
+| **Execution outcomes** | Answers, explicit abstentions, failures, cancellations, and unattempted cases across all admitted cases. Pipeline and judge failures remain distinct. |
+| **Latency** | Query p50 (median) and p95 (95th percentile), with sample counts for completed answers/abstentions. Report failures/timeouts, judge time, and total time including queueing separately. Small samples do not establish production latency. |
+| **Usage/cost** | Gateway calls, tokens, and observed/estimated charges, separated by pipeline execution, starter generation, and judging. Unknown values are not zero. |
 
-Calculating these counts adds no model calls. Running the pipelines still uses their configured generation, question-embedding, and other model operations. Embeddings are the numerical representations used for search.
+There is no blended quality score. Show each denominator and exclusions. Completion says whether work finished, not that every metric was available or the pipeline passed.
 
-A later source-recall-at-k metric could count the fraction of expected sources found for each case. Keep that name distinct from hit rate, which only asks whether at least one expected source was found.
+<a id="result-presentation"></a>
 
-**No blended quality score is needed in v1.** A reference answer also does not make substring matching a valid correctness test.
+### Make progress and results easy to inspect
 
-### Interpret groundedness according to the recorded rubric
+For example, a 20-case run can finish with 18 answers, one explicit abstention and one failed query. If scoring failed for one of the 18 answers, faithfulness covers 17 answers, not 20. A result summary must identify that saved-but-unscored answer separately from the query that failed. "No answer returned" means an explicit pipeline abstention here, not a missing network response.
 
-The selected OpenEvals 0.2.0 `RAG_GROUNDEDNESS_PROMPT` compares the answer with `context`, the supplied evidence. It uses neither the question nor a reference answer.
+[CLI progress and result presentation](https://github.com/matejpalenik/inframeld/issues/175) presents those facts in ordinary language. Keep the admitted population, answering/scoring progress, per-case outcomes and saved results visible. In-progress counts name their denominator; "12 answered; 10 of those 12 scored" does not mean the other eight admitted questions have run. At completion or interruption, retain stage-specific passage coverage, faithfulness and its scored population, citation signals, failures/exclusions, latency sample counts and known/estimated/unavailable usage. The concise view may put additional stage, claim and pipeline-versus-judge details behind normal result inspection, but may not conceal missing observations or substitute a combined pass score.
 
-Its rubric flags unsupported additions, contradictions, and invalid inferences, while permitting basic facts such as arithmetic. It therefore does not prove that every sentence comes exclusively from the corpus. Pin or hash the prompt. A changed rubric needs a new evaluator revision.
+Show a bounded list of cases needing attention, with stable case identity, permitted question text and a short reason such as "Answer saved; scoring failed", "Query failed" or "Not started". Make the full authorized list and individual saved answers/evidence available through ordinary paginated history inspection. Long questions can be shortened in the summary and read in full in the case view. Failed queries, abstentions, judge failures, canceled work, unscorable evidence and uncertain dispatch are different outcomes. Question text, identifiers and aggregate counts are protected too; never reveal an inaccessible population or reconstruct erased content for a friendly screen.
 
-The judge assesses the whole answer. It does not extract a structured list of claims, link every claim to sources, or reliably classify root causes.
+A budget stop with 17 fully completed cases and three not started retains the 17 results and names the remaining cases when permitted. If instead case 18 has an unknown paid-call outcome, identify that uncertainty and the two not-started cases; do not label all three safe to retry or suggest ordinary resume. Apply [job recovery](jobs-and-idempotency.md#progress-presentation) without repeating completed or uncertain model calls. Reading results never runs the pipeline or judge to fill missing data.
 
-### Judge the context the generation model actually received
-
-Judge against the exact permitted evidence sent to generation, after reranking and size-based truncation. Adding unused documents or discarded chunks would judge a different context.
-
-Show the answer, context IDs, and explanation for human review. An irrelevant or incomplete answer can still be supported by its context. Groundedness also does not establish that the source itself is true.
-
-### Keep missing evidence and judge failures distinct from negative verdicts
+Reuse Evaluation's existing logical case/run observations and shared jobs. This is not a new data framework, generic work-item registry or status enum. #140 specifies the exact representation, #143 persists outcomes, #70 exposes protected reads and #180 displays them, with human/JSON parity qualified by #187. Contract and runtime qualification remain required.
 
 | Situation | Required treatment |
 | --- | --- |
-| **Explicit pipeline abstention** | Groundedness is `not_applicable`. The abstention remains visible in outcome counts. |
-| **An answer appears to contain no factual claims** | Do not automatically infer a special claim-free category or give it a perfect score. |
-| **Answered case with no usable bound evidence** | Record a visible input/missing-evidence failure. |
-| **Valid boolean verdict that the answer is unsupported** | Record an unsupported judgment, not an execution failure. |
-| **Judge refusal, malformed/truncated output, or missing verdict** | Record a judge failure, not an unsupported-answer judgment. |
-| **A string such as `"false"` instead of a boolean** | Reject it. Accept only an actual boolean and a bounded explanation. Do not coerce a string into a passing verdict. |
+| Explicit pipeline abstention | Faithfulness not applicable; retain outcome. |
+| Answer with no usable final evidence | Unscorable, missing-evidence input failure; never 1.0. |
+| No extracted claims, including a library NaN | Unscorable, no evaluable claims; neither 0.0 nor 1.0. |
+| Complete valid judgments mark claims unsupported | A legitimate lower score, not an execution failure. |
+| Refusal, malformed/truncated output, missing/duplicate claim judgments | Judge failure; never present a partial verdict list as complete. |
+| Wrong types or non-finite/out-of-range score | Reject; no truthy-string conversion or silent clamping. |
 
-Answers and excerpts are untrusted input. Give the judge no tools, arbitrary endpoints, or release authority. A valid response structure does not prove a correct verdict or resistance to prompt injection. Include hostile excerpts in calibration.
+Validate that each extracted claim has exactly one usable verdict under the pinned schema and that the score agrees with those counts. Save bounded claim text, verdicts, and explanations when produced. The inspected Ragas metric returns a score object, not a complete review record; the adapter must capture intermediate structured observations to enable inspection. Never fabricate missing explanations.
 
-Evaluation evidence follows normal permissions, outgoing-data restrictions, and retention. Keep it in protected evaluation records, not ordinary application logs.
+Answers and excerpts are untrusted input. Give the judge no tools, independent endpoints, or release authority. Structured output does not prevent prompt injection or prove that extraction found every claim. Calibration must test both extraction and support judgments.
 
 <a id="gateway"></a>
 
-## 3. Keep judging inside the model boundary
+## 6. Bind Ragas to ModelGateway
 
-ModelGateway handles model calls. The OpenEvals adapter translates the library's requests into that interface without giving the library independent connection or credential settings.
+<a id="model-selection"></a>
+
+### Select existing connections for separate roles
+
+Starter generation and evaluation judging have separate explicitly selected bindings. Offer reuse of the pipeline's generation connection or another authorized saved connection without another key. Reuse is not implicit fallback. Generator and judge may share a connection; disclose that using the same model to generate and judge is not independent assessment.
+
+These choices do not change pipeline generation, embedding, or reranking settings. No provider or model family is mandatory. Chat success does not prove support for the schemas, context size, and limits needed here. [Optional preflight](../adr/ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md) stays optional; real work must still validate responses and report unsupported capabilities.
 
 ```text
-Authorized comparison from Studio or an optional API client
-    -> Freeze benchmark/evaluator revisions and admit durable runs
-        -> Execute baseline and candidate through serving paths
-            -> ModelGateway for their model calls
-        -> Calculate retrieval, citation, and outcome signals
-        -> Run the OpenEvals asynchronous groundedness evaluator
-            -> In-process ModelClient facade
-                -> ModelGateway bound to this authorized run
-        -> Persist Inframeld case results, comparison, and history
+Evaluation application service
+  -> Ragas infrastructure adapter
+     -> ModelGateway
+        -> embedded LiteLLM
+           -> selected authorized model
 
-A release decision is a separate authorized command.
+Includes extraction, synthesis, judging, permitted repairs,
+and explicitly enabled future embeddings.
+Pipeline execution retains its normal gateway path.
 ```
 
-Use `create_async_llm_as_judge` with the released groundedness prompt and an explicit `judge` implementing OpenEvals's structural `ModelClient` shape: **`chat.completions.create`**.
+The service owns admission, authorization, snapshots, durable work, and results through application-owned protocols. Bootstrap constructs adapters. Domain/application contracts import no Ragas, LangChain, SDK, or vendor schema types. Adapters explicitly inherit their selected library interfaces; application protocol implementations also follow repository inheritance/override conventions.
 
-This small in-process wrapper is a **facade** over ModelGateway, not an OpenAI client or another router. Any exposed synchronous path must follow the same rule. Return only the response shape OpenEvals reads, then translate results into Inframeld-owned data values (DTOs). Domain code imports neither OpenEvals nor LangChain types.
-
-### Validate the actual direct-client response
-
-The recorded inspection of `openevals/llm.py` found one direct call to `chat.completions.create`, passing messages, model, and strict JSON-schema response settings. It reads JSON from `choices[0].message.content`. This is evidence about the inspected release.
-
-The default output requires a boolean `score`. With `use_reasoning=True`, it also requires a string `reasoning` explaining the verdict. This flag requests an explanation. It does not set the provider's reasoning-effort level.
-
-That inspected path has no retry or schema-repair loop. `json.loads` only parses JSON. Inframeld must still check the exact fields, a real boolean, explanation length, and successful completion.
-
-The recorded source is the [exact OpenEvals 0.2.0 wheel](https://files.pythonhosted.org/packages/4a/8b/00f402b7f3475e235c339a9bc82d2eaf46cc08b53ecd85d4a117850170d3/openevals-0.2.0-py3-none-any.whl), including `llm.py`, `types.py`, `utils.py`, and `prompts/rag/groundedness.py`.
-
-### Bind the library to the admitted run
-
-Bind the facade to the run's authorized connection, model alias, and fixed settings. Check that the library requests the bound model. ModelGateway supplies the allowed output-token limit, reasoning setting, deadline, budget, and IDs linking the call to its operation.
-
-Give the library no independent endpoint credentials. Never pass `judge=None`, which would let it initialize its own model. ModelGateway's adapter handles provider-specific schema translation.
-
-Test the structured-output subset through the actual private gateway. A model supporting it does not prove that a gateway forwards it correctly. The recorded reference covers [structured outputs and refusals](https://developers.openai.com/api/docs/guides/structured-outputs).
-
-### Disable tracing and export explicitly
-
-OpenEvals wraps scoring in LangSmith tracing and logs feedback within a LangSmith test context. Turn tracing off when the worker starts and run the adapter inside `tracing_context(enabled=False)`.
-
-Do not supply LangSmith credentials or exporters, or run this adapter under LangSmith test or experiment tracking. Missing keys or a “standalone” label alone do not prove no telemetry is sent.
-
-The inspected direct path hard-codes an OpenAI provider label in trace metadata. Use ModelGateway's actual provider and model records instead. Verify real network behavior with the locked SDK version. The recorded reference is [LangSmith tracing controls](https://docs.langchain.com/langsmith/trace-without-env-vars).
-
-### Enforce one authorization, budget, and retry policy for evaluation
-
-Every model call uses the authorized ModelGateway path, including pipeline generation, judging, and any future claim extraction, scoring embeddings, repairs, or nested judges. Listing these possible later calls does not add them to v1.
-
-| Boundary | Required behavior and qualification |
+| Adapter | Responsibilities |
 | --- | --- |
-| **Model-call routing** | Exercise every exposed synchronous/asynchronous path through a recording gateway. No framework receives provider keys. Integration tests block other network destinations, including telemetry and export endpoints. |
-| **Whole-run resource limits** | Bound cases, concurrency, deadlines, tokens, and model calls across the complete run. Any later permitted repair consumes the same budget and is recorded. |
-| **Retries** | The gateway owns retry policy. Framework/SDK retries must not multiply it. Ambiguous provider outcomes follow [Background jobs, retries, and competing changes](jobs-and-idempotency.md), not a silent replay of the evaluation. |
-| **Authorization and configuration** | Fail closed when authorization, connection, alias, required capability, or a valid response is missing. Fail closed means deny or fail the operation rather than continue with a weaker substitute. |
-| **Provider and context behavior** | A provider refusal/error is an execution failure, not a quality verdict. No hidden model/provider fallback or silent judge-context truncation is allowed. |
-| **Evidence and logging** | Preserve provenance and authorized evidence without credentials. Keep prompts, excerpts, and full answers out of ordinary logs. |
-| **Measured behavior** | Measure actual calls, elapsed time, and dependency impact before declaring the integration qualified. |
+| **Structured LLM** | Explicitly inherit `InstructorBaseRagasLLM`; implement `generate(prompt, response_model)` and asynchronous `agenerate(prompt, response_model)`. Convert library response models into application-owned gateway structured-output requests; validate responses and reconstruct the required library type. Set `is_async = True` on the asynchronous adapter because the inspected prompt path reads it. |
+| **Embedding** | Explicitly inherit `BaseRagasEmbedding`; implement `embed_text` and asynchronous `aembed_text`, with bounded batches where required and the async capability signal used by consuming extractors. Route actual calls through an explicitly selected gateway binding. The starter preset authorizes none. |
+| **Execution binding** | Fix selected connection IDs, model choices/settings, operation identity, deadline and budget. Observe current access revisions at admission and require them still current before each relevant dispatch; never select a historical access configuration. Gateway resolves the current authorized credential. Ragas receives neither the key nor its store. |
+| **Boundary conversion** | Convert errors/results into named application outcomes. Keep vendor-specific types, schemas, and compatibility shims in infrastructure. |
 
-If a provider response is lost, the call may still have run and incurred a charge. Repeating the whole evaluation could repeat that work. Follow the saved-job recovery rules instead.
+Workers use asynchronous calls. Any exposed synchronous path must use the same gateway and must not block the event loop or create another provider client. Qualify the actual bridge against the gateway contract; do not assume a nested event loop is safe.
 
-The integration tests still need to run. The recorded documentation research executed no evaluation framework, gateway adapter, or judge model.
+### Source-inspected compatibility, not a tested integration
+
+Evidence below is from **v0.4.3**, inspected on 2026-09-29. Lock and test the whole dependency set. Rolling documentation may use different API shapes.
+
+| Source | Integration consequence |
+| --- | --- |
+| [LLM interfaces](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/llms/base.py), [structured prompts](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/prompt/pydantic_prompt.py) | Modern typed generation supports a custom adapter path; prompt code also checks async capability. Method names alone are insufficient. |
+| [Embedding interfaces](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/embeddings/base.py), [embedding extractor](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/testset/transforms/extractors/embeddings.py) | Modern and legacy APIs coexist. Verify the selected adapter against each consuming component. |
+| [Metric base](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/metrics/collections/base.py), [Faithfulness](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/metrics/collections/faithfulness/metric.py) | The collection metric validates its LLM interface and uses it for extraction and support judgments. Capture intermediate results deliberately; handle missing claims/evidence explicitly. |
+| [Generator](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/testset/synthesizers/generate.py), [single-hop strategy](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/testset/synthesizers/single_hop/specific.py), [sample construction](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/testset/synthesizers/single_hop/base.py) | Older annotations coexist with modern prompt support. Retain scenario/source identity outside returned text. The executor handle does not cover all earlier preparation. |
+| [Synthesizer defaults](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/testset/synthesizers/base.py), [extractor defaults](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/testset/transforms/base.py), [default transforms](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/testset/transforms/default.py) | Defaults can construct provider clients or add embedding/graph work. A top-level custom LLM does not automatically bind every nested component. |
+
+Explicitly bind every extractor, synthesizer, metric, prompt/repair path, and persona-generation path if later enabled. Give Ragas no provider credentials, independent provider/LiteLLM clients, or endpoints. Missing bindings must fail, not invoke default factories. No capability failure may silently select another model.
+
+### Keep one security, retry, and telemetry boundary
+
+<a id="connection-consistency"></a>
+
+#### Observe shared connectivity without weakening frozen comparisons
+
+Alice admits a comparison whose two sides use `company-gateway` access revision 7. A connection manager then activates revision 8. New work uses revision 8; the admitted comparison cannot keep calling revision 7 or silently finish the remaining cases under revision 8. Stop remaining model dispatches, preserve completed case outcomes with actual revision attribution and report an interrupted/incomplete comparison. Do not present its partial aggregate as a completed like-for-like improvement claim. To compare under revision 8, explicitly admit both sides freshly again, with normal cost review.
+
+Capture the current access revision for every generator, pipeline and judge connection needed by the operation. Check it during preparation and before nested extraction, synthesis, judging and repair dispatches, including concurrent cases. Apply the same rule to reused historical snapshots and ready versions. Their definitions select connection identities and model settings, not old access revisions. An already-dispatched call may finish and incur cost; its result remains attributed to that revision, and uncertain outcomes cannot be automatically repeated.
+
+At result finalization, check for relevant access changes since admission. If detected, retain the actually completed observations but label the run/comparison interrupted or changed-environment, not complete unchanged-environment evidence. The existing job outcomes apply: a known precondition failure is failed; an uncertain paid outcome needs recovery. A later update after a successfully finalized run does not rewrite its historical completion or scores, but future comparisons must disclose the changed environment. Credential-only rotation and metadata rename do not alone interrupt a run; record the credential revision actually used on each call.
+
+This preserves frozen benchmark/evaluator and Pipeline inputs without granting historical connectivity. It also means Manual release mode freezes serving-version selection, not shared connection settings. [Model connections](model-connections.md#dispatch-freshness) owns dispatch and [ADR-0054](../adr/ADR-0054-use-shared-current-model-connections.md) owns the architectural change. No new configuration branch, job engine or Ragas client is introduced.
+
+ModelGateway retains authorization, destination approval, credential resolution, limits, usage accounting, and retry policy. Disable or bound library/executor/SDK retries so they cannot multiply gateway attempts. Bound the whole operation, not each request alone. Repairs share the same admitted call/token/time/budget limits. A lost response may still have cost money; follow [uncertain-outcome recovery](jobs-and-idempotency.md#uncertain), not automatic replay.
+
+Check cancellation during sampling, transforms, scenario construction, between cases, and before dispatch. Check the attempt fence, which identifies the worker still allowed to finish, before persistence. The Ragas executor's cancellation handle alone is too late for earlier model-capable preparation. Cancellation stops new work once observed; it cannot unsend a request. Keep completed results and account for late/uncertain charges without allowing an obsolete attempt to publish results.
+
+Set **`RAGAS_DO_NOT_TRACK=true` before importing or using Ragas**. Its inspected [analytics implementation](https://github.com/vibrantlabsai/ragas/blob/v0.4.3/src/ragas/_analytics.py) contains an opt-out-controlled network exporter. Disable external library callbacks/exporters and supply none of their credentials. Prompts, excerpts, answers, and secrets belong in protected evidence, not ordinary logs.
+
+This disables library-owned export, not Inframeld's separately controlled operational/workload tracing. Project trace opt-out must not be bypassed by Ragas. Verify actual destinations with locked dependencies: flags and an in-process adapter are not a sandbox for arbitrary dependency code. Declare and prepare required tokenizer/assets explicitly; no hidden model downloads during a user's operation.
 
 <a id="cost"></a>
 
-## 4. Choose explicit settings and bound cost
+## 7. Admit and bound paid work
 
-The initial evaluation alias resolves to `gpt-6-luna`. It remains configurable through the same application alias system, including approved private or local gateways. OSS use does not require an OpenAI account.
+Generation review identifies sampled text/persona guidance and the selected generator. Evaluation review separately identifies pipeline calls and the judge receiving question, answer, and final context. Consenting to generation does not consent to a later evaluation charge.
 
-The proposed trial settings are explicit reasoning effort `none`, strict structured output, and limited explanation and output tokens. Changes discovered during testing become a new evaluator revision.
+Use gateway/LiteLLM prices when available for best-effort initial estimates, refine with actual inputs, and report gateway usage afterward. Do not assume one call per case: extraction, synthesis, claim extraction, support judgment, and repairs may be separate calls. Private-model prices may be unavailable. Local inference may have no external model API charge but still consumes resources.
 
-The source's model documentation recorded Chat Completions, structured outputs, and the `none` reasoning option. Do not assume `none` is the default. The inspected page provided an alias without a separate dated snapshot. Save the resolved model identity when available and check for changes behind the alias.
-
-Fifty answered and successfully judged cases on each of two versions need **100 judge calls**, plus both pipeline executions. Token use depends on their evidence and output. Estimate using the configured connection's applicable rates, then report actual gateway usage, including billable reasoning tokens. Unknown cost remains unknown.
-
-Limit total cases, calls, concurrent work, tokens, and elapsed time. Retries and any later authorized repair share that budget. Historical prices establish neither current cost nor quality. Failed qualification cannot silently select another model or an ensemble.
+The application-owned budget controls recorded in [Model spending controls](model-connections.md#spending) apply at admission and dispatch. Preview estimates are not charge guarantees. Bound cases, input/output sizes, total calls/tokens, concurrency, elapsed time, and spending where prices permit it. An enabled monetary cap must not be weakened because prices are unknown; apply the selected unknown-price admission policy and block when that policy requires it. Exhaustion stops new dispatch; completed drafts/results remain available with incomplete counts. No hidden regeneration or retry outside accounting. Use existing job outcomes, not a new paused-job engine.
 
 <a id="history"></a>
 
-## 5. Retain evidence and compare fairly
+## 8. Protect history and compare fairly
 
-Each run records its ordered case revisions, Pipeline and corpus versions, profiles, ready indexes, retrieval and generation settings, and the effective caller and permission revision. These identify what ran and what evidence it could use.
+Save generation provenance, review decisions, exact case revisions, benchmark/evaluator revisions, the selected PipelineVersion or execution-input snapshot and its corpus/bindings, effective access conditions, per-stage evidence, bounded answers, and per-case observations. Keep final context bytes or a reconstructible immutable protected artifact; a hash cannot replace missing evidence. Record gateway call IDs, admitted and actual connection access revisions, observed model identity where available, usage, and safe errors without credentials. These observations do not manufacture a live Deployment receipt or enter production feedback statistics.
 
-Keep the exact final context within the declared size bound, or an immutable protected artifact that can reconstruct it. Record ordered chunk and DocumentVersion IDs. A hash alone cannot show a reviewer missing source text.
+**Current access governs every disclosure**, including generated questions/references derived from protected sources. Historic authorization is not a permission token. Recheck before sampling, model egress, and display/export. Revocation stops prohibited work and blocks protected results; preserve safe partial status. Access owns the eventual action mapping. Exact evaluation permission identifiers and HTTP endpoints remain to be specified before implementation, not invented in this guide.
 
-Also save the answer and citations, outcome, selected search and reranking observations, evaluator revision, verdict and explanation, gateway call IDs, observed model, and usage.
+Source erasure and retention cover derived drafts, references, excerpts, answers, and judgments. Block access first, clean up resumably, and retain only permitted non-content markers showing unavailability. Immutability prevents silent edits, not authorized erasure. [Retention and deletion](retention-and-deletion.md) owns cleanup; evaluation retention periods are not implicitly the diagnostic trace default.
 
-Intermediate search IDs and scores have a declared retention bound. Full vector dumps and unlimited traces are unnecessary.
+Evaluation records and diagnostic traces are **distinct stores**. Trace opt-out does not erase an explicitly requested benchmark/result, and evaluation persistence cannot justify a hidden trace stream. Disclose persistence at admission. Neither store bypasses access, retention, or erasure; local deletion cannot recall data already sent to providers.
 
-### Preserve useful evidence without promising complete diagnosis
+### Compare compatible observations, showing missing pairs
 
-These records can help explain missing sources, changed ranking, unsupported additions, or judge disagreement. They cannot replay every execution detail or guarantee a root cause for every old result.
+Calculate paired changes only where both sides were successfully scored under compatible conditions. Show full admitted counts, each side's failures/exclusions, and paired count. Never claim improvement by discarding failed candidate cases.
 
-Keep evaluator interfaces and versioned history/detail responses owned by the application. A future diagnostic feature could read this evidence and suggest causes or remedies without rewriting history.
-
-That diagnostic interface and implementation are deferred. Do not add an unused port or let evaluation edit Pipeline settings automatically.
-
-### Compare only cases that are meaningfully comparable
-
-A run can complete without enough evidence for a conclusion. Completion describes the work. Comparability describes whether compatible retained results support a fair assessment.
-
-Keep partial results and metric failures visible. Compare paired changes only where both versions were successfully scored under compatible conditions. Show the valid paired count alongside eligible cases and each side's missing or failed results.
-
-**Never claim an improvement by dropping failed candidate cases from view.**
-
-| Comparison type | Required interpretation |
+| Comparison | Treatment |
 | --- | --- |
-| **Same-corpus comparison** | Benchmark/case semantics and evaluator revision match, corpus revisions match, and permitted document scope is equivalent. Declare the pipeline configuration changes being evaluated. |
-| **Corpus-change comparison** | Source revisions intentionally differ under the same benchmark and intended labels. Declare that change. Logical-document labels may survive the update. Missing exact-version labels remain visible mismatches. |
-| **Incompatible comparison** | Changed questions/expected meaning, metric definitions, or unsupported differences in authorization scope prevent a like-for-like improvement claim. |
+| Same corpus, changed configuration | Same benchmark/evaluator and effective document scope; identify changed settings. |
+| Changed chunking with preserved coordinates | Passage coverage remains comparable despite different chunk IDs. |
+| Deliberate corpus/parser change | Label it; unavailable expected versions or unproved mappings are unscorable. Never retarget expectations silently. |
+| Changed questions, metric definitions, or incompatible access | No like-for-like improvement claim; choose compatible inputs and rerun both sides. |
+| Working-configuration sample compared with full-corpus behavior | Label the scope difference. Neither a successful sample nor matching model names validates an unevaluated full-corpus build. |
+| Historical OpenEvals score | Retain its original evaluator identity. Never relabel boolean groundedness as Ragas faithfulness or calculate cross-definition improvement. |
 
-Unchanged cases across benchmark revisions may still be compared if scoring definitions and effective access match. Show exclusions and coverage. Unchanged questions do not make different rubrics comparable. Rerun both versions under one evaluator.
-
-Results apply to the permissions used for that run. A broad-access engineer's result does not establish what a bot with fewer readable documents will do.
-
-Check current access before displaying or exporting saved evidence. Recording the permissions used in the past does not grant access today.
+Library, prompt/schema, model binding/settings, or metric changes produce a new evaluator revision. Both fresh runs use it. A matching remote alias does not prove unchanged provider behavior; record observed identity and disclose this limitation. Broad-access engineer results do not establish what a restricted bot will see.
 
 <a id="qualification"></a>
 
-## 6. Calibrate before relying on the judge
+## 9. Qualify the integration and judge
 
-**Calibration** checks the selected judge against a small set reviewed by humans using the intended rubric. Another model's opinion is not ground truth.
+This documentation/source review installed no dependency, called no model, and ran no adapter/calibration tests. The following are future implementation obligations.
 
-From the proposed 20–50 questions, manually review a limited subset, such as 10–15 answers, against exactly the contexts they received. Label whole-answer support and note specific unsupported or contradicted statements.
+### Prove routing, limits, and failure behavior
 
-Include supported answers, invented additions, changed numbers, negation, mixed support, arithmetic, abstention, long evidence, and prompt-injection attempts. Keep several examples out of tuning. Mark disputed human labels and exclude them visibly until resolved.
+Use recording gateway fakes and controlled integration tests for all preparation, extractors, synthesizers, claim extraction/judgment, repairs, optional embeddings, sync/async paths, and constructor defaults. Block and detect direct provider/telemetry calls, including when provider environment variables exist. Prove the starter preset makes no embedding calls and runs no default graph transforms.
 
-### Measure errors as well as agreement
+Exercise actual structured schemas/context limits through supported providers and private gateways. Reject refusals, truncation, malformed structures, missing/duplicate verdicts, NaN, and incorrect types. Check intermediate claim counts and aggregation. Verify connection reuse needs no new credential and cannot change pipeline settings.
 
-Measure agreement on undisputed cases where the metric applies, false passes, output failures, calls, tokens, time, and cost. A **false pass** is a judge accepting an answer humans labelled unsupported.
+Test bounded retries/budgets, cancellation before executor creation and dispatch, stale-attempt persistence fences, restarts, and uncertain paid-call recovery. Exercise duplicate source text, changed chunking, truncated evidence, incompatible parser coordinates, revoked access, and source erasure. Repeat relevant checks after dependency changes.
 
-The proposed initial criteria remain open for agreement:
+Change a selected connection's access revision during generation, between comparison sides and after the last dispatched call but before finalization. Verify the operation preserves partial evidence, stops further sends and cannot claim a complete unchanged-environment comparison. Repeat with metadata-only rename and credential-only rotation to verify those changes do not themselves interrupt work. No test should make a historical access revision callable.
 
-| Proposed criterion | Interpretation |
-| --- | --- |
-| **At least 90% whole-answer agreement** | Report the numerator and denominator on the labelled sample. This is not a production-accuracy estimate. |
-| **No false pass on deliberately seeded critical contradictions** | Test the chosen critical examples explicitly. Do not hide a miss inside an aggregate. |
-| **All invalid outputs and failures remain visible** | Output failures are not discarded or converted into quality verdicts. |
+### Calibrate claim extraction and support judgments with humans
 
-These small-sample checks are not automatic release gates. Measuring claim-extraction coverage matters only if that separate metric is selected later, not for this whole-answer judge.
+**Calibration** compares the selected judge with human-labelled evidence, not another model's opinion. Label factual claims and whether each is supported by the exact final context. Measure missed/altered claims separately from support-classification errors. Omitting an unsupported claim can inflate a score even when returned verdicts look valid.
 
-### Check repeatability without selecting favorable results
+Include supported and mixed-support answers, contradictions, numbers, negation, irrelevant-but-supported answers, abstentions, no-evidence/no-claim cases, long contexts, and prompt injection. Keep a held-out subset unused during tuning; record disputed labels and denominators. Numeric acceptance thresholds must be established and tested for this rubric; the old whole-answer agreement target does not transfer automatically.
 
-Run **five fixed borderline or adversarial examples three times each**, without changing settings. Keep every result and report changes in verdicts and explanations.
-
-An apparent improvement similar in size to that observed variation is inconclusive. Fixed settings, deterministic arithmetic, and temperature zero do not make model outputs deterministic.
-
-Repeat calibration after changing the library, prompt, model, gateway capabilities, or material language or corpus characteristics. Start with Luna. Trying a different judge after failure is a new explicit decision, not an automatic fallback.
+Run five fixed borderline/adversarial examples three times each, keeping all results and reporting claim/score variation, failures, calls, cost, and latency. Never select favorable repeats. Temperature zero and deterministic arithmetic do not make a judge deterministic. Recalibrate after material library, prompt, model, language, or corpus changes. Changing judge after failure is an explicit choice, not automatic fallback.
 
 <a id="release"></a>
 
-## 7. Keep evidence separate from authority
+## 10. Keep evidence separate from release authority
 
-Evaluation informs a decision. Neither a score nor a completion webhook changes which version serves requests.
+Evaluation is evidence, not permission to publish. Saving cases, completing a run, or receiving a webhook changes neither publication mode nor serving pointers.
 
-| Publication mode | Who authorizes publication | How comparison behaves |
-| --- | --- | --- |
-| **Manual releases** | An engineer explicitly requests the release in Inframeld, or an authorized API client invokes the same application operation. | Results inform that decision. They do not make it. |
-| **Automatic updates** | The authorized source/configuration action described in [From a new account to a first useful answer](onboarding.md) supplies publication authority independently of evaluation. | Comparisons remain explicit and bind exact versions. Starting one does not pause automatic publication. |
+In **Manual releases**, an authorized person/application explicitly requests release; readiness, expected deployment revision, permissions, and duplicate-request checks still apply. Record the evaluation reference and acknowledgment of missing or regressed evidence where required by the release workflow.
 
-A manual release separately checks permissions, readiness, duplicate-request identity, and the expected Deployment revision. Those checks prevent a retry from publishing twice or overwriting another person's change.
-
-Record the requesting principal and its kind, the evaluation reference, and acknowledgment of missing, failed, inconclusive, or regressed evidence. Limit any optional rationale's size. [Access](access-control.md) governs humans and applications. An external CI service is not required to own this decision.
-
-Automatic updates run no hidden judge and claim no approved benchmark. Switch to Manual releases when the live endpoint must stay fixed during review. Finishing a comparison changes neither mode nor release target.
+In **Automatic updates**, an authorized live-input source operation or explicit policy-controlled Build supplies authority independently of evaluation. Saving working configuration or completing direct-query preparation supplies none. A comparison neither pauses updates nor starts a hidden judge. Use Manual releases when the live version selection must remain fixed during review; this does not freeze shared connectivity. See [Pipelines and Releases](pipelines-and-releases.md#modes) and [connection consistency](#connection-consistency).
 
 <a id="maintainer-checks"></a>
 
-## 8. Maintainer checks
+## 11. Maintainer checks
 
-| Scenario | Expected outcome |
+| Walkthrough | Expected outcome |
 | --- | --- |
-| Alice edits a test after admission | Both runs retain the frozen case revision. |
-| P13 fails a case that P12 completed | Show the failure and paired coverage. Do not drop it to claim improvement. |
-| The judge returns the string `"false"` | Reject the shape. Do not coerce it into a boolean verdict. |
-| Final evidence differs from initial retrieval | Judge only the exact context generation received. |
-| A library attempts telemetry or its own provider client | Block the bypass and qualify actual network behavior. |
-| Permission is revoked before history is read | Deny the protected content despite the retained historical scope. |
-| A comparison finishes in Automatic updates | Record its evidence without pausing or publishing the endpoint. |
-| An external model alias changes behind the same name | Matching identifiers do not establish comparable behavior. |
+| Evaluate before any release-ready version exists | Capture captured working-configuration inputs, prepare verified dependencies and run explicitly without publication authority. |
+| Edit working settings while evaluation runs | All cases keep the admitted effective configuration and corpus; subsequent edits affect later requests only. |
+| Change selected shared access settings while evaluation runs | Stop further model dispatches; preserve partial results and actual revision attribution. A new explicit admission is required, with both comparison sides executed freshly. |
+| Compare working settings with a live baseline | Resolve the baseline once, execute both sides freshly, and never follow changing live pointers per case. |
+| Build after a temporary override or a sample test | Build uses saved settings and selected build corpus, discloses mismatches and does not claim the earlier run approved them. |
+| Finish after setup | Pipeline remains usable; no generator, judge, tests, or evaluation charges required. |
+| Reject every draft | No default benchmark can run; explain the absence of accepted cases. |
+| Edit after benchmark freezing | New revision unreviewed; old snapshots unchanged, subject to erasure. |
+| Change chunking | Complete mapped coverage can pass without equal chunk IDs. |
+| Mapping unavailable | Unscorable, not ordinary retrieval miss. |
+| Twenty cases produce 16 found, three misses and one unavailable mapping | At that named stage show 16/19 scored, the unscorable case and the original 20-case scope when permitted; do not shrink the benchmark or reuse that denominator for other metrics. |
+| Historical execution binding disappears while a newer document/index exists | Report unavailability and preserve permitted partial results, without replacing or rebuilding the selected historical input. |
+| Reference answer exists for a cancellation question | Execute only the question through ordinary Pipeline inputs; expected text cannot be injected into retrieval/generation or used as extra faithfulness support. |
+| Revoke access during work/before history inspection | Stop prohibited sends and deny protected content, keeping safe partial status. |
+| Erase a source | Derived protected test/evaluation content becomes unavailable under cleanup policy. |
+| Unsupported selected model | Clear capability/output failure; no fallback. |
+| Exhaust budget | No new paid dispatch; completed drafts/results and incomplete counts remain visible. |
+| Cancel during keyphrase preparation | Cancellation applies there too, before a final executor handle exists. |
+| Obtain 17 of 20 requested cases | Save 17 unreviewed drafts and report three missing/failed units; no unbounded regeneration. |
+| Lose a provider response | Uncertain-outcome recovery, never silent replay of a potentially paid call. |
+| Candidate judge fails once | Show failure and smaller paired coverage, not a false improvement. |
+| Disable project tracing | No library export bypass; explicit evaluation records have their separately disclosed lifecycle. |
 
 <a id="decision-map"></a>
 
-## 9. Decision and reference map
+## 12. Decisions and scope
 
-Library integration, judge calibration, metric edge cases, and proposed thresholds remain work to verify.
+[ADR-0051](../adr/ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md) replaces the historical [OpenEvals decision](../adr/ADR-0030-use-openevals-for-groundedness-evaluation.md). [ADR-0031](../adr/ADR-0031-compare-fresh-executions-against-frozen-benchmarks.md) still requires fresh comparisons; [ADR-0052](../adr/ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md) partially supersedes only its ready-version-only restriction. [CLI starter-evaluation journey](https://github.com/matejpalenik/inframeld/issues/179) illustrates starter evaluation and [CLI development loop](https://github.com/matejpalenik/inframeld/issues/172) the development loop; [the data model](data-model.md#evaluation) owns records.
 
-Deeper diagnosis, automatic remedies, custom rubrics, correctness or relevance judges, generated datasets, claim extraction, ensembles, and optimization remain deferred. Keep the application-owned evidence and read contracts without unused diagnostic ports or exporters. LangSmith and Langfuse are not Compose dependencies.
+Manual blank-form authoring, automatic multi-hop/negative synthesis, correctness/relevance judges, custom evaluator platforms, ensembles, optimizers, automatic remedies, and external Phoenix/LangSmith exporters remain deferred. These exclusions do not defer starter generation, review, or claim extraction. No hosted evaluation account, graph database, separate runner, or workflow engine is required.
 
-Future exports must preserve internal IDs, current access, and retention. They cannot change run or release outcomes or rerun the judge. External references may use their own namespace without replacing internal identities.
-
-| Decision | Rationale |
-| --- | --- |
-| [ADR-0030](../adr/ADR-0030-use-openevals-for-groundedness-evaluation.md) | Use OpenEvals for groundedness evaluation. |
-| [ADR-0031](../adr/ADR-0031-compare-fresh-executions-against-frozen-benchmarks.md) | Compare fresh executions against frozen benchmarks. |
+Official background: [single-hop generation](https://docs.ragas.io/en/stable/howtos/applications/singlehop_testset_gen/), [prechunked input](https://docs.ragas.io/en/stable/howtos/customizations/testgenerator/prechunked_data/), [faithfulness](https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/), and [runtime configuration](https://docs.ragas.io/en/stable/howtos/customizations/run_config/). Use the pinned source evidence above when rolling examples have different API shapes.

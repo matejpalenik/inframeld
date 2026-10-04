@@ -12,6 +12,8 @@ Start with the worker's normal flow, then compare a lost model response with a s
 
 | Reader’s question | Start here |
 | --- | --- |
+| Does a failed CLI invocation mean I can start again? | [Automation and original admission](#automation-recovery) |
+| What does continuing a partial import mean? | [Original import and child outcomes](#import-recovery) |
 | What survives an interrupted worker? | [1. Admit work and claim an attempt](#admission) |
 | May a timed-out operation run again? | [2. Separate safe retries from uncertain work](#uncertain) |
 | What does the idempotency key mean? | [3. Identify the same request](#requests) |
@@ -65,6 +67,14 @@ The arrows show calls. The fence protects database progress and publication. It 
 ### Checkpoints, cancellation, and safe resume
 
 Save progress between limited-size files, batches, or evaluation cases. Retry automatically only when work was definitely not sent or repeating it is known to be safe. Wait between retries with bounded backoff and allow **at most three application attempts**. Once the budget is exhausted, record `failed` with that reason. There is no `paused` job state.
+
+### Apply the same jobs to Ragas work
+
+For example, a starter-generation job may save 17 usable drafts before a provider fails. Preserve those drafts and per-unit outcomes; reopening progress or review must not repeat completed calls. [Evaluation](evaluation.md#generation) owns generation/review semantics, while this guide owns durable attempts. Ragas is not another durable runner.
+
+Checkpoint bounded sampling, extraction, synthesis, and evaluation units under the existing job/attempt identity. Check cancellation during preparation as well as before each gateway dispatch; a library executor handle returned after preparation cannot cancel earlier work by itself. Recheck the current attempt fence before persisting results, and do not hold a transaction open while waiting on a model.
+
+Gateway-owned retries and budgets apply to nested calls and repairs too. Library retries must not multiply them. Budget exhaustion stops new dispatch with completed results retained, using existing failure outcomes. Cancellation cannot recall an already sent request; an unknown paid outcome follows [uncertain recovery](#uncertain), not silent resume/replay. A safe resume skips completed units; continuing after uncertain work requires the explicit recovery decision described below.
 
 An authorized person may resume the same job only after checking its current project or resource scope, ownership, retained data, and remaining work. Keep its checkpoints and attempt history. Resuming cannot revive a generation marked for permanent deletion, replace its fixed payload, or repeat an uncertain paid call. Cancellation is checked between units of work and cannot undo an already completed call or release.
 
@@ -218,6 +228,63 @@ For example, if Carol is also an eligible project member, changing Bob to Carol 
 
 The grant route exercises the safe-result path. The in-progress, asynchronous `202`, uncertain, issued-secret, and answer-receipt outcomes above retain their separate contracts. Their owning workflows still need implementation where noted.
 
+## CLI Recovery Contract
+
+The terminal and CI use the same saved backend operation. For a new command that changes state or can incur a charge, the CLI generates a request key unless automation supplies `--idempotency-key`.
+
+A retry keeps the original target, account, project, command meaning and accepted inputs. If the acceptance response was lost, first look up the original operation. Changing the selected target or editing the Pipeline does not change what that retry means. Local recovery hints can help locate an operation, but cannot prove what the server did or grant permission to continue.
+
+`Ctrl-C` requests cancellation. Pressing `c` stops watching and returns to the shell without canceling backend work. Report whether cancellation was merely requested or actually completed.
+
+Human commands wait by default. The caller can explicitly choose to return after the backend accepts work, and a wait timeout does not cancel that work. Scripts must not encounter unexpected prompts. They receive separate command and job outcomes. Exact transport, output and signal contracts still need specification. A terminal mockup does not define them.
+
+Configuration imports use these same durable jobs. They retain the approved definitions, destination mappings and completed resources. Continue only unfinished steps that the backend confirms are still safe and permitted. Changed inputs need a new review. An uncertain write must be resolved before it is repeated.
+
+Query retries still return receipts rather than answer text, and one-time secrets retain their special recovery restrictions. If the backend's original history has expired, the CLI must not automatically create new paid work. [The delivery plan](cli-delivery-plan.md) assigns lookup, progress, continuation and qualification work. It does not replace the implemented grant-idempotency behavior.
+
+<a id="automation-recovery"></a>
+
+### A failed command is not permission to start again
+
+CI submits work with request key `import-ci-42`, but the acknowledgment is lost. The backend may already have accepted the operation. Report that uncertainty. Do not invent a job ID, claim that no work started or automatically replace the key.
+
+Look up the original request using its original target, principal, project and meaningful inputs. Only the retained backend record can establish the result. The [automation outcome contract](api-contracts.md#cli-automation-outcomes) explains command results, JSON and exit codes.
+
+When a known job is read successfully, a failed job state can accompany a successful inspection command. Waiting for that job's failed requested workflow instead returns non-success, preserving confirmed partial effects. Neither reading nor watching reruns work. A previously returned admission acknowledgment does not establish current progress; a separate authorized read does. A wait timeout is not cancellation. A missing final output record is not proof that the server stopped.
+
+If the original review and inputs remain applicable, only backend-confirmed eligible unfinished work may resume through the existing contract. Changed input or relevant state requires fresh reviewed work, not rewriting the original operation. Unknown paid outcomes remain unsafe to repeat even after the job's identity is recovered. Expired/restored/missing history limits duplicate-detection guarantees; do not promise guaranteed recovery or silently resubmit as new work. Local hints and saved credentials supply neither authoritative server history nor missing permissions.
+
+Keep Ctrl-C's cancellation request, its acknowledgment and actual termination distinct. `c` detaches the view; it cannot cancel or close the user's terminal. Cancellation or an output failure cannot roll back completed effects. Bounded retry, receipt-only answers, show-once secrets and current-authority checks remain unchanged. #124/#156 specify concrete mappings and #175/#187 must prove the CLI behavior; this section is accepted design, not implementation evidence.
+
+<a id="import-recovery"></a>
+
+### An interrupted import keeps its original meaning
+
+Bob's import creates two resources and reuses three existing ones. Before its final step, the Pipeline changes, so the reviewed update can no longer be applied. Preserve the five confirmed outcomes and report the unapplied action. Do not undo the creates or replay completed updates.
+
+Reusing a resource does not write it. Any remaining step that needs it must still check its current state and permissions. The [worked import example](configuration-portability.md#import-recovery) explains the resource workflow and terminal output.
+
+Recovery first finds the original admission/job under its original context. An unchanged, retained review can support explicit continuation of eligible unfinished work through ordinary current checks. Changed definitions, mappings or relevant state instead require fresh review/admission; they cannot replace the old job's inputs. A new reviewed import may reuse completed resources after current comparison, while the old partial history remains intact. Exact relationship/projection contracts remain #151/#124 work, not a new generic workflow engine.
+
+An uncertain child write is neither a confirmed success nor a confirmed failure. Reconcile its original command/result before repeating it. Replaying an earlier successful response must not restore old configuration over a later edit. Lost local connectivity does not prove failure, and missing authoritative history does not prove absence of effects. Report those limits without silently creating another import. Cancellation prevents only work the ordinary cancellation boundary can stop; it cannot undo committed resources or eliminate the need to reconcile a late write. No import recovery implicitly calls models, syncs documents, builds or publishes.
+
+<a id="progress-presentation"></a>
+
+### Show useful progress in plain language
+
+Alice evaluates 20 cases. Seventeen finish before the project spending limit prevents the next call. Tell her: "Evaluation stopped: project spending limit reached. 17 of 20 cases completed. Their results are saved." Identify the three not-started cases through Evaluation's protected results and offer inspection. Offer `job resume` only when the backend reports eligible remaining work; admission still rechecks current authority, retained inputs and spending. Resolving the budget does not restart work automatically.
+
+[CLI progress and result presentation](https://github.com/matejpalenik/inframeld/issues/175) selects concise outcome/reason/next-action copy without removing counts or results. The initiating domain supplies meaningful units and saved outcomes; shared job support supplies operation state and recovery eligibility. Do not add a universal per-item tracking framework or job states to fill a screen. [Evaluation](evaluation.md#result-presentation) owns questions, scoring and case details.
+
+- Show actual progress when known, with a named unit and denominator. Do not invent a percentage, time estimate, zero or successful result when information is unavailable. Preparation can show its current activity without a case count.
+- Separate an answer being saved from its scoring being complete. Partial, failed, canceled, unattempted and uncertain work must remain distinguishable. A total or saved-result statement must come from authoritative retained observations, not elapsed time or local guesses.
+- Use a short default summary and a bounded list of items needing attention; link to ordinary inspection for the rest. Summaries, identifiers, questions and counts all remain subject to current access and erasure. Do not fetch every protected item merely to render progress.
+- `c` stops watching without sending cancellation and returns to the shell; it does not close the user's terminal. Ctrl-C requests cancellation. Acknowledge locally that cancellation is being requested, but report "Cancellation requested" only after server acknowledgment and "Job canceled" only after confirmation. If acknowledgment is lost, report it as unconfirmed and offer status lookup.
+- A lost CLI connection means the job **may** still be running, not that it certainly is. Look up the original operation before starting again. A model request with an unknown paid outcome instead requires review; say that it may have been charged and was not retried when those facts are established. Ordinary resume cannot repeat that call.
+- Human and JSON views expose the same authorized facts and recovery limits. Human progress goes to stderr when stdout carries JSON; no animations or interactive key handling in noninteractive output. Reading or watching results does not rerun work.
+
+These are accepted presentation requirements, not implemented guarantees or a wire schema. #124 owns precise backend outcomes, #156 the CLI output mapping, #175 presentation, and #39/#187 qualification. Preserve the existing lifecycle and bounded cancellation/recovery rules below.
+
 <a id="secrets"></a>
 
 ## 4. Recover secret operations safely
@@ -314,11 +381,33 @@ Before restarting provider-capable jobs or replaying builds, evaluations, or rel
 
 Do not promise deduplication or exactly-once external effects for history absent from the restored backup.
 
+<a id="connection-changes"></a>
+
+### Preserve operation identity across shared connection changes
+
+Admitted work records selected connection IDs and the current access revisions it observed, separately from fixed Pipeline/model/corpus inputs. Before each model dispatch, resolve current access and apply [the gateway freshness rule](model-connections.md#dispatch-freshness). A relevant access change stops remaining model work; it is not permission to use the old revision, rebind the existing job or retry against new settings automatically. Credential-only rotation and metadata rename remain independent.
+
+A known revision/precondition failure uses the existing failed outcome with a safe explanation. An uncertain dispatched paid call retains recovery-required handling. Keep completed checkpoints with actual revision attribution. Changed settings require new explicit admission and cost review; resuming the same job must not relabel old units or adopt a newer access revision. Previously captured immutable vector payloads retain their ordinary bounded storage-retry path, but this permits neither new model calls nor automatic publication under changed consent.
+
+Connection updates themselves are conditional, idempotent commands. Recheck reviewed revisions, current management authority, complete dependency impact and embedding compatibility in coordination with new bindings/preparation admission. Commit configuration, required credential transition, audit and safe replay outcome together. No external model call occurs inside that transaction. Lost responses recover the original metadata-only outcome; replay after another update does not restore the earlier state. Exact public schemas and concurrency mechanisms remain implementation work, not another workflow framework.
+
+<a id="capture-experimental-inputs-before-preparation-and-preserve-them-on-retry"></a>
+
+### Capture working-configuration inputs before preparation and preserve them on retry
+
+Alice admits an evaluation of working revision 18, then saves revision 19 while its preparation is running. The existing job retains revision 18, its explicit overrides, exact corpus and eventual fixed verified bindings. Direct-query/evaluation preparation uses ordinary bounded jobs and checkpoints, without creating a release version. No child completion acquires publication authority.
+
+On a repeated request, find the original operation before resolving the current working revision, collection selection or sole Deployment again. The same key cannot capture revision 19 or a newly created target and charge for a second operation. An explicit new request is required for changed inputs. Admission checks expected reviewed revisions; conflicts are not automatically retried with fresher consent.
+
+The user-facing policy-controlled Build likewise captures the saved configuration and target exactly once. Its ordinary build child records readiness; only a separately authorized publication child may change traffic. Record ready-but-unpublished distinctly from preparation failure, and preserve a successful build when permission, mode, candidate state or a newer request prevents publication.
+
+Cancellation covers preparation, between evaluation cases and before gateway dispatch. A canceled/superseded workflow cannot later publish merely because a child finishes. Already dispatched model calls may finish and charge; uncertain outcomes retain `recovery_required`, not an automatic paid retry. CLI Ctrl-C requests cancellation, while `c` only detaches a durable progress view. Reopening a watcher observes the same job without resubmission. Canceling after publication committed cannot undo the release. [Pipelines](pipelines-and-releases.md#preview) and [CLI development loop](https://github.com/matejpalenik/inframeld/issues/172) own user-visible context and outcomes.
+
 <a id="automatic"></a>
 
 ## 7. Reuse these rules for automatic publication
 
-Automatic updates use these same jobs and keep stable IDs for their child operations. Building and publishing are separate commands. Only one update runs per Deployment at a time. A newer authorized update removes an older one's permission to publish, without changing the older build's fixed inputs.
+Automatic updates use these same jobs and keep stable IDs for their child operations. The underlying preparation and publication are separate application commands, even when the CLI Build workflow admits both together. Only one update runs per Deployment at a time. A newer authorized live-input update or automatic Build removes an older one's permission to publish, without changing the older build's fixed inputs. A working edit, restore, direct Pipeline queries or evaluation does not supersede publication work.
 
 The [publication-mode guide](pipelines-and-releases.md#modes) defines the full checks. A worker cannot substitute a newer revision to make an outdated request valid. After a crash, it finds the recorded release change instead of publishing twice. Canceling pending work does not reverse a release already saved.
 

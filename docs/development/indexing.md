@@ -13,6 +13,8 @@ Assume Alice builds Support from three documents under one processing profile an
 | Reader’s question | Start here |
 | --- | --- |
 | What can an unchanged document reuse? | [1. Understand what is shared](#model) |
+| What must a portable profile preserve? | [Processing and embedding settings](#portable-profiles) |
+| What happens when a shared model connection changes? | [Embedding compatibility](#embedding-compatibility) |
 | When is the whole corpus ready? | [2. Prepare and verify a materialization](#build) |
 | What if Chroma times out? | [3. Recover a vector write](#retries) |
 | How are search results scoped? | [4. Search only the permitted corpus](#retrieval) |
@@ -81,9 +83,53 @@ There are **six records before the change, eight while both revisions are retain
 
 GA and GC keep the same IDs, values, metadata, and shard locations. R1 searches GA, GB1, and GC. R2 searches GA, GB2, and GC. Changing the search filter lets the two revisions share unchanged records without adding a changing collection-membership field to Chroma.
 
+<a id="portable-profiles"></a>
+
+<a id="portable-profile-meaning"></a>
+
+### Preserve processing and embedding settings during export
+
+If Alice changes chunking, she creates a new named processing profile and explicitly prepares data with it. Processing profiles are immutable. Changing only a prompt or reranker can reuse compatible verified indexes.
+
+The selected processing option is Docling HybridChunker. Its processing and tokenizer assets must have pinned identities and work offline. Keep the supported configuration small and validated, and export the effective settings explicitly. Exact assets, numerical presets and source-coordinate mappings still need qualification.
+
+An embedding profile must describe the complete vector meaning: connection and model, expected dimensions, normalization, distance metric and relevant handling of document and query inputs.
+
+Expected dimensions are an output check, not automatically a request for the provider to resize its vectors. Validate the actual document and query payload sizes. Reject oversized inputs rather than silently truncate them. Successful response validation records evidence without changing the profile. Using a connection's current settings never permits incompatible query vectors to be mixed with prepared data.
+
+The [model-metadata contract](model-connections.md#model-metadata) permits reliable suggestions that users can edit before saving. If a private server provides no usable metadata, ask for the required supported dimensions and input/tokenizer settings. Do not guess that its model matches a public one.
+
+These declarations can complete a configuration, but do not prove that the model works or is compatible with another model. Save the reviewed settings and where they came from. A newer catalogue cannot change an existing profile. Changing the tokenizer, dimensions or any other processing or vector meaning requires a new profile and ordinary preparation.
+
+Do not resize returned vectors or silently choose a generic tokenizer to make them appear compatible. Explain missing required metadata or assets as actionable failures. Synthetic probes remain optional.
+
+[Configuration portability](configuration-portability.md) transfers these definitions, not vectors. Named references resolve to permanent destination IDs; altered profile meaning needs a distinct name. Settings cannot guarantee future provider-alias stability or identical vectors. The [delivery plan](cli-delivery-plan.md) tracks schema/metadata/source-mapping gates and runtime tests.
+
 <a id="build"></a>
 
 ## 2. Prepare and verify a materialization
+
+<a id="embedding-compatibility"></a>
+
+### Distinguish a model migration from an unsafe shared update
+
+Alice's documents were embedded with model A. Selecting model B for a direct query is allowed, but querying A's vectors with B's query embedding is not. A matching array length does not make two vector spaces compatible. The model/profile selection describes requested behavior; a verified materialization supplies matching prepared data.
+
+| Situation | Required result |
+| --- | --- |
+| **Choose another embedding model or vector-space setting** | Save the appropriate new immutable profile and Pipeline working revision, or admit an explicit per-request override. This alone makes no model calls and changes no live data. |
+| **Direct query or Build with that profile** | Reuse genuinely compatible ready data, otherwise disclose and admit ordinary preparation. New numerical outputs get new generation identities. No retrieval until complete matching bindings are verified. |
+| **Try to query mismatched model/profile and prepared data** | Block before incompatible retrieval. Do not silently choose the old model, search anyway or start unapproved re-embedding. |
+| **Edit shared connectivity while prepared or in-progress data depends on it** | Reject the entire connection update if it changes vector meaning or compatibility is unproven. Leave access settings, credentials, profiles and old data unchanged. |
+| **Rotate a credential or rename metadata without changing the access/model contract** | No new embedding profile or vectors solely for that change. Required credential, response and current access checks remain. |
+
+The connection-update guard considers all retained prepared dependencies and admitted preparation, not just live Deployment pointers or dependencies visible to the manager. Coordinate new dependency admission and updates so concurrent preparation cannot create a gap. A historical index kept for rollback is still a dependency; ordinary reference-aware retirement is separate, not an automatic way around rejection.
+
+Use the profile's explicit expected provider/model identity, known model revision where supported, dimensions, normalization, metric and relevant model-input settings to check meaning. In v1, changing provider, endpoint/base path or provider API version is not presumed compatible with existing data. Supported identity evidence may establish compatibility; an alias, dimensions or optional probe alone cannot. If it cannot be established, the shared update is rejected. This does not require a synthetic probe before ordinary model use or promise detection of unannounced provider-side changes.
+
+Offer the isolated migration: create another connection when access settings must change, select the appropriate new profile, prepare it, query/evaluate, then Build and release. Compatible processing artifacts can be reused; old vectors are neither relabelled nor overwritten. [Model connections](model-connections.md#connection-compatibility) owns the shared-update operation and [ADR-0054](../adr/ADR-0054-use-shared-current-model-connections.md) records the decision.
+
+Numerical execution records the actual access revision used. Profiles reference a connection ID, not an executable historical access revision. A relevant access change observed during admitted work stops remaining model dispatches under [the dispatch contract](model-connections.md#dispatch-freshness). Previously captured vector payloads retain their identity and ordinary safe-storage recovery rules; that does not authorize another model call or certify incomplete work ready.
 
 ```mermaid
 flowchart LR
@@ -109,9 +155,19 @@ The arrows show the order of work. Indexing prepares and checks the data. Releas
 
 A **tombstone** permanently marks a physical identity as retired so it cannot be reused or made live again. The full retirement protocol appears below.
 
-A build saves the exact configuration, collection revisions, and profiles it will use. If Alice changes “latest” while it runs, the build continues with its saved choices. Finishing that build and sending traffic to it are separate actions.
+A build saves the exact Pipeline configuration, collection revisions, and profiles it will use. Later Pipeline edits do not replace those choices. Shared connections remain current operational dependencies: changed admitted access revisions stop further model dispatch instead of selecting old access settings. Finishing a build and sending traffic to it are separate actions.
 
 The application may reserve a PipelineVersion ID when a build starts. It publishes the complete version, including its fixed references to prepared data, only after every required materialization is ready. A **materialization** is the verified search data for an exact collection revision and set of profiles.
+
+<a id="preparation-can-serve-an-experiment-without-creating-a-release-version"></a>
+
+### Preparation can serve a direct query without creating a release version
+
+Alice may query the Pipeline with a different reranker before building any PipelineVersion. [Pipelines](pipelines-and-releases.md#preview) captures the effective configuration and exact corpus, then asks Indexing for compatible verified materializations. A changed reranker usually reuses them; changed chunking or embedding semantics may require new processing/vectors. Disclose and admit that preparation with its cost and limits, using the same worker, gateway and verification behavior as a release build.
+
+Indexing supplies immutable prepared bindings to the execution-input snapshot, not a Deployment pointer or release-ready version. Unready, missing or incompatible bindings block questions and evaluations. Preparation completion never authorizes publication. Existing live generations remain untouched, and query-preparation inserts follow the same single-writer, uncertainty and cleanup rules. A direct query is not a second index engine or permission to query a partial index.
+
+Active direct-query work uses bounded artifact pins. Retaining snapshot metadata does not permanently retain every numerical generation. A release build can reuse still-compatible verified outputs, but must not silently reconstruct missing historical numerical data or claim that changed bindings were evaluated. Source erasure and present health checks apply to both direct Pipeline and live execution.
 
 A prompt-only pipeline version can reuse M1 without another physical collection or vectorization. Retaining R1 does not preserve old access rights: current permissions can exclude B from either revision.
 
@@ -146,6 +202,12 @@ Creating a profile first saves it in PostgreSQL and queues its setup. The worker
 Show progress for each step separately: accepting the source, processing it, setting up a profile, producing vectors, creating the logical revision, and verifying its materialization. A single “ready” flag would hide which work is complete.
 
 V1 offers supported processing profiles. Arbitrary parser or chunker plugins are deferred. The application-owned processing interfaces leave room for them without requiring a plugin system now.
+
+### Preserve source coordinates for evaluation
+
+An expected passage can remain the same when a new chunking profile divides it differently. Expose the DocumentVersion, immutable parsed-artifact identity, and source spans for processed passages and returned chunks. Define the coordinate units explicitly; generation-scoped chunk IDs alone cannot establish equivalent evidence. Truncated generation context needs mappings for the retained text, not the original full chunk.
+
+[Evaluation](evaluation.md#passages) owns the full-coverage calculation and freezes expectations from already processed text. It needs no additional parsing, embeddings, or relationship graph for its starter preset. If parser outputs lack a verified shared coordinate mapping, report that limitation: Evaluation marks the case unscorable rather than guessing from text similarity. These mappings and conversions still require implementation qualification; this is not a guarantee of arbitrary cross-parser compatibility.
 
 ### Verify a materialization before publishing its readiness
 
@@ -256,9 +318,9 @@ Creating or deleting a physical Chroma collection needs its own recovery handlin
 
 For each query, the application follows this sequence:
 
-1. **Identify the caller and version.** Authenticate the human through Kratos or the integration through its application identity. Check project and action permissions, then resolve the Deployment and exact PipelineVersion.
+1. **Identify the caller and fixed execution inputs.** Authenticate the caller through the supported human or application path. Check project and operation-specific permissions. Live queries resolve a Deployment and exact PipelineVersion; direct queries instead capture working settings under [Query on the exact Pipeline](access-control.md#pipeline-query-authority). Evaluation uses its separately authorized admission and captured inputs. All identify exact verified bindings before search; Pipeline Query alone does not grant evaluation-history access.
 2. **Keep the required data available.** In PostgreSQL, check that the profiles, layout, and materializations are healthy and ready. Register a time-limited operation pin, a record that prevents ordinary cleanup while this query uses them.
-3. **Choose permitted generations.** Start with compatible generations from the version's exact collection revisions. Keep only those allowed by current document groups and deletion state, then remove duplicates.
+3. **Choose permitted generations.** Start with compatible generations from the fixed execution inputs' exact collection revisions. Keep only those allowed by current document groups and deletion state, then remove duplicates.
 4. **Embed the question.** Request one query embedding for the selected profile through `ModelGateway`.
 5. **Build the search filter.** The server includes `vectorization_generation_id: {"$in": [...]}` and the required immutable scope/profile restrictions.
 6. **Search every required shard.** Limit simultaneous calls, use a shared deadline, and merge results using the same distance metric. Break ties by stable record ID and remove duplicates.
@@ -313,6 +375,8 @@ The distances above are invented examples. Chroma's single-node HNSW index uses 
 ### Empty or invalid filters must never become unrestricted searches
 
 An empty allowed set returns an authorized no-evidence outcome without querying Chroma.
+
+This presumes the caller passed the query's project/action authorization. [Access distinguishes an empty evidence scope from denial](access-control.md#empty-evidence-scope): a forbidden query or protected-content read still fails under its normal contract. Do not map every empty permitted set to an authorization error.
 
 An empty or failed filter must never turn into an unrestricted search. Searching all records and discarding forbidden ones afterward is insufficient: forbidden or obsolete records may have crowded out the permitted candidates before they were returned.
 

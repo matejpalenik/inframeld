@@ -8,6 +8,8 @@ Status: Accepted — operating baseline remains provisional and requires qualifi
 
 PostgreSQL, Kratos data, objects, numerical indexes, configuration, and keys refer to one another. Restoring one store alone can leave broken references or silently restore obsolete permissions.
 
+[ADR-0053](ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md) subsequently adds Hydra to the accepted identity runtime. The same complete-installation rule includes its database, protocol state, client registrations and required keys/configuration. This clarifies the existing backup boundary; it does not select a new backup mechanism or claim a qualified restore.
+
 ## Considered Options
 
 - A coordinated complete backup and restricted, validated restoration.

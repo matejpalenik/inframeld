@@ -73,7 +73,7 @@ async def test_password_login_cookie_verifies_same_identity() -> None:
 @pytest.mark.asyncio
 async def test_expired_browser_cookie_is_rejected() -> None:
     """Reject the original cookie after Kratos's recorded session expiry."""
-    async with create_browser() as registration_browser:
+    async with create_browser(public_url=EXPIRING_KRATOS_PUBLIC_URL) as registration_browser:
         human = await register_human(registration_browser)
 
     async with create_browser(public_url=EXPIRING_KRATOS_PUBLIC_URL) as browser:

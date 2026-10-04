@@ -1,8 +1,10 @@
 # ADR-0025: Separate connection meaning from replaceable credentials
 
-Status: Accepted
+Status: Accepted, partially superseded by [ADR-0050](ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md) on 2026-09-28 for the separate-probe prerequisite, and [ADR-0054](ADR-0054-use-shared-current-model-connections.md) on 2026-09-30 for consumer-pinned connection meaning. Credentials remain separate and evidence remains revision-specific; consumers use shared current access settings, not historical access revisions.
 
 **Date:** 2026-09-24
+
+The original rationale and outcome below are preserved as history, including the frozen connection/model meaning and mandatory-probe example. [ADR-0050](ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md) defines optional preflight. [ADR-0054](ADR-0054-use-shared-current-model-connections.md) and the current guides define shared connectivity, guarded updates and actual-call evidence.
 
 ## Context and Problem Statement
 
@@ -33,4 +35,5 @@ Implementation evidence and qualification limits are recorded in the current gui
 
 - [Current model connections](../development/model-connections.md).
 - [Current data model](../development/data-model.md).
+- Partially superseded by [ADR-0050](ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md).
 - Related decisions: [ADR-0023](ADR-0023-route-every-model-request-through-modelgateway.md), [ADR-0024](ADR-0024-approve-outbound-destinations-before-model-calls.md).

@@ -18,6 +18,8 @@ Use this guide when adding or rewriting documentation. A new maintainer should b
 
 ## Where information belongs
 
+For authorized backlog maintenance, use [the implementation template](../../.github/ISSUE_TEMPLATE/implementation.md), [Definition of Done](definition-of-done.md) and [CLI delivery traceability](cli-delivery-plan.md). One ticket owns one coherent capability or transition. Epics map children; qualification issues specify evidence rather than claim to implement runtime behavior. Record a real architecture SHA and disclose any uncommitted overlay. Keep native parents/dependencies and issue-body tables aligned, preserve completion history and isolate unresolved contract design before labelling implementation ready.
+
 | Reader’s question | Owning document | What to put there |
 | --- | --- | --- |
 | What does this application do, and how do its parts work together? | [Architecture introduction](../ARCHITECTURE.md) | A connected explanation, vocabulary, a worked journey, and links to deeper material. |
@@ -74,9 +76,15 @@ Adapt this pattern to the document. Pagination needs a short contract and exampl
 
 Use short, connected paragraphs and familiar words. Keep exact code names, but explain what they mean before using them heavily. Prefer “save the change and its audit event together” to “commit the mutation and transactional audit atomically.” Introduce a term such as transaction when it helps the reader understand the mechanism.
 
+Use the shared [resource-naming vocabulary](data-model.md#resource-naming): **name** is the exact command/configuration selector, **display name** is the presentation label, and **ID** is the permanent identity. Screen columns should say `NAME` and `DISPLAY NAME`; distinguish them in prompts and rename examples too. Do not use display names as implicit references. Preserve exact third-party symbols and existing code/database/wire field names when documenting them, and explain legacy mappings rather than silently renaming them or implying a migration. This terminology does not turn every internal record into a user-named resource.
+
 Use Alice, SupportBot, Support, Test, and Production consistently, with each example's assumptions stated. Explain what diagram arrows mean and whether boxes are parts of the backend or separate services. Tables work well for comparisons and exact rules. Avoid semicolons in prose.
 
-Give each rule one owning document. Remove repeated explanations, rewrite history, and obsolete comparisons, while keeping warnings next to the operation they constrain. Preserve limits, exceptions, calculations, open questions, and untested assumptions. If detail belongs elsewhere, move it to an active reference and link it. A shorter document is not better if it loses the reason a safeguard exists.
+Give each rule one owning document. Remove duplicated explanations and obsolete comparisons, while keeping warnings next to the operation they constrain. Keep dated historical evidence clearly separate from current instructions. Preserve limits, exceptions, calculations, open questions and untested assumptions. If detail belongs elsewhere, move it to an active reference and link it. A shorter document is not better if it loses the reason a safeguard exists.
+
+State the rule directly rather than citing shorthand from a design workshop. For example, explain which operations an application account may perform and which permissions it needs. Link the owning guide with descriptive text. A reader should not need a retired discussion document to decode a decision number.
+
+Introduce precise technical terms when they are useful. For example, "save and validate the operation before starting background work" explains admission. Prefer "check current permission before saving" to "revalidate mutation authority at commit" when the distinction does not require the more technical wording. Separate a rule, its reason and its failure behavior instead of packing them into one sentence.
 
 ## Skill reading routes
 
@@ -109,9 +117,9 @@ Preserve [AGENTS.md](../../AGENTS.md), its TDD and read-only safeguards, and [we
 
 Four previously referenced documents were unavailable in the reviewed checkout and available Git history. The availability notes below identify the missing files and link to existing specifications. No missing report or test result has been reconstructed.
 
-### Missing SDK Kit review
+### Missing historical client review
 
-`docs/reviews/sdk-kit-feasibility.md` is unavailable. The [API contract guide](api-contracts.md) retains the known delivery decision: backend work proceeds first, while external SDK Kit suitability blocks Studio. Studio uses the official generated TypeScript SDK. This does not prove generation or interoperability has passed.
+The previously referenced external client-tooling feasibility report is unavailable and establishes no qualification evidence. [ADR-0055](../adr/ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md) replaces the earlier tooling dependency with generator-neutral OpenAPI clients and CLI-first v1. See [API contracts](api-contracts.md) for current delivery requirements.
 
 ### Missing closing review
 

@@ -1,6 +1,6 @@
 # ADR-0012: Use Kratos for human authentication
 
-Status: Accepted
+**Status:** Accepted; partially superseded by [ADR-0053](ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md) for human CLI OAuth issuance through Hydra. Kratos remains the human identity and browser-session provider. The original browser-focused rationale below is preserved; it must not be read as deferring Hydra for the now-accepted CLI flow.
 
 **Date:** 2026-09-17
 

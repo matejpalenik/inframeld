@@ -20,6 +20,8 @@ These options summarize the recorded choices, exclusions, and deferrals. They do
 
 Have ordinary builds publish readiness, not Deployment serving pointers. Releases selects ready compatible versions through its authorized transitions. Automatic updates may authorize ordinary build and separate conditional publication in advance, but must retain their current authority and control checks. Human creation has the accepted first-ready-version and explicit creator-grant transaction.
 
+[ADR-0052](ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md) distinguishes the user-facing CLI Build workflow from this underlying build operation. The CLI workflow may admit preparation and conditional publication together for its selected Automatic Deployment. Preparation still owns no release authority. Direct Pipeline query preparation and evaluation never initiate publication, and no separate CLI apply command is required.
+
 **Example.** P13 can finish successfully after the user switches to Manual releases. It remains a usable ready result, but the old automatic operation cannot publish it.
 
 ## Consequences

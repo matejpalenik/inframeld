@@ -176,7 +176,7 @@ Keep this adjustment limited to declared problem responses. Do not create anothe
 
 The runtime response and schema must agree on aliases, required and nullable fields, limits, and omitted optional fields. A model may be absent from the committed production schema until a production response uses it. Never mount test fixture routes in the product or export them in its schema.
 
-Use the existing OpenAPI 3.1.x exporter and drift check. Do not hand-edit `contracts/openapi/v1/inframeld-v1.json`, add another exporter, down-convert the schema, or begin SDK Kit work here. Clients need fallbacks for unfamiliar problem types and upstream responses in other formats. HTTP status alone does not define a shared retry policy.
+Use the existing OpenAPI 3.1.x exporter and drift check. Do not hand-edit `contracts/openapi/v1/inframeld-v1.json`, add another exporter, down-convert the schema, or implement a custom generator here. Clients need fallbacks for unfamiliar problem types and upstream responses in other formats. HTTP status alone does not define a shared retry policy.
 
 ## Qualification checklist
 

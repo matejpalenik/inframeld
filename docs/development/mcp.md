@@ -8,6 +8,8 @@ Start with the two supported tools, then follow authentication and retry handlin
 
 > **Design status:** This is the accepted v1 client profile. The protocol and SDK choices are dated research, not proof that an Inframeld integration or a named client has passed testing.
 
+[CLI application-connection journey](https://github.com/matejpalenik/inframeld/issues/161) offers an optional access-first connection flow with HTTP and MCP branches. It uses the application-account/key rules below, not the human's CLI login. [ADR-0053](../adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md) separately selects Hydra for human CLI authentication without expanding this MCP profile.
+
 ## Contents
 
 | Reader’s question | Start here |
@@ -84,7 +86,7 @@ Feedback uses the [existing HTTP contract](answer-feedback.md). V1 adds no model
 
 ## 3. Authenticate every mounted request
 
-An authorized administrator creates an existing Inframeld application key with a defined scope, expiry, and revocation support. The key is **opaque**: Inframeld verifies it rather than trusting identity or permission claims written by the caller.
+An authorized human explicitly grants the application its intended access and issues an Inframeld application key under the [full issuance checks](access-control.md#applications). Its audience, expiry and revocation support are distinct from the account's current permissions. A general administrator title is not issuance authority. The key is **opaque**: Inframeld verifies it rather than trusting identity or permission claims written by the caller.
 
 The installed or server-side client stores it outside prompts and source control, and sends this header on **every MCP HTTP request**:
 
@@ -92,7 +94,9 @@ The installed or server-side client stores it outside prompts and source control
 Authorization: Bearer <credential>
 ```
 
-The existing API verifier checks the key's hash, expiry, revocation, permitted installation and resource, and the account's current permissions. Replacing the key keeps the same application principal.
+The shared application-key verifier must check the key's hash, expiry, revocation and permitted installation/resource, followed by the account's current permission checks. Replacing the key keeps the same application principal.
+
+This is the required shared verifier contract, not a claim that the application-key/MCP path is already implemented. Hydra-backed human CLI access tokens have their own API audience and verifier. The MCP profile does not accept them or Kratos browser cookies by implication.
 
 A key with additional permissions still gets only this adapter's query and receipt tools. Permission to deploy through another API does not create a deployment tool here.
 
@@ -219,7 +223,7 @@ Mount one MCP ASGI application behind the existing TLS reverse proxy at:
 https://<installation>/mcp/
 ```
 
-TLS protects the HTTPS connection. The reverse proxy is the installation's existing public entry point.
+TLS protects the HTTPS connection for production/network installations. The reverse proxy is the installation's existing public entry point. Only the [CLI-managed same-machine loopback trial](deployment.md#managed-local-http) may use its explicitly configured HTTP origin under H07. A target named local, an arbitrary loopback URL, tunnel or remote Docker host cannot opt into this exception. Use the actual configured canonical MCP URL for credential binding.
 
 Use the official SDK's low-level **`Server`** with only **`on_list_tools`** and **`on_call_tool`** handlers. In the [pinned SDK 2.2.0](https://github.com/modelcontextprotocol/python-sdk/blob/v2.2.0/docs/advanced/low-level-server.md), the higher-level `MCPServer` advertises prompts, resources, and subscriptions even when Inframeld registers no such content. The low-level server advertises only the handler families it serves. Validate tool arguments against their advertised schemas before calling the application, because the low-level server does not do that validation automatically.
 
@@ -270,11 +274,11 @@ Full OAuth connection includes finding the protected resource and authorization 
 
 The recorded SDK's built-in OAuth `TokenVerifier` also requires `AuthSettings`, including an issuer, and advertises resource discovery. Do not invent an issuer or point this setting at Kratos merely to enable that configuration.
 
-Kratos's company OIDC sign-in identifies humans. It does not make Kratos an OAuth access-token issuer. The MCP mount therefore uses Inframeld's existing application-key verifier without advertising an unavailable OAuth discovery flow.
+Kratos's company OIDC sign-in identifies humans. Hydra is now explicitly selected as the OAuth/OIDC issuer for first-party human CLI login under ADR-0053. This does not make Kratos an issuer or automatically configure Hydra for MCP clients, resource audiences and consent. The MCP mount retains Inframeld's application-key verifier without advertising an unimplemented MCP OAuth discovery flow.
 
-If broad browser OAuth connection becomes a v1 requirement, make a new scope decision. It needs a real authorization server, discovery and registration, consent, token lifecycle, and tested clients. That issuer can run elsewhere, but renaming an opaque application key cannot replace it.
+If broad browser OAuth connection becomes a v1 requirement, make a new scope decision. Hydra can be assessed as the already-selected issuer, but MCP resource discovery, client onboarding, consent, audience-bound token lifecycle and actual client interoperability still need their own design and tests. Renaming an opaque application key or reusing the human CLI client registration cannot supply them.
 
-Hydra and verified user delegation remain deferred unless separately approved. Human engineers use Kratos sessions inside Inframeld and must not export those cookies to MCP clients. Supporting a later OAuth-only client needs its own decision.
+Hydra for human CLI login is **accepted**, not deferred. Third-party MCP OAuth interoperability and verified user delegation remain deferred. Human engineers use Kratos browser sessions or the separate Hydra CLI login and must export neither credential to an MCP integration. Supporting an OAuth-only MCP client needs its own decision and qualification.
 
 <a id="maintainer-checks"></a>
 
@@ -296,9 +300,10 @@ The cases below are requirements for the future integration. The source document
 
 ## 8. Decision and reference map
 
-Protocol 2026-07-28 and Python SDK 2.2.0 remain the dated choices to test, not newly verified releases. The default-selector fields are still recommended. Browser OAuth discovery, Hydra, delegated users, broader tools, and certification of named desktop clients remain outside this profile.
+Protocol 2026-07-28 and Python SDK 2.2.0 remain the dated choices to test, not newly verified releases. The default-selector fields are still recommended. MCP browser OAuth discovery, delegated users, broader tools, and certification of named desktop clients remain outside this profile. Hydra's separate human CLI role is accepted under ADR-0053 and still needs implementation/release evidence.
 
 | Decision | Rationale |
 | --- | --- |
 | [ADR-0044](../adr/ADR-0044-provide-mcp-through-a-thin-adapter-in-the-existing-api-process.md) | Provide MCP through a thin adapter in the existing API process. |
 | [ADR-0045](../adr/ADR-0045-support-preconfigured-mcp-clients-with-application-credentials.md) | Support preconfigured MCP clients with application credentials. |
+| [ADR-0053](../adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md) | Select Hydra for human CLI login without changing the MCP credential/client profile. |

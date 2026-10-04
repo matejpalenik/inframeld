@@ -22,6 +22,8 @@ Send model traffic only through approved connections and the documented destinat
 
 **Example.** Changing a connection from one origin to another must not silently send the first provider’s saved key to the second origin.
 
+[ADR-0054](ADR-0054-use-shared-current-model-connections.md) clarifies deliberate handling: a guarded in-place origin update can be authorized with explicit destination-bound credential provision and atomic activation. Operator approval, TLS/DNS checks and the prohibition on implicitly forwarding saved credentials remain unchanged. Its embedding-compatibility guard may reject the update; another connection is the isolated migration path.
+
 ## Consequences
 
 - OSS can support private/custom providers while keeping outbound authority explicit.

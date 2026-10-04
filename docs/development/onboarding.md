@@ -13,8 +13,9 @@ Start with what private setup creates, then follow model configuration and publi
 | Reader’s question | Start here |
 | --- | --- |
 | What does setup create? | [1. Private defaults are ordinary resources](#model) |
+| How does CLI setup establish human identity? | [Human login before provisioning](#human-login) |
 | Do defaults bypass upload or sharing checks? | [2. Keep starter content private](#access) |
-| What is required before the first answer? | [3. Configure and validate real models](#models) |
+| Must I test models before using them? | [3. Configure models with optional preflight](#models) |
 | What happens before first publication? | [4. Resolve the default through normal serving](#default-route) |
 | Does every upload publish? | [5. Apply a complete authorized selection](#updates) |
 | How do failures and mode changes look? | [6. Follow the first answer and a later change](#journey) |
@@ -44,6 +45,56 @@ flowchart LR
 
 The arrows show successive steps within the application. Each step uses its existing domain and ordinary permission checks.
 
+<a id="human-login"></a>
+
+### Sign in before provisioning, without requiring Studio
+
+For the CLI, `local start` starts/reuses the managed runtime and returns with an explicit `setup --target local` next step. It does not sign in or claim administration. Guided setup or explicit login opens the system browser through the accepted Kratos-plus-Hydra flow. The small Ory account UI authenticates Alice through Kratos and handles the documented Hydra login/consent integration independently of the full Studio. [Access](access-control.md#human-cli-authentication) owns token verification and local-principal resolution; [ADR-0053](../adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md) records this selected architecture.
+
+Successful identity-provider login alone is insufficient. The first administrator must complete the separately authorized operator claim, and every human must pass current admission/account checks before private provisioning or product access. Local setup may use its narrowly bound host maintenance channel; remote setup requires the remote operator's authorized action, not an implied SSH privilege. [Deployment](deployment.md#managed-local-http) specifies the managed same-machine HTTP exception. All other installations require HTTPS.
+
+Reuse an existing valid login for the selected target/account. A changed issuer, a different verified person for an existing account alias, unavailable verification or incomplete admission must not silently create another identity or default project. Reopening setup follows the same saved state. Human CLI tokens stay in the qualified local credential store, not in a project file or an application integration. [Authentication qualification](access-control.md#cli-authentication-qualification) remains pending; the existing cookie adapter alone does not establish this flow.
+
+<a id="host-bootstrap"></a>
+
+### Confirm the first administrator through host authority
+
+Local setup first obtains a verified Ory identity, keeping issued tokens transient until admission and secure saving succeed. Show that verified account and installation, and ask the host operator to confirm the initial explicit administrative grants. A typed email is not proof of identity; OAuth consent alone is not the bootstrap permission.
+
+Invoke a narrow maintenance operation inside the verified managed backend using existing host/container authority. Bind it to the installation, not a target named `local` or whichever Docker context happens to be selected. Send any credential through protected stdin/IPC, never argv, environment or logs. The operation independently verifies the identity evidence through trusted Ory integration, then atomically saves the identity link, scoped grants and audit event. Repeating the completed claim for the same identity is harmless; a competing different identity fails.
+
+No public claim endpoint, shared claim password, browser host authority or Docker socket mounted in the backend is introduced. Remote first setup requires the equivalent operator action on the server; ordinary remote login supplies no SSH or maintenance authority. Exact maintenance command/IPC, expected-state and retry contracts remain #116/#27 deliverables. After the claim, normal admission must still succeed before the CLI reports a usable saved login.
+
+<a id="guided-setup-entry"></a>
+
+### Start setup explicitly and resume only unfinished work
+
+Setup guides an unconfigured or partly configured project to its first functioning pipeline. It is not ongoing administration and does not equate an existing project record with readiness. `local start` reports runtime health and the next `setup --target local` command, then returns without entering or prompting for onboarding. Starting local also preserves an existing remote selection. No mandatory `init` or project configuration file is required.
+
+An explicit or saved unfinished project resumes its missing steps using current backend state and normal operation recovery. A ready project reports readiness and ordinary next commands without recreating a Pipeline, replaying a configuration wizard or making another paid demonstration query. An unavailable/inaccessible project fails without substituting a starter or treating denial as incomplete setup.
+
+For a first-time user without a project selection, offer **Your starter project** as the recommended choice and **A new project** as the advanced choice. Do not add a generic existing-project picker or an experience-level question. Existing unfinished work remains reachable through explicit/saved context. Selecting the starter reuses it; creating another project requires ordinary Create projects authority and leaves the starter untouched. Remembering context requires visible agreement and obeys [selection rules](api-contracts.md#cli-context).
+
+The New project choice calls [ordinary project creation](https://github.com/matejpalenik/inframeld/issues/28), not the [private-starter provisioner](https://github.com/matejpalenik/inframeld/issues/27). Creation saves the project, creator membership and seven explicit initial project-action grants together. It does not provision a Pipeline or start model work. Setup then continues as separate steps. A naming conflict or denied permission saves no partial project; a lost response is reconciled before retry. If Alice stops after successful creation, her new project remains and later setup resumes it without duplication. [CLI project management](https://github.com/matejpalenik/inframeld/issues/178) exposes the same operation outside setup.
+
+Offer the starter's saved Display name once. Enter keeps it and its Name; a new label does not change stable IDs, bindings or publication mode. Any suggested Name change is a separate explicit review. Do not ask for collection, Pipeline or access-group names in that step. Resume preserves subsequent renames without asking again. Naming is optional and does not imply an extra registration field.
+
+The starter is ordinary, not undeletable or permanently automatic. Creating/selecting another project and stop/start leave it intact. Deliberate mode changes remain unchanged on later setup. Authorized deliberate deletion records absence; setup explains it and requires explicit repair/creation rather than resurrecting it. Destructive review identifies the target/project and consequences; `--no-input` alone is not confirmation.
+
+Every guided choice has a noninteractive input path. Missing required input fails before that operation without prompts/browser/editor or blanket approval of later model calls. Completed earlier steps remain saved. A connection created separately during an abandoned setup remains a real resource, not a promise of cross-resource rollback. Precise command options, readiness reporting and recovery projections remain specification work; ordinary backend workflows own their effects.
+
+<a id="starter-naming"></a>
+
+### Generate a readable starter name once
+
+For example, the backend provisions `Quiet Orbit` with Name `quiet-orbit`. Use the selected Python `coolname` package behind an infrastructure adapter, with a reviewed bundled Inframeld vocabulary and a preferred two-word pattern. The upstream function `generate_slug(2)` is a library identifier, not Inframeld's resource terminology. No model call, network naming service, personal information or credential participates in generation.
+
+Save the generated Display name and Name in the same all-or-nothing, principal/purpose-idempotent starter provisioning operation as the project. Database uniqueness, not randomness, prevents collisions. Retry generated candidates only within a specified bound; exhaustion fails provisioning honestly. A lost response or repeated setup returns the existing project and values, not another random name or partial starter.
+
+The optional naming prompt starts from the persisted Display name. Keeping it is a complete choice. Editing that label may suggest a corresponding Name, but changing the existing Name needs a separate explicit reviewed choice. This is not a Kratos registration field or a reason to delay or duplicate provisioning. Resume preserves subsequent edits; do not mass-rename existing projects or recreate deliberately deleted starters.
+
+`coolname` was selected as a BSD-2-Clause dependency, not installed or qualified by this documentation. Retain copyright, conditions, disclaimer and applicable word-list notices in source and binary distribution materials. This selection does not change Apache-2.0 OSS scope or choose a future enterprise license. Package version, approved vocabulary, retry bounds, migrations and release licensing review remain delivery work. [Resource naming](data-model.md#resource-naming) owns name uniqueness, explicit rename and retirement.
+
 ### Make provisioning safe to repeat
 
 After Kratos verifies Alice, save her starter setup in one short PostgreSQL transaction. This includes both group membership and management, the other setup records, the access change number, and audit. Either all are saved or none are. Follow the [member-plus-manager rule](access-control.md#group-managers). A unique ownership-and-purpose key can be:
@@ -54,7 +105,7 @@ After Kratos verifies Alice, save her starter setup in one short PostgreSQL tran
 
 A **principal** is the stable local identity of a human or application. This key lets a retry find Alice's existing starter project. Saved default bindings identify its group, collection, preset, and Pipeline by ID. The installation's one-time administrator claim has its own uniqueness check.
 
-Do not keep the transaction open while calling Kratos or a model. If saving fails, a later request can complete the same setup. If saving succeeds but the response is lost, return the existing IDs.
+Do not keep the transaction open while calling Kratos, Hydra or a model. If saving fails, a later request can complete the same setup. If saving succeeds but the response is lost, return the existing IDs.
 
 Record both completed setup and deliberate removal. Otherwise a restart could mistake deleted defaults for unfinished setup and recreate them. Database transactions and uniqueness rules are enough, without a distributed setup coordinator.
 
@@ -68,27 +119,47 @@ Changing defaults needs Manage upload defaults and management of every old and n
 
 Setup issues no application key automatically. An authorized human must pass Access's key-administration and grant-authority checks. The application's access must be safe for everyone using it. Applications cannot administer permissions or incoming keys in v1. A person leaving follows ordinary handover or deletion rules.
 
+After setup or publication, **Finish** remains the default. The optional [CLI application-connection journey](https://github.com/matejpalenik/inframeld/issues/161) can guide account selection/creation, an explicit access review, separate show-once credential issuance and HTTP or MCP instructions. It uses ordinary Access operations and preserves partial-completion identities. An optional live test authenticates as the application, not Alice, and needs its own cost/data-transfer approval. Neither choosing MCP nor accepting this optional flow changes publication policy or exports Alice's Hydra credentials.
+
 <a id="models"></a>
 
-## 3. Configure and validate real models
+## 3. Configure models with optional preflight
 
 Saving a provider key does not prove it works. Testing text generation also does not prove that the same connection can create embeddings for search.
 
 The simplest form accepts one connection and key, then separate embedding and generation model IDs. Share the connection when both use the same origin and authentication. An **origin** is the scheme, host, and port. Otherwise configure separate connections without copying a saved secret to another origin.
 
-Test generation and embedding separately through ModelGateway. Record the connection and credential revisions tested, plus the actual embedding dimensions.
+Use the same role, model and connection screens for generation, embeddings and hosted reranking. [Metadata suggestions](model-connections.md#model-metadata) may prefill supported settings from either an identified versioned local catalogue entry or a qualified metadata read from the selected approved server. Show where the suggestion came from, let the user edit it and save the reviewed values.
 
-Replacing or removing a key invalidates the old test result. First publication requires validation of the **current credential revision**. Changing the endpoint origin requires a new connection and explicit credential entry.
+For a private model alias with no reliable metadata, leave unknown settings unknown until the user supplies the necessary supported configuration. If model listing fails, still allow manual model input. Do not run an inference probe to fill the gap.
 
-These capability probes are limited model calls authorized by the configuration action. They test the selected roles, without adding an offline benchmark or a general certification process.
+For example, Alice changes a suggested context of 131,072 tokens to her gateway's configured 32,768, reuses `company-gateway`'s saved key and skips testing. Resuming setup retains those saved choices even after a catalog update; it does not re-prompt for the key or mark the role Validated. Model settings belong to the Pipeline/profile, not a new connection variant. A refresh requires a reviewed ordinary edit. Human and noninteractive paths expose the same values, provenance and unresolved requirements; scripts do not silently choose a newer suggestion.
+
+[Provider authentication](model-connections.md#provider-authentication) is separate from login: users provide a raw provider key once through the protected connection workflow, and the backend supplies the supported authentication header when calling that destination. Incoming Hydra tokens and Inframeld application keys never travel upstream. A credential-free approved local Ollama connection skips irrelevant key entry. Authentication-method support, safe metadata discovery and exact field contracts still require qualification.
+
+Offer a small synthetic test of the selected roles, but let Alice continue without it. This **preflight** can catch configuration problems before larger processing costs occur. It is not a prerequisite for ordinary model use or first publication. A user may instead save configuration and exit. Separate paid probes require explicit approval, and skipping them never silently schedules one later.
+
+Before a selected role/model has been tried, show it as **Not tested**, not invalid or ready merely because a key was saved. When a real call completes and passes all required response checks, automatically mark its actual configuration **Validated**, recording real use as the evidence source. Report a failed or uncertain attempt explicitly rather than calling it untested or validated. Generation success validates only generation; a successful embedding call validates only that embedding configuration and its actual dimensions. Neither makes an incomplete build ready or certifies answer quality.
+
+For example, Alice skips both tests. Her real document-embedding work establishes embedding validation, and the complete verified index can become ready for authorized publication while generation remains Not tested. Her first real answer then establishes generation validation if its response passes the required checks. If generation fails, report the ordinary query failure without changing provider, fabricating an answer or erasing completed embedding work.
+
+Configuration and runtime checks remain mandatory even when Alice skips the probe. Establish embedding meaning and dimensions before freezing the profile, using supported metadata, explicit validated configuration or an optional probe. Resolve missing dimensions rather than guess them.
+
+Every real call goes through ModelGateway's permission, credential, destination, transport and response checks. First publication still needs complete valid configuration, a ready version with verified materializations, all required local dependencies and normal release permission.
+
+Local credential checks establish only that a required key is present, permitted and decryptable. They do not prove that the provider accepts it. **Absence of prior model-validation evidence is not itself a readiness or publication blocker.**
+
+Replacing a key makes the new credential revision untested. A late success using the old key cannot validate the replacement. Removing a required key still blocks dispatch. After setup, connection management can change shared current access settings through [guarded review](model-connections.md#shared-current), including explicit credential provision for a changed origin. Incompatible or unproven existing embedding dependencies reject the update. Another connection and ordinary preparation/query/Build support isolated migration. Setup does not silently edit a reused connection. Validation status is historical evidence, not an availability guarantee; show later failures without hiding them behind an earlier successful check.
+
+[Model connections](model-connections.md#roles) owns these runtime and evidence rules, and [ADR-0050](../adr/ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md) supersedes the former separate-probe prerequisite. Neither optional preflight nor runtime evidence adds an offline benchmark, judge or certification process.
 
 Save application-entered credentials using the accepted [PostgreSQL/PyNaCl mechanism](model-connections.md). Missing setup cannot be bypassed with a fabricated valid connection.
 
-### Keep optional work out of the initial path
+### Offer reranking without adding mandatory work
 
-Start with the explicit `none` reranker and a tested text-first processing preset with limits. A reranker reorders search results, so `none` deliberately skips that optional step. Text-first processing handles existing text without requiring OCR to read scanned pages.
+Use a qualified text-first Docling hybrid processing preset with explicit limits. Offer reranking through the shared model-role screens: recommend the qualified built-in Ettin 32M option for English workloads, preserve explicit `none`, and allow a supported hosted connection/model. A highlighted recommendation does not silently save or run it. Text-first processing handles existing text without requiring OCR to read scanned pages.
 
-Do not quietly add model or profile downloads, a local language model, OCR, reranking, or a judge. Users can select richer settings later through normal versioned configuration. A different embedding model requires a new profile and materialization, not relabelling old vectors.
+Do not quietly add model/profile downloads, a local generation model, OCR, reranking or a judge. Built-in reranking runs on the selected backend using packaged assets, not in the CLI. Hosted selection reuses connection/credential screens and optional testing, with cost review before any model call. A different embedding model requires a new profile and materialization, not relabelling old vectors.
 
 <a id="default-route"></a>
 
@@ -144,7 +215,7 @@ Manage releases covers publication, rollback, canaries, mode switches, and autom
 
 Save who requested the update and the authority under which it was accepted. Check current project or resource scope and permissions again before sending work and before publishing. A job cannot publish using permission its requester has since lost.
 
-The starter creator receives explicit permissions for the starter project and resources, including Build on the selected Pipeline. Before the first Deployment exists, publication also requires Create Deployment. Creating it assigns Manage releases on that new Deployment; later updates require current Manage releases on that exact Deployment. The installation-level Create projects permission is separate. Starter setup neither needs nor grants it. Someone with upload-only permission may save source changes, but Studio must explain that applying them needs an authorized person. Upload or Query never includes release permission.
+The starter creator receives explicit permissions for the starter project and resources, including Build on the selected Pipeline. Before the first Deployment exists, publication also requires Create Deployment. Creating it assigns Manage releases on that new Deployment; later updates require current Manage releases on that exact Deployment. The installation-level Create projects permission is separate. Starter setup neither needs nor grants it. Someone with upload-only permission may save source changes, but the CLI must explain that publishing them needs an authorized person. Future Studio follows the same rule. Upload or Query never includes release permission.
 
 When several automatic Deployments use one collection, the operation names each target it may update. Each has its own request and outcome. There is no all-Deployment transaction or use of another person's release permissions.
 
@@ -156,29 +227,47 @@ A partially failed batch may keep successfully accepted files, but must not quie
 
 The first batch may reserve document IDs through normal saved acceptance steps before building. If any admission fails, publication is blocked.
 
-A manually requested S3 sync follows the same rule after establishing a complete revision. An authorized Apply action starts the update for the automatic Deployment. V1 adds no scheduled polling or publication after each incomplete listing page.
+A manually requested S3 sync follows the same rule after establishing a complete revision. Its explicitly authorized live-input update starts preparation and conditional publication for the selected Automatic Deployment. It uses the Deployment's selected configuration, not an unrelated working edit. V1 adds no scheduled polling or publication after each incomplete listing page.
 
 Removing a document from a collection changes a future selection. Revoking access or explicitly erasing it is different: [retention rules](retention-and-deletion.md) apply immediately and may make the current version unavailable in either mode. Old versions are not entitled to keep serving erased content.
 
-### Apply only the configuration the user selected
+### Build only the saved configuration the user selected
 
-Save and apply freezes the model or Pipeline configuration shown to Alice for that target. Explain when changing the embedding profile may require processing the whole corpus again.
+After setup, Alice can edit the Pipeline's revisioned working configuration, query the protected direct Pipeline query API and evaluate it before creating a release version. [Pipelines and Releases](pipelines-and-releases.md#working-configuration) owns this loop. `inframeld build` captures the current saved configuration and corpus shown to Alice, not a run ID or unsaved per-request overrides. It follows the selected live Deployment's mode, with no separate CLI apply command. Explain when changed embedding/chunking requires preparation of the whole corpus and when earlier evaluation does not match these inputs.
 
-Editing a field, saving an unrelated draft, or testing a model role does not start an update. Replacing a provider credential changes current access to the service, but neither creates a pipeline version nor silently releases one or selects another model.
+Editing/saving/restoring working settings, preparing direct-query dependencies, evaluating, or testing a model role does not start publication. Automatic document updates keep the Deployment's explicitly selected configuration. Development-only uploads must not silently modify its watched collections. Replacing a provider credential changes current access to the service, but neither creates a pipeline version nor silently releases one or selects another model.
+
+This later development loop is not a new setup prerequisite. Initial private provisioning, authorized automatic first publication and optional Finish remain unchanged. An ordinary Build with no live Deployment creates an unpublished version; it does not impersonate setup's separately authorized create-and-bind operation. A direct query can execute without a Deployment once its own inputs and dependencies are ready, but it must never be labelled a live/default answer.
+
+### Take an imported Pipeline live explicitly
+
+Bob imports his colleague's configuration into an existing project. The import creates supported resource definitions, not documents, vectors, a release version or a Deployment. If he needs a new project, he creates it through the ordinary operation above before returning to a fresh import review.
+
+1. Supply credentials and documents through their existing authorized workflows. Import does not perform these steps or send model requests implicitly.
+2. Explicitly Build the saved Pipeline configuration and selected corpus. Review preparation, outgoing data and cost. With no Deployment, successful Build returns a ready **unpublished** version.
+3. Use [CLI Deployment management](https://github.com/matejpalenik/inframeld/issues/174) to create a Deployment from that exact ready, compatible version. [Backend creation](https://github.com/matejpalenik/inframeld/issues/59) checks current Create Deployment authority and readiness. Explicit creation defaults to **Manual**; **Automatic** and its input binding require an explicit choice.
+4. Show the endpoint and initial serving version only after creation is confirmed. A lost response requires original-operation recovery, not a second creation or a substituted version.
+5. Offer Finish. Creation alone does not change the project-default binding, issue an application key or send a paid test query. Those are separate choices with their own checks.
+
+This journey must be available in CLI v1 without Studio or handwritten API requests. The exact commands and human/JSON/noninteractive/dry-run contracts belong to [CLI contract work](https://github.com/matejpalenik/inframeld/issues/156); the sequence here does not invent final flags or claim the CLI is implemented. The initial starter's separately authorized Automatic create-and-bind flow remains unchanged.
 
 ### Make defaults discoverable, editable, and deliberately repairable
 
-Studio marks ordinary default resources with a **Default** badge and shows publication mode, current version, selected configuration, and pending update status.
+The CLI identifies ordinary default resources and shows publication mode, current version, selected configuration and pending update status. Future Studio presents the same facts, including a **Default** badge; it is not required to inspect or change them in v1.
 
 Renaming a default changes its label, not its ID, binding, mode, or settings. Another Deployment starts in Manual releases unless Automatic updates and its input binding are explicitly chosen.
 
-Changing which inputs an automatic Deployment follows needs Build, Manage releases, input access, the expected revision, and a fresh Apply decision.
+Changing which inputs an automatic Deployment follows needs Build, Manage releases, input access, the expected revision, and a fresh explicit update decision. Configuration selection is captured by the policy-controlled Build workflow; saving a working revision alone cannot change the binding. Mode switching retains its separately reviewed update selection under [the publication rules](pipelines-and-releases.md#modes).
 
 Changing the default route changes what serves requests, not just a label. It cannot override an attached candidate silently. It invalidates pending work for the old binding and uses the selected Deployment's own mode. An existing manual Deployment must not inherit the old default's automatic setting.
 
 After deliberate deletion, keep setup and removal markers so restart does not recreate defaults. Repair requires an authorized choice of resources and mode. Deletion cancels pending publication, and an old default-route job cannot bring the removed Deployment back.
 
 A missing default group blocks uploads. Repair follows normal lifecycle and permission rules, without a special one-time reset bypass.
+
+[CLI Deployment management](https://github.com/matejpalenik/inframeld/issues/174) owns the complete mode and default-route journey. It calls [publication-mode changes](https://github.com/matejpalenik/inframeld/issues/62) and [default-binding operations](https://github.com/matejpalenik/inframeld/issues/60), rather than writing release state itself. Switching Automatic to Manual invalidates pending publication authority. Re-enabling Automatic initially reviews the currently serving version's configuration; using different saved settings requires deliberate selection and fresh admission. An attached candidate, even at zero allocation, blocks enabling Automatic.
+
+For example, Bob deliberately deletes the old default and later selects a ready Manual Deployment as its replacement. Review the route change, current authority and candidate restrictions before saving the new binding. Preserve that Deployment's Manual mode and invalidate authority tied to the old binding. If state changes during review, stop and review again; do not silently accept newer state or recreate the deleted resource. Repairing a missing upload-default group belongs to [ordinary Access administration](https://github.com/matejpalenik/inframeld/issues/28), presented by [CLI access management](https://github.com/matejpalenik/inframeld/issues/178), not the release operation.
 
 <a id="journey"></a>
 
@@ -188,7 +277,15 @@ Alice completes account setup, saves a provider connection, and selects embeddin
 
 She completes one batch containing `installation.md` **A1** and `refunds.md` **B1**. The worker builds **P1** against **R1 = {A1, B1}**, then the separate publication command creates the first Deployment and binds the route.
 
-Studio shows preparation progress, then **Ready to ask**. Her answer has normal citations and **AnswerReceipt A77**. No judge or release screen is required.
+The client shows preparation progress, then **Ready to ask**. Her answer has normal citations and **AnswerReceipt A77**. No judge or release screen is required.
+
+### Finish setup before optional evaluation
+
+In the [CLI starter-evaluation journey](https://github.com/matejpalenik/inframeld/issues/179), **Finish** is the default action after the first answer. Asking another question, inspecting the execution, or generating starter evaluation cases are optional. Choosing Finish leaves a fully usable pipeline; it creates no evaluation job or judge configuration.
+
+If Alice chooses starter generation, she selects an existing generator connection, reviews the permitted source sample, outgoing data, estimated cost and budget, then admits a separate durable job. The default request is 20 single-passage cases. They are unreviewed proposals, with exact source excerpts and proposed answers, not automatically trusted tests. Review can be deferred or resumed without running a judge.
+
+Only a later explicit evaluation action selects a judge and freezes accepted case revisions into the default regression benchmark. Neither action modifies the pipeline's generation model or publication mode. Rejected drafts, partial generation, budget exhaustion, and changed permissions follow [Evaluation](evaluation.md), the canonical lifecycle specification. The Ragas integration and these CLI commands remain accepted design pending implementation and qualification.
 
 ### Successful replacement
 
@@ -204,7 +301,7 @@ Show failure of the newest update. Do not silently publish an incomplete corpus 
 
 ### Manual review
 
-Alice switches to Manual releases, which removes pending automatic jobs' permission to publish. She builds P4, explicitly compares it with P2, attaches a canary, then promotes or rejects it.
+Alice can query and evaluate a changed working configuration while Production remains automatic; those operations do not publish. If she also wants to stop independently authorized live updates during review, she switches to Manual releases, removing pending automatic jobs' permission to publish. She compares her captured working settings freshly against P2, explicitly saves the settings she wants, then builds P4 from the current saved configuration. Build discloses any mismatch with evaluated inputs. She may compare the ready P4 again, then attach a candidate and promote or reject it, with optional canary traffic.
 
 Enabling automation while that candidate remains attached is rejected. A later rollback leaves Manual releases selected.
 
@@ -237,33 +334,33 @@ A **fixture** is a defined set of test inputs used to repeat the scenario.
 
 This scenario assumes the endpoint origin and certificate authority are already approved. A private gateway needing extra certificates or network setup has a separate cost to measure. It cannot be promised the same setup time.
 
-Measure role probes, embedding, and generation, noting throttling and provider cold starts. Do not prescribe mandatory seconds per stage before measuring an implementation.
+Measure optional role probes when selected, embedding, and generation, noting throttling and provider cold starts. Record whether preflight was chosen or skipped. Do not prescribe mandatory seconds per stage before measuring an implementation.
 
 ### Report three different journeys rather than substituting the easiest one
 
 | Journey | What its clock includes |
 | --- | --- |
-| **Prepared installation launch → first answer** | Start when the user launches the already-installed product, before services are healthy. Include startup/migrations, account/private-resource setup, model/credential entry and probes, upload, parsing/chunking, embeddings, index verification, authorized publication, and question generation. Include human interaction time. |
+| **Prepared installation launch → first answer** | Start when the user launches the already-installed product, before services are healthy. Include startup/migrations, account/private-resource setup, model/credential entry and any selected probes, upload, parsing/chunking, embeddings, index verification, authorized publication, and question generation. Include human interaction time. |
 | **Clean installation → first answer** | Also include obtaining Docker if absent, image/model downloads, generating initial protected configuration, and host/network setup. Report these real first-run costs rather than moving them outside both clocks. |
 | **Restart with existing accounts/configuration → answer** | A separate, easier case. It must not replace the empty-application-state journey. |
 
 Image downloads alone can exceed two minutes, so do not claim that timing from a fresh machine. Report automated phases separately. A test that supplies configuration instantly does not measure a human completing onboarding.
 
-Investigate slow service startup or migrations, credential entry, parser startup, and provider cold starts or rate limits. Prepare assets, limit text processing, explain model roles, and share credentials where appropriate. Keep optional OCR, reranker, and judge setup out of the initial path.
+Investigate slow service startup or migrations, credential entry, parser startup, and provider cold starts or rate limits. Prepare assets, limit text processing, explain model roles, and reuse connections where authorized. Offer the optional reranking choice through the same role/model/connection screens; built-in or none needs no new key. Keep optional OCR and post-setup generator/judge configuration outside the required first-answer path.
 
 Authentication, parser isolation, index verification, and real supporting evidence remain required. Use measured delays to improve confusing or slow steps. A longer run alone is not a reason to redesign the architecture.
 
 ### Lightweight end-to-end acceptance scenario
 
-1. **Start with prepared images and empty application state.** Start the full journey clock. Complete real account setup and save actual role configurations and a credential through the API-backed flow.
+1. **Start with prepared images and empty application state.** Start the full journey clock. Complete real account setup and save actual role configurations and a credential through the API-backed flow. Exercise the path with preflight skipped and record that choice. Unknown profile settings must still be supplied before the build.
 2. **Upload the complete two-file batch with Automatic updates selected.** Its admission authorizes the ordinary build and first publication without a separate Prepare and ask command. Record source versions, collection revision, job/build, ready PipelineVersion, and the actual first Deployment. Verify that no Deployment existed before readiness.
-3. **Ask for a fixture-specific fact.** The answer must match permitted retrieved content, contain valid source citations and an answer identity, and use the real `ModelGateway` and Chroma paths. A canned answer or ungrounded fallback does not pass.
+3. **Ask for a fixture-specific fact.** The answer must match permitted retrieved content, contain valid source citations and an answer identity, and use the real `ModelGateway` and Chroma paths. Verify separate validation evidence from actual embedding and generation calls without extra synthetic requests. A canned answer or ungrounded fallback does not pass.
 4. **Report the full journey, not only the fastest run.** Repeat a few clean-application-state runs. Record total and phase times, available provider model/revision, chunk counts, hardware, and image versions. Check whether a new user completes the path without learning internal resource setup. Neither two minutes nor roughly ten minutes is a hard gate or promised support limit.
 5. **Check the essential behavior separately.** Verify that restart preserves credentials and default IDs, another user cannot read starter data, and retries do not duplicate setup. Failed batches must never publish. Cancellation or a control change must prevent an old build from publishing. A failed later update must leave healthy P1 serving. Check API/MCP default resolution and feedback attribution against the actual version. Retry an alias query after promotion or rebinding and confirm it returns the original operation/receipt without another model call.
 
-During backend-first work, authenticated integration tests and a test client can check behavior and server timings. Measuring a real person's discovery and setup journey waits for Studio and its tested external TypeScript SDK.
+During backend-first work, authenticated integration tests and a test client can check behavior and server timings. Measuring a real person's discovery and setup journey requires the CLI and its small Ory browser account UI. Both can be qualified independently of full Studio; future Studio has its own generated-client and browser gates.
 
-SDK Kit suitability blocks Studio, not backend work. This is a focused acceptance exercise rather than a new certification or operations program.
+V1 qualifies the CLI journey and its independent Ory account UI without requiring full Studio. Generated-client compatibility follows the delivered contract incrementally. This is a focused acceptance exercise rather than a new certification or operations program; see [the delivery plan](cli-delivery-plan.md).
 
 <a id="maintainer-checks"></a>
 
@@ -274,6 +371,7 @@ Use real PostgreSQL tests for simultaneous changes and the existing adapter-veri
 | Area | Required verification |
 | --- | --- |
 | **Provisioning and creation** | The private group records its creator as both member and manager in the same transaction. Retries create no duplicates or manager-only state. Defaults start automatic without a fake-ready Deployment. Explicit creation defaults manual and honors an explicit automatic choice. A failed or incomplete first batch never serves. |
+| **Optional model preflight** | Permit skipping synthetic tests without blocking an otherwise ready first publication. Real calls validate only their exact role/model/revisions after response checks. Missing credentials/configuration and invalid embeddings still fail. Late old-key results cannot validate a replacement. |
 | **Successful and failed replacements** | Automatic publication uses complete ready bindings, records previous/history, and preserves answer/feedback attribution. Failed replacement preserves healthy current serving. Erasure and unavailability retain their separate rules. |
 | **Mode-switch races** | Exercise publication versus switching to manual in both commit orders, and automatic → manual → automatic while an old build runs. Only still-authorized work may publish. |
 | **Overlapping batches** | Supersede both queued and running work. Verify complete corpus membership, no stale overwrite, and no fallback to an older result when the newest request fails. |
@@ -295,3 +393,4 @@ Private defaults and reversible modes are settled. Selector fields, timing assum
 | [ADR-0046](../adr/ADR-0046-provision-creator-private-defaults-through-ordinary-resources.md) | Provision creator-private defaults through ordinary resources. |
 | [ADR-0049](../adr/ADR-0049-require-group-managers-to-be-ordinary-members.md) | Record the creator as both member and manager of the private group. |
 | [ADR-0047](../adr/ADR-0047-support-reversible-publication-modes-per-deployment.md) | Support reversible publication modes per Deployment. |
+| [ADR-0050](../adr/ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md) | Allow optional model preflight and validation through successful real use. |

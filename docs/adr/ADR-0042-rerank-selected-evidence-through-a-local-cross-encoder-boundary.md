@@ -1,6 +1,6 @@
 # ADR-0042: Rerank selected evidence through a local cross-encoder boundary
 
-Status: Accepted
+Status: Accepted; local-only selection and unselected model choice partially superseded by [ADR-0056](ADR-0056-support-explicit-local-hosted-or-disabled-reranking.md). The original bounded-candidate rationale remains.
 
 **Date:** 2026-09-24
 

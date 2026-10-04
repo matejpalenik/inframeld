@@ -434,7 +434,7 @@ Workers call the same commands as the API, including when a source sync discover
 
 Studio calls the application HTTP API through the official generated TypeScript **SDK**, a client library for working with the backend.
 
-SDK Kit is the external tooling for generating those client libraries. **It is a blocker for Studio implementation, not backend implementation.** Backend work can proceed while that dependency is resolved.
+Generate those clients from native OpenAPI without choosing a generator package here. **V1 delivers the Rust CLI and small Ory account UI, not full Studio.** Backend work proceeds independently; client compatibility is qualified incrementally against actual contracts. The future Studio follows the same application behavior under [ADR-0055](../adr/ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md).
 
 Repository skills are guidance for developers and agents. They do not run inside the application.
 
