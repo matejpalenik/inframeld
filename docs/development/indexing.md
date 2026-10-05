@@ -89,7 +89,7 @@ GA and GC keep the same IDs, values, metadata, and shard locations. R1 searches 
 
 ### Preserve processing and embedding settings during export
 
-If Alice changes chunking, she creates a new named processing profile and explicitly prepares data with it. Processing profiles are immutable. Changing only a prompt or reranker can reuse compatible verified indexes.
+If Alice changes chunking, she creates a new named processing profile and explicitly prepares data with it. Processing profiles are immutable. V1 creation of processing/embedding profiles is human-only, using the corresponding Project Create action and separate exact-profile View/Use creator assignments in [the Access contract](access-contracts.md#initial-assignments). Applications can use permitted existing profiles; a changed imported definition requires a human to create a distinct profile. There is no mutable-profile Edit or force-deletion workflow in this decision. Saving a definition neither processes data nor generates vectors. Changing only a prompt or reranker can reuse compatible verified indexes.
 
 The selected processing option is Docling HybridChunker. Its processing and tokenizer assets must have pinned identities and work offline. Keep the supported configuration small and validated, and export the effective settings explicitly. Exact assets, numerical presets and source-coordinate mappings still need qualification.
 

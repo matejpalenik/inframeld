@@ -9,6 +9,8 @@ Explain source information before it becomes searchable. Knowledge owns Document
 
 ## Scope and reading route
 
+For the accepted #116 catalogue, assignments and remaining schema/route/maintenance handoff, read [Access contracts](../../../docs/development/access-contracts.md). Guides own behavior; the new reference is accepted design, not implemented API or runtime evidence.
+
 Default to read-only help; loading this skill grants no edit or execution permission. Read only the relevant current section. Report contradictions and distinguish accepted design from code actually inspected.
 
 - [Knowledge lifecycle](../../../docs/development/knowledge-lifecycle.md) owns behavior; [Knowledge records](../../../docs/development/data-model.md#knowledge) defines identities and relationships. [ADR-0008](../../../docs/adr/ADR-0008-preserve-immutable-versions-and-their-provenance.md) explains immutable provenance.
@@ -20,7 +22,7 @@ Default to read-only help; loading this skill grants no edit or execution permis
 
 ## Essential boundaries
 
-For configuration recreation, use [portable Knowledge resources](../../../docs/development/knowledge-lifecycle.md#portable-knowledge), [portability](../../../docs/development/configuration-portability.md) and [delivery ownership](../../../docs/development/cli-delivery-plan.md). Imported collections are empty; reuse does not alter contents. Sources require explicit destination audience IDs and separate backend-bound credentials before a separately reviewed bounded sync. No implicit source contact, ambient laptop credentials, upstream ACL import or disappearance inference from incomplete inventory. Evaluation owns protected dataset transfer; those excerpts are not admitted corpus documents.
+For configuration recreation, use [portable Knowledge resources](../../../docs/development/knowledge-lifecycle.md#portable-knowledge), [portability](../../../docs/development/configuration-portability.md) and [delivery ownership](../../../docs/development/cli-delivery-plan.md). Imported collections are empty; reuse does not alter contents. [The fixed Access catalogue](../../../docs/development/access-contracts.md#capability-catalogue) separates Collection view/edit/delete from Source configuration, sync, credentials and deletion. Collection/source retirement does not erase admitted Documents; source sync uses saved scope and current group/collection mutation authority. Sources require explicit destination audience IDs and separate backend-bound credentials before a separately reviewed bounded sync. No implicit source contact, ambient laptop credentials, upstream ACL import or disappearance inference from incomplete inventory. Evaluation owns protected dataset transfer; those excerpts are not admitted corpus documents.
 
 For query inputs, follow [frozen corpus selection](../../../docs/development/knowledge-lifecycle.md#corpus), [direct queries](../../../docs/development/pipelines-and-releases.md#preview) and [ADR-0052](../../../docs/adr/ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md). Capture exact source revisions before direct-query/evaluation preparation; no release version is required. Development-only uploads explicitly use ordinary collections outside live-watched inputs. Do not silently clone collections or suppress their automatic update behavior. Live-input updates retain the Deployment's selected configuration, never an unrelated working edit. Erasure can invalidate historical query inputs as well as releases.
 

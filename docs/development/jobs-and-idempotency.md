@@ -14,6 +14,7 @@ Start with the worker's normal flow, then compare a lost model response with a s
 | --- | --- |
 | Does a failed CLI invocation mean I can start again? | [Automation and original admission](#automation-recovery) |
 | What does continuing a partial import mean? | [Original import and child outcomes](#import-recovery) |
+| What if identity cleanup or project deletion is interrupted? | [Identity cleanup](#identity-cleanup) and [project deletion](#project-deletion) |
 | What survives an interrupted worker? | [1. Admit work and claim an attempt](#admission) |
 | May a timed-out operation run again? | [2. Separate safe retries from uncertain work](#uncertain) |
 | What does the idempotency key mean? | [3. Identify the same request](#requests) |
@@ -119,6 +120,8 @@ A delayed write of identical data does not change an immutable generation. It st
 Every state-changing command requires an opaque **`Idempotency-Key`**, at most **128 characters**. Queries that call a provider need it too, because repeating them can repeat paid work. GET requests do not require this header.
 
 An HTTP command must receive exactly one `Idempotency-Key` header. Duplicate headers are invalid and must be rejected before reserving an operation.
+
+[The accepted Access mutation profile](access-contracts.md#mutation-profile) limits new Access-management JSON bodies to 32 KiB and new bulk requests to 100 explicit assignments, with unknown fields rejected in new schemas. It preserves existing published models and does not cap document/configuration payloads. Access uses `expectedAccessRevision`; domain owners retain their own revisions. Find the original operation before considering a current revision as new work, then apply current authorization to recovery. Creation uses 201, completed metadata changes 200, and durable remaining cleanup 202 through the owning operation's result.
 
 The caller chooses the key to identify this requested operation. It carries no permissions and has no business meaning.
 
@@ -242,6 +245,26 @@ Configuration imports use these same durable jobs. They retain the approved defi
 
 Query retries still return receipts rather than answer text, and one-time secrets retain their special recovery restrictions. If the backend's original history has expired, the CLI must not automatically create new paid work. [The delivery plan](cli-delivery-plan.md) assigns lookup, progress, continuation and qualification work. It does not replace the implemented grant-idempotency behavior.
 
+<a id="identity-cleanup"></a>
+
+### Reconcile the original identity-cleanup obligation
+
+Verified recovery/reset admits one trusted flow-bound cleanup identity and temporary product block under the [Access contract](access-control.md#identity-recovery-cleanup). Suspension likewise commits its immediate local block, revision/audit and original durable cleanup obligation together. These workflows use ordinary durable jobs/reconciliation, not another queue or public state machine.
+
+Record Kratos-session and Hydra-grant outcomes independently. Confirmed success, failure and uncertainty are different evidence. Keep provider waits outside SQL transactions and retries bounded. One provider succeeding never releases the block while another required outcome is unconfirmed. Reconcile the original admitted operation instead of restoring access to retry provider work.
+
+A completed duplicate recovery event returns the original result. It must not start broad cleanup against credentials from a subsequent login. An older operation finishing cannot release a newer pending block. Otherwise active humans automatically resume only after all required cleanup is confirmed and current local eligibility holds; suspended humans still require separately authorized restoration/security review. No completion recreates removed assignments. The [private recovery handoff draft](access-contracts.md#recovery-wire) specifies stable original-flow/identity/kind/phase deduplication and durable acknowledgment. #117 still qualifies hook ordering, trusted completion and bounded reconciliation; these are specification requirements, not implemented cleanup evidence.
+
+<a id="project-deletion"></a>
+
+### Continue only the project deletion that was admitted
+
+[Access admission](https://github.com/matejpalenik/inframeld/issues/204) checks current eligible human, membership, exact Delete project permission and reviewed state under the shared organization/project locks. It commits the project block, audit, original operation binding and exact durable cleanup obligation together. Denial or a stale review leaves no partial block. [Application lifecycle](https://github.com/matejpalenik/inframeld/issues/30) stops project applications and revokes their keys before [physical cleanup](https://github.com/matejpalenik/inframeld/issues/45). Failed or uncertain shutdown/cleanup keeps the block and original obligation; racing work cannot reopen the project.
+
+Distinguish admitted/access-blocked, shutdown-unfinished, physical-cleanup-unfinished and cleanup-complete outcomes. These meanings do not choose a new job enum. After a lost acknowledgment, look up the original operation before retrying. Workers continue only its admitted exact project scope, without resurrecting the project, consulting a cached user-permission snapshot or affecting another project.
+
+The currently eligible original initiating human may read retained content-free status after membership removal, based on the authoritative original principal/operation binding. Unrelated principals cannot claim that exception. Return no private inventory, hidden names, private-content counts or excerpts; status grants neither cancellation nor continuation. [Deletion-status delivery](https://github.com/matejpalenik/inframeld/issues/38) and [job contracts](https://github.com/matejpalenik/inframeld/issues/124) still own schemas, retention and protected lookup. This rule is accepted design, not an implemented status route.
+
 <a id="automation-recovery"></a>
 
 ### A failed command is not permission to start again
@@ -259,6 +282,8 @@ Keep Ctrl-C's cancellation request, its acknowledgment and actual termination di
 <a id="import-recovery"></a>
 
 ### An interrupted import keeps its original meaning
+
+[The v1 provisioning boundary](access-contracts.md#provisioning) rejects application plans requiring new configurable resources before known-ineligible mutations. Eligible updates to existing resources retain the recovery rules below. Later permission/state changes can still leave confirmed partial effects; they never authorize replay as a human or creating missing dependencies.
 
 Bob's import creates two resources and reuses three existing ones. Before its final step, the Pipeline changes, so the reviewed update can no longer be applied. Preserve the five confirmed outcomes and report the unapplied action. Do not undo the creates or replay completed updates.
 
@@ -301,7 +326,9 @@ For example, an administrator creates a CI credential using idempotency key `cre
 
 Retrying `create-ci-7` returns K’s identifier and **`secretAvailable: false`**. It neither creates another credential nor recovers the original secret.
 
-The administrator revokes K, then requests a new key with a new idempotency key. The retry deliberately returns a safe description of the first creation, not a copy of its secret-bearing response.
+The administrator revokes K, then requests a new key with a new idempotency key. The retry deliberately returns a safe description of the first creation, not a copy of its secret-bearing response. [The application-key lifecycle](access-contracts.md#key-lifecycle) records `secretAvailable: true` only for first delivery; incoming keys remain bound to the server-derived installation/project and current account, not a caller-submitted permission set.
+
+Invitation issuance likewise generates a 32-random-byte protected token, stores only verification material and safe metadata, and delivers plaintext once. The [HTTP draft](access-contracts.md#http-operation-matrix) specifies first-delivery/replay fields and the separate activation reservation bound to verified Kratos authority/subject before local admission; original activation resolves consumption before any new-write checks. Lost-response recovery cannot mint a second invitation or recover cached plaintext. [Invitation activation](access-contracts.md#invitations) instead recovers the original consumed intent and assignments under its verified-recipient admission boundary.
 
 ### Submitted provider credentials are never echoed
 

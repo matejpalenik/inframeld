@@ -150,6 +150,10 @@ Imported documents receive an explicit list of Inframeld access groups. The sour
 
 ### Recreate collections and sources from configuration
 
+Collection/Source provisioning is human-only in v1, using Project `create-collections` or `create-sources` and [fixed exact-resource creator assignments](access-contracts.md#initial-assignments). Applications may view/edit/delete existing Collections through separate grants. Collection membership editing creates normal revisions and never erases Documents or widens their audiences. Collection deletion follows dependency checks and leaves admitted Documents intact.
+
+Source configuration, credential administration and deletion remain human-only. An application with `sync-source` may run a separately admitted bounded sync against the saved approved configuration, with current Add/Update rights on the required groups and collection mutation authority. `view-source-configuration` reveals only permitted non-secret configuration. Retiring a Source stops future sync and removes its configuration/credentials; already admitted Documents remain until separately authorized document erasure. [The catalogue](access-contracts.md#capability-catalogue) names these distinct actions.
+
 Bob importing Alice's configuration receives empty collection definitions, not documents or vector data. Explicit reuse of an existing collection leaves its membership/history untouched. [Configuration portability](configuration-portability.md) specifies the complete export boundary and reviewed partial import.
 
 Source definitions contain the supported non-secret read-only S3 location, collection reference and required document audience. Before creating a source, explicitly map each audience to permitted destination group IDs. Matching names may help suggest a mapping, but do not prove equivalent access. Creating groups and granting permissions remain separate operations. Changing configuration does not silently change existing documents' audiences.

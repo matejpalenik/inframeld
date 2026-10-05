@@ -42,16 +42,16 @@ SupportBot can help Alice diagnose an answer when it has explicit trace-inspecti
 
 | Requested action | Eligible caller and required authority |
 | --- | --- |
-| Inspect permitted pipeline traces | Active humans or application accounts with explicit current inspection authority and current source access |
-| Enable or disable project tracing | Active humans with current project trace-policy authority |
-| Change project trace retention | Active humans with current project trace-policy authority, within operator limits |
-| Explicitly delete past project traces | Active humans with separate current project trace-deletion authority |
+| Inspect permitted query traces | Active humans or application accounts with `inspect-query-traces` on the exact Pipeline or Deployment and current source access |
+| Enable or disable project tracing | Active humans with `manage-trace-policy` on the exact Project |
+| Change project trace retention | Active humans with `manage-trace-policy` on the exact Project, within operator limits |
+| Explicitly delete past project traces | Active humans with separate `delete-trace-history` on the exact Project |
 
 There is no all-powerful tracing role. Query permission, project membership or knowing a trace ID does not grant inspection. Being human does not by itself permit a policy change or deletion.
 
 Live-query inspection names an exact Deployment. Direct-query inspection names an exact Pipeline. Neither permission grants the other, and neither introduces an Experiment resource or permission. Either can reveal other callers' questions and answers on that resource. Explain that when granting access.
 
-Check access to every captured source, including retrieved candidates excluded from the final context. The [Access](https://github.com/matejpalenik/inframeld/issues/116) and [tracing](https://github.com/matejpalenik/inframeld/issues/147) contracts still need concrete permission mappings, initial grant rules and capabilities for non-query work.
+Check access to every captured source, including retrieved candidates excluded from the final context. The [reviewed Access catalogue](access-control.md#reviewed-capability-catalogue) selects these query/policy identifiers and targets. The [fixed creator assignments](access-contracts.md#initial-assignments) include query inspection; product non-query diagnostic browsing is [deferred in v1](#non-query-diagnostics); [#147](https://github.com/matejpalenik/inframeld/issues/147) retains exact storage/coordination/wire contracts. A query grant alone never admits inspection, and an application inspection grant cannot include policy management or explicit deletion.
 
 For a policy change, the ordinary backend operation checks current human eligibility, project authority, expected state and operator constraints, then commits the permitted change and required audit together. Stale review or lost authority fails without silently accepting newer settings. Explicit history deletion checks its separate authority and reviewed cutoff, blocks affected reads, then performs bounded resumable cleanup. Policy management alone cannot invoke that deletion operation; inspection is not required to delete through separately granted authority, and the review must not expose protected content.
 
@@ -60,6 +60,14 @@ Retention changes can affect existing history: reducing the period may make olde
 The human-only rule concerns caller-requested policy changes and explicit deletion. Scheduled expiry, previously admitted cleanup and source erasure continue through their owning backend workflows without a new human approval per record. It does not make unrelated source/project deletion human-only or replace those workflows' authorization. Mandatory audit, evaluation evidence and receipts retain their separate rules.
 
 TOML import invokes the same guarded policy operation. An application may preserve the destination settings while importing otherwise authorized resources. An explicit application request to apply tracing/retention changes is denied before known-invalid plan mutations, not silently skipped or retried using a saved human login. Later authority loss after earlier steps committed produces an honest partial outcome. [Portability](configuration-portability.md#destination-review) owns plan/recovery behavior; importing settings never imports or deletes trace history.
+
+<a id="non-query-diagnostics"></a>
+
+### Non-query diagnostic browsing is deferred in v1
+
+Product-facing browsing of generator, judge, processing and sync diagnostic traces is deferred. Host operators may inspect these diagnostics through their existing infrastructure boundary. An ordinary human login or `inspect-query-traces` grant does not acquire that authority, and there is no general Project/installation trace-read permission or product audit-browser API.
+
+Authorized domain job status, case history and Evaluation results remain available through their own contracts. This deferral changes neither recording controls nor required security/audit, and those domain views must not become an unrestricted diagnostic trace browser. Future product browsing requires reviewed owner-specific targets/permissions and current protected-evidence checks. [ADR-0063](../adr/ADR-0063-defer-product-non-query-diagnostic-browsing.md) records the scope.
 
 <a id="trace-lifecycle"></a>
 

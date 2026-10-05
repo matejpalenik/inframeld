@@ -6,6 +6,8 @@ This guide follows Alice and SupportBot through those decisions. Start with sect
 
 > **Design status:** This is the accepted v1 design, including the member-plus-manager rule in [ADR-0049](../adr/ADR-0049-require-group-managers-to-be-ordinary-members.md). The initial migration creates the 14-table Access foundation. PostgreSQL integration tests confirm those tables and selected constraints, including manager membership, human-only assignments, and cross-project references. They do not verify every constraint or prove that endpoints, identity integrations, and Access workflows are complete. Permission names describe intended actions, and some API names and workflow details still need specification.
 
+**Contract decisions accepted on 2026-10-04:** the credential dispatch, application-key format and lifetimes, capability mappings, initial project grants, recovery block, maintenance boundary and deletion-status rules below record the reviewed decisions for [#116](https://github.com/matejpalenik/inframeld/issues/116). They are accepted design, not implementation evidence or a claim that the whole specification is complete. [The remaining contract work](#access-contract-review) stays explicit.
+
 ## Contents
 
 | Reader's question | Start here |
@@ -13,18 +15,23 @@ This guide follows Alice and SupportBot through those decisions. Start with sect
 | What does someone need to use a document? | [1. Three separate checks](#the-model) |
 | What do Kratos, Hydra and Inframeld each do? | [2. Signing in and checking permissions](#architecture) |
 | How does a human sign into the CLI? | [Human CLI authentication](#human-cli-authentication) |
+| Which credential does an HTTP request use? | [Credential dispatch and session checks](#credential-dispatch) |
 | Which human-session components exist now? | [Implemented authentication boundary](#implemented-human-authentication) |
 | How is a question answered safely? | [3. Follow a query](#query-flow) |
 | How can people share access? | [4. Membership, permissions, and visibility](#sharing) |
 | Who can upload, change, or delete documents? | [5. Document operations](#documents) |
 | How do application accounts and keys work? | [6. SupportBot's lifecycle](#applications) |
+| What is the complete application-key format? | [Key verification and lifetime](#application-key-contract) |
 | Which workflows can an application automate? | [Application workflows](#cli-automation-authority) |
 | Who can inspect or change tracing? | [Trace permissions](#trace-authority) |
 | Who may build and publish a version? | [7. Pipelines and releases](#releases) |
 | What happens when someone leaves or an account is compromised? | [8. Administration and recovery](#recovery) |
+| When does password recovery restore product access? | [Recovery cleanup](#identity-recovery-cleanup) |
 | What if two people change access at the same time? | [9. Storing access and handling simultaneous changes](#persistence) |
 | What should a maintainer check? | [10. Maintainer checks](#maintainer-checks) |
 | Where are the permission list, decisions, and open questions? | [11. Decision and reference map](#decision-map) |
+| Which exact capability mappings have been accepted? | [Reviewed capability catalogue](#reviewed-capability-catalogue) |
+| What remains before #116 can close? | [Contract review and open work](#access-contract-review) |
 
 <a id="the-model"></a>
 
@@ -143,9 +150,37 @@ Follow the CLI request in execution order:
 4. Check the corresponding Kratos identity is currently eligible. Resolve the trusted stable Kratos identity ID to the existing authority/subject link, then the admitted active human principal. Do not create a second person from Hydra's issuer, merge by email or add grants. No positive introspection/eligibility cache is selected for v1.
 5. Return the existing principal-only access context and run the operation's current project/action/document checks. External identity calls precede the short application lookup transaction; never hold a transaction while waiting for Hydra or Kratos. Verification failure/unavailability denies execution without falling back to another identity.
 
-Reject competing credential mechanisms instead of trying cookies, OAuth tokens and application keys until one succeeds. The exact unambiguous HTTP dispatch contract remains a prerequisite to implementing bearer support. No application credential becomes a human token merely because both travel in an Authorization header. No human CLI token automatically becomes an MCP credential.
+Reject competing credential mechanisms instead of trying cookies, OAuth tokens and application keys until one succeeds. The [accepted HTTP dispatch contract](#credential-dispatch) is a prerequisite to implementing bearer support. No application credential becomes a human token merely because both travel in an Authorization header. No human CLI token automatically becomes an MCP credential.
 
-Inframeld application keys reserve the `ifm_app_` prefix; Ory token formats remain unchanged. [Application-key recognition](#application-key-prefix) describes this accepted distinction. It narrows the dispatch specification in #116 but does not complete it: full syntax, errors, compatibility handling and runtime qualification remain open.
+Inframeld application keys reserve the `ifm_app_` prefix; Ory token formats remain unchanged. [Application-key recognition](#application-key-prefix), [complete syntax and verification](#application-key-contract), and [authentication errors](error-handling.md#authentication-contract) record the accepted choices. Adapter implementation and runtime qualification remain open.
+
+<a id="credential-dispatch"></a>
+
+### Select one credential before verification
+
+Alice's human CLI and SupportBot both send `Authorization: Bearer <credential>`. The backend chooses one verifier from the request's credential family, then verifies the complete credential. It never tries another family after a failure. Browser callers retain their Kratos cookie rather than converting it to a bearer token.
+
+| Request input | Sole verification path | Required outcome |
+| --- | --- | --- |
+| Kratos session cookie only | Existing Kratos session verifier, then current local human admission/state | Preserve browser behavior and cookie-write CSRF. |
+| One Bearer value starting with `ifm_app_` | Inframeld application-key verifier only | Check the complete key, restrictions and current account/project state. A fabricated prefix supplies no identity. |
+| One other Bearer value | Private Hydra access-token introspection, current Kratos identity eligibility, then current local human admission/state | Check trusted issuer/client/API audience/scope and token kind. A non-prefixed value is not automatically valid. |
+| Kratos session cookie together with Authorization | No verifier | Reject competing mechanisms before provider I/O, even if they might identify the same human. Unrelated cookies do not compete. |
+| Repeated Authorization headers or malformed authentication-header syntax | No verifier | Reject the request rather than choosing a header or combining values. |
+| No supported credential | No verifier | Return the generic missing-authentication outcome. |
+
+Credentials travel in the supported cookie or Authorization header, not URL parameters or request bodies. Apply the standard case-insensitive authentication-scheme parsing for Bearer. Invalid or unsupported credentials, malformed requests and provider uncertainty follow the [authentication error table](error-handling.md#authentication-contract). Invalid application-key content stays on the application path and never reaches Hydra.
+
+Every human bearer request repeats private introspection, current Kratos eligibility and the short local lookup. There is no positive authentication cache across requests. Cookie verification remains current too. Neither an earlier successful request nor `AccessContextDTO` freezes status or permissions. The context remains principal-only, including when a [recovery cleanup block](#identity-recovery-cleanup) makes a verified human temporarily ineligible for product access.
+
+Cookie-authenticated writes retain the existing CSRF marker and trusted Origin check. Bearer-authenticated writes use their bearer path without requiring a browser Origin or invoking cookie-only CSRF. Protected operations still check current principal-kind eligibility, membership, exact-target action and source access. External verification precedes independent short authentication reads, without a database transaction held across provider waits.
+
+| Accepted operation contract | Allowed credential | Successful response |
+| --- | --- | --- |
+| Existing `GET /v1/session`, operation ID `getCurrentSession` | Kratos cookie or verified human Hydra bearer | Preserve the existing `principalId` field. |
+| New `GET /v1/application-session`, operation ID `getCurrentApplicationSession` | Valid Inframeld application key for the HTTP audience/adapter | Only `principalId` and the account's bound `projectId`. |
+
+The human-session operation does not accept application keys. A key there is an unsupported credential family and returns 401. The separate application check verifies expiry, revocation, installation/audience bindings, active application state and an active bound project. It makes no model call and returns no permission snapshot or assurance that a later operation will be authorized. A timeout remains unconfirmed. Neither bearer support nor the application-check endpoint is implemented by this documentation change. [API contracts](api-contracts.md#session-contracts) owns their transport handoff.
 
 The CLI stores tokens in the qualified OS credential store with target/account isolation. Refresh rotates tokens under a per-target/account lock and replaces the stored pair coherently. A lost refresh response requires explicit login unless qualified standard behavior proves recovery is safe; it does not permit blind replay or disabled rotation. Ordinary product commands do not open a browser unexpectedly. The credential lifecycle below defines the deployment-configurable defaults, including the seven-day rolling refresh window and no separately selected absolute session-age cap.
 
@@ -244,7 +279,7 @@ Even when Hydra is unreachable, remove the selected local credentials and return
 
 Account switching uses `account use`, not `login --reauth`. Existing-alias reauthentication must prove the same identity; a reused browser session cannot rebind Alice to Bob. The Ory account UI handles changing browser identity, not cookie manipulation or an assumption that `prompt=login` chooses another user.
 
-Verified password recovery/reset explicitly invalidates old Kratos sessions and affected Hydra grants through documented OSS hooks/APIs. Requesting a recovery email anonymously must not revoke access. Distinguish the legitimate new recovery session so recovery can finish. Password reset neither removes Inframeld suspension nor restores grants. Suspension blocks subsequent authorization immediately; keep compromised accounts blocked until separately reported provider cleanup and authorized restoration checks succeed. Exact hook delivery, ordering and durable partial-failure recovery remain specification work, not a promise that either identity product revokes the other's credentials automatically.
+Verified password recovery/reset invalidates old Kratos sessions and affected Hydra grants under the [recovery cleanup contract](#identity-recovery-cleanup). Product access stays blocked until both required outcomes are confirmed. An otherwise active human then resumes automatically; a suspended human still needs deliberate authorized restoration. Requesting a recovery email anonymously must not revoke access. Preserve the legitimate new recovery session so recovery can finish. Exact hook delivery, ordering and durable partial-failure recovery remain specification work, not a promise that either identity product revokes the other's credentials automatically.
 
 <a id="cli-application-key-input"></a>
 
@@ -289,7 +324,7 @@ Before release, #96 and #185 require evidence for all of these behaviors, not ju
 
 Use 0 for success, 2 for usage errors and 1 for other ordinary failures. Precise signal/JSON contracts remain #156 deliverables. Missing target/account/credentials produce explicit context-specific guidance, not fallback or surprise browser launch. `--no-input` is checked before interactive work. Invalid credentials map to 401, valid but unadmitted/ineligible humans to 403, and unavailable/malformed provider verification to 503 for the proposed session extension; ordinary product visibility rules remain unchanged. Saved-login replacement/logout cleanup uncertainty is a nonzero partial outcome, not success.
 
-Exact compatible version/digest pins, release advisories, managed origins, maintenance IPC, issuer mix-up defenses, remaining lifespan keys, wire dispatch, OS matrix and recovery-hook sequencing remain engineering/qualification deliverables. The historical inspection of Hydra v26.2.0 was a candidate observation, not a permanent pin or evidence that later fixes exist there. Qualify a suitable maintained OSS release without floating tags, surprise startup upgrades, private protocol forks or silently switching to a paid distribution.
+Exact compatible version/digest pins, release advisories, managed origins, maintenance IPC, issuer mix-up defenses, remaining lifespan keys, wire schemas, OS matrix and recovery-hook sequencing remain engineering/qualification deliverables. The historical inspection of Hydra v26.2.0 was a candidate observation, not a permanent pin or evidence that later fixes exist there. Qualify a suitable maintained OSS release without floating tags, surprise startup upgrades, private protocol forks or silently switching to a paid distribution.
 
 <a id="implemented-human-authentication"></a>
 
@@ -520,7 +555,7 @@ Changing upload defaults requires both Manage upload defaults on the project and
 
 Changing the default from HRPrivate to SupportKnowledge affects future uploads, not existing documents. Each upload still needs Add documents on every selected group. If that fails, the backend must report the failure rather than silently choose a different audience.
 
-Starter uploads use the private group saved in the project's defaults. Future source connectors also select Inframeld groups explicitly. They do not automatically copy the source system's permissions. Who may configure each kind of source still needs a separate decision.
+Starter uploads use the private group saved in the project's defaults. Future source connectors also select Inframeld groups explicitly. They do not automatically copy the source system's permissions. V1 source configuration is human-only under the [fixed Source capabilities](access-contracts.md#capability-catalogue); separately granted sync remains eligible for applications.
 
 ### Deleting a document and deleting a group do different things
 
@@ -528,7 +563,7 @@ Deleting a Document first blocks access and marks affected serving state as unus
 
 Removing a group from a document's allowlist only changes its audience. Leaving a document out of a future CollectionRevision only changes that future selection. Neither action deletes the Document. The [retention and deletion guide](retention-and-deletion.md) explains cleanup.
 
-A manager may delete an **unused access group**. No Document, active upload or source configuration, or upload default may still refer to it. Those references must first be changed through their usual authorized workflows. Deleting the unused group removes its memberships, managers, and action grants. It neither deletes documents nor changes their audiences, and needs no replacement manager because the group itself is going away.
+A manager may delete an **unused access group**. No Document, active upload/source configuration, upload default, or stored Evaluation case protection or a live import-audience default may still refer to it. Those references must first be changed through their usual authorized workflows. Deleting the unused group removes its memberships, managers, and action grants. It neither deletes documents nor changes their audiences, and needs no replacement manager because the group itself is going away.
 
 <a id="applications"></a> <a id="section-give-applications-and-automation-their-own-scoped-credentials"></a> <a id="section-start-with-fixed-integration-access-defer-verified-user-delegation"></a>
 
@@ -542,7 +577,7 @@ SupportBot's account holds its permissions. Its key proves that a request comes 
 
 ### Application workflows and human-only administration
 
-SupportBot can import ordinary configuration, upload documents, query Pipelines, run evaluations and accept specific evaluation-case revisions.
+SupportBot can update permitted existing configuration through import, upload documents, query Pipelines, run evaluations and accept specific evaluation-case revisions. V1 resource provisioning is human-only: a bot cannot create Projects, groups, accounts, Pipelines, Deployments, Collections, Sources, connections or immutable profiles. The [provisioning contract](access-contracts.md#provisioning) distinguishes those resources from versions, Documents, jobs and cases produced by authorized operations. Missing import dependencies require a human provisioning step; do not fall back to a saved human login.
 
 These actions are not enabled automatically. SupportBot needs permission for each action on the relevant resources, together with access to any required documents and models. Being an application account makes it eligible to receive those permissions. It does not grant them.
 
@@ -554,7 +589,7 @@ Project spending-policy changes are **human-only in v1**. Alice may set, increas
 
 SupportBot may inspect budget information it is allowed to see and run authorized work within the limits. It cannot change the policy, including through setup or TOML import. Otherwise an automated worker could remove the control intended to contain its spending.
 
-This restriction does not change the separate limits on individual operations or decide who may change unrelated project policies. [Budget management](model-connections.md#budget-policy-authority) explains the workflow. The [Access contract](https://github.com/matejpalenik/inframeld/issues/116) and [model contract](https://github.com/matejpalenik/inframeld/issues/121) must define the exact capabilities. [Budget-policy management](https://github.com/matejpalenik/inframeld/issues/190) implements them.
+Use `inspect-budget` and the separate human-only `manage-budget`, each on the exact Project, as recorded in the [reviewed catalogue](#reviewed-capability-catalogue). This restriction does not change the separate limits on individual operations or decide who may change unrelated project policies. [Budget management](model-connections.md#budget-policy-authority) explains the workflow. The [model contract](https://github.com/matejpalenik/inframeld/issues/121) still owns its exact policy/accounting schemas and coordination. [Budget-policy management](https://github.com/matejpalenik/inframeld/issues/190) implements them.
 
 #### Keep identity, resource names and imported access separate
 
@@ -562,9 +597,9 @@ The existing cookie/CSRF and deployment OIDC implementation remains in place. Hy
 
 [Resource names](data-model.md#resource-naming) select resources, not permissions. Project names are unique within an installation. Pipeline, Deployment, connection, collection and profile names are scoped by project and resource type.
 
-For a source or imported evaluation dataset, the user must explicitly map its audience to destination groups. A matching group name or imported metadata cannot grant access. Imported case content needs protection before its source is linked. After linking, access must also satisfy the current source permissions.
+For a source or imported evaluation dataset, an authorized human explicitly maps its audience to destination groups. Applications importing cases use the current saved human-approved Pipeline import audience under [Evaluation audience administration](evaluation.md#case-audiences). A matching group name or imported metadata cannot grant access. Imported case content needs protection before its source is linked. After linking, access must also satisfy the current source permissions.
 
-The [delivery plan](cli-delivery-plan.md) identifies remaining specification work: dispatching bearer tokens, cookies and application keys to the correct verifier, exact action identifiers and targets, invitations, naming changes and imported-evidence capabilities. These accepted rules do not imply that all those operations already exist.
+The [accepted dispatch](#credential-dispatch) and [reviewed capability catalogue](#reviewed-capability-catalogue) resolve the choices recorded here. The [delivery plan](cli-delivery-plan.md) identifies remaining invitation, naming, imported-audience and other specification work. These accepted rules do not imply that all those operations already exist.
 
 <a id="trace-authority"></a>
 
@@ -578,11 +613,11 @@ SupportBot may inspect a recorded answer when it has the appropriate inspection 
 | Enable or disable project tracing, or change retention | An active human with current permission to manage that project's trace policy. |
 | Explicitly delete past traces | An active human with the separate permission to delete that project's trace history. Inspection or policy-management permission is not enough. |
 
-These are descriptions of actions, not new published permission identifiers. [Project tracing](https://github.com/matejpalenik/inframeld/issues/149) implements this distinction.
+The [reviewed catalogue](#reviewed-capability-catalogue) selects `inspect-query-traces` on an exact Pipeline or Deployment, `manage-trace-policy` on a Project, and the separate Project `delete-trace-history`. These identifiers are accepted design, not published endpoint/schema evidence. [Project tracing](https://github.com/matejpalenik/inframeld/issues/149) implements this distinction.
 
 Inspection permission names the exact resource: a Deployment for live queries, or a Pipeline for direct queries. Neither grants inspection on the other. Inspection can reveal other callers' questions and answers on that resource, so every captured source must remain readable, including retrieved passages that were not used as final citations. Lists, stage details and JSON output obey the same checks.
 
-Query permission, having created the resource or knowing an execution ID does not grant inspection. No pipeline permission exposes the installation's full operational trace store. The [Access contract](https://github.com/matejpalenik/inframeld/issues/116) and [tracing contract](https://github.com/matejpalenik/inframeld/issues/147) still need exact permission mappings, initial grant rules and capabilities for non-query work.
+Query permission, having created the resource or knowing an execution ID does not grant inspection. No pipeline permission exposes the installation's full operational trace store. The query mappings are selected. [Fixed creator assignments](access-contracts.md#initial-assignments) include query inspection. Product-facing non-query diagnostic browsing is [deferred in v1](observability.md#non-query-diagnostics); [the tracing contract](https://github.com/matejpalenik/inframeld/issues/147) retains concrete storage/coordination/wire work.
 
 Recording is controlled by installation constraints and project preferences, not by the caller's inspection permission. Normal retention expiry, previously authorized cleanup and source erasure use their ordinary backend permissions. They do not require fresh human approval for each record. This does not change permissions for unrelated deletion operations. A retention change must warn when existing history will expire. [Observability](observability.md#trace-authority) explains these transitions and which history a deletion affects.
 
@@ -601,6 +636,28 @@ The backend verifies the **complete application key** against its stored verifie
 Keep show-once delivery, high-entropy secrets, verifier-only storage, redaction and explicit rotation/revocation. Outbound model-provider credentials retain their own formats. #30 implements application-key issuance/verification using the reviewed #116 dispatch contract; #117 implements the separate human path. The prefix is accepted design, not evidence that those adapters or a migration exist. No enterprise-only Ory token-format customization is required.
 
 [CLI application-connection journey](https://github.com/matejpalenik/inframeld/issues/161) provides the accepted optional access-first connection journey for HTTP or MCP: review account and document/action scope, perform ordinary authorized grants, explicitly issue and deliver a credential, then optionally approve a paid live test as the application. It does not alter the rules below, issue keys during setup automatically or export the human's Hydra credentials.
+
+<a id="application-key-contract"></a>
+
+### Verify a complete key and bound its lifetime
+
+The accepted key format is `ifm_app_<key-UUID>_<secret>`. Generate the public key ID as UUIDv4 and the secret from **32 cryptographically random bytes**, encoded as unpadded base64url, producing 43 secret characters. The public UUID identifies the verifier record to load. It is not the application principal and proves nothing about the caller. This generation rule does not change the valid UUID values accepted by existing application-owned identifier types.
+
+Store **SHA-256 of the complete canonical key** as the verifier bytes, together with safe identity/binding/lifecycle metadata. Compare verifier bytes in constant time after validating the supported key syntax. Do not store or return plaintext for later retrieval, expose the secret in validation messages, or treat lookup by public UUID as authentication. Full verification includes the key's installation, audience/adapter, expiry and revocation, plus current application principal, account, project binding and lifecycle state. Authorization separately checks current grants and protected inputs.
+
+The default lifetime is **90 days**, with a **365-day maximum**. Both are operator-configurable. Authorized issuance may select a shorter lifetime, and there is no automatic renewal. An operator's configured default must fit its configured maximum. These incoming-key durations do not replace the separate Hydra/Kratos lifetime settings. The safe record fields belong to [the logical key contract](data-model.md#application-key-record-contract).
+
+Keep the two-usable-key limit across audiences and explicit issue/update-consumers/revoke replacement sequence. Issuance still performs every [current delegation and group-management check](#applications), coordinated with competing scope changes. Display the secret only on the original successful delivery. A lost response yields the safe [show-once retry outcome](jobs-and-idempotency.md#secrets), never plaintext replay. Algorithm, format and lifetime selection are accepted design. #30 still needs their implementation and behavioral qualification.
+
+| Application lifecycle operation | Human authority and additional checks | Effect |
+| --- | --- | --- |
+| Create application account | Create application accounts on its Project, with current human/project eligibility | Save shared principal, account, membership, audit and the creator's three exact-account administration grants together. The application starts with no actions, groups or key. |
+| Issue application key | Issue application keys on the exact account, authority to grant every current account permission and manage every current account group | Recheck account/project state and the two-key limit at commit. Issuance creates no new account permissions. |
+| Read safe key metadata | Issue or Revoke application keys on the exact account | Return safe IDs, prefix, timestamps and state. No secret/hash, and no extra issuance-delegation check. Delete account alone is insufficient. |
+| Revoke application key | Revoke application keys on the exact account | Independently revoke even the last usable key immediately. No Issue, document-read or full delegation authority is required. |
+| Retire application account | Delete application account on the exact account | Revoke all keys and remove its memberships/grants and human administration assignments. Preserve project-owned work and safe historical attribution. |
+
+Every row is human-only administration. Applications retain use-only grants for eligible operational actions and cannot administer their own account or keys. Initial grants are revocable assignments, not continuing authority from creator history.
 
 ### Alice creates SupportBot
 
@@ -649,7 +706,7 @@ An application may have **at most two usable keys** across supported audiences. 
 2. Update and test the integration with it.
 3. Explicitly revoke the old key.
 
-Different authorized people may perform these steps. There is no separate Rotate permission, automatic revocation of the old key, or silent removal of a key to free a slot. Exact lifetime limits remain undecided.
+Different authorized people may perform these steps. There is no separate Rotate permission, automatic revocation of the old key, or silent removal of a key to free a slot. [The accepted key contract](#application-key-contract) sets the operator-configurable 90-day default and 365-day maximum.
 
 **Revoke application keys is independent of Issue.** Bob can revoke a leaked HRBot key without reading HR documents or being able to grant HRBot's permissions. He may revoke the last usable key immediately. That blocks authentication through the key without deleting the account, its grants, or its human administrators. Neither Issue nor Revoke includes the other.
 
@@ -659,7 +716,7 @@ Replacing a key preserves the principal, its canary routing identity, and owners
 
 Delete application account is a separate human permission on that application. It permanently retires SupportBot, revokes every key, and removes its project membership, group memberships, action permissions, and the human administration grants over it. Key creation and permission changes must not race with deletion and leave the account usable. No replacement key administrator is needed for an account being deleted.
 
-Documents, pipelines, and Deployments created by SupportBot belong to the project and remain. Deleting the account gives Alice no additional permission to read or erase them. Historical attribution follows the usual retention and erasure rules. Creating another account named SupportBot cannot reactivate the old identity or its keys.
+Documents, versions, cases and other project-owned work produced by SupportBot remain with the project. The human-provisioned Pipelines and Deployments it used remain too. Deleting the account gives Alice no additional permission to read or erase them. Historical attribution follows the usual retention and erasure rules. Creating another account named SupportBot cannot reactivate the old identity or its keys.
 
 ### Provider keys are different
 
@@ -696,7 +753,7 @@ Before direct execution, check current Pipeline Query authority, source/model ac
 
 Lists, retained results, trace stages, safe errors and exports enforce current disclosure rules; knowing a request/snapshot ID or having created a Pipeline never bypasses them. Trace capture and retention remain separately controlled. Evaluation cases/results keep their own Access rules: this decision does not settle every evaluation or non-query job-diagnostic capability or make a query trace grant a general evaluation-history grant.
 
-These are accepted action meanings and target scopes, **not invented machine permission identifiers or schema changes**. #116/#128/#147 must specify concrete catalogue/wire mappings, grant bootstrap and remaining non-query capabilities, then qualify enforcement. Preserve existing implemented contracts when mapping them; this documentation does not claim Pipeline Query is already implemented. The old `preview-authority` anchor is retained only for existing links.
+These are accepted action meanings and target scopes. The [reviewed catalogue](#reviewed-capability-catalogue) now selects `query` and `inspect-query-traces` on each exact resource; it changes no schema. #116/#128/#147 retain concrete wire schemas/mappings and implementation/qualification of the settled query grants and fixed initialization. Non-query product diagnostic browsing is deferred; separately authorized domain job/case/result views retain their own contracts. Preserve existing implemented contracts when mapping them; this documentation does not claim Pipeline Query is already implemented. The old `preview-authority` anchor is retained only for existing links.
 
 ### Support CI builds a version and Carol publishes it
 
@@ -753,13 +810,23 @@ The first administrator is established through a **one-time claim controlled by 
 
 None of the user-administration permissions includes another or allows taking over someone's sign-in identity. The initial administrator's grants can be transferred or removed under the same handover rules as other grants. They are not permanent special privileges.
 
-An additional project's creator receives membership and explicit can-use-and-grant assignments for the seven project actions in the [permission reference](#decision-map). Each action's extra checks still apply. These grants cover neither existing projects nor future unnamed actions.
+An invitation is not a saved permission bypass. At issuance and activation, check current Admit users authority plus every named project-membership, group-management and exact-action delegation authority needed for its requested assignments, including the existing group-manager alternative for document-action assignments. Expired/revoked invitations or changed authority cannot widen admission/access. Link the independently verified Ory authority/subject to the legitimate human; matching email alone never merges principals. Installation administration is not automatically assigned to an invitee. The [invitation contract](access-contracts.md#invitations) selects single-use opaque intent, seven-day default/thirty-day maximum and current activation checks. [Activation's narrow admission boundary](access-contracts.md#invitations) uses a verified Kratos browser cookie, cookie-write CSRF and a 32-random-byte invitation token before local admission. It cannot reuse a dependency requiring prior admission, bypass ordinary product checks, restore suspension or release recovery blocks. Consumption, exact assignments, audit and original outcome commit together; the [HTTP draft](access-contracts.md#http-operation-matrix) now specifies the new route/schema declarations for final review, including a non-consuming protected-token preview so the account UI can show authoritative intended scope before activation. Preview admits no principal and grants no ordinary product authority.
+
+An additional project's creator receives membership and explicit can-use-and-grant assignments for exactly the seventeen actions below. Each action's extra checks still apply. These grants cover neither existing projects nor future unnamed actions. [ADR-0059](../adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md) owns the current expansion; ADR-0057 preserves the earlier eleven-action rationale.
+
+<a id="initial-project-grants"></a>
+
+#### Seventeen explicit initial project grants
+
+The fixed list is `manage-project-members`, `create-access-groups`, `create-application-accounts`, `create-pipelines`, `create-deployments`, `manage-upload-defaults`, `delete-project`, `inspect-budget`, `manage-budget`, `manage-trace-policy`, `delete-trace-history`, `inspect-feedback`, `create-collections`, `create-sources`, `create-model-connections`, `create-processing-profiles` and `create-embedding-profiles`.
+
+[The initial-assignment contract](access-contracts.md#initial-assignments) owns this list and the enumerated human creator assignments for Pipelines, Deployments, Collections, Sources, connections, profiles and application accounts. [ADR-0059](../adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md) supersedes the earlier eleven-action seed. These are removable exact-target grants, not an administrator role, future-action wildcard or automatic backfill for existing projects. Pipeline creators receive thirteen assignments; Deployment creators receive seven, including own-feedback authority. Resource grants supply neither document access nor rights on another resource.
 
 For example, Alice keeps her starter and creates Legal Research for a separate workload. [Ordinary project administration](https://github.com/matejpalenik/inframeld/issues/28) owns this creation operation:
 
 1. Check that Alice is an eligible human with current installation-level Create projects permission. There is no existing project membership to require yet.
 2. Check the reviewed Name and Display name. An unavailable Name fails without silently choosing a different one or revealing another project's owner.
-3. Save the project, Alice's membership, the seven explicit initial assignments, audit and original-request outcome together. If the transaction fails, none of these partial records remains.
+3. Save the project, Alice's membership, the seventeen explicit initial assignments, audit and original-request outcome together. If the transaction fails, none of these partial records remains.
 4. Return the committed identity. If the response is lost, recover that original result under current access; do not create another project or restore grants removed since creation.
 
 Creation alone does not create RAG resources, change the starter or change the CLI's saved selection. Setup and import are separate next operations. If either is interrupted, the completed project remains. [CLI access management](https://github.com/matejpalenik/inframeld/issues/178) presents ordinary creation and deletion; setup uses the same creation operation. [Starter provisioning](https://github.com/matejpalenik/inframeld/issues/27) remains a separate responsibility and does not depend on Create projects.
@@ -784,6 +851,24 @@ Prefer recovering Alice's **existing legitimate account**, keeping the same loca
 
 Kratos handles recovery of the sign-in identity. Access decides whether the recovered account may act. This integration still needs implementation and testing.
 
+<a id="identity-recovery-cleanup"></a>
+
+### Block product access until verified recovery cleanup finishes
+
+Alice can recover her password without having been suspended. At the authenticated server-side boundary, trusted flow-bound evidence of verified identity recovery/reset durably admits one cleanup operation and temporarily blocks her product access. Evidence of the verified reset is distinct from confirmation that both providers have finished session/grant cleanup. The Kratos recovery and password-setting screens remain usable. An anonymous request for a recovery email, a browser redirect or an OAuth callback is not proof of recovery completion and cannot trigger revocation.
+
+Track Kratos-session cleanup and affected Hydra-grant cleanup independently. A confirmed success from one provider does not establish the other outcome. Failure or uncertainty keeps the product block in place while bounded reconciliation continues the original operation. Provider calls happen outside a database transaction. The operation must distinguish the legitimate new recovery session from sessions to invalidate.
+
+| Current local account state | After both required cleanup outcomes are confirmed |
+| --- | --- |
+| Otherwise active, with no newer pending cleanup | Automatically remove this operation's temporary product block; current admission and grants still apply. |
+| Suspended | Keep suspension. A human with Restore users must separately verify the legitimate identity, complete the security review and check cleanup/current state before restoring access. |
+| Another cleanup remains pending, or account is no longer eligible | Do not release that newer block or make the account eligible. |
+
+Deduplicate trusted completion using its original flow-bound event identity. A duplicate completed event returns its recorded outcome; it cannot start broad revocation against sessions from a later login. Neither cleanup completion nor restoration recreates explicitly removed memberships or grants. Keep callback evidence bounded and credential-free: do not include session cookies/tokens in callback payloads or audit. The temporary block is an operation obligation, not a newly selected `Principal` status or permission snapshot. [ADR-0058](../adr/ADR-0058-block-product-access-during-identity-recovery-cleanup.md) records this decision; [durable cleanup](jobs-and-idempotency.md#identity-cleanup) and [logical records](data-model.md#identity-cleanup-records) own the related contracts.
+
+**Accepted integration shape; exact mechanism still to qualify:** use authenticated server-side admission of the verified flow, native Kratos session cleanup, trusted cleanup-completion evidence and durable independent Hydra cleanup. The admitted product block must protect the pending cleanup interval; a completed password form or browser callback cannot establish those provider outcomes. Current upstream [Kratos session-destroyer source](https://github.com/ory/kratos/blob/master/selfservice/hook/session_destroyer.go) preserves the recovery session. Its generic [post-recovery webhook source](https://github.com/ory/kratos/blob/master/selfservice/hook/web_hook.go) does not expose that session in the template context. These are source observations, not pinned-release qualification. Exact callback placement/ordering relative to password-setting and native cleanup, authenticated flow-bound evidence, failure/retry identity and session preservation remain [#116](https://github.com/matejpalenik/inframeld/issues/116)/[#117](https://github.com/matejpalenik/inframeld/issues/117) work. Do not assume a generic webhook supplies the new session ID or certifies native cleanup. [The private callback contract](access-contracts.md#recovery-callbacks) selects a dedicated rotatable service secret, a five-field allowlisted body limited to 8 KiB and stable flow/event/phase deduplication. Its authenticated sender alone does not prove reset or native cleanup completion. The [private callback draft](access-contracts.md#recovery-wire) specifies private declarations/evidence requirements for final review; pinned integration qualification belongs to #117. This does not publish an unqualified hook configuration.
+
 ### The server operator can recover a stranded responsibility
 
 An **in-app administrator** has only their assigned permissions. There is no unrestricted UI superadministrator or special ability to read documents.
@@ -799,7 +884,9 @@ Prefer help from an already authorized peer or recovery of the legitimate accoun
 
 The compromised account stays blocked. Recovery records the operator, reason, changed permissions, and the access change number together with the change. It does not give the operator ordinary document-reading permissions or let an in-app administrator take over private groups.
 
-The audit record helps explain what the operator did. It cannot prevent misuse by a trusted host operator. The exact maintenance command, identity checks, and handling of simultaneous changes remain to be implemented and tested.
+The accepted boundary is a narrow one-shot maintenance command executed inside the verified managed backend using the operator's existing host/container-exec authority. Supply bounded protected input, an expected immutable installation identity, independently verified Ory identity and the exact reviewed request state. An ordinary bearer token, email address, target label or Docker context name is not operator authority or sufficient installation proof. Remote host maintenance remains separate from ordinary remote CLI login. Do not expose a public claim/maintenance API, shared claim password or backend Docker socket.
+
+First-administrator setup commits the verified identity link, admission, four explicit organization grants and audit together. Replaying the same original claim returns that result without recreating removed grants; a competing identity fails. For repair, the replacement must already be an active admitted verified human. Recheck under the applicable organization/project locks that the exact responsibility is still stranded and the reviewed revision is current. A stale review fails without partial assignments. Save the operator reason, before/after revisions and audit with the exact membership/management or use-and-grant repair. The audit explains the action but cannot prevent misuse by a trusted host operator. The [maintenance contract](access-contracts.md#maintenance) selects `inframeld-maintenance`, one protected versioned JSON request limited to 64 KiB, independent verification of the candidate's current Ory session/identity, exact reviewed intent and safe output. Host execution authorizes repair; the session proof identifies its recipient. The [version 1 maintenance draft](access-contracts.md#maintenance-wire) uses the transient Hydra human access token already obtained by the CLI as protected recipient identity proof. Private introspection and current Kratos identity checks precede local reads; host execution supplies authority. First bootstrap may verify before local admission, while repair requires an active admitted eligible recipient. The draft specifies installation-identity initialization and versioned input/output/error/replay contracts for final review and qualification.
 
 Deliver suspension/restoration and scoped operator maintenance as explicit capabilities, separate from ordinary membership/grant administration. The immediate local block, external Kratos/Hydra cleanup and deliberate restoration have separate recorded outcomes: cleanup failure cannot lift the block. A retry inspects or continues the original cleanup; it never restores access merely to make another provider request. Operator maintenance uses a privileged host boundary, not an unrestricted token or hidden bypass in ordinary CLI authentication. The [delivery plan](cli-delivery-plan.md) assigns these workflows and their specification/security qualification prerequisites; no maintenance command is implemented by this guide.
 
@@ -813,9 +900,11 @@ Resources being deleted need no replacement manager or grantor. History still fo
 
 For example, Alice may delete Legal Research while being unable to read its private HR documents. [Project-deletion admission](https://github.com/matejpalenik/inframeld/issues/204) checks her authority, commits the project block and records a durable cleanup obligation. It uses [application/key lifecycle enforcement](https://github.com/matejpalenik/inframeld/issues/30) to stop the project's applications and revoke their keys before [Knowledge cleanup](https://github.com/matejpalenik/inframeld/issues/45) removes data. It does not ask Alice to obtain Delete documents or Delete application account on every item. Her identity and other projects remain unchanged.
 
-The client must distinguish **deletion accepted**, **access blocked** and **physical cleanup complete**. Losing a response does not prove that deletion failed; inspect the original operation. A failed cleanup keeps the project blocked and records what remains to remove. The [protected deletion-status operation](https://github.com/matejpalenik/inframeld/issues/38) lets an eligible reader observe safe progress after ordinary membership disappears, without private inventory or content. Current identity checks still apply, and status access does not grant cancellation or continuation authority.
+The client must distinguish **deletion admitted/access blocked**, **application shutdown unfinished**, **physical cleanup unfinished** and **physical cleanup complete**. These are required observable outcomes, not a second job state machine or settled public enum. Losing a response does not prove failure; inspect the original operation before retrying. Failed or uncertain shutdown/cleanup keeps the project blocked and its durable obligation available for reconciliation.
 
-The block, audit and recoverable cleanup obligation must survive interruption together. Racing uploads, key issuance and publication cannot reopen the project. Cleanup continues only within the original admitted scope; it cannot restore the project or affect a different one. [Access contracts](https://github.com/matejpalenik/inframeld/issues/116) and [job contracts](https://github.com/matejpalenik/inframeld/issues/124) specify the exact coordination and public outcomes before implementation. These are accepted requirements, not claims of completed lifecycle code.
+The original initiating human may read retained content-free deletion status after ordinary membership disappears. The [protected status operation](https://github.com/matejpalenik/inframeld/issues/38) must check current identity eligibility and the authoritative original principal/operation binding. A claimed operation ID alone is insufficient; unrelated principals cannot use this exception. Status returns no private inventory, hidden names, private-content counts or excerpts, and grants neither cancellation nor continuation authority. Retention still limits availability.
+
+Under the shared organization/project write coordination, current human eligibility, membership, Delete project and reviewed state must be rechecked at commit. The block, audit, original operation identity and exact durable cleanup obligation survive interruption together. Denied or stale admission leaves no partial block. Racing uploads, key issuance and publication cannot reopen the project. Cleanup workers use only the original admitted project scope, independently of a cached initiating-user permission snapshot; they cannot restore the project or affect another one. [Deletion/job contracts](jobs-and-idempotency.md#project-deletion) link the owning tickets and public-schema work. These are accepted requirements, not claims of completed lifecycle code.
 
 <a id="persistence"></a> <a id="section-accepted-access-data-model"></a> <a id="section-accepted-write-coordination-and-proposed-indexes"></a>
 
@@ -954,13 +1043,46 @@ A permission's **scope** is the exact installation, project, group, or resource 
 | Target | Named actions or authority |
 | --- | --- |
 | Installation organization | Admit users, Suspend users, Restore users, Create projects. |
-| Project | Manage project members, Create access groups, Create application accounts, Create Pipeline, Create Deployment, Manage upload defaults, Delete project. |
-| Individual Pipeline | Query, Inspect query traces, Build, View configuration, Edit configuration, Delete. |
-| Individual Deployment | Query, Inspect query traces, Manage releases, View configuration, Edit configuration, Delete. |
+| Project | [Seventeen initial creator actions](#initial-project-grants), including Inspect feedback and named resource-creation actions. |
+| Individual Pipeline | Query, Inspect query traces, Build, View configuration, Edit configuration, Delete, six Evaluation operations and human case-audience administration. |
+| Individual Deployment | Query, Inspect query traces, Manage releases, View configuration, Edit configuration, Delete, own `feedback:write`. |
 | Access group | Add documents, Update documents, Delete documents. Manager assignment is separate from these grants. |
 | Individual application account | Issue application keys, Revoke application keys, Delete application account. |
 
-Evaluation and feedback retain their own workflow contracts. This table does not settle their remaining permission targets or API identifiers. Basic visibility follows [section 4](#sharing), rather than a universal View permission.
+The [fixed capability catalogue](access-contracts.md#capability-catalogue) records reviewed identifiers, targets and principal eligibility, including Collection, Source, connection and profile actions. Basic visibility follows [section 4](#sharing), rather than a universal View permission.
+
+<a id="reviewed-capability-catalogue"></a>
+
+### Reviewed capability identifiers and extra checks
+
+Use [the fixed capability catalogue](access-contracts.md#capability-catalogue) for the exact identifiers and supported action/target/caller combinations. It preserves `create-access-groups`, `query` and `feedback:write`. Applications receive use-only eligible grants; human-only creation, grant administration, credentials, audiences and policy changes cannot become application-eligible through import. Current principal/project state, membership and protected-input checks remain additional conditions.
+
+Evaluation uses six separate Pipeline-scoped operational grants and human-only `manage-evaluation-case-audiences`, without per-case grant rows or a generic Dataset/Experiment target. The [Evaluation guide](evaluation.md#case-audiences) owns protected saved import audiences and existing-case changes. [Feedback](answer-feedback.md#feedback-authority), [tracing](observability.md#trace-authority) and [budget policy](model-connections.md#budget-policy-authority) own their detailed workflows. Product-facing non-query diagnostic browsing is deferred in v1; ordinary domain job/case/result inspection remains separately authorized.
+
+<a id="access-contract-review"></a>
+
+### Reviewed scenarios and remaining #116 work
+
+These examples record the design review, not executed tests or implemented guarantees:
+
+| Scenario | Required outcome |
+| --- | --- |
+| Alice sends a cookie and bearer, or duplicate Authorization headers. | Reject before any provider call; no fallback even if credentials could identify the same human. |
+| SupportBot sends a revoked key, or a verified key whose account/project is blocked. | Revoked credentials return 401; verified but ineligible application/account/project state returns 403. Neither public key ID nor cached grants can admit it. |
+| Bob can revoke a key but cannot grant SupportBot's HR actions. | Revocation remains allowed; issuance fails its full current delegation/group checks. |
+| SupportBot can query a Deployment and inspect budget. | It cannot query the Pipeline, inspect traces, change budget/tracing policy or delete history without the corresponding eligible exact grant. |
+| An accepted case revision is edited or imported with an acceptance claim. | The changed/new revision is unreviewed until exact-revision review; provenance does not supply authority. |
+| Verified recovery finishes Kratos cleanup while Hydra cleanup is uncertain. | Product access stays blocked; reconciliation uses the original operation. A later completed duplicate cannot revoke new logins. |
+| The only manager is suspended and an operator repairs the group. | Suspend immediately; repair only the reviewed stranded responsibility, giving the eligible replacement membership and management together. |
+| Project deletion succeeds but Alice loses the response and later her membership. | Recover the original operation under the narrow content-free status rule; keep failed shutdown/cleanup blocked without recreating the project. |
+
+**Settled by the 2026-10-04 review:** fixed capability identifiers/targets/eligibility, seventeen Project creator grants and exact-resource creator assignments, human-only resource provisioning with application updates, case-audience administration/import defaults, single-use invitation rules and non-query diagnostic deferral. [The contract reference](access-contracts.md) records application inputs/results, transport compatibility, maintenance intent and reviewed scenarios.
+
+**Also settled by the final approval:** session fields and 5/10/15-second configurable starting budgets, safe authentication problem/challenge literals, new 32-KiB/100-assignment Access limits, exact-action grant listing, cookie/CSRF invitation admission, show-once key outcomes, the 64-KiB maintenance command and the 8-KiB private recovery callback boundary.
+
+**Concrete draft now written:** [HTTP operations and bounded schemas](access-contracts.md#http-operation-matrix), [host maintenance/proof](access-contracts.md#maintenance-wire) and [private recovery handoff](access-contracts.md#recovery-wire). Final maintainer review of the written contracts and separately authorized GitHub reconciliation remain before #116 closure. [The remaining-artifact table](access-contracts.md#review-and-remaining-work) preserves downstream qualification and domain-schema ownership. These documentation changes do not edit or close issues.
+
+Full domain schemas, pinned OSS provider compatibility and runtime/browser/CLI/OS qualification remain with their consuming specification and implementation/qualification issues. The historical tests do not prove new bearer, recovery or application-key behavior. See [remaining contract work](access-contracts.md#review-and-remaining-work).
 
 ### Decisions behind the design
 
@@ -969,6 +1091,11 @@ Evaluation and feedback retain their own workflow contracts. This table does not
 | Public documentation and protected operations | [ADR-0007](../adr/ADR-0007-keep-api-documentation-public-and-product-operations-protected.md). Public API documentation does not grant permission to use product operations. |
 | Human authentication and application-owned policy | [ADR-0012](../adr/ADR-0012-use-kratos-for-human-authentication.md), [ADR-0053](../adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md), [ADR-0013](../adr/ADR-0013-keep-authorization-in-access-and-postgresql.md). |
 | Bounded grants, document audiences, and manager membership | [ADR-0014](../adr/ADR-0014-bound-permission-delegation-by-action-and-exact-target.md), [ADR-0015](../adr/ADR-0015-keep-document-group-access-separate-from-operational-permissions.md), [ADR-0049](../adr/ADR-0049-require-group-managers-to-be-ordinary-members.md). |
+| Explicit initial creator grants | [ADR-0059](../adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md). Seventeen Project actions and fixed resource assignments supersede the historical eleven-action seed. |
+| Provisioning and application updates | [ADR-0060](../adr/ADR-0060-keep-v1-resource-provisioning-human-only.md). Humans provision; applications perform granted operations on existing resources. |
+| Case audiences and invitations | [ADR-0061](../adr/ADR-0061-control-evaluation-audiences-through-pipeline-authority.md) and [ADR-0062](../adr/ADR-0062-activate-invitations-under-current-issuer-authority.md). |
+| Non-query diagnostics | [ADR-0063](../adr/ADR-0063-defer-product-non-query-diagnostic-browsing.md). Product browsing is deferred; domain inspection remains. |
+| Recovery completion and product access | [ADR-0058](../adr/ADR-0058-block-product-access-during-identity-recovery-cleanup.md). Active-account cleanup release differs from deliberate suspension restoration. |
 | Shared principals and application credentials | [ADR-0016](../adr/ADR-0016-use-stable-shared-principals-with-an-application-account-extension.md), [ADR-0017](../adr/ADR-0017-let-valid-application-keys-use-current-account-permissions.md), [ADR-0018](../adr/ADR-0018-use-opaque-expiring-and-revocable-application-credentials.md). |
 | Recovery, relational grants, audit, and simultaneous changes | [ADR-0019](../adr/ADR-0019-permit-emergency-suspension-with-scoped-operator-recovery.md), [ADR-0020](../adr/ADR-0020-store-current-grants-in-target-specific-relational-tables.md), [ADR-0021](../adr/ADR-0021-separate-current-grants-from-transactional-audit-history.md), [ADR-0022](../adr/ADR-0022-coordinate-access-writes-by-project-with-scope-revisions.md). |
 | Readiness, starter setup, and publication | [ADR-0033](../adr/ADR-0033-separate-build-readiness-from-release-authority.md), [ADR-0046](../adr/ADR-0046-provision-creator-private-defaults-through-ordinary-resources.md), [ADR-0047](../adr/ADR-0047-support-reversible-publication-modes-per-deployment.md). |
@@ -976,15 +1103,15 @@ Evaluation and feedback retain their own workflow contracts. This table does not
 
 ### What remains outside this design
 
-**Deferred features:** verified user delegation, third-party OAuth/MCP onboarding, different permissions per key, nested groups, custom roles, general policy languages, and permissions for individual document chunks. Hydra for the first-party human CLI is accepted but still needs implementation and qualification. Keycloak and ZITADEL are not alternative deployment profiles under the Kratos-plus-Hydra decision.
+**Deferred features:** application-driven resource provisioning, product-facing non-query diagnostic browsing, verified user delegation, third-party OAuth/MCP onboarding, different permissions per key, nested groups, custom roles, general policy languages, and permissions for individual document chunks. Hydra for the first-party human CLI is accepted but still needs implementation and qualification. Keycloak and ZITADEL are not alternative deployment profiles under the Kratos-plus-Hydra decision.
 
 Future enterprise options could include federation, separate identity providers per organization, SAML/SCIM integration, managed operation, and governance features. These are possibilities, not shipped capabilities or reasons to restrict basic secure OSS operation. Enterprise deployments could use the same identity technology, but migration would still need its own validation. User delegation is deferred by sequencing, not declared permanently enterprise-only.
 
 **Still to specify or test:**
 
-- Remaining action names, exact configuration fields, treatment of links to private resources, and views of history and other resources.
+- Exact public schemas, treatment of links to private resources and bounded views/history within the fixed capability catalogue.
 - Remaining source, collection, contributor, project, group, and application administration details.
-- Application-key lifetimes and exact credential dispatch/binding contracts. The [human CLI protocol](#cli-client-registration) and [primary duration defaults](#cli-credential-lifecycle) are accepted; their implementation, full setting inventory and release qualification remain.
+- Implementation and qualification of the [accepted credential dispatch](#credential-dispatch), [application-key contract](#application-key-contract), [human CLI protocol](#cli-client-registration) and [duration defaults](#cli-credential-lifecycle), including the full setting inventory.
 - User admission, identity verification, handover, and recovery workflows.
 - Behavioral tests for administration, handover, recovery, simultaneous changes, permitted document retrieval, and deployment integration, plus coverage for database constraints not exercised by the current relational tests.
 

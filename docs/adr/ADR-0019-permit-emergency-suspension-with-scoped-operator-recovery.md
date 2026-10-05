@@ -22,6 +22,10 @@ Allow authorized emergency suspension without last-manager handover. Preserve re
 
 **Example.** Suspend the only Support manager to stop a compromise. Keep that account blocked while scoped maintenance appoints a verified replacement; do not make every installation administrator a Support reader.
 
+**Recovery clarification, 2026-10-04:** [ADR-0058](ADR-0058-block-product-access-during-identity-recovery-cleanup.md) adds a temporary product block while verified recovery cleanup completes. Otherwise active users resume automatically only after both required provider outcomes are confirmed. Suspended humans still require this decision's deliberate authorized restoration and security review; password recovery alone never lifts suspension.
+
+**Maintenance input clarification, 2026-10-04:** the accepted CLI uses its transient Hydra human access token only to prove the replacement/first administrator's identity through independent backend introspection/current Kratos checks. Verified host/container execution supplies authority. The [version 1 draft](../development/access-contracts.md#maintenance-wire) specifies the narrow input, installation binding, reviewed responsibility and secret-safe replay; it neither adds an ordinary bearer bypass nor implements a command.
+
 ## Consequences
 
 - Containment can happen immediately without accepting that a stranded group is permanently unrecoverable.

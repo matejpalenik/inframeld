@@ -17,6 +17,7 @@ The feature examples are illustrative. They do not claim that these business ope
 | How does this look in a feature? | [Examples](#3-everyday-examples) |
 | When is a new exception justified? | [New exceptions](#4-when-should-i-create-a-new-exception) |
 | What does a client receive? | [HTTP behavior](#5-what-the-http-client-receives) |
+| How will incoming credentials fail? | [Accepted authentication contract](#authentication-contract) |
 | How do cleanup and retries behave? | [Execution boundaries](#6-logging-cleanup-and-retries) |
 | Which public types exist? | [Problem catalogue](#problem-catalogue) |
 
@@ -242,6 +243,44 @@ A request-validation problem also contains sanitized issues, for example:
 ```
 
 This fragment belongs inside the problem object. Return at most 20 sanitized issues, so the list can be incomplete. Include only verified public field names and safe indices. Submitted dictionary keys may contain secrets. Never return raw FastAPI or Pydantic error dictionaries.
+
+<a id="authentication-contract"></a>
+
+### Accepted authentication outcomes for #116
+
+The [Access dispatch contract](access-control.md#credential-dispatch) selects one verifier before provider I/O. The following extension was accepted on 2026-10-04. It is not a claim that the bearer adapters, new error code or route declarations are implemented:
+
+| Status | Condition | Public problem contract |
+| --- | --- | --- |
+| 400 | Malformed Authorization header syntax, duplicate Authorization headers or competing Kratos session cookie and Authorization | New accepted code `invalid_authentication_request`, with the exact reviewed definition below. Reject before provider I/O. |
+| 401 | Missing, invalid, expired, revoked or route-unsupported credential family | Preserve the existing generic `http_error` problem body; supply an appropriate trusted Bearer challenge when applicable. |
+| 403 | Verified human or application is locally ineligible, including an unadmitted/recovery-blocked human or blocked application/account/project; or an authenticated principal has the wrong kind or lacks the requested action | Preserve existing safe authentication/permission problem mappings; no token or protected-account detail in the body. |
+| 404 | Missing resource or resource hidden from this caller under the ordinary visibility rule | Preserve hidden-resource semantics. A visible resource with denied action instead returns 403. |
+| 409 | Stale reviewed revision or conflicting use of an idempotency key | Preserve existing stale-state/idempotency problem mappings; never turn conflict into a fresh mutation. |
+| 422 | Invalid request fields | Preserve the existing bounded validation problem contract. |
+| 503 | Required provider verification is unavailable or its response cannot be validated | Preserve the existing safe authentication 503 body; do not admit stale/cached success. |
+
+A malformed complete credential value with otherwise valid header syntax is a failed credential (401), rather than a malformed request (400). Invalid credential bindings, expiry and revocation likewise return 401; a verified application credential still cannot admit a currently ineligible account/project (403). Application keys at the human-session operation are an unsupported family (401). A verified application at an ordinary human-only operation fails principal eligibility (403). No failed verifier falls back to another family.
+
+The new 400 definition uses these accepted literal values, within the existing `ProblemDetails` representation:
+
+| Field | Value |
+| --- | --- |
+| `type` | `https://github.com/matejpalenik/inframeld/blob/main/docs/development/error-handling.md#invalid-authentication-request` |
+| `title` | `Invalid authentication request` |
+| `status` | `400` |
+| `code` | `invalid_authentication_request` |
+| `detail` | `Use one supported authentication method with correctly formatted credentials.` |
+
+<a id="invalid-authentication-request"></a>
+
+#### Invalid authentication request and trusted challenges
+
+`requestId` remains the generated correlation ID matching `X-Request-ID`; omit `instance` and validation-only `errors`. This definition is accepted design, not a new implemented catalogue entry. Existing 401/403/503 problem bodies and codes remain unchanged.
+
+Use realm `inframeld` for applicable Bearer challenges. A missing credential receives `WWW-Authenticate: Bearer realm="inframeld"` without an `error` attribute. A failed bearer credential receives `Bearer realm="inframeld", error="invalid_token"`. For a malformed/competing Bearer authentication request, use `Bearer realm="inframeld", error="invalid_request"` with the 400 response where that Bearer challenge applies. Keep challenge production with the authentication adapter, not the shared problem handler.
+
+[RFC 6750](https://www.rfc-editor.org/rfc/rfc6750.html#section-3) supplies the Bearer error meanings. Inframeld's problem `code` is a separate vocabulary. Local grants are not OAuth scope strings: do not manufacture `insufficient_scope` challenges for ordinary product authorization denial. Do not copy provider error text into problems or treat a 403 as a refresh/identity-fallback instruction. Route declarations and runtime challenge behavior still need qualification alongside the new adapters.
 
 ### Declare the actual route contract
 
