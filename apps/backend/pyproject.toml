@@ -8,6 +8,7 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",
     "fastapi>=0.141.1",
+    "ory-hydra-client",
     "ory-kratos-client>=25.4.0",
     "psycopg[binary]>=3.3.5",
     "pydantic-settings>=2.15.0",
@@ -26,6 +27,9 @@ build-backend = "uv_build"
 # Only consider Python distributions uploaded at least seven days ago.
 exclude-newer = "7 days"
 index-strategy = "first-index"
+
+[tool.uv.sources]
+ory-hydra-client = { git = "https://github.com/ory/hydra-client-python.git", rev = "756e95a40b4ddefd3d67006b62d43577f2856be6" }
 
 [dependency-groups]
 dev = [
