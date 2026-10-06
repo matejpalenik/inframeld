@@ -1,12 +1,13 @@
 """Verify typed runtime configuration and sanitized validation errors."""
 
+import os
 from pathlib import Path
 
 import pytest
 from pydantic import HttpUrl, SecretStr, ValidationError
 
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
-from inframeld_backend.bootstrap.application_settings import get_settings
+from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 from inframeld_backend.shared.infrastructure.settings.request_fingerprint_settings import (
     RequestFingerprintSettings,
@@ -133,3 +134,114 @@ def test_fingerprint_key_path_must_be_absolute() -> None:
     """Avoid resolving a deployment secret relative to an unpredictable working directory."""
     with pytest.raises(ValidationError, match="absolute"):
         RequestFingerprintSettings(key_file=Path("relative/fingerprint.key"))
+
+
+@pytest.fixture
+def bearer_configuration_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep configuration cases independent of the developer's inherited environment."""
+    for name in tuple(os.environ):
+        if name.startswith("INFRAMELD_"):
+            monkeypatch.delenv(name, raising=False)
+
+
+def _load_bearer_settings() -> ApplicationSettings:
+    # Explicit values and _env_file=None isolate tests from real configuration.
+    return ApplicationSettings(
+        database=DatabaseSettings(
+            name="synthetic",
+            user="synthetic",
+            password=SecretStr("synthetic-password"),
+        ),
+        request_fingerprint=RequestFingerprintSettings(
+            key_file=Path("/run/secrets/synthetic-fingerprint.key")
+        ),
+        # BaseSettings supports this; its generated model signature omits it.
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+    )
+
+
+def _configure_kratos(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    with_admin_url: bool,
+) -> None:
+    monkeypatch.setenv("INFRAMELD_KRATOS__PUBLIC_URL", "http://kratos:4433")
+    monkeypatch.setenv("INFRAMELD_KRATOS__AUTHORITY", "kratos:test")
+    if with_admin_url:
+        monkeypatch.setenv("INFRAMELD_KRATOS__ADMIN_URL", "http://kratos:4434")
+
+
+def _configure_hydra(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("INFRAMELD_HYDRA__ADMIN_URL", "http://hydra:4445")
+    monkeypatch.setenv("INFRAMELD_HYDRA__ISSUER", "https://login.example.test/")
+    monkeypatch.setenv("INFRAMELD_HYDRA__API_AUDIENCE", "https://api.example.test")
+
+
+def test_cookie_only_environment_remains_valid(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Allow browser login without requiring Hydra or a Kratos admin endpoint."""
+    _configure_kratos(monkeypatch, with_admin_url=False)
+
+    settings = _load_bearer_settings()
+
+    assert settings.hydra is None
+    assert settings.kratos is not None
+    assert settings.kratos.admin_url is None
+
+
+def test_complete_human_bearer_environment_is_parsed(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Load both private endpoints and the exact Hydra issuer and API audience."""
+    _configure_kratos(monkeypatch, with_admin_url=True)
+    _configure_hydra(monkeypatch)
+
+    settings = _load_bearer_settings()
+
+    assert settings.kratos is not None
+    assert settings.kratos.admin_url == HttpUrl("http://kratos:4434")
+    assert settings.kratos.authority == IdentityAuthority("kratos:test")
+    assert settings.hydra is not None
+    assert settings.hydra.admin_url == HttpUrl("http://hydra:4445")
+    assert settings.hydra.issuer.value == "https://login.example.test/"
+    assert settings.hydra.api_audience.value == "https://api.example.test"
+
+
+def test_hydra_requires_kratos_configuration(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject token verification without a configured source of current identity state."""
+    _configure_hydra(monkeypatch)
+
+    with pytest.raises(ValidationError, match="requires Kratos configuration"):
+        _load_bearer_settings()
+
+
+def test_hydra_requires_an_explicit_kratos_admin_url(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject bearer configuration that cannot perform the required Kratos identity lookup."""
+    _configure_kratos(monkeypatch, with_admin_url=False)
+    _configure_hydra(monkeypatch)
+
+    with pytest.raises(ValidationError, match="requires an explicit Kratos admin URL"):
+        _load_bearer_settings()
+
+
+def test_kratos_admin_url_alone_does_not_require_hydra(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep a configured Kratos admin client independent of whether Hydra is enabled."""
+    _configure_kratos(monkeypatch, with_admin_url=True)
+
+    settings = _load_bearer_settings()
+
+    assert settings.hydra is None
+    assert settings.kratos is not None
+    assert settings.kratos.admin_url == HttpUrl("http://kratos:4434")

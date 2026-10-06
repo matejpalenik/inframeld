@@ -3,12 +3,13 @@
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
+from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 from inframeld_backend.shared.infrastructure.settings.request_fingerprint_settings import (
@@ -25,7 +26,8 @@ class ApplicationSettings(BaseSettings):
     """Validate aggregate process configuration and compose provider-specific settings.
 
     Environment names and defaults are shared by HTTP startup, migration tooling,
-    and tests. This object contains configuration, not opened external resources."""
+    and tests. This object contains configuration, not opened external resources.
+    """
 
     environment: Literal["local", "test", "production"] = "local"
     log_level: LogLevel = "INFO"
@@ -34,6 +36,7 @@ class ApplicationSettings(BaseSettings):
     database: DatabaseSettings
     request_fingerprint: RequestFingerprintSettings
     kratos: KratosSettings | None = None
+    hydra: HydraSettings | None = None
     csrf: CSRFSettings = Field(default_factory=CSRFSettings)
 
     model_config = SettingsConfigDict(
@@ -43,6 +46,21 @@ class ApplicationSettings(BaseSettings):
         env_nested_delimiter="__",
         extra="forbid",
     )
+
+    @model_validator(mode="after")
+    def _require_human_bearer_configuration(self) -> Self:
+        """Require both identity providers when Hydra authentication is configured."""
+
+        if self.hydra is None:
+            return self
+
+        if self.kratos is None:
+            raise ValueError("Hydra authentication requires Kratos configuration")
+
+        if self.kratos.admin_url is None:
+            raise ValueError("Hydra authentication requires an explicit Kratos admin URL.")
+
+        return self
 
 
 def _format_validation_error(error: ValidationError) -> str:
