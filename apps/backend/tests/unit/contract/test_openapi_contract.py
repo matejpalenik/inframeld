@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Annotated, Any, cast
 
+import pytest
 from fastapi import FastAPI, File, Form, Query, UploadFile
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
@@ -110,6 +111,46 @@ def test_openapi_contract_matches_application() -> None:
         "Every public operation must define an operationId."
     )
     assert len(operation_ids) == len(set(operation_ids)), "Public operationIds must be unique."
+
+
+@pytest.mark.parametrize(
+    ("path", "method"),
+    [
+        ("/v1/session", "get"),
+        ("/v1/projects/{project_id}/grants", "post"),
+    ],
+)
+def test_human_routes_declare_cookie_or_bearer_and_authentication_errors(
+    path: str, method: str
+) -> None:
+    """Tell clients they can use either human credential and how authentication failures look."""
+    schema = create_app().openapi()
+    operation = schema["paths"][path][method]
+
+    assert operation["security"] == [
+        {"KratosSession": []},
+        {"HumanBearer": []},
+    ]
+    schemes = schema["components"]["securitySchemes"]
+    assert schemes["KratosSession"]["type"] == "apiKey"
+    assert schemes["KratosSession"]["in"] == "cookie"
+    assert schemes["KratosSession"]["name"] == "ory_kratos_session"
+    assert schemes["HumanBearer"]["type"] == "http"
+    assert schemes["HumanBearer"]["scheme"] == "bearer"
+
+    for status in ("400", "401"):
+        response = operation["responses"][status]
+        assert set(response["content"]) == {"application/problem+json"}
+        assert response["content"]["application/problem+json"]["schema"] == {
+            "$ref": "#/components/schemas/ProblemDetails"
+        }
+        assert response["headers"]["WWW-Authenticate"]["schema"] == {"type": "string"}
+
+    if path == "/v1/session":
+        assert operation["operationId"] == "getCurrentSession"
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/CurrentSessionResponse"
+        }
 
 
 def test_schema_fixture_preserves_native_field_semantics() -> None:
