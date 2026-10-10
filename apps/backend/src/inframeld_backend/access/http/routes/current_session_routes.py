@@ -1,6 +1,5 @@
-"""Expose the authenticated local human to the browser client."""
+"""Expose the authenticated local human to browser and CLI clients."""
 
-from http import HTTPStatus
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -9,12 +8,14 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
+from inframeld_backend.access.http.openapi.human_authentication_responses import (
+    human_authentication_responses,
+)
 from inframeld_backend.access.http.responses.current_session_response import CurrentSessionResponse
 from inframeld_backend.shared.http.definitions.problem_catalogue import (
     ACCESS_DENIED_PROBLEM,
     DEPENDENCY_UNAVAILABLE_PROBLEM,
 )
-from inframeld_backend.shared.http.mappers.problem_mapper import for_http_status
 from inframeld_backend.shared.http.openapi.problem_openapi import problem_responses
 
 
@@ -29,7 +30,7 @@ def create_session_router(authenticate: HumanSessionDependency) -> APIRouter:
         openapi_extra={"description": None},
         operation_id="getCurrentSession",
         responses=(
-            problem_responses(for_http_status(HTTPStatus.UNAUTHORIZED))
+            human_authentication_responses()
             | problem_responses(ACCESS_DENIED_PROBLEM)
             | problem_responses(DEPENDENCY_UNAVAILABLE_PROBLEM)
         ),

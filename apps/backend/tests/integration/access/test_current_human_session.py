@@ -96,19 +96,28 @@ async def test_current_session_reports_kratos_outage(
     assert response.json()["code"] == "dependency_unavailable"
 
 
-@pytest.mark.parametrize("cookie", [None, "synthetic-session"])
-def test_missing_kratos_configuration_returns_unavailable(
+@pytest.mark.parametrize(
+    ("cookie", "status", "code"),
+    [
+        (None, 401, "http_error"),
+        ("synthetic-session", 503, "dependency_unavailable"),
+    ],
+)
+def test_missing_kratos_configuration_preserves_authentication_outcomes(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
     cookie: str | None,
+    status: int,
+    code: str,
 ) -> None:
-    """Keep the session route unavailable when the operator has not configured Kratos."""
+    """Missing credentials need login; a supplied cookie needs configured verification."""
     settings = get_settings().model_copy(
-        update={"database": temporary_postgres_settings, "kratos": None}
+        update={"database": temporary_postgres_settings, "kratos": None, "hydra": None}
     )
     with TestClient(create_app(settings), raise_server_exceptions=False) as client:
         if cookie is not None:
             client.cookies.set("ory_kratos_session", cookie)
         response = client.get("/v1/session")
-    assert response.status_code == 503
-    assert response.json()["code"] == "dependency_unavailable"
+
+    assert response.status_code == status
+    assert response.json()["code"] == code

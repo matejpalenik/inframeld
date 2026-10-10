@@ -6,6 +6,7 @@ class ProblemCode(StrEnum):
 
     VALIDATION_ERROR = "validation_error"
     INVALID_INPUT = "invalid_input"
+    INVALID_AUTHENTICATION_REQUEST = "invalid_authentication_request"
     RESOURCE_NOT_FOUND = "resource_not_found"
     ACCESS_DENIED = "access_denied"
     CONFLICT = "conflict"

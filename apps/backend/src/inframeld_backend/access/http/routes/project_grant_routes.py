@@ -19,6 +19,9 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
+from inframeld_backend.access.http.openapi.human_authentication_responses import (
+    human_authentication_responses,
+)
 from inframeld_backend.access.http.requests.project_use_only_grant_request import (
     ProjectUseOnlyGrantRequest,
 )
@@ -46,7 +49,6 @@ from inframeld_backend.shared.http.definitions.problem_catalogue import (
 from inframeld_backend.shared.http.dependencies.idempotency_key_dependency import (
     IdempotencyKeyDependency,
 )
-from inframeld_backend.shared.http.mappers.problem_mapper import for_http_status
 from inframeld_backend.shared.http.openapi.problem_openapi import problem_responses
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservation_writer import (
@@ -56,7 +58,7 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
 _GRANT_ROUTE = "/v1/projects/{project_id}/grants"
 
 _GRANT_PROBLEM_RESPONSES = (
-    problem_responses(for_http_status(HTTPStatus.UNAUTHORIZED))
+    human_authentication_responses()
     | problem_responses(ACCESS_DENIED_PROBLEM)
     | problem_responses(RESOURCE_NOT_FOUND_PROBLEM)
     | problem_responses(CONFLICT_PROBLEM)

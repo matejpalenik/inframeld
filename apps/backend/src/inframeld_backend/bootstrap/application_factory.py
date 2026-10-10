@@ -100,7 +100,9 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         human_session = HumanSessionDependency(
             access.authenticator,
             CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
+            access_token_authenticator=access.access_token_authenticator,
         )
+
         application.include_router(create_session_router(human_session))
         application.include_router(
             create_project_grant_router(human_session, database, fingerprints)

@@ -239,6 +239,19 @@
         "title": "ValidationIssue",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "HumanBearer": {
+        "description": "Opaque human Hydra access token. Application keys do not authenticate a human.",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "KratosSession": {
+        "description": "Kratos browser session. Cookie-authenticated writes also require a trusted Origin and X-Inframeld-CSRF: 1.",
+        "in": "cookie",
+        "name": "ory_kratos_session",
+        "type": "apiKey"
+      }
     }
   },
   "info": {
@@ -331,6 +344,24 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -339,7 +370,15 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -392,6 +431,14 @@
             "description": "Dependency unavailable"
           }
         },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "HumanBearer": []
+          }
+        ],
         "summary": "Assign Use Only",
         "tags": [
           "access"
@@ -412,6 +459,24 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "401": {
             "content": {
               "application/problem+json": {
@@ -420,7 +485,15 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -443,6 +516,14 @@
             "description": "Dependency unavailable"
           }
         },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "HumanBearer": []
+          }
+        ],
         "summary": "Current Session",
         "tags": [
           "access"
