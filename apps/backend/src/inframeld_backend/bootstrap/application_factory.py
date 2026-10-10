@@ -1,5 +1,6 @@
 """Construct the HTTP application and connect its concrete resources and services."""
 
+from contextlib import ExitStack
 from functools import partial
 
 from fastapi import FastAPI
@@ -43,8 +44,8 @@ API_VERSION = "0.1.0"
 def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
     """Construct resources, wire application services, and register HTTP behavior.
 
-    Construction performs no network I/O. The lifespan starts PostgreSQL checks
-    and releases both database and provider resources, including startup failure.
+    Construction performs no network I/O. Release provider clients if assembly
+    fails; otherwise transfer their ownership to the application lifespan.
     """
     resolved_settings = settings if settings is not None else get_settings()
 
@@ -52,38 +53,60 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
 
     database = Database(resolved_settings.database)
 
-    access = create_access_components(resolved_settings.kratos, database)
-
-    fingerprints = ProjectGrantChangeFingerprintService(
-        RequestFingerprintService(
-            FileRequestFingerprintKeyReader(resolved_settings.request_fingerprint.key_file).read()
+    with ExitStack() as provider_cleanup:
+        access = create_access_components(
+            resolved_settings.kratos,
+            resolved_settings.hydra,
+            database,
         )
-    )
+        for client in (
+            access.kratos_client,
+            access.kratos_admin_client,
+            access.hydra_client,
+        ):
+            if client is not None:
+                provider_cleanup.callback(client.rest_client.pool_manager.clear)
 
-    resources = ApplicationResources(database, access.kratos_client)
+        fingerprints = ProjectGrantChangeFingerprintService(
+            RequestFingerprintService(
+                FileRequestFingerprintKeyReader(
+                    resolved_settings.request_fingerprint.key_file
+                ).read()
+            )
+        )
 
-    application = FastAPI(
-        debug=False,
-        title=API_TITLE,
-        version=API_VERSION,
-        description="Governed retrieval and release workflows.",
-        openapi_url="/v1/openapi.json",
-        docs_url="/docs",
-        redoc_url="/redoc",
-        lifespan=partial(application_lifespan, resources),
-    )
+        resources = ApplicationResources(
+            database=database,
+            kratos_client=access.kratos_client,
+            kratos_admin_client=access.kratos_admin_client,
+            hydra_client=access.hydra_client,
+        )
 
-    register_error_handlers(application)
-    configure_problem_openapi(application)
-    application.include_router(health_router)
+        application = FastAPI(
+            debug=False,
+            title=API_TITLE,
+            version=API_VERSION,
+            description="Governed retrieval and release workflows.",
+            openapi_url="/v1/openapi.json",
+            docs_url="/docs",
+            redoc_url="/redoc",
+            lifespan=partial(application_lifespan, resources),
+        )
 
-    human_session = HumanSessionDependency(
-        access.authenticator,
-        CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
-    )
-    application.include_router(create_session_router(human_session))
-    application.include_router(create_project_grant_router(human_session, database, fingerprints))
+        register_error_handlers(application)
+        configure_problem_openapi(application)
+        application.include_router(health_router)
 
-    application.add_middleware(RequestContextMiddleware)
+        human_session = HumanSessionDependency(
+            access.authenticator,
+            CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
+        )
+        application.include_router(create_session_router(human_session))
+        application.include_router(
+            create_project_grant_router(human_session, database, fingerprints)
+        )
 
-    return application
+        application.add_middleware(RequestContextMiddleware)
+
+        provider_cleanup.pop_all()
+        return application
