@@ -1,6 +1,6 @@
 # Access contracts for CLI-first v1
 
-**Status:** accepted specification decisions for #116, reviewed with the developer on 2026-10-04, with the authorized concrete HTTP/maintenance/recovery draft below ready for final review. These contracts do not establish implemented routes, physical tables, generated schemas or runtime qualification. [Access control](access-control.md) owns the explanation of authorization and recovery. This reference owns the fixed identifiers, initial assignments and contract handoff. Domain guides own the workflows behind each action.
+**Status:** accepted specification decisions for #116, reviewed with the developer on 2026-10-04. [Issue #116](https://github.com/matejpalenik/inframeld/issues/116) closed on 2026-10-05. The existing human session and preserved grant command now have implemented cookie/bearer paths and native OpenAPI declarations, identified below. The remaining operation, maintenance and recovery contracts describe intended behavior rather than delivered runtime capabilities. [Access control](access-control.md) owns the explanation of authorization and recovery. This reference owns the fixed identifiers, initial assignments and contract handoff. Domain guides own the workflows behind each action.
 
 For example, Alice creates Support's Pipeline and explicitly grants SupportBot permission to edit it. SupportBot can save a supported configuration, build under its separate Build grant and run authorized evaluations. It cannot create a second Pipeline, delegate its permissions or change a protected audience. Producing a new configuration revision is part of editing the existing Pipeline.
 
@@ -23,7 +23,7 @@ For example, Alice creates Support's Pipeline and explicitly grants SupportBot p
 | What are the exact new routes, symbols and fields? | [Concrete HTTP draft](#http-operation-matrix) |
 | How does the CLI prove the maintenance recipient? | [Version 1 maintenance input/proof](#maintenance-wire) |
 | What is the private recovery integration handoff? | [Version 1 callback contract](#recovery-wire) |
-| What remains before #116 closes? | [Review and remaining work](#review-and-remaining-work) |
+| What remains to implement or qualify? | [Review and remaining work](#review-and-remaining-work) |
 
 <a id="capability-catalogue"></a>
 
@@ -187,7 +187,13 @@ Both accepted session checks return HTTP 200 with `Cache-Control: no-store` and 
 | Complete backend authentication check | 10 seconds | Cover required provider verification and current local eligibility checks. Do not add individual timeouts into an unbounded request. |
 | CLI session-check request | 15 seconds | Allow the backend check and transport overhead before reporting an unconfirmed connection check. |
 
-These are accepted starting limits, not measured latency guarantees. The inspected [Kratos cookie adapter](../../apps/backend/src/inframeld_backend/access/infrastructure/verifiers/kratos_browser_session_verifier.py) already defaults to five seconds per call. The overall deadline and CLI limit still need implementation and qualification. Wait for providers outside database sessions, use short independent local reads after verification, and admit no success after the authentication deadline. Do not use cross-request positive authentication caches, verifier fallback or blind server verification retries. Timeout behavior must not disclose whether a protected identity exists. [Authentication errors](error-handling.md#authentication-contract) preserve 503 for required verification that cannot be confirmed.
+These are accepted starting limits, not measured latency guarantees. The [human bearer service](../../apps/backend/src/inframeld_backend/access/application/services/human_access_token_authentication_service.py) now defaults to five seconds per provider call and ten seconds for the complete authentication workflow, including the local principal lookup. Each provider receives the smaller of its per-call limit and the time left before that total deadline. A result arriving after the deadline cannot authenticate the caller.
+
+The [Kratos cookie adapter](../../apps/backend/src/inframeld_backend/access/infrastructure/verifiers/kratos_browser_session_verifier.py) also defaults to five seconds for its provider call. The cookie authentication service does not yet impose a total deadline around verification and the local read. Bootstrap currently uses constructor defaults rather than deployment-configurable authentication settings. Those settings, the cookie path's total deadline and the CLI's fifteen-second limit still need implementation and qualification.
+
+For example, if Alice's Hydra check takes four seconds and the Kratos check takes another four, at most two seconds remain for the local lookup within the ten-second budget. A timeout returns 503 because verification could not be confirmed. It never permits reuse of an earlier successful check.
+
+Wait for providers outside database sessions, use short independent local reads after verification, and admit no success after the authentication deadline. Do not use cross-request positive authentication caches, verifier fallback or blind server verification retries. Timeout behavior must not disclose whether a protected identity exists. [Authentication errors](error-handling.md#authentication-contract) preserve 503 for required verification that cannot be confirmed.
 
 <a id="mutation-profile"></a>
 
@@ -252,7 +258,7 @@ Recovery/reset separately uses authenticated server-side admission and trusted c
 
 ## Concrete HTTP contract draft
 
-**Review status:** the product boundaries and route patterns above are accepted. The exact new operation/model names and field bounds below are the concrete engineering draft for final maintainer review. A read-only specification review on 2026-10-04 found no remaining blocking inconsistencies after the scope, query encoding, invitation preview and delegation corrections. They are not generated OpenAPI, implemented Python symbols or permission changes. Preserve existing published symbols. Native OpenAPI will be generated from owning backend code when implementation is authorized.
+**Review status:** the product boundaries and route patterns above are accepted. The read-only specification review on 2026-10-04 found no remaining blocking inconsistencies after the scope, query encoding, invitation preview and delegation corrections. #116 is now closed. The existing human-session and project-grant operations below are implemented and published in native OpenAPI. Other new operation/model names and field bounds remain engineering contracts for their owning workflows, not generated symbols or runtime evidence. Preserve existing published symbols and generate each implemented contract from its backend models and routes.
 
 For example, Alice sets SupportBot's `query` assignment on Support's Pipeline with `canGrant: false` and the reviewed access revision. If the response is lost, her same idempotency key recovers that original assignment result under current authority. Removing that assignment returns a removal result, not `canGrant: false`: the latter still permits use. If SupportBot is subsequently given another grant, replay of Alice's old removal cannot remove it again.
 
@@ -299,9 +305,11 @@ Invalid/expired/revoked invitation tokens on new activation use the same safe 40
 
 | Method and route | Operation ID | Input / response | Profile and success |
 | --- | --- | --- | --- |
-| `GET /v1/session` | Existing `getCurrentSession` | No input / existing `CurrentSessionResponse`, only `principalId` | Human session; 200. Cookie implementation exists, bearer extension remains planned. |
-| `GET /v1/application-session` | `getCurrentApplicationSession` | No input / `CurrentApplicationSessionResponse`: `principalId`, `projectId` | Application session; 200. |
-| `POST /v1/projects/{project_id}/grants` | Existing `assignProjectUseOnlyGrant` | Existing `ProjectUseOnlyGrantRequest` / `ProjectUseOnlyGrantResponse` | Human administration; existing 201 and published `create-access-groups` / `canGrant: false` restrictions unchanged. |
+| `GET /v1/session` | Existing `getCurrentSession` | No input / existing `CurrentSessionResponse`, only `principalId` | Human session; 200. Cookie and human bearer paths are implemented. Real Hydra runtime qualification remains. |
+| `GET /v1/application-session` | `getCurrentApplicationSession` | No input / `CurrentApplicationSessionResponse`: `principalId`, `projectId` | Accepted application-session design; not yet implemented. Success will be 200. |
+| `POST /v1/projects/{project_id}/grants` | Existing `assignProjectUseOnlyGrant` | Existing `ProjectUseOnlyGrantRequest` / `ProjectUseOnlyGrantResponse` | Implemented human cookie/bearer administration; existing 201 and published `create-access-groups` / `canGrant: false` restrictions unchanged. |
+
+The implemented session and preserved grant command are published in native OpenAPI with `KratosSession` and `HumanBearer` security alternatives and authentication problem responses. These alternatives mean cookie **or** bearer, not permission to send both. See [HTTP contracts](api-contracts.md#session-contracts) and [implemented behavior and evidence](access-control.md#implemented-human-authentication). The remaining operations below retain their accepted-design status.
 
 ### Full action-grant operations
 
@@ -499,14 +507,14 @@ These are design-review scenarios, not executed tests:
 
 The 2026-10-04 approvals settle the catalogue, initial assignments, human-only provisioning with application updates, case audiences, invitations and diagnostic scope. They also settle session response fields/time budgets, authentication problem text/challenges, new Access mutation bounds, exact-action grant listing, invitation activation's admission boundary, key secret replay, the maintenance command/input bounds and the private recovery callback boundary.
 
-The accepted proposal has now been expanded into concrete artifacts. The following review and handoff gates remain before declaring #116 complete:
+The accepted proposal is recorded in the artifacts below. #116 is closed, while its consuming implementation and qualification issues still have work to do. The table separates those responsibilities from the earlier review history:
 
 | Remaining artifact | Required review/handoff |
 | --- | --- |
-| Complete Access operation matrix | Written in the [HTTP draft](#http-operation-matrix), including preserved symbols, new target-specific operations, credential/status/revision/visibility profiles and bounded fields. Final written-contract review must accept the new symbols and field details. Domain-owned deletion/status schemas remain explicitly with #124/#38/#204. |
+| Complete Access operation matrix | Written in the [HTTP draft](#http-operation-matrix), including preserved symbols, new target-specific operations, credential/status/revision/visibility profiles and bounded fields. The current session and grant command are implemented. Other operation models and routes remain with their consuming workflows. Domain-owned deletion/status schemas remain explicitly with #124/#38/#204. |
 | Maintenance proof and versioned models | Written in the [maintenance draft](#maintenance-wire), using transient Hydra access-token identity proof through protected stdin. Review the exact versioned models, replay/error semantics and installation identity; #27/#117 implement and qualify them. |
 | Recovery integration handoff | Written in the [private callback draft](#recovery-wire). Review original-flow binding, acknowledgment and safe failures. #117 must qualify actual hook ordering, durable admission and reconciliation, native-completion evidence and legitimate-session preservation; unqualified YAML is not a #116 deliverable. |
-| Closure review | The read-only spec review is complete with no remaining blocking findings. Obtain final maintainer acceptance of this engineering draft. Reconcile GitHub bodies/checklists in a separately authorized update. The live #116 body inspected on 2026-10-04 still contains seven-grant requirements; [ADR-0059](../adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md) and the seventeen-grant contract supersede those requirements. Preserve their historical evidence when reconciling. |
+| Issue status and review history | GitHub inspection on 2026-10-13 found #116 closed on 2026-10-05, with its older task boxes still unchecked. Issue closure is not runtime evidence. The 2026-10-04 inspection recorded older seven-grant requirements. [ADR-0059](../adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md) and the seventeen-grant contract own the accepted initialization. Preserve that history if the GitHub checklist is reconciled in a separately authorized update. |
 
 No GitHub issue is edited or closed by this documentation update.
 

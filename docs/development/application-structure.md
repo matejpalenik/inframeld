@@ -104,10 +104,14 @@ inframeld_backend/
 │   ├── application/
 │   │   ├── services/
 │   │   │   ├── human_session_authentication_service.py
+│   │   │   ├── human_access_token_authentication_service.py
 │   │   │   ├── unavailable_human_session_authentication_service.py
 │   │   │   └── action_authorization_service.py
 │   │   ├── protocols/
 │   │   │   ├── human_session_authenticator.py
+│   │   │   ├── human_access_token_authenticator.py
+│   │   │   ├── human_access_token_verifier.py
+│   │   │   ├── human_identity_verifier.py
 │   │   │   ├── action_authorizer.py
 │   │   │   ├── browser_session_verifier.py
 │   │   │   ├── human_identity_link_reader.py
@@ -117,15 +121,21 @@ inframeld_backend/
 │   │   │   ├── verified_human_identity_dto.py
 │   │   │   ├── project_action_target_dto.py
 │   │   │   └── project_action_facts_dto.py
-│   │   └── value_objects/browser_session_credential.py
+│   │   └── value_objects/
+│   │       ├── browser_session_credential.py
+│   │       └── human_access_token_credential.py
 │   ├── http/
-│   │   ├── routes/current_session_routes.py
-│   │   ├── dependencies/human_session_dependency.py
-│   │   └── responses/current_session_response.py
+│   │   ├── routes/                    # current_session_routes, project_grant_routes
+│   │   ├── dependencies/              # HumanSessionDependency, CSRFProtectionDependency
+│   │   ├── openapi/human_authentication_responses.py
+│   │   └── responses/                 # CurrentSessionResponse, ProjectUseOnlyGrantResponse
 │   └── infrastructure/
 │       ├── readers/                   # PostgresHumanIdentityLinkReader, project facts reader
-│       ├── verifiers/kratos_browser_session_verifier.py
-│       ├── settings/kratos_settings.py
+│       ├── verifiers/
+│       │   ├── kratos_browser_session_verifier.py
+│       │   ├── hydra_access_token_verifier.py
+│       │   └── kratos_human_identity_verifier.py
+│       ├── settings/                   # KratosSettings, HydraSettings, CSRFSettings
 │       ├── rows/                      # one ORM row or mapping base per module
 │       └── types/enum_types.py
 └── shared/
@@ -188,7 +198,7 @@ Use one primary public type per production module, with a matching snake-case fi
 
 Existing published HTTP names such as `ProblemDetails` and `ValidationIssue` are preserved, including their OpenAPI descriptions. They do not acquire a DTO suffix. New HTTP models use Request/Response naming; application transfer records always use the uppercase `DTO` suffix.
 
-A FastAPI dependency and ASGI middleware have different lifetimes. FastAPI invokes `HumanSessionDependency` for the route that declares it. `RequestContextMiddleware` wraps requests at the ASGI boundary. The authentication workflow belongs to `HumanSessionAuthenticationService`.
+A FastAPI dependency and ASGI middleware have different lifetimes. FastAPI invokes `HumanSessionDependency` for the route that declares it. `RequestContextMiddleware` wraps requests at the ASGI boundary. The cookie workflow belongs to `HumanSessionAuthenticationService`, and the human bearer workflow belongs to `HumanAccessTokenAuthenticationService`. The dependency chooses one of them before provider verification.
 
 ### Record roles: DTO, policy input, entity, and value object
 
@@ -288,38 +298,53 @@ Dictionaries are appropriate at ASGI, JSON/OpenAPI, environment-framework, and l
 
 ### Follow the implemented human-session request
 
+Alice can call the same session route from her browser or CLI. The browser supplies a Kratos cookie. The CLI supplies a human access token in `Authorization: Bearer ...`. The route should return the same local `principalId`, but each credential needs its own verification steps.
+
 ```mermaid
 flowchart TD
-    Route["Current session route"] --> Dependency["HumanSessionDependency<br/>Extract browser credential"]
-    Dependency --> Service["HumanSessionAuthenticationService<br/>HumanSessionAuthenticator protocol"]
-    Service --> Verifier["BrowserSessionVerifier"]
-    Verifier --> Kratos["KratosBrowserSessionVerifier<br/>Kratos SDK"]
-    Service --> Reader["HumanIdentityLinkReader"]
-    Reader --> Postgres["PostgresHumanIdentityLinkReader<br/>Independent read session"]
+    Route["Session or project-grant route"] --> Dependency["HumanSessionDependency<br/>Choose one credential"]
+    Dependency --> Cookie["HumanSessionAuthenticationService"]
+    Dependency --> Bearer["HumanAccessTokenAuthenticationService"]
+    Cookie --> SessionVerifier["KratosBrowserSessionVerifier<br/>BrowserSessionVerifier protocol"]
+    SessionVerifier --> KratosPublic["Kratos public API<br/>Verify browser session"]
+    Bearer --> TokenVerifier["HydraAccessTokenVerifier<br/>HumanAccessTokenVerifier protocol"]
+    TokenVerifier --> Hydra["Hydra private API<br/>Introspect access token"]
+    Bearer --> IdentityVerifier["KratosHumanIdentityVerifier<br/>HumanIdentityVerifier protocol"]
+    IdentityVerifier --> KratosAdmin["Kratos private API<br/>Check current identity"]
+    Cookie --> Reader["PostgresHumanIdentityLinkReader<br/>HumanIdentityLinkReader protocol"]
+    Bearer --> Reader
+    Reader --> Postgres["PostgreSQL<br/>Independent short read session"]
     Reader --> Principal["Principal<br/>ID, organization, kind, status"]
-    Service --> Policy["HumanAuthenticationPolicy.may_authenticate"]
-    Service --> Context["AccessContextDTO<br/>PrincipalId"]
+    Cookie --> Policy["HumanAuthenticationPolicy.may_authenticate"]
+    Bearer --> Policy
+    Cookie --> Context["AccessContextDTO<br/>PrincipalId only"]
+    Bearer --> Context
 ```
 
-Arrows represent calls or returned data inside one backend. Kratos and PostgreSQL are external services; the protocol and implementation boxes describe the same capability at two code boundaries.
+Arrows show calls or returned data inside one backend. The API boxes represent external provider endpoints, and PostgreSQL is the application database. The services call their adapters in the order below. The diagram does not describe separate business services.
 
-1. Alice calls `GET /v1/session`. The FastAPI dependency reads the session cookie and creates an optional `BrowserSessionCredential`.
-2. `HumanSessionAuthenticationService.authenticate` rejects an absent credential, then calls the injected verifier. The Kratos adapter runs the synchronous SDK call in a worker thread, checks expiry and provider identity state, and returns the verified authority/subject.
-3. After verification completes, the reader opens a short independent database session. It finds the exact identity pair, constructs a `Principal`, and closes the session. No SQL session is held while waiting for Kratos, and concurrent requests never share an `AsyncSession`.
-4. The service applies `HumanAuthenticationPolicy.may_authenticate`. A verified upstream identity needs an existing active local human account. The service returns `AccessContextDTO` containing that account's ID.
-5. The route unwraps the ID into `CurrentSessionResponse`. The existing wire result remains `{"principalId": "<uuid>"}`.
+1. `HumanSessionDependency` reads the original headers and cookie. It rejects repeated or malformed Authorization, a Kratos cookie combined with Authorization, and unsupported credential families before provider verification. A missing credential returns 401 even when providers are not configured. An `ifm_app_` key never reaches Hydra through these human routes.
+2. On the cookie path, `HumanSessionAuthenticationService` calls `KratosBrowserSessionVerifier`. The adapter runs the synchronous SDK call in a worker thread, checks the session and identity state, and returns the verified authority/subject pair.
+3. On the bearer path, `HumanAccessTokenAuthenticationService` first calls `HydraAccessTokenVerifier`. Private introspection checks token kind, validity and the configured issuer/client/audience/scope. It then calls `KratosHumanIdentityVerifier` to check that the same human identity is currently eligible. Both adapters bound their SDK calls and return application-owned identity values.
+4. After the required provider checks finish, `PostgresHumanIdentityLinkReader` opens a short independent session. It finds the exact identity pair, constructs a `Principal` and closes the session. Concurrent requests share the reader, but each lookup gets its own `AsyncSession`. Provider waits never hold that read session open.
+5. The selected service applies `HumanAuthenticationPolicy.may_authenticate`. A verified identity still needs an existing active local human. The result is `AccessContextDTO` containing that account's ID, with no cached status or permission snapshot.
+6. The session route converts the ID to the existing `CurrentSessionResponse`: `{"principalId": "<uuid>"}`. A business route instead uses that identity to check its current permissions. The project-grant route performs those checks and its change, audit and idempotency work in a short transaction.
 
-Missing/rejected/expired credentials produce generic 401; absent links or ineligible local principals produce 403; unavailable/malformed provider responses produce 503. An explicit unavailable authentication implementation preserves 503 when Kratos configuration is absent. These outcomes use the shared [HTTP problem boundary](error-handling.md).
+Cookie-authenticated writes also pass `CSRFProtectionDependency` after authentication and before the route runs. They need both the CSRF marker and a trusted Origin. Human bearer writes do not require those browser headers. Every new request repeats its required provider and local checks, including a request to replay a previously saved result.
 
-Authentication establishes the caller. A later `ActionAuthorizationService.require_action` reads current visibility, membership, account, and exact-grant facts. The service checks `ProjectVisibilityPolicy`, converts the reader DTO into `ActionAuthorizationPolicyInput`, then checks `ActionAuthorizationPolicy`. Hidden targets stay 404; visible targets without authority stay 403. Its PostgreSQL reader is bound to the caller's transaction session, unlike the independently scoped authentication reader.
+Malformed or competing credentials return 400. Missing/rejected/expired credentials return 401. Missing local admission or an ineligible local principal returns 403. Required verification that cannot be confirmed returns 503. A supplied credential whose provider is not configured also returns 503. [Access](access-control.md#implemented-human-authentication) explains the cases, test coverage and current limits, while [HTTP errors](error-handling.md#authentication-contract) owns exact problem and challenge values.
+
+Authentication establishes the caller. A later `ActionAuthorizationService.require_action` reads current visibility, membership, account and exact-grant facts. It checks `ProjectVisibilityPolicy`, converts the reader DTO into `ActionAuthorizationPolicyInput`, then checks `ActionAuthorizationPolicy`. Hidden targets stay 404 and visible targets without authority stay 403. Its PostgreSQL reader uses the caller's transaction, unlike the independently scoped authentication reader.
 
 ### Resource ownership and test organization
 
-Bootstrap creates stateless authentication services and adapters once per application. `Database` owns the pool and produces operation-local sessions. The lifespan starts the database compatibility check and always disposes the database and clears the actual Kratos SDK pool, including failed startup. The installed SDK context-manager exit does not release that pool. Construction and OpenAPI export perform no network calls; schema tools import `create_app` directly.
+[Access assembly](../../apps/backend/src/inframeld_backend/bootstrap/access_composition.py) creates stateless services and their configured SDK clients once per application. Cookie authentication needs the Kratos public client. Enabling human bearer authentication adds a separate Kratos admin client and Hydra admin client. `ApplicationSettings` requires Kratos and an explicit Kratos admin URL when Hydra is configured.
 
-Unit tests mirror production layers and component roles. Integration tests are grouped under `access`, `postgres`, `kratos`, and `observability`, with distinct scenario filenames. Shared typed seed builders, isolated database provisioning, and validated browser-flow DTOs live under `tests/support`. Tests assert public JSON explicitly when the wire representation is the behavior under test.
+Assembly owns cleanup until construction succeeds, then transfers the clients to the application. If construction fails, it clears pools created so far. The [application lifespan](../../apps/backend/src/inframeld_backend/bootstrap/application_lifespan.py) starts the database compatibility check, disposes the database on exit and clears every configured provider pool, including failed startup or shutdown. The installed SDK context-manager exit alone does not release those pools. `Database` owns its pool and creates operation-local sessions. Construction and OpenAPI export make no provider or database network calls. Schema tools import `create_app` directly.
 
-`pnpm check:backend` runs formatting, lint, strict Pyright, fast behavioral/contract tests, and OpenAPI comparison. `pnpm test:integration` starts the isolated application PostgreSQL and Kratos stack, runs the complete suite, and cleans up services. CI invokes that same command. Review architecture and documentation manually; automated tests cover behavior, API contracts, resource cleanup, and actual integrations.
+Unit tests mirror production layers and component roles. Integration tests are grouped under `access`, `postgres`, `kratos` and `observability`, with distinct scenario filenames. Shared typed seed builders, isolated database provisioning and validated browser-flow DTOs live under `tests/support`. Test doubles intended to replace provider verification use the `Mock` naming convention, explicitly implement their protocol and override its members. Public JSON is asserted when the wire representation is the behavior under test.
+
+`pnpm check:backend` checks formatting, lint, strict Pyright, fast behavioral/contract tests and OpenAPI drift. `pnpm test:integration` starts the isolated application PostgreSQL and Kratos stack, runs the suite and cleans up services. CI uses that same command. The newer bearer integration scenarios exercise real HTTP, authentication and PostgreSQL behavior with mocked provider verifiers. The test stack does not yet run Hydra. Follow [the evidence and remaining work](access-control.md#implemented-human-authentication) before treating those checks as complete Ory runtime qualification. Review architecture and documentation manually. Automated tests cover behavior, API contracts, resource cleanup and integrations.
 
 ### Business areas and state ownership
 
