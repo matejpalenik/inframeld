@@ -25,6 +25,9 @@ from inframeld_backend.access.application.services.unavailable_human_session_aut
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
+from inframeld_backend.access.infrastructure.settings.human_authentication_settings import (
+    HumanAuthenticationSettings,
+)
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
 from inframeld_backend.access.infrastructure.verifiers.hydra_access_token_verifier import (
@@ -44,6 +47,8 @@ def create_access_components(
     kratos_settings: KratosSettings | None,
     hydra_settings: HydraSettings | None,
     database: Database,
+    *,
+    human_authentication_settings: HumanAuthenticationSettings,
 ) -> AccessComponents:
     """Assemble authentication without provider calls or shared database sessions.
 
@@ -74,8 +79,14 @@ def create_access_components(
             KratosBrowserSessionVerifier(
                 FrontendApi(kratos_client),
                 kratos_settings.authority,
+                timeout_seconds=min(
+                    human_authentication_settings.provider_timeout_seconds,
+                    human_authentication_settings.total_timeout_seconds,
+                ),
             ),
             reader,
+            provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
+            total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
         )
 
         access_token_authenticator: HumanAccessTokenAuthenticator | None = None
@@ -116,6 +127,8 @@ def create_access_components(
                     kratos_settings.authority,
                 ),
                 reader,
+                provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
+                total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
             )
 
         components = AccessComponents(

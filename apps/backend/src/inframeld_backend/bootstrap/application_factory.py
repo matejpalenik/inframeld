@@ -58,6 +58,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             resolved_settings.kratos,
             resolved_settings.hydra,
             database,
+            human_authentication_settings=resolved_settings.human_authentication,
         )
         for client in (
             access.kratos_client,

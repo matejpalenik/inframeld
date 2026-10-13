@@ -1,7 +1,9 @@
 """Verify provider authentication and local admission as one application workflow."""
 
+import asyncio
+from contextlib import suppress
 from dataclasses import replace
-from typing import override
+from typing import Literal, override
 from uuid import uuid4
 
 import pytest
@@ -76,6 +78,48 @@ class FixedPrincipalReader(HumanIdentityLinkReader):
         return self.principal
 
 
+class MockDeadlineBrowserVerifier(BrowserSessionVerifier):
+    """Simulate a provider that stalls or returns a result after cancellation."""
+
+    def __init__(self) -> None:
+        self.blocked = False
+        self.return_after_cancellation = False
+        self.result: VerifiedHumanIdentityDTO | None = IDENTITY
+        self.started = asyncio.Event()
+
+    @override
+    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+        self.started.set()
+        if self.blocked:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                if not self.return_after_cancellation:
+                    raise
+        return self.result
+
+
+class MockDeadlinePrincipalReader(HumanIdentityLinkReader):
+    """Simulate a local read that can outlast the authentication deadline."""
+
+    def __init__(self) -> None:
+        self.called = False
+        self.blocked = False
+        self.return_after_cancellation = False
+        self.result: Principal | None = PRINCIPAL
+
+    @override
+    async def find_principal(self, identity: VerifiedHumanIdentityDTO) -> Principal | None:
+        self.called = True
+        if self.blocked:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                if not self.return_after_cancellation:
+                    raise
+        return self.result
+
+
 @pytest.mark.asyncio
 async def test_valid_identity_resolves_active_local_human() -> None:
     """Carry the verified identity into lookup and return only the local principal ID."""
@@ -144,3 +188,139 @@ def test_credential_hides_secret_and_rejects_empty_value() -> None:
     assert "synthetic-secret" not in repr(CREDENTIAL)
     with pytest.raises(ValueError):
         BrowserSessionCredential("")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("provider_seconds", "total_seconds"),
+    [(0.05, 1.0), (1.0, 0.05)],
+)
+async def test_cookie_provider_wait_uses_the_shorter_limit(
+    provider_seconds: float,
+    total_seconds: float,
+) -> None:
+    """A stuck Kratos check must respect both the provider cap and the total deadline."""
+    verifier = MockDeadlineBrowserVerifier()
+    verifier.blocked = True
+    reader = MockDeadlinePrincipalReader()
+    service = HumanSessionAuthenticationService(
+        verifier,
+        reader,
+        provider_timeout_seconds=provider_seconds,
+        total_timeout_seconds=total_seconds,
+    )
+
+    # This guard makes missing deadline enforcement fail instead of hanging.
+    async with asyncio.timeout(0.5):
+        with pytest.raises(DependencyUnavailableError) as caught:
+            await service.authenticate(CREDENTIAL)
+
+    assert isinstance(caught.value.__cause__, TimeoutError)
+    assert not reader.called
+
+
+@pytest.mark.asyncio
+async def test_cookie_total_deadline_includes_the_local_read() -> None:
+    """Successful Kratos verification does not permit an unlimited database wait."""
+    reader = MockDeadlinePrincipalReader()
+    reader.blocked = True
+    service = HumanSessionAuthenticationService(
+        MockDeadlineBrowserVerifier(),
+        reader,
+        total_timeout_seconds=0.05,
+    )
+
+    async with asyncio.timeout(0.5):
+        with pytest.raises(DependencyUnavailableError) as caught:
+            await service.authenticate(CREDENTIAL)
+
+    assert reader.called
+    assert isinstance(caught.value.__cause__, TimeoutError)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("identity", [IDENTITY, None])
+async def test_cookie_late_provider_result_cannot_decide_authentication(
+    identity: VerifiedHumanIdentityDTO | None,
+) -> None:
+    """An overdue provider result must produce 503, whether it accepts or rejects the cookie."""
+    verifier = MockDeadlineBrowserVerifier()
+    verifier.blocked = True
+    verifier.return_after_cancellation = True
+    verifier.result = identity
+    reader = MockDeadlinePrincipalReader()
+    service = HumanSessionAuthenticationService(
+        verifier,
+        reader,
+        provider_timeout_seconds=0.05,
+    )
+
+    async with asyncio.timeout(0.5):
+        with pytest.raises(DependencyUnavailableError):
+            await service.authenticate(CREDENTIAL)
+
+    assert not reader.called
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("principal", [PRINCIPAL, None])
+async def test_cookie_late_local_result_cannot_decide_admission(
+    principal: Principal | None,
+) -> None:
+    """An overdue local result cannot admit a human or turn the timeout into a 403."""
+    reader = MockDeadlinePrincipalReader()
+    reader.blocked = True
+    reader.return_after_cancellation = True
+    reader.result = principal
+    service = HumanSessionAuthenticationService(
+        MockDeadlineBrowserVerifier(),
+        reader,
+        total_timeout_seconds=0.05,
+    )
+
+    async with asyncio.timeout(0.5):
+        with pytest.raises(DependencyUnavailableError):
+            await service.authenticate(CREDENTIAL)
+
+
+@pytest.mark.asyncio
+async def test_external_cancellation_remains_cancellation() -> None:
+    """A caller cancelling its request is different from verification timing out."""
+    verifier = MockDeadlineBrowserVerifier()
+    verifier.blocked = True
+    reader = MockDeadlinePrincipalReader()
+    service = HumanSessionAuthenticationService(verifier, reader)
+
+    task = asyncio.create_task(service.authenticate(CREDENTIAL))
+    try:
+        async with asyncio.timeout(0.5):
+            await verifier.started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    finally:
+        if not task.done():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+    assert not reader.called
+
+
+@pytest.mark.parametrize("setting", ["provider", "total"])
+@pytest.mark.parametrize(
+    "seconds",
+    [True, 0.0, -1.0, float("nan"), float("inf"), float("-inf")],
+)
+def test_cookie_service_rejects_invalid_timeout_arguments(
+    setting: Literal["provider", "total"],
+    seconds: float,
+) -> None:
+    """Direct service construction must be safe even when settings parsing is bypassed."""
+    with pytest.raises(ValueError, match="finite and positive"):
+        HumanSessionAuthenticationService(
+            MockDeadlineBrowserVerifier(),
+            MockDeadlinePrincipalReader(),
+            provider_timeout_seconds=seconds if setting == "provider" else 5.0,
+            total_timeout_seconds=seconds if setting == "total" else 10.0,
+        )

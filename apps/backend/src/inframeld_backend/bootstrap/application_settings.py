@@ -9,6 +9,9 @@ from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
+from inframeld_backend.access.infrastructure.settings.human_authentication_settings import (
+    HumanAuthenticationSettings,
+)
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
@@ -37,6 +40,9 @@ class ApplicationSettings(BaseSettings):
     request_fingerprint: RequestFingerprintSettings
     kratos: KratosSettings | None = None
     hydra: HydraSettings | None = None
+    human_authentication: HumanAuthenticationSettings = Field(
+        default_factory=HumanAuthenticationSettings
+    )
     csrf: CSRFSettings = Field(default_factory=CSRFSettings)
 
     model_config = SettingsConfigDict(
