@@ -245,3 +245,65 @@ def test_kratos_admin_url_alone_does_not_require_hydra(
     assert settings.hydra is None
     assert settings.kratos is not None
     assert settings.kratos.admin_url == HttpUrl("http://kratos:4434")
+
+
+def test_human_authentication_limits_have_safe_environment_defaults(
+    bearer_configuration_environment: None,
+) -> None:
+    settings = _load_bearer_settings().human_authentication
+
+    assert settings.provider_timeout_seconds == 5.0
+    assert settings.total_timeout_seconds == 10.0
+
+
+@pytest.mark.parametrize("with_total_override", [False, True])
+def test_human_authentication_limits_parse_from_environment(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    with_total_override: bool,
+) -> None:
+    """Parse numeric strings while retaining the default for an omitted nested value."""
+    monkeypatch.setenv(
+        "INFRAMELD_HUMAN_AUTHENTICATION__PROVIDER_TIMEOUT_SECONDS",
+        "2.5",
+    )
+    if with_total_override:
+        monkeypatch.setenv(
+            "INFRAMELD_HUMAN_AUTHENTICATION__TOTAL_TIMEOUT_SECONDS",
+            "7.0",
+        )
+
+    settings = _load_bearer_settings().human_authentication
+
+    assert settings.provider_timeout_seconds == 2.5
+    assert settings.total_timeout_seconds == (7.0 if with_total_override else 10.0)
+
+
+@pytest.mark.parametrize(
+    ("name", "field"),
+    [
+        (
+            "INFRAMELD_HUMAN_AUTHENTICATION__PROVIDER_TIMEOUT_SECONDS",
+            "provider_timeout_seconds",
+        ),
+        (
+            "INFRAMELD_HUMAN_AUTHENTICATION__TOTAL_TIMEOUT_SECONDS",
+            "total_timeout_seconds",
+        ),
+    ],
+)
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "true"])
+def test_invalid_human_authentication_environment_is_rejected(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    field: str,
+    value: str,
+) -> None:
+    """Reject unusable deployment limits and identify the offending field."""
+    monkeypatch.setenv(name, value)
+
+    with pytest.raises(ValidationError) as caught:
+        _load_bearer_settings()
+
+    assert caught.value.errors()[0]["loc"] == ("human_authentication", field)
