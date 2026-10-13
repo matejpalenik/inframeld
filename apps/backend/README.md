@@ -96,9 +96,9 @@ Application services own business orchestration through explicit protocols. Doma
 
 Application records use the `DTO` suffix, such as `VerifiedHumanIdentityDTO`. Dedicated policy inputs use `PolicyInput`, such as `ActionAuthorizationPolicyInput`. `ProjectActionFactsDTO` is a reader result, despite the word “Facts.” Use standard frozen, slotted dataclasses; no record marker protocols or custom decorators. Keep docstrings where they explain meaningful behavior or ownership, and omit repetitive boilerplate.
 
-`HumanSessionDependency` extracts the cookie and calls `HumanSessionAuthenticator`. `HumanSessionAuthenticationService` verifies the provider session, reads the exact linked principal, applies `HumanAuthenticationPolicy`, and returns `AccessContextDTO`. The route serializes its ID into the existing `principalId` response. `ActionAuthorizationService` separately checks project visibility and the exact action grant through `ProjectVisibilityPolicy` and `ActionAuthorizationPolicy`.
+`HumanSessionDependency` chooses a Kratos cookie or human bearer credential before verification. The cookie path calls `HumanSessionAuthenticationService`. The bearer path calls `HumanAccessTokenAuthenticationService`, which verifies the access token through Hydra and then checks the current Kratos identity. Both paths read the same local identity link and apply `HumanAuthenticationPolicy`. They return `AccessContextDTO` with only the principal ID, which the session route serializes as the existing `principalId` field. `ActionAuthorizationService` separately checks project visibility and the exact action grant through `ProjectVisibilityPolicy` and `ActionAuthorizationPolicy`.
 
-Application construction and OpenAPI export perform no network calls. The lifespan owns database startup/shutdown and actual Kratos SDK pool cleanup, including failed startup. Authentication adapters are shared per application, but each identity lookup opens its own short session after provider verification. Authorization readers use the caller's transaction session. This organization change preserves that lifecycle.
+Application construction and OpenAPI export perform no network calls. Bootstrap owns the Kratos public client and, when Hydra is configured, the Kratos admin and Hydra admin clients. The lifespan owns database startup/shutdown and clears all configured SDK pools, including failed startup or shutdown. Authentication adapters are shared per application, but each identity lookup opens its own short session after provider verification. Authorization readers use the caller's transaction session. This organization change preserves that lifecycle.
 
 UUID identities remain runtime value objects. ORM columns remain UUIDs and enum columns perform real conversion. The immutable `Principal` holds account state; `AccessContextDTO` carries only its identity. The [data model](../../docs/development/data-model.md#implemented-principal-model) explains these distinctions.
 
@@ -108,7 +108,7 @@ Architecture and naming are reviewed manually. Unit tests mirror production role
 
 ## Configuration
 
-`bootstrap/application_settings.py` aggregates `ApplicationSettings`. `KratosSettings`, `CSRFSettings`, and `DatabaseSettings` live in their owners’ infrastructure `settings` packages; logging value definitions live in shared infrastructure `types`.
+`bootstrap/application_settings.py` aggregates `ApplicationSettings`. `KratosSettings`, `HydraSettings`, `CSRFSettings`, and `DatabaseSettings` live in their owners’ infrastructure `settings` packages; logging value definitions live in shared infrastructure `types`.
 
 Runtime configuration is loaded from files under `apps/backend`:
 
@@ -190,13 +190,32 @@ INFRAMELD_CSRF__TRUSTED_ORIGINS='["http://127.0.0.1:8000"]'
 
 `INFRAMELD_CSRF__TRUSTED_ORIGINS` is a JSON array of exact browser origins: scheme, host, and optional port, without a path. The host-run example permits requests originating from `http://127.0.0.1:8000`; `compose.dev.yaml` uses `http://127.0.0.1:8001`, its published backend port. An omitted or empty list denies cookie-authenticated writes.
 
-After authentication, unsafe requests also need `X-Inframeld-CSRF: 1` and a matching `Origin` header. This is Inframeld's HTTP protection; Kratos checks its own CSRF values during browser account flows. The [Access guide](../../docs/development/access-control.md#implemented-human-authentication) describes the implemented boundary and its test coverage.
+After cookie authentication, methods other than `GET`, `HEAD` and `OPTIONS` also need `X-Inframeld-CSRF: 1` and a matching `Origin` header. Human bearer writes do not need those browser headers. This is Inframeld's HTTP protection; Kratos checks its own CSRF values during browser account flows. The [Access guide](../../docs/development/access-control.md#implemented-human-authentication) describes the implemented boundary and its test coverage.
 
 The web scaffold currently runs on `localhost:3000`, while these backend and Kratos examples use `127.0.0.1`. Browser integration still needs a consistent hostname and routing so the Kratos cookie reaches the backend. The trusted-origin list alone does not configure that routing.
 
 Do not commit `.env` or `.env.test`.
 
-The development passwords and Kratos secrets are only for local Compose and must not be reused in production. Kratos settings remain optional at startup; without them, the session route returns 503.
+The development passwords and Kratos secrets are only for local Compose and must not be reused in production. Kratos settings remain optional at startup. A request with no supported credential returns 401. A supplied cookie returns 503 when Kratos verification is not configured. A human bearer similarly returns 503 when Hydra verification is not configured. Malformed or competing credentials are rejected before reaching either verifier.
+
+### Human bearer configuration
+
+Alice's token and browser cookie must resolve to the same local account. The backend has the verification adapters for both paths, but the checked-in development and test Compose files do not yet run Hydra or the complete first-party CLI login flow.
+
+When configuring the backend for a separately provisioned identity runtime, these are the supported settings:
+
+| Environment variable | Meaning |
+| --- | --- |
+| `INFRAMELD_KRATOS__ADMIN_URL` | Explicit private Kratos identity API endpoint, required when Hydra is configured. |
+| `INFRAMELD_HYDRA__ADMIN_URL` | Private Hydra endpoint used for token introspection. |
+| `INFRAMELD_HYDRA__ISSUER` | Exact trusted Hydra issuer identifier. Do not derive it from an incoming token. |
+| `INFRAMELD_HYDRA__API_AUDIENCE` | Exact API audience the token must contain. |
+| `INFRAMELD_HYDRA__CLIENT_ID` | Fixed supported client `inframeld-cli`, also the default. |
+| `INFRAMELD_HYDRA__REQUIRED_SCOPE` | Fixed supported scope `inframeld:api`, also the default. |
+
+`ApplicationSettings` rejects Hydra configuration unless Kratos and its admin URL are also present. Choose endpoints and issuer/audience identifiers for the actual installation. Keep admin APIs private, including during development. These settings neither provision Hydra nor register the CLI client. [The deployment guide](../../docs/development/deployment.md#identity-runtime) owns those runtime requirements.
+
+The bearer service currently uses five-second per-provider and ten-second total authentication constructor defaults. They are not yet exposed as deployment settings. Cookie verification has a five-second provider default, but its complete workflow still needs a total deadline. See [the authentication budget contract](../../docs/development/access-contracts.md#session-checks) for the accepted limits and remaining work.
 
 ---
 
@@ -458,6 +477,10 @@ pnpm test:integration
 ### Integration tests
 
 CI runs the same `pnpm test:integration` command; there is no separate database-only CI suite.
+
+The new [bearer session tests](tests/integration/access/test_human_bearer_session_postgres.py) and [bearer grant-write tests](tests/integration/access/test_human_bearer_grant_http_postgres.py) use real application services, HTTP routes and temporary PostgreSQL databases. `Mock*Verifier` classes supply provider results. The tests can therefore check current local suspension, missing admission, grant authority and replay denial, cookie CSRF, provider failure handling and absence of unintended writes without issuing real Hydra credentials.
+
+A fixture such as `linked_human` or `grant_seed` runs when its name appears in the test's parameters. It commits that test's local account or permission setup before the request. Each test receives a fresh database, so using the same synthetic token does not share admission or grants between tests. The [Access evidence section](../../docs/development/access-control.md#implemented-human-authentication) distinguishes these backend scenarios from real-provider qualification and records the developer-reported passing run.
 
 `pnpm test:integration` starts the application PostgreSQL, two Kratos test processes, Mailpit, and the mock OIDC provider from `compose.test.yaml`, waits for the required services, applies the application migrations, and runs all backend integration tests. The real browser tests cover registration, password login, session expiry, logout, disabled identities, code recovery, OIDC login, and password-confirmed OIDC account linking. They also check that matching email alone does not link an account. Compose runs the Kratos migration before starting either Kratos process. The command stops the test services afterward and retains their test-only volumes. It forces the application test database's host, port, name, and credentials, so a database target in `.env.test` cannot redirect application migrations to the development database.
 
