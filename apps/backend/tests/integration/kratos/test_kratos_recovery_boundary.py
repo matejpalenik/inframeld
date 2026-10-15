@@ -8,6 +8,7 @@ import httpx2
 import pytest
 from ory_kratos_client.models.recovery_flow import RecoveryFlow
 from ory_kratos_client.models.recovery_flow_state import RecoveryFlowState
+from tests.support.integration_services import MAILPIT_URL
 from tests.support.kratos_browser import BrowserFlow, WhoamiResponse, create_browser, register_human
 
 pytestmark = pytest.mark.skipif(
@@ -47,9 +48,7 @@ async def _request_recovery_code(browser: httpx2.AsyncClient, email: str) -> Bro
 
 async def _wait_for_recovery_email(email: str) -> str:
     """Wait for Kratos's message to reach the test mailbox for this address."""
-    async with httpx2.AsyncClient(
-        base_url="http://127.0.0.1:18025", timeout=5.0, trust_env=False
-    ) as mailbox:
+    async with httpx2.AsyncClient(base_url=MAILPIT_URL, timeout=5.0, trust_env=False) as mailbox:
         for _ in range(80):
             message = await mailbox.get("/view/latest.txt", params={"query": f"to:{email}"})
             if message.status_code == 200:

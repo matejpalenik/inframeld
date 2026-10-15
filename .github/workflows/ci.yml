@@ -91,7 +91,7 @@ jobs:
       - name: Run backend-only checks
         run: pnpm check:backend
 
-      - name: Run PostgreSQL and Kratos integration tests
+      - name: Run backend integration tests with PostgreSQL, Kratos and Hydra
         env:
           INFRAMELD_CONTAINER_RUNTIME: docker
         run: pnpm test:integration

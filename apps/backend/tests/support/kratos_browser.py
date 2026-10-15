@@ -10,8 +10,7 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
     BrowserSessionCredential,
 )
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
-
-KRATOS_PUBLIC_URL = "http://127.0.0.1:14433"
+from tests.support.integration_services import KRATOS_PUBLIC_URL
 
 
 class InputAttributes(BaseModel):
