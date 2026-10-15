@@ -20,7 +20,7 @@ Commands:
   down     Stop all development services without removing their database volumes.
   status   Show the service status.
   check    Verify that PostgreSQL is accepting connections.
-  test-services-up    Build the integration runner and start its private dependencies.
+  test-services-up    Prepare the integration image and start its private dependencies.
   test-run [args...]   Run integration tests; optional arguments are passed to pytest.
   test-services-down  Remove project-labelled test containers/networks; keep volumes.
 EOF
@@ -276,7 +276,17 @@ case "${command_name}" in
         ;;
     test-services-up)
         cleanup_test_services
-        test_compose build integration-tests
+        if [[ -n "${INFRAMELD_INTEGRATION_IMAGE:-}" ]]; then
+            # CI loads the current image after a cache-aware Buildx build.
+            # Require it locally instead of pulling or rebuilding a different image.
+            if ! "${container_command}" image inspect "${INFRAMELD_INTEGRATION_IMAGE}" >/dev/null; then
+                printf 'Prebuilt integration image is not available locally: %s\n' "${INFRAMELD_INTEGRATION_IMAGE}" >&2
+                exit 1
+            fi
+            printf 'Using prebuilt integration image: %s\n' "${INFRAMELD_INTEGRATION_IMAGE}"
+        else
+            test_compose build integration-tests
+        fi
         test_compose up -d postgres mailpit mock-oidc kratos kratos-expiring hydra
         ;;
     test-run)

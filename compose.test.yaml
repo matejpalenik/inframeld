@@ -154,6 +154,8 @@ services:
         condition: service_completed_successfully
 
   integration-tests:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
     build:
       context: .
       dockerfile: apps/backend/Dockerfile.integration
