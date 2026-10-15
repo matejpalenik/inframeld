@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 
-from inframeld_backend.shared.domain.validation.value_validation import require_string
+from inframeld_backend.shared.domain.validation.value_validation import ValueValidation
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,6 +12,6 @@ class BrowserSessionCredential:
     value: str = field(repr=False)
 
     def __post_init__(self) -> None:
-        require_string(self.value)
+        ValueValidation.require_string(self.value)
         if not self.value:
             raise ValueError("A session credential must be nonempty.")

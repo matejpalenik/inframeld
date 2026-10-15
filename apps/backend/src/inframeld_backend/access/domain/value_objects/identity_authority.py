@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from inframeld_backend.shared.domain.validation.value_validation import require_string
+from inframeld_backend.shared.domain.validation.value_validation import ValueValidation
 
 
 @dataclass(frozen=True, slots=True)
@@ -10,6 +10,6 @@ class IdentityAuthority:
     value: str
 
     def __post_init__(self) -> None:
-        require_string(self.value)
+        ValueValidation.require_string(self.value)
         if not self.value.strip():
             raise ValueError("An identity authority must be nonblank.")
