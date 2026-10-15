@@ -13,7 +13,10 @@ class IdentityRecoveryAdmissionWriter(Protocol):
     """Reserve recovery admission within the caller's transaction.
 
     Use trusted installation/provider configuration to scope the original flow.
+    Admission does not require or create a local principal, membership, or grant.
+
     A new admission saves its cleanup obligation and product block atomically.
+
     An existing admission returns its original binding without restarting cleanup,
     replacing its operation, or recreating a completed block. Do not commit here.
     """
