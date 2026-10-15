@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.integration_services import KRATOS_PUBLIC_URL
 from tests.support.kratos_browser import create_browser, register_human
 
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
@@ -18,7 +19,6 @@ from inframeld_backend.bootstrap.application_settings import get_settings
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
-KRATOS_PUBLIC_URL = "http://127.0.0.1:14433"
 AUTHORITY = IdentityAuthority("kratos:test")
 
 pytestmark = pytest.mark.skipif(

@@ -200,7 +200,7 @@ The development passwords and Kratos secrets are only for local Compose and must
 
 ### Human bearer configuration
 
-Alice's token and browser cookie must resolve to the same local account. The backend has the verification adapters for both paths, but the checked-in development and test Compose files do not yet run Hydra or the complete first-party CLI login flow.
+Alice's token and browser cookie must resolve to the same local account. The backend has verification adapters for both paths. The integration stack runs real Kratos and Hydra services to test that boundary. The development stack and complete first-party CLI login flow still need Hydra integration.
 
 When configuring the backend for a separately provisioned identity runtime, these are the supported settings:
 
@@ -215,7 +215,7 @@ When configuring the backend for a separately provisioned identity runtime, thes
 
 `ApplicationSettings` rejects Hydra configuration unless Kratos and its admin URL are also present. Choose endpoints and issuer/audience identifiers for the actual installation. Keep admin APIs private, including during development. These settings neither provision Hydra nor register the CLI client. [The deployment guide](../../docs/development/deployment.md#identity-runtime) owns those runtime requirements.
 
-The bearer service currently uses five-second per-provider and ten-second total authentication constructor defaults. They are not yet exposed as deployment settings. Cookie verification has a five-second provider default, but its complete workflow still needs a total deadline. See [the authentication budget contract](../../docs/development/access-contracts.md#session-checks) for the accepted limits and remaining work.
+Both cookie and bearer authentication use deployment-configurable limits: `INFRAMELD_HUMAN_AUTHENTICATION__PROVIDER_TIMEOUT_SECONDS` defaults to five seconds and `INFRAMELD_HUMAN_AUTHENTICATION__TOTAL_TIMEOUT_SECONDS` defaults to ten. The total covers provider verification and the local principal lookup. A provider receives only the time still available within that total. See [the authentication budget contract](../../docs/development/access-contracts.md#session-checks) for timeout behavior and the remaining CLI request limit.
 
 ---
 
@@ -307,10 +307,11 @@ The script can also be run directly:
 ./scripts/dev-compose.sh check
 ./scripts/dev-compose.sh down
 ./scripts/dev-compose.sh test-services-up
+./scripts/dev-compose.sh test-run
 ./scripts/dev-compose.sh test-services-down
 ```
 
-`check` verifies that the development PostgreSQL service is accepting connections. The integration test runner uses separate test-only PostgreSQL and Kratos services.
+`check` verifies that the development PostgreSQL service is accepting connections. The integration test runner uses separate test-only PostgreSQL, Kratos and Hydra services.
 
 If PostgreSQL is unavailable, it reports the required dependency and startup commands.
 
@@ -478,15 +479,30 @@ pnpm test:integration
 
 CI runs the same `pnpm test:integration` command; there is no separate database-only CI suite.
 
-The new [bearer session tests](tests/integration/access/test_human_bearer_session_postgres.py) and [bearer grant-write tests](tests/integration/access/test_human_bearer_grant_http_postgres.py) use real application services, HTTP routes and temporary PostgreSQL databases. `Mock*Verifier` classes supply provider results. The tests can therefore check current local suspension, missing admission, grant authority and replay denial, cookie CSRF, provider failure handling and absence of unintended writes without issuing real Hydra credentials.
+The [bearer session tests](tests/integration/access/test_human_bearer_session_postgres.py) and [bearer grant-write tests](tests/integration/access/test_human_bearer_grant_http_postgres.py) use real application services, HTTP routes and temporary PostgreSQL databases. `Mock*Verifier` classes supply provider results. These scenarios check current local suspension, missing admission, grant authority and replay denial, cookie CSRF, provider failure handling and absence of unintended writes. The separate [real Hydra scenarios](tests/integration/access/test_human_hydra_session.py) issue actual tokens and exercise both provider SDKs through the backend.
 
 A fixture such as `linked_human` or `grant_seed` runs when its name appears in the test's parameters. It commits that test's local account or permission setup before the request. Each test receives a fresh database, so using the same synthetic token does not share admission or grants between tests. The [Access evidence section](../../docs/development/access-control.md#implemented-human-authentication) distinguishes these backend scenarios from real-provider qualification and records the developer-reported passing run.
 
-`pnpm test:integration` starts the application PostgreSQL, two Kratos test processes, Mailpit, and the mock OIDC provider from `compose.test.yaml`, waits for the required services, applies the application migrations, and runs all backend integration tests. The real browser tests cover registration, password login, session expiry, logout, disabled identities, code recovery, OIDC login, and password-confirmed OIDC account linking. They also check that matching email alone does not link an account. Compose runs the Kratos migration before starting either Kratos process. The command stops the test services afterward and retains their test-only volumes. It forces the application test database's host, port, name, and credentials, so a database target in `.env.test` cannot redirect application migrations to the development database.
+`pnpm test:integration` builds one locked test image and starts one stack from `compose.test.yaml`. A non-root `integration-tests` container waits up to 60 seconds for the required services, runs the existing application migration command, then runs the entire integration directory in one pytest process. All three database/Kratos/Hydra integration flags are enabled there, so provider scenarios run in the same summary. The browser tests cover registration, password login, session expiry, logout, disabled identities, code recovery, OIDC login, and password-confirmed OIDC account linking. Matching email alone must not link an account. Compose runs each provider's database migration before starting that provider.
 
-The application test PostgreSQL service listens on `127.0.0.1:15433`. Standard test Kratos listens on `127.0.0.1:14433`; an expiry-only Kratos process listens on `127.0.0.1:14435` and issues 15-second sessions. Both Kratos processes share the separate test Kratos PostgreSQL service, database role, and `inframeld_test_kratos_postgres_data` volume. Their admin endpoints stay inside Compose. Neither test database shares a volume with the development database at `127.0.0.1:15432`.
+The test stack publishes no host ports. [Shared test endpoints](tests/support/integration_services.py) use `postgres:5432`, Kratos public/admin at `kratos:4433`/`4434`, expiry-only Kratos at `kratos-expiring:4433`, Hydra public/admin at `hydra:4444`/`4445`, Mailpit at `mailpit:8025` and mock OIDC at `mock-oidc:8080`. The expiry instance issues 15-second sessions and shares the isolated Kratos database with standard Kratos. Hydra has its own ephemeral database and role.
 
-Integration scenarios live under `tests/integration/access`, `postgres`, `kratos`, and `observability`. Typed seed builders, validated browser-flow helpers, and isolated database provisioning live under `tests/support`. Application PostgreSQL tests use temporary databases and Alembic-created fixture tables, cleaned up after each test. The Kratos browser-flow test creates an identity with a unique email in Kratos's isolated test database; that identity remains in the retained test volume. Keep the database-specific values in `.env.test` aligned with `.env.test.example` when running tests directly with `pytest`.
+The runner mounts source and tests read-only, reads the committed `.env.test.example` as its test configuration, and overrides endpoints and database credentials explicitly. It creates a temporary fingerprint key inside the container. Your host `.env.test`, development secrets and development database are not used by this command. Fast host-side checks still use the usual local test configuration and skip service-dependent scenarios.
+
+Before startup and on exit, the wrapper removes only containers and networks labelled for the `inframeld-test` project, including leftovers from older test profiles. It verifies removal and reports cleanup failure as a command failure. The named application and Kratos test volumes survive. Application scenarios create and remove separate temporary databases, while uniquely named Kratos test identities remain in the retained Kratos volume. Run one integration command at a time.
+
+The wrapper gives its background commands no terminal input. These commands need no interactive answers, and inheriting terminal input can suspend Podman before the wrapper reaches cleanup. Ctrl+C still interrupts the run and triggers cleanup. Allow a few seconds for graceful shutdown after Ctrl+C, because pnpm can return before the shell finishes stopping services.
+
+For a focused run or debugging, keep the same private network:
+
+```bash
+./scripts/dev-compose.sh test-services-up
+./scripts/dev-compose.sh test-run tests/integration/access/test_human_hydra_session.py
+podman compose -p inframeld-test -f compose.test.yaml logs kratos hydra
+./scripts/dev-compose.sh test-services-down
+```
+
+Use `docker compose` for logs when `INFRAMELD_CONTAINER_RUNTIME=docker` selects Docker. Each `test-run` performs readiness checks and migrations before pytest. The public wrapper accepts the same optional pytest arguments and handles cleanup automatically, for example `pnpm test:integration tests/integration/kratos`.
 
 ---
 
