@@ -49,6 +49,37 @@ selfservice:
       enabled: true
       use: code
       ui_url: http://kratos:4433/recovery
+      after:
+        hooks:
+          - hook: web_hook
+            config:
+              url: http://recovery-hooks:8080/internal/v1/identity-recovery/admit
+              method: POST
+              body: file:///etc/config/kratos/test-recovery-admit.jsonnet
+              auth:
+                type: api_key
+                config:
+                  name: X-Inframeld-Recovery-Key
+                  value: inframeld-recovery-hook-test-only
+                  in: header
+              response:
+                ignore: false
+                parse: false
+          - hook: revoke_active_sessions
+          - hook: web_hook
+            config:
+              url: http://recovery-hooks:8080/internal/v1/identity-recovery/complete
+              method: POST
+              body: file:///etc/config/kratos/test-recovery-complete.jsonnet
+              auth:
+                type: api_key
+                config:
+                  name: X-Inframeld-Recovery-Key
+                  value: inframeld-recovery-hook-test-only
+                  in: header
+              response:
+                ignore: false
+                parse: false
 
 secrets:
   default:

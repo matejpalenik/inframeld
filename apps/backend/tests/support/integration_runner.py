@@ -22,6 +22,7 @@ from tests.support.integration_services import (
     MOCK_OIDC_URL,
     POSTGRES_HOST,
     POSTGRES_PORT,
+    RECOVERY_HOOKS_URL,
 )
 from tests.support.postgres import database_url
 
@@ -64,6 +65,7 @@ async def _wait_for_services() -> None:
         "hydra": f"{HYDRA_ADMIN_URL}/health/ready",
         "mailpit": f"{MAILPIT_URL}/readyz",
         "mock-oidc": f"{MOCK_OIDC_URL}/isalive",
+        "recovery-hooks": f"{RECOVERY_HOOKS_URL}/health/ready",
     }
     pending = {"postgres", *endpoints}
     engine = create_async_engine(

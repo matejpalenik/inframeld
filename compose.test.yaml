@@ -72,6 +72,8 @@ services:
         condition: service_completed_successfully
       mailpit:
         condition: service_started
+      recovery-hooks:
+        condition: service_started
 
   mock-oidc:
     image: ghcr.io/navikt/mock-oauth2-server:6.0.2
@@ -152,6 +154,29 @@ services:
     depends_on:
       hydra-migrate:
         condition: service_completed_successfully
+
+  recovery-hooks:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
+    volumes:
+      - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    entrypoint:
+      [
+        "python",
+        "-m",
+        "uvicorn",
+        "tests.support.kratos_recovery_hooks:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8080",
+        "--no-access-log",
+        "--log-level",
+        "warning",
+      ]
 
   integration-tests:
     image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}

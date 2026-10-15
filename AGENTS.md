@@ -69,6 +69,8 @@ Add docstrings where they answer a question a maintainer would otherwise have to
 
 Remove boilerplate that merely restates a name, signature, decorator, or obvious statement. Straightforward error subclasses need no individual docstring unless their use or handling has a meaningful distinction. Do not add repetitive documentation to reach blanket declaration coverage.
 
+Do not use semicolons in prose, comments, or docstrings. Use separate sentences or a normal hyphen (`-`) to join short clauses, never an em dash. For example: `"""Open a phase gate - return 204 even when the flow is unknown."""`
+
 Examples: “Loads the current account status and project grants using the caller’s transaction.” “Identifies the caller after authentication. Project permissions are checked separately.” “Closes resources created before startup failed.”
 
 ## Typed database access
