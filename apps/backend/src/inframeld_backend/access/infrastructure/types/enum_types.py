@@ -4,6 +4,12 @@ from enum import Enum as PythonEnum
 
 from sqlalchemy import Enum
 
+from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
+    IdentityRecoveryEventKind,
+)
+from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
+    IdentityRecoveryCleanupState,
+)
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
@@ -35,5 +41,21 @@ PROJECT_STATUS_TYPE = Enum(
     native_enum=False,
     values_callable=_enum_values,
     length=20,
+    validate_strings=True,
+)
+
+IDENTITY_RECOVERY_EVENT_KIND_TYPE = Enum(
+    IdentityRecoveryEventKind,
+    native_enum=False,
+    values_callable=_enum_values,
+    length=20,
+    validate_strings=True,
+)
+
+IDENTITY_RECOVERY_CLEANUP_STATE_TYPE = Enum(
+    IdentityRecoveryCleanupState,
+    native_enum=False,
+    values_callable=_enum_values,
+    length=16,
     validate_strings=True,
 )

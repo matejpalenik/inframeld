@@ -190,7 +190,11 @@ Alice's Kratos browser cookie and Hydra CLI access token must ultimately resolve
 
 Introspection/identity-provider response types stay at infrastructure boundaries. The application still receives `AccessContextDTO` with `PrincipalId`, not a token, mutable permission cache or vendor user object. Identity lookup follows external verification without holding a database transaction across provider waits. Replacing or refreshing a CLI credential preserves principal identity; changing trusted endpoint/issuer bindings requires fresh login rather than credential forwarding.
 
-These are logical responsibilities, not new table definitions or schema changes. The existing Principal/browser-session implementation does not provide the Hydra bearer path. [Credential dispatch](access-control.md#credential-dispatch) is accepted; subject-mapping, lifecycle, protected-storage and recovery implementation/qualification remain. Incoming application-key records and their two-usable-key limit remain separate.
+The implemented bearer service now reuses the same `human_identity_links` and `principals` records as browser authentication. After Hydra and Kratos verification, `PostgresHumanIdentityLinkReader` reads that exact authority/subject pair in a fresh database session. No Hydra-named person or new token table is created in Inframeld.
+
+For example, a test provider can recognize Alice while the local test database contains no identity link for her. The session request returns 403. Requesting the `linked_human` test fixture first creates an active local principal and its link, so the same verified identity can return 200. Each test uses an isolated database, so admission from an earlier test does not carry over. [The implemented authentication boundary](access-control.md#implemented-human-authentication) links both the mocked-provider scenarios and real Hydra/Kratos tests that resolve cookie and bearer credentials to the same local principal.
+
+The table still describes ownership rather than new schema changes. The full Ory subject-mapping/login integration, credential lifecycle, protected CLI storage and recovery cleanup remain to be qualified or implemented. Incoming application-key records and their two-usable-key limit remain separate.
 
 ### What one action grant means
 

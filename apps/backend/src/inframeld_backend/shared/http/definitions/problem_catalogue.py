@@ -7,6 +7,13 @@ TYPE_PREFIX = (
     "https://github.com/matejpalenik/inframeld/blob/main/docs/development/error-handling.md"
 )
 
+INVALID_AUTHENTICATION_REQUEST_PROBLEM = ProblemDefinition(
+    type_uri=f"{TYPE_PREFIX}#invalid-authentication-request",
+    code=ProblemCode.INVALID_AUTHENTICATION_REQUEST,
+    title="Invalid authentication request",
+    status=400,
+    detail="Use one supported authentication method with correctly formatted credentials.",
+)
 
 VALIDATION_ERROR_PROBLEM = ProblemDefinition(
     type_uri=f"{TYPE_PREFIX}#validation-error",

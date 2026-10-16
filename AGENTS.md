@@ -57,7 +57,9 @@ Only the `PolicyInput` suffix identifies a dedicated policy input. `ProjectActio
 
 Use `Principal` when a workflow needs ID, organization, kind and status together; pass `PrincipalId` when it only needs identity. Principal equality/hash follow its ID. `AccessContextDTO` retains identity, not a status or permission snapshot. Add lifecycle behavior only with the workflow that needs it.
 
-Policy classes receive explicit inputs, have no mutable class state, and perform no I/O. Call them by their qualified class name, such as `ActionAuthorizationPolicy.may_perform_action(policy_input)`. Keep orchestration and injected collaborators in services. Ordinary conversion and validation helpers may remain functions.
+Policy classes receive explicit inputs, have no mutable class state, and perform no I/O. Call them by their qualified class name, such as `ActionAuthorizationPolicy.may_perform_action(policy_input)`. Keep orchestration and injected collaborators in services.
+
+Shared value-validation helpers belong to `ValueValidation` in `shared/domain/validation/value_validation.py` and use `@staticmethod`. Import the class directly and call its methods by class name, such as `ValueValidation.require_uuid(value)` or `ValueValidation.require_string(value)`. Do not expose these checks as standalone functions or use module-qualified calls. Keep value-specific invariants on the owning value object. Ordinary conversion helpers may remain functions.
 
 HTTP adapters parse, invoke operations, and serialize. Services coordinate business steps. Entities/value objects/policies express rules without I/O. Provider and persistence adapters perform their specific I/O and boundary conversions. Bootstrap constructs and releases resources. Authentication readers open independent short sessions after provider verification; transaction-bound authorization readers use the caller's session. Never share an `AsyncSession` across requests or keep one open while waiting for a provider.
 
@@ -68,6 +70,8 @@ Before generating a component, identify its owner, layer, role, destination, nam
 Add docstrings where they answer a question a maintainer would otherwise have to investigate: purpose, trust assumptions, result meaning, expected failures, non-obvious invariants, I/O/state changes, or resource/transaction ownership. Write approachable, concrete explanations. Protocols own the shared behavioral contract; implementations document additional details without repeating it. Explain what a DTO establishes or what a value object validates when the declaration alone does not make that clear.
 
 Remove boilerplate that merely restates a name, signature, decorator, or obvious statement. Straightforward error subclasses need no individual docstring unless their use or handling has a meaningful distinction. Do not add repetitive documentation to reach blanket declaration coverage.
+
+Do not use semicolons in prose, comments, or docstrings. Use separate sentences or a normal hyphen (`-`) to join short clauses, never an em dash. For example: `"""Open a phase gate - return 204 even when the flow is unknown."""`
 
 Examples: “Loads the current account status and project grants using the caller’s transaction.” “Identifies the caller after authentication. Project permissions are checked separately.” “Closes resources created before startup failed.”
 

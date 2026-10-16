@@ -7,8 +7,6 @@ services:
       POSTGRES_DB: inframeld_test
       POSTGRES_USER: inframeld_test
       POSTGRES_PASSWORD: inframeld-test-only
-    ports:
-      - "127.0.0.1:15433:5432"
     volumes:
       - inframeld_test_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -57,14 +55,10 @@ services:
       MP_SMTP_TLS_KEY: sans:mailpit
       MP_SMTP_REQUIRE_STARTTLS: "true"
       MP_SMTP_AUTH_ACCEPT_ANY: "true"
-    ports:
-      - "127.0.0.1:18025:8025"
   kratos:
     image: docker.io/oryd/kratos:v25.4.0
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
-    ports:
-      - "127.0.0.1:14433:4433"
     command:
       [
         "serve",
@@ -78,12 +72,8 @@ services:
         condition: service_completed_successfully
       mailpit:
         condition: service_started
-
-  kratos-admin-client:
-    image: docker.io/curlimages/curl:8.16.0
-    profiles: ["test-admin"]
-    entrypoint: ["curl"]
-    # Runs only on demand inside the Compose network. Publish no ports.
+      recovery-hooks:
+        condition: service_started
 
   mock-oidc:
     image: ghcr.io/navikt/mock-oauth2-server:6.0.2
@@ -110,15 +100,11 @@ services:
             }
           ]
         }
-    ports:
-      - "127.0.0.1:15556:8080"
 
   kratos-expiring:
     image: docker.io/oryd/kratos:v25.4.0
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
-    ports:
-      - "127.0.0.1:14435:4433"
     command:
       - serve
       - -c
@@ -129,6 +115,98 @@ services:
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
+
+  hydra-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: hydra_test
+      POSTGRES_USER: hydra_test
+      POSTGRES_PASSWORD: hydra-test-only
+    # Ephemeral, test-only database. No host ports or persistent volume.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydra_test -d hydra_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  hydra-migrate:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    command: ["migrate", "sql", "up", "-e", "--yes"]
+    environment:
+      DSN: postgres://hydra_test:hydra-test-only@hydra-postgres:5432/hydra_test?sslmode=disable
+    depends_on:
+      hydra-postgres:
+        condition: service_healthy
+
+  hydra:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    command:
+      [
+        "serve",
+        "all",
+        "--dev",
+        "--sqa-opt-out",
+        "-c",
+        "/etc/config/hydra/test.yaml",
+      ]
+    volumes:
+      - ./config/hydra/test.yaml:/etc/config/hydra/test.yaml:ro
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+
+  recovery-hooks:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
+    volumes:
+      - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    entrypoint:
+      [
+        "python",
+        "-m",
+        "uvicorn",
+        "tests.support.kratos_recovery_hooks:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8080",
+        "--no-access-log",
+        "--log-level",
+        "warning",
+      ]
+
+  integration-tests:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile.integration
+    environment:
+      INFRAMELD_ENVIRONMENT: test
+      INFRAMELD_RUN_DB_INTEGRATION: "1"
+      INFRAMELD_RUN_KRATOS_INTEGRATION: "1"
+      INFRAMELD_RUN_HYDRA_INTEGRATION: "1"
+      INFRAMELD_DATABASE__HOST: postgres
+      INFRAMELD_DATABASE__PORT: "5432"
+      INFRAMELD_KRATOS__PUBLIC_URL: http://kratos:4433
+      INFRAMELD_DATABASE__NAME: inframeld_test
+      INFRAMELD_DATABASE__USER: inframeld_test
+      INFRAMELD_DATABASE__PASSWORD: inframeld-test-only
+      INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE: /tmp/fingerprint.key
+    volumes:
+      - ./apps/backend/src:/workspace/apps/backend/src:ro
+      - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+      - ./apps/backend/migrations:/workspace/apps/backend/migrations:ro
+      - ./apps/backend/alembic.ini:/workspace/apps/backend/alembic.ini:ro
+      - ./apps/backend/.env.test.example:/workspace/apps/backend/.env.test:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    entrypoint: ["python", "-m", "tests.support.integration_runner"]
+    command: ["tests/integration"]
 
 volumes:
   inframeld_test_postgres_data:

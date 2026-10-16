@@ -72,6 +72,8 @@ Preserve Hydra's identity/protocol state, client registrations, keys and require
 
 **Implemented-state distinction, 2026-09-29:** the inspected development/test Compose files configure Kratos but not Hydra. The backend's existing human dependency is cookie/CSRF-based. The table above records accepted runtime design, not services added by this documentation change.
 
+**Test/runtime update, 2026-10-15:** the backend now implements cookie and bearer authentication with configurable provider and total deadlines. The isolated [integration stack](../../compose.test.yaml) runs pinned Hydra alongside Kratos and their separate databases, with no published test ports. One test container runs the backend suite and creates a first-party client registration for each real Hydra scenario. This test harness approves login/consent through private APIs. It does not supply the production account UI, qualify CLI refresh/recovery, or add Hydra to the development deployment. [Access evidence](access-control.md#implemented-human-authentication) records the tested boundary and remaining work.
+
 ### PostgreSQL delivers background jobs
 
 The worker checks PostgreSQL for eligible jobs, claims a limited amount of work, and saves progress so another attempt can recover it. No queue broker is required. V1 also does not need an outbox dispatcher, a process that forwards saved messages to another system, merely to run background jobs.
