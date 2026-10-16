@@ -4,6 +4,7 @@ from typing import Literal, override
 from uuid import UUID
 
 import pytest
+from tests.support.mock_identity_recovery_block_reader import MockIdentityRecoveryBlockReader
 
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
@@ -152,10 +153,12 @@ class AuthenticationScenario:
         self.token = MockTokenVerifier(self.events)
         self.identity = MockIdentityVerifier(self.events)
         self.reader = MockPrincipalReader(self.events)
+        self.recovery = MockIdentityRecoveryBlockReader()
         self.service = HumanAccessTokenAuthenticationService(
             self.token,
             self.identity,
             self.reader,
+            recovery_block_reader=self.recovery,
             provider_timeout_seconds=provider_timeout_seconds,
             total_timeout_seconds=total_timeout_seconds,
         )
@@ -182,6 +185,7 @@ async def test_missing_credential_performs_no_io() -> None:
         await scenario.service.authenticate(None)
 
     assert scenario.events == []
+    assert scenario.recovery.identities == []
 
 
 @pytest.mark.asyncio
@@ -193,6 +197,7 @@ async def test_rejected_token_skips_identity_and_principal_checks() -> None:
         await scenario.service.authenticate(CREDENTIAL)
 
     assert scenario.events == ["token"]
+    assert scenario.recovery.identities == []
 
 
 @pytest.mark.asyncio
@@ -223,6 +228,7 @@ async def test_current_identity_must_match_verified_token_identity(
         await scenario.service.authenticate(CREDENTIAL)
 
     assert scenario.events == ["token", "identity"]
+    assert scenario.recovery.identities == []
     assert scenario.identity.identities == [IDENTITY]
 
 
@@ -416,3 +422,65 @@ def test_timeouts_must_be_finite_positive_numbers(
             provider_timeout_seconds=provider_timeout,
             total_timeout_seconds=total_timeout,
         )
+
+
+@pytest.mark.asyncio
+async def test_bearer_rechecks_recovery_without_clearing_suspension() -> None:
+    """A valid token follows current recovery state and cannot undo suspension."""
+    scenario = AuthenticationScenario()
+    service = scenario.service
+
+    assert (await service.authenticate(CREDENTIAL)).actor_principal_id == PRINCIPAL.id
+
+    scenario.recovery.result = True
+    with pytest.raises(AccessDeniedError):
+        await service.authenticate(CREDENTIAL)
+
+    scenario.recovery.result = False
+    assert (await service.authenticate(CREDENTIAL)).actor_principal_id == PRINCIPAL.id
+
+    scenario.reader.result = replace(PRINCIPAL, status=PrincipalStatus.SUSPENDED)
+    with pytest.raises(AccessDeniedError):
+        await service.authenticate(CREDENTIAL)
+
+    assert scenario.recovery.identities == [IDENTITY] * 4
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_type", [DependencyUnavailableError, TimeoutError, RuntimeError])
+async def test_bearer_recovery_failure_preserves_its_category(
+    failure_type: type[Exception],
+) -> None:
+    """A recovery dependency failure cannot be mistaken for an invalid bearer token."""
+    scenario = AuthenticationScenario()
+    failure = failure_type()
+    scenario.recovery.failure = failure
+    expected = DependencyUnavailableError if failure_type is TimeoutError else failure_type
+
+    with pytest.raises(expected) as caught:
+        await scenario.service.authenticate(CREDENTIAL)
+
+    if failure_type is TimeoutError:
+        assert caught.value.__cause__ is failure
+    else:
+        assert caught.value is failure
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("return_after_cancellation", [False, True])
+@pytest.mark.parametrize("result", [False, True])
+async def test_bearer_total_deadline_includes_recovery_read(
+    return_after_cancellation: bool, result: bool
+) -> None:
+    """Late results cannot authenticate a caller or replace a timeout with a 403."""
+    scenario = AuthenticationScenario(total_timeout_seconds=0.02)
+    scenario.recovery.stall = True
+    scenario.recovery.return_after_cancellation = return_after_cancellation
+    scenario.recovery.result = result
+
+    async with asyncio.timeout(1):
+        with pytest.raises(DependencyUnavailableError) as caught:
+            await scenario.service.authenticate(CREDENTIAL)
+
+    assert isinstance(caught.value.__cause__, TimeoutError)
+    assert scenario.recovery.identities == [IDENTITY]

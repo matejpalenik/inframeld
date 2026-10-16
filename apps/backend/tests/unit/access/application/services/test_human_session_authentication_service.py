@@ -7,6 +7,7 @@ from typing import Literal, override
 from uuid import uuid4
 
 import pytest
+from tests.support.mock_identity_recovery_block_reader import MockIdentityRecoveryBlockReader
 
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
@@ -124,9 +125,9 @@ class MockDeadlinePrincipalReader(HumanIdentityLinkReader):
 async def test_valid_identity_resolves_active_local_human() -> None:
     """Carry the verified identity into lookup and return only the local principal ID."""
     reader = FixedPrincipalReader()
-    context = await HumanSessionAuthenticationService(FixedVerifier(), reader).authenticate(
-        CREDENTIAL
-    )
+    context = await HumanSessionAuthenticationService(
+        FixedVerifier(), reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
+    ).authenticate(CREDENTIAL)
     assert context.actor_principal_id == PRINCIPAL.id
     assert reader.identity == IDENTITY
 
@@ -136,7 +137,9 @@ async def test_missing_credential_performs_no_io() -> None:
     """Reject a missing session before contacting either external dependency."""
     verifier, reader = FixedVerifier(), FixedPrincipalReader()
     with pytest.raises(AuthenticationRequiredError):
-        await HumanSessionAuthenticationService(verifier, reader).authenticate(None)
+        await HumanSessionAuthenticationService(
+            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
+        ).authenticate(None)
     assert not verifier.called
     assert reader.identity is None
 
@@ -157,7 +160,9 @@ async def test_verified_identity_requires_an_active_local_human(
     """Deny absent links, inactive humans, and application principals."""
     with pytest.raises(AccessDeniedError):
         await HumanSessionAuthenticationService(
-            FixedVerifier(), FixedPrincipalReader(principal)
+            FixedVerifier(),
+            FixedPrincipalReader(principal),
+            recovery_block_reader=MockIdentityRecoveryBlockReader(),
         ).authenticate(CREDENTIAL)
 
 
@@ -166,9 +171,9 @@ async def test_rejected_session_skips_local_lookup() -> None:
     """Require successful provider verification before reading local principal state."""
     reader = FixedPrincipalReader()
     with pytest.raises(AuthenticationRequiredError):
-        await HumanSessionAuthenticationService(FixedVerifier(None), reader).authenticate(
-            CREDENTIAL
-        )
+        await HumanSessionAuthenticationService(
+            FixedVerifier(None), reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
+        ).authenticate(CREDENTIAL)
     assert reader.identity is None
 
 
@@ -178,7 +183,9 @@ async def test_provider_failure_skips_local_lookup() -> None:
     reader = FixedPrincipalReader()
     with pytest.raises(DependencyUnavailableError):
         await HumanSessionAuthenticationService(
-            FixedVerifier(failure=DependencyUnavailableError()), reader
+            FixedVerifier(failure=DependencyUnavailableError()),
+            reader,
+            recovery_block_reader=MockIdentityRecoveryBlockReader(),
         ).authenticate(CREDENTIAL)
     assert reader.identity is None
 
@@ -206,6 +213,7 @@ async def test_cookie_provider_wait_uses_the_shorter_limit(
     service = HumanSessionAuthenticationService(
         verifier,
         reader,
+        recovery_block_reader=MockIdentityRecoveryBlockReader(),
         provider_timeout_seconds=provider_seconds,
         total_timeout_seconds=total_seconds,
     )
@@ -227,6 +235,7 @@ async def test_cookie_total_deadline_includes_the_local_read() -> None:
     service = HumanSessionAuthenticationService(
         MockDeadlineBrowserVerifier(),
         reader,
+        recovery_block_reader=MockIdentityRecoveryBlockReader(),
         total_timeout_seconds=0.05,
     )
 
@@ -252,6 +261,7 @@ async def test_cookie_late_provider_result_cannot_decide_authentication(
     service = HumanSessionAuthenticationService(
         verifier,
         reader,
+        recovery_block_reader=MockIdentityRecoveryBlockReader(),
         provider_timeout_seconds=0.05,
     )
 
@@ -275,6 +285,7 @@ async def test_cookie_late_local_result_cannot_decide_admission(
     service = HumanSessionAuthenticationService(
         MockDeadlineBrowserVerifier(),
         reader,
+        recovery_block_reader=MockIdentityRecoveryBlockReader(),
         total_timeout_seconds=0.05,
     )
 
@@ -289,7 +300,9 @@ async def test_external_cancellation_remains_cancellation() -> None:
     verifier = MockDeadlineBrowserVerifier()
     verifier.blocked = True
     reader = MockDeadlinePrincipalReader()
-    service = HumanSessionAuthenticationService(verifier, reader)
+    service = HumanSessionAuthenticationService(
+        verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
+    )
 
     task = asyncio.create_task(service.authenticate(CREDENTIAL))
     try:
@@ -321,6 +334,101 @@ def test_cookie_service_rejects_invalid_timeout_arguments(
         HumanSessionAuthenticationService(
             MockDeadlineBrowserVerifier(),
             MockDeadlinePrincipalReader(),
+            recovery_block_reader=MockIdentityRecoveryBlockReader(),
             provider_timeout_seconds=seconds if setting == "provider" else 5.0,
             total_timeout_seconds=seconds if setting == "total" else 10.0,
         )
+
+
+@pytest.mark.asyncio
+async def test_cookie_rechecks_recovery_without_clearing_suspension() -> None:
+    """A released block restores eligibility only while the human remains active."""
+    reader = FixedPrincipalReader()
+    recovery = MockIdentityRecoveryBlockReader()
+    service = HumanSessionAuthenticationService(
+        FixedVerifier(), reader, recovery_block_reader=recovery
+    )
+
+    assert (await service.authenticate(CREDENTIAL)).actor_principal_id == PRINCIPAL.id
+
+    recovery.result = True
+    with pytest.raises(AccessDeniedError):
+        await service.authenticate(CREDENTIAL)
+
+    recovery.result = False
+    assert (await service.authenticate(CREDENTIAL)).actor_principal_id == PRINCIPAL.id
+
+    reader.principal = replace(PRINCIPAL, status=PrincipalStatus.SUSPENDED)
+    with pytest.raises(AccessDeniedError):
+        await service.authenticate(CREDENTIAL)
+
+    assert recovery.identities == [IDENTITY] * 4
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_type", [DependencyUnavailableError, TimeoutError, RuntimeError])
+async def test_cookie_recovery_failure_preserves_its_category(
+    failure_type: type[Exception],
+) -> None:
+    """Unavailable checks stop admission, while unexpected bugs remain visible."""
+    recovery = MockIdentityRecoveryBlockReader()
+    failure = failure_type()
+    recovery.failure = failure
+    service = HumanSessionAuthenticationService(
+        FixedVerifier(), FixedPrincipalReader(), recovery_block_reader=recovery
+    )
+    expected = DependencyUnavailableError if failure_type is TimeoutError else failure_type
+
+    with pytest.raises(expected) as caught:
+        await service.authenticate(CREDENTIAL)
+
+    if failure_type is TimeoutError:
+        assert caught.value.__cause__ is failure
+    else:
+        assert caught.value is failure
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("return_after_cancellation", [False, True])
+@pytest.mark.parametrize("result", [False, True])
+async def test_cookie_total_deadline_includes_recovery_read(
+    return_after_cancellation: bool, result: bool
+) -> None:
+    """An overdue check must not become a successful login or a recovery denial."""
+    recovery = MockIdentityRecoveryBlockReader()
+    recovery.stall = True
+    recovery.return_after_cancellation = return_after_cancellation
+    recovery.result = result
+    service = HumanSessionAuthenticationService(
+        FixedVerifier(),
+        FixedPrincipalReader(),
+        recovery_block_reader=recovery,
+        total_timeout_seconds=0.02,
+    )
+
+    async with asyncio.timeout(1):
+        with pytest.raises(DependencyUnavailableError) as caught:
+            await service.authenticate(CREDENTIAL)
+
+    assert isinstance(caught.value.__cause__, TimeoutError)
+    assert recovery.identities == [IDENTITY]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["missing-credential", "provider", "local-link"])
+async def test_cookie_rejection_before_admission_skips_recovery_read(
+    stage: Literal["missing-credential", "provider", "local-link"],
+) -> None:
+    """Read recovery state only after a credential resolves to a local principal."""
+    recovery = MockIdentityRecoveryBlockReader()
+    service = HumanSessionAuthenticationService(
+        FixedVerifier(None if stage == "provider" else IDENTITY),
+        FixedPrincipalReader(None if stage == "local-link" else PRINCIPAL),
+        recovery_block_reader=recovery,
+    )
+    expected = AccessDeniedError if stage == "local-link" else AuthenticationRequiredError
+
+    with pytest.raises(expected):
+        await service.authenticate(None if stage == "missing-credential" else CREDENTIAL)
+
+    assert recovery.identities == []

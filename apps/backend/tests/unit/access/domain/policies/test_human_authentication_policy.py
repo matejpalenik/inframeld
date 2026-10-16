@@ -16,9 +16,18 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 
 @pytest.mark.parametrize("kind", list(PrincipalKind))
 @pytest.mark.parametrize("status", list(PrincipalStatus))
-def test_only_active_humans_may_authenticate(kind: PrincipalKind, status: PrincipalStatus) -> None:
-    """Require human kind and active status independently of provider verification."""
+@pytest.mark.parametrize("has_pending_recovery", [False, True])
+def test_only_eligible_humans_without_recovery_blocks_may_authenticate(
+    kind: PrincipalKind,
+    status: PrincipalStatus,
+    has_pending_recovery: bool,
+) -> None:
+    """Provider approval cannot bypass account state or an unreleased recovery block."""
     principal = Principal(PrincipalId(uuid4()), OrganizationId(uuid4()), kind, status)
-    assert HumanAuthenticationPolicy.may_authenticate(principal) is (
-        kind is PrincipalKind.HUMAN and status is PrincipalStatus.ACTIVE
+    assert HumanAuthenticationPolicy.may_authenticate(
+        principal, has_pending_recovery=has_pending_recovery
+    ) is (
+        kind is PrincipalKind.HUMAN
+        and status is PrincipalStatus.ACTIVE
+        and not has_pending_recovery
     )

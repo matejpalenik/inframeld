@@ -25,6 +25,9 @@ from inframeld_backend.access.application.services.unavailable_human_session_aut
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
+from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
+    PostgresIdentityRecoveryBlockReader,
+)
 from inframeld_backend.access.infrastructure.settings.human_authentication_settings import (
     HumanAuthenticationSettings,
 )
@@ -64,6 +67,7 @@ def create_access_components(
         )
 
     reader = PostgresHumanIdentityLinkReader(database)
+    recovery_block_reader = PostgresIdentityRecoveryBlockReader(database)
 
     with ExitStack() as provider_cleanup:
         kratos_client = KratosApiClient(
@@ -85,6 +89,7 @@ def create_access_components(
                 ),
             ),
             reader,
+            recovery_block_reader=recovery_block_reader,
             provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
             total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
         )
@@ -127,6 +132,7 @@ def create_access_components(
                     kratos_settings.authority,
                 ),
                 reader,
+                recovery_block_reader=recovery_block_reader,
                 provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
                 total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
             )

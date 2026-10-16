@@ -14,6 +14,9 @@ from inframeld_backend.access.application.protocols.human_identity_link_reader i
 from inframeld_backend.access.application.protocols.human_session_authenticator import (
     HumanSessionAuthenticator,
 )
+from inframeld_backend.access.application.protocols.identity_recovery_block_reader import (
+    IdentityRecoveryBlockReader,
+)
 from inframeld_backend.access.application.value_objects.browser_session_credential import (
     BrowserSessionCredential,
 )
@@ -35,6 +38,7 @@ class HumanSessionAuthenticationService(HumanSessionAuthenticator):
         verifier: BrowserSessionVerifier,
         reader: HumanIdentityLinkReader,
         *,
+        recovery_block_reader: IdentityRecoveryBlockReader,
         provider_timeout_seconds: float = 5.0,
         total_timeout_seconds: float = 10.0,
     ) -> None:
@@ -44,6 +48,7 @@ class HumanSessionAuthenticationService(HumanSessionAuthenticator):
 
         self._verifier = verifier
         self._reader = reader
+        self._recovery_block_reader = recovery_block_reader
         self._provider_timeout_seconds = provider_timeout_seconds
         self._total_timeout_seconds = total_timeout_seconds
 
@@ -77,7 +82,17 @@ class HumanSessionAuthenticationService(HumanSessionAuthenticator):
                 if loop.time() >= deadline:
                     raise TimeoutError()
 
-                if principal is None or not HumanAuthenticationPolicy.may_authenticate(principal):
+                if principal is None:
+                    raise AccessDeniedError()
+
+                has_pending_recovery = await self._recovery_block_reader.is_blocked(identity)
+
+                if loop.time() >= deadline:
+                    raise TimeoutError()
+
+                if not HumanAuthenticationPolicy.may_authenticate(
+                    principal, has_pending_recovery=has_pending_recovery
+                ):
                     raise AccessDeniedError()
 
                 return AccessContextDTO(actor_principal_id=principal.id)
