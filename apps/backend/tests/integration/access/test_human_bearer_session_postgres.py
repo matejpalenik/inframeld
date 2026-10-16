@@ -3,16 +3,24 @@
 import os
 from functools import partial
 from typing import Literal, override
+from uuid import uuid4
 
+import httpx2
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import func, update
 from tests.support.access_scenarios import MockAccessScenarios
 
+from inframeld_backend.access.application.dtos.identity_recovery_event_dto import (
+    IdentityRecoveryEventDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
+)
+from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
+    IdentityRecoveryEventKind,
 )
 from inframeld_backend.access.application.protocols.browser_session_verifier import (
     BrowserSessionVerifier,
@@ -29,6 +37,9 @@ from inframeld_backend.access.application.services.human_access_token_authentica
 from inframeld_backend.access.application.services.human_session_authentication_service import (
     HumanSessionAuthenticationService,
 )
+from inframeld_backend.access.application.services.identity_recovery_admission_service import (
+    IdentityRecoveryAdmissionService,
+)
 from inframeld_backend.access.application.value_objects.browser_session_credential import (
     BrowserSessionCredential,
 )
@@ -36,8 +47,14 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
     HumanAccessTokenCredential,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
+    IdentityRecoveryCleanupState,
+)
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
+    IdentityRecoveryFlowId,
+)
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
@@ -49,17 +66,30 @@ from inframeld_backend.access.http.routes.current_session_routes import create_s
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
+from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
+    PostgresIdentityRecoveryBlockReader,
+)
+from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
+    IdentityRecoveryAdmissionRow,
+)
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
+from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_admission_writer import (
+    PostgresIdentityRecoveryAdmissionWriter,
+)
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
 from inframeld_backend.shared.http.middleware.request_context_middleware import (
     RequestContextMiddleware,
 )
 from inframeld_backend.shared.http.openapi.problem_openapi import configure_problem_openapi
+from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
+    PostgresInstallationIdentityReader,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
@@ -138,16 +168,22 @@ class SessionScenario:
         # `TestClient` uses its own event loop so it needs its own db pool
         api_database = Database(settings)
         reader = PostgresHumanIdentityLinkReader(api_database)
+        recovery_block_reader = PostgresIdentityRecoveryBlockReader(api_database)
 
         self.token = MockTokenVerifier()
         self.identity = MockIdentityVerifier()
         self.browser = MockBrowserVerifier()
 
         authenticate = HumanSessionDependency(
-            HumanSessionAuthenticationService(self.browser, reader),
+            HumanSessionAuthenticationService(
+                self.browser, reader, recovery_block_reader=recovery_block_reader
+            ),
             CSRFProtectionDependency(()),
             access_token_authenticator=HumanAccessTokenAuthenticationService(
-                self.token, self.identity, reader
+                self.token,
+                self.identity,
+                reader,
+                recovery_block_reader=recovery_block_reader,
             ),
         )
 
@@ -321,3 +357,111 @@ async def test_competing_credentials_are_rejected_before_provider_verification(
     assert scenario.identity.calls == 0
     assert scenario.browser.calls == 0
     assert await PostgresHumanIdentityLinkReader(database).find_principal(IDENTITY) is None
+
+
+async def _admit_recovery(database: Database) -> OperationId:
+    installation_id = await PostgresInstallationIdentityReader(database).read()
+    event = IdentityRecoveryEventDTO(
+        flow_id=IdentityRecoveryFlowId(uuid4()),
+        identity=IDENTITY,
+        event_kind=IdentityRecoveryEventKind.RECOVERY,
+    )
+    async with database.session() as session, session.begin():
+        return await IdentityRecoveryAdmissionService(
+            PostgresIdentityRecoveryAdmissionWriter(
+                session,
+                installation_id=installation_id,
+                authority=IDENTITY.authority,
+            )
+        ).admit(event)
+
+
+async def _seed_recovery_outcome(
+    database: Database, operation_id: OperationId, *, release_block: bool
+) -> None:
+    """Arrange cleanup state directly without claiming real provider cleanup."""
+    async with database.session() as session, session.begin():
+        await session.execute(
+            update(IdentityRecoveryAdmissionRow)
+            .where(IdentityRecoveryAdmissionRow.operation_id == operation_id.value)
+            .values(
+                kratos_cleanup_state=IdentityRecoveryCleanupState.CONFIRMED,
+                hydra_cleanup_state=IdentityRecoveryCleanupState.CONFIRMED,
+                released_at=func.now() if release_block else None,
+            )
+        )
+
+
+def _get_session(client: TestClient, family: Literal["cookie", "bearer"]) -> httpx2.Response:
+    client.cookies.clear()
+    if family == "cookie":
+        client.cookies.set("ory_kratos_session", COOKIE.value)
+        return client.get("/v1/session")
+    return client.get("/v1/session", headers=BEARER_HEADERS)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("family", ["cookie", "bearer"])
+async def test_recovery_block_changes_are_enforced_on_the_next_http_request(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    linked_human: Principal,
+    family: Literal["cookie", "bearer"],
+) -> None:
+    """Each credential follows committed recovery state without clearing suspension."""
+    scenario = SessionScenario(temporary_postgres_settings)
+
+    with TestClient(scenario.application, raise_server_exceptions=False) as client:
+        first = _get_session(client, family)
+        assert first.status_code == 200, first.text
+        assert first.json() == {"principalId": str(linked_human.id.value)}
+
+        operation_id = await _admit_recovery(database)
+        blocked = _get_session(client, family)
+        assert blocked.status_code == 403, blocked.text
+        assert blocked.json()["code"] == "access_denied"
+
+        await _seed_recovery_outcome(database, operation_id, release_block=False)
+        unreleased = _get_session(client, family)
+        assert unreleased.status_code == 403, unreleased.text
+
+        await _seed_recovery_outcome(database, operation_id, release_block=True)
+        released = _get_session(client, family)
+        assert released.status_code == 200, released.text
+        assert released.json() == {"principalId": str(linked_human.id.value)}
+
+        async with database.session() as session, session.begin():
+            await session.execute(
+                update(PrincipalRow)
+                .where(PrincipalRow.id == linked_human.id.value)
+                .values(status=PrincipalStatus.SUSPENDED)
+            )
+
+        suspended = _get_session(client, family)
+        assert suspended.status_code == 403, suspended.text
+        assert suspended.json()["code"] == "access_denied"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("family", ["cookie", "bearer"])
+async def test_later_local_admission_does_not_bypass_an_existing_recovery_block(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    family: Literal["cookie", "bearer"],
+) -> None:
+    """Linking a new local account cannot remove its provider identity's pending block."""
+    await _admit_recovery(database)
+    scenario = SessionScenario(temporary_postgres_settings)
+
+    with TestClient(scenario.application, raise_server_exceptions=False) as client:
+        before_link = _get_session(client, family)
+        assert before_link.status_code == 403, before_link.text
+
+        async with database.session() as session, session.begin():
+            principal = await MockAccessScenarios.seed_linked_human(session, IDENTITY)
+
+        assert principal.status is PrincipalStatus.ACTIVE
+        after_link = _get_session(client, family)
+
+    assert after_link.status_code == 403, after_link.text
+    assert after_link.json()["code"] == "access_denied"

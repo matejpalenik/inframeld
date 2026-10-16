@@ -15,6 +15,9 @@ from inframeld_backend.access.application.protocols.human_identity_link_reader i
 from inframeld_backend.access.application.protocols.human_identity_verifier import (
     HumanIdentityVerifier,
 )
+from inframeld_backend.access.application.protocols.identity_recovery_block_reader import (
+    IdentityRecoveryBlockReader,
+)
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
@@ -37,10 +40,10 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
         identity_verifier: HumanIdentityVerifier,
         reader: HumanIdentityLinkReader,
         *,
+        recovery_block_reader: IdentityRecoveryBlockReader,
         provider_timeout_seconds: float = 5.0,
         total_timeout_seconds: float = 10.0,
     ) -> None:
-
         for seconds in (provider_timeout_seconds, total_timeout_seconds):
             if isinstance(seconds, bool) or not math.isfinite(seconds) or seconds <= 0:
                 raise ValueError("Authentication timeouts must be finite and positive.")
@@ -48,6 +51,7 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
         self._token_verifier = token_verifier
         self._identity_verifier = identity_verifier
         self._reader = reader
+        self._recovery_block_reader = recovery_block_reader
         self._provider_timeout_seconds = provider_timeout_seconds
         self._total_timeout_seconds = total_timeout_seconds
 
@@ -91,11 +95,23 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
                 # Find the principal identity in the DB
                 principal = await self._reader.find_principal(current_identity)
 
-                if principal is None or not HumanAuthenticationPolicy.may_authenticate(principal):
-                    raise AccessDeniedError
+                if loop.time() >= deadline:
+                    raise TimeoutError()
+
+                if principal is None:
+                    raise AccessDeniedError()
+
+                has_pending_recovery = await self._recovery_block_reader.is_blocked(
+                    current_identity
+                )
 
                 if loop.time() >= deadline:
-                    raise TimeoutError
+                    raise TimeoutError()
+
+                if not HumanAuthenticationPolicy.may_authenticate(
+                    principal, has_pending_recovery=has_pending_recovery
+                ):
+                    raise AccessDeniedError()
 
                 return AccessContextDTO(actor_principal_id=principal.id)
         except TimeoutError as error:

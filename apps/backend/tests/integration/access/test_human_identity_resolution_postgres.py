@@ -27,6 +27,9 @@ from inframeld_backend.access.domain.value_objects.identity_subject import Ident
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
+from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
+    PostgresIdentityRecoveryBlockReader,
+)
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -94,7 +97,9 @@ async def test_shared_service_authenticates_concurrent_callers(database: Databas
             for identity in identities
         ]
     service = HumanSessionAuthenticationService(
-        CredentialSubjectVerifier(), PostgresHumanIdentityLinkReader(database)
+        CredentialSubjectVerifier(),
+        PostgresHumanIdentityLinkReader(database),
+        recovery_block_reader=PostgresIdentityRecoveryBlockReader(database),
     )
     contexts = await asyncio.gather(
         *(
@@ -114,7 +119,9 @@ async def test_shared_service_reads_account_status_on_each_request(database: Dat
     async with database.session() as session, session.begin():
         principal = await MockAccessScenarios.seed_linked_human(session, identity)
     service = HumanSessionAuthenticationService(
-        CredentialSubjectVerifier(), PostgresHumanIdentityLinkReader(database)
+        CredentialSubjectVerifier(),
+        PostgresHumanIdentityLinkReader(database),
+        recovery_block_reader=PostgresIdentityRecoveryBlockReader(database),
     )
     credential = BrowserSessionCredential(identity.subject.value)
     assert (await service.authenticate(credential)).actor_principal_id == principal.id

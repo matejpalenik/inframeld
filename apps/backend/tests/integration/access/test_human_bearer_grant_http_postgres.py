@@ -60,6 +60,9 @@ from inframeld_backend.access.http.routes.project_grant_routes import create_pro
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
+from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
+    PostgresIdentityRecoveryBlockReader,
+)
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
@@ -190,15 +193,21 @@ class GrantScenario:
         # Keep TestClient's connections separate from the async fixture's pool.
         api_database = Database(settings)
         reader = PostgresHumanIdentityLinkReader(api_database)
+        recovery_block_reader = PostgresIdentityRecoveryBlockReader(api_database)
         self.token = MockTokenVerifier()
         self.identity = MockIdentityVerifier()
         self.browser = MockBrowserVerifier()
 
         authenticate = HumanSessionDependency(
-            HumanSessionAuthenticationService(self.browser, reader),
+            HumanSessionAuthenticationService(
+                self.browser, reader, recovery_block_reader=recovery_block_reader
+            ),
             CSRFProtectionDependency((HttpUrl(TRUSTED_ORIGIN),)),
             access_token_authenticator=HumanAccessTokenAuthenticationService(
-                self.token, self.identity, reader
+                self.token,
+                self.identity,
+                reader,
+                recovery_block_reader=recovery_block_reader,
             ),
         )
         fingerprints = ProjectGrantChangeFingerprintService(

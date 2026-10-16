@@ -7,6 +7,7 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
+from tests.support.mock_identity_recovery_block_reader import MockIdentityRecoveryBlockReader
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
@@ -119,7 +120,9 @@ def _test_app(
     register_error_handlers(application)
     application.add_middleware(RequestContextMiddleware)
     authenticate = HumanSessionDependency(
-        HumanSessionAuthenticationService(verifier, reader),
+        HumanSessionAuthenticationService(
+            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
+        ),
         CSRFProtectionDependency(TRUSTED_ORIGINS),
         access_token_authenticator=bearer,
     )
@@ -178,7 +181,9 @@ def test_cookie_authenticated_post_requires_csrf_header() -> None:
     reader = _MockLinkReader(PRINCIPAL_ID)
     application = _test_app(verifier, reader)
     authenticate = HumanSessionDependency(
-        HumanSessionAuthenticationService(verifier, reader),
+        HumanSessionAuthenticationService(
+            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
+        ),
         CSRFProtectionDependency(TRUSTED_ORIGINS),
     )
     changes: list[PrincipalId] = []
@@ -203,7 +208,9 @@ def test_cookie_authenticated_post_rejects_untrusted_origin() -> None:
     reader = _MockLinkReader(PRINCIPAL_ID)
     application = _test_app(verifier, reader)
     authenticate = HumanSessionDependency(
-        HumanSessionAuthenticationService(verifier, reader),
+        HumanSessionAuthenticationService(
+            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
+        ),
         CSRFProtectionDependency(TRUSTED_ORIGINS),
     )
     changes: list[PrincipalId] = []
@@ -230,7 +237,9 @@ def test_cookie_authenticated_post_accepts_trusted_origin() -> None:
     reader = _MockLinkReader(PRINCIPAL_ID)
     application = _test_app(verifier, reader)
     authenticate = HumanSessionDependency(
-        HumanSessionAuthenticationService(verifier, reader),
+        HumanSessionAuthenticationService(
+            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
+        ),
         CSRFProtectionDependency(TRUSTED_ORIGINS),
     )
     changes: list[PrincipalId] = []

@@ -4,8 +4,12 @@ from inframeld_backend.access.domain.enums.principal_status import PrincipalStat
 
 
 class HumanAuthenticationPolicy:
-    """Admit a verified identity only when its linked principal is an active human."""
+    """Require an active human and no unreleased recovery obligation."""
 
     @staticmethod
-    def may_authenticate(principal: Principal) -> bool:
-        return principal.kind is PrincipalKind.HUMAN and principal.status is PrincipalStatus.ACTIVE
+    def may_authenticate(principal: Principal, *, has_pending_recovery: bool) -> bool:
+        return (
+            principal.kind is PrincipalKind.HUMAN
+            and principal.status is PrincipalStatus.ACTIVE
+            and not has_pending_recovery
+        )
