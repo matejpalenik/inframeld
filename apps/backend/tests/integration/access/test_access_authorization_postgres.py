@@ -7,7 +7,6 @@ import pytest
 from tests.support.access_scenarios import MockAccessScenarios
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
 )
@@ -82,13 +81,15 @@ async def test_hides_project_from_active_nonmember(database: Database) -> None:
             target=target,
         )
 
-    assert facts == ProjectActionFactsDTO(
-        organization_id=scenario.organization_id,
-        principal_status=PrincipalStatus.ACTIVE,
-        project_status=ProjectStatus.ACTIVE,
-        is_project_member=False,
-        has_exact_action_grant=False,
-    )
+    assert facts is not None
+    assert facts.principal_access.principal.id == scenario.principal_id
+    assert facts.principal_access.principal.organization_id == scenario.organization_id
+    assert facts.principal_access.principal.kind is PrincipalKind.HUMAN
+    assert facts.principal_access.principal.status is PrincipalStatus.ACTIVE
+    assert facts.principal_access.has_pending_recovery is False
+    assert facts.project_status is ProjectStatus.ACTIVE
+    assert facts.is_project_member is False
+    assert facts.has_exact_action_grant is False
 
 
 @pytest.mark.asyncio

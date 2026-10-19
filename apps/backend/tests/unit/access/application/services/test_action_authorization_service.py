@@ -17,8 +17,13 @@ from inframeld_backend.access.application.protocols.project_action_facts_reader 
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
 )
+from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
+from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
+    PrincipalAccessPolicyInput,
+)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
@@ -33,16 +38,25 @@ TARGET = ProjectActionTargetDTO(ProjectId(UUID(int=2)))
 ACTION = ActionId("build")
 ORGANIZATION_ID = OrganizationId(UUID(int=3))
 
+PRINCIPAL_ACCESS = PrincipalAccessPolicyInput(
+    principal=Principal(
+        id=ACCESS.actor_principal_id,
+        organization_id=ORGANIZATION_ID,
+        kind=PrincipalKind.HUMAN,
+        status=PrincipalStatus.ACTIVE,
+    ),
+    has_pending_recovery=False,
+)
+
 ALLOWED_FACTS = ProjectActionFactsDTO(
-    organization_id=ORGANIZATION_ID,
-    principal_status=PrincipalStatus.ACTIVE,
+    principal_access=PRINCIPAL_ACCESS,
     project_status=ProjectStatus.ACTIVE,
     is_project_member=True,
     has_exact_action_grant=True,
 )
 
 
-class FixedProjectActionFactsReader(ProjectActionFactsReader):
+class MockProjectActionFactsReader(ProjectActionFactsReader):
     """Return chosen stored facts and record the exact requested scope."""
 
     def __init__(self, facts: ProjectActionFactsDTO | None) -> None:
@@ -62,7 +76,7 @@ class FixedProjectActionFactsReader(ProjectActionFactsReader):
 @pytest.mark.asyncio
 async def test_allows_current_member_with_exact_grant() -> None:
     """Admit eligible callers using facts for the exact actor, action, and project."""
-    reader = FixedProjectActionFactsReader(ALLOWED_FACTS)
+    reader = MockProjectActionFactsReader(ALLOWED_FACTS)
 
     authorized_organization_id = await ActionAuthorizationService(reader).require_action(
         access=ACCESS, action_id=ACTION, target=TARGET
@@ -75,7 +89,7 @@ async def test_allows_current_member_with_exact_grant() -> None:
 @pytest.mark.asyncio
 async def test_visible_project_without_grant_is_forbidden() -> None:
     """Return access denied when visibility holds but the exact action grant is absent."""
-    reader = FixedProjectActionFactsReader(replace(ALLOWED_FACTS, has_exact_action_grant=False))
+    reader = MockProjectActionFactsReader(replace(ALLOWED_FACTS, has_exact_action_grant=False))
 
     with pytest.raises(AccessDeniedError):
         await ActionAuthorizationService(reader).require_action(
@@ -88,8 +102,26 @@ async def test_visible_project_without_grant_is_forbidden() -> None:
     "facts",
     [
         None,
-        replace(ALLOWED_FACTS, principal_status=PrincipalStatus.SUSPENDED),
-        replace(ALLOWED_FACTS, principal_status=PrincipalStatus.RETIRED),
+        replace(
+            ALLOWED_FACTS,
+            principal_access=replace(
+                PRINCIPAL_ACCESS,
+                principal=replace(
+                    PRINCIPAL_ACCESS.principal,
+                    status=PrincipalStatus.SUSPENDED,
+                ),
+            ),
+        ),
+        replace(
+            ALLOWED_FACTS,
+            principal_access=replace(
+                PRINCIPAL_ACCESS,
+                principal=replace(
+                    PRINCIPAL_ACCESS.principal,
+                    status=PrincipalStatus.RETIRED,
+                ),
+            ),
+        ),
         replace(ALLOWED_FACTS, project_status=ProjectStatus.DELETING),
         replace(ALLOWED_FACTS, is_project_member=False),
     ],
@@ -97,8 +129,45 @@ async def test_visible_project_without_grant_is_forbidden() -> None:
 async def test_hidden_project_is_not_found_even_with_a_grant(
     facts: ProjectActionFactsDTO | None,
 ) -> None:
-    """Hide missing or ineligible scope before an action grant can disclose it."""
-    reader = FixedProjectActionFactsReader(facts)
+    """Hide missing or ineligible scope before a grant can disclose the project."""
+    reader = MockProjectActionFactsReader(facts)
+
+    with pytest.raises(ResourceNotFoundError):
+        await ActionAuthorizationService(reader).require_action(
+            access=ACCESS, action_id=ACTION, target=TARGET
+        )
+
+
+@pytest.mark.asyncio
+async def test_recovery_blocks_an_action_on_a_visible_project() -> None:
+    """Recovery denies an otherwise authorized member with a forbidden response."""
+    facts = replace(
+        ALLOWED_FACTS,
+        principal_access=replace(
+            PRINCIPAL_ACCESS,
+            has_pending_recovery=True,
+        ),
+    )
+    reader = MockProjectActionFactsReader(facts)
+
+    with pytest.raises(AccessDeniedError):
+        await ActionAuthorizationService(reader).require_action(
+            access=ACCESS, action_id=ACTION, target=TARGET
+        )
+
+
+@pytest.mark.asyncio
+async def test_recovery_does_not_disclose_a_hidden_project() -> None:
+    """A recovery block must not change a nonmember's not-found response."""
+    facts = replace(
+        ALLOWED_FACTS,
+        principal_access=replace(
+            PRINCIPAL_ACCESS,
+            has_pending_recovery=True,
+        ),
+        is_project_member=False,
+    )
+    reader = MockProjectActionFactsReader(facts)
 
     with pytest.raises(ResourceNotFoundError):
         await ActionAuthorizationService(reader).require_action(

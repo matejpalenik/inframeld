@@ -10,6 +10,9 @@ from sqlalchemy import select
 from tests.support.access_scenarios import MockAccessScenarios
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.services.project_grant_authorization_service import (
+    ProjectGrantAuthorizationService,
+)
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
 )
@@ -126,9 +129,11 @@ async def test_assign_use_only_saves_grant_revision_audit_and_reservation(
 
     async with database.session() as session, session.begin():
         service = ProjectGrantChangeService(
-            PostgresProjectGrantChangeFactsReader(session),
-            PostgresOperationReservationWriter(session),
-            PostgresProjectGrantChangeWriter(session),
+            authorizer=ProjectGrantAuthorizationService(
+                PostgresProjectGrantChangeFactsReader(session)
+            ),
+            reservations=PostgresOperationReservationWriter(session),
+            changes=PostgresProjectGrantChangeWriter(session),
         )
         await service.assign_use_only(
             access=AccessContextDTO(actor_principal_id=scenario.principal_id),
@@ -239,9 +244,11 @@ async def test_assign_use_only_replay_keeps_original_operation_without_writing_a
 
     async with database.session() as session, session.begin():
         service = ProjectGrantChangeService(
-            PostgresProjectGrantChangeFactsReader(session),
-            PostgresOperationReservationWriter(session),
-            PostgresProjectGrantChangeWriter(session),
+            authorizer=ProjectGrantAuthorizationService(
+                PostgresProjectGrantChangeFactsReader(session)
+            ),
+            reservations=PostgresOperationReservationWriter(session),
+            changes=PostgresProjectGrantChangeWriter(session),
         )
         first_result = await service.assign_use_only(
             access=access,
@@ -254,9 +261,11 @@ async def test_assign_use_only_replay_keeps_original_operation_without_writing_a
     # The first transaction has committed, but the caller repeats its old request.
     async with database.session() as session, session.begin():
         service = ProjectGrantChangeService(
-            PostgresProjectGrantChangeFactsReader(session),
-            PostgresOperationReservationWriter(session),
-            PostgresProjectGrantChangeWriter(session),
+            authorizer=ProjectGrantAuthorizationService(
+                PostgresProjectGrantChangeFactsReader(session)
+            ),
+            reservations=PostgresOperationReservationWriter(session),
+            changes=PostgresProjectGrantChangeWriter(session),
         )
         replay_result = await service.assign_use_only(
             access=access,
@@ -364,9 +373,11 @@ async def test_new_key_with_stale_revision_rolls_back_entire_grant_change(
 
     async with database.session() as session, session.begin():
         service = ProjectGrantChangeService(
-            PostgresProjectGrantChangeFactsReader(session),
-            PostgresOperationReservationWriter(session),
-            PostgresProjectGrantChangeWriter(session),
+            authorizer=ProjectGrantAuthorizationService(
+                PostgresProjectGrantChangeFactsReader(session)
+            ),
+            reservations=PostgresOperationReservationWriter(session),
+            changes=PostgresProjectGrantChangeWriter(session),
         )
         await service.assign_use_only(
             access=access,
@@ -386,9 +397,11 @@ async def test_new_key_with_stale_revision_rolls_back_entire_grant_change(
     with pytest.raises(StaleRevisionError):
         async with database.session() as session, session.begin():
             service = ProjectGrantChangeService(
-                PostgresProjectGrantChangeFactsReader(session),
-                PostgresOperationReservationWriter(session),
-                PostgresProjectGrantChangeWriter(session),
+                authorizer=ProjectGrantAuthorizationService(
+                    PostgresProjectGrantChangeFactsReader(session)
+                ),
+                reservations=PostgresOperationReservationWriter(session),
+                changes=PostgresProjectGrantChangeWriter(session),
             )
             await service.assign_use_only(
                 access=access,
@@ -502,9 +515,11 @@ async def test_same_key_cannot_change_grant_recipient(database: Database) -> Non
 
     async with database.session() as session, session.begin():
         service = ProjectGrantChangeService(
-            PostgresProjectGrantChangeFactsReader(session),
-            PostgresOperationReservationWriter(session),
-            PostgresProjectGrantChangeWriter(session),
+            authorizer=ProjectGrantAuthorizationService(
+                PostgresProjectGrantChangeFactsReader(session)
+            ),
+            reservations=PostgresOperationReservationWriter(session),
+            changes=PostgresProjectGrantChangeWriter(session),
         )
         await service.assign_use_only(
             access=access,
@@ -527,9 +542,11 @@ async def test_same_key_cannot_change_grant_recipient(database: Database) -> Non
     with pytest.raises(IdempotencyKeyReusedError):
         async with database.session() as session, session.begin():
             service = ProjectGrantChangeService(
-                PostgresProjectGrantChangeFactsReader(session),
-                PostgresOperationReservationWriter(session),
-                PostgresProjectGrantChangeWriter(session),
+                authorizer=ProjectGrantAuthorizationService(
+                    PostgresProjectGrantChangeFactsReader(session)
+                ),
+                reservations=PostgresOperationReservationWriter(session),
+                changes=PostgresProjectGrantChangeWriter(session),
             )
             await service.assign_use_only(
                 access=access,
@@ -631,9 +648,11 @@ async def test_concurrent_equal_grants_commit_one_change(
     async def assign() -> OperationReservationResultDTO:
         async with database.session() as session, session.begin():
             service = ProjectGrantChangeService(
-                PostgresProjectGrantChangeFactsReader(session),
-                PostgresOperationReservationWriter(session),
-                PostgresProjectGrantChangeWriter(session),
+                authorizer=ProjectGrantAuthorizationService(
+                    PostgresProjectGrantChangeFactsReader(session)
+                ),
+                reservations=PostgresOperationReservationWriter(session),
+                changes=PostgresProjectGrantChangeWriter(session),
             )
             await barrier.wait()
             return await service.assign_use_only(

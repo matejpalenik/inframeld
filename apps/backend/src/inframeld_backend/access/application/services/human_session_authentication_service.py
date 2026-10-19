@@ -23,6 +23,9 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 from inframeld_backend.access.domain.policies.human_authentication_policy import (
     HumanAuthenticationPolicy,
 )
+from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
+    PrincipalAccessPolicyInput,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     AuthenticationRequiredError,
@@ -90,9 +93,12 @@ class HumanSessionAuthenticationService(HumanSessionAuthenticator):
                 if loop.time() >= deadline:
                     raise TimeoutError()
 
-                if not HumanAuthenticationPolicy.may_authenticate(
-                    principal, has_pending_recovery=has_pending_recovery
-                ):
+                principal_access = PrincipalAccessPolicyInput(
+                    principal=principal,
+                    has_pending_recovery=has_pending_recovery,
+                )
+
+                if not HumanAuthenticationPolicy.may_authenticate(principal_access):
                     raise AccessDeniedError()
 
                 return AccessContextDTO(actor_principal_id=principal.id)

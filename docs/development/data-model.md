@@ -12,6 +12,7 @@ A **primary key (`PK`)** identifies a row. A **foreign key (`FK`)** makes the da
 | --- | --- |
 | How do resource names differ from display names and IDs? | [Resource naming](#resource-naming) |
 | Who can act, and in which project? | [Access](#access) |
+| Is eligibility stored or read for one attempt? | [Principal eligibility inputs](#principal-eligibility-inputs) |
 | Which source bytes belong to a corpus? | [Knowledge](#knowledge) |
 | Which prepared data can a build reuse? | [Indexing](#indexing) |
 | What produced an answer or rating? | [Pipelines](#pipelines) |
@@ -127,6 +128,18 @@ Equality and hashing follow `PrincipalId`, so snapshots of one account remain th
 
 For component responsibilities and conversion examples, use [application conventions](application-structure.md#component-conventions). For HTTP outcomes and verification scope, use [the implemented authentication boundary](access-control.md#implemented-human-authentication).
 
+<a id="principal-eligibility-inputs"></a>
+
+### Temporary principal eligibility inputs
+
+Alice may remain an active principal while an unreleased recovery obligation blocks her product access. Keep those facts separate in persistence. [ADR-0064](../adr/ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md) selects a common policy input that brings the observed Principal and pending-recovery fact together for one authorization attempt.
+
+[`PrincipalAccessPolicyInput`](../../apps/backend/src/inframeld_backend/access/domain/policy_inputs/principal_access_policy_input.py) is an implemented frozen, slotted domain input. Operation DTOs and policy inputs carry it rather than repeating account fields throughout their interfaces. It is not a new table, aggregate root, Principal status or stored allow/deny flag. It is not cached in `AccessContextDTO`, which retains only the authenticated principal ID.
+
+The data loader must establish the exact principal, organization and authoritative installation context. Recovery is matched through stored authority/subject links, with any unreleased matching obligation counting as pending. A later local link must respect an obligation recorded before principal admission. Missing installation metadata is a dependency failure, not proof that there is no block. Project membership, action grants and caller-kind restrictions remain additional facts and rules.
+
+These observations do not authorize a later transaction or retry. Authorization operations load current facts again under the applicable coordination contract. [Access](access-control.md#shared-principal-eligibility) owns behavior and verification evidence, and [application structure](application-structure.md#shared-access-eligibility) owns component responsibilities. The shared input and policy are implemented runtime components and add no persisted records.
+
 ### Keep identity and credential lifecycles separate
 
 A verified Kratos identity maps through an explicit identity link to the human principal. Kratos owns passwords and browser sessions, so permission records do not contain them. Verify the identity source and subject before using the link. Matching email addresses alone do not join accounts. Hydra adds the accepted human CLI token lifecycle, not another human account or a replacement grant store.
@@ -154,9 +167,25 @@ The secret is 32 cryptographically random bytes encoded as 43 unpadded base64url
 
 <a id="identity-cleanup-records"></a>
 
-#### Logical identity-cleanup and deletion obligations
+#### Identity-cleanup records and logical deletion obligations
 
-Verified recovery/reset records an original trusted flow/event identity, affected stable human principal, a temporary product-access block and independent Kratos/Hydra cleanup outcomes. Keep confirmed, failed and uncertain outcomes distinguishable, with bounded reconciliation/attempt evidence. Deduplication must preserve the original operation; its completion cannot release a newer pending block or start revocation of later logins. These facts are not a new `PrincipalStatus`, permission snapshot or duplicated OAuth-token database. [Recovery behavior](access-control.md#identity-recovery-cleanup) and [jobs](jobs-and-idempotency.md#identity-cleanup) own admission and release rules. [Private callback inputs](access-contracts.md#recovery-callbacks) are bounded to 8 KiB, authenticated by a dedicated rotatable service secret and deduplicated by installation/flow/event kind/phase. Callback credential material is not a record or audit field. The [private handoff draft](access-contracts.md#recovery-wire) defines original flow/identity/phase binding, durable acknowledgments and trusted-evidence requirements. Physical records and pinned hook evidence still need implementation/qualification.
+Verified recovery/reset binds an original trusted flow/event to a provider identity, a temporary product-access block and independent Kratos/Hydra cleanup outcomes. A local principal need not exist yet. Once linked, that principal must respect the identity's pending block. Keep confirmed, failed and uncertain outcomes distinguishable, with bounded reconciliation/attempt evidence. Completion cannot release another pending block or start revocation of later logins. These facts are not a new `PrincipalStatus`, permission snapshot or duplicated OAuth-token database.
+
+The implemented [0004 migration](../../apps/backend/migrations/versions/0004_identity_recovery.py) creates `identity_recovery_admissions`, mapped by [IdentityRecoveryAdmissionRow](../../apps/backend/src/inframeld_backend/access/infrastructure/rows/identity_recovery_admission_row.py):
+
+| Stored fields | Meaning and constraint |
+| --- | --- |
+| `operation_id` | Original nonblank operation identity and primary key. |
+| `installation_id`, `authority`, `flow_id` | Unique original flow within the trusted installation/provider scope. Installation references authoritative singleton metadata. |
+| `subject`, `event_kind` | Original affected provider identity and `recovery` or `password-reset` binding. They are checked on repeat, not included as extra uniqueness dimensions that could admit a conflicting second operation. |
+| `kratos_cleanup_state`, `hydra_cleanup_state` | Independent `pending`, `confirmed`, `failed` or `uncertain` outcomes. Both start pending. |
+| `admitted_at`, `released_at` | Admission time and explicit release time. A null release keeps the block, even if both provider states are confirmed. The database rejects release unless both states are confirmed. |
+
+There is deliberately no required principal foreign key. Current [admission orchestration](../../apps/backend/src/inframeld_backend/access/application/services/identity_recovery_admission_service.py) retains the original event binding. For an already linked identity, the PostgreSQL writer acquires its organization's exclusive lock before inserting the admission. An unlinked identity can still be recorded without creating a principal. Future first local admission must coordinate with recovery and respect pending obligations. [Access](access-control.md#shared-principal-eligibility) owns adapter deadlines and rollback behavior.
+
+The schema guard is necessary but does not implement the complete release decision, competing-obligation checks or provider reconciliation. A focused recovery aggregate will own lifecycle transitions with those workflows under [ADR-0064](../adr/ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md). It does not own every project grant or restore a suspended account.
+
+[Recovery behavior](access-control.md#identity-recovery-cleanup) and [jobs](jobs-and-idempotency.md#identity-cleanup) own admission and release rules. [Private callbacks](access-contracts.md#recovery-callbacks) are separately bounded to 8 KiB, authenticated by a rotatable service secret and deduplicated by their original flow/event/phase contract. That callback contract is not the admission table's unique key, and credential material is not stored in these records. The [private handoff draft](access-contracts.md#recovery-wire) defines evidence and acknowledgments. Full callback delivery, provider cleanup, aggregate transitions and safe release still require implementation and pinned-provider qualification.
 
 Project deletion similarly binds the original operation to the exact project and initiating principal, reviewed/admitted state, durable block, application/key shutdown obligations and resumable physical cleanup. Retained content-free status may be read by the currently eligible original human under the authoritative operation binding after membership removal. History is not permission to cancel, continue or inspect private contents. The [deletion contract](jobs-and-idempotency.md#project-deletion) owns outcomes and retries; these logical obligations do not select a new public job enum or additional physical tables.
 
@@ -168,9 +197,11 @@ An invitation records safe identity, issuer, exact intended admission/membership
 
 <a id="installation-identity-record"></a>
 
-### Logical installation identity and maintenance outcomes
+### Installation identity and logical maintenance outcomes
 
-Managed initialization creates one immutable installation UUID before user admission, persisted in authoritative backend metadata and bound into the operator-controlled managed-installation record through verified host access. The same identity survives restart/upgrade and target-label renaming. Factory reset/new installation creates a new identity; restore follows the normal retained-operation reconciliation. The identity is distinct from an Organization, principal, project and mutable URL/target label. Its new application-owned `InstallationId` must follow the same runtime UUID-wrapper convention as other known identities. No new table or migration is implemented by this record definition.
+Managed initialization creates one immutable installation UUID before user admission, persisted in authoritative backend metadata and bound into the operator-controlled managed-installation record through verified host access. The same identity survives restart/upgrade and target-label renaming. Factory reset/new installation creates a new identity. Restore follows normal retained-operation reconciliation. The identity is distinct from an Organization, principal, project and mutable URL/target label.
+
+The implemented [0003 migration](../../apps/backend/migrations/versions/0003_installation_identity.py) creates and seeds `installation_identity` once. Its fixed primary key `singleton_key = 1` permits at most one row, `installation_id` is a unique UUID, and `created_at` records initialization. [InstallationId](../../apps/backend/src/inframeld_backend/shared/domain/value_objects/installation_id.py) uses the runtime UUID-wrapper convention. [PostgresInstallationIdentityReader](../../apps/backend/src/inframeld_backend/shared/infrastructure/readers/postgres_installation_identity_reader.py) reads this metadata in its own short session. This code does not by itself qualify the complete host-maintenance workflow or permit readers to silently recreate missing metadata.
 
 A maintenance result binds original operation/mode, installation, verified Kratos authority/subject, exact responsibility and reviewed access revision to its safe assignment outcome. Retain no Hydra proof token. A keyed fingerprint covers stable request meaning and verified subject, excluding replaceable proof bytes; a fresh proof for the same identity can recover the original operation without regranting. [The maintenance wire draft](access-contracts.md#maintenance-wire) owns proof, fields, errors and scope checks.
 

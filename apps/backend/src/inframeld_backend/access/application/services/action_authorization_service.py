@@ -1,5 +1,3 @@
-"""Coordinate current fact retrieval, project visibility, and action admission."""
-
 from typing import override
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -10,7 +8,6 @@ from inframeld_backend.access.application.protocols.action_authorizer import Act
 from inframeld_backend.access.application.protocols.project_action_facts_reader import (
     ProjectActionFactsReader,
 )
-from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.policies.action_authorization_policy import (
     ActionAuthorizationPolicy,
 )
@@ -29,30 +26,28 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class ActionAuthorizationService(ActionAuthorizer):
-    """Hide unavailable projects, then require the caller's exact action authority."""
+    """Hide unavailable projects, then require current eligibility and action authority."""
 
     def __init__(self, facts_reader: ProjectActionFactsReader) -> None:
-        """Use the reader bound to the caller's operation and transaction."""
         self._facts_reader = facts_reader
 
     @override
     async def require_action(
         self, *, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
     ) -> OrganizationId:
-        """Apply visibility before action admission to preserve the 404/403 distinction."""
         facts = await self._facts_reader.read_action_facts(
             access=access, action_id=action_id, target=target
         )
 
         if facts is None or not ProjectVisibilityPolicy.may_view_project(
-            principal_status=facts.principal_status,
+            principal_status=facts.principal_access.principal.status,
             project_status=facts.project_status,
             is_project_member=facts.is_project_member,
         ):
             raise ResourceNotFoundError()
 
         policy_input = ActionAuthorizationPolicyInput(
-            principal_is_active=facts.principal_status is PrincipalStatus.ACTIVE,
+            principal_access=facts.principal_access,
             is_project_member=facts.is_project_member,
             has_exact_action_grant=facts.has_exact_action_grant,
         )
@@ -60,4 +55,4 @@ class ActionAuthorizationService(ActionAuthorizer):
         if not ActionAuthorizationPolicy.may_perform_action(policy_input):
             raise AccessDeniedError()
 
-        return facts.organization_id
+        return facts.principal_access.principal.organization_id

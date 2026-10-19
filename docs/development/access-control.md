@@ -17,6 +17,7 @@ This guide follows Alice and SupportBot through those decisions. Start with sect
 | How does a human sign into the CLI? | [Human CLI authentication](#human-cli-authentication) |
 | Which credential does an HTTP request use? | [Credential dispatch and session checks](#credential-dispatch) |
 | Which human-session components exist now? | [Implemented authentication boundary](#implemented-human-authentication) |
+| Where should a common account restriction be checked? | [Shared principal eligibility](#shared-principal-eligibility) |
 | How is a question answered safely? | [3. Follow a query](#query-flow) |
 | How can people share access? | [4. Membership, permissions, and visibility](#sharing) |
 | Who can upload, change, or delete documents? | [5. Document operations](#documents) |
@@ -69,6 +70,35 @@ Alice and SupportBot can query Production using documents shared with SupportKno
 These permissions can change separately. Removing SupportBot's Query permission stops it querying Production, even if its key is valid. Removing its SupportKnowledge membership removes that document access, even if Query remains. Replacing a key changes neither permission.
 
 > **Signing in proves who is calling. It does not grant project membership, action permissions, or document access.**
+
+<a id="shared-principal-eligibility"></a>
+
+### One shared account-eligibility decision
+
+Alice authenticated before recovery started. She now tries to grant Bob an action on Support. Her earlier session check cannot prove that she is still eligible. Access must read her current state for this attempt, deny the grant while recovery remains blocked, and avoid saving a grant, audit event or idempotency reservation. Repeating an earlier successful request still requires the same current authorization.
+
+[ADR-0064](../adr/ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md) selects one common domain policy for product eligibility. It checks the observed account status and current recovery restrictions. Human authentication adds the human-kind requirement. Action authorization adds project membership and the exact grant. Delegation additionally requires an eligible human grantor and permission to grant the exact action. These policies reuse the common rule instead of each expressing recovery eligibility independently.
+
+The shared input describes one current attempt. It carries the observed Principal and recovery facts together through the operation's records. It is not a saved permission, a new Principal status, or an extension of `AccessContextDTO`. Credential verification, provider identity eligibility and application-key lifecycle checks retain their separate owners. A valid token or key does not supply product authority.
+
+Access authorization operations own the check sequence:
+
+1. Load current facts for the exact caller and target. A grant change first acquires the required organization/project locks and holds them until the caller commits or rolls back.
+2. Apply project visibility before disclosing authority or recipient existence. A hidden project remains 404. For a visible project, a recovery block or missing action/delegation authority returns 403.
+3. Require the operation-specific rules, including human-only restrictions where applicable. Grant authorization checks the actor before revealing an absent recipient.
+4. Only then find or create the idempotent operation. A saved result does not bypass current authorization. Expected-revision handling still distinguishes replay from new work.
+
+Read adapters should collect the eligibility and relationship facts for that attempt in one coherent typed projection where practical. An `EXISTS` expression may report a pending recovery obligation alongside membership and grant existence. It does not decide permission. Missing installation metadata or unavailable dependencies must fail closed, rather than look like no block. A facts reader must not hide an additional query by instantiating another executing reader just to supply one field.
+
+One transaction may contain multiple statements. The [write coordination contract](#section-accepted-write-coordination-and-proposed-indexes) still governs locks, current-state checks and writes. Recovery admission for a linked human must take the conflicting exclusive organization lock. A future first-local-admission workflow must also coordinate with identity recovery and respect any pending provider-identity block. Never hold an Access transaction while waiting for Kratos, Hydra or a model provider.
+
+The current [recovery admission writer](../../apps/backend/src/inframeld_backend/access/infrastructure/writers/postgres_identity_recovery_admission_writer.py) finds the organization through the verified authority/subject link and takes its exclusive lock before recording recovery. An identity without a local link can still receive a recovery record. The [grant facts reader](../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_project_grant_change_facts_reader.py) takes a shared organization lock, then an exclusive project lock, before reading current authorization facts. If recovery commits first, the waiting grant reads its block and is denied. If the grant gets its locks first, recovery waits until that transaction finishes.
+
+Each of these two adapters applies one fixed five-second deadline to its database work, including lock waits. The deadline is per adapter call, not per statement. Expiry raises `DependencyUnavailableError`, and the caller rolls back the transaction, including any partial admission or reservation. The adapters never commit. These internal deadlines are separate from the configurable human-authentication provider/total budgets and do not cover later provider cleanup or the caller's final commit.
+
+Recovery screens and authenticated cleanup callbacks remain usable under their own contracts while product access is blocked. A focused recovery aggregate will protect original-operation and cleanup-state transitions when those workflows are implemented. It cannot recreate removed permissions, clear suspension or independently establish that no other recovery block remains.
+
+**Implementation status:** the shared eligibility input/policy is used by human authentication, project action authorization and the supported use-only human grant command. The [PostgreSQL recovery authorization tests](../../apps/backend/tests/integration/access/test_recovery_authorization_postgres.py) cover existing contexts, current authorization on replay, both recovery/grant ordering cases, timeout rollback, explicit block release and recovery recorded before a later local link. Provider cleanup, the recovery aggregate and qualification of concurrent first local admission remain unfinished. [Application structure](application-structure.md#shared-access-eligibility) owns component responsibilities, and [the data model](data-model.md#principal-eligibility-inputs) distinguishes temporary inputs from stored records.
 
 <a id="architecture"></a> <a id="section-keep-four-identity-and-access-responsibilities-separate"></a>
 
@@ -344,16 +374,18 @@ Alice can ask `GET /v1/session` who she is using either her Kratos browser cooki
 
 **Introspection** means asking Hydra to check a token and return its verified metadata. The backend uses the configured private endpoint. A token cannot choose its own verification destination. The [application flow](application-structure.md#authentication-flow) shows the services and adapters in execution order.
 
-After the required provider checks succeed, `PostgresHumanIdentityLinkReader` opens a short independent database session. It looks up the exact Kratos authority/subject pair and returns the [Principal](data-model.md#implemented-principal-model), including its current kind and status. The service applies `HumanAuthenticationPolicy` and returns an `AccessContextDTO` containing only `PrincipalId`. Permissions are checked by the requested operation, not stored in the authentication result.
+After the required provider checks succeed, `PostgresHumanIdentityLinkReader` opens a short independent database session. It looks up the exact Kratos authority/subject pair and returns the [Principal](data-model.md#implemented-principal-model), including its current kind and status. For a linked principal, the service also reads current recovery blocks through `PostgresIdentityRecoveryBlockReader` within the authentication deadline.
+
+The service carries that Principal and recovery restriction together in `PrincipalAccessPolicyInput`. `HumanAuthenticationPolicy` composes the [shared eligibility rule](#shared-principal-eligibility) and requires a human principal. Successful authentication returns an `AccessContextDTO` containing only `PrincipalId`. Permissions are checked by the requested operation, not stored in the authentication result.
 
 | Condition | Current HTTP result |
 | --- | --- |
 | No supported credential, even when providers are not configured | Generic 401 `http_error` with a Bearer challenge telling the caller authentication is required. |
 | Rejected/expired cookie or human bearer, or an application key on these human-only credential paths | Generic 401 `http_error`. Rejected bearers carry `error="invalid_token"`. |
 | Malformed/repeated Authorization or a Kratos cookie combined with Authorization | 400 `invalid_authentication_request`. An attempted Bearer scheme carries `error="invalid_request"`. |
-| Verified identity with no local link, suspended/retired human, or non-human principal | 403 `access_denied`. |
-| Required verification unavailable, malformed or timed out, or its provider configuration missing | 503 `dependency_unavailable`. A previous success cannot substitute for the failed check. |
-| Required provider checks succeed and the linked local human is active | 200 with the existing `principalId` field. |
+| Verified identity with no local link, suspended/retired human, non-human principal, or pending recovery block | 403 `access_denied`. |
+| Required verification unavailable, malformed or timed out, provider configuration missing, or authoritative recovery metadata unavailable | 503 `dependency_unavailable`. A previous success cannot substitute for the failed check. |
+| Required provider checks succeed and the linked local human is active with no pending recovery block | 200 with the existing `principalId` field. |
 
 `WWW-Authenticate` carries the Bearer challenge. Missing authentication uses `Bearer realm="inframeld"` without a token-error attribute. The values are server-owned constants, so the response never echoes the supplied credential. The [authentication error contract](error-handling.md#authentication-contract) owns the exact problems, headers and failure rules.
 
@@ -1128,6 +1160,7 @@ Full domain schemas, pinned OSS provider compatibility and runtime/browser/CLI/O
 | --- | --- |
 | Public documentation and protected operations | [ADR-0007](../adr/ADR-0007-keep-api-documentation-public-and-product-operations-protected.md). Public API documentation does not grant permission to use product operations. |
 | Human authentication and application-owned policy | [ADR-0012](../adr/ADR-0012-use-kratos-for-human-authentication.md), [ADR-0053](../adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md), [ADR-0013](../adr/ADR-0013-keep-authorization-in-access-and-postgresql.md). |
+| Shared principal eligibility and focused lifecycle aggregates | [ADR-0064](../adr/ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md). Common product eligibility has one policy owner, with current facts and operation-specific authorization. Implementation is pending. |
 | Bounded grants, document audiences, and manager membership | [ADR-0014](../adr/ADR-0014-bound-permission-delegation-by-action-and-exact-target.md), [ADR-0015](../adr/ADR-0015-keep-document-group-access-separate-from-operational-permissions.md), [ADR-0049](../adr/ADR-0049-require-group-managers-to-be-ordinary-members.md). |
 | Explicit initial creator grants | [ADR-0059](../adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md). Seventeen Project actions and fixed resource assignments supersede the historical eleven-action seed. |
 | Provisioning and application updates | [ADR-0060](../adr/ADR-0060-keep-v1-resource-provisioning-human-only.md). Humans provision; applications perform granted operations on existing resources. |

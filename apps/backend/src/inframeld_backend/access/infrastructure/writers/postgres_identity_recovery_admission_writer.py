@@ -1,3 +1,4 @@
+import asyncio
 from typing import override
 from uuid import uuid4
 
@@ -22,16 +23,29 @@ from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id imp
     IdentityRecoveryFlowId,
 )
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
+    HumanIdentityLinkRow,
+)
 from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
     IdentityRecoveryAdmissionRow,
 )
-from inframeld_backend.shared.application.errors.application_errors import ConflictError
+from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
+from inframeld_backend.shared.application.errors.application_errors import (
+    ConflictError,
+    DependencyUnavailableError,
+)
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
+_RECOVERY_ADMISSION_TIMEOUT_SECONDS = 5.0
+
 
 class PostgresIdentityRecoveryAdmissionWriter(IdentityRecoveryAdmissionWriter):
-    """Reserve once using trusted installation/provider scope and the caller's transaction."""
+    """Coordinate linked recovery with Access changes in the caller's transaction.
+
+    A five-second deadline covers database work. Identities without a local link
+    still receive recovery records. The caller owns commit and rollback.
+    """
 
     def __init__(
         self,
@@ -48,6 +62,34 @@ class PostgresIdentityRecoveryAdmissionWriter(IdentityRecoveryAdmissionWriter):
     async def reserve(self, event: IdentityRecoveryEventDTO) -> IdentityRecoveryAdmissionDTO:
         if event.identity.authority != self._authority:
             raise ConflictError("The recovery event does not match the configured provider.")
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + _RECOVERY_ADMISSION_TIMEOUT_SECONDS
+        try:
+            async with asyncio.timeout_at(deadline):
+                admission = await self._reserve(event)
+                if loop.time() >= deadline:
+                    raise TimeoutError()
+                return admission
+        except TimeoutError as error:
+            raise DependencyUnavailableError(
+                "Recovery admission exceeded its database deadline."
+            ) from error
+
+    async def _reserve(self, event: IdentityRecoveryEventDTO) -> IdentityRecoveryAdmissionDTO:
+        # An unlinked identity has no organization to lock and may still recover.
+        await self._session.scalar(
+            select(OrganizationRow.id)
+            .join(
+                HumanIdentityLinkRow,
+                HumanIdentityLinkRow.organization_id == OrganizationRow.id,
+            )
+            .where(
+                HumanIdentityLinkRow.authority == event.identity.authority.value,
+                HumanIdentityLinkRow.subject == event.identity.subject.value,
+            )
+            .with_for_update(of=OrganizationRow)
+        )
 
         await self._session.execute(
             insert(IdentityRecoveryAdmissionRow)

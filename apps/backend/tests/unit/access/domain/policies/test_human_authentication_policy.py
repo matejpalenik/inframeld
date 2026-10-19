@@ -10,6 +10,9 @@ from inframeld_backend.access.domain.enums.principal_status import PrincipalStat
 from inframeld_backend.access.domain.policies.human_authentication_policy import (
     HumanAuthenticationPolicy,
 )
+from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
+    PrincipalAccessPolicyInput,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 
@@ -23,10 +26,18 @@ def test_only_eligible_humans_without_recovery_blocks_may_authenticate(
     has_pending_recovery: bool,
 ) -> None:
     """Provider approval cannot bypass account state or an unreleased recovery block."""
-    principal = Principal(PrincipalId(uuid4()), OrganizationId(uuid4()), kind, status)
-    assert HumanAuthenticationPolicy.may_authenticate(
-        principal, has_pending_recovery=has_pending_recovery
-    ) is (
+    principal = Principal(
+        id=PrincipalId(uuid4()),
+        organization_id=OrganizationId(uuid4()),
+        kind=kind,
+        status=status,
+    )
+    policy_input = PrincipalAccessPolicyInput(
+        principal=principal,
+        has_pending_recovery=has_pending_recovery,
+    )
+
+    assert HumanAuthenticationPolicy.may_authenticate(policy_input) is (
         kind is PrincipalKind.HUMAN
         and status is PrincipalStatus.ACTIVE
         and not has_pending_recovery

@@ -7,6 +7,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.services.project_grant_authorization_service import (
+    ProjectGrantAuthorizationService,
+)
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
 )
@@ -112,9 +115,11 @@ def create_project_grant_router(
         # Authentication and CSRF have completed before this short transaction.
         async with database.session() as session, session.begin():
             service = ProjectGrantChangeService(
-                PostgresProjectGrantChangeFactsReader(session),
-                PostgresOperationReservationWriter(session),
-                PostgresProjectGrantChangeWriter(session),
+                authorizer=ProjectGrantAuthorizationService(
+                    PostgresProjectGrantChangeFactsReader(session)
+                ),
+                reservations=PostgresOperationReservationWriter(session),
+                changes=PostgresProjectGrantChangeWriter(session),
             )
             result = await service.assign_use_only(
                 access=access,

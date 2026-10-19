@@ -29,7 +29,7 @@ Follow [the application structure guide](docs/development/application-structure.
 | Layer | Role folders, created only when needed |
 | --- | --- |
 | Domain | `entities`, `value_objects`, `enums`, `policy_inputs`, `policies`, `errors`, `validation` |
-| Application | `services`, `protocols`, `dtos`, `value_objects`, `enums`, `errors` |
+| Application | `services`, `protocols`, `commands`, `queries`, `dtos`, `value_objects`, `enums`, `errors` |
 | HTTP | `routes`, `dependencies`, `requests`, `responses`, `middleware`, `handlers`, `mappers`, `builders`, `openapi`, `definitions`, `types`, `validation` |
 | Infrastructure | `readers`, `verifiers`, `rows`, `settings`, `resources`, `migrations`, `logging`, `diagnostics`, `timing`, `errors`, `types` |
 
@@ -42,16 +42,20 @@ Follow [the application structure guide](docs/development/application-structure.
 | FastAPI dependency | `*Dependency`; extract inputs and invoke the operation |
 | Route registration | `*_routes.py`; translate HTTP input/output |
 | ASGI middleware | `*Middleware` in `*_middleware.py`; wrap the request lifecycle |
-| Application transfer record | `*DTO` in `dtos/*_dto.py`; includes operation inputs, results, and caller/command contexts |
+| CQRS command input | `*Command` in `commands/*_command.py`, such as `AssignProjectUseOnlyGrantCommand`. Never append `DTO`. |
+| CQRS query input | `*Query` in `queries/*_query.py`, such as `GetProjectQuery`. Never append `DTO`. |
+| Other application transfer record | `*DTO` in `dtos/*_dto.py`. Includes results, read projections, and caller/operation contexts. |
 | Dedicated domain policy input | `*PolicyInput` in `policy_inputs/*_policy_input.py` |
 | HTTP model | `*Request` / `*Response`, using Pydantic; preserve existing published schema names |
 | Persistence mapping | `*Row`, under `infrastructure/rows` |
 | Configuration | `*Settings`, under `infrastructure/settings`; aggregate in bootstrap |
 | Pure business decision | `*Policy` class in `policies/*_policy.py`, with pure `@staticmethod` methods |
 
-Use one primary public type per production module. Give entities, identifiers, enums, and policy inputs separate files named after their type. Cohesive exception families, private helpers, constants, and framework type aliases may remain grouped. Import directly from defining modules. Remove obsolete modules after migrating callers, without compatibility aliases for competing layouts. Bootstrap assembly/resource records retain purpose-specific names such as `AccessComponents` and `ApplicationResources`; they are not application DTOs.
+Use one primary public type per production module. Give entities, identifiers, enums, commands, queries, and policy inputs separate files named after their type. Cohesive exception families, private helpers, constants, and framework type aliases may remain grouped. Import directly from defining modules. Remove obsolete modules after migrating callers, without compatibility aliases for competing layouts. Bootstrap assembly/resource records retain purpose-specific names such as `AccessComponents` and `ApplicationResources`. They are not application DTOs.
 
-Entities have stable identity and cohesive state. Value objects represent immutable meaning and validate their own invariants. Application DTOs carry named operation inputs/results. Dedicated policy inputs carry the values a domain decision consumes. Use standard `@dataclass(frozen=True, slots=True)` for DTOs, policy inputs, and immutable value objects; preserve entity-specific equality and secret-safe representations. Do not add custom record decorators, marker bases, empty protocols, or generic DTO/value-object frameworks. Field annotations alone do not perform runtime validation.
+Entities have stable identity and cohesive state. Value objects represent immutable meaning and validate their own invariants. Commands describe requested changes, while queries describe requested reads. Other application DTOs carry transfer data such as results, projections, and caller/operation metadata. Dedicated policy inputs carry the values a domain decision consumes. Use standard `@dataclass(frozen=True, slots=True)` for commands, queries, DTOs, policy inputs, and immutable value objects. Preserve entity-specific equality and secret-safe representations. Do not add custom record decorators, marker bases, empty protocols, or generic DTO/value-object frameworks. Field annotations alone do not perform runtime validation.
+
+Name command inputs for the requested action and query inputs for the requested read, such as `AssignProjectUseOnlyGrantCommand` and `GetProjectQuery`. They may validate their own input without I/O, but current authorization, state checks, and execution remain with application services and domain rules. Create a command or query record only when a workflow benefits from a named input. Direct typed parameters remain valid. Results, projections, and metadata such as `CommandContextDTO` retain `DTO` because they are not command or query inputs.
 
 Only the `PolicyInput` suffix identifies a dedicated policy input. `ProjectActionFactsDTO` is a persistence read result, despite having "Facts" in its name; the service converts it into `ActionAuthorizationPolicyInput`. A policy may instead accept an existing entity or typed parameters directly. Do not create extra input wrappers solely for naming symmetry.
 
@@ -103,11 +107,11 @@ The symbol scaffold is a test seam and API outline, not a completed implementati
 
 ## Test-code documentation
 
-Apply the same value-based documentation rule to tests, fixtures, helpers, and test modules. Preserve explanations of meaningful scenarios, boundaries, and unusual setup. Omit docstrings that only repeat the test name or assertions; there is no requirement to document every declaration. Public test-support transfer records use the `DTO` suffix, while scenario helpers may remain grouped.
+Apply the same value-based documentation rule to tests, fixtures, helpers, and test modules. Preserve explanations of meaningful scenarios, boundaries, and unusual setup. Omit docstrings that only repeat the test name or assertions. There is no requirement to document every declaration. Command and query input records in tests follow the production `Command` and `Query` suffixes without `DTO`. Other public test-support transfer records use `DTO`, while scenario helpers may remain grouped.
 
 ## Implementing Python protocols
 
-Any concrete class, adapter, fake, or test double intended to implement a Python `Protocol` must explicitly name that protocol as a base class. Do not rely on structural typing alone in this repository. For example, write `class FixedProjectActionFactsReader(ProjectActionFactsReader):`. Implement every required protocol member with a compatible signature. Explicit inheritance documents the intended contract and lets static type checkers check member compatibility. When an implementation must provide a method, mark that protocol method with `@abstractmethod`; otherwise an IDE may treat the protocol method as an inherited default and may not flag its absence.
+Any concrete class, adapter, fake, or test double intended to implement a Python `Protocol` must explicitly name that protocol as a base class. Do not rely on structural typing alone in this repository. For example, write `class MockProjectActionFactsReader(ProjectActionFactsReader):`. Implement every required protocol member with a compatible signature. Explicit inheritance documents the intended contract and lets static type checkers check member compatibility. When an implementation must provide a method, mark that protocol method with `@abstractmethod`; otherwise an IDE may treat the protocol method as an inherited default and may not flag its absence.
 
 Put the shared behavioral contract on `Protocol` classes and methods. Describe implementation-specific details where they add value. Mark overridden members with `@override`, including test doubles, and retain strict Pyright with `reportImplicitOverride` enabled. Protocols describe behavioral capabilities; do not introduce one merely to label a record.
 

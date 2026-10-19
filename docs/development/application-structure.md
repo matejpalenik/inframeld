@@ -14,6 +14,7 @@ Sections 1–2 explain the owners and follow a request. Sections 3–5 explain h
 | --- | --- |
 | Where does my change belong? | [1. One backend, several owners](#model) |
 | Which component should I open? | [Component map and conventions](#component-conventions) |
+| How do common eligibility rules stay in one place? | [Shared Access eligibility](#shared-access-eligibility) |
 | How does a human-session request work? | [Implemented authentication flow](#authentication-flow) |
 | How does work reach its owner? | [2. Follow a command and a query](#operation) |
 | Where do transactions start and end? | [3. Keep changes consistent](#coordination) |
@@ -184,7 +185,9 @@ Use one primary public type per production module, with a matching snake-case fi
 | Entity | `Principal` in `entities/principal.py` | Hold account state with stable identity; equality follows its ID. |
 | Value object | `PrincipalId`, `IdentitySubject`, `BrowserSessionCredential` in `value_objects` | Give a value its meaning and enforce its invariants. |
 | Enum | `PrincipalStatus` in `enums/principal_status.py` | Define a closed vocabulary. |
-| Application DTO | `*DTO` in `dtos/*_dto.py` | Carry named operation inputs, results, or caller/command context. |
+| CQRS command input | `*Command` in `commands/*_command.py` | Describe the change to request, such as `AssignProjectUseOnlyGrantCommand`. |
+| CQRS query input | `*Query` in `queries/*_query.py` | Describe the read to request, such as `GetProjectQuery`. |
+| Other application DTO | `*DTO` in `dtos/*_dto.py` | Carry results, read projections, or caller/operation context. |
 | Dedicated policy input | `*PolicyInput` in `policy_inputs/*_policy_input.py` | Supply the values a domain policy needs for its decision. |
 | Policy | `*Policy` in `policies/*_policy.py` | Make a pure decision through static methods with explicit inputs. |
 | Adapter | Technology-prefixed `PostgresHumanIdentityLinkReader`, `KratosBrowserSessionVerifier` | Perform I/O and convert external values at the boundary. |
@@ -196,13 +199,19 @@ Use one primary public type per production module, with a matching snake-case fi
 | Settings | `*Settings` in `infrastructure/settings` | Validate resource configuration; bootstrap aggregates it. |
 | Bootstrap assembly | `AccessComponents`, `ApplicationResources` | Group constructed collaborators and owned resources. These are not application DTOs. |
 
-Existing published HTTP names such as `ProblemDetails` and `ValidationIssue` are preserved, including their OpenAPI descriptions. They do not acquire a DTO suffix. New HTTP models use Request/Response naming; application transfer records always use the uppercase `DTO` suffix.
+Existing published HTTP names such as `ProblemDetails` and `ValidationIssue` are preserved, including their OpenAPI descriptions. New HTTP models use Request/Response naming. CQRS command and query inputs end in `Command` and `Query`, without `DTO`. Other application transfer records use the uppercase `DTO` suffix, including command/query results, read projections, and caller/operation metadata.
+
+For example, `AssignProjectUseOnlyGrantCommand` would describe a requested grant change, while `GetProjectQuery` would describe which project to read. Their files belong under the owning domain's `application/commands/` and `application/queries/` folders. These are naming examples, not implemented types in the layout above. Create the folders with the first real workflow that needs them. Query results can still be DTOs, and `CommandContextDTO` remains metadata rather than a command input.
+
+This follows the CQRS distinction between a request to change state and a request to read it. Microsoft describes a command as a specialized DTO and illustrates a purpose-specific name such as `CreateOrderCommand`. Inframeld uses the more specific `Command` and `Query` suffixes for these input roles. They need no DTO base class, marker interface, or command bus. See [Microsoft's command definition](https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/microservice-application-layer-implementation-web-api#the-command-class) and [CQRS overview](https://learn.microsoft.com/en-us/azure/architecture/patterns/cqrs).
+
+Keep execution in application services behind capability-named protocols. A command or query input may reject invalid values or inconsistent combinations of its own fields without I/O. It cannot establish current permission, resource existence, or a match with the current stored revision. Preserve those checks in their owning workflows. Direct typed parameters remain valid when a separate input record would add no useful meaning.
 
 A FastAPI dependency and ASGI middleware have different lifetimes. FastAPI invokes `HumanSessionDependency` for the route that declares it. `RequestContextMiddleware` wraps requests at the ASGI boundary. The cookie workflow belongs to `HumanSessionAuthenticationService`, and the human bearer workflow belongs to `HumanAccessTokenAuthenticationService`. The dependency chooses one of them before provider verification.
 
 ### Record roles: DTO, policy input, entity, and value object
 
-A dataclass is an implementation mechanism, not a record's architectural role. Use standard `@dataclass(frozen=True, slots=True)` for application DTOs, policy inputs, and immutable value objects. Do not add custom decorators, marker bases, empty protocols, or generic record frameworks. Dataclass annotations do not perform runtime validation; value objects retain their explicit checks.
+A dataclass is an implementation mechanism, not a record's architectural role. Use standard `@dataclass(frozen=True, slots=True)` for command/query inputs, other application DTOs, policy inputs, and immutable value objects. Do not add custom decorators, marker bases, empty protocols, or generic record frameworks. Dataclass annotations do not perform runtime validation. Value objects retain their explicit checks, and command/query inputs may validate their own input constraints.
 
 | Implemented record | What it means |
 | --- | --- |
@@ -229,48 +238,42 @@ Call pure business decisions through their policy class:
 
 | Call | Decision |
 | --- | --- |
-| `HumanAuthenticationPolicy.may_authenticate(principal)` | Is the linked principal an active human? |
+| `HumanAuthenticationPolicy.may_authenticate(...)` | Is the linked principal a currently eligible human? |
 | `ProjectVisibilityPolicy.may_view_project(...)` | May this caller learn that the organization-scoped project exists? |
 | `ActionAuthorizationPolicy.may_perform_action(policy_input)` | Does current eligibility include the exact requested grant? |
 
 Policy methods use `@staticmethod`, explicit inputs, and no I/O or mutable class state. Services own orchestration and their injected collaborators. Ordinary conversion and validation helpers remain functions; adding a static policy convention does not turn all helpers into classes.
 
-The following are the complete implemented declarations in `apps/backend/src/inframeld_backend/access/domain/policy_inputs/action_authorization_policy_input.py` and `apps/backend/src/inframeld_backend/access/domain/policies/action_authorization_policy.py`; they illustrate the convention and require no separate example files.
+Read the current [action policy input](../../apps/backend/src/inframeld_backend/access/domain/policy_inputs/action_authorization_policy_input.py) and [action policy](../../apps/backend/src/inframeld_backend/access/domain/policies/action_authorization_policy.py) for exact declarations. The contract below explains how they compose shared eligibility without maintaining a second copy of their signatures here.
 
-**`access/domain/policy_inputs/action_authorization_policy_input.py`**
+<a id="shared-access-eligibility"></a>
 
-```python
-from dataclasses import dataclass
+### Shared Access eligibility and focused lifecycle behavior
 
+Alice's recovery block affects authentication, action use and delegation. Adding a separate boolean argument to every operation would spread one rule across the backend. [ADR-0064](../adr/ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md) instead gives common product eligibility one domain-policy owner and a cohesive input. Human authentication, project action authorization and the supported grant command now use this structure. Recovery lifecycle aggregates remain planned.
 
-@dataclass(frozen=True, slots=True)
-class ActionAuthorizationPolicyInput:
-    """Supply the current eligibility and exact grant needed to decide action admission."""
+| Component | Current responsibility or planned lifecycle work |
+| --- | --- |
+| `Principal` | Preserve local account identity and observed kind/status. Add lifecycle methods with the suspension/restoration workflows that require them. |
+| `PrincipalAccessPolicyInput` | Carry the observed Principal and current pending-recovery fact together. It is a frozen, slotted domain policy input for one attempt. |
+| `PrincipalAccessPolicy` | Make the pure common active-account/no-pending-recovery decision. It performs no I/O. |
+| Authentication, action and delegation policies | Compose common eligibility, then apply their own caller-kind and operation-specific rules. Visibility remains a distinct decision. |
+| Application DTOs and operation-specific policy inputs | Carry the cohesive principal input without spreading its fields across each operation signature. A DTO remains data, not a domain aggregate. |
+| Access authorization operations | Coordinate exact-scope facts, visibility and authority checks. A grant-authorization operation returns the current organization/revision information needed by the caller's transaction. Its result grants no future authority. |
+| PostgreSQL facts readers | Load the required values and convert them at the boundary. Prefer a single facts projection rather than executing another reader inside a reader. |
+| Focused recovery aggregate | Own original-operation and cleanup-state transitions when confirmation/release is implemented. Current eligibility and competing obligations remain authoritative external inputs. |
 
-    principal_is_active: bool
-    is_project_member: bool
-    has_exact_action_grant: bool
-```
+The common input contains a `Principal` and `has_pending_recovery`. `ProjectActionFactsDTO` carries it as `principal_access`, and `ProjectGrantChangeFactsDTO` carries it as `actor_access`. The action policy input nests it with membership and exact-grant facts. This keeps dependency direction inward. Readers supply observations rather than a precomputed permission, and services pass the common input intact. Policies must not import application DTOs or ORM types.
 
-**`access/domain/policies/action_authorization_policy.py`**
+Keep public authorization capabilities specific. `ActionAuthorizer` remains the entry point for ordinary action checks. [`ProjectGrantChangeService`](../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) calls `ProjectGrantAuthorizer`, implemented by [`ProjectGrantAuthorizationService`](../../apps/backend/src/inframeld_backend/access/application/services/project_grant_authorization_service.py), before reserving work or returning a replay. The authorization result supplies the current organization and revision for that transaction. Access services may compose specialized reader protocols. This does not call for a universal authorization service or generic policy engine.
 
-```python
-from inframeld_backend.access.domain.policy_inputs.action_authorization_policy_input import (
-    ActionAuthorizationPolicyInput,
-)
+The caller owns the transaction and supplies its session to transaction-bound adapters. Lock acquisition and updates may require several statements. Facts used together should come from a coherent projection where practical, with recovery expressed alongside current membership and grant existence. Shared SQL-expression construction may be factored without performing I/O. Missing installation metadata must remain distinguishable from an absent block.
 
+The grant facts reader takes the shared organization lock before the exclusive project lock. Linked recovery admission takes the conflicting exclusive organization lock. Both adapters bound their database work and leave commit or rollback to the caller. [Access](access-control.md#shared-principal-eligibility) owns their current five-second deadlines and failure behavior. Provider calls stay outside these transactions.
 
-class ActionAuthorizationPolicy:
-    """Require an active project member with the exact action grant."""
+The shared input, composed policies, authorization boundaries and linked-recovery coordination are implemented. [Recovery authorization tests](../../apps/backend/tests/integration/access/test_recovery_authorization_postgres.py) check current-state replay and concurrent writes in PostgreSQL. Add the recovery aggregate alongside cleanup outcome/release behavior, not as an empty scaffold for a future feature. Provider cleanup and safe concurrent first local admission remain qualification work.
 
-    @staticmethod
-    def may_perform_action(policy_input: ActionAuthorizationPolicyInput) -> bool:
-        return (
-            policy_input.principal_is_active
-            and policy_input.is_project_member
-            and policy_input.has_exact_action_grant
-        )
-```
+[Access behavior](access-control.md#shared-principal-eligibility) owns failure ordering and recovery exceptions. [Attempt-local inputs](data-model.md#principal-eligibility-inputs) own the record distinction. Database authorization evidence is separate from the unfinished provider cleanup and account-UI/CLI lifecycle qualification.
 
 ### Contracts and useful documentation
 

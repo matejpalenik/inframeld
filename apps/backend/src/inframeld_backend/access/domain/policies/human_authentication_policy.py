@@ -1,15 +1,18 @@
-from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
-from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.policies.principal_access_policy import (
+    PrincipalAccessPolicy,
+)
+from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
+    PrincipalAccessPolicyInput,
+)
 
 
 class HumanAuthenticationPolicy:
-    """Require an active human and no unreleased recovery obligation."""
+    """Require a human who passes the shared product-eligibility rule."""
 
     @staticmethod
-    def may_authenticate(principal: Principal, *, has_pending_recovery: bool) -> bool:
+    def may_authenticate(policy_input: PrincipalAccessPolicyInput) -> bool:
         return (
-            principal.kind is PrincipalKind.HUMAN
-            and principal.status is PrincipalStatus.ACTIVE
-            and not has_pending_recovery
+            policy_input.principal.kind is PrincipalKind.HUMAN
+            and PrincipalAccessPolicy.may_use_product(policy_input)
         )
