@@ -46,3 +46,19 @@ def test_product_eligibility_respects_account_status_and_recovery(
     )
 
     assert PrincipalAccessPolicy.may_use_product(policy_input) is expected
+
+
+@pytest.mark.parametrize("kind", list(PrincipalKind))
+@pytest.mark.parametrize("status", list(PrincipalStatus))
+def test_account_activity_is_available_separately_from_product_access(
+    kind: PrincipalKind, status: PrincipalStatus
+) -> None:
+    """Recovery can check local account status without treating itself as a product grant."""
+    principal = Principal(
+        id=PrincipalId(UUID(int=1)),
+        organization_id=OrganizationId(UUID(int=2)),
+        kind=kind,
+        status=status,
+    )
+
+    assert PrincipalAccessPolicy.is_account_active(principal) is (status is PrincipalStatus.ACTIVE)

@@ -1,6 +1,6 @@
 # ADR-0058: Block product access during identity-recovery cleanup
 
-**Status:** Accepted; clarifies recovery completion under ADR-0019 and ADR-0053. Deliberate suspension restoration remains required.
+**Status:** Accepted. Partially superseded by [ADR-0069](ADR-0069-release-completed-recovery-obligations-independently.md) for independent per-flow release and completion before local admission. Deliberate suspension restoration remains required. The decision originally clarified recovery completion under ADR-0019 and ADR-0053.
 
 **Date:** 2026-10-04
 
@@ -26,6 +26,8 @@ After both outcomes are confirmed, release this operation's block only if the hu
 Deduplicate completed trusted events by their original identity. A duplicate cannot revoke credentials from later logins, and an older operation cannot release a newer block. The temporary obligation does not introduce a new `PrincipalStatus` or cache permissions in `AccessContextDTO`. Detailed procedures belong to [Access](../development/access-control.md#identity-recovery-cleanup); records and retry semantics belong to [the data model](../development/data-model.md#identity-cleanup-records) and [jobs](../development/jobs-and-idempotency.md#identity-cleanup).
 
 ## Consequences
+
+[ADR-0069](ADR-0069-release-completed-recovery-obligations-independently.md) refines the historical no-newer-pending-cleanup wording above. A completed eligible flow may release only its own block while other unreleased flows continue blocking product access. A fully cleaned identity without a local account may finish without provisioning one. The provider-evidence, suspension and no-permission-restoration rules remain unchanged.
 
 - Product access fails closed during partial cleanup while routine recovery can finish without an extra administrator intervention.
 - Emergency suspension retains its immediate block, preserved-but-unusable assignments and deliberate security-review restoration rule.
