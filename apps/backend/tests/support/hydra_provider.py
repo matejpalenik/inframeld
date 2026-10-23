@@ -12,12 +12,19 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs, urlsplit
+from uuid import UUID
 
 import httpx2
 from pydantic import BaseModel, ConfigDict, SecretStr
 
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
+)
+from inframeld_backend.access.application.value_objects.oauth_consent_request_id import (
+    OAuthConsentRequestId,
+)
+from inframeld_backend.access.application.value_objects.oauth_login_session_id import (
+    OAuthLoginSessionId,
 )
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
@@ -47,6 +54,25 @@ class _ConsentRequest(BaseModel):
     subject: str
     requested_scope: list[str]
     requested_access_token_audience: list[str]
+    consent_request_id: UUID
+    login_session_id: UUID
+
+
+class _LoginRequest(BaseModel):
+    model_config = ConfigDict(hide_input_in_errors=True)
+    session_id: UUID
+    skip: bool
+    subject: str | None = None
+
+
+class _IntrospectionResponse(BaseModel):
+    model_config = ConfigDict(hide_input_in_errors=True)
+    active: bool
+
+
+class _OAuthError(BaseModel):
+    model_config = ConfigDict(hide_input_in_errors=True)
+    error: str
 
 
 class _TokenResponse(BaseModel):
@@ -62,12 +88,14 @@ class IssuedHydraTokensDTO:
 
     access_token: HumanAccessTokenCredential = field(repr=False)
     refresh_token: SecretStr = field(repr=False)
+    consent_request_id: OAuthConsentRequestId
+    login_session_id: OAuthLoginSessionId
 
 
 def _require_status(response: httpx2.Response, expected: int) -> None:
     # OAuth/admin response bodies can contain credentials. Never print them.
     assert response.status_code == expected, (
-        f"Ory test request returned {response.status_code}; expected {expected}."
+        f"Ory test request returned {response.status_code} - expected {expected}."
     )
 
 
@@ -105,6 +133,8 @@ class HydraTestProvider:
         human: RegisteredHumanDTO,
         *,
         include_audience: bool = True,
+        browser: httpx2.AsyncClient | None = None,
+        remember_login: bool = False,
     ) -> IssuedHydraTokensDTO:
         """Use a verified Kratos subject in an S256 authorization-code test exchange.
 
@@ -112,6 +142,7 @@ class HydraTestProvider:
         production CLI still needs its maintained OAuth/OIDC library, callback
         listener, ID-token validation and account UI integration.
         """
+        public = browser if browser is not None else self._client
         whoami = await self._client.get(
             f"{KRATOS_PUBLIC_URL}/sessions/whoami",
             headers={"Cookie": f"ory_kratos_session={human.credential.value}"},
@@ -140,14 +171,17 @@ class HydraTestProvider:
         if include_audience:
             params["audience"] = API_AUDIENCE.value
 
-        started = await self._client.get(f"{HYDRA_PUBLIC_URL}/oauth2/auth", params=params)
+        started = await public.get(f"{HYDRA_PUBLIC_URL}/oauth2/auth", params=params)
         login_challenge = _challenge(started, "login")
+        login = await self._read_login(login_challenge)
+        if login.skip:
+            assert login.subject == subject.value
         accepted_login = await self._client.put(
             f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/login/accept",
             params={"login_challenge": login_challenge},
-            json={"subject": subject.value, "remember": False},
+            json={"subject": subject.value, "remember": remember_login},
         )
-        consent_redirect = await self._client.get(_hydra_redirect(accepted_login))
+        consent_redirect = await public.get(_hydra_redirect(accepted_login))
         consent_challenge = _challenge(consent_redirect, "consent")
 
         consent_response = await self._client.get(
@@ -158,6 +192,7 @@ class HydraTestProvider:
         consent = _ConsentRequest.model_validate_json(consent_response.text)
         assert consent.client.client_id == CLIENT_ID
         assert consent.subject == subject.value
+        assert consent.login_session_id == login.session_id
         assert set(consent.requested_scope) == {"inframeld:api", "offline_access"}
         expected_audience = [API_AUDIENCE.value] if include_audience else []
         assert consent.requested_access_token_audience == expected_audience
@@ -171,7 +206,7 @@ class HydraTestProvider:
                 "remember": False,
             },
         )
-        callback_redirect = await self._client.get(_hydra_redirect(accepted_consent))
+        callback_redirect = await public.get(_hydra_redirect(accepted_consent))
         assert callback_redirect.status_code in {302, 303}
         callback = callback_redirect.headers["location"]
         parsed_callback = urlsplit(callback)
@@ -183,7 +218,7 @@ class HydraTestProvider:
         assert "error" not in parse_qs(parsed_callback.query)
         code = _single_query_value(callback, "code")
 
-        # Inspect the callback; do not send a request to its loopback address.
+        # Inspect the callback without sending a request to its loopback address.
         exchanged = await self._client.post(
             f"{HYDRA_PUBLIC_URL}/oauth2/token",
             data={
@@ -200,7 +235,65 @@ class HydraTestProvider:
         return IssuedHydraTokensDTO(
             access_token=HumanAccessTokenCredential(tokens.access_token.get_secret_value()),
             refresh_token=tokens.refresh_token,
+            consent_request_id=OAuthConsentRequestId(consent.consent_request_id),
+            login_session_id=OAuthLoginSessionId(consent.login_session_id),
         )
+
+    async def _read_login(self, challenge: str) -> _LoginRequest:
+        response = await self._client.get(
+            f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/login",
+            params={"login_challenge": challenge},
+        )
+        _require_status(response, 200)
+        return _LoginRequest.model_validate_json(response.text)
+
+    async def refresh_tokens(self, tokens: IssuedHydraTokensDTO) -> IssuedHydraTokensDTO | None:
+        """Return rotated credentials, or None for an explicit invalid-grant denial."""
+        response = await self._client.post(
+            f"{HYDRA_PUBLIC_URL}/oauth2/token",
+            data={
+                "client_id": CLIENT_ID,
+                "grant_type": "refresh_token",
+                "refresh_token": tokens.refresh_token.get_secret_value(),
+            },
+        )
+        if response.status_code == 400:
+            assert _OAuthError.model_validate_json(response.text).error == "invalid_grant"
+            return None
+        _require_status(response, 200)
+        refreshed = _TokenResponse.model_validate_json(response.text)
+        assert refreshed.token_type.casefold() == "bearer"
+        return IssuedHydraTokensDTO(
+            access_token=HumanAccessTokenCredential(refreshed.access_token.get_secret_value()),
+            refresh_token=refreshed.refresh_token,
+            consent_request_id=tokens.consent_request_id,
+            login_session_id=tokens.login_session_id,
+        )
+
+    async def token_is_active(self, credential: HumanAccessTokenCredential) -> bool:
+        response = await self._client.post(
+            f"{HYDRA_ADMIN_URL}/admin/oauth2/introspect",
+            data={"token": credential.value, "token_type_hint": "access_token"},
+        )
+        _require_status(response, 200)
+        return _IntrospectionResponse.model_validate_json(response.text).active
+
+    async def login_can_skip(self, browser: httpx2.AsyncClient) -> bool:
+        """Observe a fresh login challenge without approving it or issuing more tokens."""
+        started = await browser.get(
+            f"{HYDRA_PUBLIC_URL}/oauth2/auth",
+            params={
+                "client_id": CLIENT_ID,
+                "redirect_uri": REDIRECT_URI,
+                "response_type": "code",
+                "scope": "inframeld:api offline_access",
+                "audience": API_AUDIENCE.value,
+                "state": secrets.token_urlsafe(32),
+                "code_challenge": secrets.token_urlsafe(32),
+                "code_challenge_method": "S256",
+            },
+        )
+        return (await self._read_login(_challenge(started, "login"))).skip
 
     async def revoke_access_token(self, credential: HumanAccessTokenCredential) -> None:
         response = await self._client.post(
@@ -216,7 +309,7 @@ class HydraTestProvider:
 
 @asynccontextmanager
 async def hydra_test_provider() -> AsyncGenerator[HydraTestProvider]:
-    """Own one test client registration; remove it even after a scenario fails.
+    """Own one test client registration and remove it even after a scenario fails.
 
     This runs only against the dedicated Hydra test database. Tests using this
     fixed first-party client must run sequentially.

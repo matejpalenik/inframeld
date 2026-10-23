@@ -138,6 +138,7 @@ inframeld_backend/
 │   │   └── responses/                 # CurrentSessionResponse, ProjectUseOnlyGrantResponse
 │   └── infrastructure/
 │       ├── readers/                   # PostgresHumanIdentityLinkReader, project facts reader
+│       ├── revokers/hydra_human_oauth_credential_revoker.py
 │       ├── verifiers/
 │       │   ├── kratos_browser_session_verifier.py
 │       │   ├── hydra_access_token_verifier.py
@@ -188,6 +189,7 @@ Use one primary public type per production module, with a matching snake-case fi
 | Application operation | Capability-named protocol: `HumanSessionAuthenticator`, `ActionAuthorizer` | Specify public inputs, results, failures, and ownership independently of HTTP and vendors. |
 | Application service | `*Service`: `HumanSessionAuthenticationService` | Coordinate the complete workflow through injected protocols. |
 | I/O capability | Specific protocol: `BrowserSessionVerifier`, `ProjectActionFactsReader` | State the external capability the application requires. |
+| Provider revocation | Specific protocol: `HumanOAuthCredentialRevoker`, with `HydraHumanOAuthCredentialRevoker` in `infrastructure/revokers` | Revoke one trusted, preselected provider target and report confirmation, rejection or uncertainty. |
 | Aggregate repository | Specific protocol: `ProjectMembershipRepository`, with `PostgresProjectMembershipRepository` in `infrastructure/repositories` | Load an existing aggregate and persist supported changes and audit in the caller's transaction. |
 | Entity | `Principal` in `entities/principal.py` | Hold account state with stable identity; equality follows its ID. |
 | Value object | `PrincipalId`, `IdentitySubject`, `BrowserSessionCredential` in `value_objects` | Give a value its meaning and enforce its invariants. |
@@ -292,7 +294,15 @@ The [recovery repository](../../apps/backend/src/inframeld_backend/access/applic
 
 [`IdentityRecoveryCompletionService`](../../apps/backend/src/inframeld_backend/access/application/services/identity_recovery_completion_service.py) implements `IdentityRecoveryCleanupRecorder` through direct `TransactionManager`, completion-facts and repository dependencies. Its configured installation/provider scope is server-owned. Within its transaction it checks the original event, validates the loaded aggregate, applies supplied provider outcomes and uses `IdentityRecoveryReleasePolicy` before saving. The policy requires both confirmations and either an active human or no local account. It reuses `PrincipalAccessPolicy.is_account_active()` without pretending a recovery block is absent for ordinary product access. Each flow releases only itself under [ADR-0069](../adr/ADR-0069-release-completed-recovery-obligations-independently.md).
 
-The [completion facts reader](../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_identity_recovery_completion_facts_reader.py) uses the same session and locks the linked organization before reading current account/admission/other-flow facts in a typed projection. Its five-second deadline includes lock waits. Returned other-pending metadata is observational, not authority. Missing admission conflicts instead of provisioning an obligation. An already released repeat skips mutation/save, while an unreleased repeat can recheck local eligibility. [The Access walkthrough](access-control.md#recovery-completion-workflow) owns the complete local sequence and qualification limits. Bootstrap/private callbacks and provider cleanup remain future integration work.
+The [completion facts reader](../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_identity_recovery_completion_facts_reader.py) uses the same session and locks the linked organization before reading current account/admission/other-flow facts in a typed projection. Its five-second deadline includes lock waits. Returned other-pending metadata is observational, not authority. Missing admission conflicts instead of provisioning an obligation. An already released repeat skips mutation/save, while an unreleased repeat can recheck local eligibility. [The Access walkthrough](access-control.md#recovery-completion-workflow) owns the complete local sequence and qualification limits. Bootstrap/private callbacks and complete provider-cleanup orchestration remain future integration work. Individual Hydra calls are implemented separately below.
+
+<a id="provider-revocation"></a>
+
+### Targeted provider cleanup
+
+Alice has two CLI logins. Removing one old login must not remove her newer credentials. The [revocation capability](../../apps/backend/src/inframeld_backend/access/application/protocols/human_oauth_credential_revoker.py) therefore takes one consent-request ID or one remembered-login ID, rather than an account or business Command. Its [Hydra adapter](../../apps/backend/src/inframeld_backend/access/infrastructure/revokers/hydra_human_oauth_credential_revoker.py) converts those typed identifiers at the SDK boundary and reports an independent outcome for each request.
+
+The application must establish the target's identity and installation binding before calling. The adapter selects no targets, opens no database transaction, persists no checklist and releases no access block. Calls use an explicit finite positive deadline. The injected SDK client must have retries and debug logging disabled, with its pool owned by the caller. A timeout or cancellation cannot stop an already running SDK thread or establish its remote result. Keep provider details out of errors and logs. Follow [the tested behavior and remaining recovery work](access-control.md#hydra-cleanup-evidence), including the distinction between individual acknowledgements and confirmation of the complete recovery target set.
 
 <a id="typed-authorization"></a>
 

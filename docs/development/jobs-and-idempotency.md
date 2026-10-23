@@ -307,6 +307,8 @@ A completed duplicate recovery event returns the original result. It must not st
 
 The implemented [local completion service](access-control.md#recovery-completion-workflow) records trusted provider outcomes in its own short transaction. It requires the original admission, checks binding and current local facts, invokes domain transitions and saves before returning the original operation identity. It calls no provider and retries nothing automatically. A released duplicate returns recorded state without another save. An unreleased repeat can reevaluate eligibility after separate restoration, using existing confirmed outcomes. This is local completion evidence, not implementation of private callback acknowledgment, remote cleanup or durable retry scheduling. Those integration and reconciliation steps remain unfinished.
 
+The implemented [Hydra revoker](access-control.md#hydra-cleanup-evidence) provides individual remote calls, not a recovery runner. Reuse the original consent-request or remembered-login ID when reconciling a lost response. A confirmed response covers only that target and cannot confirm a recovery's entire Hydra obligation without an established complete target set. The adapter performs no retries. Explicit 4xx rejection is failed evidence, while timeout, transport/server failure or an unexpected response is uncertain. Cancellation propagates and the SDK thread may still finish remotely. Keep the block until the workflow has confirmed every required target. Selecting and durably retaining those targets, bounding reconciliation and recording aggregate completion remain unfinished.
+
 <a id="project-deletion"></a>
 
 ### Continue only the project deletion that was admitted

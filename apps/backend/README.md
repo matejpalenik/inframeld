@@ -80,7 +80,7 @@ src/inframeld_backend/
 │   ├── domain/                # entities, value_objects, enums, policy_inputs, policies
 │   ├── application/           # services, protocols, dtos, value_objects
 │   ├── http/                  # routes, dependencies, responses
-│   └── infrastructure/        # readers, verifiers, rows, settings, types
+│   └── infrastructure/        # readers, revokers, verifiers, rows, settings, types
 ├── shared/
 │   ├── domain/                # errors, validation
 │   ├── application/           # errors, enums, dtos, value_objects
@@ -205,6 +205,8 @@ The development passwords and Kratos secrets are only for local Compose and must
 ### Human bearer configuration
 
 Alice's token and browser cookie must resolve to the same local account. The backend has verification adapters for both paths. The integration stack runs real Kratos and Hydra services to test that boundary. The development stack and complete first-party CLI login flow still need Hydra integration.
+
+The standalone `HydraHumanOAuthCredentialRevoker` can invalidate one consent request's token chains or remove one remembered login through the private SDK. Callers supply typed target IDs and an explicit deadline after verifying ownership and installation binding. It makes one attempt and reports confirmed, failed or uncertain cleanup. [Real-provider tests](tests/integration/access/test_hydra_credential_cleanup.py) qualify the targeted behavior, refresh denial and preservation of other/later logins. Target inventory, durable retries, production callback/bootstrap wiring and recovery-block release remain separate work. See [the Access evidence](../../docs/development/access-control.md#hydra-cleanup-evidence).
 
 When configuring the backend for a separately provisioned identity runtime, these are the supported settings:
 
