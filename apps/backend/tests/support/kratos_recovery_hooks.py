@@ -16,6 +16,29 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 RecoveryPhase = Literal["admit", "complete"]
 TEST_RECOVERY_KEY = SecretStr("inframeld-recovery-hook-test-only")
+SettingsPhase = Literal["before", "after"]
+
+
+class SettingsEventRequest(BaseModel):
+    """Observe settings identifiers separately from the production recovery envelope."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, hide_input_in_errors=True)
+
+    settings_flow_id: UUID = Field(alias="settingsFlowId")
+    identity_id: UUID = Field(alias="identityId")
+    session_id: UUID | None = Field(alias="sessionId")
+    source_recovery_flow_id: UUID | None = Field(default=None, alias="sourceRecoveryFlowId")
+    phase: SettingsPhase
+
+
+class MockSettingsPlanRequest(BaseModel):
+    pause: bool = False
+    reject_phase: SettingsPhase | None = None
+
+
+class MockSettingsSnapshotResponse(BaseModel):
+    received: list[SettingsEventRequest]
+    acknowledged: list[SettingsPhase]
 
 
 class RecoveryEventRequest(BaseModel):
@@ -62,6 +85,21 @@ class _FlowObservation:
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 _observations: dict[UUID, _FlowObservation] = {}
+
+
+def _settings_gates() -> dict[SettingsPhase, asyncio.Event]:
+    return {"before": asyncio.Event(), "after": asyncio.Event()}
+
+
+@dataclass(slots=True)
+class _SettingsObservation:
+    plan: MockSettingsPlanRequest = field(default_factory=MockSettingsPlanRequest)
+    received: list[SettingsEventRequest] = field(default_factory=list[SettingsEventRequest])
+    acknowledged: list[SettingsPhase] = field(default_factory=list[SettingsPhase])
+    gates: dict[SettingsPhase, asyncio.Event] = field(default_factory=_settings_gates)
+
+
+_settings_observations: dict[UUID, _SettingsObservation] = {}
 
 
 def _require_key(request: Request) -> None:
@@ -157,3 +195,65 @@ async def receive(phase: RecoveryPhase, event: RecoveryEventRequest, request: Re
         },
         status_code=202,
     )
+
+
+@app.put("/settings/plans/{flow_id}", status_code=204)
+async def configure_settings(
+    flow_id: UUID, plan: MockSettingsPlanRequest, request: Request
+) -> Response:
+    """Configure a settings flow before its password hooks start."""
+    _require_key(request)
+    observation = _settings_observations.setdefault(flow_id, _SettingsObservation())
+    if observation.received:
+        raise HTTPException(status_code=409, detail="The settings hooks have already started.")
+    observation.plan = plan
+    return Response(status_code=204)
+
+
+@app.get("/settings/observations/{flow_id}")
+async def settings_snapshot(flow_id: UUID, request: Request) -> MockSettingsSnapshotResponse:
+    """Return only allowlisted settings observations, without credential material."""
+    _require_key(request)
+    observation = _settings_observations.get(flow_id)
+    return MockSettingsSnapshotResponse(
+        received=list(observation.received) if observation is not None else [],
+        acknowledged=list(observation.acknowledged) if observation is not None else [],
+    )
+
+
+@app.post("/settings/plans/{flow_id}/release/{phase}", status_code=204)
+async def release_settings(flow_id: UUID, phase: SettingsPhase, request: Request) -> Response:
+    """Open one settings hook's test gate, including for an unknown flow."""
+    _require_key(request)
+    observation = _settings_observations.get(flow_id)
+    if observation is not None:
+        observation.gates[phase].set()
+    return Response(status_code=204)
+
+
+@app.post("/internal/test/password-settings/{phase}", status_code=204)
+async def receive_settings(
+    phase: SettingsPhase, event: SettingsEventRequest, request: Request
+) -> Response:
+    """Pause or reject a real settings hook without recording production completion.
+
+    Arrival is observed before the gate or failure. Acceptance proves only
+    that this in-memory test probe responded, not durable cleanup or release.
+    """
+    _require_key(request)
+    if event.phase != phase:
+        raise HTTPException(status_code=409, detail="The settings phase does not match.")
+    observation = _settings_observations.setdefault(event.settings_flow_id, _SettingsObservation())
+    observation.received.append(event)
+    if observation.plan.pause:
+        try:
+            async with asyncio.timeout(10.0):
+                await observation.gates[phase].wait()
+        except TimeoutError:
+            raise HTTPException(
+                status_code=409, detail="Settings callback was not released."
+            ) from None
+    if observation.plan.reject_phase == phase:
+        raise HTTPException(status_code=409, detail="Injected settings callback failure.")
+    observation.acknowledged.append(phase)
+    return Response(status_code=204)

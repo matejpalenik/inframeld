@@ -45,6 +45,40 @@ selfservice:
             - hook: session
     settings:
       ui_url: http://kratos:4433/settings
+      after:
+        password:
+          hooks:
+            - hook: web_hook
+              config:
+                url: http://recovery-hooks:8080/internal/test/password-settings/before
+                method: POST
+                body: file:///etc/config/kratos/test-settings-before.jsonnet
+                can_interrupt: true
+                auth:
+                  type: api_key
+                  config:
+                    name: X-Inframeld-Recovery-Key
+                    value: inframeld-recovery-hook-test-only
+                    in: header
+                response:
+                  ignore: false
+                  parse: false
+            - hook: revoke_active_sessions
+            - hook: web_hook
+              config:
+                url: http://recovery-hooks:8080/internal/test/password-settings/after
+                method: POST
+                body: file:///etc/config/kratos/test-settings-after.jsonnet
+                can_interrupt: false
+                auth:
+                  type: api_key
+                  config:
+                    name: X-Inframeld-Recovery-Key
+                    value: inframeld-recovery-hook-test-only
+                    in: header
+                response:
+                  ignore: false
+                  parse: false
     recovery:
       enabled: true
       use: code
