@@ -20,8 +20,8 @@ from tests.support.kratos_browser import (
 )
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.project_action_target_dto import (
-    ProjectActionTargetDTO,
+from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
+    ProjectActionAuthorizationRequestDTO,
 )
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
@@ -208,10 +208,11 @@ async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
     async with database.session() as session, session.begin():
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
         with pytest.raises(AccessDeniedError):
-            await authorizer.require_action(
+            await authorizer.require_authorization(
                 access=AccessContextDTO(actor_principal_id=scenario.principal_id),
-                action_id=scenario.action,
-                target=ProjectActionTargetDTO(project_id=scenario.project_id),
+                request=ProjectActionAuthorizationRequestDTO(
+                    project_id=scenario.project_id, action_id=scenario.action
+                ),
             )
 
 

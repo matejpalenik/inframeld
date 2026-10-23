@@ -75,6 +75,7 @@ from inframeld_backend.access.infrastructure.rows.project_membership_row import 
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
+from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -221,7 +222,9 @@ class GrantScenario:
         configure_problem_openapi(self.application)
         self.application.include_router(create_session_router(authenticate))
         self.application.include_router(
-            create_project_grant_router(authenticate, api_database, fingerprints)
+            create_project_grant_router(
+                authenticate, partial(open_project_grant_change, api_database, fingerprints)
+            )
         )
         self.application.add_middleware(RequestContextMiddleware)
 

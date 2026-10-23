@@ -12,8 +12,10 @@ from inframeld_backend.shared.application.value_objects.operation_id import Oper
 
 @dataclass(frozen=True, slots=True)
 class OperationReservationResultDTO:
-    """Identify the operation, replay decision, and stored deduplication deadline.
+    """Carry a low-level reservation result before its stored shape is validated.
 
+    IdempotencyService converts this persistence projection into distinct workflow
+    outcomes. Field annotations alone do not validate its state combinations.
     The deadline is absent while work remains active or needs recovery.
     """
 

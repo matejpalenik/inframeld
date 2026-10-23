@@ -1,6 +1,6 @@
 # ADR-0064: Centralize principal eligibility and keep Access aggregates focused
 
-**Status:** Accepted. Shared eligibility and linked-recovery/write coordination are implemented. The recovery aggregate still requires implementation and qualification.
+**Status:** Accepted. Grant transaction placement is partially superseded by [ADR-0065](ADR-0065-application-services-own-write-transactions.md). Shared eligibility and linked-recovery/write coordination are implemented. The recovery aggregate still requires implementation and qualification.
 
 **Date:** 2026-10-18
 
@@ -36,7 +36,7 @@ Application workflows invoke Access authorization operations. Access services co
 
 Read adapters may collect principal state, recovery, membership and exact-grant facts in one typed projection. Prefer one coherent facts query when those values decide the same attempt. Sharing SQL expression construction is allowed, but a facts reader must not instantiate another executing reader merely to fill one field. This is a responsibility rule, not a ban on multiple statements in a transaction.
 
-The caller retains transaction ownership. Grant changes acquire the shared organization lock and exclusive project lock before checking current facts and saving changes. Recovery for an already linked human acquires the conflicting exclusive organization lock. Keep bounded waits, and roll back failures. Never hold these transactions across identity-provider calls.
+At adoption, the caller assembling the grant operation retained transaction ownership. [ADR-0065](ADR-0065-application-services-own-write-transactions.md) moves this boundary into the grant application service. The adapters remain caller-transaction bound. Grant changes acquire the shared organization lock and exclusive project lock before checking current facts and saving changes. Recovery for an already linked human acquires the conflicting exclusive organization lock. Keep bounded waits, and roll back failures. Never hold these transactions across identity-provider calls.
 
 Preserve the visibility-before-authority distinction, including 404 for hidden projects and 403 for visible projects denied by recovery or missing authority. Missing installation metadata or unavailable dependencies cannot become an absent block. Replays require current authorization. Authentication deadlines, cookie protection, application eligibility and exact-target grants remain unchanged.
 

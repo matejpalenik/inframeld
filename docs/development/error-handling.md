@@ -15,6 +15,7 @@ The feature examples are illustrative. They do not claim that these business ope
 | When should I catch a failure? | [The rule](#1-the-rule-to-remember) |
 | Which exception fits? | [Selection table](#2-which-error-should-i-use) |
 | How does this look in a feature? | [Examples](#3-everyday-examples) |
+| How do domain errors become stable application failures? | [Domain error mapping](#stable-domain-error-mapping) |
 | When is a new exception justified? | [New exceptions](#4-when-should-i-create-a-new-exception) |
 | What does a client receive? | [HTTP behavior](#5-what-the-http-client-receives) |
 | How will incoming credentials fail? | [Accepted authentication contract](#authentication-contract) |
@@ -122,6 +123,16 @@ await deployments.save(deployment)
 Keep loading and saving outside this catch. An invalid state found while loading stored data may indicate corruption or a bug, which is different from rejecting Alice's requested rollback. **Domain errors do not all map to HTTP 409.**
 
 A use case can also document and directly expose a specific domain error. It need not add a wrapper solely to match a layer diagram.
+
+<a id="stable-domain-error-mapping"></a>
+
+#### Keep translated application messages stable
+
+When a service translates a recognized domain rejection, it owns the application error type and message. Do not use `ConflictError(str(error))` or another wrapper that copies arbitrary domain exception text. Domain wording can change independently of the application's failure contract. Preserve the original exception with `raise ... from error` for controlled diagnostics. The transport's shared handler still owns the safe response fields and does not expose exception messages or chained causes by default.
+
+The implemented [`ProjectGrantChangeService.assign_use_only()`](../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) catches `ProjectGrantAlreadyExistsError` only around the membership's assignment method. It raises `ConflictError("This project action grant already exists.")` with the original error as its cause. Loading, persistence, audit and completion failures remain outside that catch and propagate to the transaction owner.
+
+The [grant service regression test](../../apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py) named `test_duplicate_conflict_message_is_independent_of_domain_wording` injects different domain wording. It checks the exact application message, preserved cause, absence of saving/completion and rollback. When adding a similar translation, test its application meaning and failure effects. Do not make all domain errors conflicts or catch every exception to produce one convenient message. The [service-writing guide](application-structure.md#service-writing-guide) places this boundary in the complete operation.
 
 ### C. Translate a known provider failure in its adapter
 

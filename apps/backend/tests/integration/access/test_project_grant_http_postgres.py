@@ -52,6 +52,7 @@ from inframeld_backend.access.infrastructure.rows.project_membership_row import 
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
+from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
 )
@@ -106,7 +107,11 @@ def _test_app(database: Database, actor_id: PrincipalId) -> FastAPI:
     fingerprints = ProjectGrantChangeFingerprintService(
         RequestFingerprintService(RequestFingerprintKey(b"K" * 32))
     )
-    application.include_router(create_project_grant_router(authenticate, database, fingerprints))
+    application.include_router(
+        create_project_grant_router(
+            authenticate, partial(open_project_grant_change, database, fingerprints)
+        )
+    )
     application.add_middleware(RequestContextMiddleware)
     return application
 

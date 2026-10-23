@@ -1,30 +1,31 @@
-"""Define the application operation used to require current project authority."""
-
-from abc import abstractmethod
 from typing import Protocol
 
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.project_action_target_dto import (
-    ProjectActionTargetDTO,
+from inframeld_backend.access.application.dtos.project_action_authorization_dto import (
+    ProjectActionAuthorizationDTO,
 )
-from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
+from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
+    ProjectActionAuthorizationRequestDTO,
+)
+from inframeld_backend.access.application.protocols.authorizer import Authorizer
 
 
-class ActionAuthorizer(Protocol):
-    """Require current visibility and an exact action grant on a project."""
+class ActionAuthorizer(
+    Authorizer[ProjectActionAuthorizationRequestDTO, ProjectActionAuthorizationDTO],
+    Protocol,
+):
+    """Check permission to perform one named action in one project.
 
-    @abstractmethod
-    async def require_action(
-        self, *, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
-    ) -> OrganizationId:
-        """Read current facts and deny hidden targets with ResourceNotFoundError.
+    For example, Alice creating access groups in Support needs that exact
+    action's use permission. Project membership alone does not permit the action.
+    Check her current account status, recovery block, membership and action grant.
 
-        Raise `AccessDeniedError` for visible targets lacking authority. Grant
-        decisions are never cached on the caller's authentication context.
-        Success returns the matched project's organization for this authorized
-        attempt. It grants no future authority after the caller's state changes.
-        The caller owns the surrounding transaction; this operation does not
-        open a transaction, commit changes, or provision permissions.
-        """
-        ...
+    The inherited `require_authorization()` accepts the project's ID and the
+    action selected by the trusted workflow. Return the matched organization
+    and exact project. The caller checks that project against its requested
+    target before using the scope for further work.
+
+    Report an unavailable or hidden project with `ResourceNotFoundError` before
+    checking action permission. On a visible project, failed eligibility or a
+    missing use grant raises `AccessDeniedError`. Performing an action does not
+    establish permission to grant it to someone else.
+    """

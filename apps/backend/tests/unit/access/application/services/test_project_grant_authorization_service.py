@@ -11,6 +11,9 @@ from inframeld_backend.access.application.dtos.project_grant_authorization_dto i
 from inframeld_backend.access.application.dtos.project_grant_change_facts_dto import (
     ProjectGrantChangeFactsDTO,
 )
+from inframeld_backend.access.application.dtos.project_use_only_grant_authorization_request_dto import (
+    ProjectUseOnlyGrantAuthorizationRequestDTO,
+)
 from inframeld_backend.access.application.protocols.project_grant_change_facts_reader import (
     ProjectGrantChangeFactsReader,
 )
@@ -105,15 +108,16 @@ async def test_returns_current_scope_and_revision() -> None:
     reader = MockProjectGrantChangeFactsReader(FACTS)
     service = ProjectGrantAuthorizationService(reader)
 
-    result = await service.require_use_only_assignment(
+    result = await service.require_authorization(
         access=ACCESS,
-        project_id=PROJECT_ID,
-        recipient_principal_id=RECIPIENT.id,
-        action_id=ACTION_ID,
+        request=ProjectUseOnlyGrantAuthorizationRequestDTO(
+            project_id=PROJECT_ID, recipient_principal_id=RECIPIENT.id, action_id=ACTION_ID
+        ),
     )
 
     assert result == ProjectGrantAuthorizationDTO(
         organization_id=ORGANIZATION_ID,
+        project_id=PROJECT_ID,
         project_access_revision=7,
     )
     assert reader.last_request == (
@@ -264,9 +268,9 @@ async def test_rejects_assignment_with_the_required_error(
     service = ProjectGrantAuthorizationService(MockProjectGrantChangeFactsReader(facts))
 
     with pytest.raises(expected_error):
-        await service.require_use_only_assignment(
+        await service.require_authorization(
             access=ACCESS,
-            project_id=PROJECT_ID,
-            recipient_principal_id=RECIPIENT.id,
-            action_id=ACTION_ID,
+            request=ProjectUseOnlyGrantAuthorizationRequestDTO(
+                project_id=PROJECT_ID, recipient_principal_id=RECIPIENT.id, action_id=ACTION_ID
+            ),
         )

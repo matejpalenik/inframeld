@@ -5,6 +5,9 @@ from typing import Literal
 
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.application.value_objects.request_fingerprint import (
+    RequestFingerprint,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,4 +18,4 @@ class ProjectOperationAdmissionRequestDTO:
     method: Literal["POST", "PUT", "PATCH", "DELETE"]
     requested_route: str
     key: IdempotencyKey
-    fingerprint: bytes
+    fingerprint: RequestFingerprint

@@ -1,0 +1,2 @@
+class ProjectGrantAlreadyExistsError(Exception):
+    pass

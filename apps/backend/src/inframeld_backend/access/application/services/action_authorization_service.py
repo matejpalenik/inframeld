@@ -1,6 +1,12 @@
 from typing import override
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.project_action_authorization_dto import (
+    ProjectActionAuthorizationDTO,
+)
+from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
+    ProjectActionAuthorizationRequestDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
 )
@@ -17,8 +23,6 @@ from inframeld_backend.access.domain.policies.project_visibility_policy import (
 from inframeld_backend.access.domain.policy_inputs.action_authorization_policy_input import (
     ActionAuthorizationPolicyInput,
 )
-from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ResourceNotFoundError,
@@ -26,17 +30,17 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class ActionAuthorizationService(ActionAuthorizer):
-    """Hide unavailable projects, then require current eligibility and action authority."""
-
     def __init__(self, facts_reader: ProjectActionFactsReader) -> None:
         self._facts_reader = facts_reader
 
     @override
-    async def require_action(
-        self, *, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
-    ) -> OrganizationId:
+    async def require_authorization(
+        self, *, access: AccessContextDTO, request: ProjectActionAuthorizationRequestDTO
+    ) -> ProjectActionAuthorizationDTO:
         facts = await self._facts_reader.read_action_facts(
-            access=access, action_id=action_id, target=target
+            access=access,
+            action_id=request.action_id,
+            target=ProjectActionTargetDTO(project_id=request.project_id),
         )
 
         if facts is None or not ProjectVisibilityPolicy.may_view_project(
@@ -55,4 +59,7 @@ class ActionAuthorizationService(ActionAuthorizer):
         if not ActionAuthorizationPolicy.may_perform_action(policy_input):
             raise AccessDeniedError()
 
-        return facts.principal_access.principal.organization_id
+        return ProjectActionAuthorizationDTO(
+            organization_id=facts.principal_access.principal.organization_id,
+            project_id=request.project_id,
+        )

@@ -190,14 +190,15 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     Alice->>HTTP: POST grant with key K and expected revision 0
-    HTTP->>HTTP: Authenticate, validate one key, check CSRF, fingerprint input
-    HTTP->>DB: Begin transaction
+    HTTP->>HTTP: Authenticate, validate one key, check CSRF, map Command
     HTTP->>Service: Assign use-only grant
+    Service->>Service: Compute the unchanged keyed fingerprint
+    Service->>DB: Begin transaction
     Service->>DB: Read current actor, recipient, and project facts
     Service->>Service: Check current Access policies
     alt Caller no longer allowed
+        Service->>DB: Roll back
         Service-->>HTTP: Deny or hide project
-        HTTP->>DB: Roll back
         HTTP-->>Alice: 403 or 404, no replay
     else Caller allowed
         Service->>DB: Reserve principal, organization/project, method, route, K, and fingerprint
@@ -206,28 +207,75 @@ sequenceDiagram
             DB-->>Service: New operation O
             Service->>Service: Compare expected and current revision
             alt Revision stale
+                Service->>DB: Roll back new reservation
                 Service-->>HTTP: Stale revision
-                HTTP->>DB: Roll back new reservation
                 HTTP-->>Alice: 409 stale_revision
             else Revision current
                 Service->>DB: Save grant, revision, and audit
                 Service->>DB: Mark O replayable and store expiry
-                HTTP->>DB: Commit all changes
+                Service->>DB: Commit all changes
+                Service-->>HTTP: Completed operation and expiry
                 HTTP-->>Alice: 201 with O and idempotencyExpiresAt
             end
         else Existing key with changed fingerprint
             DB-->>Service: Request meaning differs
-            HTTP->>DB: Roll back
+            Service->>DB: Roll back
             HTTP-->>Alice: 409 idempotency_key_reused
         else Existing key with same fingerprint and safe result
             DB-->>Service: Original O and expiry
-            HTTP->>DB: Commit without another grant change
+            Service->>DB: Commit without another grant change
+            Service-->>HTTP: Original completed operation and expiry
             HTTP-->>Alice: 201 with original O and expiry
         end
     end
 ```
 
 For example, if Carol is also an eligible project member, changing Bob to Carol while keeping `grant-bob-1` conflicts. Losing permission blocks a replay before the saved result is returned. Once completed history expires, the same key is treated as a new request. Alice's old expected revision would then fail the grant's revision check. Expiry limits duplicate detection, not the lifetime of Bob's grant.
+
+The [grant application service](application-structure.md#grant-command-flow) computes the fingerprint from its Command and owns the transaction. `IdempotencyService`, implementing `OperationIdempotency`, validates reservation state through the existing writer. It does not authorize, commit, cache arbitrary business results or reconstruct responses.
+
+<a id="reservation-inputs"></a>
+
+### Supply retry metadata and trusted scope
+
+Alice's Command names the project and the grant she wants to assign. Her verified caller identity and current authorized scope come from separate checks. Pass these existing objects to [`OperationIdempotency.find_or_reserve()`](../../apps/backend/src/inframeld_backend/shared/application/protocols/operation_idempotency.py). All five arguments are required and keyword-only:
+
+| Argument | Source and meaning |
+| --- | --- |
+| `context: OperationAdmissionContextDTO` | Retry key, method and canonical route from the entry point. It carries no authority. |
+| `access: AccessContextDTO` | Authenticated actor identity, rather than the grant recipient. |
+| `authorization: AuthorizedOperationScope[ProjectScope]` | Organization and project scope established by current authorization. Project results use `ProjectId`. Organization-scoped results supply `None`. |
+| `fingerprint: RequestFingerprint` | Immutable 32-byte digest already computed by the owning workflow. |
+| `expected_replay_kind: OperationReplayKind` | Replay category required by the owning operation. |
+
+[`IdempotencyService`](../../apps/backend/src/inframeld_backend/shared/application/services/idempotency_service.py) constructs `OperationReservationRequestDTO` at the reservation-writer boundary. It reads the actor from access, both scope IDs from authorization, retry metadata from context and digest bytes from `fingerprint.value`. It copies these values exactly, without normalization, scope inference or fingerprint recomputation. The Command is not an idempotency input.
+
+`AuthorizedOperationScope` is a field-based Protocol parameterized by the project type. This keeps a project-specific DTO's `project_id: ProjectId` precise while allowing organization scope through the same generic method. Concrete DTOs explicitly implement the interface and declare their own fields. Frozen records remain immutable, but the Protocol itself does not express read-only access. Neither interface conformance nor a typed fingerprint proves permission. Authorize current state first on every attempt, including replay.
+
+The grant workflow first verifies that authorization returned the project requested by its Command. It does this before lookup on every attempt, including replay. A mismatch is an internal runtime error and rolls back, without returning a saved response or making a reservation. After matching, it takes scope from authorization for both reservation and membership repository loading. The Command stays unchanged and continues supplying the requested grant details. The grant workflow passes its context directly and owns the transaction. The admission-only helper retains its public request input and caller-owned transaction. It calls the action family with `ProjectActionAuthorizationRequestDTO`, then checks that the returned project matches its input before any idempotency lookup or replay. A mismatch raises an internal runtime error, leaving rollback to the caller. After matching it converts the input's method, route and key into the admission context. Both consumers share mapping and outcome validation. [ADR-0066](../adr/ADR-0066-use-typed-operation-contexts-and-command-classification.md) records the idempotency inputs. [ADR-0067](../adr/ADR-0067-standardize-authorization-capabilities-with-typed-requests.md) standardizes `require_authorization(access, request)` across the two permission families. Authorization requests remain separate from retry metadata, fingerprints and expected revisions. Neither convention introduces a dispatcher.
+
+For new grant work, the service checks the expected project revision, loads the recipient's existing membership in authorization scope, validates the returned target, invokes its domain assignment and saves through `ProjectMembershipRepository`. It passes the original operation ID for audit correlation and the checked project-wide revision for persistence. Replays return before this load, so they cannot add another grant, revision or audit. Required completion metadata still commits in the same application-owned transaction. The repository's private value snapshots live only for that transaction and are discarded after failure or transaction end. [ADR-0068](../adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md) changes the grant persistence boundary without changing retry identity, fingerprints, expiry or outcome validation.
+
+<a id="workflow-outcomes"></a>
+
+### Use distinct workflow outcomes
+
+Alice's first request receives a new reservation and may change the grant. Her retry receives completed metadata and must not make that change again. Application services distinguish those paths by their result types:
+
+| Outcome | What the owning workflow may do |
+| --- | --- |
+| `NewOperationReservationDTO` | Execute newly reserved work using its operation ID. |
+| `CompletedSynchronousOperationDTO` | Return the recorded synchronous outcome. It carries the operation ID, recognized non-asynchronous replay kind and required stored expiry. |
+| `AcceptedAsyncOperationDTO` | Report acceptance of the original asynchronous operation. Preserve its optional stored expiry. Acceptance does not prove successful background execution. |
+| `RecoveryRequiredOperationDTO` | Handle uncertainty about the original operation. Its ID is preserved and work must not restart automatically. |
+
+Completed and accepted outcomes include `created` to distinguish first completion or acceptance from replay. Newness and recovery are represented by their own classes. These records carry operation metadata, not permission. Every attempt still checks current authorization before looking up a reservation.
+
+The low-level writer retains `OperationReservationResultDTO` as its storage projection. `IdempotencyService` is the conversion boundary. A new reservation must have the in-progress shape without completion metadata. Existing in-progress work raises the same error with the original operation ID and three-second retry advice. Recovery-required work cannot carry completion metadata. Completed work must match the caller's required `expected_replay_kind`. Synchronous completion requires a stored expiry, while asynchronous acceptance preserves its optional expiry. Malformed or incompatible results raise the existing conflict error.
+
+Only a `NewOperationReservationDTO` can be passed to `record_completed_result()`. The owner saves its effects first in the same transaction. Completion returns either synchronous completed metadata or asynchronous acceptance. For the grant command, recovery-required or unexpected asynchronous outcomes conflict before commit. An authorized synchronous replay returns without another grant, revision increment or audit event.
+
+`ProjectOperationAdmissionService` is a second consumer of the same idempotency operation. It first authorizes the action, derives the organization and principal scope, then delegates with the caller's expected replay kind. Its caller continues owning the transaction. [PostgreSQL admission tests](../../apps/backend/tests/integration/idempotency/test_authorized_replay_postgres.py) exercise replay metadata and rollback through the real reservation adapter. This verifies shared retry decisions, not another complete product command or job lifecycle.
 
 The grant route exercises the safe-result path. The in-progress, asynchronous `202`, uncertain, issued-secret, and answer-receipt outcomes above retain their separate contracts. Their owning workflows still need implementation where noted.
 

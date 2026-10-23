@@ -128,6 +128,18 @@ Equality and hashing follow `PrincipalId`, so snapshots of one account remain th
 
 For component responsibilities and conversion examples, use [application conventions](application-structure.md#component-conventions). For HTTP outcomes and verification scope, use [the implemented authentication boundary](access-control.md#implemented-human-authentication).
 
+<a id="project-membership-aggregate"></a>
+
+### Implemented project membership aggregate
+
+`ProjectMembership` is an in-memory Access aggregate with identity `(project_id, principal_id)`. It holds read-only organization/principal-kind metadata and the complete collection of that member's direct project grants. It adds no table or synthetic membership ID. Group membership, group-derived grants and cross-member lifecycle behavior are outside this collection.
+
+Each immutable `ProjectActionGrant` child is identified by project, recipient and action. `ProjectGrantLevel` expresses `USE_ONLY` or `USE_AND_GRANT` in the domain. Infrastructure converts these to/from the existing `project_action_grants.can_grant` boolean. Nullable historical attribution remains valid, while new use-only assignments require an assigning principal. Duplicate assignment at either level is rejected without replacing the old grant. Applications cannot hold delegation rights.
+
+The specific repository reconstitutes this model from `project_memberships` and all matching direct `project_action_grants` rows with one scoped typed outer join. Its private infrastructure snapshots compare complete values independently of entity identity. Loaded instances and snapshots belong to one active transaction, are never cached across requests, and must be discarded after a failed save or transaction end.
+
+The supported delta is attributed use-only additions. An unchanged save does no writes. Additions preserve existing grant values, attribution and database-generated timestamps, conditionally increment the existing project-wide access revision once, and append required audit with the original operation ID. No membership version, new grant ID or schema migration is introduced. Authorization readers retain current eligibility/delegation checks and existing locks. [ADR-0068](../adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md) owns the aggregate decision, and [application structure](application-structure.md#membership-aggregate-and-repository) owns transaction/snapshot behavior. Membership provisioning, updates/revocation and cross-member lifecycle operations remain deferred.
+
 <a id="principal-eligibility-inputs"></a>
 
 ### Temporary principal eligibility inputs
@@ -139,6 +151,33 @@ Alice may remain an active principal while an unreleased recovery obligation blo
 The data loader must establish the exact principal, organization and authoritative installation context. Recovery is matched through stored authority/subject links, with any unreleased matching obligation counting as pending. A later local link must respect an obligation recorded before principal admission. Missing installation metadata is a dependency failure, not proof that there is no block. Project membership, action grants and caller-kind restrictions remain additional facts and rules.
 
 These observations do not authorize a later transaction or retry. Authorization operations load current facts again under the applicable coordination contract. [Access](access-control.md#shared-principal-eligibility) owns behavior and verification evidence, and [application structure](application-structure.md#shared-access-eligibility) owns component responsibilities. The shared input and policy are implemented runtime components and add no persisted records.
+
+### Temporary authorization requests
+
+`ProjectActionAuthorizationRequestDTO` carries a project ID and the action required by a trusted application workflow. `ProjectUseOnlyGrantAuthorizationRequestDTO` carries project ID, recipient principal ID and the action being delegated. Both are Access-owned frozen, slotted application records. They contain no expected revision, retry metadata or fingerprint, and do not inherit business Commands. Field annotations do not establish existence or permission.
+
+`ActionAuthorizer` and `ProjectGrantAuthorizer` specialize `Authorizer[RequestType, ResultType]` with these requests and their existing authorization results. They load current facts and apply their own policies. Both the complete grant workflow and admission helper check returned project scope before idempotency lookup. The grant service owns its transaction, while the helper remains caller-transaction bound. These request records add no persisted state. [ADR-0067](../adr/ADR-0067-standardize-authorization-capabilities-with-typed-requests.md) records the convention and its limits.
+
+### Temporary grant operation inputs
+
+`AssignProjectUseOnlyGrantCommand` carries project ID, recipient principal ID, action ID and expected access revision. It requires a whole-number revision of zero or greater and rejects booleans. It does not establish current authority or resource existence. `OperationAdmissionContextDTO` separately carries the idempotency key, method and canonical route. The application service computes the fingerprint from the Command before opening the transaction. Inside that transaction, current authorization of the authenticated principal establishes both organization and project scope. `ProjectActionAuthorizationDTO` carries those two IDs. `ProjectGrantAuthorizationDTO` also carries the current project access revision. Both explicitly implement `AuthorizedOperationScope[ProjectId]` and declare required fields. The generic scope interface also permits organization-scoped work with `project_id=None`. These are observations for the current transaction, not authorization certificates.
+
+`RequestFingerprint` wraps the existing immutable 32-byte HMAC digest, rejects other byte lengths and hides the digest from its representation. `IdempotencyService` unwraps the same bytes at the reservation boundary. The nominal `Command` base and required-field `ProjectCommand` interface add no stored state or execution. [ADR-0066](../adr/ADR-0066-use-typed-operation-contexts-and-command-classification.md) records these input contracts.
+
+These records add no tables or persisted flags. Existing grant, audit and idempotency records retain their schema and values. The [implemented grant chain](application-structure.md#grant-command-flow) and [ADR-0065](../adr/ADR-0065-application-services-own-write-transactions.md) own orchestration and transaction placement.
+
+### Temporary operation outcomes
+
+`OperationReservationResultDTO` is the low-level reservation adapter's projection. It retains the stored state, optional replay kind and optional expiry. Those fields alone do not establish a valid workflow outcome. `IdempotencyService` validates their combination before constructing one of four frozen, slotted application records:
+
+| Record | Fields and meaning |
+| --- | --- |
+| `NewOperationReservationDTO` | `operation_id` for newly reserved work. |
+| `CompletedSynchronousOperationDTO` | `operation_id`, `created`, a synchronous `replay_kind` and required `expires_at`. |
+| `AcceptedAsyncOperationDTO` | `operation_id`, `created` and optional `expires_at`. Asynchronous acceptance is implicit in the type. |
+| `RecoveryRequiredOperationDTO` | Original `operation_id` for work requiring recovery. |
+
+For completed and accepted records, `created` distinguishes first completion or acceptance from a saved replay. These records describe operation metadata for this attempt. They are not persisted records or authorization certificates, and add no schema or stored flags. [Jobs and idempotency](jobs-and-idempotency.md#workflow-outcomes) owns conversion failures, retry behavior and the admission helper's shared dependency.
 
 ### Keep identity and credential lifecycles separate
 
@@ -974,7 +1013,7 @@ A successful generation call does not validate embeddings, every model on its co
 
 Migration [0002](../../apps/backend/migrations/versions/0002_idempotency_reservations.py) implements `idempotency_reservations`. Each row stores an opaque `operation_id`, stable `principal_id`, `organization_id`, optional `project_id`, HTTP `method`, logical `requested_route`, `request_key`, binary `request_fingerprint`, `state`, optional `replay_kind`, and creation and expiry times. A unique constraint covers principal, organization, project, method, route, and key, treating an absent project as one shared scope. A completed row classifies the safe replay outcome; it does not store an HTTP response body or plaintext secret.
 
-The owning command saves its accepted change and required audit in the same transaction as the reservation. The implemented project grant command follows this rule; other outcome kinds await their owning workflows. Fingerprints of secret-bearing requests use a separate protected HMAC key. [Jobs](jobs-and-idempotency.md) owns replay and retention.
+The owning command saves its accepted change and required audit in the same transaction as the reservation. The implemented project grant command follows this rule. The admission helper also exercises shared outcome conversion, while other outcome kinds await their complete owning workflows. Fingerprints of secret-bearing requests use a separate protected HMAC key. [Jobs](jobs-and-idempotency.md) owns replay and retention.
 
 ### Maintainer checks
 

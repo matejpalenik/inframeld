@@ -7,6 +7,9 @@ import pytest
 from tests.support.access_scenarios import MockAccessScenarios
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
+    ProjectActionAuthorizationRequestDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
 )
@@ -43,15 +46,15 @@ async def test_allows_member_with_exact_project_action_grant(database: Database)
         )
 
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
-        authorized_organization_id = await authorizer.require_action(
+        authorization = await authorizer.require_authorization(
             access=AccessContextDTO(actor_principal_id=scenario.principal_id),
-            action_id=scenario.action,
-            target=ProjectActionTargetDTO(
-                project_id=scenario.project_id,
+            request=ProjectActionAuthorizationRequestDTO(
+                project_id=scenario.project_id, action_id=scenario.action
             ),
         )
 
-    assert authorized_organization_id == scenario.organization_id
+    assert authorization.organization_id == scenario.organization_id
+    assert authorization.project_id == scenario.project_id
 
 
 @pytest.mark.asyncio
@@ -69,10 +72,11 @@ async def test_hides_project_from_active_nonmember(database: Database) -> None:
         target = ProjectActionTargetDTO(project_id=scenario.project_id)
 
         with pytest.raises(ResourceNotFoundError):
-            await authorizer.require_action(
+            await authorizer.require_authorization(
                 access=access,
-                action_id=scenario.action,
-                target=target,
+                request=ProjectActionAuthorizationRequestDTO(
+                    project_id=target.project_id, action_id=scenario.action
+                ),
             )
 
         facts = await reader.read_action_facts(
@@ -104,11 +108,10 @@ async def test_denies_project_member_without_exact_action_grant(database: Databa
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
 
         with pytest.raises(AccessDeniedError):
-            await authorizer.require_action(
+            await authorizer.require_authorization(
                 access=AccessContextDTO(actor_principal_id=scenario.principal_id),
-                action_id=scenario.action,
-                target=ProjectActionTargetDTO(
-                    project_id=scenario.project_id,
+                request=ProjectActionAuthorizationRequestDTO(
+                    project_id=scenario.project_id, action_id=scenario.action
                 ),
             )
 
@@ -128,11 +131,10 @@ async def test_hides_suspended_project_member_even_with_an_action_grant(
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
 
         with pytest.raises(ResourceNotFoundError):
-            await authorizer.require_action(
+            await authorizer.require_authorization(
                 access=AccessContextDTO(actor_principal_id=scenario.principal_id),
-                action_id=scenario.action,
-                target=ProjectActionTargetDTO(
-                    project_id=scenario.project_id,
+                request=ProjectActionAuthorizationRequestDTO(
+                    project_id=scenario.project_id, action_id=scenario.action
                 ),
             )
 
@@ -145,20 +147,18 @@ async def test_project_action_grant_does_not_carry_to_another_project(database: 
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
         access = AccessContextDTO(actor_principal_id=scenario.principal_id)
 
-        await authorizer.require_action(
+        await authorizer.require_authorization(
             access=access,
-            action_id=scenario.action,
-            target=ProjectActionTargetDTO(
-                project_id=scenario.granted_project_id,
+            request=ProjectActionAuthorizationRequestDTO(
+                project_id=scenario.granted_project_id, action_id=scenario.action
             ),
         )
 
         with pytest.raises(AccessDeniedError):
-            await authorizer.require_action(
+            await authorizer.require_authorization(
                 access=access,
-                action_id=scenario.action,
-                target=ProjectActionTargetDTO(
-                    project_id=scenario.ungranted_project_id,
+                request=ProjectActionAuthorizationRequestDTO(
+                    project_id=scenario.ungranted_project_id, action_id=scenario.action
                 ),
             )
 
@@ -177,11 +177,10 @@ async def test_allows_application_principal_with_its_exact_project_action_grant(
         )
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
 
-        await authorizer.require_action(
+        await authorizer.require_authorization(
             access=AccessContextDTO(actor_principal_id=scenario.principal_id),
-            action_id=scenario.action,
-            target=ProjectActionTargetDTO(
-                project_id=scenario.project_id,
+            request=ProjectActionAuthorizationRequestDTO(
+                project_id=scenario.project_id, action_id=scenario.action
             ),
         )
 
@@ -208,10 +207,11 @@ async def test_missing_project_returns_no_facts_and_is_hidden(database: Database
         assert facts is None
 
         with pytest.raises(ResourceNotFoundError):
-            await ActionAuthorizationService(reader).require_action(
+            await ActionAuthorizationService(reader).require_authorization(
                 access=access,
-                action_id=caller.action,
-                target=target,
+                request=ProjectActionAuthorizationRequestDTO(
+                    project_id=target.project_id, action_id=caller.action
+                ),
             )
 
 
@@ -242,8 +242,9 @@ async def test_another_organizations_project_is_hidden(database: Database) -> No
         assert facts is None
 
         with pytest.raises(ResourceNotFoundError):
-            await ActionAuthorizationService(reader).require_action(
+            await ActionAuthorizationService(reader).require_authorization(
                 access=access,
-                action_id=caller.action,
-                target=target,
+                request=ProjectActionAuthorizationRequestDTO(
+                    project_id=target.project_id, action_id=caller.action
+                ),
             )

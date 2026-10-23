@@ -20,7 +20,9 @@ def test_produces_the_reviewed_hmac_sha256_fingerprint() -> None:
         canonical_request=CANONICAL_REQUEST,
     )
 
-    assert fingerprint.hex() == ("1cb17af4d9a31b49205c08abdd1772242d8986bcea859af4d6aedd2f3c36aa60")
+    assert fingerprint.value.hex() == (
+        "1cb17af4d9a31b49205c08abdd1772242d8986bcea859af4d6aedd2f3c36aa60"
+    )
 
 
 def test_same_request_has_the_same_fingerprint() -> None:

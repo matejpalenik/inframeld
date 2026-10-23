@@ -4,6 +4,9 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_grant_authorization_dto import (
     ProjectGrantAuthorizationDTO,
 )
+from inframeld_backend.access.application.dtos.project_use_only_grant_authorization_request_dto import (
+    ProjectUseOnlyGrantAuthorizationRequestDTO,
+)
 from inframeld_backend.access.application.protocols.project_grant_authorizer import (
     ProjectGrantAuthorizer,
 )
@@ -16,9 +19,6 @@ from inframeld_backend.access.domain.policies.project_grant_delegation_policy im
 from inframeld_backend.access.domain.policies.project_visibility_policy import (
     ProjectVisibilityPolicy,
 )
-from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
-from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ResourceNotFoundError,
@@ -26,25 +26,18 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class ProjectGrantAuthorizationService(ProjectGrantAuthorizer):
-    """Coordinate current grant facts, project visibility and delegation policy."""
-
     def __init__(self, facts_reader: ProjectGrantChangeFactsReader) -> None:
         self._facts_reader = facts_reader
 
     @override
-    async def require_use_only_assignment(
-        self,
-        *,
-        access: AccessContextDTO,
-        project_id: ProjectId,
-        recipient_principal_id: PrincipalId,
-        action_id: ActionId,
+    async def require_authorization(
+        self, *, access: AccessContextDTO, request: ProjectUseOnlyGrantAuthorizationRequestDTO
     ) -> ProjectGrantAuthorizationDTO:
         facts = await self._facts_reader.read_for_change(
             access=access,
-            project_id=project_id,
-            recipient_principal_id=recipient_principal_id,
-            action_id=action_id,
+            project_id=request.project_id,
+            recipient_principal_id=request.recipient_principal_id,
+            action_id=request.action_id,
         )
 
         if facts is None or not ProjectVisibilityPolicy.may_view_project(
@@ -75,5 +68,6 @@ class ProjectGrantAuthorizationService(ProjectGrantAuthorizer):
 
         return ProjectGrantAuthorizationDTO(
             organization_id=facts.actor_access.principal.organization_id,
+            project_id=request.project_id,
             project_access_revision=facts.project_access_revision,
         )

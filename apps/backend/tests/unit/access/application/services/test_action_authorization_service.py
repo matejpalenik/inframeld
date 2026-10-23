@@ -7,6 +7,12 @@ from uuid import UUID
 import pytest
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.project_action_authorization_dto import (
+    ProjectActionAuthorizationDTO,
+)
+from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
+    ProjectActionAuthorizationRequestDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
@@ -78,11 +84,14 @@ async def test_allows_current_member_with_exact_grant() -> None:
     """Admit eligible callers using facts for the exact actor, action, and project."""
     reader = MockProjectActionFactsReader(ALLOWED_FACTS)
 
-    authorized_organization_id = await ActionAuthorizationService(reader).require_action(
-        access=ACCESS, action_id=ACTION, target=TARGET
+    authorization = await ActionAuthorizationService(reader).require_authorization(
+        access=ACCESS,
+        request=ProjectActionAuthorizationRequestDTO(
+            project_id=TARGET.project_id, action_id=ACTION
+        ),
     )
 
-    assert authorized_organization_id == ORGANIZATION_ID
+    assert authorization == ProjectActionAuthorizationDTO(ORGANIZATION_ID, TARGET.project_id)
     assert reader.last_request == (ACCESS, ACTION, TARGET)
 
 
@@ -92,8 +101,11 @@ async def test_visible_project_without_grant_is_forbidden() -> None:
     reader = MockProjectActionFactsReader(replace(ALLOWED_FACTS, has_exact_action_grant=False))
 
     with pytest.raises(AccessDeniedError):
-        await ActionAuthorizationService(reader).require_action(
-            access=ACCESS, action_id=ACTION, target=TARGET
+        await ActionAuthorizationService(reader).require_authorization(
+            access=ACCESS,
+            request=ProjectActionAuthorizationRequestDTO(
+                project_id=TARGET.project_id, action_id=ACTION
+            ),
         )
 
 
@@ -133,8 +145,11 @@ async def test_hidden_project_is_not_found_even_with_a_grant(
     reader = MockProjectActionFactsReader(facts)
 
     with pytest.raises(ResourceNotFoundError):
-        await ActionAuthorizationService(reader).require_action(
-            access=ACCESS, action_id=ACTION, target=TARGET
+        await ActionAuthorizationService(reader).require_authorization(
+            access=ACCESS,
+            request=ProjectActionAuthorizationRequestDTO(
+                project_id=TARGET.project_id, action_id=ACTION
+            ),
         )
 
 
@@ -151,8 +166,11 @@ async def test_recovery_blocks_an_action_on_a_visible_project() -> None:
     reader = MockProjectActionFactsReader(facts)
 
     with pytest.raises(AccessDeniedError):
-        await ActionAuthorizationService(reader).require_action(
-            access=ACCESS, action_id=ACTION, target=TARGET
+        await ActionAuthorizationService(reader).require_authorization(
+            access=ACCESS,
+            request=ProjectActionAuthorizationRequestDTO(
+                project_id=TARGET.project_id, action_id=ACTION
+            ),
         )
 
 
@@ -170,6 +188,9 @@ async def test_recovery_does_not_disclose_a_hidden_project() -> None:
     reader = MockProjectActionFactsReader(facts)
 
     with pytest.raises(ResourceNotFoundError):
-        await ActionAuthorizationService(reader).require_action(
-            access=ACCESS, action_id=ACTION, target=TARGET
+        await ActionAuthorizationService(reader).require_authorization(
+            access=ACCESS,
+            request=ProjectActionAuthorizationRequestDTO(
+                project_id=TARGET.project_id, action_id=ACTION
+            ),
         )
