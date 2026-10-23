@@ -1,35 +1,30 @@
 from abc import abstractmethod
 from typing import Protocol
 
-from inframeld_backend.access.application.value_objects.oauth_consent_request_id import (
-    OAuthConsentRequestId,
-)
-from inframeld_backend.access.application.value_objects.oauth_login_session_id import (
-    OAuthLoginSessionId,
-)
 from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
     IdentityRecoveryCleanupState,
 )
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 
 
 class HumanOAuthCredentialRevoker(Protocol):
-    """Remove individual OAuth credentials selected by a trusted cleanup workflow.
+    """Remove a recovering human's CLI grants and remembered OAuth logins.
 
-    The caller must bind each target to the correct identity and installation.
-    Typed IDs alone establish neither ownership nor permission to revoke it.
+    The caller must establish the subject's provider and installation binding.
+    A typed subject alone establishes neither ownership nor permission to revoke.
     Provider calls belong outside database transactions.
     """
 
     @abstractmethod
-    async def revoke_grant(
-        self, consent_request_id: OAuthConsentRequestId, *, timeout_seconds: float
+    async def revoke_cli_grants(
+        self, subject: IdentitySubject, *, timeout_seconds: float
     ) -> IdentityRecoveryCleanupState:
-        """Invalidate access and refresh token chains from one consent request.
+        """Invalidate this human's access and refresh grants for the Inframeld CLI.
 
-        Leave other consent requests and remembered logins alone. Return
+        Leave other humans, other clients and remembered logins alone. Return
         `CONFIRMED` for acknowledged cleanup, `FAILED` for explicit rejection, or
         `UNCERTAIN` when completion cannot be established. Never return `PENDING`.
-        Repeating cleanup must address the same original target.
+        A retry may also revoke credentials obtained since the previous attempt.
 
         Raises:
             ValueError: The deadline is not finite and positive.
@@ -39,13 +34,13 @@ class HumanOAuthCredentialRevoker(Protocol):
         ...
 
     @abstractmethod
-    async def revoke_login(
-        self, login_session_id: OAuthLoginSessionId, *, timeout_seconds: float
+    async def revoke_remembered_logins(
+        self, subject: IdentitySubject, *, timeout_seconds: float
     ) -> IdentityRecoveryCleanupState:
-        """Forget one remembered login so that it cannot skip authentication.
+        """Forget all of this human's remembered OAuth logins, across clients.
 
-        Issued token grants need separate revoke_grant calls. The provider may
-        send configured logout notifications. Outcome, deadline and cancellation
-        rules match revoke_grant.
+        Issued tokens need separate revoke_cli_grants calls. Kratos browser
+        sessions remain separate. A retry may forget a newer remembered login.
+        Outcome, deadline and cancellation rules match revoke_cli_grants.
         """
         ...

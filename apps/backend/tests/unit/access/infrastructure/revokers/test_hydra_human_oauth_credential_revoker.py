@@ -4,7 +4,6 @@ from json import JSONDecodeError
 from threading import Event
 from typing import Literal
 from unittest.mock import patch
-from uuid import UUID
 
 import pytest
 from ory_hydra_client import ApiClient, Configuration, OAuth2Api
@@ -12,22 +11,16 @@ from ory_hydra_client.api_response import ApiResponse
 from ory_hydra_client.exceptions import ApiException, OpenApiException
 from urllib3.exceptions import HTTPError
 
-from inframeld_backend.access.application.value_objects.oauth_consent_request_id import (
-    OAuthConsentRequestId,
-)
-from inframeld_backend.access.application.value_objects.oauth_login_session_id import (
-    OAuthLoginSessionId,
-)
 from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
     IdentityRecoveryCleanupState,
 )
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.infrastructure.revokers.hydra_human_oauth_credential_revoker import (
     HydraHumanOAuthCredentialRevoker,
 )
 
 type Operation = Literal["grant", "login"]
-CONSENT = OAuthConsentRequestId(UUID("01234567-89ab-cdef-0123-456789abcdef"))
-LOGIN = OAuthLoginSessionId(UUID("abcdef01-2345-6789-abcd-ef0123456789"))
+SUBJECT = IdentitySubject("alice-provider-subject")
 METHODS: dict[Operation, str] = {
     "grant": "revoke_o_auth2_consent_sessions_with_http_info",
     "login": "revoke_o_auth2_login_sessions_with_http_info",
@@ -47,21 +40,25 @@ async def _revoke(
     revoker: HydraHumanOAuthCredentialRevoker, operation: Operation, timeout_seconds: float = 1.0
 ) -> IdentityRecoveryCleanupState:
     if operation == "grant":
-        return await revoker.revoke_grant(CONSENT, timeout_seconds=timeout_seconds)
-    return await revoker.revoke_login(LOGIN, timeout_seconds=timeout_seconds)
+        return await revoker.revoke_cli_grants(SUBJECT, timeout_seconds=timeout_seconds)
+    return await revoker.revoke_remembered_logins(SUBJECT, timeout_seconds=timeout_seconds)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("operation", ["grant", "login"])
-async def test_acknowledged_cleanup_sends_only_the_exact_target(
-    client: OAuth2Api, operation: Operation
+@pytest.mark.parametrize("subject", [SUBJECT, IdentitySubject(" Alice/provider:subject ")])
+async def test_acknowledged_cleanup_sends_the_exact_subject_and_required_client_scope(
+    client: OAuth2Api, operation: Operation, subject: IdentitySubject
 ) -> None:
-    """Never substitute a subject-wide or client-wide request for one target."""
+    """CLI cleanup fixes the client while remembered-login cleanup covers only this subject."""
     response = ApiResponse[None](status_code=204, headers=None, data=None, raw_data=b"")
     with patch.object(client, METHODS[operation], return_value=response) as revoke:
-        assert await _revoke(HydraHumanOAuthCredentialRevoker(client), operation) == (
-            IdentityRecoveryCleanupState.CONFIRMED
-        )
+        revoker = HydraHumanOAuthCredentialRevoker(client)
+        if operation == "grant":
+            outcome = await revoker.revoke_cli_grants(subject, timeout_seconds=1.0)
+        else:
+            outcome = await revoker.revoke_remembered_logins(subject, timeout_seconds=1.0)
+        assert outcome == IdentityRecoveryCleanupState.CONFIRMED
 
     revoke.assert_called_once()
     arguments = dict(revoke.call_args.kwargs)
@@ -69,9 +66,9 @@ async def test_acknowledged_cleanup_sends_only_the_exact_target(
     assert isinstance(timeout, float)
     assert 0 < timeout <= 1.0
     assert arguments == (
-        {"consent_request_id": CONSENT.value.hex}
+        {"subject": subject.value, "client": "inframeld-cli"}
         if operation == "grant"
-        else {"sid": str(LOGIN.value)}
+        else {"subject": subject.value}
     )
 
 

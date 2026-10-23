@@ -1,6 +1,6 @@
 # ADR-0058: Block product access during identity-recovery cleanup
 
-**Status:** Accepted. Partially superseded by [ADR-0069](ADR-0069-release-completed-recovery-obligations-independently.md) for independent per-flow release and completion before local admission. Deliberate suspension restoration remains required. The decision originally clarified recovery completion under ADR-0019 and ADR-0053.
+**Status:** Accepted. Partially superseded by [ADR-0069](ADR-0069-release-completed-recovery-obligations-independently.md) for independent per-flow release and completion before local admission, and by [ADR-0070](ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md) for bulk Hydra scope and delayed-attempt effects. Deliberate suspension restoration remains required. The decision originally clarified recovery completion under ADR-0019 and ADR-0053.
 
 **Date:** 2026-10-04
 
@@ -28,6 +28,8 @@ Deduplicate completed trusted events by their original identity. A duplicate can
 ## Consequences
 
 [ADR-0069](ADR-0069-release-completed-recovery-obligations-independently.md) refines the historical no-newer-pending-cleanup wording above. A completed eligible flow may release only its own block while other unreleased flows continue blocking product access. A fully cleaned identity without a local account may finish without provisioning one. The provider-evidence, suspension and no-permission-restoration rules remain unchanged.
+
+[ADR-0070](ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md) replaces the stronger later-login-preservation requirement for Hydra recovery cleanup. Unfinished bulk retries and already-dispatched calls may invalidate newer CLI credentials. Completed events still initiate no new cleanup, and the legitimate Kratos recovery session remains protected. The original rationale above is retained as historical context.
 
 - Product access fails closed during partial cleanup while routine recovery can finish without an extra administrator intervention.
 - Emergency suspension retains its immediate block, preserved-but-unusable assignments and deliberate security-review restoration rule.
