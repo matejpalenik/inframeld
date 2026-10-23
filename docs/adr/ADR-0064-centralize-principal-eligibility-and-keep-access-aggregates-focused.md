@@ -1,6 +1,6 @@
 # ADR-0064: Centralize principal eligibility and keep Access aggregates focused
 
-**Status:** Accepted. Grant transaction placement is partially superseded by [ADR-0065](ADR-0065-application-services-own-write-transactions.md). Shared eligibility and linked-recovery/write coordination are implemented. The recovery aggregate still requires implementation and qualification.
+**Status:** Accepted. Grant transaction placement is partially superseded by [ADR-0065](ADR-0065-application-services-own-write-transactions.md). Shared eligibility, linked-recovery/write coordination and the recovery checklist aggregate/repository are implemented. Provider cleanup and safe release orchestration remain unfinished.
 
 **Date:** 2026-10-18
 
@@ -42,7 +42,9 @@ Preserve the visibility-before-authority distinction, including 404 for hidden p
 
 ### Rich behavior at actual lifecycle boundaries
 
-Introduce a focused recovery aggregate when implementing cleanup confirmation and release in #117. It owns the original operation binding, provider outcomes and valid transitions. Its release decision must also receive authoritative current eligibility and other-pending-obligation facts, coordinated through persistence. Provider calls remain application orchestration outside the transaction.
+Introduce a focused recovery aggregate when implementing cleanup confirmation and release in #117. It protects the original recovery binding, provider outcomes and valid transitions. Release must also depend on authoritative current eligibility and other-pending-obligation facts, coordinated through persistence. Provider calls remain application orchestration outside the transaction.
+
+The implemented `IdentityRecovery` keeps the original installation/provider/flow and subject, independent provider outcomes and release state. Its specific repository preserves the original operation ID, event kind and admission time as infrastructure metadata. Transaction-bound value snapshots and conditional updates prevent overwriting changed stored progress. These are implementation details within this decision, with no new schema. The future application workflow must check current eligibility and competing obligations under coordination locks before invoking release. The aggregate's local both-providers-confirmed guard and repository persistence do not complete that workflow. See [recovery records](../development/data-model.md#identity-cleanup-records).
 
 Add account lifecycle behavior to `Principal` with the suspension/restoration workflows that need it. Do not move all grants, memberships or provider recovery obligations into a large User aggregate. A domain transition method complements database constraints and locks rather than replacing them.
 
@@ -60,4 +62,4 @@ Add account lifecycle behavior to `Principal` with the suspension/restoration wo
 - [Component responsibilities and staged refactor](../development/application-structure.md#shared-access-eligibility).
 - [Attempt-local inputs](../development/data-model.md#principal-eligibility-inputs) and [recovery records](../development/data-model.md#identity-cleanup-records).
 - [Lightweight CQRS](ADR-0002-separate-commands-and-queries-without-a-command-bus-framework.md), [Access ownership](ADR-0013-keep-authorization-in-access-and-postgresql.md), [write coordination](ADR-0022-coordinate-access-writes-by-project-with-scope-revisions.md) and [recovery blocks](ADR-0058-block-product-access-during-identity-recovery-cleanup.md).
-- [PostgreSQL recovery authorization tests](../../apps/backend/tests/integration/access/test_recovery_authorization_postgres.py) check current-state replay, both linked-recovery/grant ordering cases and timeout rollback. Provider cleanup, the recovery aggregate, safe release and concurrent first-local-admission qualification remain [#117](https://github.com/matejpalenik/inframeld/issues/117) work.
+- [PostgreSQL recovery authorization tests](../../apps/backend/tests/integration/access/test_recovery_authorization_postgres.py) check current-state replay, both linked-recovery/grant ordering cases and timeout rollback. [Recovery domain tests](../../apps/backend/tests/unit/access/domain/entities/test_identity_recovery.py) and [repository tests](../../apps/backend/tests/integration/access/test_identity_recovery_repository_postgres.py) cover checklist transitions and persistence. Provider cleanup, safe release orchestration and concurrent first-local-admission qualification remain [#117](https://github.com/matejpalenik/inframeld/issues/117) work.
