@@ -79,6 +79,10 @@ Before generating a component, identify its owner, layer, role, destination, nam
 
 ## Component documentation
 
+Start docstrings with a simple purpose and product context, assuming the reader is new to the codebase. Explain what the component does and why it exists before describing technical details. Use one brief example or familiar analogy when helpful, such as Alice's cleanup checklist after account recovery. Explain unfamiliar terms instead of leading with abstract jargon.
+
+Keep class docstrings compact: a short summary followed by one or two short paragraphs when needed. Preserve essential trust, failure and ownership details, and put longer workflow explanations in linked guides. Use compact Google-style `Args`, `Returns` and `Raises` sections only where they add useful meaning. Do not repeat annotated types or obvious implementation details.
+
 Add docstrings where they answer a question a maintainer would otherwise have to investigate: purpose, trust assumptions, result meaning, expected failures, non-obvious invariants, I/O/state changes, or resource/transaction ownership. Write approachable, concrete explanations. Protocols own the shared behavioral contract; implementations document additional details without repeating it. Explain what a DTO establishes or what a value object validates when the declaration alone does not make that clear.
 
 Remove boilerplate that merely restates a name, signature, decorator, or obvious statement. Straightforward error subclasses need no individual docstring unless their use or handling has a meaningful distinction. Do not add repetitive documentation to reach blanket declaration coverage.
