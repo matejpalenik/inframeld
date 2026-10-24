@@ -1,4 +1,8 @@
+import asyncio
 from collections.abc import Iterator
+from threading import Event
+from traceback import format_exception
+from typing import Literal
 from unittest.mock import patch
 
 import pytest
@@ -150,3 +154,80 @@ async def test_network_failure_is_unavailable(client: OAuth2Api) -> None:
         pytest.raises(DependencyUnavailableError),
     ):
         await HydraOAuthConsentRequestReader(client).read(CHALLENGE, timeout_seconds=1.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interruption", ["deadline", "cancellation"])
+async def test_interrupted_read_does_not_wait_for_or_accept_a_late_sdk_response(
+    client: OAuth2Api, interruption: Literal["deadline", "cancellation"]
+) -> None:
+    """Stopping the caller does not stop the SDK thread or make its late response usable."""
+    loop = asyncio.get_running_loop()
+    started, finished = asyncio.Event(), asyncio.Event()
+    release = Event()
+    response = _request()
+
+    def blocked(**_kwargs: object) -> OAuth2ConsentRequest:
+        loop.call_soon_threadsafe(started.set)
+        try:
+            assert release.wait(5.0), "The test SDK gate was not released."
+            return response
+        finally:
+            loop.call_soon_threadsafe(finished.set)
+
+    expected_error = (
+        DependencyUnavailableError if interruption == "deadline" else asyncio.CancelledError
+    )
+    with patch.object(client, "get_o_auth2_consent_request", side_effect=blocked) as read:
+        task = asyncio.create_task(
+            HydraOAuthConsentRequestReader(client).read(CHALLENGE, timeout_seconds=1.0)
+        )
+        try:
+            await asyncio.wait_for(started.wait(), timeout=5.0)
+            if interruption == "cancellation":
+                task.cancel()
+            with pytest.raises(expected_error) as caught:
+                await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
+            assert not finished.is_set()
+            read.assert_called_once()
+            timeout: object = read.call_args.kwargs["_request_timeout"]
+            assert isinstance(timeout, float)
+            assert 0 < timeout <= 1.0
+        finally:
+            release.set()
+            if not task.done():
+                task.cancel()
+            async with asyncio.timeout(5.0):
+                await asyncio.gather(task, return_exceptions=True)
+                await finished.wait()
+
+        assert finished.is_set()
+        if interruption == "cancellation":
+            assert task.cancelled()
+        else:
+            assert task.exception() is caught.value
+        read.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sdk_timeout_is_unavailable_without_retry_or_secret_disclosure(
+    client: OAuth2Api, caplog: pytest.LogCaptureFixture
+) -> None:
+    with (
+        patch.object(
+            client,
+            "get_o_auth2_consent_request",
+            side_effect=TimeoutError("private-provider-timeout"),
+        ) as read,
+        pytest.raises(DependencyUnavailableError) as caught,
+    ):
+        await HydraOAuthConsentRequestReader(client).read(CHALLENGE, timeout_seconds=1.0)
+    diagnostic = "".join(format_exception(caught.value)) + caplog.text
+    assert "private-provider-timeout" not in diagnostic
+    assert CHALLENGE.value not in diagnostic
+    assert caught.value.__cause__ is None
+    assert caught.value.__suppress_context__
+    read.assert_called_once()
+    timeout: object = read.call_args.kwargs["_request_timeout"]
+    assert isinstance(timeout, float)
+    assert 0 < timeout <= 1.0

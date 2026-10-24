@@ -1,4 +1,8 @@
+import asyncio
 from collections.abc import Iterator
+from threading import Event
+from traceback import format_exception
+from typing import Literal
 from unittest.mock import patch
 from uuid import UUID
 
@@ -9,6 +13,9 @@ from ory_hydra_client.models.o_auth2_redirect_to import OAuth2RedirectTo
 
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
+)
+from inframeld_backend.access.application.dtos.oauth_consent_continuation_dto import (
+    OAuthConsentContinuationDTO,
 )
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
@@ -49,6 +56,22 @@ def client() -> Iterator[OAuth2Api]:
         yield OAuth2Api(sdk)
     finally:
         sdk.rest_client.pool_manager.clear()
+
+
+async def _decide(
+    client: OAuth2Api, decision: Literal["allow", "deny"]
+) -> OAuthConsentContinuationDTO:
+    writer = HydraOAuthConsentDecisionWriter(client, public_url="https://auth.test/base")
+    if decision == "deny":
+        return await writer.deny(CHALLENGE, timeout_seconds=1.0)
+    return await writer.allow(
+        CHALLENGE,
+        scopes=(HumanOAuthScope.API,),
+        audiences=(HumanAPIAudience("https://api.test"),),
+        binding=BINDING,
+        remember_for_seconds=None,
+        timeout_seconds=1.0,
+    )
 
 
 @pytest.mark.asyncio
@@ -158,3 +181,96 @@ async def test_an_unconfirmed_decision_is_not_a_confirmed_denial_or_an_automatic
         )
     assert "private-provider-payload" not in str(caught.value)
     accept.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("decision", ["allow", "deny"])
+@pytest.mark.parametrize("interruption", ["deadline", "cancellation"])
+async def test_interrupted_decision_does_not_wait_for_or_accept_a_late_sdk_response(
+    client: OAuth2Api,
+    decision: Literal["allow", "deny"],
+    interruption: Literal["deadline", "cancellation"],
+) -> None:
+    """An uncertain approval stays uncertain even if its SDK call later succeeds."""
+    loop = asyncio.get_running_loop()
+    started, finished = asyncio.Event(), asyncio.Event()
+    release = Event()
+    response = OAuth2RedirectTo(redirect_to=URL)
+
+    def blocked(**_kwargs: object) -> OAuth2RedirectTo:
+        loop.call_soon_threadsafe(started.set)
+        try:
+            assert release.wait(5.0), "The test SDK gate was not released."
+            return response
+        finally:
+            loop.call_soon_threadsafe(finished.set)
+
+    expected_error = (
+        DependencyUnavailableError if interruption == "deadline" else asyncio.CancelledError
+    )
+    with (
+        patch.object(client, "accept_o_auth2_consent_request", side_effect=blocked) as allow,
+        patch.object(client, "reject_o_auth2_consent_request", side_effect=blocked) as deny,
+    ):
+        selected, opposite = (allow, deny) if decision == "allow" else (deny, allow)
+        task = asyncio.create_task(_decide(client, decision))
+        try:
+            await asyncio.wait_for(started.wait(), timeout=5.0)
+            if interruption == "cancellation":
+                task.cancel()
+            with pytest.raises(expected_error) as caught:
+                await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
+            assert not finished.is_set()
+            selected.assert_called_once()
+            opposite.assert_not_called()
+            timeout: object = selected.call_args.kwargs["_request_timeout"]
+            assert isinstance(timeout, float)
+            assert 0 < timeout <= 1.0
+        finally:
+            release.set()
+            if not task.done():
+                task.cancel()
+            async with asyncio.timeout(5.0):
+                await asyncio.gather(task, return_exceptions=True)
+                await finished.wait()
+
+        assert finished.is_set()
+        if interruption == "cancellation":
+            assert task.cancelled()
+        else:
+            assert task.exception() is caught.value
+        selected.assert_called_once()
+        opposite.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("decision", ["allow", "deny"])
+async def test_sdk_timeout_does_not_retry_reverse_the_decision_or_disclose_secrets(
+    client: OAuth2Api, decision: Literal["allow", "deny"], caplog: pytest.LogCaptureFixture
+) -> None:
+    with (
+        patch.object(
+            client,
+            "accept_o_auth2_consent_request",
+            side_effect=TimeoutError("private-provider-timeout"),
+        ) as allow,
+        patch.object(
+            client,
+            "reject_o_auth2_consent_request",
+            side_effect=TimeoutError("private-provider-timeout"),
+        ) as deny,
+        pytest.raises(DependencyUnavailableError) as caught,
+    ):
+        await _decide(client, decision)
+    diagnostic = "".join(format_exception(caught.value)) + caplog.text
+    assert "private-provider-timeout" not in diagnostic
+    assert CHALLENGE.value not in diagnostic
+    assert "private-state" not in diagnostic
+    assert caught.value.__cause__ is None
+    assert caught.value.__suppress_context__
+    selected, opposite = (allow, deny) if decision == "allow" else (deny, allow)
+    selected.assert_called_once()
+    opposite.assert_not_called()
+    timeout: object = selected.call_args.kwargs["_request_timeout"]
+    assert isinstance(timeout, float)
+    assert 0 < timeout <= 1.0
