@@ -1,55 +1,45 @@
 ---
 name: inframeld-evaluation
-description: Explain or review Inframeld Ragas starter generation, case review, working-configuration and version-based evaluation, frozen benchmarks, passage coverage, faithfulness, gateway adapters and protected comparisons. Use for offline evidence; online feedback and release authority belong to Pipelines/Releases.
+description: Explains and reviews Inframeld generated test cases, case review, frozen benchmarks, faithfulness, passage coverage and fresh comparisons. Use for offline evidence, not production feedback or release authority.
 ---
 
 # Inframeld Evaluation
 
-Help an engineer move from a working pipeline to useful evidence about a change. Evaluation owns generated cases, review, immutable revisions, benchmarks, evaluator definitions, runs, comparisons, and protected results. Other owners supply source identity, processed text, execution, permissions, model calls, and release authority.
+Help a developer obtain useful evidence about a Pipeline change. Evaluation owns generated cases, review, immutable revisions, benchmarks, evaluator definitions, runs, comparisons and protected results. Other owners supply source identity, processed text, ordinary execution, current permissions, model calls and release authority.
 
-## Scope and reading route
+## Working model
 
-For the accepted #116 catalogue, assignments and remaining schema/route/maintenance handoff, read [Access contracts](../../../docs/development/access-contracts.md). Guides own behavior; the new reference is accepted design, not implemented API or runtime evidence.
+Alice generates questions from the Support handbook, reviews them and freezes accepted case revisions into a benchmark. She compares two reranker configurations by executing both afresh against the same benchmark and evaluator. Neither side needs a newly built release version if its captured working inputs have complete verified dependencies.
 
-- For operation authority, read [six Pipeline-scoped actions](../../../docs/development/evaluation.md#operation-authority), [Access identifiers/eligibility](../../../docs/development/access-control.md#reviewed-capability-catalogue) and [logical grant/record ownership](../../../docs/development/data-model.md#evaluation). Humans and applications may receive use; grant/audience administration remains human-only. Review binds exact revisions, edits/imported changes are unreviewed and every protected read rechecks current audiences/sources. The [fixed creator assignments](../../../docs/development/access-contracts.md#initial-assignments) and [human Pipeline audience administration](../../../docs/development/evaluation.md#case-audiences) are accepted #116 decisions; exact public/physical schemas and runtime qualification remain pending.
+A benchmark freezes case membership and revisions. An admitted run freezes effective configuration, corpus, baseline selection and bindings. Later edits do not retarget those inputs. Current access and erasure still apply, so frozen history does not mean permanently readable evidence.
 
-Default to read-only guidance. Loading this skill authorizes no edit, model call, export, or release. Read the sections relevant to the question and distinguish accepted design, source-inspected compatibility, and runtime qualification still required.
+Generation proposes cases. Review decides which revisions are suitable. Evaluation executes and scores them. These are separate explicit operations, and setup can finish without any of them.
 
-- Start with [Evaluation](../../../docs/development/evaluation.md), the behavioral specification, and [ADR-0051](../../../docs/adr/ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md), the Ragas choice superseding historical ADR-0030. [Evaluation records](../../../docs/development/data-model.md#evaluation) owns logical records, not a mandated physical table layout.
-- For first use, follow [generation](../../../docs/development/evaluation.md#generation), [review](../../../docs/development/evaluation.md#review), and [CLI starter-evaluation journey](https://github.com/matejpalenik/inframeld/issues/179). Setup may finish without any evaluation.
-- For terminal progress and results, read [plain-language result presentation](../../../docs/development/evaluation.md#result-presentation) and [job recovery](../../../docs/development/jobs-and-idempotency.md#progress-presentation). Keep answering and scoring distinct, retain real counts and saved results, and identify incomplete cases without hiding failures or exposing protected populations. These are display requirements, not changes to data ownership or scoring rules.
-- For a changed chunking profile, read [passage identity](../../../docs/development/evaluation.md#passages) and [Indexing](../../../docs/development/indexing.md). For scores, read [metrics](../../../docs/development/evaluation.md#metrics) and [human calibration](../../../docs/development/evaluation.md#qualification).
-- For library integration, read [gateway adapters and pinned source evidence](../../../docs/development/evaluation.md#gateway), [Model connections](../../../docs/development/model-connections.md), and [Jobs](../../../docs/development/jobs-and-idempotency.md). Do not treat inspected v0.4.3 interfaces as an executed integration.
-- For comparisons, follow [frozen execution](../../../docs/development/evaluation.md#comparison), [history/comparability](../../../docs/development/evaluation.md#history), and [ADR-0031](../../../docs/adr/ADR-0031-compare-fresh-executions-against-frozen-benchmarks.md).
-- For edits or unavailable inputs during a run, use the [fixed-input worked example](../../../docs/development/evaluation.md#input-reliability). Distinguish missing execution dependencies from an unscorable passage mapping. Preserve fixed membership without leaking protected counts or substituting newer sources; reference answers never enter Pipeline execution or supply extra faithfulness evidence.
-- [ADR-0052](../../../docs/adr/ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md) extends execution to captured working-configuration inputs before release builds. Read [direct-query preparation](../../../docs/development/pipelines-and-releases.md#preview), [query execution records](../../../docs/development/data-model.md#experimental-execution-records) and [CLI development loop](https://github.com/matejpalenik/inframeld/issues/172) for that loop; the starter-generation ticket above owns the first-use case journey.
-- For disclosure/erasure, read [Access](../../../docs/development/access-control.md) and [Retention and deletion](../../../docs/development/retention-and-deletion.md). For publication, read [Pipelines and Releases](../../../docs/development/pipelines-and-releases.md); feedback has its [separate guide](../../../docs/development/answer-feedback.md).
-- Use [maintainer checks](../../../docs/development/evaluation.md#maintainer-checks) to review partial generation, changed mappings/access, budgets, cancellation, and uncertain paid outcomes.
+## Essential rules
 
-- For shared current connections, read [run/comparison consistency](../../../docs/development/evaluation.md#connection-consistency), [dispatch freshness](../../../docs/development/model-connections.md#dispatch-freshness) and [ADR-0054](../../../docs/adr/ADR-0054-use-shared-current-model-connections.md). Historical access observations are not executable bindings.
+- Generate from a frozen permitted corpus sample across sources/sections, not only successful retrieval hits. Starter generation requests 20 single-passage cases with bounded visible shortfalls.
+- Generated or edited revisions are unreviewed. Default regression membership uses accepted revisions. Exploratory unreviewed inclusion is explicit and labelled.
+- Expected passages retain source version, artifact identity and coordinates. Different chunk boundaries may cover the same passage. Missing mappings are unscorable, not ordinary retrieval misses.
+- Execute questions through the ordinary Pipeline without reference answers or expected evidence. Judge faithfulness only against final context actually sent to generation.
+- Show denominators, failures, exclusions and paired coverage. Abstention, no claims, missing evidence and malformed judgments cannot silently become perfect scores.
+- Generator/judge roles bind explicit authorized connections. All nested model work and repairs use ModelGateway, including preparation. Ragas gets no independent credentials, provider fallback or durable runner.
+- Both comparison sides execute freshly. Retained snapshots do not authorize reusing historical scores or old connection access settings.
+- Scores never authorize publication, pause Automatic updates or replace current permissions and retention rules.
 
-## Essential boundaries
+## Explain or review
 
-For portable datasets and post-import evaluation, read [Evaluation transfer](../../../docs/development/evaluation.md#dataset-portability), [portability](../../../docs/development/configuration-portability.md) and [delivery ownership](../../../docs/development/cli-delivery-plan.md). Questions/references/expectations transfer explicitly as protected versioned JSONL; configuration alone is TOML. New/changed cases are unreviewed, unchanged reimports reuse exact identity, and unresolved content has a reviewed audience before linking. Verified source proof and current access are cumulative, not replaced by imported provenance. Eligible applications may accept exact revisions with explicit current authority; the six exact-Pipeline use mappings are accepted, with separate human-only `manage-evaluation-case-audiences` and fixed creator assignments. Applications import into the saved current human-approved Pipeline audience; changing its default affects future imports only. Existing-case changes require separate explicit review and management of every authoritative old/new group. No silent reduced benchmark or implicit evaluation follows import.
+1. Start with one case Alice accepts, then edits. Identify the case revision, benchmark, captured execution input and evaluator.
+2. Explain generation, review and scoring separately. For a quality claim, name the corpus, metric definition, paired population and missing observations.
+3. Include changed settings, lost access, unavailable inputs or paid-call uncertainty. Preserve fixed membership without leaking protected counts.
+4. Trace preparation and nested calls when reviewing gateway safety. Separate source-inspected library compatibility from executed integration and human calibration.
+5. Cite the current rule. Loading this skill grants no edits, model calls, exports or releases.
 
-Generate from a frozen permitted corpus sample, not only successful retrieval hits. The initial request is 20 single-passage cases using processed text, explicit personas, keyphrases and single-hop synthesis. No additional generation-time embeddings or relationship graph belongs in that preset. Shortfalls remain visible; no unbounded regeneration.
+## Read as needed
 
-Generated revisions are unreviewed. Accept/edit/reject/defer/remove have distinct meanings. An edit creates a new unreviewed revision; older benchmark snapshots remain unchanged, subject to erasure. Default regression membership uses current accepted revisions only. Exploratory inclusion of unreviewed content is explicit and labelled. Manual blank-form authoring is deferred. Generation and review never start evaluation implicitly.
+- For starter sampling and immutable review, read [Generation and review](references/generation-and-review.md).
+- For captured inputs, baselines and fresh execution, read [Benchmarks and comparisons](references/benchmarks-and-comparisons.md).
+- For passage identity, faithfulness and score interpretation, read [Metrics and evidence](references/metrics-and-evidence.md).
+- For Ragas adapters, cancellation and paid work, read [Gateway and jobs](references/gateway-and-jobs.md).
+- For permissions, erasure, audiences and JSONL transfer, read [History and dataset transfer](references/history-and-dataset-transfer.md).
 
-Expected passages retain source version, parsed-artifact identity, source spans and reconstructible protected evidence, with scenario attribution preserved during generation. Full union coverage at each measured stage can survive changed chunk boundaries. Chunk IDs, filenames and fuzzy text are not equivalent identities. Missing coordinate mappings are unscorable, not ordinary retrieval misses.
-
-Execute questions through the ordinary pipeline without reference answers or expected evidence. Judge only the final context actually sent to generation. Ragas faithfulness is supported/evaluated claims per case, then the mean of successfully scored eligible cases. Show denominators, failures, exclusions and paired coverage. Abstention, missing evidence, no claims and malformed judgments cannot become perfect scores. Keep passage, citation, outcome, latency and usage signals separate.
-
-Explicit generator and judge bindings may reuse authorized saved connections without another key; they do not modify pipeline generation configuration. Every nested model call, repair and optional future embedding uses ModelGateway. Infrastructure adapters explicitly inherit the selected Ragas interfaces and convert vendor types locally. No default provider clients, credentials or implicit model fallback. Gateway owns retries/limits; cancellation must cover preparation before a library executor is returned. Disable Ragas analytics/export, not independently controlled Inframeld tracing, and verify network behavior.
-
-Definitions select connection IDs and model settings. At admission observe current access revisions for every generator, Pipeline and judge connection; changes stop subsequent dispatch rather than mixing configurations or using old settings. Preserve partial results and flag interrupted/changed-environment runs, including a finalization check. A fresh comparison requires new admission of both sides. Key-only rotation and metadata rename do not themselves interrupt; record actual credential/access observations. Historical Pipeline execution uses current connectivity, not its old environment.
-
-Both comparison sides execute freshly against the same frozen benchmark/evaluator. Each side can be a ready version or a captured execution-input snapshot with complete verified bindings. Freeze working settings/overrides, corpus and baseline selection once, not per case. Reusing a retained snapshot means fresh execution, never reuse of its historical scores. Preparation may cost money but creates no release authority. Historical OpenEvals scores keep their original meaning. Model aliases alone do not prove unchanged behavior.
-
-Temporary evaluation overrides do not save the Pipeline. The user explicitly saves desired settings before Build, which captures the current saved configuration rather than a run ID. Report configuration/corpus/binding or sample/full-corpus mismatches without inventing quality approval or compulsory evaluation. Current access protects snapshots, cases and results; erasure applies to derived content. Query provenance, evaluation evidence and traces are different records, not permission/retention bypasses or production feedback.
-
-Scores never authorize release or pause Automatic updates. Use Manual releases to control serving-version changes; shared connection administration can still change connectivity, so this does not freeze the complete live environment. Ragas supplies algorithms, not case management, authorization, durable jobs or a new workflow engine. External exporters and additional judging/generation presets remain deferred.
-
-## Explain and review
-
-Use a small case first: Alice accepts a generated question, freezes a benchmark, then edits its reference or the Pipeline's working configuration. Explain why admitted runs retain their exact inputs. Walk through two reranker configurations and a fresh comparison against a ready baseline before any new release build. For a quality claim, identify metric definition, corpus, access, paired cases and missing observations. For gateway safety, trace preparation and nested calls, not just the final judge. Cite qualification requirements without claiming they ran.
+The [Evaluation guide](../../../docs/development/evaluation.md) owns behavior. [Evaluation records](../../../docs/development/data-model.md#evaluation) defines logical records without mandating one physical table per concept. Exact runtime and wire qualification remains explicit.

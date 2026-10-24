@@ -260,7 +260,17 @@ Call pure business decisions through their policy class:
 | `ProjectVisibilityPolicy.may_view_project(...)` | May this caller learn that the organization-scoped project exists? |
 | `ActionAuthorizationPolicy.may_perform_action(policy_input)` | Does current eligibility include the exact requested grant? |
 
-Policy methods use `@staticmethod`, explicit inputs, and no I/O or mutable class state. Services own orchestration and their injected collaborators. Ordinary conversion and validation helpers remain functions; adding a static policy convention does not turn all helpers into classes.
+Policy methods use `@staticmethod`, explicit inputs, and no I/O or mutable class state. Services own orchestration and their injected collaborators.
+
+### Static utilities and mappers
+
+Default reusable pure production conversion and validation utilities to cohesive named classes with `@staticmethod` methods. Import the class directly and call it by name. For example, import `ValueValidation` from its defining module and call `ValueValidation.require_uuid(value)`, rather than exposing a standalone check or using a module-qualified utility call. Shared primitive checks belong to `ValueValidation` in `shared/domain/validation/value_validation.py`. Value-specific invariants stay on their owning value objects.
+
+Keep static utility classes focused on one purpose and free of I/O or mutable class state. Do not collect unrelated functions in miscellaneous `Utils` classes. Small private helpers, test fixtures and framework-required callables may remain functions. Standard-library and SDK module imports remain valid where appropriate.
+
+Feature HTTP mappers and shared technology-prefixed persistence mappers retain their required static roles and perform no I/O or authorization. Services remain instantiated with injected collaborators. Entities own state transitions. This utility preference does not convert stateful workflows into static methods or automatically migrate existing helpers.
+
+Use dedicated value types when identity, invariants, secrecy or accidental mixing matter. Preserve enums/literals for closed vocabularies, free-form text and other documented primitive or serialization-boundary exceptions. Do not introduce a value object solely to wrap every scalar. The [Coding Standards skill](../../.agents/skills/inframeld-coding-standards/SKILL.md) explains these conventions through contextual examples.
 
 Read the current [action policy input](../../apps/backend/src/inframeld_backend/access/domain/policy_inputs/action_authorization_policy_input.py) and [action policy](../../apps/backend/src/inframeld_backend/access/domain/policies/action_authorization_policy.py) for exact declarations. The contract below explains how they compose shared eligibility without maintaining a second copy of their signatures here.
 
@@ -349,7 +359,7 @@ Reuse the ordinary action family for another operation needing the same kind of 
 
 ### Writing an application service
 
-Use this convention when generating, suggesting or implementing backend services. Alice granting Bob permission on Support is the implemented reference: [`ProjectGrantChangeService.assign_use_only()`](../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) coordinates the operation, while [`ProjectMembership.assign_use_only_grant()`](../../apps/backend/src/inframeld_backend/access/domain/entities/project_membership.py) protects the assignment transition. The [request walkthrough](#grant-command-flow) follows the real collaborators from HTTP through commit. Other domains adopt these responsibilities as their workflows are implemented.
+Use this convention when generating, suggesting, reviewing or implementing backend services. Read Coding Standards' [complete worked service example](../../.agents/skills/inframeld-coding-standards/references/services-and-use-cases.md) for code and step-by-step decisions, and its [aggregate/repository example](../../.agents/skills/inframeld-coding-standards/references/aggregates-and-repositories.md) when those components are affected. Alice granting Bob permission on Support is the implemented reference: [`ProjectGrantChangeService.assign_use_only()`](../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) coordinates the operation, while [`ProjectMembership.assign_use_only_grant()`](../../apps/backend/src/inframeld_backend/access/domain/entities/project_membership.py) protects the assignment transition. The [request walkthrough](#grant-command-flow) follows the real collaborators from HTTP through commit. Other domains adopt these responsibilities as their workflows are implemented.
 
 #### Put each decision with its owner
 
@@ -444,7 +454,7 @@ Discard the repository and aggregates after commit, rollback or failed save. If 
 
 Operation and I/O contracts are explicit protocols. Required methods use `@abstractmethod`; implementations and test doubles explicitly inherit their protocol and mark overrides with `@override`. Strict Pyright checks those contracts. Protocols normally describe behavior. `ProjectCommand` and `AuthorizedOperationScope` are the agreed exceptions for required fields, with explicit inheritance and concrete declarations. Do not add unrelated record-labeling protocols.
 
-Keep class and method docstrings focused on what callers need to use the component correctly. Start with a simple purpose and add essential context, such as trusted inputs, result meaning, side effects or transaction ownership. For public methods, prioritize prerequisites and failures that change what the caller must do next. Put the shared contract on the protocol and useful implementation details on the adapter. Follow the compact [docstring guidance](../../AGENTS.md#component-documentation).
+Keep class and method docstrings focused on what callers need to use the component correctly. Start with a simple purpose and add essential context, such as trusted inputs, result meaning, side effects or transaction ownership. For public methods, prioritize prerequisites and failures that change what the caller must do next. Put the shared contract on the protocol and useful implementation details on the adapter. Follow the compact [docstring guidance](../../.agents/skills/inframeld-coding-standards/references/testing-and-documentation.md#purpose-before-implementation-detail).
 
 Use Google-style `Args`, `Returns` and `Raises` sections only when they add information beyond the signature and existing prose. Avoid repeating argument descriptions or the class contract. Internal algorithms, lists of persistence fields and ordinary exception propagation do not belong in the method contract unless they affect correct use. Longer workflow explanations belong in guides. There is no fixed length limit - keep essential safeguards and remove repetition.
 

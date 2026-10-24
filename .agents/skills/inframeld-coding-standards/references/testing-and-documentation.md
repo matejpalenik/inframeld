@@ -1,0 +1,258 @@
+# Test behavior and explain the contract
+
+Alice adds a grant workflow. A useful test proves what happens when authority is missing or a response is lost. A test that only checks the service's filename would not protect either behavior. Documentation should explain the same useful boundaries to a new maintainer.
+
+## Contents
+
+- [Behavioral TDD](#behavioral-tdd)
+- [Purpose before implementation detail](#purpose-before-implementation-detail)
+- [Examples and exceptions](#examples-and-exceptions)
+- [Worked example: test a rejected transition without mutation](#worked-example-test-a-rejected-transition-without-mutation)
+- [Worked example: test service ordering and replay](#worked-example-test-service-ordering-and-replay)
+- [Worked example: document the capability once](#worked-example-document-the-capability-once)
+- [Sources and status](#sources-and-status)
+
+## Behavioral TDD
+
+For new behavior and bug fixes, follow this sequence:
+
+1. Establish only the public symbols, signatures and lifecycle shape needed to import and execute the test. This may be an application-owned interface, protocol, exception or minimal pass-through class/module. The scaffold is an API outline and implements none of the behavior under test.
+2. Write the behavioral test against those symbols.
+3. Run it and require failure for the expected behavioral reason. Import/collection errors mean the seam is incomplete. Add only the missing symbol/signature and rerun.
+4. Implement the smallest real behavior. Run the focused test, then the relevant suite.
+5. Refactor while tests remain green. Do not smuggle behavior into scaffolding or add interfaces for speculative future services.
+
+Qualify new workflows through domain, service and persistence behavior. Type-compatible authorization does not prove ordering before disclosure or mutation. Test the actual boundary.
+
+Mirror production roles in unit tests. Group integration tests by scenario with distinct filenames. Do not add architecture/import-boundary tests, dependency-rule fixtures, composition-root construction tests, naming checks or similar setup-enforcement tests. The developer guards organization manually.
+
+Test Command/Query inputs retain those suffixes without DTO. Other public test-support transfer records use DTO. Cohesive scenario helpers may remain grouped, and fixtures may remain functions.
+
+When qualifying generated code, check the actual proposed files with the existing backend Ruff rules and strict Pyright, alongside meaningful behavior tests. For isolated examples, adapt import/source roots without weakening the rules. A partial or in-memory check is not proof that the final files pass. Report checks actually run and any remaining diagnostics.
+
+## Purpose before implementation detail
+
+Start class and method docstrings with a simple purpose and product context for a reader new to the codebase. Explain what the component does and why it exists before technical details. A brief example, such as Alice's recovery cleanup checklist, can clarify an unfamiliar concept.
+
+Keep documentation compact and value-based. Preserve trust assumptions, result meaning, expected failures, non-obvious invariants, I/O/state changes and resource/transaction ownership where a maintainer would otherwise investigate.
+
+For public methods, prioritize caller prerequisites and failures that change the caller's next action. Avoid repeating the class contract, internal algorithms or persistence fields unless they affect correct use. Ordinary exception propagation needs no explanation.
+
+Protocols own shared behavioral contracts. Implementations add useful details without repetition. Explain what a DTO establishes or a value object validates when the declaration alone does not make it clear. Keep longer workflows in linked guides and useful adapter details on the adapter.
+
+Use compact Google-style Args, Returns and Raises sections only when they add information beyond annotations and surrounding prose. Do not repeat annotated types or argument descriptions. Prefer removing repetition over enforcing a fixed length. Straightforward error subclasses need no individual boilerplate docstring.
+
+## Examples and exceptions
+
+Useful purpose-first wording includes “Open a phase gate - return 204 even when the flow is unknown.” Other examples are “Loads the current account status and project grants using the caller's transaction”, “Identifies the caller after authentication. Project permissions are checked separately”, and “Closes resources created before startup failed.”
+
+Remove text that merely repeats a name, signature, decorator or obvious statement. Do not pursue blanket declaration coverage. Apply the same rule to tests, fixtures, helpers and modules. Preserve meaningful scenarios and unusual setup while omitting descriptions that repeat assertions or test names.
+
+Use no semicolons or em dashes in prose, comments or docstrings. Use separate sentences or a normal hyphen.
+
+## Worked example: test a rejected transition without mutation
+
+**Situation.** Adding an already assigned action must not replace or downgrade it. Testing only the raised exception would miss a partial mutation.
+
+**Decision and placement.** Put domain behavior tests under the production owner's mirrored unit-test roles. This selected test excerpt includes its existing constants and scenario helper, with the imports it needs:
+
+**Inspected teaching excerpt:** the typed constants, membership helper and complete duplicate-rejection test from [apps/backend/tests/unit/access/domain/entities/test_project_membership.py](../../../../apps/backend/tests/unit/access/domain/entities/test_project_membership.py). This is existing code for explanation, not replacement or insertion instructions.
+
+```python
+from dataclasses import replace
+from uuid import UUID
+
+import pytest
+
+from inframeld_backend.access.domain.entities.project_action_grant import (
+    ProjectActionGrant,
+)
+from inframeld_backend.access.domain.entities.project_membership import (
+    ProjectMembership,
+)
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_grant_level import ProjectGrantLevel
+from inframeld_backend.access.domain.errors.project_grant_errors import (
+    ProjectGrantAlreadyExistsError,
+)
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+
+ORGANIZATION = OrganizationId(UUID(int=1))
+PROJECT = ProjectId(UUID(int=2))
+RECIPIENT = PrincipalId(UUID(int=3))
+ACTOR = PrincipalId(UUID(int=4))
+ACTION = ActionId("create-access-groups")
+EXISTING = ProjectActionGrant(PROJECT, RECIPIENT, ACTION, ProjectGrantLevel.USE_ONLY, None)
+
+
+def membership(
+    *,
+    grants: tuple[ProjectActionGrant, ...] = (),
+    kind: PrincipalKind = PrincipalKind.HUMAN,
+) -> ProjectMembership:
+    return ProjectMembership(
+        organization_id=ORGANIZATION,
+        project_id=PROJECT,
+        principal_id=RECIPIENT,
+        principal_kind=kind,
+        grants=grants,
+    )
+
+
+@pytest.mark.parametrize("level", list(ProjectGrantLevel))
+def test_existing_assignment_cannot_be_replaced_or_downgraded(
+    level: ProjectGrantLevel,
+) -> None:
+    original = replace(EXISTING, level=level)
+    member = membership(grants=(original,))
+    with pytest.raises(ProjectGrantAlreadyExistsError):
+        member.assign_use_only_grant(action_id=ACTION, assigned_by_principal_id=ACTOR)
+    assert member.grants == (original,)
+    assert member.grants[0] is original
+    assert member.grants[0].level is level
+    assert member.grants[0].assigned_by_principal_id is None
+```
+
+The excerpt includes its actual typed fixtures. It is a complete runnable selection of the existing test module, shown for teaching rather than as an instruction to duplicate the test. The helper remains a function because it is local scenario setup, not a public production conversion utility.
+
+**Walkthrough and failure.** The test exercises both grant levels. It checks the rejection, exact existing child instance, level and historical attribution after the attempted change. Those assertions protect meaningful state preservation. The neighboring successful-transition test covers attributed addition. An inheritance or filename assertion would protect neither behavior.
+
+## Worked example: test service ordering and replay
+
+**Situation.** A saved grant result must not bypass revoked authority, and a new change must finish its required writes before commit.
+
+**Decision and placement.** Use application service tests with explicit protocol doubles to control results and failures. These complete tests are excerpts from the existing service test module. Its `GrantScenario`, `COMMAND`, `ACCESS`, `AUTHORIZATION`, `CONTEXT`, `SAVED_RESULT`, `NEW_RESERVATION` and `PROJECT_ID` fixtures are defined in that same linked file. They are selected examples, not standalone test files:
+
+**Inspected teaching excerpt:** the complete authorization-before-reservation test from [apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py](../../../../apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py). This is existing code for explanation, not replacement or insertion instructions.
+
+```python
+import pytest
+
+from inframeld_backend.shared.application.errors.application_errors import (
+    AccessDeniedError,
+    ResourceNotFoundError,
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [AccessDeniedError, ResourceNotFoundError])
+async def test_denied_authorization_does_not_reserve_work(
+    error_type: type[AccessDeniedError | ResourceNotFoundError],
+) -> None:
+    """Authorization failure must stop the workflow before any reservation."""
+    scenario = GrantScenario()
+    scenario.authorizer.error = error_type()
+    with pytest.raises(error_type):
+        await scenario.assign()
+    assert scenario.idempotency.calls == 0
+    assert scenario.memberships.calls == 0
+    assert scenario.memberships.loads == 0
+    assert scenario.events == ["fingerprint", "begin", "authorize", "rollback"]
+```
+
+**Inspected teaching excerpt:** the complete authorized replay and revoked-authority test from [apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py](../../../../apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py). This is existing code for explanation, not replacement or insertion instructions.
+
+```python
+from dataclasses import replace
+
+import pytest
+
+from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
+    ProjectGrantChangeFingerprintService,
+)
+from inframeld_backend.shared.application.enums.operation_replay_kind import (
+    OperationReplayKind,
+)
+from inframeld_backend.shared.application.errors.application_errors import (
+    AccessDeniedError,
+)
+from inframeld_backend.shared.application.services.request_fingerprint_service import (
+    RequestFingerprintService,
+)
+from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
+    RequestFingerprintKey,
+)
+
+
+@pytest.mark.asyncio
+async def test_replay_rechecks_authorization_before_returning_saved_result() -> None:
+    """A prior success cannot bypass changed authority on the next request."""
+    scenario = GrantScenario()
+    old_command = replace(COMMAND, expected_access_revision=0)
+    first = await scenario.assign(old_command)
+    assert first == SAVED_RESULT
+    assert scenario.authorizer.last_request == (
+        ACCESS,
+        PROJECT_ID,
+        RECIPIENT_ID,
+        ACTION_ID,
+    )
+    expected_fingerprint = ProjectGrantChangeFingerprintService(
+        RequestFingerprintService(RequestFingerprintKey(b"K" * 32))
+    ).for_assign_use_only(old_command)
+    assert scenario.idempotency.context is CONTEXT
+    assert scenario.idempotency.access is ACCESS
+    assert scenario.idempotency.authorization is AUTHORIZATION
+    assert scenario.idempotency.fingerprint == expected_fingerprint
+    assert scenario.idempotency.expected_kind is OperationReplayKind.SAFE_RESULT
+    assert scenario.events == ["fingerprint", "begin", "authorize", "reserve", "commit"]
+    assert scenario.memberships.calls == 0
+    assert scenario.memberships.loads == 0
+    scenario.authorizer.error = AccessDeniedError()
+    with pytest.raises(AccessDeniedError):
+        await scenario.assign(old_command)
+    assert scenario.authorizer.calls == 2
+    assert scenario.idempotency.calls == 1
+```
+
+**Inspected teaching excerpt:** the complete new-assignment commit-order test from [apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py](../../../../apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py). This is existing code for explanation, not replacement or insertion instructions.
+
+```python
+from dataclasses import replace
+
+import pytest
+
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+
+
+@pytest.mark.asyncio
+async def test_new_assignment_completes_before_transaction_commit() -> None:
+    scenario = GrantScenario()
+    scenario.authorizer.result = replace(AUTHORIZATION, project_id=ProjectId(PROJECT_ID.value))
+    scenario.idempotency.result = NEW_RESERVATION
+    result = await scenario.assign()
+    assert result == replace(SAVED_RESULT, created=True)
+    assert scenario.memberships.last_operation == NEW_RESERVATION.operation_id
+    assert scenario.memberships.last_project_id is scenario.authorizer.result.project_id
+    assert scenario.events == [
+        "fingerprint",
+        "begin",
+        "authorize",
+        "reserve",
+        "load_membership",
+        "write",
+        "complete",
+        "commit",
+    ]
+```
+
+**Walkthrough.** The denial test proves there is no reservation, aggregate load or save. The replay test proves the original result returns after current authorization, without another load or write, and later revoked authority stops lookup. The new-work test checks the original operation identity and checked scope, then completion before commit. These observable interactions protect the security and atomicity contract rather than the service's private layout.
+
+**Failures and alternatives.** Neighboring tests cover mismatched returned scope, stale revision, narrow domain-error translation and reservation/save/completion/commit failures. Unit doubles cannot prove actual PostgreSQL rollback, locking or concurrency. The existing integration scenarios exercise those boundaries and must be qualified for a real affected implementation. Do not present a unit test as database evidence.
+
+## Worked example: document the capability once
+
+**Situation.** A new maintainer needs to know whether a recovery-block read opens a session, what its boolean means and how missing installation metadata fails.
+
+**Decision and placement.** The [complete protocol and explicit double](protocols-and-persistence.md#worked-example-add-a-capability-and-its-test-double) show both docstrings and declarations. The protocol owns caller prerequisites, current unreleased-block meaning and session/failure requirements. The [PostgreSQL implementation](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_identity_recovery_block_reader.py) adds its authoritative query and availability translation. It does not repeat the entire shared contract.
+
+Keep `@abstractmethod`, explicit protocol inheritance and `@override` on real implementations and doubles. A fake may expose controls for failure and overdue responses because those are useful test scenarios. No docstring is needed merely to repeat an annotated argument type, obvious constructor or test name.
+
+## Sources and status
+
+- [Canonical service-writing guide](../../../../docs/development/application-structure.md#service-writing-guide) and [grant chain](../../../../docs/development/application-structure.md#grant-command-flow) supply actual workflow boundaries.
+- [Root guidance](../../../../AGENTS.md#behavioral-testing-and-documentation) makes this sequence mandatory. Loading a skill does not authorize file writes, test-database provisioning or paid calls.
+- [Backend tool configuration](../../../../apps/backend/pyproject.toml) and [strict Pyright configuration](../../../../apps/backend/pyrightconfig.json) supply the current rules. Do not install dependencies or modify those configurations merely to make an isolated example pass.

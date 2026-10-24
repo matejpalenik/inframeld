@@ -27,7 +27,7 @@ For authorized backlog maintenance, use [the implementation template](../../.git
 | How must this part of the product behave? | The relevant [topic guide](../ARCHITECTURE.md#reading-paths) | Current rules, procedures, examples, failures, limitations, and qualification requirements. |
 | Which records exist, and how do they relate? | [data-model.md](data-model.md) | Record identities, ownership, fields, relationships, lifecycle states, constraints, and whether physical tables are proposed or implemented. |
 | What has actually been implemented or tested? | Existing code, tests, and a dated evidence section or implementation reference | Concrete paths and what the check established. A design document is not test evidence. |
-| What should an assistant read and preserve for this task? | One of the six [repository skills](#skill-reading-routes) | Essential boundaries and precise reading routes. Skills must not become independent specifications. |
+| What should an assistant read and preserve for this task? | One of the nine [repository skills](#skill-reading-routes) | Essential boundaries and precise reading routes. Skills must not become independent specifications. |
 
 The [HTTP error guide](error-handling.md), [error maintainer reference](error-handling-reference.md), and [pagination guide](pagination.md) continue to own their established details. Link to them rather than reproducing their implementation instructions in the API guide.
 
@@ -88,18 +88,69 @@ Introduce precise technical terms when they are useful. For example, "save and v
 
 ## Skill reading routes
 
-Keep one active `SKILL.md` per domain under `.agents/skills/`. Preserve its frontmatter, discovery purpose, read-only default, and task boundaries. A small question should load the relevant guide section, not every guide in the repository.
+Keep one active `SKILL.md` for each of the nine capabilities below under `.agents/skills/`. Architecture is for orientation and journeys spanning owners, not a prerequisite for every domain question. Coding Standards loads for code work in every repository language. It teaches backend Python conventions and routes other languages to their existing guidance. Application Contracts covers application orchestration and transport. The former combined Pipelines/Releases skill has been replaced by the separate Pipelines and Releases names, without a compatibility body.
 
 | Skill | Read for current behavior | Read for records |
 | --- | --- | --- |
-| [Access Models](../../.agents/skills/inframeld-access-models/SKILL.md) | [Access control](access-control.md), [model connections](model-connections.md) | [Access](data-model.md#access), [connections and credentials](data-model.md#shared-supporting-records) |
-| [Application Contracts](../../.agents/skills/inframeld-application-contracts/SKILL.md) | [Application structure](application-structure.md), [API contracts](api-contracts.md), [jobs and idempotency](jobs-and-idempotency.md), [MCP](mcp.md), HTTP error and pagination references | [Supporting records](data-model.md#shared-supporting-records) |
-| [Knowledge](../../.agents/skills/inframeld-knowledge/SKILL.md) | [Knowledge lifecycle](knowledge-lifecycle.md), [ingestion security](ingestion-security.md), [retention and deletion](retention-and-deletion.md), [onboarding](onboarding.md) | [Knowledge](data-model.md#knowledge) |
+| [Architecture](../../.agents/skills/inframeld-architecture/SKILL.md) | [Product introduction](../ARCHITECTURE.md), [application structure](application-structure.md), [deployment](deployment.md), [onboarding](onboarding.md) | [Data model](data-model.md) |
+| [Access](../../.agents/skills/inframeld-access-models/SKILL.md) | [Access control](access-control.md), [Access contracts](access-contracts.md), [model connections](model-connections.md) | [Access](data-model.md#access), [connections and credentials](data-model.md#shared-supporting-records) |
+| [Knowledge](../../.agents/skills/inframeld-knowledge/SKILL.md) | [Knowledge lifecycle](knowledge-lifecycle.md), [ingestion security](ingestion-security.md), [retention/deletion](retention-and-deletion.md), [onboarding](onboarding.md) | [Knowledge](data-model.md#knowledge) |
 | [Indexing](../../.agents/skills/inframeld-indexing/SKILL.md) | [Indexing](indexing.md), [ingestion security](ingestion-security.md), [model connections](model-connections.md) | [Indexing](data-model.md#indexing) |
-| [Pipelines and Releases](../../.agents/skills/inframeld-pipelines-releases/SKILL.md) | [Pipelines and releases](pipelines-and-releases.md), [answer feedback](answer-feedback.md), [onboarding](onboarding.md) | [Pipelines](data-model.md#pipelines), [Releases](data-model.md#releases) |
+| [Pipelines](../../.agents/skills/inframeld-pipelines/SKILL.md) | [Pipelines and Releases](pipelines-and-releases.md), [feedback](answer-feedback.md), [observability](observability.md) | [Pipelines](data-model.md#pipelines) |
 | [Evaluation](../../.agents/skills/inframeld-evaluation/SKILL.md) | [Evaluation](evaluation.md), relevant [model](model-connections.md) and [access](access-control.md) boundaries | [Evaluation](data-model.md#evaluation) |
+| [Releases](../../.agents/skills/inframeld-releases/SKILL.md) | [Pipelines and Releases](pipelines-and-releases.md), [onboarding](onboarding.md), [Access](access-control.md) | [Releases](data-model.md#releases) |
+| [Coding Standards](../../.agents/skills/inframeld-coding-standards/SKILL.md) | [Component conventions](application-structure.md#component-conventions), [static utilities](application-structure.md#static-utilities-and-mappers), [service-writing guide](application-structure.md#service-writing-guide) | [Existing typed values and contracts](application-structure.md#component-conventions) |
+| [Application Contracts](../../.agents/skills/inframeld-application-contracts/SKILL.md) | [Application structure](application-structure.md), [API contracts](api-contracts.md), [jobs/idempotency](jobs-and-idempotency.md), [MCP](mcp.md), error and pagination references | [Supporting records](data-model.md#shared-supporting-records) |
 
-After a substantive skill change, check its frontmatter and links, then follow realistic questions through its reading routes. Skills keep essential warnings and task boundaries. Guides own the full explanation. Loading a skill does not authorize edits.
+Read the selected skill and only the references relevant to the current question. Before any repository code planning, suggestions, additions, changes or reviews, including tests and code snippets, root AGENTS.md requires Coding Standards. Apply its Python references only to backend Python. Other languages retain their directory and language guidance. Backend services require its service example, and affected aggregates/repositories require their specific example. Services and execution boundaries also require the owning Application Contracts workflow. Moving detailed conventions out of root guidance does not make them optional. Domain-only explanations need no coding-standard load. Loading any skill grants no editing or external-action authority.
+
+### Write a skill for both people and agents
+
+Frontmatter describes the actual capability and activation conditions. The body explains purpose, a small working model, essential constraints, a method for explaining/reviewing, and direct conditional reading routes. Aim for roughly 400–800 words per entry point, excluding diagrams. This is an editorial target, not permission to discard information.
+
+References should explain a problem through Alice or SupportBot, introduce concepts and owners, follow a normal flow, then cover failures/retries/changed state, implementation limits and supporting sources. A junior engineer should understand the ordinary workflow without reading ADRs first. Explain specialized terms where introduced. Avoid dense paragraphs, unexplained issue shorthand and a catch-all edge-case dump.
+
+Keep one-level reference navigation and direct source citations. Canonical guides own behavior, the data model owns records and ADRs own rationale. Skill references teach those sources without becoming independent specifications or copying whole manuals. Keep historical evidence, explicit supersession and pending qualification distinguishable. No scripts, assets, interface metadata or placeholder folders are needed without a concrete workflow benefit.
+
+Architecture diagrams distinguish processes, logical owners and interaction arrows from code dependencies. The glossary explains terms and commonly confused meanings without duplicating exact record schemas.
+
+### Maintain worked code examples
+
+Coding Standards keeps substantial examples in its seven focused references. Begin with a concrete component task, explain its owner/layer/role and placement, then show contextual code, normal flow, relevant failure and source limits. A junior reader should understand why that component exists without opening an ADR first.
+
+Label complete inspected modules, selected teaching excerpts and illustrative code accurately. Identify the exact source or proposed destination and whether a proposed snippet is a complete new file, replacement or insertion. Include needed imports and context. For a selected test, identify its source fixtures and show their declarations when needed to understand the behavior. Do not use unexplained ellipses or omit safety checks from an example presented as a complete use case.
+
+When an implementation changes, recheck the corresponding excerpt and its explanation against the owning guide. Keep one full service example rather than copying it into every reference. Link neighboring examples by the decision they help make. Preserve valid function, primitive, projection and instance-service exceptions. Source fidelity does not make incidental code choices universal rules.
+
+### Preserve coverage during a rewrite
+
+Snapshot current working-tree files and hashes outside the repository before writing. Inventory individual decisions, requirements, examples, exceptions, symbols, limits, sources and qualification statements. Record each item's final location and any identical statements merged. Check meaning and applicability, not just shared words. Retained canonical content is an acceptable destination only when the relevant rule is identified and remains reachable.
+
+Do not leave unique context solely in a temporary ledger or Git history. Do not create a permanent migration map or archive. Preserve intervening edits and resolve only explicit supersession. Report unresolved source disagreements without inventing policy. Repair active skill names and routes, while retaining historical file identities and dates in old reports with current navigation alongside them.
+
+### Evaluate in fresh contexts
+
+After substantive changes, validate frontmatter and links, then use fresh conversations for explanation, review/failure and unrelated requests for each skill. Inspect which files are loaded as well as answer quality. Narrow questions should not require every reference or Architecture by default.
+
+For coding-standard changes, include isolated generation and review trials. Cover reusable utilities, typed values and boundary conversion, static mappers, explicit protocol implementations, and legitimate function/instance-service exceptions. Trial agents return proposed code without repository edits. Materialize artifacts only in temporary workspaces and check meaningful behavior, strict typing and applicable lint using existing tools. Seeded review cases must include both violations and valid exceptions. For worked service/repository examples, also trial complete service construction, domain ownership, scoped loading, replay/failure behavior and repository lifetime. Check all-language routing with frontend additions/reviews and Rust review, plus behavior-only and documentation-only controls. Inspect actual loading traces and verify that non-Python answers do not inherit Python conventions.
+
+Keep trial prompts independent of the expected answers. Record actual loading traces and outcomes. Source walkthroughs do not establish automatic activation. Report unavailable runtime trials honestly, without replacing them with inferred success. These evaluations add no repository enforcement tests and contact no product model endpoints.
+
+| Walkthrough | Expected understanding |
+| --- | --- |
+| Handbook upload to Production | Separate admission, verified preparation, ready build and publication. |
+| Browser, human CLI and bot key | Same human across browser/CLI, separate application identity, current authority and no fallback. |
+| Consent/refresh across recovery | Version invalidation, independent blocks, provider uncertainty and unfinished production qualification. |
+| Grant retry after lost response or revoked authority | Current authorization, checked scope, original operation, atomic audit and correct rollback owner. |
+| Replace B1 and later erase it | Immutable revisions, unchanged A1 reuse, blocked late publication and historical unavailability. |
+| A vector shard times out | Frozen-byte storage retry, no inferred paid retry, incomplete materialization remains unready. |
+| Automatic → Manual → Automatic during Build | Old publication authority never revives. |
+| Edited cases or missing passage coordinates | Frozen inputs, fresh comparison, explicit unscorable counts and protected evidence. |
+| Connection/import/tracing/feedback changes | Exact authority, no identity fallback, partial effects, current access and original attribution. |
+| Suggested backend component | Owner/layer/role, typed values/ORM, explicit protocol implementation and behavioral testing. |
+| Unrelated styling, CI or generic authentication | No Inframeld domain policy imposed on the unrelated task. |
+
+Record walkthrough outcomes and corrections in the temporary review material or handoff. Do not mislabel these editorial checks as application-suite execution, model-quality calibration or runtime qualification.
 
 ## Check coverage and references
 

@@ -1210,7 +1210,7 @@ Exact repository files changed in this pass:
 - [.agents/skills/inframeld-evaluation/SKILL.md](../../.agents/skills/inframeld-evaluation/SKILL.md)
 - [.agents/skills/inframeld-indexing/SKILL.md](../../.agents/skills/inframeld-indexing/SKILL.md)
 - [.agents/skills/inframeld-knowledge/SKILL.md](../../.agents/skills/inframeld-knowledge/SKILL.md)
-- [.agents/skills/inframeld-pipelines-releases/SKILL.md](../../.agents/skills/inframeld-pipelines-releases/SKILL.md)
+- Former path `.agents/skills/inframeld-pipelines-releases/SKILL.md` (historical). Current routes: [Pipelines](../../.agents/skills/inframeld-pipelines/SKILL.md) and [Releases](../../.agents/skills/inframeld-releases/SKILL.md)
 - [docs/ARCHITECTURE.md](../ARCHITECTURE.md)
 - [docs/adr/ADR-0031-compare-fresh-executions-against-frozen-benchmarks.md](../adr/ADR-0031-compare-fresh-executions-against-frozen-benchmarks.md)
 - [docs/adr/ADR-0033-separate-build-readiness-from-release-authority.md](../adr/ADR-0033-separate-build-readiness-from-release-authority.md)
@@ -1315,7 +1315,7 @@ Exact repository scope:
 - structured change presentation requirements and mock screens: [structured changes](https://github.com/matejpalenik/inframeld/issues/158).
 - [API contracts](api-contracts.md#cli-change-presentation): shared delta semantics, fallbacks, disclosure and machine output.
 - [Pipelines/Releases](pipelines-and-releases.md#change-review): editing, stale review, admitted Build and publication examples.
-- [Application Contracts skill](../../.agents/skills/inframeld-application-contracts/SKILL.md) and [Pipelines/Releases skill](../../.agents/skills/inframeld-pipelines-releases/SKILL.md): concise routes/invariants, not duplicate specifications.
+- [Application Contracts skill](../../.agents/skills/inframeld-application-contracts/SKILL.md) and former `inframeld-pipelines-releases` skill (current routes: [Pipelines](../../.agents/skills/inframeld-pipelines/SKILL.md) and [Releases](../../.agents/skills/inframeld-releases/SKILL.md)): concise routes/invariants, not duplicate specifications.
 - This [delivery plan](cli-delivery-plan.md): ownership for 114 recorded capabilities and the scoped pass record.
 
 Fresh baselines captured 382 repository files and 178 issues. Retain real SHA `b3bbfc438a6dbc390e4bd56210474bacaf177a49` plus the explicitly dated 2026-10-02 uncommitted overlay; local document references are not claims that unpublished files exist at the commit. Earlier pass checks remain historical, not this pass's evidence.
@@ -1369,7 +1369,7 @@ Exact repository scope:
 - [Retention and deletion](retention-and-deletion.md#trace-history-deletion): opt-out versus erasure, unreadable history, resumable cleanup and external-copy limitations.
 - [Data model](data-model.md): logical outcome, policy, availability and cleanup distinctions without physical schema changes.
 - [Pipelines/Releases](pipelines-and-releases.md#direct-query): application to direct and live queries without weakening business checks or receipt-only recovery.
-- [Application Contracts skill](../../.agents/skills/inframeld-application-contracts/SKILL.md) and [Pipelines/Releases skill](../../.agents/skills/inframeld-pipelines-releases/SKILL.md): focused reading routes rather than duplicated specifications.
+- [Application Contracts skill](../../.agents/skills/inframeld-application-contracts/SKILL.md) and former `inframeld-pipelines-releases` skill (current routes: [Pipelines](../../.agents/skills/inframeld-pipelines/SKILL.md) and [Releases](../../.agents/skills/inframeld-releases/SKILL.md)): focused reading routes rather than duplicated specifications.
 - This [delivery plan](cli-delivery-plan.md): traceability for 116 recorded capabilities and this scoped evidence record.
 
 Fresh baselines captured 382 repository files and 178 issues. Retain real SHA `b3bbfc438a6dbc390e4bd56210474bacaf177a49` plus the explicit 2026-10-02 uncommitted overlay; local paths do not claim unpublished files exist at the commit. Earlier pass checks remain historical.

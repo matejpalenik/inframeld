@@ -89,7 +89,7 @@ The maintained destinations below were among the files changed relative to that 
 - [.agents/skills/inframeld-evaluation/SKILL.md](../../.agents/skills/inframeld-evaluation/SKILL.md)
 - [.agents/skills/inframeld-indexing/SKILL.md](../../.agents/skills/inframeld-indexing/SKILL.md)
 - [.agents/skills/inframeld-knowledge/SKILL.md](../../.agents/skills/inframeld-knowledge/SKILL.md)
-- [.agents/skills/inframeld-pipelines-releases/SKILL.md](../../.agents/skills/inframeld-pipelines-releases/SKILL.md)
+- Former path `.agents/skills/inframeld-pipelines-releases/SKILL.md` (historical). Current routes: [Pipelines](../../.agents/skills/inframeld-pipelines/SKILL.md) and [Releases](../../.agents/skills/inframeld-releases/SKILL.md)
 - [.github/ISSUE_TEMPLATE/implementation.md](../../.github/ISSUE_TEMPLATE/implementation.md)
 - [AGENTS.md](../../AGENTS.md)
 - [README.md](../../README.md)
@@ -222,7 +222,7 @@ These maintained destinations were among the files changed in that historical pa
 - [docs/development/pipelines-and-releases.md](pipelines-and-releases.md)
 - [.agents/skills/inframeld-access-models/SKILL.md](../../.agents/skills/inframeld-access-models/SKILL.md)
 - [.agents/skills/inframeld-application-contracts/SKILL.md](../../.agents/skills/inframeld-application-contracts/SKILL.md)
-- [.agents/skills/inframeld-pipelines-releases/SKILL.md](../../.agents/skills/inframeld-pipelines-releases/SKILL.md)
+- Former path `.agents/skills/inframeld-pipelines-releases/SKILL.md` (historical). Current routes: [Pipelines](../../.agents/skills/inframeld-pipelines/SKILL.md) and [Releases](../../.agents/skills/inframeld-releases/SKILL.md)
 
 ### Developer handoff
 
@@ -309,7 +309,7 @@ Compared with the fresh 382-file baseline, **30 Markdown files** changed and the
 - [.agents/skills/inframeld-access-models/SKILL.md](../../.agents/skills/inframeld-access-models/SKILL.md)
 - [.agents/skills/inframeld-application-contracts/SKILL.md](../../.agents/skills/inframeld-application-contracts/SKILL.md)
 - [.agents/skills/inframeld-evaluation/SKILL.md](../../.agents/skills/inframeld-evaluation/SKILL.md)
-- [.agents/skills/inframeld-pipelines-releases/SKILL.md](../../.agents/skills/inframeld-pipelines-releases/SKILL.md)
+- Former path `.agents/skills/inframeld-pipelines-releases/SKILL.md` (historical). Current routes: [Pipelines](../../.agents/skills/inframeld-pipelines/SKILL.md) and [Releases](../../.agents/skills/inframeld-releases/SKILL.md)
 - [docs/ARCHITECTURE.md](../ARCHITECTURE.md)
 - [docs/adr/ADR-0038-recover-from-a-coordinated-backup-of-the-installation.md](../adr/ADR-0038-recover-from-a-coordinated-backup-of-the-installation.md)
 - [docs/adr/ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md](../adr/ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md)
