@@ -18,7 +18,9 @@ Sections 1–2 explain the owners and follow a request. Sections 3–5 explain h
 | How do authorization capabilities scale? | [Typed authorization families](#typed-authorization) |
 | How should I write a service with rich domain behavior? | [Service-writing guide](#service-writing-guide) |
 | What does a complete write operation look like? | [Implemented grant command](#grant-command-flow) |
+| What evidence does an access context carry? | [Authentication evidence](#access-context-evidence) |
 | How does a human-session request work? | [Implemented authentication flow](#authentication-flow) |
+| Where are CLI credential versions captured and checked? | [Credential-version flow](#human-credential-version-flow) |
 | How does work reach its owner? | [2. Follow a command and a query](#operation) |
 | Where do transactions start and end? | [3. Keep changes consistent](#coordination) |
 | What belongs in HTTP, Studio, or MCP? | [4. Share behavior across entry points](#entry-points) |
@@ -138,6 +140,7 @@ inframeld_backend/
 │   │   └── responses/                 # CurrentSessionResponse, ProjectUseOnlyGrantResponse
 │   └── infrastructure/
 │       ├── readers/                   # PostgresHumanIdentityLinkReader, project facts reader
+│       ├── mappers/postgres_human_credential_state_mapper.py
 │       ├── revokers/hydra_human_oauth_credential_revoker.py
 │       ├── verifiers/
 │       │   ├── kratos_browser_session_verifier.py
@@ -206,6 +209,7 @@ Use one primary public type per production module, with a matching snake-case fi
 | HTTP model | `*Request` / `*Response` | Validate or serialize the wire contract using Pydantic. |
 | Middleware | `*Middleware` in `*_middleware.py` | Wrap the ASGI request lifecycle. |
 | ORM mapping | `*Row` in `infrastructure/rows` | Map persisted fields using typed constructors and expressions. |
+| Shared persistence conversion | Technology-prefixed static `*Mapper` in `infrastructure/mappers` | Convert database projections into application/domain values when several adapters share that conversion. Perform no I/O or authorization. |
 | Settings | `*Settings` in `infrastructure/settings` | Validate resource configuration; bootstrap aggregates it. |
 | Bootstrap assembly | `AccessComponents`, `ApplicationResources` | Group constructed collaborators and owned resources. These are not application DTOs. |
 
@@ -230,7 +234,7 @@ A dataclass is an implementation mechanism, not a record's architectural role. U
 | Implemented record | What it means |
 | --- | --- |
 | `VerifiedHumanIdentityDTO` | The provider verified this authority/subject pair. Local account admission remains to be checked. |
-| `AccessContextDTO` | The authenticated caller's principal ID, without cached status or permissions. |
+| `AccessContextDTO` | The authenticated caller's principal ID and required authentication evidence, without cached status or permissions. |
 | `ProjectActionTargetDTO` | The exact project selected for authorization; no proof of existence or visibility. |
 | `ProjectActionFactsDTO` | Stored project/account status, membership, and exact-grant existence returned by a reader. |
 | `ActionAuthorizationPolicyInput` | The eligibility and grant values the action policy consumes. |
@@ -269,16 +273,16 @@ Alice's recovery block affects authentication, action use and delegation. Adding
 | Component | Current responsibility or planned lifecycle work |
 | --- | --- |
 | `Principal` | Preserve local account identity and observed kind/status. Add lifecycle methods with the suspension/restoration workflows that require them. |
-| `PrincipalAccessPolicyInput` | Carry the observed Principal and current pending-recovery fact together. It is a frozen, slotted domain policy input for one attempt. |
+| `PrincipalAccessPolicyInput` | Carry the observed Principal, pending-recovery fact and evaluated credential currentness together. It is a frozen, slotted domain policy input for one attempt. |
 | `PrincipalAccessPolicy` | Own the pure common active-account check and compose it with no-pending-recovery for product use. It performs no I/O. |
 | Authentication, action and delegation policies | Compose common eligibility, then apply their own caller-kind and operation-specific rules. Visibility remains a distinct decision. |
-| Application DTOs and operation-specific policy inputs | Carry the cohesive principal input without spreading its fields across each operation signature. A DTO remains data, not a domain aggregate. |
+| Application DTOs and operation-specific policy inputs | Facts DTOs report stored observations. Application services build the cohesive principal input for operation policies. A DTO remains data, not a domain aggregate. |
 | Access authorization operations | Coordinate exact-scope facts, visibility and authority checks. Action authorization returns the checked organization and project. Grant authorization also returns the current project access revision needed by the caller's transaction. Its result grants no future authority. |
 | PostgreSQL facts readers | Load the required values and convert them at the boundary. Prefer a single facts projection rather than executing another reader inside a reader. |
 | `IdentityRecovery` | Protect the original flow's independent provider outcomes and local release transition. The application must first check current eligibility and competing obligations. |
 | `IdentityRecoveryRepository` | Load and save an existing checklist within one caller-owned transaction. Preserve original admission metadata and reject conflicting changed saves. |
 
-The common input contains a `Principal` and `has_pending_recovery`. `ProjectActionFactsDTO` carries it as `principal_access`, and `ProjectGrantChangeFactsDTO` carries it as `actor_access`. The action policy input nests it with membership and exact-grant facts. This keeps dependency direction inward. Readers supply observations rather than a precomputed permission, and services pass the common input intact. Policies must not import application DTOs or ORM types.
+`ProjectActionFactsDTO` carries the stored `principal`, while `ProjectGrantChangeFactsDTO` carries the stored `actor`. Both also report `has_pending_recovery` and optional `HumanOAuthCredentialFactsDTO`. After loading these observations, each authorizer calls `PrincipalAccessEvaluationService.evaluate()` to interpret the authentication evidence and construct `PrincipalAccessPolicyInput`. Operation policies compose that input with membership and exact-grant facts. Readers do not evaluate eligibility, and policies do not import application DTOs or ORM types. [Credential query and policy boundaries](#credential-query-and-policy-boundaries) explain the full chain.
 
 Keep public authorization capabilities specific. `ActionAuthorizer` remains the entry point for ordinary action checks. [`ProjectGrantChangeService`](../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) calls `ProjectGrantAuthorizer`, implemented by [`ProjectGrantAuthorizationService`](../../apps/backend/src/inframeld_backend/access/application/services/project_grant_authorization_service.py), before reserving work or returning a replay. The authorization result supplies the current organization and revision for that transaction. Access services may compose specialized reader protocols. This does not call for a universal authorization service or generic policy engine.
 
@@ -295,6 +299,22 @@ The [recovery repository](../../apps/backend/src/inframeld_backend/access/applic
 [`IdentityRecoveryCompletionService`](../../apps/backend/src/inframeld_backend/access/application/services/identity_recovery_completion_service.py) implements `IdentityRecoveryCleanupRecorder` through direct `TransactionManager`, completion-facts and repository dependencies. Its configured installation/provider scope is server-owned. Within its transaction it checks the original event, validates the loaded aggregate, applies supplied provider outcomes and uses `IdentityRecoveryReleasePolicy` before saving. The policy requires both confirmations and either an active human or no local account. It reuses `PrincipalAccessPolicy.is_account_active()` without pretending a recovery block is absent for ordinary product access. Each flow releases only itself under [ADR-0069](../adr/ADR-0069-release-completed-recovery-obligations-independently.md).
 
 The [completion facts reader](../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_identity_recovery_completion_facts_reader.py) uses the same session and locks the linked organization before reading current account/admission/other-flow facts in a typed projection. Its five-second deadline includes lock waits. Returned other-pending metadata is observational, not authority. Missing admission conflicts instead of provisioning an obligation. An already released repeat skips mutation/save, while an unreleased repeat can recheck local eligibility. [The Access walkthrough](access-control.md#recovery-completion-workflow) owns the complete local sequence and qualification limits. Bootstrap/private callbacks and complete provider-cleanup orchestration remain future integration work. Bulk Hydra calls are implemented separately below.
+
+<a id="human-oauth-consent"></a>
+
+### Native login and external consent orchestration
+
+Alice's CLI login gives Kratos the password-verification and Hydra login steps. Inframeld owns the consent decision, through `HumanOAuthConsentHandler` and `HumanOAuthConsentService`. Follow [ADR-0071](../adr/ADR-0071-use-native-kratos-login-and-checked-hydra-consent.md) and the [browser handoff](api-contracts.md#human-oauth-consent).
+
+The HTTP dependency extracts one cookie and enforces POST CSRF. A static mapper converts the HTTP input into an inspection Query or decision Command. The service calls its specific `OAuthConsentRequestReader`, current `BrowserSessionVerifier` and `OAuthConsentDecisionWriter`. Inspection/denial use the independent recovery-block reader. Allow decisions additionally use the explicitly named credential-state initializer and reader described in [the versioned flow](#human-credential-version-flow). A pure `HumanOAuthConsentPolicy` limits client/access. Bootstrap injects SDK adapters using the existing lifespan-owned clients.
+
+The service makes the two paths explicit. `_read_supported_request()` reads Hydra's challenge and rejects unsupported client, scope or audience before any browser or local-state work. `_check_read_only_request()` then verifies the browser and recovery state for inspection or denial. Denial submits Hydra's rejection only after those checks. `_prepare_approval()` captures credential state, verifies the browser, rereads state and returns a required binding for approval. Both observations must remain unblocked and unchanged. There is no flag-driven optional approval result.
+
+Unsupported access returns 403 even if the supplied cookie would fail verification. HTTP credential selection and POST CSRF still run first. Supported approvals still initialize/capture state before browser verification, including when that verification later fails. Inspection and denial never initialize versions.
+
+This is provider orchestration, not a local aggregate mutation. Do not invent a consent entity, open a SQL transaction around provider waits or require local principal admission. The recovery reader owns only a short independent session. Provider calls default to five seconds each within the existing ten-second total budget. Late results cannot establish success, cancellation propagates and no write is automatically retried.
+
+Request/display DTOs carry attempt-local evidence. The later decision rereads current state. The service cannot make its recovery check atomic with a remote approval. Its returned continuation contains private flow state and must remain outside logs. The [provider observations](access-control.md#native-hydra-consent) explain the remaining recovery coordination requirement.
 
 <a id="provider-revocation"></a>
 
@@ -406,7 +426,7 @@ The context manager does not decide whether its body should run. The service kee
 
 A stale revision, failed audit write, failed completion or cancellation before commit rolls back the database effects. A lost response after commit is handled by an authorized retry with the same key and meaning. Failed or uncertain commit communication cannot justify submitting new work with a fresh key.
 
-This is the implemented example for new complete database writes. `ProjectOperationAdmissionService` also uses `OperationIdempotency`, after current action authorization and trusted scope derivation. It keeps its existing request input, creates `ProjectActionAuthorizationRequestDTO` for the action family and checks the returned project before idempotency lookup. It converts method, canonical route and key into `OperationAdmissionContextDTO`. It requires its caller to specify the expected replay kind and to own the transaction. Sharing this retry decision does not qualify a second complete product command. Low-level reservation adapters retain their transaction contracts. Provider cleanup, account lifecycle aggregates and the other grant workflows remain separate work.
+This is the implemented example for new complete database writes. Access owns [`ProjectOperationAdmissionService`](../../apps/backend/src/inframeld_backend/access/application/services/project_operation_admission_service.py) and its `ProjectOperationAdmissionRequestDTO`, because the helper coordinates project authorization. It also uses shared `OperationIdempotency`, after current action authorization and trusted scope derivation. It creates `ProjectActionAuthorizationRequestDTO` for the action family and checks the returned project before idempotency lookup. It converts method, canonical route and key into `OperationAdmissionContextDTO`. Its caller specifies the expected replay kind and owns the transaction. Generic retry decisions, outcomes and reservation persistence stay shared. Sharing them does not qualify a second complete product command. Provider cleanup, account lifecycle aggregates and the other grant workflows remain separate work.
 
 ### Membership aggregate and repository
 
@@ -467,7 +487,7 @@ flowchart TD
     Reader --> Principal["Principal<br/>ID, organization, kind, status"]
     Cookie --> Policy["HumanAuthenticationPolicy.may_authenticate"]
     Bearer --> Policy
-    Cookie --> Context["AccessContextDTO<br/>PrincipalId only"]
+    Cookie --> Context["AccessContextDTO<br/>PrincipalId + authentication evidence"]
     Bearer --> Context
 ```
 
@@ -477,14 +497,14 @@ Arrows show calls or returned data inside one backend. The API boxes represent e
 2. On the cookie path, `HumanSessionAuthenticationService` calls `KratosBrowserSessionVerifier`. The adapter runs the synchronous SDK call in a worker thread, checks the session and identity state, and returns the verified authority/subject pair.
 3. On the bearer path, `HumanAccessTokenAuthenticationService` first calls `HydraAccessTokenVerifier`. Private introspection checks token kind, validity and the configured issuer/client/audience/scope. It then calls `KratosHumanIdentityVerifier` to check that the same human identity is currently eligible. Both adapters bound their SDK calls and return application-owned identity values.
 4. After the required provider checks finish, `PostgresHumanIdentityLinkReader` opens a short independent session. It finds the exact identity pair, constructs a `Principal` and closes the session. Concurrent requests share the reader, but each lookup gets its own `AsyncSession`. Provider waits never hold that read session open.
-5. The selected service applies `HumanAuthenticationPolicy.may_authenticate`. A verified identity still needs an existing active local human. The result is `AccessContextDTO` containing that account's ID, with no cached status or permission snapshot.
+5. The selected service applies `HumanAuthenticationPolicy.may_authenticate`. A verified identity still needs an existing active local human. The result is `AccessContextDTO` containing that account's ID and the exact browser-session or OAuth evidence established by authentication. It contains no cached status or permission snapshot.
 6. The session route converts the ID to the existing `CurrentSessionResponse`: `{"principalId": "<uuid>"}`. A business route instead uses that identity to check its current permissions. The project-grant route performs those checks and its change, audit and idempotency work in a short transaction.
 
 Cookie-authenticated writes also pass `CSRFProtectionDependency` after authentication and before the route runs. They need both the CSRF marker and a trusted Origin. Human bearer writes do not require those browser headers. Every new request repeats its required provider and local checks, including a request to replay a previously saved result.
 
 Malformed or competing credentials return 400. Missing/rejected/expired credentials return 401. Missing local admission or an ineligible local principal returns 403. Required verification that cannot be confirmed returns 503. A supplied credential whose provider is not configured also returns 503. [Access](access-control.md#implemented-human-authentication) explains the cases, test coverage and current limits, while [HTTP errors](error-handling.md#authentication-contract) owns exact problem and challenge values.
 
-Authentication establishes the caller. A later `ActionAuthorizationService.require_action` reads current visibility, membership, account and exact-grant facts. It checks `ProjectVisibilityPolicy`, converts the reader DTO into `ActionAuthorizationPolicyInput`, then checks `ActionAuthorizationPolicy`. Hidden targets stay 404 and visible targets without authority stay 403. Its PostgreSQL reader uses the caller's transaction, unlike the independently scoped authentication reader.
+Authentication establishes the caller. A later `ActionAuthorizationService.require_authorization` reads current visibility, membership, account and exact-grant facts. It checks `ProjectVisibilityPolicy`, converts the reader DTO into `ActionAuthorizationPolicyInput`, then checks `ActionAuthorizationPolicy`. Hidden targets stay 404 and visible targets without authority stay 403. Its PostgreSQL reader uses the caller's transaction, unlike the independently scoped authentication reader.
 
 ### Resource ownership and test organization
 
@@ -665,3 +685,43 @@ Feature endpoints and rules for simultaneous changes still need implementation a
 | --- | --- |
 | [ADR-0001](../adr/ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md) | Use one modular backend with clear domain boundaries. |
 | [ADR-0002](../adr/ADR-0002-separate-commands-and-queries-without-a-command-bus-framework.md) | Separate commands and queries without a command-bus framework. |
+
+<a id="access-context-evidence"></a>
+
+### Carry complete evidence for the authenticated caller
+
+Alice's browser context identifies the provider identity verified from her session. Her CLI context carries the exact identity, installation and credential version verified from Hydra. SupportBot's application-key evidence identifies its key without its secret. These are the three alternatives for the required `AccessContextDTO.authentication_evidence` field under [ADR-0073](../adr/ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md). [Record definitions](data-model.md#authentication-evidence-records) own their fields.
+
+The two implemented human authenticators construct complete contexts. HTTP dependencies and application services pass them unchanged. Authorizers read current facts separately. Both facts readers return the stored principal and exact OAuth binding/version observations. The shared application evaluator checks evidence against the stored principal kind. A kind mismatch is an internal `RuntimeError` before reservation, replay or mutation. It does not change the ordinary denial for a correctly represented application requesting human-only work.
+
+`PrincipalAccessPolicyInput.credential_is_current` has no default. Every producer supplies it explicitly. Browser/application contexts use true because the human OAuth generation check does not apply. That value does not establish browser-session or application-key validity. Production application-key authentication remains unfinished, and authorization tests simulate it with explicit evidence and synthetic key IDs. Add no empty evidence base, marker Protocol or parallel authentication-method enum.
+
+<a id="human-credential-version-flow"></a>
+
+### Carry credential evidence without freezing authorization
+
+[Credential versioning](access-control.md#human-credential-versions) extends the consent and human bearer chains. Access owns the version value and validity policy. Typed application records carry binding evidence and current observations. PostgreSQL adapters own scoped persistence and coherent projections. Hydra adapters alone map private provider metadata.
+
+For consent allowance, the service first reads and validates Hydra's trusted request. Unsupported access stops before initialization or browser verification. For supported access, it initializes/captures the version and block, verifies the browser, then reads current state before approval. This initializer is a narrow provider-workflow metadata capability with its own bounded short transaction. It closes that transaction before provider verification. It does not provision an account, execute a product Command or advance an existing version. GET inspection and denial remain read-only with respect to version state.
+
+Bearer verification returns a `HumanOAuthCredentialBindingDTO`. Authentication checks current state, then returns the actor with that non-secret evidence in `AccessContextDTO`. [Explicit evidence variants](#access-context-evidence) distinguish browser, OAuth and application-key callers. Authorization facts readers compose exact identity-link and version lookup into their existing statement, using pure query construction rather than executing another reader. Both authorization families reject stale credentials before retry lookup or mutation. The shared product-eligibility policy also denies a non-current credential.
+
+Existing organization/project locks and application-owned grant transactions stay in place. Recovery admission advances its identity version inside its caller's transaction. No database session waits for an external provider. A captured version identifies the credential's origin and never certifies future eligibility or permission.
+
+<a id="credential-query-and-policy-boundaries"></a>
+
+### Separate stored credential observations from decisions
+
+Alice presents CLI version 6, while her current stored version is 7. SQL establishes whether her presented installation and provider identity match the local actor's identity link. It returns that relationship and the stored version together. The domain policy then requires both a matching binding and an equal version. It does not compare the credential's identity fields with copies of those same fields.
+
+| Component | Responsibility |
+| --- | --- |
+| `HumanCredentialStateQueries` | Construct typed SQL expressions. OAuth expressions accept the exact binding, not an entire Access context. They open no sessions and execute nothing. |
+| PostgreSQL facts readers | Execute the existing coherent facts SELECT and return the stored principal, recovery flag and `HumanOAuthCredentialFactsDTO`. OAuth callers always receive an observation record, including failed matches or absent versions. Other evidence families receive no OAuth facts. |
+| `PostgresHumanCredentialStateMapper` | Share database-to-state conversion between the independent state reader, initializer and recovery-admission writer. Missing installation metadata remains unavailable state. The mapper initializes nothing and decides no permission. |
+| `PrincipalAccessEvaluationService.evaluate()` | Interpret the three evidence variants, reject stored-kind mismatches and construct `PrincipalAccessPolicyInput` using the credential policy. It performs no I/O and needs no extra injected capability. |
+| `HumanCredentialPolicy` | Decide currentness from the checked actor binding and presented/stored versions. Bearer authentication retains its separate full-binding comparison against authoritative state. |
+
+Both authorizers invoke the evaluator after a non-missing facts result. Missing OAuth observations are an internal contract failure, while an unsuccessful match or missing/different version produces non-current credentials. Authorizers translate that result into the existing generic invalid-credential failure before visibility, permission, reservation or replay. Browser/application paths explicitly supply true for this inapplicable OAuth check without verifying their sessions or keys again.
+
+The action reader still executes one statement. The grant reader retains its three coordination statements followed by one facts SELECT. Both use the caller's transaction, and ORM projections refresh already loaded state. [PostgreSQL observation tests](../../apps/backend/tests/integration/access/test_human_credential_facts_postgres.py) exercise these query counts and current principal status. No reader calls another executing reader to fill a field.

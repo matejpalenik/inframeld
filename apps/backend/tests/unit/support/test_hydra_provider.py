@@ -16,7 +16,7 @@ from tests.support.hydra_provider import (
     UI_ORIGIN,
     HydraTestProvider,
 )
-from tests.support.integration_services import HYDRA_PUBLIC_URL
+from tests.support.integration_services import HYDRA_PUBLIC_URL, KRATOS_PUBLIC_URL
 from tests.support.kratos_browser import RegisteredHumanDTO
 
 from inframeld_backend.access.application.value_objects.browser_session_credential import (
@@ -71,7 +71,10 @@ class MockHydraTransport(httpx2.AsyncBaseTransport):
             if "response_type" in params:
                 self.authorization = params
                 return httpx2.Response(
-                    302, headers={"location": f"{UI_ORIGIN}/login?login_challenge=login-secret"}
+                    302,
+                    headers={
+                        "location": f"{KRATOS_PUBLIC_URL}/self-service/login/browser?login_challenge=login-secret"
+                    },
                 )
             if "login_verifier" in params:
                 return httpx2.Response(
@@ -268,3 +271,57 @@ async def test_only_explicit_invalid_grant_means_a_denied_code_without_retries(
                 await provider.exchange_authorization_code(code)
             assert "provider-detail-secret" not in str(failure.value)
         assert sum(request.url.path == "/oauth2/token" for request in transport.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_provider_setup_failure_restores_http_client_logging() -> None:
+    import logging
+
+    from tests.support.hydra_provider import hydra_test_provider
+
+    logger = logging.getLogger("httpx2")
+    previous = logger.level
+    transport = httpx2.MockTransport(lambda _request: httpx2.Response(500))
+    try:
+        with pytest.raises(AssertionError):
+            async with hydra_test_provider(transport=transport):
+                raise AssertionError("Setup unexpectedly succeeded.")
+        assert logger.level == previous
+    finally:
+        logger.setLevel(previous)
+
+
+@pytest.mark.asyncio
+async def test_only_explicit_binding_is_written_to_test_consent_metadata() -> None:
+    import json
+
+    from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+        HumanOAuthCredentialBindingDTO,
+    )
+    from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+        VerifiedHumanIdentityDTO,
+    )
+    from inframeld_backend.access.domain.value_objects.human_credential_version import (
+        HumanCredentialVersion,
+    )
+    from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+    from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+
+    transport = MockHydraTransport()
+    binding = HumanOAuthCredentialBindingDTO(
+        VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), SUBJECT),
+        InstallationId(UUID(int=123)),
+        HumanCredentialVersion(6),
+    )
+    async with httpx2.AsyncClient(transport=transport) as client:
+        provider = HydraTestProvider(client)
+        await provider.approve_login_and_consent(
+            await provider.begin_login(HUMAN), credential_binding=binding
+        )
+    accepted = next(
+        request for request in transport.requests if request.url.path.endswith("/consent/accept")
+    )
+    assert json.loads(accepted.content)["session"]["access_token"] == {
+        "inframeld_installation_id": str(binding.installation_id.value),
+        "inframeld_credential_version": 6,
+    }

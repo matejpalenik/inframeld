@@ -14,7 +14,8 @@ class HumanSessionAuthenticator(Protocol):
     async def authenticate(self, credential: BrowserSessionCredential | None) -> AccessContextDTO:
         """Authenticate a browser credential and admit its active local human.
 
-        Return an `AccessContextDTO` after provider verification and local admission.
+        Return the admitted actor with browser-session evidence identifying the
+        verified provider identity. The evidence contains no cookie or permissions.
         Raise `AuthenticationRequiredError` for missing/rejected credentials,
         `AccessDeniedError` for an absent or ineligible local principal, and
         `DependencyUnavailableError` when session verification is unavailable.

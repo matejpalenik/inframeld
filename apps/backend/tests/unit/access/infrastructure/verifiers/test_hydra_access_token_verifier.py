@@ -16,6 +16,9 @@ from ory_hydra_client.models.introspected_o_auth2_token import IntrospectedOAuth
 from pydantic import HttpUrl, ValidationError
 from urllib3.exceptions import HTTPError
 
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
@@ -23,6 +26,9 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
     HumanAccessTokenCredential,
 )
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.oauth_issuer import OAuthIssuer
@@ -33,6 +39,7 @@ from inframeld_backend.access.infrastructure.verifiers.hydra_access_token_verifi
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
 type RequiredTokenField = Literal[
     "iss", "client_id", "aud", "scope", "exp", "sub", "token_type", "token_use"
@@ -80,6 +87,7 @@ def _token() -> IntrospectedOAuth2Token:
         token_type="Bearer",
         token_use="access_token",
         username="alice@example.test",
+        ext={"inframeld_installation_id": str(UUID(int=123)), "inframeld_credential_version": 6},
     )
 
 
@@ -92,9 +100,12 @@ async def test_valid_access_token_returns_the_existing_kratos_identity(
     with patch.object(client, "introspect_o_auth2_token", return_value=_token()) as introspect:
         result = await verifier.verify(CREDENTIAL, timeout_seconds=2.0)
 
-    assert result == VerifiedHumanIdentityDTO(
-        authority=AUTHORITY,
-        subject=IdentitySubject(str(IDENTITY_ID)),
+    assert result == HumanOAuthCredentialBindingDTO(
+        identity=VerifiedHumanIdentityDTO(
+            authority=AUTHORITY, subject=IdentitySubject(str(IDENTITY_ID))
+        ),
+        installation_id=InstallationId(UUID(int=123)),
+        version=HumanCredentialVersion(6),
     )
     introspect.assert_called_once()
     assert introspect.call_args.kwargs["token"] == CREDENTIAL.value
@@ -298,3 +309,30 @@ async def test_next_request_rechecks_hydra(client: OAuth2Api) -> None:
     assert first is not None
     assert second is None
     assert introspect.call_count == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        None,
+        {},
+        {"inframeld_installation_id": "bad", "inframeld_credential_version": 6},
+        *[
+            {"inframeld_installation_id": str(UUID(int=123)), "inframeld_credential_version": value}
+            for value in (None, True, 0, -1, 2**63, 6.0, "6")
+        ],
+    ],
+)
+async def test_missing_or_invalid_generation_is_a_rejected_credential(
+    client: OAuth2Api, metadata: dict[str, object] | None
+) -> None:
+    """Unversioned tokens and malformed custom claims require a fresh login."""
+    token = _token().model_copy(update={"ext": metadata})
+    with patch.object(client, "introspect_o_auth2_token", return_value=token):
+        assert (
+            await HydraAccessTokenVerifier(client, SETTINGS, AUTHORITY).verify(
+                CREDENTIAL, timeout_seconds=2.0
+            )
+            is None
+        )

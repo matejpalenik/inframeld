@@ -13,14 +13,26 @@ from ory_kratos_client.configuration import Configuration as KratosConfiguration
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
 )
+from inframeld_backend.access.application.protocols.human_oauth_consent_handler import (
+    HumanOAuthConsentHandler,
+)
 from inframeld_backend.access.application.services.human_access_token_authentication_service import (
     HumanAccessTokenAuthenticationService,
+)
+from inframeld_backend.access.application.services.human_oauth_consent_service import (
+    HumanOAuthConsentService,
 )
 from inframeld_backend.access.application.services.human_session_authentication_service import (
     HumanSessionAuthenticationService,
 )
 from inframeld_backend.access.application.services.unavailable_human_session_authentication_service import (
     UnavailableHumanSessionAuthenticationService,
+)
+from inframeld_backend.access.infrastructure.readers.hydra_oauth_consent_request_reader import (
+    HydraOAuthConsentRequestReader,
+)
+from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
+    PostgresHumanCredentialStateReader,
 )
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
@@ -41,6 +53,12 @@ from inframeld_backend.access.infrastructure.verifiers.kratos_browser_session_ve
 )
 from inframeld_backend.access.infrastructure.verifiers.kratos_human_identity_verifier import (
     KratosHumanIdentityVerifier,
+)
+from inframeld_backend.access.infrastructure.writers.hydra_oauth_consent_decision_writer import (
+    HydraOAuthConsentDecisionWriter,
+)
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
 )
 from inframeld_backend.bootstrap.access_components import AccessComponents
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -79,21 +97,23 @@ def create_access_components(
         )
         provider_cleanup.callback(kratos_client.rest_client.pool_manager.clear)
 
-        authenticator = HumanSessionAuthenticationService(
-            KratosBrowserSessionVerifier(
-                FrontendApi(kratos_client),
-                kratos_settings.authority,
-                timeout_seconds=min(
-                    human_authentication_settings.provider_timeout_seconds,
-                    human_authentication_settings.total_timeout_seconds,
-                ),
+        browser_verifier = KratosBrowserSessionVerifier(
+            FrontendApi(kratos_client),
+            kratos_settings.authority,
+            timeout_seconds=min(
+                human_authentication_settings.provider_timeout_seconds,
+                human_authentication_settings.total_timeout_seconds,
             ),
+        )
+        authenticator = HumanSessionAuthenticationService(
+            browser_verifier,
             reader,
             recovery_block_reader=recovery_block_reader,
             provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
             total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
         )
 
+        oauth_consent_handler: HumanOAuthConsentHandler | None = None
         access_token_authenticator: HumanAccessTokenAuthenticator | None = None
         kratos_admin_client: KratosApiClient | None = None
         hydra_client: HydraApiClient | None = None
@@ -121,6 +141,23 @@ def create_access_components(
             )
             provider_cleanup.callback(hydra_client.rest_client.pool_manager.clear)
 
+            if hydra_settings.public_url is not None:
+                oauth_consent_handler = HumanOAuthConsentService(
+                    HydraOAuthConsentRequestReader(OAuth2Api(hydra_client)),
+                    HydraOAuthConsentDecisionWriter(
+                        OAuth2Api(hydra_client), public_url=str(hydra_settings.public_url)
+                    ),
+                    browser_verifier,
+                    recovery_block_reader,
+                    credential_states=PostgresHumanCredentialStateReader(database),
+                    credential_initializer=PostgresHumanCredentialStateInitializer(database),
+                    authority=kratos_settings.authority,
+                    api_audience=hydra_settings.api_audience,
+                    remember_consent_seconds=hydra_settings.remember_consent_seconds,
+                    provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
+                    total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
+                )
+
             access_token_authenticator = HumanAccessTokenAuthenticationService(
                 HydraAccessTokenVerifier(
                     OAuth2Api(hydra_client),
@@ -132,7 +169,7 @@ def create_access_components(
                     kratos_settings.authority,
                 ),
                 reader,
-                recovery_block_reader=recovery_block_reader,
+                credential_state_reader=PostgresHumanCredentialStateReader(database),
                 provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
                 total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
             )
@@ -143,6 +180,7 @@ def create_access_components(
             access_token_authenticator=access_token_authenticator,
             kratos_admin_client=kratos_admin_client,
             hydra_client=hydra_client,
+            oauth_consent_handler=oauth_consent_handler,
         )
         provider_cleanup.pop_all()
         return components

@@ -32,7 +32,7 @@ services:
       start_period: 5s
 
   kratos-migrate:
-    image: docker.io/oryd/kratos:v25.4.0
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
     command:
       [
         "-c",
@@ -60,7 +60,7 @@ services:
       - "127.0.0.1:18024:8025"
 
   kratos:
-    image: docker.io/oryd/kratos:v25.4.0
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
     # Optional company sign-in: follow apps/backend/README.md to create the
     # Git-ignored config/kratos/dev.local.yaml and register the OIDC callback.
     # Comment out the default command and uncomment the local-config command.

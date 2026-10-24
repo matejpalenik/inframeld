@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.integration_services import KRATOS_PUBLIC_URL, MOCK_OIDC_URL
 from tests.support.kratos_admin import get_identity
 from tests.support.kratos_browser import (
@@ -209,7 +210,12 @@ async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
         with pytest.raises(AccessDeniedError):
             await authorizer.require_authorization(
-                access=AccessContextDTO(actor_principal_id=scenario.principal_id),
+                access=AccessContextDTO(
+                    actor_principal_id=scenario.principal_id,
+                    authentication_evidence=MockAuthenticationEvidence.browser(
+                        VerifiedHumanIdentityDTO(AUTHORITY, subject)
+                    ),
+                ),
                 request=ProjectActionAuthorizationRequestDTO(
                     project_id=scenario.project_id, action_id=scenario.action
                 ),
@@ -266,7 +272,7 @@ async def test_password_proof_links_oidc_to_existing_identity() -> None:
         )
 
         identity = await get_identity(human.subject)
-        assert identity.id == human.subject.value
+        assert str(identity.id) == human.subject.value
         assert identity.credentials is not None
         assert {"password", "oidc"} <= identity.credentials.keys()
 

@@ -11,6 +11,9 @@ from ory_hydra_client.exceptions import ApiException, OpenApiException
 from pydantic import ValidationError
 from urllib3.exceptions import HTTPError
 
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
@@ -20,12 +23,16 @@ from inframeld_backend.access.application.protocols.human_access_token_verifier 
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
 
 class HydraAccessTokenVerifier(HumanAccessTokenVerifier):
@@ -56,7 +63,7 @@ class HydraAccessTokenVerifier(HumanAccessTokenVerifier):
             token=credential.value, scope=self._settings.required_scope, _request_timeout=remaining
         )
 
-    def _read_identity(self, token: object) -> VerifiedHumanIdentityDTO | None:
+    def _read_identity(self, token: object) -> HumanOAuthCredentialBindingDTO | None:
         # Narrow SDK output here: a null or unexpected body is not confirmation of identity.
         if not isinstance(token, IntrospectedOAuth2Token):
             raise DependencyUnavailableError
@@ -114,14 +121,29 @@ class HydraAccessTokenVerifier(HumanAccessTokenVerifier):
         except ValueError:
             raise DependencyUnavailableError from None
 
-        return VerifiedHumanIdentityDTO(authority=self._kratos_authority, subject=subject)
+        # SDK extension values are untyped JSON. Narrow only our server-owned claims.
+        metadata: dict[str, object] = token.ext or {}
+        installation = metadata.get("inframeld_installation_id")
+        version = metadata.get("inframeld_credential_version")
+        if not isinstance(installation, str) or type(version) is not int:
+            return None
+        try:
+            return HumanOAuthCredentialBindingDTO(
+                identity=VerifiedHumanIdentityDTO(
+                    authority=self._kratos_authority, subject=subject
+                ),
+                installation_id=InstallationId(UUID(installation)),
+                version=HumanCredentialVersion(version),
+            )
+        except ValueError:
+            return None
 
     # endregion
 
     @override
     async def verify(
         self, credential: HumanAccessTokenCredential, *, timeout_seconds: float
-    ) -> VerifiedHumanIdentityDTO | None:
+    ) -> HumanOAuthCredentialBindingDTO | None:
         if (
             isinstance(timeout_seconds, bool)
             or not math.isfinite(timeout_seconds)

@@ -1,6 +1,6 @@
 # ADR-0070: Use bulk Hydra revocation for identity recovery
 
-**Status:** Accepted. Partially supersedes [ADR-0058](ADR-0058-block-product-access-during-identity-recovery-cleanup.md) on Hydra cleanup scope and preservation of later CLI logins. Its recovery block and provider-evidence rules remain selected. [ADR-0069](ADR-0069-release-completed-recovery-obligations-independently.md) continues to govern per-flow release.
+**Status:** Accepted. Supplemented by [ADR-0072](ADR-0072-version-human-cli-credentials-across-account-recovery.md) for permanent Inframeld rejection of stale CLI generations. Partially supersedes [ADR-0058](ADR-0058-block-product-access-during-identity-recovery-cleanup.md) on Hydra cleanup scope and preservation of later CLI logins. Its recovery block and provider-evidence rules remain selected. [ADR-0069](ADR-0069-release-completed-recovery-obligations-independently.md) continues to govern per-flow release.
 
 **Date:** 2026-10-23
 
@@ -42,3 +42,7 @@ These are controlled HTTP boundaries, not pauses inside Hydra. Production issuan
 - [Access behavior and provider evidence](../development/access-control.md#hydra-cleanup-evidence).
 - [Recovery records](../development/data-model.md#identity-cleanup-records) and [reconciliation](../development/jobs-and-idempotency.md#identity-cleanup).
 - [Hydra v26.2.0 handlers](https://github.com/ory/hydra/blob/v26.2.0/consent/handler.go) and [bulk persistence](https://github.com/ory/hydra/blob/v26.2.0/persistence/sql/persister_consent.go).
+
+[ADR-0071](ADR-0071-use-native-kratos-login-and-checked-hydra-consent.md) adds native login and checked consent without changing this bulk scope. Its [provider observations](../development/access-control.md#native-hydra-consent) distinguish the after-validation token-hook denials from consent issuing between the two bulk calls. Current checks and two acknowledgments do not by themselves qualify safe recovery release. No production token hook or worker is introduced.
+
+[ADR-0072](ADR-0072-version-human-cli-credentials-across-account-recovery.md) adds durable versions without changing native login or bulk cleanup. Late grants can remain active at Hydra while failing Inframeld authentication after block release. Production completion remains unwired until trusted native evidence and durable execution are qualified.

@@ -259,6 +259,8 @@ This fragment belongs inside the problem object. Return at most 20 sanitized iss
 
 ### Accepted authentication outcomes for #116
 
+The implemented [consent API](api-contracts.md#human-oauth-consent) has an explicit precedence rule. After HTTP credential selection and POST CSRF, unsupported Hydra client/access returns 403 before browser verification, including when the supplied cookie is invalid. Supported requests keep the usual invalid-session 401, policy-denial 403 and unavailable-dependency 503 outcomes. This ordering initializes no credential state for unsupported requests.
+
 The [Access dispatch contract](access-control.md#credential-dispatch) selects one verifier before provider I/O. The following extension was accepted on 2026-10-04. It is not a claim that the bearer adapters, new error code or route declarations are implemented:
 
 | Status | Condition | Public problem contract |
@@ -471,3 +473,9 @@ Preserve trusted protocol headers such as `Allow`, an appropriate `WWW-Authentic
 [python-cancellation]: https://docs.python.org/3/library/asyncio-exceptions.html
 [litellm-errors]: https://docs.litellm.ai/docs/exception_mapping
 [fastapi-responses]: https://fastapi.tiangolo.com/advanced/additional-responses/
+
+### Reject a stale human CLI credential consistently
+
+Under [ADR-0072](../adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md), missing/invalid binding claims or a non-current version are credential failures. Preserve the existing generic 401 problem and Bearer `invalid_token` challenge. The Access-owned handler also translates `HumanOAuthCredentialRejectedError` raised during transactional authorization, without putting HTTP types in application code or exposing versions, subjects or recovery details.
+
+A valid credential with denied account/recovery/project permissions retains normal 403/visibility behavior. Required unavailable verification remains 503. Neither means the CLI should delete its login. Public schemas and problem codes remain unchanged.

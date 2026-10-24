@@ -20,6 +20,9 @@ from tests.support.integration_services import HYDRA_ADMIN_URL, KRATOS_ADMIN_URL
 from tests.support.kratos_admin import disable_identity
 from tests.support.kratos_browser import RegisteredHumanDTO, create_browser, register_human
 
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
@@ -29,6 +32,9 @@ from inframeld_backend.access.domain.value_objects.identity_authority import Ide
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -97,7 +103,9 @@ async def test_real_cookie_and_access_token_resolve_the_same_local_human(
 ) -> None:
     """Real provider verification must converge on the one existing local principal."""
     principal = await _admit_human(database, human)
-    tokens = await provider.issue_tokens(human)
+    tokens = await provider.issue_tokens(
+        human, credential_binding=await _credential_binding(database, human)
+    )
     application = create_app(_application_settings(temporary_postgres_settings))
 
     with TestClient(application, raise_server_exceptions=False) as client:
@@ -122,7 +130,9 @@ async def test_real_token_without_local_admission_is_denied(
     human: RegisteredHumanDTO,
 ) -> None:
     """A real Hydra login does not create or admit a local Inframeld account."""
-    tokens = await provider.issue_tokens(human)
+    tokens = await provider.issue_tokens(
+        human, credential_binding=await _credential_binding(database, human)
+    )
 
     with TestClient(
         create_app(_application_settings(temporary_postgres_settings)),
@@ -146,7 +156,9 @@ async def test_real_token_rechecks_local_suspension(
 ) -> None:
     """A still-valid provider token cannot bypass a later local suspension."""
     principal = await _admit_human(database, human)
-    tokens = await provider.issue_tokens(human)
+    tokens = await provider.issue_tokens(
+        human, credential_binding=await _credential_binding(database, human)
+    )
     headers = {"Authorization": f"Bearer {tokens.access_token.value}"}
 
     with TestClient(
@@ -178,7 +190,9 @@ async def test_real_provider_changes_stop_the_next_request(
 ) -> None:
     """Each request must observe token revocation and current Kratos eligibility."""
     await _admit_human(database, human)
-    tokens = await provider.issue_tokens(human)
+    tokens = await provider.issue_tokens(
+        human, credential_binding=await _credential_binding(database, human)
+    )
     headers = {"Authorization": f"Bearer {tokens.access_token.value}"}
 
     with TestClient(
@@ -208,7 +222,9 @@ async def test_real_wrong_token_kind_or_audience_is_rejected(
     """A real refresh token or an access token without this API's audience cannot authenticate."""
     await _admit_human(database, human)
     tokens = await provider.issue_tokens(
-        human, include_audience=credential_kind != "missing-api-audience"
+        human,
+        include_audience=credential_kind != "missing-api-audience",
+        credential_binding=await _credential_binding(database, human),
     )
     credential = (
         tokens.refresh_token.get_secret_value()
@@ -239,7 +255,9 @@ async def test_real_provider_connection_failures_return_503(
 ) -> None:
     """Exercise each SDK's transport failure without stopping shared test services."""
     await _admit_human(database, human)
-    tokens = await provider.issue_tokens(human)
+    tokens = await provider.issue_tokens(
+        human, credential_binding=await _credential_binding(database, human)
+    )
 
     with TestClient(
         create_app(_application_settings(temporary_postgres_settings, unavailable=unavailable)),
@@ -252,3 +270,13 @@ async def test_real_provider_connection_failures_return_503(
 
     assert response.status_code == 503, response.text
     assert response.json()["code"] == "dependency_unavailable"
+
+
+async def _credential_binding(
+    database: Database, human: RegisteredHumanDTO
+) -> HumanOAuthCredentialBindingDTO:
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(
+        VerifiedHumanIdentityDTO(AUTHORITY, human.subject)
+    )
+    assert state.version is not None
+    return HumanOAuthCredentialBindingDTO(state.identity, state.installation_id, state.version)

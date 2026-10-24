@@ -5,6 +5,9 @@ import math
 from typing import override
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.protocols.browser_session_verifier import (
     BrowserSessionVerifier,
 )
@@ -96,11 +99,15 @@ class HumanSessionAuthenticationService(HumanSessionAuthenticator):
                 principal_access = PrincipalAccessPolicyInput(
                     principal=principal,
                     has_pending_recovery=has_pending_recovery,
+                    credential_is_current=True,
                 )
 
                 if not HumanAuthenticationPolicy.may_authenticate(principal_access):
                     raise AccessDeniedError()
 
-                return AccessContextDTO(actor_principal_id=principal.id)
+                return AccessContextDTO(
+                    actor_principal_id=principal.id,
+                    authentication_evidence=BrowserSessionAuthenticationDTO(identity),
+                )
         except TimeoutError as error:
             raise DependencyUnavailableError() from error

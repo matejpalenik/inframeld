@@ -4,6 +4,9 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
     ProjectActionAuthorizationRequestDTO,
 )
+from inframeld_backend.access.application.dtos.project_operation_admission_request_dto import (
+    ProjectOperationAdmissionRequestDTO,
+)
 from inframeld_backend.access.application.protocols.action_authorizer import ActionAuthorizer
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
@@ -17,9 +20,6 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
 )
 from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
     OperationAdmissionContextDTO,
-)
-from inframeld_backend.shared.application.dtos.project_operation_admission_request_dto import (
-    ProjectOperationAdmissionRequestDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,

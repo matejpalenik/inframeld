@@ -7,6 +7,7 @@ and CLI have been qualified.
 
 import base64
 import hashlib
+import logging
 import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -17,6 +18,9 @@ from uuid import UUID
 import httpx2
 from pydantic import BaseModel, ConfigDict, SecretStr
 
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
@@ -24,7 +28,12 @@ from inframeld_backend.access.domain.value_objects.human_api_audience import Hum
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.oauth_issuer import OAuthIssuer
 from tests.support.integration_services import HYDRA_ADMIN_URL, HYDRA_PUBLIC_URL, KRATOS_PUBLIC_URL
-from tests.support.kratos_browser import RegisteredHumanDTO, WhoamiResponse
+from tests.support.kratos_browser import (
+    BrowserFlow,
+    RegisteredHumanDTO,
+    WhoamiResponse,
+    read_browser_csrf_token,
+)
 
 HYDRA_ISSUER = OAuthIssuer(f"{HYDRA_PUBLIC_URL}/")
 API_AUDIENCE = HumanAPIAudience("http://inframeld-api.test")
@@ -109,6 +118,17 @@ class HydraAuthorizationCodeDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class PendingHydraConsentDTO:
+    """Keep an unfinished native login private until the consent API decides it."""
+
+    client_id: str
+    challenge: SecretStr = field(repr=False)
+    verifier: SecretStr = field(repr=False)
+    state: SecretStr = field(repr=False)
+    consent_skipped: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class _ConsentFlow:
     consent: _ConsentRequest
     challenge: SecretStr = field(repr=False)
@@ -133,7 +153,12 @@ def _challenge(response: httpx2.Response, phase: str) -> str:
     assert response.status_code in {302, 303}
     location = response.headers["location"]
     parsed = urlsplit(location)
-    assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == f"{UI_ORIGIN}/{phase}"
+    expected = (
+        f"{KRATOS_PUBLIC_URL}/self-service/login/browser"
+        if phase == "login"
+        else f"{UI_ORIGIN}/consent"
+    )
+    assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == expected
     return _single_query_value(location, f"{phase}_challenge")
 
 
@@ -173,6 +198,15 @@ class HydraTestProvider:
         subject = IdentitySubject(str(WhoamiResponse.model_validate_json(whoami.text).identity.id))
         assert subject == human.subject
 
+        return await self._start_login(subject, include_audience=include_audience, browser=browser)
+
+    async def _start_login(
+        self,
+        subject: IdentitySubject,
+        *,
+        include_audience: bool,
+        browser: httpx2.AsyncClient | None,
+    ) -> PendingHydraLoginDTO:
         verifier = secrets.token_urlsafe(48)
         challenge = (
             base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest())
@@ -210,6 +244,107 @@ class HydraTestProvider:
             state=SecretStr(state),
         )
 
+    async def begin_native_consent(
+        self, human: RegisteredHumanDTO, *, browser: httpx2.AsyncClient
+    ) -> PendingHydraConsentDTO:
+        """Let real Kratos authenticate and approve login, without private login approval."""
+        pending = await self._start_login(human.subject, include_audience=True, browser=browser)
+        started = await browser.get(
+            f"{KRATOS_PUBLIC_URL}/self-service/login/browser",
+            params={"login_challenge": pending.challenge.get_secret_value()},
+            headers={"Accept": "text/html"},
+        )
+        assert started.status_code in {302, 303}, "Native Kratos login did not redirect."
+        location = started.headers["location"]
+        parsed = urlsplit(location)
+        if f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == f"{KRATOS_PUBLIC_URL}/login":
+            flow_id = str(UUID(_single_query_value(location, "flow")))
+            read = await browser.get(
+                f"{KRATOS_PUBLIC_URL}/self-service/login/flows",
+                params={"id": flow_id},
+                headers={"Accept": "application/json"},
+            )
+            _require_status(read, 200)
+            flow = BrowserFlow.model_validate_json(read.text)
+            action = urlsplit(flow.ui.action)
+            assert (
+                f"{action.scheme}://{action.netloc}{action.path}"
+                == f"{KRATOS_PUBLIC_URL}/self-service/login"
+            )
+            submitted = await browser.post(
+                flow.ui.action,
+                data={
+                    "csrf_token": read_browser_csrf_token(flow),
+                    "identifier": human.email,
+                    "password": human.password,
+                    "method": "password",
+                },
+                headers={"Accept": "text/html"},
+            )
+            assert submitted.status_code in {302, 303}, "Native password login did not redirect."
+            location = submitted.headers["location"]
+        parsed = urlsplit(location)
+        assert (
+            f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == f"{HYDRA_PUBLIC_URL}/oauth2/auth"
+        )
+        consent_redirect = await browser.get(location)
+        challenge = _challenge(consent_redirect, "consent")
+        response = await self._client.get(
+            f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent",
+            params={"consent_challenge": challenge},
+        )
+        _require_status(response, 200)
+        consent = _ConsentRequest.model_validate_json(response.text)
+        assert consent.subject == human.subject.value
+        assert consent.client.client_id == self._client_id
+        assert consent.login_session_id == pending.login_session_id
+        return PendingHydraConsentDTO(
+            client_id=self._client_id,
+            challenge=SecretStr(challenge),
+            verifier=pending.verifier,
+            state=pending.state,
+            consent_skipped=consent.skip,
+        )
+
+    async def finish_native_consent(
+        self, pending: PendingHydraConsentDTO, redirect_to: str, *, browser: httpx2.AsyncClient
+    ) -> HydraAuthorizationCodeDTO:
+        assert pending.client_id == self._client_id
+        parsed = urlsplit(redirect_to)
+        assert (
+            f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == f"{HYDRA_PUBLIC_URL}/oauth2/auth"
+        )
+        response = await browser.get(redirect_to)
+        assert response.status_code in {302, 303}
+        callback = response.headers["location"]
+        parsed = urlsplit(callback)
+        assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == REDIRECT_URI
+        assert secrets.compare_digest(
+            _single_query_value(callback, "state"), pending.state.get_secret_value()
+        )
+        errors = parse_qs(parsed.query).get("error", [])
+        category = (
+            errors[0]
+            if len(errors) == 1
+            and errors[0]
+            in {
+                "error",
+                "server_error",
+                "access_denied",
+                "invalid_request",
+                "login_required",
+                "consent_required",
+            }
+            else "unrecognized"
+        )
+        assert not errors, f"Hydra rejected native consent with error category '{category}'."
+        return HydraAuthorizationCodeDTO(
+            client_id=self._client_id,
+            code=SecretStr(_single_query_value(callback, "code")),
+            verifier=pending.verifier,
+            consent_skipped=pending.consent_skipped,
+        )
+
     async def approve_login_and_consent(
         self,
         pending: PendingHydraLoginDTO,
@@ -217,6 +352,7 @@ class HydraTestProvider:
         browser: httpx2.AsyncClient | None = None,
         remember_login: bool = False,
         remember_consent: bool = False,
+        credential_binding: HumanOAuthCredentialBindingDTO | None = None,
     ) -> HydraAuthorizationCodeDTO:
         """Approve the pending test flow and stop before exchanging its code.
 
@@ -225,14 +361,25 @@ class HydraTestProvider:
         public = browser if browser is not None else self._client
         flow = await self._approve_login(pending, public=public, remember_login=remember_login)
         consent = flow.consent
+        payload: dict[str, object] = {
+            "grant_scope": consent.requested_scope,
+            "grant_access_token_audience": consent.requested_access_token_audience,
+            "remember": remember_consent,
+        }
+        if credential_binding is not None:
+            assert credential_binding.identity.subject.value == consent.subject, (
+                "Binding does not match the test subject."
+            )
+            payload["session"] = {
+                "access_token": {
+                    "inframeld_installation_id": str(credential_binding.installation_id.value),
+                    "inframeld_credential_version": credential_binding.version.value,
+                }
+            }
         accepted_consent = await self._client.put(
             f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent/accept",
             params={"consent_challenge": flow.challenge.get_secret_value()},
-            json={
-                "grant_scope": consent.requested_scope,
-                "grant_access_token_audience": consent.requested_access_token_audience,
-                "remember": remember_consent,
-            },
+            json=payload,
         )
         callback_redirect = await public.get(_hydra_redirect(accepted_consent))
         assert callback_redirect.status_code in {302, 303}
@@ -290,6 +437,7 @@ class HydraTestProvider:
         browser: httpx2.AsyncClient | None = None,
         remember_login: bool = False,
         remember_consent: bool = False,
+        credential_binding: HumanOAuthCredentialBindingDTO | None = None,
     ) -> IssuedHydraTokensDTO:
         """Complete the staged S256 test exchange without retrying provider failures.
 
@@ -302,6 +450,7 @@ class HydraTestProvider:
             browser=browser,
             remember_login=remember_login,
             remember_consent=remember_consent,
+            credential_binding=credential_binding,
         )
         tokens = await self.exchange_authorization_code(code)
         assert tokens is not None, "Hydra rejected the test authorization code."
@@ -465,33 +614,39 @@ async def hydra_test_provider(
     This runs only against the dedicated Hydra test database. Tests using this
     same registered client must run sequentially.
     """
-    async with httpx2.AsyncClient(
-        timeout=5.0,
-        follow_redirects=False,
-        trust_env=False,
-        transport=transport,
-    ) as client:
-        client_url = f"{HYDRA_ADMIN_URL}/admin/clients/{client_id}"
-        removed = await client.delete(client_url)
-        assert removed.status_code in {204, 404}
-        created = await client.post(
-            f"{HYDRA_ADMIN_URL}/admin/clients",
-            json={
-                "client_id": client_id,
-                "client_name": "Inframeld CLI integration test",
-                "token_endpoint_auth_method": "none",
-                "grant_types": ["authorization_code", "refresh_token"],
-                "response_types": ["code"],
-                "redirect_uris": [REDIRECT_URI],
-                "scope": "openid offline_access inframeld:api",
-                "audience": [API_AUDIENCE.value],
-                "subject_type": "public",
-                "access_token_strategy": "opaque",
-                "skip_consent": False,
-            },
-        )
-        _require_status(created, 201)
-        try:
-            yield HydraTestProvider(client, client_id=client_id)
-        finally:
-            _require_status(await client.delete(client_url), 204)
+    http_logger = logging.getLogger("httpx2")
+    previous_level = http_logger.level
+    http_logger.setLevel(logging.WARNING)
+    try:
+        async with httpx2.AsyncClient(
+            timeout=5.0,
+            follow_redirects=False,
+            trust_env=False,
+            transport=transport,
+        ) as client:
+            client_url = f"{HYDRA_ADMIN_URL}/admin/clients/{client_id}"
+            removed = await client.delete(client_url)
+            assert removed.status_code in {204, 404}
+            created = await client.post(
+                f"{HYDRA_ADMIN_URL}/admin/clients",
+                json={
+                    "client_id": client_id,
+                    "client_name": "Inframeld CLI integration test",
+                    "token_endpoint_auth_method": "none",
+                    "grant_types": ["authorization_code", "refresh_token"],
+                    "response_types": ["code"],
+                    "redirect_uris": [REDIRECT_URI],
+                    "scope": "openid offline_access inframeld:api",
+                    "audience": [API_AUDIENCE.value],
+                    "subject_type": "public",
+                    "access_token_strategy": "opaque",
+                    "skip_consent": False,
+                },
+            )
+            _require_status(created, 201)
+            try:
+                yield HydraTestProvider(client, client_id=client_id)
+            finally:
+                _require_status(await client.delete(client_url), 204)
+    finally:
+        http_logger.setLevel(previous_level)

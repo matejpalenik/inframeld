@@ -63,3 +63,30 @@ def test_requires_the_accepted_first_party_client_and_api_scope(
 
     with pytest.raises(ValidationError):
         HydraSettings.model_validate(inputs)
+
+
+def test_consent_configuration_defaults_to_one_hour_and_requires_an_explicit_public_url() -> None:
+    settings = HydraSettings.model_validate(_settings_input())
+    assert settings.remember_consent_seconds == 3600
+    assert settings.public_url is None
+
+
+@pytest.mark.parametrize("seconds", [True, 0, -1, 1.5, "forever"])
+def test_remembered_consent_cannot_be_unbounded_or_fractional(seconds: object) -> None:
+    inputs = _settings_input() | {"remember_consent_seconds": seconds}
+    with pytest.raises(ValidationError):
+        HydraSettings.model_validate(inputs)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://user:secret@auth.test",
+        "https://auth.test?x=y",
+        "https://auth.test#x",
+        "ftp://auth.test",
+    ],
+)
+def test_public_consent_endpoint_rejects_unsafe_configuration(url: str) -> None:
+    with pytest.raises(ValidationError):
+        HydraSettings.model_validate(_settings_input() | {"public_url": url})

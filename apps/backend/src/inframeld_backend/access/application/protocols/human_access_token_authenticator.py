@@ -20,5 +20,7 @@ class HumanAccessTokenAuthenticator(Protocol):
 
         Raise `DependencyUnavailableError` when required verification cannot be confirmed.
 
-        Return principal identity only - authorization remains separate."""
+        Return the admitted actor with the exact verified OAuth credential binding.
+        Current authorization must check that evidence again before work or replay.
+        """
         ...

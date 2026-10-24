@@ -14,6 +14,8 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
+from tests.support.hydra_token_hook import create_hydra_token_hook_router
+
 RecoveryPhase = Literal["admit", "complete"]
 TEST_RECOVERY_KEY = SecretStr("inframeld-recovery-hook-test-only")
 SettingsPhase = Literal["before", "after"]
@@ -257,3 +259,6 @@ async def receive_settings(
         raise HTTPException(status_code=409, detail="Injected settings callback failure.")
     observation.acknowledged.append(phase)
     return Response(status_code=204)
+
+
+app.include_router(create_hydra_token_hook_router(_require_key))

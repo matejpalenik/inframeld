@@ -348,3 +348,22 @@ def test_pagination_fixture_preserves_query_and_response_contract() -> None:
         for variant in page_schema["properties"]["nextCursor"]["anyOf"]
     )
     assert set(operation["responses"]["422"]["content"]) == {"application/problem+json"}
+
+
+@pytest.mark.parametrize(
+    "method,operation_id",
+    [("get", "inspectHumanOAuthConsent"), ("post", "decideHumanOAuthConsent")],
+)
+def test_consent_declares_cookie_only_security_and_problem_responses(
+    method: str, operation_id: str
+) -> None:
+    schema = create_app().openapi()
+    operation = schema["paths"]["/v1/oauth/consent"][method]
+    assert operation["operationId"] == operation_id
+    assert operation["security"] == [{"KratosSession": []}]
+    for status in ("400", "401", "403", "404", "422", "503"):
+        assert set(operation["responses"][status]["content"]) == {"application/problem+json"}
+    if method == "post":
+        request = schema["components"]["schemas"]["HumanOAuthConsentRequest"]
+        assert request["additionalProperties"] is False
+        assert set(request["properties"]) == {"consentChallenge", "decision", "remember"}

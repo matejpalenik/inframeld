@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic_settings import NoDecode
 
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
@@ -40,10 +40,26 @@ class HydraSettings(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", hide_input_in_errors=True)
 
     admin_url: HttpUrl
+    public_url: HttpUrl | None = None
     issuer: Annotated[OAuthIssuer, NoDecode]
     api_audience: Annotated[HumanAPIAudience, NoDecode]
     client_id: Literal["inframeld-cli"] = "inframeld-cli"
     required_scope: Literal["inframeld:api"] = "inframeld:api"
+    remember_consent_seconds: int = Field(default=3600, gt=0)
+
+    @field_validator("remember_consent_seconds", mode="before")
+    @classmethod
+    def _validate_remember_duration(cls, value: object) -> object:
+        if isinstance(value, (bool, float)):
+            raise ValueError("Remembered consent requires a positive whole duration.")
+        return value
+
+    @field_validator("public_url")
+    @classmethod
+    def _validate_public_url(cls, value: HttpUrl | None) -> HttpUrl | None:
+        if value is not None:
+            _require_endpoint(str(value))
+        return value
 
     @field_validator("admin_url")
     @classmethod

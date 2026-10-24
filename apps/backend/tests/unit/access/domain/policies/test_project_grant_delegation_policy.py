@@ -42,6 +42,7 @@ def _may_assign(
         actor_access=PrincipalAccessPolicyInput(
             principal=actor if actor is not None else _principal(1),
             has_pending_recovery=has_pending_recovery,
+            credential_is_current=True,
         ),
         recipient=recipient if recipient is not None else _principal(2),
         actor_is_project_member=actor_is_member,

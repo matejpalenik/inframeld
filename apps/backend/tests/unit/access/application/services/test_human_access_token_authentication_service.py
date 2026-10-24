@@ -4,8 +4,11 @@ from typing import Literal, override
 from uuid import UUID
 
 import pytest
-from tests.support.mock_identity_recovery_block_reader import MockIdentityRecoveryBlockReader
+from tests.support.mock_human_credential_state_reader import MockHumanCredentialStateReader
 
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
@@ -27,6 +30,9 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -36,6 +42,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
 type AuthenticationStep = Literal["token", "identity", "principal"]
 
@@ -73,7 +80,9 @@ async def _record_call(
 class MockTokenVerifier(HumanAccessTokenVerifier):
     def __init__(self, events: list[AuthenticationStep]) -> None:
         self.events = events
-        self.result: VerifiedHumanIdentityDTO | None = IDENTITY
+        self.result: HumanOAuthCredentialBindingDTO | None = HumanOAuthCredentialBindingDTO(
+            IDENTITY, InstallationId(UUID(int=123)), HumanCredentialVersion(1)
+        )
         self.failure: Exception | None = None
         self.blocked = False
         self.credentials: list[HumanAccessTokenCredential] = []
@@ -82,7 +91,7 @@ class MockTokenVerifier(HumanAccessTokenVerifier):
     @override
     async def verify(
         self, credential: HumanAccessTokenCredential, *, timeout_seconds: float
-    ) -> VerifiedHumanIdentityDTO | None:
+    ) -> HumanOAuthCredentialBindingDTO | None:
         self.credentials.append(credential)
         self.budgets.append(timeout_seconds)
 
@@ -153,12 +162,12 @@ class AuthenticationScenario:
         self.token = MockTokenVerifier(self.events)
         self.identity = MockIdentityVerifier(self.events)
         self.reader = MockPrincipalReader(self.events)
-        self.recovery = MockIdentityRecoveryBlockReader()
+        self.recovery = MockHumanCredentialStateReader()
         self.service = HumanAccessTokenAuthenticationService(
             self.token,
             self.identity,
             self.reader,
-            recovery_block_reader=self.recovery,
+            credential_state_reader=self.recovery,
             provider_timeout_seconds=provider_timeout_seconds,
             total_timeout_seconds=total_timeout_seconds,
         )
@@ -171,6 +180,7 @@ async def test_valid_token_resolves_active_local_human() -> None:
     context = await scenario.service.authenticate(CREDENTIAL)
 
     assert context.actor_principal_id == PRINCIPAL.id
+    assert context.authentication_evidence is scenario.token.result
     assert scenario.events == ["token", "identity", "principal"]
     assert scenario.token.credentials == [CREDENTIAL]
     assert scenario.identity.identities == [IDENTITY]
@@ -484,3 +494,37 @@ async def test_bearer_total_deadline_includes_recovery_read(
 
     assert isinstance(caught.value.__cause__, TimeoutError)
     assert scenario.recovery.identities == [IDENTITY]
+
+
+@pytest.mark.asyncio
+async def test_old_generation_cannot_regain_access_after_block_release() -> None:
+    """Removing the temporary block never makes an older CLI login current again."""
+    scenario = AuthenticationScenario()
+    first = await scenario.service.authenticate(CREDENTIAL)
+    assert first.authentication_evidence is scenario.token.result
+    scenario.recovery.version = HumanCredentialVersion(2)
+    scenario.recovery.result = False
+    with pytest.raises(AuthenticationRequiredError):
+        await scenario.service.authenticate(CREDENTIAL)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("missing", [False, True])
+async def test_missing_state_or_wrong_installation_cannot_authenticate(missing: bool) -> None:
+    scenario = AuthenticationScenario()
+    if missing:
+        scenario.recovery.version = None
+    else:
+        scenario.recovery.installation_id = InstallationId(UUID(int=321))
+    with pytest.raises(AuthenticationRequiredError):
+        await scenario.service.authenticate(CREDENTIAL)
+
+
+@pytest.mark.asyncio
+async def test_stale_unadmitted_identity_is_a_credential_failure() -> None:
+    """A missing local account cannot make a stale generation look like a valid login."""
+    scenario = AuthenticationScenario()
+    scenario.reader.result = None
+    scenario.recovery.version = HumanCredentialVersion(2)
+    with pytest.raises(AuthenticationRequiredError):
+        await scenario.service.authenticate(CREDENTIAL)

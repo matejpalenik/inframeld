@@ -11,6 +11,7 @@ import pytest_asyncio
 from sqlalchemy import ARRAY, Integer, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios, ProjectAuthorizationSeedDTO
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_grant_changes import create_project_grant_change_service
 
 from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
@@ -246,11 +247,15 @@ async def _assign(
     authorizer: ProjectGrantAuthorizer | None = None,
     audit_events: AuditEventWriter | None = None,
     idempotency: OperationIdempotency | None = None,
+    access: AccessContextDTO | None = None,
 ) -> CompletedSynchronousOperationDTO:
     return await create_project_grant_change_service(
         session, authorizer=authorizer, audit_events=audit_events, idempotency=idempotency
     ).assign_use_only(
-        access=AccessContextDTO(scenario.seed.principal_id),
+        access=access
+        or AccessContextDTO(
+            scenario.seed.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
+        ),
         context=OperationAdmissionContextDTO(
             method="POST", requested_route="/v1/projects/{project_id}/grants", key=key
         ),
@@ -400,7 +405,9 @@ async def test_existing_context_rechecks_recovery_inside_authorization(
     scenario: RecoveryAuthorizationScenarioDTO,
 ) -> None:
     """A context created before recovery must not preserve old action eligibility."""
-    access = AccessContextDTO(scenario.seed.principal_id)
+    access = AccessContextDTO(
+        scenario.seed.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
+    )
 
     async with database.session() as session, session.begin():
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
@@ -666,7 +673,10 @@ async def test_missing_installation_metadata_cannot_allow_authorization(
             await ActionAuthorizationService(
                 PostgresProjectActionFactsReader(session)
             ).require_authorization(
-                access=AccessContextDTO(scenario.seed.principal_id),
+                access=AccessContextDTO(
+                    scenario.seed.principal_id,
+                    authentication_evidence=MockAuthenticationEvidence.browser(),
+                ),
                 request=ProjectActionAuthorizationRequestDTO(
                     project_id=scenario.seed.project_id, action_id=ACTION
                 ),
@@ -694,7 +704,10 @@ async def test_one_humans_recovery_does_not_block_an_unrelated_application(
         authorization = await ActionAuthorizationService(
             PostgresProjectActionFactsReader(session)
         ).require_authorization(
-            access=AccessContextDTO(application.principal_id),
+            access=AccessContextDTO(
+                application.principal_id,
+                authentication_evidence=MockAuthenticationEvidence.application_key(),
+            ),
             request=ProjectActionAuthorizationRequestDTO(
                 project_id=application.project_id, action_id=application.action
             ),
@@ -761,4 +774,94 @@ async def test_duplicate_assignment_rolls_back_its_new_reservation_and_revision(
             await _assign(
                 session, scenario, key=IdempotencyKey("duplicate-assignment"), expected_revision=1
             )
+    assert await _effects(database, scenario) == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replay", [False, True])
+@pytest.mark.parametrize("consumer", ["grant", "admission"])
+async def test_captured_credential_cannot_resume_after_recovery_release(
+    database: Database, scenario: RecoveryAuthorizationScenarioDTO, replay: bool, consumer: str
+) -> None:
+    """A request paused after authentication cannot disclose replay or write with an old binding."""
+    from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+        HumanOAuthCredentialBindingDTO,
+    )
+    from inframeld_backend.access.application.dtos.project_operation_admission_request_dto import (
+        ProjectOperationAdmissionRequestDTO,
+    )
+    from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+        HumanOAuthCredentialRejectedError,
+    )
+    from inframeld_backend.access.application.services.project_operation_admission_service import (
+        ProjectOperationAdmissionService,
+    )
+    from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+        PostgresHumanCredentialStateInitializer,
+    )
+    from inframeld_backend.shared.application.value_objects.request_fingerprint import (
+        RequestFingerprint,
+    )
+    from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservation_writer import (
+        PostgresOperationReservationWriter,
+    )
+
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(scenario.identity)
+    assert state.version is not None
+    access = AccessContextDTO(
+        scenario.seed.principal_id,
+        HumanOAuthCredentialBindingDTO(scenario.identity, state.installation_id, state.version),
+    )
+    request = ProjectOperationAdmissionRequestDTO(
+        scenario.seed.project_id, "POST", "/v1/test-operation", KEY, RequestFingerprint(b"F" * 32)
+    )
+    if replay:
+        async with database.session() as session:
+            if consumer == "grant":
+                await _assign(session, scenario, access=access)
+            else:
+                async with session.begin():
+                    idempotency = IdempotencyService(PostgresOperationReservationWriter(session))
+                    admitted = await ProjectOperationAdmissionService(
+                        ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+                        idempotency,
+                    ).reserve(
+                        access=access,
+                        action_id=ACTION,
+                        request=request,
+                        expected_replay_kind=OperationReplayKind.SAFE_RESULT,
+                    )
+                    assert isinstance(admitted, NewOperationReservationDTO)
+                    await idempotency.record_completed_result(
+                        admitted, replay_kind=OperationReplayKind.SAFE_RESULT
+                    )
+    before = await _effects(database, scenario)
+    async with database.session() as session, session.begin():
+        operation = await _admit(session, scenario)
+    # This fixture isolates resumed authorization from provider evidence.
+    async with database.session() as session, session.begin():
+        await session.execute(
+            update(IdentityRecoveryAdmissionRow)
+            .where(IdentityRecoveryAdmissionRow.operation_id == operation.value)
+            .values(
+                kratos_cleanup_state=IdentityRecoveryCleanupState.CONFIRMED,
+                hydra_cleanup_state=IdentityRecoveryCleanupState.CONFIRMED,
+                released_at=func.now(),
+            )
+        )
+    async with database.session() as session:
+        with pytest.raises(HumanOAuthCredentialRejectedError):
+            if consumer == "grant":
+                await _assign(session, scenario, access=access)
+            else:
+                async with session.begin():
+                    await ProjectOperationAdmissionService(
+                        ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+                        IdempotencyService(PostgresOperationReservationWriter(session)),
+                    ).reserve(
+                        access=access,
+                        action_id=ACTION,
+                        request=request,
+                        expected_replay_kind=OperationReplayKind.SAFE_RESULT,
+                    )
     assert await _effects(database, scenario) == before

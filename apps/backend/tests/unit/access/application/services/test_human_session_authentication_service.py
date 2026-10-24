@@ -9,6 +9,9 @@ from uuid import uuid4
 import pytest
 from tests.support.mock_identity_recovery_block_reader import MockIdentityRecoveryBlockReader
 
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
@@ -123,12 +126,13 @@ class MockDeadlinePrincipalReader(HumanIdentityLinkReader):
 
 @pytest.mark.asyncio
 async def test_valid_identity_resolves_active_local_human() -> None:
-    """Carry the verified identity into lookup and return only the local principal ID."""
+    """Carry browser authentication evidence alongside the admitted local actor."""
     reader = FixedPrincipalReader()
     context = await HumanSessionAuthenticationService(
         FixedVerifier(), reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
     ).authenticate(CREDENTIAL)
     assert context.actor_principal_id == PRINCIPAL.id
+    assert context.authentication_evidence == BrowserSessionAuthenticationDTO(IDENTITY)
     assert reader.identity == IDENTITY
 
 

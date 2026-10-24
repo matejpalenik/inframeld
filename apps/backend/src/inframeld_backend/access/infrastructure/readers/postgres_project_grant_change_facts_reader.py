@@ -1,11 +1,17 @@
 import asyncio
 from typing import final, override
 
-from sqlalchemy import Nullable, and_, exists, select
+from sqlalchemy import BigInteger, Nullable, and_, exists, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
+from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
+    HumanOAuthCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_change_facts_dto import (
     ProjectGrantChangeFactsDTO,
 )
@@ -13,13 +19,16 @@ from inframeld_backend.access.application.protocols.project_grant_change_facts_r
     ProjectGrantChangeFactsReader,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
-from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
-    PrincipalAccessPolicyInput,
-)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.readers.human_credential_state_queries import (
+    HumanCredentialStateQueries,
+)
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
 )
@@ -170,17 +179,26 @@ class PostgresProjectGrantChangeFactsReader(ProjectGrantChangeFactsReader):
             .correlate(PrincipalRow)
         )
 
+        evidence = access.authentication_evidence
+        if isinstance(evidence, HumanOAuthCredentialBindingDTO):
+            binding_matches_actor = HumanCredentialStateQueries.binding_matches_actor(evidence)
+            credential_version = Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
+        else:
+            binding_matches_actor = literal(False)
+            credential_version = Nullable(literal(None, BigInteger))
+
         statement = (
             select(
                 PrincipalRow,
                 Nullable(recipient),
-                ProjectRow.status,
-                ProjectRow.access_revision,
+                ProjectRow,
                 actor_is_member,
                 recipient_is_member,
                 actor_can_grant,
                 installation_available,
                 has_pending_recovery,
+                binding_matches_actor,
+                credential_version,
             )
             .select_from(PrincipalRow)
             .join(
@@ -212,26 +230,35 @@ class PostgresProjectGrantChangeFactsReader(ProjectGrantChangeFactsReader):
         (
             actor_row,
             recipient_row,
-            project_status,
-            project_access_revision,
+            project_row,
             actor_member,
             recipient_member,
             can_grant,
             has_installation,
             pending_recovery,
+            matches_actor,
+            current_credential_version,
         ) = row
 
         if not has_installation:
             raise DependencyUnavailableError("The installation identity is not available.")
 
         return ProjectGrantChangeFactsDTO(
-            actor_access=PrincipalAccessPolicyInput(
-                principal=_to_principal(actor_row),
-                has_pending_recovery=pending_recovery,
+            actor=_to_principal(actor_row),
+            has_pending_recovery=pending_recovery,
+            oauth_credential_facts=(
+                HumanOAuthCredentialFactsDTO(
+                    binding_matches_actor=matches_actor,
+                    current_version=HumanCredentialVersion(current_credential_version)
+                    if current_credential_version is not None
+                    else None,
+                )
+                if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+                else None
             ),
             recipient=(_to_principal(recipient_row) if recipient_row is not None else None),
-            project_status=project_status,
-            project_access_revision=project_access_revision,
+            project_status=project_row.status,
+            project_access_revision=project_row.access_revision,
             actor_is_project_member=actor_member,
             recipient_is_project_member=recipient_member,
             actor_can_grant_action=can_grant,

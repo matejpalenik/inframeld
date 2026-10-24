@@ -133,6 +133,27 @@ SupportBot calls a stable Deployment and supplies a routing-affinity key when re
 
 <a id="failures"></a>
 
+<a id="human-oauth-consent"></a>
+
+### Browser consent is separate from product admission
+
+Alice's CLI login uses native Kratos authentication followed by [Access's consent operation](access-control.md#native-hydra-consent). The future account UI uses these implemented operations, with the current Kratos session cookie:
+
+| Operation | Input and result |
+| --- | --- |
+| `GET /v1/oauth/consent` - `inspectHumanOAuthConsent` | Required `consent_challenge` query value. Return `accountSubject`, `installation`, `clientId`, `requestedScopes`, `requestedAudience`, `approvalRequired` and `rememberConsentSeconds`. GET makes no approval. |
+| `POST /v1/oauth/consent` - `decideHumanOAuthConsent` | JSON `consentChallenge`, `decision` (`allow` or `deny`) and optional boolean `remember` (default false). Return `redirectTo` for browser continuation through Hydra. |
+
+The installation value is the configured canonical API URL. The account subject is the checked Kratos identity, not a local principal ID or email-based association. Account UI labels must remain tied to that identity. The server derives requested access from Hydra and remember duration from operator configuration. Extra input fields are rejected. Remember applies to a new allow decision, never denial or automatic extension of a remembered approval.
+
+Both routes declare only `KratosSession` security in native OpenAPI. Missing cookies return 401. Authorization headers and competing/duplicate session credentials return the existing authentication-request 400. POST requires the existing trusted `Origin` plus `X-Inframeld-CSRF: 1` before service I/O. After reading Hydra's challenge, unsupported client, scopes or audience return safe 403 immediately, even when the supplied cookie is also invalid. No browser verification, recovery lookup, version initialization or decision submission follows. For supported requests, invalid sessions return 401 and wrong identity or pending recovery returns 403. Provider-reported unusable challenges map to 404, ordinary request validation to 422 and missing configuration or unavailable/uncertain provider responses to 503. Invalid challenge text uses the existing invalid-input 400. No credential fallback occurs.
+
+Inspection and decision both repeat current provider and recovery checks. A successful inspection neither reserves the flow nor authorizes its later decision. Hydra owns expiry and final one-use verifier enforcement. Both success and handled problem responses have `Cache-Control: no-store` and `Referrer-Policy: no-referrer`. Do not log challenges or continuation URLs. The account UI and reverse proxy must also protect flow query values and use a no-referrer policy on the browser page. Only continuations matching the configured public Hydra authorization endpoint are returned, and the backend never follows them.
+
+Inspection and denial never initialize credential versions. Supported approval deliberately captures state before browser verification, even if that verification later fails. It approves only after rereading unchanged, unblocked state. [The application flow](application-structure.md#human-oauth-consent) explains the two paths and required captured binding.
+
+A timeout is not a confirmed denial or permission to replay approval automatically. The account UI must present failure honestly and support an explicit fresh login. The frontend still owns rendering the consent page and navigation. Its Hydra `urls.consent` destination is that browser page, not this JSON inspection endpoint. Product admission, project permissions and recovery completion remain separate.
+
 ## 4. Make failure and retry behavior explicit
 
 Errors use RFC 9457 `application/problem+json`: a stable type and code, a safe explanation, and a `requestId`. Domain and application code raise ordinary Python exceptions. Only reviewed exception mappings become public problems. The [error guide](error-handling.md) explains which exception to use and lists the problems. Its [maintainer reference](error-handling-reference.md) covers handlers, logging, and OpenAPI.
@@ -452,3 +473,9 @@ The shared error and pagination foundations are implemented. [Error qualificatio
 | [ADR-0006](../adr/ADR-0006-use-official-generated-clients-for-application-api-access.md) | Use official generated clients for application API access. |
 | [ADR-0007](../adr/ADR-0007-keep-api-documentation-public-and-product-operations-protected.md) | Keep API documentation public and product operations protected. |
 | [ADR-0044](../adr/ADR-0044-provide-mcp-through-a-thin-adapter-in-the-existing-api-process.md) | Provide MCP through a thin adapter in the existing API process. |
+
+### Handle invalidated human CLI credentials
+
+[Credential versioning](access-control.md#human-credential-versions) changes server-side acceptance, not HTTP schemas. An unversioned or stale human bearer receives the existing generic 401 and Bearer `invalid_token` challenge, including rejection inside current transactional authorization. Current credentials retain normal eligibility and permission failures. No version field is accepted from clients or added to session/consent responses.
+
+The future CLI checks `/v1/session` before saving a completed login. After bounded refresh handling, confirmed invalidation clears only the selected target/account's unchanged saved credential revision and requires explicit sign-in. Permission denial and dependency unavailability retain the saved login. Authentication recovery never authorizes an automatic repeat of a paid/mutating operation.

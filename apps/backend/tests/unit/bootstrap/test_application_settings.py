@@ -307,3 +307,22 @@ def test_invalid_human_authentication_environment_is_rejected(
         _load_bearer_settings()
 
     assert caught.value.errors()[0]["loc"] == ("human_authentication", field)
+
+
+def test_consent_settings_parse_explicit_public_url_and_remember_duration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("INFRAMELD_KRATOS__ADMIN_URL", "http://kratos:4434")
+    monkeypatch.setenv("INFRAMELD_HYDRA__ADMIN_URL", "http://hydra:4445")
+    monkeypatch.setenv("INFRAMELD_HYDRA__PUBLIC_URL", "https://auth.test/hydra")
+    monkeypatch.setenv("INFRAMELD_HYDRA__ISSUER", "https://auth.test/hydra/")
+    monkeypatch.setenv("INFRAMELD_HYDRA__API_AUDIENCE", "https://api.test")
+    monkeypatch.setenv("INFRAMELD_HYDRA__REMEMBER_CONSENT_SECONDS", "7200")
+    get_settings.cache_clear()
+    try:
+        settings = get_settings().hydra
+        assert settings is not None
+        assert str(settings.public_url) == "https://auth.test/hydra"
+        assert settings.remember_consent_seconds == 7200
+    finally:
+        get_settings.cache_clear()

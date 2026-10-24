@@ -4,6 +4,7 @@ from typing import cast, override
 from uuid import UUID
 
 import pytest
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.protocols.authorized_operation_scope import (
@@ -72,7 +73,9 @@ REQUEST = OperationReservationRequestDTO(
 CONTEXT = OperationAdmissionContextDTO(
     method=REQUEST.method, requested_route=REQUEST.requested_route, key=REQUEST.key
 )
-ACCESS = AccessContextDTO(REQUEST.principal_id)
+ACCESS = AccessContextDTO(
+    REQUEST.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
+)
 AUTHORIZATION = MockAuthorizedOperationScopeDTO(REQUEST.organization_id, REQUEST.project_id)
 NEW = OperationReservationResultDTO(
     operation_id=OperationId("original-operation"),
@@ -142,7 +145,9 @@ async def test_reservation_mapping_preserves_explicit_scope_and_retry_values(
     fingerprint = bytes(range(32))
     result = await IdempotencyService(writer).find_or_reserve(
         context=context,
-        access=AccessContextDTO(principal_id),
+        access=AccessContextDTO(
+            principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
+        ),
         authorization=MockAuthorizedOperationScopeDTO(organization_id, project_id),
         fingerprint=RequestFingerprint(fingerprint),
         expected_replay_kind=OperationReplayKind.SAFE_RESULT,

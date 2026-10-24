@@ -7,6 +7,7 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.mock_identity_recovery_block_reader import MockIdentityRecoveryBlockReader
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -114,6 +115,7 @@ def _test_app(
     verifier: _MockVerifier,
     reader: _MockLinkReader,
     bearer: HumanAccessTokenAuthenticator | None = None,
+    observed_contexts: list[AccessContextDTO] | None = None,
 ) -> FastAPI:
     """Expose protected reads and writes using the production HTTP dependency."""
     application = FastAPI(debug=False)
@@ -132,6 +134,8 @@ def _test_app(
         access: Annotated[AccessContextDTO, Depends(authenticate)],
     ) -> dict[str, str]:
         """Return the principal admitted by human authentication."""
+        if observed_contexts is not None:
+            observed_contexts.append(access)
         return {"principalId": str(access.actor_principal_id.value)}
 
     @application.post("/_test/protected")
@@ -149,6 +153,10 @@ class _RecordingAccessTokenAuthenticator(HumanAccessTokenAuthenticator):
     def __init__(self, failure: Exception | None = None) -> None:
         self.failure = failure
         self.seen_tokens: list[HumanAccessTokenCredential] = []
+        self.context = AccessContextDTO(
+            PRINCIPAL_ID,
+            authentication_evidence=MockAuthenticationEvidence.human_oauth(IDENTITY),
+        )
 
     @override
     async def authenticate(self, credential: HumanAccessTokenCredential | None) -> AccessContextDTO:
@@ -157,7 +165,7 @@ class _RecordingAccessTokenAuthenticator(HumanAccessTokenAuthenticator):
         self.seen_tokens.append(credential)
         if self.failure is not None:
             raise self.failure
-        return AccessContextDTO(actor_principal_id=PRINCIPAL_ID)
+        return self.context
 
 
 def test_valid_session_resolves_local_principal() -> None:
@@ -557,3 +565,26 @@ def test_unsupported_authorization_scheme_is_unauthorized() -> None:
     assert verifier.seen_cookies == []
     assert reader.seen_identities == []
     assert bearer.seen_tokens == []
+
+
+@pytest.mark.parametrize("family", ["browser", "oauth"])
+def test_http_dependency_preserves_evidence_without_serializing_it(family: str) -> None:
+    """The route receives internal evidence while the public response remains principalId only."""
+    observed: list[AccessContextDTO] = []
+    bearer = _RecordingAccessTokenAuthenticator()
+    headers = (
+        {"Cookie": f"{COOKIE_NAME}=synthetic-cookie"}
+        if family == "browser"
+        else {"Authorization": f"Bearer {TOKEN}"}
+    )
+    with TestClient(
+        _test_app(_MockVerifier(IDENTITY), _MockLinkReader(PRINCIPAL_ID), bearer, observed)
+    ) as client:
+        response = client.get("/_test/protected", headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"principalId": str(PRINCIPAL_ID.value)}
+    assert len(observed) == 1
+    if family == "browser":
+        assert observed[0].authentication_evidence == MockAuthenticationEvidence.browser(IDENTITY)
+    else:
+        assert observed[0] is bearer.context

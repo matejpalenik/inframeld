@@ -6,6 +6,7 @@ from typing import Literal, override
 from uuid import UUID
 
 import pytest
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
     AssignProjectUseOnlyGrantCommand,
@@ -86,7 +87,9 @@ RECIPIENT_ID = PrincipalId(UUID(int=2))
 ORGANIZATION_ID = OrganizationId(UUID(int=3))
 PROJECT_ID = ProjectId(UUID(int=4))
 ACTION_ID = ActionId("create-access-groups")
-ACCESS = AccessContextDTO(actor_principal_id=ACTOR_ID)
+ACCESS = AccessContextDTO(
+    actor_principal_id=ACTOR_ID, authentication_evidence=MockAuthenticationEvidence.browser()
+)
 AUTHORIZATION = ProjectGrantAuthorizationDTO(
     organization_id=ORGANIZATION_ID, project_id=PROJECT_ID, project_access_revision=7
 )

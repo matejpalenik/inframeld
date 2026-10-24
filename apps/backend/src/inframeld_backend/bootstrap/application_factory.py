@@ -14,7 +14,13 @@ from inframeld_backend.access.http.dependencies.csrf_protection_dependency impor
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
+from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler import (
+    register_human_oauth_credential_error_handler,
+)
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
+from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
+    create_human_oauth_consent_router,
+)
 from inframeld_backend.access.http.routes.project_grant_routes import (
     create_project_grant_router,
 )
@@ -96,6 +102,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
 
         register_error_handlers(application)
+        register_human_oauth_credential_error_handler(application)
         configure_problem_openapi(application)
         application.include_router(health_router)
 
@@ -106,6 +113,12 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
 
         application.include_router(create_session_router(human_session))
+        application.include_router(
+            create_human_oauth_consent_router(
+                access.oauth_consent_handler,
+                CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
+            )
+        )
         application.include_router(
             create_project_grant_router(
                 human_session, partial(open_project_grant_change, database, fingerprints)

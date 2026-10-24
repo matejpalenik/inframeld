@@ -4,7 +4,6 @@ import asyncio
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import final, override
-from uuid import UUID
 
 from ory_kratos_client.api.frontend_api import FrontendApi
 from ory_kratos_client.exceptions import (
@@ -30,6 +29,7 @@ from inframeld_backend.access.domain.value_objects.identity_subject import Ident
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.validation.value_validation import ValueValidation
 
 
 class _KratosIdentityState(StrEnum):
@@ -88,7 +88,8 @@ class KratosBrowserSessionVerifier(BrowserSessionVerifier):
 
         try:
             state = _KratosIdentityState(session.identity.state)
-            subject = IdentitySubject(str(UUID(session.identity.id)))
+            ValueValidation.require_uuid(session.identity.id)
+            subject = IdentitySubject(str(session.identity.id))
 
         except (TypeError, ValueError) as error:
             raise DependencyUnavailableError() from error

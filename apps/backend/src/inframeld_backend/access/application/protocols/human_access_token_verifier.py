@@ -1,8 +1,8 @@
 from abc import abstractmethod
 from typing import Protocol
 
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
 )
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
@@ -15,11 +15,12 @@ class HumanAccessTokenVerifier(Protocol):
     @abstractmethod
     async def verify(
         self, credential: HumanAccessTokenCredential, *, timeout_seconds: float
-    ) -> VerifiedHumanIdentityDTO | None:
-        """Return the trusted Kratos authority / subject after token verification.
+    ) -> HumanOAuthCredentialBindingDTO | None:
+        """Return the verified identity and stored credential binding.
 
         Require current access token validity and the configured issuer, client,
-        API audience and scopes.
+        API audience, scopes and valid version metadata. Current local version equality
+        remains the authentication service's responsibility.
 
         Return `None` for rejected credentials.
 

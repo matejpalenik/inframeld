@@ -14,6 +14,9 @@ from pydantic import HttpUrl
 from sqlalchemy import delete, select, update
 from tests.support.access_scenarios import MockAccessScenarios
 
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
@@ -44,6 +47,9 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -57,6 +63,9 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.project_grant_routes import create_project_grant_router
+from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
+    PostgresHumanCredentialStateReader,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
@@ -73,6 +82,9 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
@@ -91,6 +103,9 @@ from inframeld_backend.shared.http.middleware.request_context_middleware import 
     RequestContextMiddleware,
 )
 from inframeld_backend.shared.http.openapi.problem_openapi import configure_problem_openapi
+from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
+    PostgresInstallationIdentityReader,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
@@ -142,7 +157,9 @@ class GrantStateDTO:
 
 
 class MockTokenVerifier(HumanAccessTokenVerifier):
-    def __init__(self) -> None:
+    def __init__(self, database: Database) -> None:
+        self.database = database
+        self.tokens = {TOKEN: HumanCredentialVersion(1)}
         self.calls = 0
         self.unavailable = False
 
@@ -152,11 +169,15 @@ class MockTokenVerifier(HumanAccessTokenVerifier):
         credential: HumanAccessTokenCredential,
         *,
         timeout_seconds: float,
-    ) -> VerifiedHumanIdentityDTO | None:
+    ) -> HumanOAuthCredentialBindingDTO | None:
         self.calls += 1
         if self.unavailable:
             raise DependencyUnavailableError()
-        return IDENTITY if credential == TOKEN else None
+        version = self.tokens.get(credential)
+        if version is None:
+            return None
+        installation = await PostgresInstallationIdentityReader(self.database).read()
+        return HumanOAuthCredentialBindingDTO(IDENTITY, installation, version)
 
 
 class MockIdentityVerifier(HumanIdentityVerifier):
@@ -195,7 +216,7 @@ class GrantScenario:
         api_database = Database(settings)
         reader = PostgresHumanIdentityLinkReader(api_database)
         recovery_block_reader = PostgresIdentityRecoveryBlockReader(api_database)
-        self.token = MockTokenVerifier()
+        self.token = MockTokenVerifier(api_database)
         self.identity = MockIdentityVerifier()
         self.browser = MockBrowserVerifier()
 
@@ -208,7 +229,7 @@ class GrantScenario:
                 self.token,
                 self.identity,
                 reader,
-                recovery_block_reader=recovery_block_reader,
+                credential_state_reader=PostgresHumanCredentialStateReader(api_database),
             ),
         )
         fingerprints = ProjectGrantChangeFingerprintService(
@@ -591,3 +612,9 @@ async def test_competing_credentials_cannot_change_grants(
     assert scenario.identity.calls == 0
     assert scenario.browser.calls == 0
     assert await _read_state(database, grant_seed) == before
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def versioned_test_credentials(database: Database) -> None:
+    """Seed the security metadata represented by the mocked provider's fixed grant."""
+    await PostgresHumanCredentialStateInitializer(database).initialize(IDENTITY)

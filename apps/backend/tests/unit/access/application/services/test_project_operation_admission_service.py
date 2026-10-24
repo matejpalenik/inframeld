@@ -4,6 +4,7 @@ from typing import override
 from uuid import UUID
 
 import pytest
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.project_action_authorization_dto import (
@@ -12,9 +13,15 @@ from inframeld_backend.access.application.dtos.project_action_authorization_dto 
 from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
     ProjectActionAuthorizationRequestDTO,
 )
+from inframeld_backend.access.application.dtos.project_operation_admission_request_dto import (
+    ProjectOperationAdmissionRequestDTO,
+)
 from inframeld_backend.access.application.protocols.action_authorizer import ActionAuthorizer
 from inframeld_backend.access.application.protocols.authorized_operation_scope import (
     AuthorizedOperationScope,
+)
+from inframeld_backend.access.application.services.project_operation_admission_service import (
+    ProjectOperationAdmissionService,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -32,9 +39,6 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
 from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
     OperationAdmissionContextDTO,
 )
-from inframeld_backend.shared.application.dtos.project_operation_admission_request_dto import (
-    ProjectOperationAdmissionRequestDTO,
-)
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
@@ -48,16 +52,15 @@ from inframeld_backend.shared.application.errors.application_errors import (
 from inframeld_backend.shared.application.protocols.operation_idempotency import (
     OperationIdempotency,
 )
-from inframeld_backend.shared.application.services.project_operation_admission_service import (
-    ProjectOperationAdmissionService,
-)
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
 
-ACCESS = AccessContextDTO(PrincipalId(UUID(int=1)))
+ACCESS = AccessContextDTO(
+    PrincipalId(UUID(int=1)), authentication_evidence=MockAuthenticationEvidence.browser()
+)
 ORGANIZATION = OrganizationId(UUID(int=2))
 ACTION = ActionId("create-access-groups")
 OPERATION = OperationId("original-admission")

@@ -10,9 +10,15 @@ from inframeld_backend.access.application.dtos.project_action_authorization_requ
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
 )
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
+)
 from inframeld_backend.access.application.protocols.action_authorizer import ActionAuthorizer
 from inframeld_backend.access.application.protocols.project_action_facts_reader import (
     ProjectActionFactsReader,
+)
+from inframeld_backend.access.application.services.principal_access_evaluation_service import (
+    PrincipalAccessEvaluationService,
 )
 from inframeld_backend.access.domain.policies.action_authorization_policy import (
     ActionAuthorizationPolicy,
@@ -43,15 +49,27 @@ class ActionAuthorizationService(ActionAuthorizer):
             target=ProjectActionTargetDTO(project_id=request.project_id),
         )
 
-        if facts is None or not ProjectVisibilityPolicy.may_view_project(
-            principal_status=facts.principal_access.principal.status,
+        if facts is None:
+            raise ResourceNotFoundError()
+
+        principal_access = PrincipalAccessEvaluationService.evaluate(
+            access=access,
+            principal=facts.principal,
+            has_pending_recovery=facts.has_pending_recovery,
+            oauth_credential_facts=facts.oauth_credential_facts,
+        )
+        if not principal_access.credential_is_current:
+            raise HumanOAuthCredentialRejectedError()
+
+        if not ProjectVisibilityPolicy.may_view_project(
+            principal_status=facts.principal.status,
             project_status=facts.project_status,
             is_project_member=facts.is_project_member,
         ):
             raise ResourceNotFoundError()
 
         policy_input = ActionAuthorizationPolicyInput(
-            principal_access=facts.principal_access,
+            principal_access=principal_access,
             is_project_member=facts.is_project_member,
             has_exact_action_grant=facts.has_exact_action_grant,
         )
@@ -60,6 +78,6 @@ class ActionAuthorizationService(ActionAuthorizer):
             raise AccessDeniedError()
 
         return ProjectActionAuthorizationDTO(
-            organization_id=facts.principal_access.principal.organization_id,
+            organization_id=facts.principal.organization_id,
             project_id=request.project_id,
         )

@@ -33,8 +33,7 @@ def test_only_eligible_humans_without_recovery_blocks_may_authenticate(
         status=status,
     )
     policy_input = PrincipalAccessPolicyInput(
-        principal=principal,
-        has_pending_recovery=has_pending_recovery,
+        principal=principal, has_pending_recovery=has_pending_recovery, credential_is_current=True
     )
 
     assert HumanAuthenticationPolicy.may_authenticate(policy_input) is (

@@ -9,14 +9,14 @@ from inframeld_backend.access.application.protocols.human_access_token_authentic
 from inframeld_backend.access.application.protocols.human_access_token_verifier import (
     HumanAccessTokenVerifier,
 )
+from inframeld_backend.access.application.protocols.human_credential_state_reader import (
+    HumanCredentialStateReader,
+)
 from inframeld_backend.access.application.protocols.human_identity_link_reader import (
     HumanIdentityLinkReader,
 )
 from inframeld_backend.access.application.protocols.human_identity_verifier import (
     HumanIdentityVerifier,
-)
-from inframeld_backend.access.application.protocols.identity_recovery_block_reader import (
-    IdentityRecoveryBlockReader,
 )
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
@@ -24,6 +24,7 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
 from inframeld_backend.access.domain.policies.human_authentication_policy import (
     HumanAuthenticationPolicy,
 )
+from inframeld_backend.access.domain.policies.human_credential_policy import HumanCredentialPolicy
 from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
     PrincipalAccessPolicyInput,
 )
@@ -43,7 +44,7 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
         identity_verifier: HumanIdentityVerifier,
         reader: HumanIdentityLinkReader,
         *,
-        recovery_block_reader: IdentityRecoveryBlockReader,
+        credential_state_reader: HumanCredentialStateReader,
         provider_timeout_seconds: float = 5.0,
         total_timeout_seconds: float = 10.0,
     ) -> None:
@@ -54,7 +55,7 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
         self._token_verifier = token_verifier
         self._identity_verifier = identity_verifier
         self._reader = reader
-        self._recovery_block_reader = recovery_block_reader
+        self._credential_state_reader = credential_state_reader
         self._provider_timeout_seconds = provider_timeout_seconds
         self._total_timeout_seconds = total_timeout_seconds
 
@@ -80,12 +81,13 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
         try:
             async with asyncio.timeout_at(deadline):
                 # Verify token in Hydra
-                identity = await self._token_verifier.verify(
+                binding = await self._token_verifier.verify(
                     credential, timeout_seconds=self._provider_budget(deadline)
                 )
 
-                if identity is None:
+                if binding is None:
                     raise AuthenticationRequiredError
+                identity = binding.identity
 
                 # Verify the identity in the access token matches Kratos
                 current_identity = await self._identity_verifier.verify(
@@ -101,25 +103,39 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
                 if loop.time() >= deadline:
                     raise TimeoutError()
 
-                if principal is None:
-                    raise AccessDeniedError()
-
-                has_pending_recovery = await self._recovery_block_reader.is_blocked(
-                    current_identity
-                )
+                credential_state = await self._credential_state_reader.read(current_identity)
+                has_pending_recovery = credential_state.has_pending_recovery
 
                 if loop.time() >= deadline:
                     raise TimeoutError()
 
+                if not HumanCredentialPolicy.is_current(
+                    installation_id=binding.installation_id,
+                    authority=binding.identity.authority,
+                    subject=binding.identity.subject,
+                    version=binding.version,
+                    current_installation_id=credential_state.installation_id,
+                    current_authority=credential_state.identity.authority,
+                    current_subject=credential_state.identity.subject,
+                    current_version=credential_state.version,
+                ):
+                    raise AuthenticationRequiredError()
+
+                if principal is None:
+                    raise AccessDeniedError()
+
                 principal_access = PrincipalAccessPolicyInput(
                     principal=principal,
                     has_pending_recovery=has_pending_recovery,
+                    credential_is_current=True,
                 )
 
                 if not HumanAuthenticationPolicy.may_authenticate(principal_access):
                     raise AccessDeniedError()
 
-                return AccessContextDTO(actor_principal_id=principal.id)
+                return AccessContextDTO(
+                    actor_principal_id=principal.id, authentication_evidence=binding
+                )
 
         except TimeoutError as error:
             raise DependencyUnavailableError from error

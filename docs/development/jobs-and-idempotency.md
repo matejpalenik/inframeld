@@ -275,7 +275,7 @@ The low-level writer retains `OperationReservationResultDTO` as its storage proj
 
 Only a `NewOperationReservationDTO` can be passed to `record_completed_result()`. The owner saves its effects first in the same transaction. Completion returns either synchronous completed metadata or asynchronous acceptance. For the grant command, recovery-required or unexpected asynchronous outcomes conflict before commit. An authorized synchronous replay returns without another grant, revision increment or audit event.
 
-`ProjectOperationAdmissionService` is a second consumer of the same idempotency operation. It first authorizes the action, derives the organization and principal scope, then delegates with the caller's expected replay kind. Its caller continues owning the transaction. [PostgreSQL admission tests](../../apps/backend/tests/integration/idempotency/test_authorized_replay_postgres.py) exercise replay metadata and rollback through the real reservation adapter. This verifies shared retry decisions, not another complete product command or job lifecycle.
+Access owns [`ProjectOperationAdmissionService`](../../apps/backend/src/inframeld_backend/access/application/services/project_operation_admission_service.py) and its request DTO. The helper first authorizes the action and matches the returned project, then delegates with the caller's expected replay kind. The principal comes from authentication and both scope IDs from authorization. Its caller continues owning the transaction. Generic idempotency, outcomes and reservation persistence remain shared. [PostgreSQL admission tests](../../apps/backend/tests/integration/idempotency/test_authorized_replay_postgres.py) exercise replay metadata and rollback through the real reservation adapter. This verifies shared retry decisions, not another complete product command or job lifecycle.
 
 The grant route exercises the safe-result path. The in-progress, asynchronous `202`, uncertain, issued-secret, and answer-receipt outcomes above retain their separate contracts. Their owning workflows still need implementation where noted.
 
@@ -314,6 +314,12 @@ Each request makes one bounded attempt without automatic retries. An expected em
 Keep Kratos and Hydra evidence independent. The future recovery workflow must establish both required Hydra results and safe reset/issuance ordering before recording aggregate confirmation. It must bound reconciliation and keep unresolved obligations blocked. The [provider observations](access-control.md#hydra-discovery-evidence) retain skipped-consent, empty-listing and password-gap evidence without using listed rows to choose targets. Production callback delivery, durable execution, coordination with authorization-code exchange and refresh, and completion wiring remain unfinished. Ordinary selected-device CLI logout retains its separate narrower semantics.
 
 [Controlled HTTP-ordering tests](access-control.md#hydra-issuance-evidence) show that cleanup invalidates outstanding codes and credentials from completed exchanges or refreshes, including successful responses delivered afterward. An authorization begun earlier can still issue working credentials if the test harness approves login after cleanup. Neither that prepared approval nor a held HTTP response pauses Hydra internally. These observations clarify the production coordination requirement without implementing it or establishing permission to release a recovery block.
+
+[Native login and consent](access-control.md#native-hydra-consent) now check the browser and recovery state through the production API. They do not use a local reservation or hold a database transaction during provider I/O. A lost approval response must not cause an automatic retry. Remembered-consent duration controls another approval prompt, not token retention or recovery completion.
+
+Consent rejects unsupported access before initializing version state or checking the browser. Inspection and denial use read-only checks. Supported approval captures state before browser verification, rereads it afterward and sends the unchanged binding to Hydra. These explicit paths do not add a reservation or turn an uncertain remote result into a confirmed denial.
+
+The deeper test-only hook pauses after Hydra reads code/refresh credentials and before response persistence. Crossing cleanup returns the pinned `500 server_error` for code exchange and `400 invalid_request` for refresh, without credentials. A delayed consent approval between the two bulk operations can still create an active grant that survives remembered-login deletion. Its local recovery block remains effective. Neither those denials nor two bulk acknowledgments establish that issuance has become quiet. Keep the future recovery worker and release wiring unfinished until that coordination is qualified.
 
 <a id="project-deletion"></a>
 
@@ -539,3 +545,11 @@ External work is not guaranteed to happen exactly once. [Recovery](upgrades-and-
 | [ADR-0027](../adr/ADR-0027-identify-repeated-requests-by-caller-and-request-meaning.md) | Identify repeated requests by caller and request meaning. |
 | [ADR-0028](../adr/ADR-0028-recover-answer-requests-through-receipts-without-a-full-answer-replay-cache.md) | Recover answer requests through receipts without a full-answer replay cache. |
 | [ADR-0029](../adr/ADR-0029-use-expected-revisions-to-protect-competing-changes.md) | Use expected revisions to protect competing changes. |
+
+### Keep credential invalidation independent of recovery replay
+
+[Human credential versions](access-control.md#human-credential-versions) advance only when the original recovery admission is newly inserted. Its version, operation and block commit together. Repeated callbacks retain the existing version and operation. A failed transaction commits none of these effects. Independent recoveries each invalidate the previous generation, while release changes only the original checklist.
+
+A request authenticated before recovery still carries its original binding. Both existing authorization families compare it with current state before reservation/replay. Completed operation metadata does not authorize disclosure to a stale credential. Grant fingerprints and operation identities remain unchanged.
+
+Bulk Hydra cleanup and its independent outcomes remain required. A late grant may survive at Hydra while permanently failing Inframeld's version check. The test-controlled completion scenario does not qualify production hooks, safe evidence delivery or durable provider scheduling. Completed events must still initiate no new cleanup.

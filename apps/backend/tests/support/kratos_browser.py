@@ -77,7 +77,7 @@ def create_browser(*, public_url: str = KRATOS_PUBLIC_URL) -> httpx2.AsyncClient
     )
 
 
-def _csrf_token(flow: BrowserFlow) -> str:
+def read_browser_csrf_token(flow: BrowserFlow) -> str:
     """Require a textual CSRF input before submitting a browser form."""
     for node in flow.ui.nodes:
         if node.attributes.name == "csrf_token" and isinstance(node.attributes.value, str):
@@ -109,7 +109,7 @@ async def register_human(
     completed = await browser.post(
         flow.ui.action,
         data={
-            "csrf_token": _csrf_token(flow),
+            "csrf_token": read_browser_csrf_token(flow),
             "traits.email": resolved_email,
             "password": password,
             "method": "password",
@@ -151,7 +151,7 @@ async def submit_password_login(
     return await browser.post(
         flow.ui.action,
         data={
-            "csrf_token": _csrf_token(flow),
+            "csrf_token": read_browser_csrf_token(flow),
             "identifier": email,
             "password": password.get_secret_value(),
             "method": "password",
@@ -177,7 +177,7 @@ async def begin_oidc_login(browser: httpx2.AsyncClient) -> str:
     submitted = await browser.post(
         flow.ui.action,
         data={
-            "csrf_token": _csrf_token(flow),
+            "csrf_token": read_browser_csrf_token(flow),
             "provider": "company",
             "method": "oidc",
         },

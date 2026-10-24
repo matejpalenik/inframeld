@@ -13,6 +13,8 @@ A **primary key (`PK`)** identifies a row. A **foreign key (`FK`)** makes the da
 | How do resource names differ from display names and IDs? | [Resource naming](#resource-naming) |
 | Who can act, and in which project? | [Access](#access) |
 | Is eligibility stored or read for one attempt? | [Principal eligibility inputs](#principal-eligibility-inputs) |
+| What does an authenticated request carry? | [Authentication evidence records](#authentication-evidence-records) |
+| What keeps old CLI credentials invalid after recovery? | [Human credential version records](#human-credential-version-records) |
 | Which source bytes belong to a corpus? | [Knowledge](#knowledge) |
 | Which prepared data can a build reuse? | [Indexing](#indexing) |
 | What produced an answer or rating? | [Pipelines](#pipelines) |
@@ -146,7 +148,7 @@ The supported delta is attributed use-only additions. An unchanged save does no 
 
 Alice may remain an active principal while an unreleased recovery obligation blocks her product access. Keep those facts separate in persistence. [ADR-0064](../adr/ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md) selects a common policy input that brings the observed Principal and pending-recovery fact together for one authorization attempt.
 
-[`PrincipalAccessPolicyInput`](../../apps/backend/src/inframeld_backend/access/domain/policy_inputs/principal_access_policy_input.py) is an implemented frozen, slotted domain input. Operation DTOs and policy inputs carry it rather than repeating account fields throughout their interfaces. It is not a new table, aggregate root, Principal status or stored allow/deny flag. It is not cached in `AccessContextDTO`, which retains only the authenticated principal ID.
+[`PrincipalAccessPolicyInput`](../../apps/backend/src/inframeld_backend/access/domain/policy_inputs/principal_access_policy_input.py) is an implemented frozen, slotted domain input. Authorization services construct it from stored facts and authentication evidence, then operation-specific policies consume it. It is not a new table, aggregate root, Principal status or stored allow/deny flag. It is not cached in `AccessContextDTO`, which retains the authenticated principal ID and required non-secret authentication evidence.
 
 The data loader must establish the exact principal, organization and authoritative installation context. Recovery is matched through stored authority/subject links, with any unreleased matching obligation counting as pending. A later local link must respect an obligation recorded before principal admission. Missing installation metadata is a dependency failure, not proof that there is no block. Project membership, action grants and caller-kind restrictions remain additional facts and rules.
 
@@ -165,6 +167,8 @@ These observations do not authorize a later transaction or retry. Authorization 
 `RequestFingerprint` wraps the existing immutable 32-byte HMAC digest, rejects other byte lengths and hides the digest from its representation. `IdempotencyService` unwraps the same bytes at the reservation boundary. The nominal `Command` base and required-field `ProjectCommand` interface add no stored state or execution. [ADR-0066](../adr/ADR-0066-use-typed-operation-contexts-and-command-classification.md) records these input contracts.
 
 These records add no tables or persisted flags. Existing grant, audit and idempotency records retain their schema and values. The [implemented grant chain](application-structure.md#grant-command-flow) and [ADR-0065](../adr/ADR-0065-application-services-own-write-transactions.md) own orchestration and transaction placement.
+
+Access also owns `ProjectOperationAdmissionRequestDTO`, used by its caller-transaction-bound admission helper. It carries project, method, canonical route, retry key and fingerprint. The helper obtains the actor from authentication and scope from current authorization. Generic admission context, outcomes and reservation persistence remain shared.
 
 ### Temporary operation outcomes
 
@@ -204,6 +208,14 @@ The [accepted key contract](access-control.md#application-key-contract) requires
 
 The secret is 32 cryptographically random bytes encoded as 43 unpadded base64url characters. The default lifetime is 90 days and the maximum 365 days, both operator-configurable; validate default against maximum. The account has at most two usable keys across audiences. Issuance coordinates the current usable count, full issuer delegation/group-management authority, bindings and audit under the Access write protocol. Revocation and retirement use their independent current human Revoke keys/Delete application account authority and lifecycle checks; they do not require issuance delegation or document-reading authority. Keys use current grants, not a historical issuer ceiling or cached permission snapshot. General UUID identifier constructors retain their existing valid-version/zero-value rules.
 
+<a id="oauth-consent-records"></a>
+
+### Attempt-local OAuth consent records
+
+`OAuthConsentChallenge` carries Hydra's opaque private flow state with a secret-safe representation. `OAuthClientId` identifies the requesting client without authorizing it. The provider request DTO contains the subject, client, supported scopes, requested audiences and remembered-consent indication. The checked display DTO adds the verified identity, installation API URL and operator-configured remember duration. A continuation DTO privately carries the checked Hydra URL.
+
+These records are not entities, local admissions, permission snapshots, credential inventories or new tables. The inspection Query and decision Command remain independent inputs. Unsupported client/access is rejected before browser or local-state work. Supported requests freshly check the browser, exact provider subject and recovery state. Inspection and denial never initialize versions. Approval returns a required binding captured before browser verification and checked against a second state observation. Hydra owns consent persistence and final verifier use. [The consent API](api-contracts.md#human-oauth-consent) owns fields and [ADR-0071](../adr/ADR-0071-use-native-kratos-login-and-checked-hydra-consent.md) owns the boundary.
+
 <a id="identity-cleanup-records"></a>
 
 #### Identity-cleanup records and logical deletion obligations
@@ -236,7 +248,7 @@ The [bulk revocation capability](access-control.md#hydra-cleanup-evidence) consu
 
 The admission row's single Hydra state must eventually reflect both required bulk calls and the qualified recovery/issuance ordering. One successful request cannot establish that whole outcome. A typed subject and an empty-scope acknowledgment establish no account ownership or permission. [Fixture-bound provider observations](access-control.md#hydra-discovery-evidence) demonstrate why consent listing cannot determine cleanup completeness. Production orchestration, bounded reconciliation and completion wiring remain unfinished. This refinement adds no columns, outcomes or persistence model.
 
-[Issuance-ordering evidence](access-control.md#hydra-issuance-evidence) now covers outstanding authorization codes and token responses delivered after cleanup. A login approved afterward can still issue working credentials. The frozen pending-login and code records belong only to the test harness, keep credentials out of representations and create no inventory or persistence requirement. HTTP-ordering evidence does not qualify provider-internal races or authorize recording the aggregate Hydra state as confirmed.
+[Issuance-ordering evidence](access-control.md#hydra-issuance-evidence) now covers outstanding authorization codes and token responses delivered after cleanup. A login approved afterward can still issue Hydra-active credentials. [Credential versioning](access-control.md#human-credential-versions) keeps a late grant with an older generation unusable at Inframeld after test-controlled release. The frozen pending-login and code records belong only to the test harness, keep credentials out of representations and create no inventory or persistence requirement. HTTP-ordering evidence does not qualify provider-internal races or authorize recording the aggregate Hydra state as confirmed.
 
 Project deletion similarly binds the original operation to the exact project and initiating principal, reviewed/admitted state, durable block, application/key shutdown obligations and resumable physical cleanup. Retained content-free status may be read by the currently eligible original human under the authoritative operation binding after membership removal. History is not permission to cancel, continue or inspect private contents. The [deletion contract](jobs-and-idempotency.md#project-deletion) owns outcomes and retries; these logical obligations do not select a new public job enum or additional physical tables.
 
@@ -270,7 +282,7 @@ Alice's Kratos browser cookie and Hydra CLI access token must ultimately resolve
 | Local principal, admission, active state and grants | Existing Access records, checked currently. Neither OAuth scope nor successful consent creates membership or authority. |
 | CLI account binding and credential set | Local CLI settings plus a qualified OS credential store, bound to immutable target identity, API/issuer/client/audience configuration and verified account. Secrets are not backend job, trace, audit or response-cache records. |
 
-Introspection/identity-provider response types stay at infrastructure boundaries. The application still receives `AccessContextDTO` with `PrincipalId`, not a token, mutable permission cache or vendor user object. Identity lookup follows external verification without holding a database transaction across provider waits. Replacing or refreshing a CLI credential preserves principal identity; changing trusted endpoint/issuer bindings requires fresh login rather than credential forwarding.
+Introspection/identity-provider response types stay at infrastructure boundaries. The application receives `AccessContextDTO` with `PrincipalId` and required non-secret authentication evidence, never a token, mutable permission cache or vendor user object. Identity lookup follows external verification without holding a database transaction across provider waits. Replacing or refreshing a CLI credential preserves principal identity; changing trusted endpoint/issuer bindings requires fresh login rather than credential forwarding.
 
 The implemented bearer service now reuses the same `human_identity_links` and `principals` records as browser authentication. After Hydra and Kratos verification, `PostgresHumanIdentityLinkReader` reads that exact authority/subject pair in a fresh database session. No Hydra-named person or new token table is created in Inframeld.
 
@@ -1046,3 +1058,35 @@ The owning command saves its accepted change and required audit in the same tran
 The [ADR index](../adr/README.md) owns rationale and alternatives. Topic guides own behavior: [Access](access-control.md), [Knowledge](knowledge-lifecycle.md), [Indexing](indexing.md), [Pipelines/Releases](pipelines-and-releases.md), [Evaluation](evaluation.md), [model connections](model-connections.md), and [jobs](jobs-and-idempotency.md).
 
 Before migrations, review proposed field types, indexes, exact action IDs, allowed status transitions, and event-specific audit fields. Add Documents, Pipelines, Deployments, and credential records with the features that own their behavior.
+
+<a id="authentication-evidence-records"></a>
+
+### Authentication evidence records
+
+`AccessContextDTO` is a frozen request-local transfer record containing `actor_principal_id: PrincipalId` and required `authentication_evidence`. The evidence is exactly one of these records:
+
+| Record | Required values | Meaning |
+| --- | --- | --- |
+| `BrowserSessionAuthenticationDTO` | `identity: VerifiedHumanIdentityDTO` | The browser authenticator verified this provider identity. No cookie is retained. |
+| `HumanOAuthCredentialBindingDTO` | Verified identity, `InstallationId`, `HumanCredentialVersion` | The exact binding verified from the CLI credential. No token or permission snapshot is retained. |
+| `ApplicationKeyAuthenticationDTO` | `key_id: ApplicationKeyId` | The safe key identifier associated with application authentication. No secret is retained. |
+
+`ApplicationKeyId` is a distinct UUID-backed value object using the existing parsed-UUID rule. It neither verifies key ownership nor establishes current validity. These records add no tables, migrations or public response fields. Construction rejects missing or unsupported evidence, but the records do not authenticate themselves. Production application-key authentication remains unfinished. Tests may explicitly simulate it without persisting keys.
+
+The actor is still resolved locally, and current authorization obtains its account kind, status and permissions from current reads. Follow [the request chain](application-structure.md#access-context-evidence) and [ADR-0073](../adr/ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md) for ownership and mismatch behavior.
+
+<a id="human-credential-version-records"></a>
+
+### Human credential version records
+
+The implemented [0005 migration](../../apps/backend/migrations/versions/0005_human_credential_versions.py) adds `human_credential_versions`. Its composite primary key is `(installation_id, authority, subject)`. Installation references authoritative installation metadata with restricted deletion. `version` is a positive PostgreSQL BIGINT. No local principal foreign key is required.
+
+Migration backfills existing linked humans and recovery identities at version 1. Unversioned Hydra tokens remain rejected. First consent initialization creates a missing record at 1 without admission or grants. Existing recovery history with missing version state is an integrity failure, never permission to restart at 1. State is retained independently of cleanup-record retention and cannot be reset or downgraded.
+
+The recovery admission writer advances the version once for each newly inserted original flow in the same transaction as its obligation/block. Duplicate events retain the original operation and generation. Overlapping admissions serialize increments. Overflow, failure and cancellation cannot commit a block without its version change. Completion leaves the version unchanged.
+
+`HumanOAuthCredentialBindingDTO` carries verified provider identity, `InstallationId` and `HumanCredentialVersion`. `HumanCredentialStateDTO` observes authoritative installation, identity, optional initialized version and pending block together. These are typed transfer records, not extra tables or permission certificates. `AccessContextDTO` requires one of the [authentication evidence records](#authentication-evidence-records). OAuth evidence retains this binding so authorization can compare it again. The shared eligibility input carries the current comparison result, not a cached permission.
+
+`HumanOAuthCredentialFactsDTO` is an attempt-local read projection with required `binding_matches_actor: bool` and `current_version: HumanCredentialVersion | None`. The match covers the current installation and the presented provider identity's link to the actor. A missing version stays absent. Both project facts DTOs carry the stored principal/actor, pending-recovery flag and optional OAuth facts instead of an evaluated eligibility input. OAuth evidence always has a facts record, while browser/application evidence has none. The shared application evaluator constructs `PrincipalAccessPolicyInput` from these observations and the unchanged authenticated context. [Component ownership](application-structure.md#credential-query-and-policy-boundaries) keeps SQL construction, boundary conversion and validity decisions separate.
+
+[Access behavior](access-control.md#human-credential-versions) owns issuance, current checks and errors. [ADR-0072](../adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md) owns the API guarantee and its provider limits.

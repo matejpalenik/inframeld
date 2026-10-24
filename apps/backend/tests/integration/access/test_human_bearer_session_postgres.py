@@ -13,6 +13,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, update
 from tests.support.access_scenarios import MockAccessScenarios
 
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
 from inframeld_backend.access.application.dtos.identity_recovery_event_dto import (
     IdentityRecoveryEventDTO,
 )
@@ -51,6 +54,9 @@ from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state impor
     IdentityRecoveryCleanupState,
 )
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
     IdentityRecoveryFlowId,
@@ -63,6 +69,9 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
     HumanSessionDependency,
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
+from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
+    PostgresHumanCredentialStateReader,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
@@ -73,6 +82,9 @@ from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_ro
     IdentityRecoveryAdmissionRow,
 )
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_admission_writer import (
     PostgresIdentityRecoveryAdmissionWriter,
 )
@@ -110,7 +122,9 @@ BEARER_HEADERS = {"Authorization": f"Bearer {TOKEN.value}"}
 class MockTokenVerifier(HumanAccessTokenVerifier):
     """Represent Hydra responses without replacing the real authentication workflow."""
 
-    def __init__(self) -> None:
+    def __init__(self, database: Database) -> None:
+        self.database = database
+        self.tokens = {TOKEN: HumanCredentialVersion(1)}
         self.calls = 0
         self.unavailable = False
 
@@ -120,13 +134,17 @@ class MockTokenVerifier(HumanAccessTokenVerifier):
         credential: HumanAccessTokenCredential,
         *,
         timeout_seconds: float,
-    ) -> VerifiedHumanIdentityDTO | None:
+    ) -> HumanOAuthCredentialBindingDTO | None:
         self.calls += 1
 
         if self.unavailable:
             raise DependencyUnavailableError()
 
-        return IDENTITY if credential == TOKEN else None
+        version = self.tokens.get(credential)
+        if version is None:
+            return None
+        installation = await PostgresInstallationIdentityReader(self.database).read()
+        return HumanOAuthCredentialBindingDTO(IDENTITY, installation, version)
 
 
 class MockIdentityVerifier(HumanIdentityVerifier):
@@ -170,7 +188,7 @@ class SessionScenario:
         reader = PostgresHumanIdentityLinkReader(api_database)
         recovery_block_reader = PostgresIdentityRecoveryBlockReader(api_database)
 
-        self.token = MockTokenVerifier()
+        self.token = MockTokenVerifier(api_database)
         self.identity = MockIdentityVerifier()
         self.browser = MockBrowserVerifier()
 
@@ -183,7 +201,7 @@ class SessionScenario:
                 self.token,
                 self.identity,
                 reader,
-                recovery_block_reader=recovery_block_reader,
+                credential_state_reader=PostgresHumanCredentialStateReader(api_database),
             ),
         )
 
@@ -409,6 +427,7 @@ async def test_recovery_block_changes_are_enforced_on_the_next_http_request(
     family: Literal["cookie", "bearer"],
 ) -> None:
     """Each credential follows committed recovery state without clearing suspension."""
+    fresh = HumanAccessTokenCredential("synthetic-fresh-human-token")
     scenario = SessionScenario(temporary_postgres_settings)
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
@@ -418,15 +437,20 @@ async def test_recovery_block_changes_are_enforced_on_the_next_http_request(
 
         operation_id = await _admit_recovery(database)
         blocked = _get_session(client, family)
-        assert blocked.status_code == 403, blocked.text
-        assert blocked.json()["code"] == "access_denied"
+        assert blocked.status_code == (401 if family == "bearer" else 403), blocked.text
+        assert blocked.json()["code"] == ("http_error" if family == "bearer" else "access_denied")
 
         await _seed_recovery_outcome(database, operation_id, release_block=False)
         unreleased = _get_session(client, family)
-        assert unreleased.status_code == 403, unreleased.text
+        assert unreleased.status_code == (401 if family == "bearer" else 403), unreleased.text
 
         await _seed_recovery_outcome(database, operation_id, release_block=True)
         released = _get_session(client, family)
+        if family == "bearer":
+            assert released.status_code == 401
+            # Model a fresh provider grant explicitly, not an upgrade of the old one.
+            scenario.token.tokens[fresh] = HumanCredentialVersion(2)
+            released = client.get("/v1/session", headers={"Authorization": f"Bearer {fresh.value}"})
         assert released.status_code == 200, released.text
         assert released.json() == {"principalId": str(linked_human.id.value)}
 
@@ -437,7 +461,11 @@ async def test_recovery_block_changes_are_enforced_on_the_next_http_request(
                 .values(status=PrincipalStatus.SUSPENDED)
             )
 
-        suspended = _get_session(client, family)
+        suspended = (
+            client.get("/v1/session", headers={"Authorization": f"Bearer {fresh.value}"})
+            if family == "bearer"
+            else _get_session(client, family)
+        )
         assert suspended.status_code == 403, suspended.text
         assert suspended.json()["code"] == "access_denied"
 
@@ -455,7 +483,7 @@ async def test_later_local_admission_does_not_bypass_an_existing_recovery_block(
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
         before_link = _get_session(client, family)
-        assert before_link.status_code == 403, before_link.text
+        assert before_link.status_code == (401 if family == "bearer" else 403), before_link.text
 
         async with database.session() as session, session.begin():
             principal = await MockAccessScenarios.seed_linked_human(session, IDENTITY)
@@ -463,5 +491,11 @@ async def test_later_local_admission_does_not_bypass_an_existing_recovery_block(
         assert principal.status is PrincipalStatus.ACTIVE
         after_link = _get_session(client, family)
 
-    assert after_link.status_code == 403, after_link.text
-    assert after_link.json()["code"] == "access_denied"
+    assert after_link.status_code == (401 if family == "bearer" else 403), after_link.text
+    assert after_link.json()["code"] == ("http_error" if family == "bearer" else "access_denied")
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def versioned_test_credentials(database: Database) -> None:
+    """Seed the security metadata represented by the mocked provider's fixed grant."""
+    await PostgresHumanCredentialStateInitializer(database).initialize(IDENTITY)

@@ -89,8 +89,7 @@ def test_action_requires_eligibility_membership_and_exact_grant(
     )
     policy_input = ActionAuthorizationPolicyInput(
         principal_access=PrincipalAccessPolicyInput(
-            principal=principal,
-            has_pending_recovery=pending_recovery,
+            principal=principal, has_pending_recovery=pending_recovery, credential_is_current=True
         ),
         is_project_member=member,
         has_exact_action_grant=granted,

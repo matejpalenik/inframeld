@@ -15,6 +15,7 @@ from tests.support.access_scenarios import (
     MockAccessScenarios,
     ProjectAuthorizationSeedDTO,
 )
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.protocols.human_session_authenticator import (
@@ -92,7 +93,10 @@ class FixedHumanSessionAuthenticator(HumanSessionAuthenticator):
             "rotated-session",
         }:
             raise AuthenticationRequiredError()
-        return AccessContextDTO(actor_principal_id=self._actor_id)
+        return AccessContextDTO(
+            actor_principal_id=self._actor_id,
+            authentication_evidence=MockAuthenticationEvidence.browser(),
+        )
 
 
 def _test_app(database: Database, actor_id: PrincipalId) -> FastAPI:

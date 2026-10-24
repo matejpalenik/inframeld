@@ -3,8 +3,12 @@ from typing import override
 from uuid import UUID
 
 import pytest
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
+    HumanOAuthCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_authorization_dto import (
     ProjectGrantAuthorizationDTO,
 )
@@ -24,10 +28,10 @@ from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
-from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
-    PrincipalAccessPolicyInput,
-)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -52,22 +56,15 @@ RECIPIENT = Principal(
     kind=PrincipalKind.HUMAN,
     status=PrincipalStatus.ACTIVE,
 )
-ACCESS = AccessContextDTO(actor_principal_id=ACTOR.id)
-
-
-def _actor_access(
-    principal: Principal = ACTOR,
-    *,
-    has_pending_recovery: bool = False,
-) -> PrincipalAccessPolicyInput:
-    return PrincipalAccessPolicyInput(
-        principal=principal,
-        has_pending_recovery=has_pending_recovery,
-    )
+ACCESS = AccessContextDTO(
+    actor_principal_id=ACTOR.id, authentication_evidence=MockAuthenticationEvidence.browser()
+)
 
 
 FACTS = ProjectGrantChangeFactsDTO(
-    actor_access=_actor_access(),
+    actor=ACTOR,
+    has_pending_recovery=False,
+    oauth_credential_facts=None,
     recipient=RECIPIENT,
     project_status=ProjectStatus.ACTIVE,
     project_access_revision=7,
@@ -140,7 +137,7 @@ async def test_returns_current_scope_and_revision() -> None:
         pytest.param(
             replace(
                 FACTS,
-                actor_access=_actor_access(replace(ACTOR, status=PrincipalStatus.SUSPENDED)),
+                actor=replace(ACTOR, status=PrincipalStatus.SUSPENDED),
             ),
             ResourceNotFoundError,
             id="suspended-actor",
@@ -148,7 +145,7 @@ async def test_returns_current_scope_and_revision() -> None:
         pytest.param(
             replace(
                 FACTS,
-                actor_access=_actor_access(replace(ACTOR, status=PrincipalStatus.RETIRED)),
+                actor=replace(ACTOR, status=PrincipalStatus.RETIRED),
             ),
             ResourceNotFoundError,
             id="retired-actor",
@@ -167,7 +164,7 @@ async def test_returns_current_scope_and_revision() -> None:
             replace(
                 FACTS,
                 actor_is_project_member=False,
-                actor_access=_actor_access(has_pending_recovery=True),
+                has_pending_recovery=True,
             ),
             ResourceNotFoundError,
             id="recovery-does-not-disclose-hidden-project",
@@ -180,7 +177,7 @@ async def test_returns_current_scope_and_revision() -> None:
         pytest.param(
             replace(
                 FACTS,
-                actor_access=_actor_access(has_pending_recovery=True),
+                has_pending_recovery=True,
             ),
             AccessDeniedError,
             id="actor-has-pending-recovery",
@@ -188,7 +185,7 @@ async def test_returns_current_scope_and_revision() -> None:
         pytest.param(
             replace(
                 FACTS,
-                actor_access=_actor_access(replace(ACTOR, kind=PrincipalKind.APPLICATION)),
+                actor=replace(ACTOR, kind=PrincipalKind.APPLICATION),
             ),
             AccessDeniedError,
             id="application-cannot-delegate",
@@ -213,7 +210,7 @@ async def test_returns_current_scope_and_revision() -> None:
                 FACTS,
                 recipient=None,
                 recipient_is_project_member=False,
-                actor_access=_actor_access(has_pending_recovery=True),
+                has_pending_recovery=True,
             ),
             AccessDeniedError,
             id="recovery-denial-precedes-missing-recipient",
@@ -266,10 +263,46 @@ async def test_rejects_assignment_with_the_required_error(
 ) -> None:
     """Preserve project privacy and check the grantor before recipient details."""
     service = ProjectGrantAuthorizationService(MockProjectGrantChangeFactsReader(facts))
+    access = (
+        replace(ACCESS, authentication_evidence=MockAuthenticationEvidence.application_key())
+        if facts is not None and facts.actor.kind is PrincipalKind.APPLICATION
+        else ACCESS
+    )
 
     with pytest.raises(expected_error):
         await service.require_authorization(
-            access=ACCESS,
+            access=access,
+            request=ProjectUseOnlyGrantAuthorizationRequestDTO(
+                project_id=PROJECT_ID, recipient_principal_id=RECIPIENT.id, action_id=ACTION_ID
+            ),
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("visible", [False, True])
+@pytest.mark.parametrize("binding_matches_actor, version", [(False, 1), (True, 2), (True, None)])
+async def test_stale_credentials_are_rejected_before_authority_can_be_reused(
+    visible: bool, binding_matches_actor: bool, version: int | None
+) -> None:
+    from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+        HumanOAuthCredentialRejectedError,
+    )
+
+    stale = replace(
+        FACTS,
+        actor_is_project_member=visible,
+        oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            binding_matches_actor=binding_matches_actor,
+            current_version=HumanCredentialVersion(version) if version is not None else None,
+        ),
+    )
+    with pytest.raises(HumanOAuthCredentialRejectedError):
+        await ProjectGrantAuthorizationService(
+            MockProjectGrantChangeFactsReader(stale)
+        ).require_authorization(
+            access=replace(
+                ACCESS, authentication_evidence=MockAuthenticationEvidence.human_oauth()
+            ),
             request=ProjectUseOnlyGrantAuthorizationRequestDTO(
                 project_id=PROJECT_ID, recipient_principal_id=RECIPIENT.id, action_id=ACTION_ID
             ),

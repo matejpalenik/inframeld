@@ -1,9 +1,15 @@
 from typing import final, override
 
-from sqlalchemy import and_, exists, select
+from sqlalchemy import BigInteger, Nullable, and_, exists, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
+from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
+    HumanOAuthCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
@@ -12,12 +18,15 @@ from inframeld_backend.access.application.protocols.project_action_facts_reader 
     ProjectActionFactsReader,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
-from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
-    PrincipalAccessPolicyInput,
-)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.infrastructure.readers.human_credential_state_queries import (
+    HumanCredentialStateQueries,
+)
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
 )
@@ -91,17 +100,24 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
             .correlate(PrincipalRow)
         )
 
+        evidence = access.authentication_evidence
+        if isinstance(evidence, HumanOAuthCredentialBindingDTO):
+            binding_matches_actor = HumanCredentialStateQueries.binding_matches_actor(evidence)
+            credential_version = Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
+        else:
+            binding_matches_actor = literal(False)
+            credential_version = Nullable(literal(None, BigInteger))
+
         statement = (
             select(
-                PrincipalRow.id,
-                ProjectRow.organization_id,
-                PrincipalRow.kind,
-                PrincipalRow.status,
+                PrincipalRow,
                 ProjectRow.status,
                 is_project_member,
                 has_exact_action_grant,
                 installation_available,
                 has_pending_recovery,
+                binding_matches_actor,
+                credential_version,
             )
             .select_from(PrincipalRow)
             .join(
@@ -112,6 +128,7 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
                 ),
             )
             .where(PrincipalRow.id == access.actor_principal_id.value)
+            .execution_options(populate_existing=True)
         )
 
         result = await self._session.execute(statement)
@@ -121,31 +138,38 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
             return None
 
         (
-            principal_id,
-            organization_id,
-            principal_kind,
-            principal_status,
+            principal_row,
             project_status,
             member,
             granted,
             has_installation,
             pending_recovery,
+            matches_actor,
+            current_credential_version,
         ) = row
 
         if not has_installation:
             raise DependencyUnavailableError("The installation identity is not available.")
 
         principal = Principal(
-            id=PrincipalId(principal_id),
-            organization_id=OrganizationId(organization_id),
-            kind=principal_kind,
-            status=principal_status,
+            id=PrincipalId(principal_row.id),
+            organization_id=OrganizationId(principal_row.organization_id),
+            kind=principal_row.kind,
+            status=principal_row.status,
         )
 
         return ProjectActionFactsDTO(
-            principal_access=PrincipalAccessPolicyInput(
-                principal=principal,
-                has_pending_recovery=pending_recovery,
+            principal=principal,
+            has_pending_recovery=pending_recovery,
+            oauth_credential_facts=(
+                HumanOAuthCredentialFactsDTO(
+                    binding_matches_actor=matches_actor,
+                    current_version=HumanCredentialVersion(current_credential_version)
+                    if current_credential_version is not None
+                    else None,
+                )
+                if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+                else None
             ),
             project_status=project_status,
             is_project_member=member,

@@ -26,5 +26,7 @@ class ProjectGrantChangeFactsReader(Protocol):
 
         The recipient may be absent - the application service decides how to
         report that after checking the actor's authority. Do not commit.
+        Include the stored actor kind and current OAuth binding/version facts.
+        The authorizer interprets evidence before permission checks or replay.
         """
         ...

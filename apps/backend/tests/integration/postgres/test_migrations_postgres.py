@@ -213,3 +213,74 @@ def test_migration_cli_does_not_disclose_driver_message(
     diagnostic = json.loads(result.stdout.strip().splitlines()[-1])
     assert diagnostic["event"] == "migration_failed"
     assert "exception" in diagnostic
+
+
+@pytest.mark.asyncio
+async def test_version_migration_backfills_linked_and_unlinked_identities_without_reset(
+    temporary_postgres_settings: DatabaseSettings,
+) -> None:
+    """Upgrade existing installations while preserving recovery blocks and durable generations."""
+    from uuid import uuid4
+
+    from alembic import command
+    from alembic.config import Config
+    from tests.support.access_scenarios import MockAccessScenarios
+
+    from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+        VerifiedHumanIdentityDTO,
+    )
+    from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
+        IdentityRecoveryEventKind,
+    )
+    from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+    from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+    from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
+        HumanCredentialVersionRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
+        IdentityRecoveryAdmissionRow,
+    )
+    from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
+        PostgresInstallationIdentityReader,
+    )
+
+    config = Config(str(BACKEND_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(BACKEND_ROOT / "migrations"))
+    config.attributes["database_settings"] = temporary_postgres_settings
+    command.upgrade(config, "0004_identity_recovery")
+    database = Database(temporary_postgres_settings)
+    alice = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySubject("alice"))
+    try:
+        installation = await PostgresInstallationIdentityReader(database).read()
+        async with database.session() as session, session.begin():
+            await MockAccessScenarios.seed_linked_human(session, alice)
+            session.add(
+                IdentityRecoveryAdmissionRow(
+                    operation_id=str(uuid4()),
+                    installation_id=installation.value,
+                    authority=alice.authority.value,
+                    subject="bob",
+                    flow_id=uuid4(),
+                    event_kind=IdentityRecoveryEventKind.RECOVERY,
+                )
+            )
+        run_migrations(temporary_postgres_settings)
+        async with database.session() as session, session.begin():
+            rows = (
+                (
+                    await session.execute(
+                        select(HumanCredentialVersionRow.subject, HumanCredentialVersionRow.version)
+                    )
+                )
+                .tuples()
+                .all()
+            )
+            assert set(rows) == {("alice", 1), ("bob", 1)}
+            await session.execute(update(HumanCredentialVersionRow).values(version=6))
+        run_migrations(temporary_postgres_settings)
+        with pytest.raises(RuntimeError, match="unsupported"):
+            command.downgrade(config, "0004_identity_recovery")
+        async with database.session() as session:
+            assert set(await session.scalars(select(HumanCredentialVersionRow.version))) == {6}
+    finally:
+        await database.shutdown()

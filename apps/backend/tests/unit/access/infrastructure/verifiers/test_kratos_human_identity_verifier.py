@@ -54,7 +54,7 @@ def client() -> Iterator[IdentityApi]:
 
 def _identity(state: Literal["active", "inactive"] = "active") -> Identity:
     return Identity(
-        id=str(IDENTITY_ID),
+        id=IDENTITY_ID,
         schema_id="default",
         schema_url="http://kratos-admin.test:4434/schemas/default",
         traits=None,
@@ -146,7 +146,7 @@ async def test_unsupported_identity_is_rejected_without_provider_io(
         pytest.param(_identity().model_copy(update={"state": "unknown"}), id="unknown-state"),
         pytest.param(_identity().model_copy(update={"id": "invalid-id"}), id="invalid-id"),
         pytest.param(
-            _identity().model_copy(update={"id": "00000000-0000-4000-8000-000000000004"}),
+            _identity().model_copy(update={"id": UUID("00000000-0000-4000-8000-000000000004")}),
             id="different-identity",
         ),
     ],

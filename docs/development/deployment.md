@@ -64,7 +64,7 @@ Alice's CLI opens her system browser, Kratos verifies her identity through the a
 
 Provision the official `inframeld-cli` public client using Hydra's private administration interface during installation. Ordinary setup users do not register OAuth clients. Configure the API URL, expected issuer, API audience, redirect rules and account-UI origins explicitly. Expose only necessary public protocol/UI endpoints. Use service-specific secrets, private administration, separate migrations and official Ory APIs rather than shared identity-table reads or a custom token issuer.
 
-The accepted release policy is the latest suitable reviewed OSS Hydra release, with an exact tested version and image digest. The historical v26.2.0 source inspection was dated 2026-09-28, not a claim that it remains newest or qualified. Check advisories and compatible Kratos/UI/client versions before pinning. Device authorization must remain unavailable until its specific release gates pass. Never use a floating `latest` tag, silently change distribution or upgrade identity services during `local start`.
+The accepted release policy is the latest suitable reviewed OSS Kratos and Hydra releases, with exact tested versions and image digests. Check advisories and compatible account-UI/client versions before pinning. Device authorization must remain unavailable until its specific release gates pass. Never use a floating `latest` tag, silently change distribution or upgrade identity services during `local start`. The [current provider review](#identity-provider-versions) distinguishes release selection from security clearance.
 
 Primary accepted defaults are a five-minute access token, seven-day rolling refresh token, one-minute authorization code and eight-hour Kratos browser session. Use the respective containers' documented environment settings and the [credential-lifecycle configuration inventory](access-control.md#cli-credential-lifecycle). These are deployment settings, not user-project files. Other flow/session settings need qualified keys and explicit effective defaults, not guessed values. Refresh rotation, zero reuse grace and no positive token/identity-eligibility cache remain the selected profile.
 
@@ -73,6 +73,36 @@ Preserve Hydra's identity/protocol state, client registrations, keys and require
 **Implemented-state distinction, 2026-09-29:** the inspected development/test Compose files configure Kratos but not Hydra. The backend's existing human dependency is cookie/CSRF-based. The table above records accepted runtime design, not services added by this documentation change.
 
 **Test/runtime update, 2026-10-15:** the backend now implements cookie and bearer authentication with configurable provider and total deadlines. The isolated [integration stack](../../compose.test.yaml) runs pinned Hydra alongside Kratos and their separate databases, with no published test ports. One test container runs the backend suite and creates a first-party client registration for each real Hydra scenario. This test harness approves login/consent through private APIs. It does not supply the production account UI, qualify CLI refresh/recovery, or add Hydra to the development deployment. [Access evidence](access-control.md#implemented-human-authentication) records the tested boundary and remaining work.
+
+<a id="identity-provider-versions"></a>
+
+### Reviewed identity-provider versions and remaining security work
+
+On 2026-10-24, Ory's latest stable public OSS releases were [Kratos v26.2.0](https://github.com/ory/kratos/releases/tag/v26.2.0) and [Hydra v26.2.0](https://github.com/ory/hydra/releases/tag/v26.2.0). Newer 26.4.x builds belong to the [enterprise distribution](https://www.ory.com/docs/oel/kratos/install), which requires a commercial license. This upgrade retains the accepted OSS distribution.
+
+| Component | Selected pin |
+| --- | --- |
+| Kratos server and migration jobs | v26.2.0, multi-platform index `sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643` |
+| Hydra server and migration job | Existing v26.2.0, verified index `sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9` |
+| Kratos Python SDK | 26.2.0 from official Git revision `13a5b1e8b2baa3c4bf52700ecfdbb641bdb493a5` |
+| Hydra Python SDK | Existing 26.2.0 from official Git revision `756e95a40b4ddefd3d67006b62d43577f2856be6` |
+
+The Compose files and backend lockfile own the executable pins. Both [Kratos](https://pypi.org/project/ory-kratos-client/) and [Hydra](https://pypi.org/project/ory-hydra-client/) SDK releases on PyPI still stop at 25.4.0. The locked SDK revisions supply the matching 26.2.0 APIs without following a moving branch. Only Kratos's package changed during this upgrade.
+
+Kratos v26.2.0 fixes [CVE-2026-33503](https://github.com/ory/kratos/security/advisories/GHSA-hgx2-28f8-6g2r), which affects the previously pinned v25.4.0 courier-message admin API. Hydra already uses the patched version for its [related pagination advisory](https://github.com/ory/hydra/security/advisories/GHSA-r9w3-57w2-gch2). Keep admin APIs private regardless of version.
+
+**Security clearance is still pending.** Grype v0.121.0 scanned both pinned images for `linux/arm64` and `linux/amd64` using a valid vulnerability database built on 2026-10-23. Both architectures returned the following package/advisory match counts:
+
+| Official image | Critical | High | Medium | Low | Unknown | Total |
+| -------------- | -------- | ---- | ------ | --- | ------- | ----- |
+| Kratos v26.2.0 | 5        | 53   | 24     | 6   | 3       | 91    |
+| Hydra v26.2.0  | 11       | 71   | 36     | 16  | 3       | 137   |
+
+These are scanner matches, not unique vulnerabilities or demonstrated reachable exploits. Findings include bundled Go 1.26.0, Go dependencies and OS libraries. For example, the [reviewed Go TLS advisory GO-2026-6607](https://github.com/golang/vulndb/blob/master/data/reports/GO-2026-6607.yaml) is fixed in Go 1.26.9 or 1.27.2. Kratos's image also uses Alpine 3.20, whose [normal support ended on 2026-04-01](https://alpinelinux.org/releases/). The scanner warns that its EOL-distribution coverage may be incomplete. Do not suppress these matches or describe the latest image as vulnerability-free. A separate image-hardening and reachability review remains necessary before production approval.
+
+The installed backend environment was also checked with pip-audit 2.10.1. It found no known vulnerabilities among 44 auditable packages. It skipped the editable backend and the two Git-sourced Ory SDKs, whose 26.2.0 distributions are absent from PyPI. That result does not replace review of SDK source or provider images.
+
+Provider upgrades can migrate their own databases. Back up and test with retained identity data before upgrading a development or deployed stack. The qualification run backed up and migrated only the private Kratos test volume. It did not start or migrate the development stack. Application migrations and the published OpenAPI contract remain separate from provider upgrades. [Access qualification](access-control.md#provider-upgrade-evidence) owns the regression evidence and changed hook behavior.
 
 ### PostgreSQL delivers background jobs
 
@@ -388,3 +418,11 @@ Exact versions and settings, supported hosts, disk limits, durability, and recov
 | [ADR-0035](../adr/ADR-0035-deploy-v1-on-one-server-through-docker-compose.md) | Deploy v1 on one server through Docker Compose. |
 | [ADR-0053](../adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md) | Kratos plus Hydra for human CLI login, with private administration and a bounded managed-local HTTP exception. |
 | [ADR-0036](../adr/ADR-0036-use-seaweedfs-through-the-application-s3-storage-boundary.md) | Use SeaweedFS through the application S3 storage boundary. |
+
+### Deploy credential versioning as one coordinated cutover
+
+Apply migration `0005_human_credential_versions` and deploy its matching backend together. Startup requires the supported revision. Existing human CLI tokens lack binding metadata and require one fresh sign-in. Browser sessions and application keys keep their existing contracts. No unversioned compatibility mode or mixed-version backend deployment is supported.
+
+Persist credential version state with installation identity across restarts and backups. Do not prune it with cleanup history, downgrade its schema or restore an older security generation as a routine rollback. Missing state with recovery history requires repair, not silent initialization. [ADR-0072](../adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md) records this choice.
+
+Future production ingress must keep Hydra administration private and expose only required OAuth/OIDC routes. Do not expose a generic Hydra administration proxy through Inframeld. Block external `/userinfo` if qualification confirms the selected CLI/library does not require it, and keep discovery/client behavior consistent with deployed routing. Containers on an internal network alone do not establish this restriction. The gateway and CLI remain delivery work.

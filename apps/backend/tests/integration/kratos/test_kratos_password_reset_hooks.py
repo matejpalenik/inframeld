@@ -186,7 +186,7 @@ async def test_password_change_revokes_sessions_created_after_recovery(
             assert all(
                 str(event.identity_id) == scenario.human.subject.value for event in after.received
             )
-            assert after.received[0].session_id is None
+            assert after.received[0].session_id == original.id
             assert after.received[1].session_id == original.id
 
             await _release(scenario, "after")

@@ -19,5 +19,6 @@
   "[javascript][javascriptreact][typescript][typescriptreact][json][jsonc][css][scss][less][markdown][mdx][html][yaml][graphql]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
-  }
+  },
+  "python.terminal.useEnvFile": true
 }

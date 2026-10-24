@@ -10,7 +10,7 @@ serve:
 urls:
   self:
     issuer: http://hydra:4444/
-  login: http://hydra-test-ui.invalid/login
+  login: http://kratos:4433/self-service/login/browser
   consent: http://hydra-test-ui.invalid/consent
 
 secrets:
@@ -28,6 +28,14 @@ ttl:
   auth_code: 1m
 
 oauth2:
+  token_hook:
+    url: http://recovery-hooks:8080/internal/test/hydra/token
+    auth:
+      type: api_key
+      config:
+        in: header
+        name: X-Inframeld-Recovery-Key
+        value: inframeld-recovery-hook-test-only
   pkce:
     enforced: true
     enforced_for_public_clients: true

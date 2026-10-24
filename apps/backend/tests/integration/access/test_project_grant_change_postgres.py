@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import ARRAY, Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_grant_changes import create_project_grant_change_service
 
 from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
@@ -138,7 +139,9 @@ async def test_mismatched_authorization_rolls_back_without_changing_either_proje
             ]
         )
 
-    access = AccessContextDTO(scenario.principal_id)
+    access = AccessContextDTO(
+        scenario.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
+    )
     command = AssignProjectUseOnlyGrantCommand(
         scenario.project_id, recipient_id, action_id, expected_access_revision=0
     )
@@ -259,7 +262,10 @@ async def test_assign_use_only_saves_grant_revision_audit_and_reservation(
     async with database.session() as session:
         service = create_project_grant_change_service(session)
         await service.assign_use_only(
-            access=AccessContextDTO(actor_principal_id=scenario.principal_id),
+            access=AccessContextDTO(
+                actor_principal_id=scenario.principal_id,
+                authentication_evidence=MockAuthenticationEvidence.browser(),
+            ),
             context=request,
             command=AssignProjectUseOnlyGrantCommand(
                 project_id=scenario.project_id,
@@ -372,7 +378,10 @@ async def test_assign_use_only_replay_keeps_original_operation_without_writing_a
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-bob-replay-1"),
     )
-    access = AccessContextDTO(actor_principal_id=scenario.principal_id)
+    access = AccessContextDTO(
+        actor_principal_id=scenario.principal_id,
+        authentication_evidence=MockAuthenticationEvidence.browser(),
+    )
 
     async with database.session() as session:
         service = create_project_grant_change_service(session)
@@ -493,7 +502,10 @@ async def test_new_key_with_stale_revision_rolls_back_entire_grant_change(
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-bob-original"),
     )
-    access = AccessContextDTO(actor_principal_id=scenario.principal_id)
+    access = AccessContextDTO(
+        actor_principal_id=scenario.principal_id,
+        authentication_evidence=MockAuthenticationEvidence.browser(),
+    )
 
     async with database.session() as session:
         service = create_project_grant_change_service(session)
@@ -619,7 +631,10 @@ async def test_same_key_cannot_change_grant_recipient(database: Database) -> Non
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-recipient-1"),
     )
-    access = AccessContextDTO(actor_principal_id=scenario.principal_id)
+    access = AccessContextDTO(
+        actor_principal_id=scenario.principal_id,
+        authentication_evidence=MockAuthenticationEvidence.browser(),
+    )
 
     async with database.session() as session:
         service = create_project_grant_change_service(session)
@@ -724,7 +739,10 @@ async def test_concurrent_equal_grants_commit_one_change(
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-bob-concurrent-1"),
     )
-    access = AccessContextDTO(actor_principal_id=scenario.principal_id)
+    access = AccessContextDTO(
+        actor_principal_id=scenario.principal_id,
+        authentication_evidence=MockAuthenticationEvidence.browser(),
+    )
     barrier = asyncio.Barrier(2)
 
     async def assign() -> CompletedSynchronousOperationDTO:
@@ -870,7 +888,9 @@ async def test_competing_memberships_share_the_project_revision(database: Databa
             )
         )
 
-    access = AccessContextDTO(seed.principal_id)
+    access = AccessContextDTO(
+        seed.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
+    )
     authorized, release = asyncio.Event(), asyncio.Event()
     pid_ready = asyncio.get_running_loop().create_future()
 

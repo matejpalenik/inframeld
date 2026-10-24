@@ -41,8 +41,7 @@ def test_product_eligibility_respects_account_status_and_recovery(
         status=status,
     )
     policy_input = PrincipalAccessPolicyInput(
-        principal=principal,
-        has_pending_recovery=has_pending_recovery,
+        principal=principal, has_pending_recovery=has_pending_recovery, credential_is_current=True
     )
 
     assert PrincipalAccessPolicy.may_use_product(policy_input) is expected
@@ -62,3 +61,15 @@ def test_account_activity_is_available_separately_from_product_access(
     )
 
     assert PrincipalAccessPolicy.is_account_active(principal) is (status is PrincipalStatus.ACTIVE)
+
+
+def test_stale_credential_keeps_an_active_unblocked_account_ineligible() -> None:
+    principal = Principal(
+        id=PrincipalId(UUID(int=1)),
+        organization_id=OrganizationId(UUID(int=2)),
+        kind=PrincipalKind.HUMAN,
+        status=PrincipalStatus.ACTIVE,
+    )
+    assert not PrincipalAccessPolicy.may_use_product(
+        PrincipalAccessPolicyInput(principal, False, credential_is_current=False)
+    )

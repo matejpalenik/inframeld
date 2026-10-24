@@ -22,6 +22,7 @@ from inframeld_backend.access.domain.value_objects.identity_authority import Ide
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.validation.value_validation import ValueValidation
 
 
 class KratosIdentityState(StrEnum):
@@ -60,12 +61,12 @@ class KratosHumanIdentityVerifier(HumanIdentityVerifier):
             raise DependencyUnavailableError()
 
         try:
-            returned_subject = UUID(response.id)
+            ValueValidation.require_uuid(response.id)
             state = KratosIdentityState(response.state)
         except (TypeError, ValueError):
             raise DependencyUnavailableError() from None
 
-        if returned_subject != subject:
+        if response.id != subject:
             raise DependencyUnavailableError()
 
         if state is KratosIdentityState.INACTIVE:

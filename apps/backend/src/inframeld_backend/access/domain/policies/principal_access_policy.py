@@ -17,4 +17,5 @@ class PrincipalAccessPolicy:
         return (
             PrincipalAccessPolicy.is_account_active(policy_input.principal)
             and not policy_input.has_pending_recovery
+            and policy_input.credential_is_current
         )

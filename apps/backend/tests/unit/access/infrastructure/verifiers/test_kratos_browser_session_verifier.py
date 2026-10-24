@@ -46,14 +46,14 @@ def _session(
 ) -> Session:
     """Create a typed SDK session with independently variable validity."""
     identity = Identity(
-        id=str(IDENTITY_ID),
+        id=IDENTITY_ID,
         schema_id="default",
         schema_url="http://kratos.test/schemas/default",
         traits={"email": "alice@example.test"},
         state=identity_state,
     )
     return Session(
-        id="00000000-0000-0000-0000-000000000002",
+        id=UUID("00000000-0000-0000-0000-000000000002"),
         active=active,
         expires_at=datetime.now(UTC) + expires_in,
         identity=identity,
@@ -134,6 +134,25 @@ async def test_incomplete_session_reports_dependency_failure(missing_field: str)
     frontend = _frontend()
     session = _session()
     setattr(session, missing_field, None)
+
+    with (
+        patch.object(frontend, "to_session", return_value=session),
+        pytest.raises(DependencyUnavailableError),
+    ):
+        await KratosBrowserSessionVerifier(frontend, AUTHORITY).verify(
+            BrowserSessionCredential(COOKIE)
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("identity_id", [None, "invalid-id", 42])
+async def test_malformed_identity_id_reports_dependency_failure(identity_id: object) -> None:
+    """Reject a broken provider identity without accepting it as an account."""
+    frontend = _frontend()
+    session = _session()
+    assert session.identity is not None
+    # Bypass SDK validation to check the adapter's defensive response handling.
+    session.identity = session.identity.model_copy(update={"id": identity_id})
 
     with (
         patch.object(frontend, "to_session", return_value=session),
