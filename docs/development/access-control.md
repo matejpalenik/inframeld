@@ -132,6 +132,8 @@ The two authorization families now specialize the shared abstract `Authorizer[Re
 
 **Bulk Hydra recovery verification (2026-10-23):** The fresh baseline passed 829 fast tests and all 291 integration scenarios. `pnpm check:backend` now passes formatting, lint, strict Pyright, 791 fast tests and all 11 OpenAPI checks, with 292 expected service-dependent host skips. `pnpm test:integration` passed all 292 scenarios without skips. The [56 adapter unit cases](../../apps/backend/tests/unit/access/infrastructure/revokers/test_hydra_human_oauth_credential_revoker.py) preserve rejection, uncertainty, deadline and cancellation coverage while checking exact subject and fixed-client forwarding. The new methods first failed against their public scaffolds. The lower fast-test count deliberately retires 37 pagination-helper cases and three obsolete identifier cases, while adding two forwarding cases. [Ten bulk-provider cases](../../apps/backend/tests/integration/access/test_hydra_credential_cleanup.py) and [five fixture-observation cases](../../apps/backend/tests/integration/access/test_hydra_cleanup_target_discovery.py) replace the previous fourteen targeted/discovery scenarios. The additional case records the pinned stale-cookie reauthentication edge described [below](#hydra-cleanup-evidence). Unrelated application and provider tests remain unchanged. The live private stack published no ports. Automatic cleanup removed its containers/networks under both Compose labels and preserved both named PostgreSQL volumes. OpenAPI, migrations and dependency files remain unchanged. This qualifies the standalone bulk capability and provider observations, not production callbacks, durable recovery execution, issuance coordination or account-UI handling.
 
+**Hydra issuance-ordering verification (2026-10-24):** The fresh baseline passed 791 fast tests and all 292 integration scenarios. After adding staged helpers and the bounded transport gate, `pnpm check:backend` passed formatting, lint, strict Pyright, 823 fast tests and all 11 OpenAPI checks, with 299 expected service-dependent host skips. `pnpm test:integration` passed all 299 scenarios without skips. The 32 new helper unit cases first failed against behavioral scaffolds, then passed. [Seven real-provider cases](#hydra-issuance-evidence) retain exact denial, credential-state and Bob-isolation assertions. All pre-existing scenarios remain intact. The live private stack published no ports, cleanup left no test containers or networks under either Compose label and both named PostgreSQL volumes survived. Production code, configuration, dependencies, migrations and OpenAPI contracts are unchanged. This qualifies HTTP ordering, not provider-internal races, production approval or safe recovery-block release.
+
 <a id="architecture"></a> <a id="section-keep-four-identity-and-access-responsibilities-separate"></a>
 
 ## 2. Signing in and checking permissions
@@ -1014,6 +1016,27 @@ Every call requires a finite positive deadline. The caller owns the official SDK
 
 The pinned [handlers](https://github.com/ory/hydra/blob/v26.2.0/consent/handler.go) distinguish subject/client grant deletion from subject-wide remembered-login deletion. [Bulk persistence](https://github.com/ory/hydra/blob/v26.2.0/persistence/sql/persister_consent.go) does not use the consent listing's skipped-flow or expiry filter. The caller must first establish the subject's original provider and installation binding. A typed subject and one successful request do not establish complete recovery cleanup or authorize release. Production callbacks/bootstrap, durable reconciliation, safe issuance ordering and completion wiring remain unfinished.
 
+<a id="hydra-issuance-evidence"></a>
+
+#### When login or refresh crosses cleanup
+
+Alice starts signing in to the CLI, then recovery cleanup runs before her login finishes. The result depends on which step Hydra has reached. [Seven real-provider cases](../../apps/backend/tests/integration/access/test_hydra_issuance_cleanup_ordering.py), verified against Hydra v26.2.0 on 2026-10-24, separate these orderings.
+
+| Ordering | Observed result |
+| --- | --- |
+| Start authorization, finish both bulk calls, then approve login and consent | Alice receives working credentials. The test helper verified Kratos before the pause and deliberately does not recheck it before approving. Earlier cleanup cannot prevent a later approval from issuing new credentials. |
+| Issue a code, revoke CLI grants, then exchange the code | Hydra returns `invalid_grant` without tokens. Both ordinary and skipped-consent codes are covered. |
+| Complete code exchange, hold its successful response, run cleanup, then deliver the response | The helper receives the earlier success, but its access token is already inactive and refresh is denied. A late response cannot restore the deleted grant. |
+| Hold a refresh request before dispatch, run cleanup, then send it | Hydra rejects refresh with `invalid_grant`. The request had not reached Hydra during cleanup. |
+| Complete refresh, hold its successful response, run cleanup, then deliver it | The rotated credentials are already inactive and cannot refresh. |
+| Start a fresh login after cleanup finishes | Alice receives working credentials again. Bob's access, refresh and remembered login remain usable in every ordering. |
+
+The outstanding-code result verifies [Ory's documented revocation behavior](https://www.ory.com/docs/oauth2-oidc/revoke-consent) against the pinned release. The staged [provider helper](../../apps/backend/tests/support/hydra_provider.py) retains `issue_tokens()` for existing callers. Its pending-login and code records protect secrets in representations and exist only for tests. The harness approves challenges through private APIs, without implementing the production account UI.
+
+The test-only [transport gate](../../apps/backend/tests/support/hydra_token_request_gate.py) pauses one explicitly armed token request. Its after-response mode reads and closes the complete real response before signalling the test. Events establish ordering without sleeps. HTTP calls have five-second timeouts, bulk calls use three-second deadlines, gates have ten-second deadlines and each scenario has a thirty-second deadline. Request tasks are cancelled and awaited on failure before their transport closes. Neither helper retries a failure silently.
+
+These tests control HTTP boundaries, not Hydra's internal processing. They do not prove every interleaving between issuance and deletion inside the provider. Successful bulk responses alone therefore do not establish safe recovery completion. Production approval checks, coordination with requests already processing, durable execution and access-block release still need implementation and qualification.
+
 <a id="hydra-discovery-evidence"></a>
 
 #### Consent listing is observation, not cleanup evidence
@@ -1030,7 +1053,7 @@ Alice can have working credentials that the consent listing does not show. [Smal
 
 The listing observation is private to this test module. One five-second HTTP request reads at most ten fixture rows and rejects an unexpected next page. It returns only a count, never a cleanup inventory. No production code uses the listing, and no target capture, pagination utility, original-target snapshot or timestamp cutoff remains in the recovery capability.
 
-The harness verifies Kratos identities and approves Hydra challenges through private test APIs. It does not implement the account UI, bind Hydra logins to Kratos provider-session IDs or configure logout receivers. These tests establish the listed boundaries in this setup. They do not qualify production callback delivery, durable scheduling, authorization-code exchange or refresh races during cleanup. Those coordination requirements remain prerequisites for a production recovery worker.
+The harness verifies Kratos identities and approves Hydra challenges through private test APIs. It does not implement the account UI, bind Hydra logins to Kratos provider-session IDs or configure logout receivers. These tests establish the listed boundaries in this setup. [Separate issuance tests](#hydra-issuance-evidence) now qualify controlled HTTP ordering around code exchange and refresh. Production callback delivery, durable scheduling, provider-internal races and production issuance coordination remain prerequisites for a production recovery worker.
 
 <a id="recovery-checklist-persistence"></a>
 

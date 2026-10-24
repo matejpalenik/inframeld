@@ -31,6 +31,12 @@ Preserve the legitimate Kratos recovery browser session. Ordinary selected-devic
 - The standalone adapter performs bounded provider I/O without database work or automatic retries. Existing recovery admission, checklist persistence and local release rules remain unchanged.
 - Production callbacks, durable execution/reconciliation and coordination with authorization-code issuance and refresh remain unfinished. Provider tests do not qualify the account UI or complete CLI lifecycle.
 
+## Implementation evidence
+
+The [HTTP-ordering qualification](../development/access-control.md#hydra-issuance-evidence), verified on 2026-10-24 against Hydra v26.2.0, covers outstanding codes, refresh requests sent after cleanup and successful token responses delivered late. Revoked codes cannot be exchanged, and holding an earlier successful response does not preserve its revoked credentials. A login approved after cleanup can still issue working credentials.
+
+These are controlled HTTP boundaries, not pauses inside Hydra. Production issuance coordination, provider-internal races, durable execution and recovery completion remain unfinished. This evidence does not change the transaction, retry or release decisions above.
+
 ## Links
 
 - [Access behavior and provider evidence](../development/access-control.md#hydra-cleanup-evidence).

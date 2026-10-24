@@ -313,6 +313,8 @@ Each request makes one bounded attempt without automatic retries. An expected em
 
 Keep Kratos and Hydra evidence independent. The future recovery workflow must establish both required Hydra results and safe reset/issuance ordering before recording aggregate confirmation. It must bound reconciliation and keep unresolved obligations blocked. The [provider observations](access-control.md#hydra-discovery-evidence) retain skipped-consent, empty-listing and password-gap evidence without using listed rows to choose targets. Production callback delivery, durable execution, coordination with authorization-code exchange and refresh, and completion wiring remain unfinished. Ordinary selected-device CLI logout retains its separate narrower semantics.
 
+[Controlled HTTP-ordering tests](access-control.md#hydra-issuance-evidence) show that cleanup invalidates outstanding codes and credentials from completed exchanges or refreshes, including successful responses delivered afterward. An authorization begun earlier can still issue working credentials if the test harness approves login after cleanup. Neither that prepared approval nor a held HTTP response pauses Hydra internally. These observations clarify the production coordination requirement without implementing it or establishing permission to release a recovery block.
+
 <a id="project-deletion"></a>
 
 ### Continue only the project deletion that was admitted
