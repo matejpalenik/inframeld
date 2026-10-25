@@ -31,5 +31,5 @@ Keep one current rating per answer and originating principal, with the accepted 
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current answer feedback](../development/answer-feedback.md).
-- [Current data model](../development/data-model.md).
+- [Current answer feedback](../../.agents/skills/inframeld-pipelines/references/answer-feedback.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).

@@ -63,9 +63,9 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Accepted key format and lifetime](../../../../docs/development/access-control.md#application-key-contract).
-- [Existing authorizers and remaining contracts](../../../../docs/development/access-control.md#application-key-current-authorization).
+- [Accepted key format and lifetime](application-key-contracts.md#application-key-contract).
+- [Existing authorizers and remaining contracts](application-keys.md#application-key-current-authorization).
 - [Minimal verifier split](../../../../docs/adr/ADR-0074-separate-application-key-verification-from-local-admission.md).
-- [Evidence records](../../../../docs/development/data-model.md#authentication-evidence-records).
+- [Evidence records](credential-and-recovery-records.md#authentication-evidence-records).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

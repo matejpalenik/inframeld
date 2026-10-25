@@ -33,6 +33,6 @@ Keep logical identities separate from their immutable contents and actual proces
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current data model](../development/data-model.md).
-- [Current knowledge lifecycle](../development/knowledge-lifecycle.md).
-- [Current pipelines and releases](../development/pipelines-and-releases.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
+- [Current knowledge lifecycle](../../.agents/skills/inframeld-knowledge/references/documents-and-collections.md).
+- [Current pipelines and releases](../../.agents/skills/inframeld-pipelines/references/configuration-queries-and-builds.md).

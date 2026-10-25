@@ -1,10 +1,14 @@
 # System overview: runtime topology
 
+<a id="system-overview-runtime-topology"></a>
+
 Alice runs Inframeld on one server and wants to know where her documents, questions and credentials travel. This is an interaction map of the accepted architecture. It is not a claim that every path is implemented or qualified.
 
 For who uses the product, start with [System context](system-context.md). For logical domain ownership, use [Module map](module-map.md). This view explains where work runs. A process is a running program, while a module is an area of shared code and responsibility.
 
 API, worker, parser, identity services and stores are runtime pieces. The Operations and ModelGateway boxes below represent code responsibilities reused by the backend processes. They do not add a process or service per domain.
+
+<a id="processes-and-responsibilities"></a>
 
 ## Processes and responsibilities
 
@@ -42,6 +46,8 @@ flowchart TB
 
 Arrows show interactions, not code import directions or a separate service for each box. The operations box represents shared code. Application keys can also be used by the CLI. The human-token arrow describes HTTP access and does not add human OAuth to the accepted MCP profile.
 
+<a id="follow-one-request"></a>
+
 ## Follow one request
 
 1. An entry point parses input and establishes the caller's authenticated identity. Access separately checks current eligibility and authority for the operation.
@@ -52,6 +58,8 @@ Arrows show interactions, not code import directions or a separate service for e
 
 Bootstrap constructs concrete dependencies and closes resources. Entry points stay small. PostgreSQL owns current membership, grants, revision coordination and retained operation identity. Chroma must not become an alternative permission or serving-state database.
 
+<a id="failure-and-trust-boundaries"></a>
+
 ## Failure and trust boundaries
 
 A valid provider identity does not create a local account or grant permission. OAuth consent, host bootstrap, local product admission and project authorization have different purposes. An operator controls the host without automatically becoming an unrestricted reader through product APIs.
@@ -60,8 +68,10 @@ A SQL lease or revision guard can prevent stale publication. It cannot cancel an
 
 Missing credentials, an unhealthy required shard, unsupported parser isolation or changed authority must follow their documented failure path. None permits an unfiltered or alternate-provider fallback.
 
+<a id="status-and-sources"></a>
+
 ## Status and sources
 
 V1 targets a Rust CLI and the small Ory account UI independently of full Studio. Future Studio uses the same generated application contracts and user context. Do not infer deployed UI, complete CLI lifecycle, universal MCP interoperability, production recovery completion or measured capacity from this diagram.
 
-The [architecture introduction](../../../../docs/ARCHITECTURE.md), [application structure](../../../../docs/development/application-structure.md), [deployment guide](../../../../docs/development/deployment.md), and [ADR-0001](../../../../docs/adr/ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md) own these boundaries. Use [API contracts](../../../../docs/development/api-contracts.md), [MCP](../../../../docs/development/mcp.md) and the [CLI delivery plan](../../../../docs/development/cli-delivery-plan.md) for delivery scope and qualification.
+The [architecture introduction](../../../../docs/ARCHITECTURE.md), [application structure](../../inframeld-application-contracts/references/components-and-services.md), [deployment guide](runtime-deployment-and-storage.md), and [ADR-0001](../../../../docs/adr/ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md) own these boundaries. Use [API contracts](../../inframeld-application-contracts/references/http-mcp-and-generated-clients.md), [MCP](../../inframeld-application-contracts/references/mcp-transport.md) and the [CLI delivery plan](v1-scope-and-extension-boundaries.md) for delivery scope and qualification.

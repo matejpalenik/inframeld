@@ -43,9 +43,9 @@ Relevant access changes stop remaining model dispatches in an admitted multi-cal
 
 ## Links
 
-- [Model connections](../development/model-connections.md#shared-current) owns update, dispatch and restoration behavior.
-- [Data model](../development/data-model.md#shared-current-connections) owns logical identities, revisions and observations.
-- [Indexing](../development/indexing.md#embedding-compatibility) owns vector compatibility and preparation.
+- [Model connections](../../.agents/skills/inframeld-application-contracts/references/model-connection-changes.md#shared-current) owns update, dispatch and restoration behavior.
+- [Data model](../../.agents/skills/inframeld-application-contracts/references/model-connection-changes.md#shared-current-connections) owns logical identities, revisions and observations.
+- [Indexing](../../.agents/skills/inframeld-indexing/references/materialization-verification.md#embedding-compatibility) owns vector compatibility and preparation.
 - [Shared-connection administration](https://github.com/matejpalenik/inframeld/issues/31) illustrates administration and gradual migration.
 - [ADR-0050](ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md), [ADR-0051](ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md) and [ADR-0052](ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md) retain optional tests, Ragas and the development loop with this shared-connectivity boundary.
 - [Azure API Management backends](https://learn.microsoft.com/en-us/azure/api-management/backends) is a precedent for centrally editable reusable upstreams. [Azure API revisions](https://learn.microsoft.com/en-us/azure/api-management/api-management-revisions) separately illustrate controlled API changes. Neither is an Inframeld dependency or proof of implementation.

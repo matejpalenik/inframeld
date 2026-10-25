@@ -23,7 +23,7 @@ This reference supports a future discussion. Its recommendation is not accepted 
 
 Alice upgrades one CLI and uses it with local, test and Production installations that were upgraded at different times. A mutation is admitted by an older server, but the new CLI cannot decode its result. Starting again with a fresh key could duplicate work even though issuer discovery succeeded.
 
-Native OpenAPI and generated clients qualify one contract, not a supported version-skew policy. The delivery plan requires compatibility evidence and release guidance, but no supported release range or breaking-change rule is selected.
+Native OpenAPI and generated clients qualify one contract, not a supported version-skew policy. The accepted release scope requires compatibility evidence and release guidance, but no supported release range or breaking-change rule is selected.
 
 ## Accepted context and evidence
 
@@ -59,8 +59,8 @@ CLI release metadata, server discovery/compatibility response where selected, ge
 
 ## Sources and finalization
 
-- [Generated clients and CLI contracts](../../../../docs/development/api-contracts.md).
+- [Generated clients and CLI contracts](http-mcp-and-generated-clients.md).
 - [CLI-first decision](../../../../docs/adr/ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md).
-- [Runtime compatibility is separate](../../../../docs/development/upgrades-and-recovery.md).
+- [Runtime compatibility is separate](../../../../docs/development/operations/upgrades.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

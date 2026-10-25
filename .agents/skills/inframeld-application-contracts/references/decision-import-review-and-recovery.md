@@ -66,8 +66,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Durable import and recovery](../../../../docs/development/configuration-portability.md#import-recovery).
-- [Original import identity](../../../../docs/development/jobs-and-idempotency.md#import-recovery).
-- [Context and target contracts](../../../../docs/development/api-contracts.md).
+- [Durable import and recovery](configuration-import-recovery.md#import-recovery).
+- [Original import identity](configuration-import-recovery.md#import-recovery).
+- [Context and target contracts](http-mcp-and-generated-clients.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

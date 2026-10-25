@@ -32,6 +32,6 @@ Keep application identities, exact collection membership, current policy, and ge
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current indexing](../development/indexing.md).
-- [Current data model](../development/data-model.md).
+- [Current indexing](../../.agents/skills/inframeld-indexing/references/profiles-and-preparation.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Related decisions: [ADR-0010](ADR-0010-save-deterministic-layouts-for-vector-shards.md), [ADR-0011](ADR-0011-retry-frozen-vector-identities-and-payloads.md).

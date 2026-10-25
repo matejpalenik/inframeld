@@ -63,9 +63,9 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Default resolution](../../../../docs/development/onboarding.md).
-- [Exact Query permission](../../../../docs/development/access-control.md#pipeline-query-authority).
-- [Catalogue and initial assignments](../../../../docs/development/access-contracts.md#initial-assignments).
-- [MCP defaults](../../../../docs/development/mcp.md).
+- [Default resolution](../../inframeld-architecture/references/first-use-and-private-defaults.md).
+- [Exact Query permission](query-and-document-authorization.md#pipeline-query-authority).
+- [Catalogue and initial assignments](actions-and-initial-grants.md#initial-assignments).
+- [MCP defaults](../../inframeld-application-contracts/references/mcp-transport.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

@@ -34,11 +34,11 @@ Generation proposes cases. Review decides which revisions are suitable. Evaluati
 4. Trace preparation and nested calls when reviewing gateway safety. Separate source-inspected library compatibility from executed integration and human calibration.
 5. Cite the current rule. Loading this skill grants no edits, model calls, exports or releases.
 
-Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+For backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
 ## Pending decisions for affected work
 
-Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
 - [PD-EVALUATION-01](references/decision-case-review-contracts.md): Before implementing case generation/review commands, revision preconditions, local acceptance or their public result contracts.
 - [PD-EVALUATION-02](references/decision-run-and-result-contracts.md): Before defining run/comparison inputs, durable progress, scoring outcomes, result inspection or summary/export schemas.
@@ -46,12 +46,22 @@ Read only entries whose triggers match the proposed design, code suggestion or i
 
 ## Read as needed
 
-- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-- For starter sampling and immutable review, read [Generation and review](references/generation-and-review.md).
-- For captured inputs, baselines and fresh execution, read [Benchmarks and comparisons](references/benchmarks-and-comparisons.md).
-- For passage identity, faithfulness and score interpretation, read [Metrics and evidence](references/metrics-and-evidence.md).
-- For Ragas adapters, cancellation and paid work, read [Gateway and jobs](references/gateway-and-jobs.md).
-- For permissions, erasure, audiences and JSONL transfer, read [History and dataset transfer](references/history-and-dataset-transfer.md).
+| Task | Direct reference |
+| --- | --- |
+| Module/component design or structural review | [Evaluation architecture: compare fixed inputs with honest evidence](references/architecture.md) |
+| Benchmarks and comparisons | [Freeze inputs and compare fresh executions](references/benchmarks-and-comparisons.md) |
+| Case audiences | [Protect evaluation cases and imported content](references/case-audiences.md) |
+| Faithfulness | [Judge support in the actual final context](references/faithfulness.md) |
+| Gateway and jobs | [Integrate Ragas through the existing gateway and jobs](references/gateway-and-jobs.md) |
+| Generation and review | [Generate starter cases and review exact revisions](references/generation-and-review.md) |
+| History and dataset transfer | [Protect case history and transfer datasets deliberately](references/history-and-dataset-transfer.md) |
+| Judge calibration | [Qualify and calibrate the selected judge](references/judge-calibration.md) |
+| Metrics and evidence | [Explain what a score actually measures](references/metrics-and-evidence.md) |
+| Passage coverage | [Measure complete expected-passage coverage](references/passage-coverage.md) |
+| Logical records and representation ownership | [Evaluation inputs, revisions and observations](references/records.md) |
 
-The [Evaluation guide](../../../docs/development/evaluation.md) owns behavior. [Evaluation records](../../../docs/development/data-model.md#evaluation) defines logical records without mandating one physical table per concept. Exact runtime and wire qualification remains explicit.
+## Source ownership
+
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

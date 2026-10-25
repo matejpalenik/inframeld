@@ -65,8 +65,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Spending admission](../../../../docs/development/model-connections.md#spending).
-- [Human-only policy coordination](../../../../docs/development/model-connections.md#budget-policy-authority).
-- [Supporting records](../../../../docs/development/data-model.md#shared-supporting-records).
+- [Spending admission](spending-and-accounting.md#spending).
+- [Human-only policy coordination](spending-and-accounting.md#budget-policy-authority).
+- [Supporting records](components-and-services.md#shared-supporting-records).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

@@ -30,7 +30,7 @@ Check the expected revision for revision-controlled state changes and reject a s
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current jobs and idempotency](../development/jobs-and-idempotency.md).
-- [Current pipelines and releases](../development/pipelines-and-releases.md).
-- [Current model connections](../development/model-connections.md).
+- [Current jobs and idempotency](../../.agents/skills/inframeld-application-contracts/references/jobs-and-recovery.md).
+- [Current pipelines and releases](../../.agents/skills/inframeld-pipelines/references/configuration-queries-and-builds.md).
+- [Current model connections](../../.agents/skills/inframeld-application-contracts/references/model-gateway-and-connections.md).
 - Related decisions: [ADR-0026](ADR-0026-persist-background-work-through-controlled-durable-attempts.md), [ADR-0027](ADR-0027-identify-repeated-requests-by-caller-and-request-meaning.md), [ADR-0028](ADR-0028-recover-answer-requests-through-receipts-without-a-full-answer-replay-cache.md).

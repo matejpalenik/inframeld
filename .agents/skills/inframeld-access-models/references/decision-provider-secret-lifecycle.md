@@ -64,9 +64,9 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Credential management](../../../../docs/development/model-connections.md#credentials).
-- [Persistent root key](../../../../docs/development/model-connections.md#root-key).
+- [Credential management](provider-credential-storage.md#credentials).
+- [Persistent root key](provider-credential-storage.md#root-key).
 - [Encryption decision](../../../../docs/adr/ADR-0048-encrypt-outbound-credentials-in-postgresql-using-pynacl.md).
-- [Connection dispatch](../../../../docs/development/model-connections.md#dispatch).
+- [Connection dispatch](../../inframeld-application-contracts/references/model-dispatch-and-destinations.md#dispatch).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

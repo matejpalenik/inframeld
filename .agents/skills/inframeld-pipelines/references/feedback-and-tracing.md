@@ -1,6 +1,10 @@
 # Feedback, query traces and history
 
+<a id="feedback-query-traces-and-history"></a>
+
 SupportBot rates an answer after Production has moved to a new version. The rating still belongs to the version that produced that answer. A trace may help explain it, but trace recording, protected inspection and feedback authority are different capabilities.
+
+<a id="feedback-follows-the-original-live-answer"></a>
 
 ## Feedback follows the original live answer
 
@@ -14,6 +18,8 @@ SupportBot rates an answer after Production has moved to a new version. The rati
 5. Filter report totals as well as comments using current evidence access. Do not leak protected populations through aggregate counts.
 
 CLI v1 includes authorized reporting and own-live-answer rating/correction through ordinary backend contracts. Reports cannot recover answer text from receipts or include direct-query/evaluation statistics. Backend and CLI qualification stay in the release dependency chain independently of Studio.
+
+<a id="trace-authority-and-lifecycle"></a>
 
 ## Trace authority and lifecycle
 
@@ -29,22 +35,28 @@ Opt-out stops future capture and queued delivery. Re-enable applies to new admis
 
 Explicit history deletion first blocks reads, then follows durable cleanup. It never reruns model work. Automatic expiry and source erasure need no fresh human approval per record. Exact representation/fencing remains specification work rather than authority to create a tracking framework.
 
+<a id="failure-and-presentation"></a>
+
 ## Failure and presentation
 
 Distinguish unavailable traces, missing content, revoked access and healthy answers. CLI displays preserve actual counts, saved results, bounded protected details and human/JSON parity. A colored proposed delta does not establish a committed change. Ready build output is not a live-version change, and neutral unchanged state should stay clear.
 
 Neither feedback nor scores change publication mode or authorize a release. Query provenance, Evaluation evidence and traces do not share a permission or retention bypass.
 
+<a id="pending-decisions-for-dependent-implementation"></a>
+
+## Pending decisions for dependent implementation
+
+Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+
+- [PD-PIPELINES-02: Make a confirmed trace opt-out stop later capture and delivery](decision-trace-policy-fencing.md). Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.
+
+<a id="status-and-sources"></a>
+
 ## Status and sources
 
 These are accepted product and display rules. Do not infer new storage, schemas, a diff backend or a generic operations framework from a CLI mock. Non-query diagnostics retain their explicit deferral.
 
-- [Feedback](../../../../docs/development/answer-feedback.md), [authority](../../../../docs/development/answer-feedback.md#authorization), [reporting](../../../../docs/development/answer-feedback.md#reporting), [Access tracing](../../../../docs/development/access-control.md#trace-authority) and [observability](../../../../docs/development/observability.md).
-- [CLI delivery](../../../../docs/development/cli-delivery-plan.md), [CLI feedback capability](https://github.com/matejpalenik/inframeld/issues/191), [non-query diagnostic deferral](../../../../docs/development/observability.md#non-query-diagnostics) and [retention/deletion](../../../../docs/development/retention-and-deletion.md).
-- [ADR-0043](../../../../docs/adr/ADR-0043-keep-one-current-feedback-rating-per-answer-and-originating-principal.md) explains one current rating. The exact catalogue and creator assignments remain with [Access contracts](../../../../docs/development/access-contracts.md).
-
-## Pending decisions for dependent implementation
-
-The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
-
-- [PD-PIPELINES-02: Make a confirmed trace opt-out stop later capture and delivery](decision-trace-policy-fencing.md). Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.
+- [Feedback](answer-feedback.md), [authority](answer-feedback.md#authorization), [reporting](feedback-reporting.md#reporting), [Access tracing](query-tracing-and-privacy.md#trace-authority) and [observability](query-tracing-and-privacy.md).
+- [V1 scope](../../inframeld-architecture/references/v1-scope-and-extension-boundaries.md), [CLI feedback capability](https://github.com/matejpalenik/inframeld/issues/191), [non-query diagnostic deferral](query-tracing-and-privacy.md#non-query-diagnostics) and [retention/deletion](../../inframeld-knowledge/references/deletion-and-retention.md).
+- [ADR-0043](../../../../docs/adr/ADR-0043-keep-one-current-feedback-rating-per-answer-and-originating-principal.md) explains one current rating. The exact catalogue and creator assignments remain with [Access contracts](../../inframeld-access-models/references/actions-and-initial-grants.md).

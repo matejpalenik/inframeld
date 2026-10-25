@@ -65,8 +65,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Destination policy](../../../../docs/development/model-connections.md#destinations).
-- [Dispatch and freshness](../../../../docs/development/model-connections.md#dispatch).
+- [Destination policy](model-dispatch-and-destinations.md#destinations).
+- [Dispatch and freshness](model-dispatch-and-destinations.md#dispatch).
 - [Gateway decision](../../../../docs/adr/ADR-0023-route-every-model-request-through-modelgateway.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

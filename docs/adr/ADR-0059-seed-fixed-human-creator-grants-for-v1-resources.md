@@ -17,7 +17,7 @@ The developer accepted the explicit expansion. An unrestricted administrator rol
 
 ## Decision Outcome
 
-Seed the seventeen named Project actions and the fixed human creator assignments for each resource in [the initial-assignment contract](../development/access-contracts.md#initial-assignments). Pipeline creation assigns thirteen actions; Deployment creation assigns seven, including `feedback:write`. Source, Collection, connection, immutable profile and application-account assignments are separately enumerated.
+Seed the seventeen named Project actions and the fixed human creator assignments for each resource in [the initial-assignment contract](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#initial-assignments). Pipeline creation assigns thirteen actions; Deployment creation assigns seven, including `feedback:write`. Source, Collection, connection, immutable profile and application-account assignments are separately enumerated.
 
 All creator assignments are ordinary can-use-and-grant records committed with creation and audit. They do not grant document membership or authority on another resource. Private starter provisioning retains its separate admission boundary and explicit ordinary-resource initialization, without Organization Create projects authority.
 
@@ -31,8 +31,8 @@ All creator assignments are ordinary can-use-and-grant records committed with cr
 
 ## Links
 
-- [Access control](../development/access-control.md#initial-project-grants).
-- [Fixed identifiers and assignments](../development/access-contracts.md).
-- [Logical Access records](../development/data-model.md#access).
+- [Access control](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#initial-project-grants).
+- [Fixed identifiers and assignments](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md).
+- [Logical Access records](../../.agents/skills/inframeld-access-models/references/identity-and-grant-records.md#access).
 - [ADR-0014: bounded delegation](ADR-0014-bound-permission-delegation-by-action-and-exact-target.md).
 - [ADR-0060: human provisioning](ADR-0060-keep-v1-resource-provisioning-human-only.md).

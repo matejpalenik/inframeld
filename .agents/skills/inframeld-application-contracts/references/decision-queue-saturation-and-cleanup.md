@@ -64,8 +64,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Bounded worker mechanics](../../../../docs/development/jobs-and-idempotency.md#admission).
-- [Deletion obligations](../../../../docs/development/retention-and-deletion.md).
-- [Operational bounds](../../../../docs/development/deployment.md).
+- [Bounded worker mechanics](jobs-and-recovery.md#admit-work-and-claim-an-attempt).
+- [Deletion obligations](../../inframeld-knowledge/references/deletion-and-retention.md).
+- [Operational bounds](../../inframeld-architecture/references/runtime-deployment-and-storage.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

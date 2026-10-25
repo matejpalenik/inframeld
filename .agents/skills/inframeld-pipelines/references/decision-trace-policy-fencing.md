@@ -64,8 +64,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Trace lifecycle and coordination](../../../../docs/development/observability.md#trace-lifecycle).
-- [Trace authority](../../../../docs/development/access-control.md#trace-authority).
+- [Trace lifecycle and coordination](query-tracing-and-privacy.md#trace-lifecycle).
+- [Trace authority](query-tracing-and-privacy.md#trace-authority).
 - [Diagnostic scope](../../../../docs/adr/ADR-0063-defer-product-non-query-diagnostic-browsing.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

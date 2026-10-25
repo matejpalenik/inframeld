@@ -30,19 +30,13 @@ The domain owns business decisions. Application services coordinate them. Adapte
 
 ## Explain or review
 
-Tracing existing request behavior, including inspecting its source, does not by itself require Coding Standards. Add that skill when proposing code or reviewing component structure, declarations or convention conformance.
+Trace validated input, verified identity, owning use case, transaction/external work and typed outcome. Then check response loss, repetition and changed state. Compare transports by scope, fixed inputs, receipts and outcomes. Inspect source before claiming implementation.
 
-1. Trace validated input, verified identity, owning use case, transaction/external work and typed outcome.
-2. Explain a normal request before its lost-response retry, concurrent repeat or changed command.
-3. Compare HTTP/MCP behavior by scope, selected input/version, receipt identity and outcome.
-4. Before suggesting or reviewing any repository code, read [Coding Standards](../inframeld-coding-standards/SKILL.md), then applicable language guidance and the owning domain's rules. For backend services, read its [worked service example](../inframeld-coding-standards/references/services-and-use-cases.md). For aggregates or repositories, also read its [load, business action and save example](../inframeld-coding-standards/references/aggregates-and-repositories.md). Preserve runtime validation and protocol contracts.
-5. Inspect source before claiming implementation. Separate source compatibility, recorded verification and unfinished delivery. Loading this skill grants no edits, SDK extraction, deployment or external mutations.
-
-For domain-specific component design or structural code review, read that domain's architecture reference and relevant workflow. The [shared component view](references/components-and-services.md), [transaction/job view](references/transactions-jobs-and-idempotency.md) and [gateway view](references/model-gateway-and-connections.md) cover shared support. They create no additional business domain. A proposal in an owning guide remains pending until explicitly accepted.
+Code suggestions/reviews require Coding Standards and the affected language guidance. Backend services require its [service example](../inframeld-coding-standards/references/services-and-use-cases.md), aggregates/repositories its [load/action/save example](../inframeld-coding-standards/references/aggregates-and-repositories.md). Use the domain architecture/workflow for domain components, or the relevant shared architecture below. Behavior tracing alone adds no Coding Standards prerequisite.
 
 ## Pending decisions for affected work
 
-Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
 - [PD-CONTRACTS-01](references/decision-gateway-enforcement.md): Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
 - [PD-CONTRACTS-02](references/decision-spending-coordination.md): Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery.
@@ -52,10 +46,39 @@ Read only entries whose triggers match the proposed design, code suggestion or i
 
 ## Read as needed
 
-- For ownership, dependency direction, services or provider/session boundaries, read [Application boundaries and services](references/components-and-services.md).
-- For writes, reservations, jobs, replay or uncertainty, read [Transactions, jobs and idempotency](references/transactions-jobs-and-idempotency.md).
-- For native contracts, adapters, errors, pagination or client delivery, read [HTTP, MCP and generated clients](references/http-mcp-and-generated-clients.md).
-- For target selection, imports, dry-runs, progress or recovery, read [CLI context, portability and recovery](references/cli-context-portability-and-recovery.md).
-- For shared outbound execution and connection effects, read [ModelGateway and connections](references/model-gateway-and-connections.md).
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-The [application structure guide](../../../docs/development/application-structure.md) owns responsibilities. [API contracts](../../../docs/development/api-contracts.md) and [jobs](../../../docs/development/jobs-and-idempotency.md) own their behaviors. Access retains authentication/authorization policy ownership.
+| Task | Direct reference |
+| --- | --- |
+| Artifact storage | [Publish immutable artifacts through the storage boundary](references/artifact-storage.md) |
+| Cli change review | [Present an explicit before-and-after review](references/cli-change-review.md) |
+| Cli context portability and recovery | [CLI context, portability and recovery](references/cli-context-portability-and-recovery.md) |
+| Cli local runtime | [Manage the local runtime and its HTTP boundary](references/cli-local-runtime.md) |
+| Cli output and automation | [CLI outcomes, automation and change presentation](references/cli-output-and-automation.md) |
+| Cli result contracts | [Distinguish CLI command and background outcomes](references/cli-result-contracts.md) |
+| Cli targets and accounts | [Select a CLI target, account and project](references/cli-targets-and-accounts.md) |
+| Ownership, dependency direction or service boundaries | [Application boundaries and services](references/components-and-services.md) |
+| Transfer concepts and operation boundaries | [Move definitions without copying an installation](references/configuration-export-and-import.md) |
+| Configuration export | [Export one coherent configuration](references/configuration-export.md) |
+| Configuration import recovery | [Continue a partial import without replacing its meaning](references/configuration-import-recovery.md) |
+| Configuration import review | [Review destination-aware configuration changes](references/configuration-import-review.md) |
+| Http error adapters | [Translate and report failures at HTTP boundaries](references/http-error-adapters.md) |
+| Http errors | [Translate failures into safe HTTP problems](references/http-errors.md) |
+| Http mcp and generated clients | [Share behavior across HTTP, MCP and generated clients](references/http-mcp-and-generated-clients.md) |
+| Http problem contract | [Read the delivered HTTP problem contract](references/http-problem-contract.md) |
+| Idempotency and replay | [Recognize a request and recover its original outcome](references/idempotency-and-replay.md) |
+| Jobs and recovery | [Continue background work without repeating uncertain effects](references/jobs-and-recovery.md) |
+| Mcp transport | [Expose ordinary queries through the MCP adapter](references/mcp-transport.md) |
+| Model connection changes | [Change shared current model connectivity](references/model-connection-changes.md) |
+| Model dispatch and destinations | [Dispatch through the enforced model boundary](references/model-dispatch-and-destinations.md) |
+| Shared gateway architecture | [One outbound model boundary](references/model-gateway-and-connections.md) |
+| Model metadata and validation | [Separate model suggestions, saved settings and evidence](references/model-metadata-and-validation.md) |
+| Model validation | [Validate real model use without making probes mandatory](references/model-validation.md) |
+| Pagination | [Read one bounded authorized page](references/pagination.md) |
+| Safe diagnostics | [Report failures without exposing protected values](references/safe-diagnostics.md) |
+| Spending and accounting | [Reserve and account for model spending](references/spending-and-accounting.md) |
+| Shared write/job architecture | [Transactions, durable jobs and safe retries](references/transactions-jobs-and-idempotency.md) |
+
+## Source ownership
+
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

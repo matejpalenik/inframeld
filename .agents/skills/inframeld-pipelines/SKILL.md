@@ -33,21 +33,37 @@ Alice can evaluate two fixed configurations before building. Desired changes mus
 4. For result claims, identify actual model/configuration and evidence attribution. For implementation claims, inspect code and separate accepted contracts from qualification.
 5. Cite the relevant rule. Loading this skill authorizes no edits, paid calls, releases or external mutations.
 
-Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+For backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
 ## Pending decisions for affected work
 
-Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
 - [PD-PIPELINES-01](references/decision-execution-build-receipt-contracts.md): Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
 - [PD-PIPELINES-02](references/decision-trace-policy-fencing.md): Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.
 
+For a narrow feedback or tracing question, open its focused reference directly. Receipt attribution after promotion does not require Releases, and feedback counts do not require Evaluation unless the question asks about their release or metric behavior.
+
 ## Read as needed
 
-- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-- For working history, direct queries, overrides, portability or Build input selection, read [Configuration, queries and builds](references/configuration-queries-and-builds.md).
-- For context assembly, model settings, current checks or answer recovery, read [Answer execution and receipts](references/answer-execution-and-receipts.md).
-- For ratings, reports, trace policy or history deletion, read [Feedback and tracing](references/feedback-and-tracing.md).
+| Task | Direct reference |
+| --- | --- |
+| Answer execution and receipts | [Execute an answer and preserve its attribution](references/answer-execution-and-receipts.md) |
+| Answer feedback | [Submit and correct feedback on an answer](references/answer-feedback.md) |
+| Module/component design or structural review | [Pipelines architecture: execute the inputs the caller selected](references/architecture.md) |
+| Build preparation | [Build a ready version without granting publication](references/build-preparation.md) |
+| Editing/query/build distinctions | [Working configuration, direct queries and builds](references/configuration-queries-and-builds.md) |
+| Direct queries | [Try a question against captured working inputs](references/direct-queries.md) |
+| Feedback versus diagnostic tracing | [Feedback, query traces and history](references/feedback-and-tracing.md) |
+| Feedback reporting | [Read feedback reports with honest coverage](references/feedback-reporting.md) |
+| Query tracing and privacy | [Query tracing, privacy and diagnostic failure](references/query-tracing-and-privacy.md) |
+| Logical records and representation ownership | [Pipeline configuration, execution inputs and receipts](references/records.md) |
+| Reranking and context assembly | [Rerank evidence and fit the final context](references/reranking-and-context-assembly.md) |
+| Trace capture and deletion | [Stop trace capture and delete selected history](references/trace-capture-and-deletion.md) |
+| Working configuration | [Edit and restore saved Pipeline settings](references/working-configuration.md) |
 
-The [Pipelines and Releases guide](../../../docs/development/pipelines-and-releases.md) owns current behavior. [Pipeline records](../../../docs/development/data-model.md#pipelines), [feedback](../../../docs/development/answer-feedback.md) and [observability](../../../docs/development/observability.md) own their detailed contracts. Use the Releases skill for publication modes, canaries and rollback.
+## Source ownership
+
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

@@ -64,8 +64,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Accepted capability boundary](../../../../docs/development/indexing.md#indexing-capability-boundaries).
-- [Indexing records](../../../../docs/development/data-model.md#indexing).
+- [Accepted capability boundary](architecture.md#indexing-capability-boundaries).
+- [Indexing records](records.md#indexing).
 - [Capability decision](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

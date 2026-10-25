@@ -66,9 +66,9 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Pipeline operation boundary](../../../../docs/development/pipelines-and-releases.md#pipeline-operation-boundaries).
-- [Receipt-only recovery](../../../../docs/development/jobs-and-idempotency.md#answers).
-- [Pipeline records](../../../../docs/development/data-model.md#pipelines).
+- [Pipeline operation boundary](architecture.md#pipeline-operation-boundaries).
+- [Receipt-only recovery](answer-execution-and-receipts.md#answers).
+- [Pipeline records](records.md#pipelines).
 - [Shared ordinary execution](../../../../docs/adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

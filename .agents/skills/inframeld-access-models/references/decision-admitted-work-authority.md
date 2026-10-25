@@ -66,9 +66,9 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Explicit remaining credential contract](../../../../docs/development/access-control.md#application-key-current-authorization).
-- [Admission and checkpoints](../../../../docs/development/jobs-and-idempotency.md#admission).
-- [Uncertain remote work](../../../../docs/development/jobs-and-idempotency.md#uncertain).
+- [Explicit remaining credential contract](application-keys.md#application-key-current-authorization).
+- [Admission and checkpoints](../../inframeld-application-contracts/references/jobs-and-recovery.md#admit-work-and-claim-an-attempt).
+- [Uncertain remote work](../../inframeld-application-contracts/references/jobs-and-recovery.md#uncertain).
 - [Versioned human credentials](../../../../docs/adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

@@ -66,8 +66,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Comparison and protected history](../../../../docs/development/evaluation.md).
-- [Remaining Evaluation contracts](../../../../docs/development/evaluation.md#evaluation-operation-boundaries).
-- [Evaluation records](../../../../docs/development/data-model.md#evaluation).
+- [Comparison and protected history](generation-and-review.md).
+- [Remaining Evaluation contracts](architecture.md#evaluation-operation-boundaries).
+- [Evaluation records](records.md#evaluation).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

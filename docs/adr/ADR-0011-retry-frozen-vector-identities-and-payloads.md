@@ -31,6 +31,6 @@ Use the single-writer protocol and persist the exact bounded vector payload befo
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current indexing](../development/indexing.md).
-- [Current jobs and idempotency](../development/jobs-and-idempotency.md).
+- [Current indexing](../../.agents/skills/inframeld-indexing/references/profiles-and-preparation.md).
+- [Current jobs and idempotency](../../.agents/skills/inframeld-application-contracts/references/jobs-and-recovery.md).
 - Related decisions: [ADR-0009](ADR-0009-keep-application-authority-in-postgresql-and-derived-vectors-in-chroma.md), [ADR-0010](ADR-0010-save-deterministic-layouts-for-vector-shards.md).

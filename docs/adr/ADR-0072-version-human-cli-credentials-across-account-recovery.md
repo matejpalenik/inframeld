@@ -48,8 +48,8 @@ The consent service has separate read-only and approval paths. Unsupported acces
 
 ## Links
 
-- [Current credential-version behavior](../development/access-control.md#human-credential-versions)
-- [Version records and binding evidence](../development/data-model.md#human-credential-version-records)
+- [Current credential-version behavior](../../.agents/skills/inframeld-access-models/references/human-cli-credential-lifecycle.md#human-credential-versions)
+- [Version records and binding evidence](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#human-credential-version-records)
 - [Consent implementation](../../apps/backend/src/inframeld_backend/access/application/services/human_oauth_consent_service.py)
 - [PostgreSQL version scenarios](../../apps/backend/tests/integration/access/test_human_credential_versions_postgres.py)
 - [Native consent and ordering scenarios](../../apps/backend/tests/integration/access/test_native_hydra_consent.py)

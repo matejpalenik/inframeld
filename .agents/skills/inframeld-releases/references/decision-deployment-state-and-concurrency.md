@@ -66,8 +66,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Deployment transition boundary](../../../../docs/development/pipelines-and-releases.md#deployment-transition-boundary).
+- [Deployment transition boundary](architecture.md#deployment-transition-boundary).
 - [Focused aggregate decision](../../../../docs/adr/ADR-0079-protect-deployment-transitions-with-a-focused-aggregate.md).
-- [Releases records](../../../../docs/development/data-model.md#releases).
+- [Releases records](records-and-transitions.md#releases).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

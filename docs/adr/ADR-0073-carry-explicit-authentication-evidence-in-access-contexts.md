@@ -22,7 +22,7 @@ Alice's CLI credential needs its original version checked again during authoriza
 
 Context construction rejects absent or unsupported evidence. Authenticators establish the evidence, while dependencies and services pass the context unchanged. A record alone does not authenticate its contents or grant authority.
 
-Current facts readers return the stored principal and OAuth binding/version observations. Both authorizers use the shared application evaluator to check that human evidence matches a human principal and application evidence matches an application principal. A mismatch raises an internal `RuntimeError` before reservation, replay or effects. OAuth evidence retains exact identity-link and version checks through the domain policy. Valid application evidence does not permit human-only work. [Component ownership](../development/application-structure.md#credential-query-and-policy-boundaries) explains this implementation without changing the evidence decision.
+Current facts readers return the stored principal and OAuth binding/version observations. Both authorizers use the shared application evaluator to check that human evidence matches a human principal and application evidence matches an application principal. A mismatch raises an internal `RuntimeError` before reservation, replay or effects. OAuth evidence retains exact identity-link and version checks through the domain policy. Valid application evidence does not permit human-only work. [Component ownership](../../.agents/skills/inframeld-access-models/references/eligibility-and-current-authority.md#credential-query-and-policy-boundaries) explains this implementation without changing the evidence decision.
 
 Every producer explicitly supplies `PrincipalAccessPolicyInput.credential_is_current`. True for browser/application contexts means the human OAuth generation check is inapplicable. It does not establish the validity of a browser session or application key.
 
@@ -34,7 +34,7 @@ Application-key authentication remains unfinished. Existing authorization tests 
 
 ## Links
 
-- [Application request chain](../development/application-structure.md#access-context-evidence)
-- [Evidence record definitions](../development/data-model.md#authentication-evidence-records)
+- [Application request chain](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#access-context-evidence)
+- [Evidence record definitions](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#authentication-evidence-records)
 - [Context construction tests](../../apps/backend/tests/unit/access/application/dtos/test_access_context_dto.py)
 - [Stored-kind and workflow tests](../../apps/backend/tests/integration/access/test_authentication_evidence_postgres.py)

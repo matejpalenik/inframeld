@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Inframeld version 1 maintenance input, design contract",
+  "description": "Non-runtime design envelope. This schema does not implement a maintenance command or establish host authority.",
+  "$comment": "Design-only representation of the documented version 1 input. Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. PD-ACCESS-03 and PD-ACCESS-04 remain PENDING where recovery/admission integration applies. Runtime implementation must reconcile or supersede this schema. Enforce the 64 KiB received-byte bound, strict JSON token parsing, duplicate-key rejection, one JSON value, current authority, catalogue combinations and trusted identity proof separately. JSON Schema integer validation accepts 1.0.",
+  "$defs": {
+    "target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "organization"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "organizationId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "project"
+            },
+            "projectId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "projectId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "access-group"
+            },
+            "projectId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "accessGroupId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "projectId", "accessGroupId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "application-account"
+            },
+            "projectId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "applicationPrincipalId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "projectId", "applicationPrincipalId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "pipeline"
+            },
+            "pipelineId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "pipelineId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "deployment"
+            },
+            "deploymentId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "deploymentId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "collection"
+            },
+            "collectionId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "collectionId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "source"
+            },
+            "sourceId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "sourceId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "model-connection"
+            },
+            "modelConnectionId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "modelConnectionId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "processing-profile"
+            },
+            "processingProfileId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "processingProfileId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "embedding-profile"
+            },
+            "embeddingProfileId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "embeddingProfileId"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "responsibility": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "group-manager"
+            },
+            "projectId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "accessGroupId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["kind", "projectId", "accessGroupId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "action-grantor"
+            },
+            "target": {
+              "$ref": "#/$defs/target"
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          },
+          "required": ["kind", "target", "actionId"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "type": "integer"
+    },
+    "mode": {
+      "enum": ["bootstrap-first-administrator", "repair-stranded-authority"]
+    },
+    "expectedInstallationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "operationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "operatorLabel": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "\\S"
+    },
+    "expectedAccessRevision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807
+    },
+    "expectedIdentityId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "identityProof": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "hydra-access-token"
+        },
+        "accessToken": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["kind", "accessToken"],
+      "additionalProperties": false
+    },
+    "responsibility": {
+      "$ref": "#/$defs/responsibility"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "mode",
+    "expectedInstallationId",
+    "operationId",
+    "operatorLabel",
+    "reason",
+    "expectedAccessRevision",
+    "expectedIdentityId",
+    "identityProof"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "bootstrap-first-administrator"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": ["responsibility"]
+        }
+      },
+      "else": {
+        "required": ["responsibility"]
+      }
+    }
+  ]
+}

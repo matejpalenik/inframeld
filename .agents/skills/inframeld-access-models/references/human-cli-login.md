@@ -1,6 +1,10 @@
 # Human CLI login and consent
 
-Alice wants to use the CLI as the same person she uses in the browser. She signs in through the system browser, so the CLI does not collect her password or export her browser cookie. The chosen identity is bound to the selected installation and account.
+<a id="concepts-and-owners"></a>
+
+## Choose a focused reading task
+
+- For consent and remembered approval, read [Human cli consent](human-cli-consent.md).
 
 ## Concepts and owners
 
@@ -10,67 +14,7 @@ The public CLI client uses Authorization Code with S256 PKCE. The browser login 
 
 Use maintained protocol libraries, no embedded client secret, implicit/password grant or custom cookie-to-token issuer. The temporary callback binds to literal `127.0.0.1` and an ephemeral port, not the LAN. Headless device login needs separate release qualification.
 
-## Follow login and consent
-
-1. Resolve the trusted installation and official client before opening the browser. Native Kratos login supplies the verified Hydra subject and provider-session binding. Inframeld must not implement another password verifier or competing login-approval service.
-2. The cookie-only Access consent API freshly reads Hydra's challenge. Check `inframeld-cli`, supported scopes and the exact configured API audience before browser verification or local-state initialization. Unsupported access returns the selected early 403, even with an invalid supplied cookie. HTTP credential selection and POST CSRF still take precedence.
-3. Inspection and denial use read-only checks and never initialize credential versions. Approval has an explicit capture, browser-verify and state-reread path. It returns a required binding only when both observations were unblocked and unchanged.
-4. Check the current Kratos browser identity and exact provider subject. Consent can precede local admission and must neither provision an account nor create grants. Return only a checked continuation to the configured public Hydra authorization endpoint.
-5. Hydra finishes the protocol. The CLI uses secure, installation/account-bound credential storage and coordinated refresh. Each product request privately verifies active token semantics, audience, client and required API scope, then checks current Kratos identity eligibility and the same existing local human before authorization.
-
-Provider I/O stays outside SQL transactions, with finite deadlines and no automatic approval retry. A timed-out approval may still finish at Hydra.
-
-The narrowly scoped credential-state initializer may commit metadata before browser verification but must close its transaction before provider I/O.
-
-## Login and approval across the boundary
-
-**Accepted end-to-end target with inspected backend consent.** The sequence groups protocol details for readability. The complete CLI/account-UI path remains unfinished, and the checks below do not establish a universal issuance fence.
-
-```mermaid
----
-title: "Human CLI login - accepted target and inspected consent"
----
-sequenceDiagram
-    actor Alice
-    participant CLI as Rust CLI
-    participant Browser as System browser and account UI
-    participant Kratos as Kratos native login
-    participant Hydra as Hydra OAuth
-    participant Consent as Access consent service
-    participant State as Local credential-state capabilities
-    Alice->>CLI: Start human login
-    CLI->>Browser: Open trusted installation flow with state and PKCE
-    Browser->>Kratos: Human sign-in through native Hydra integration
-    Kratos->>Hydra: Verified subject and provider-session binding
-    Hydra-->>Browser: Consent challenge
-    Browser->>Consent: Inspect or decide with current browser cookie
-    Consent->>Hydra: Read fresh challenge and validate requested client/access
-    alt Inspection or denial
-        Note over Consent,State: Read-only checks, no state initialization or approval
-        Consent-->>Browser: Inspection data or checked denial continuation
-    else Approval
-        Consent->>State: Capture or initialize credential version in bounded transaction
-        Note over State: Close metadata transaction before provider I/O
-        Consent->>Kratos: Verify browser identity and matching subject
-        Consent->>State: Reread version and recovery block
-        Note over Consent: Require unchanged unblocked observations and binding
-        Consent->>Hydra: Approve exact access with checked binding
-        Hydra-->>Browser: Checked public continuation and authorization code
-        Browser-->>CLI: Loopback callback with state
-        CLI->>Hydra: Exchange code with PKCE verifier
-        Hydra-->>CLI: Installation/account-bound credentials
-    end
-```
-
-The grouped read-only branch includes browser/subject and recovery checks before display or denial. It does not approve a login. The credential exchange is conditional on successful approval or checked permitted continuation. Consent supplies no local account, project grant or recovery-block release authority. [The inspected service](../../../../apps/backend/src/inframeld_backend/access/application/services/human_oauth_consent_service.py) retains the exact early-validation, capture and reread ordering.
-
-## Remembering approval is not remembering authority
-
-Remembered login establishes who authenticated. Remembered consent records that Alice approved this client and access. New explicit remembered approvals default to one configurable hour.
-
-A remembered approval still receives current checks. Automatic continuation must not extend its original lifetime or use client-wide automatic consent as a substitute for Alice's approval.
-
-Refresh credentials renew a CLI login under their own lifetime/revocation rules. They do not create new product grants. Incoming human API credentials do not become application credentials or accepted MCP OAuth credentials.
+<a id="recovery-retries-and-changed-identity"></a>
 
 ## Recovery, retries and changed identity
 
@@ -82,6 +26,8 @@ An old grant can remain active at Hydra while Inframeld rejects its stale versio
 
 Keep ordinary selected-device logout, coordinated refresh, account recovery and local credential cleanup distinct. A changed issuer or verified person cannot silently rebind a saved account. Managed same-machine loopback HTTP has its explicit deployment exception. Other installations require HTTPS. Host bootstrap uses separate host authority, not OAuth consent or a public first-signup privilege.
 
+<a id="implementation-status-and-limits"></a>
+
 ## Implementation status and limits
 
 The guide records implemented backend cookie/bearer verification and native consent. Read-only inspection is display data, not authority for a later decision. Account pages, complete CLI login lifecycle, deployment-wide provisioning and safely coordinated production recovery remain unfinished.
@@ -90,10 +36,90 @@ Provider tests distinguish late approvals, outstanding codes and token responses
 
 Before changing provider pins, read reviewed OSS versions, image digests, immutable SDK revisions, residual vulnerabilities and upgrade qualification. A latest release or passing tests is not vulnerability-free production approval.
 
+<a id="section-use-kratoss-browser-session-flow-for-studio"></a> <a id="section-include-deployment-level-external-sign-in-in-oss-v1"></a>
+
+<a id="alice-signs-in-through-her-company"></a>
+
+### Alice signs in through her company
+
+Alice completes Kratos's browser login flow. Kratos creates a secure, HTTP-only session cookie, which browser JavaScript cannot read. The backend checks it through `/sessions/whoami`, finds Alice's local principal, and checks her current Inframeld permissions.
+
+A small account UI supplies the browser login/recovery screens and Ory's documented login/consent integration for CLI login. It displays the fields and errors supplied by Kratos and follows its cross-site request forgery (CSRF) protection. It does not require the full Studio to exist. Kratos verifies passwords. Browser product requests keep their session cookies. Adding Hydra for CLI login does not introduce Auth.js, bearer tokens in browser local storage or a native-token-to-cookie bridge.
+
+**Optional company sign-in is included in OSS v1.** The operator configures an OpenID Connect (OIDC) provider for the installation, including its client, redirect URI, and protected secret. Kratos signs Alice in through that provider and creates its own session. A local installation still requires authentication, but does not require a company provider or cloud identity account.
+
+Alice can connect more than one sign-in method to the same account. Suppose she already uses a password and later selects company sign-in with the same email address. She must first prove access to her existing account using an attached method, such as that password. Matching email addresses alone do not authorize linking. Once linked, either method identifies the same Alice and uses her existing Inframeld permissions. She does not repeat the linking step on each login or gain a second local account.
+
+Kratos maintains these links. Inframeld identifies its verified Kratos identity by **authority + subject**, meaning the identity source and the account ID within it. Email is not the identity key. Company login does not make Alice an administrator, and a token from her company is not automatically an Inframeld API credential. Importing company group memberships would need a separately designed policy.
+
+Kratos's browser-session flow does not itself require Hydra. **Hydra is nevertheless selected for human CLI login**, not deferred installation-wide. General third-party OAuth onboarding, arbitrary token exchange and verified user delegation remain outside this scope. The distinct accepted CLI flow follows below.
+
+If a session is invalid, expired, or cannot be verified, Inframeld denies the request. It does not continue when Kratos is unavailable. Browser logout rejection and disabled/expired session handling have backend coverage described in [credential dispatch](credential-dispatch.md).
+
+The required standalone account UI still needs integration and testing for logout, recovery completion, password settings and configured multi-factor authentication (MFA) challenges. These are account-UI work, not deferred Studio features. Supporting a configured challenge does not make MFA mandatory or select a new factor. Secure first-administrator setup and email delivery also need their deployment integration and tests. Hydra integration owns backend verification and recovery cleanup. Displaying a completed form does not prove admission or cleanup succeeded.
+
+<a id="human-cli-authentication"></a>
+
+<a id="alice-signs-into-the-cli-with-the-same-human-identity"></a>
+
+### Alice signs into the CLI with the same human identity
+
+Alice runs an explicit `login` or the guided setup login step. The system browser shows the installation and human account she is approving. Hydra delegates login to the Ory account UI integrated with Kratos. The CLI receives protocol credentials, not Alice's password or browser cookie. Access then resolves the same local human principal used by browser requests.
+
+The complete browser-to-CLI login journey is **accepted design with runtime qualification still ahead**. The backend already implements cookie and human bearer verification on the session and project-grant routes. The [implemented boundary](credential-dispatch.md#implemented-human-authentication) explains that code and its test coverage. The [client registration](#cli-client-registration), [login transaction](human-cli-credential-lifecycle.md#cli-login-transaction), [credential lifecycle](human-cli-credential-lifecycle.md#cli-credential-lifecycle) and [qualification requirements](human-cli-credential-lifecycle.md#cli-authentication-qualification) cover the remaining delivery profile. Terminal examples illustrate the experience. They do not establish unpublished HTTP schemas.
+
+| Caller | Credential and verifier | What it does not grant |
+| --- | --- | --- |
+| Human browser | Kratos session cookie, verified through Kratos. Preserve CSRF on cookie-authenticated writes. | CLI tokens, application-key issuance or product permissions by sign-in alone. |
+| Human CLI | Opaque Hydra access token, verified privately. Current Kratos identity eligibility and local human state. | Application identity, third-party delegation or authority derived from OAuth scopes. |
+| Application HTTP/MCP client | Inframeld-issued opaque application key, verified against its stored verifier and restrictions. | Human-only administration or acceptance on an unapproved audience/adapter. |
+
+Follow the CLI request in execution order:
+
+1. Resolve the trusted installation/issuer and official public client. Use maintained OAuth/OIDC libraries for Authorization Code with S256 PKCE, fresh state/nonce and complete response/issuer validation. No embedded client secret or implicit/password grant. A temporary callback binds to literal `127.0.0.1` and an ephemeral port, never the LAN. Headless device authorization needs its separate qualified release path.
+2. Use Ory's documented login/consent integration with Kratos, showing the verified account and requested installation access. Bind the returned credentials to that exact target configuration and human. Login does not silently select a different account, target or project. Operator bootstrap and product admission remain separate checks.
+3. On each API request, privately introspect the opaque access token against configured Hydra. Require active/unexpired access-token semantics, the canonical API audience, official CLI client and required API scope. Reject ID/refresh tokens and caller-supplied verification destinations. An active result alone is insufficient.
+4. Check the corresponding Kratos identity is currently eligible. Resolve the trusted stable Kratos identity ID to the existing authority/subject link, then the admitted active human principal. Do not create a second person from Hydra's issuer, merge by email or add grants. No positive introspection/eligibility cache is selected for v1.
+5. Return the authenticated actor and non-secret CLI credential binding and run the operation's current project/action/document checks. External identity calls precede the short application lookup transaction. Never hold a transaction while waiting for Hydra or Kratos. Verification failure/unavailability denies execution without falling back to another identity.
+
+Reject competing credential mechanisms instead of trying cookies, OAuth tokens and application keys until one succeeds. The [HTTP dispatch contract](credential-dispatch.md#credential-dispatch) defines which path may verify each credential. The implemented human routes follow it without trying another verifier after a failure. No application credential becomes a human token merely because both travel in an Authorization header. No human CLI token automatically becomes an MCP credential.
+
+Inframeld application keys reserve the `ifm_app_` prefix. Ory token formats remain unchanged. [Application-key recognition](application-key-contracts.md#application-key-contract), [complete syntax and verification](application-key-contracts.md#application-key-contract), and [authentication errors](../../../../docs/development/error-handling.md#authentication-contract) record the accepted choices. Human verification adapters exist. Application-key verification and the complete Ory runtime still need implementation or qualification.
+
+<a id="cli-client-registration"></a>
+
+<a id="register-one-first-party-public-client"></a>
+
+### Register one first-party public client
+
+Alice signs into local and dev with the same CLI executable. Each installation independently provisions `inframeld-cli` through Hydra's private administration interface. An ordinary user neither registers a client nor receives an administrator credential. A **public client** cannot keep a shared secret inside its executable. Public does not mean that its users receive public access to data.
+
+| Setting | Accepted contract |
+| --- | --- |
+| Client authentication | `token_endpoint_auth_method=none`. No embedded client secret |
+| Desktop grants and response | `authorization_code`, `refresh_token`. Response type `code`, not implicit/hybrid token delivery |
+| PKCE | S256 required by server policy and used by the CLI. Reject missing, plain or incorrect proof |
+| Scopes | `openid`, `offline_access`, `inframeld:api` |
+| API audience | Installation's explicitly configured canonical API URL, matched exactly |
+| Subject | Actual stable Kratos identity ID through the trusted integration. No pairwise remapping for this first-party client |
+| Access token | Opaque. Intended only for this installation's API |
+| Desktop callback | `http://127.0.0.1:<ephemeral-port>/oauth/callback`. Fixed host/path with standard ephemeral-port variation only |
+| Consent | Show account, installation and requested access. Recognizing the client ID alone never skips approval |
+| Device grant | Enable only after qualification of the selected OSS release |
+| Excluded grants | Password, client credentials, arbitrary token exchange and delegated-user grants |
+
+An **issuer** identifies the trusted Hydra installation. An **audience** identifies the API a token is for. Neither is a project selector. `offline_access` permits refresh, not unattended administration. Do not put current project or document grants into tokens. ID tokens describe authentication to the CLI, refresh tokens go only to Hydra, and only access tokens go to the business API.
+
+Target registration obtains the expected issuer/client/audience through validated one-server-URL discovery. Do not infer an issuer from the API hostname or replace it from an authentication error. Standard discovery must return exactly the expected issuer. Do not send existing credentials during discovery or forward credentials across origin-changing redirects.
+
+Credential binding includes immutable target identity, API URL, issuer, client, audience, managed-installation identity where applicable, and verified human identity. Renaming a target label preserves that binding. Changing a bound endpoint/issuer/client/audience/installation invalidates every affected saved login and requires fresh login. Equal URLs, email addresses or aliases do not authorize sharing credentials between targets. Only the separately verified managed-local runtime gets the [bounded HTTP exception](../../inframeld-application-contracts/references/cli-local-runtime.md#managed-local-http). Manually registered HTTP targets do not.
+
+<a id="sources-and-rationale"></a>
+
 ## Sources and rationale
 
 - [ADR-0012](../../../../docs/adr/ADR-0012-use-kratos-for-human-authentication.md) records the earlier browser-focused choice. ADR-0053 partially supersedes its Hydra deferral while retaining Kratos identity and Inframeld authorization.
-- [Human CLI flow](../../../../docs/development/access-control.md#human-cli-authentication), [registered client](../../../../docs/development/access-control.md#cli-client-registration), [credential lifecycle](../../../../docs/development/access-control.md#cli-credential-lifecycle) and [qualification](../../../../docs/development/access-control.md#cli-authentication-qualification).
-- [Native consent](../../../../docs/development/access-control.md#native-hydra-consent), [credential versions](../../../../docs/development/access-control.md#human-credential-versions), [browser API](../../../../docs/development/api-contracts.md#human-oauth-consent) and [implemented chain](../../../../docs/development/application-structure.md#human-oauth-consent).
-- [CLI identity records](../../../../docs/development/data-model.md#human-cli-identity), [version records](../../../../docs/development/data-model.md#human-credential-version-records), [ADR-0053](../../../../docs/adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md), [ADR-0071](../../../../docs/adr/ADR-0071-use-native-kratos-login-and-checked-hydra-consent.md) and [ADR-0072](../../../../docs/adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md).
-- [Deployment identity runtime](../../../../docs/development/deployment.md#identity-runtime), [host bootstrap](../../../../docs/development/onboarding.md#host-bootstrap), [HTTP ordering](../../../../docs/development/access-control.md#hydra-issuance-evidence), [provider review](../../../../docs/development/deployment.md#identity-provider-versions) and [upgrade evidence](../../../../docs/development/access-control.md#provider-upgrade-evidence).
+- [Human CLI flow](#human-cli-authentication), [registered client](#cli-client-registration), [credential lifecycle](human-cli-credential-lifecycle.md#cli-credential-lifecycle) and [qualification](human-cli-credential-lifecycle.md#cli-authentication-qualification).
+- [Native consent](human-cli-consent.md#native-hydra-consent), [credential versions](human-cli-credential-lifecycle.md#human-credential-versions), [browser API](human-cli-consent.md#human-oauth-consent) and [implemented chain](human-cli-consent.md#human-oauth-consent).
+- [CLI identity records](human-cli-credential-lifecycle.md#human-cli-identity), [version records](credential-and-recovery-records.md#human-credential-version-records), [ADR-0053](../../../../docs/adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md), [ADR-0071](../../../../docs/adr/ADR-0071-use-native-kratos-login-and-checked-hydra-consent.md) and [ADR-0072](../../../../docs/adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md).
+- [Deployment identity runtime](../../inframeld-architecture/references/runtime-deployment-and-storage.md#identity-runtime), [host bootstrap](../../inframeld-architecture/references/first-use-and-private-defaults.md#host-bootstrap), [HTTP ordering](recovery-provider-cleanup.md#hydra-issuance-evidence), [provider review](../../inframeld-architecture/references/runtime-deployment-and-storage.md) and [upgrade evidence](authorization.md).

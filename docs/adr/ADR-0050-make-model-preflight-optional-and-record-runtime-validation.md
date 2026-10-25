@@ -24,7 +24,7 @@ A completed real model call marks only its actual connection access revision, cr
 
 Credential replacement makes the replacement untested without changing Pipeline meaning or requiring a new synthetic call. Old or late results cannot validate a different revision or revive a removed credential. Validation is evidence of past compatibility, not authorization, live health, answer-quality certification or permission to publish.
 
-The [model-connections guide](../development/model-connections.md#roles) owns the runtime and failure rules. [Onboarding](../development/onboarding.md#models) owns the first-use path. [The data model](../development/data-model.md#model-validation-evidence) owns evidence identity and applicability.
+The [model-connections guide](../../.agents/skills/inframeld-application-contracts/references/model-validation.md#roles) owns the runtime and failure rules. [Onboarding](../../.agents/skills/inframeld-application-contracts/references/model-validation.md#models) owns the first-use path. [The data model](../../.agents/skills/inframeld-application-contracts/references/model-validation.md#model-validation-evidence) owns evidence identity and applicability.
 
 ## Consequences
 
@@ -39,5 +39,5 @@ The [model-connections guide](../development/model-connections.md#roles) owns th
 - [ADR-0025](ADR-0025-separate-connection-meaning-from-replaceable-credentials.md): historical connection-pinning and probe rationale; [ADR-0054](ADR-0054-use-shared-current-model-connections.md) owns current connectivity and retains separate credentials.
 - [ADR-0023](ADR-0023-route-every-model-request-through-modelgateway.md): universal model boundary.
 - [ADR-0040](ADR-0040-bind-pipeline-versions-to-verified-profile-specific-materializations.md): unchanged index-readiness requirement.
-- [Current model connections](../development/model-connections.md#roles), [onboarding](../development/onboarding.md#models) and [validation evidence](../development/data-model.md#model-validation-evidence).
+- [Current model connections](../../.agents/skills/inframeld-application-contracts/references/model-validation.md#roles), [onboarding](../../.agents/skills/inframeld-application-contracts/references/model-validation.md#models) and [validation evidence](../../.agents/skills/inframeld-application-contracts/references/model-validation.md#model-validation-evidence).
 - Implementation and integration-test qualification are pending.

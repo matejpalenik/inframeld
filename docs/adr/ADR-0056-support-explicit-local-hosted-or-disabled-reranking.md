@@ -2,7 +2,7 @@
 
 **Status:** Accepted; partially supersedes ADR-0042's local-only selection and unresolved local model choice.
 
-**Date:** 2026-10-01. This records the previously accepted local/hosted/disabled reranking choices, with implementation ownership in the [delivery traceability index](../development/cli-delivery-plan.md#decision-coverage).
+**Date:** 2026-10-01. This records the previously accepted local/hosted/disabled reranking choices, with implementation ownership in the [delivery traceability index](../../.agents/skills/inframeld-architecture/references/v1-scope-and-extension-boundaries.md).
 
 ## Context and Problem Statement
 
@@ -32,5 +32,5 @@ Preserve ADR-0042's bounded application-owned Reranker contract: only supplied p
 ## Links
 
 - [ADR-0042](ADR-0042-rerank-selected-evidence-through-a-local-cross-encoder-boundary.md).
-- [Pipelines: reranking](../development/pipelines-and-releases.md#reranking).
-- [Model connections](../development/model-connections.md) and [CLI model-management journey](https://github.com/matejpalenik/inframeld/issues/167).
+- [Pipelines: reranking](../../.agents/skills/inframeld-pipelines/references/reranking-and-context-assembly.md#reranking).
+- [Model connections](../../.agents/skills/inframeld-application-contracts/references/model-gateway-and-connections.md) and [CLI model-management journey](https://github.com/matejpalenik/inframeld/issues/167).

@@ -33,16 +33,16 @@ Preserve the legitimate Kratos recovery browser session. Ordinary selected-devic
 
 ## Implementation evidence
 
-The [HTTP-ordering qualification](../development/access-control.md#hydra-issuance-evidence), verified on 2026-10-24 against Hydra v26.2.0, covers outstanding codes, refresh requests sent after cleanup and successful token responses delivered late. Revoked codes cannot be exchanged, and holding an earlier successful response does not preserve its revoked credentials. A login approved after cleanup can still issue working credentials.
+The [HTTP-ordering qualification](../../.agents/skills/inframeld-access-models/references/recovery-provider-cleanup.md#hydra-issuance-evidence), verified on 2026-10-24 against Hydra v26.2.0, covers outstanding codes, refresh requests sent after cleanup and successful token responses delivered late. Revoked codes cannot be exchanged, and holding an earlier successful response does not preserve its revoked credentials. A login approved after cleanup can still issue working credentials.
 
 These are controlled HTTP boundaries, not pauses inside Hydra. Production issuance coordination, provider-internal races, durable execution and recovery completion remain unfinished. This evidence does not change the transaction, retry or release decisions above.
 
 ## Links
 
-- [Access behavior and provider evidence](../development/access-control.md#hydra-cleanup-evidence).
-- [Recovery records](../development/data-model.md#identity-cleanup-records) and [reconciliation](../development/jobs-and-idempotency.md#identity-cleanup).
+- [Access behavior and provider evidence](../../.agents/skills/inframeld-access-models/references/recovery-provider-cleanup.md#hydra-cleanup-evidence).
+- [Recovery records](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#identity-cleanup-records) and [reconciliation](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#identity-cleanup).
 - [Hydra v26.2.0 handlers](https://github.com/ory/hydra/blob/v26.2.0/consent/handler.go) and [bulk persistence](https://github.com/ory/hydra/blob/v26.2.0/persistence/sql/persister_consent.go).
 
-[ADR-0071](ADR-0071-use-native-kratos-login-and-checked-hydra-consent.md) adds native login and checked consent without changing this bulk scope. Its [provider observations](../development/access-control.md#native-hydra-consent) distinguish the after-validation token-hook denials from consent issuing between the two bulk calls. Current checks and two acknowledgments do not by themselves qualify safe recovery release. No production token hook or worker is introduced.
+[ADR-0071](ADR-0071-use-native-kratos-login-and-checked-hydra-consent.md) adds native login and checked consent without changing this bulk scope. Its [provider observations](../../.agents/skills/inframeld-access-models/references/human-cli-consent.md#native-hydra-consent) distinguish the after-validation token-hook denials from consent issuing between the two bulk calls. Current checks and two acknowledgments do not by themselves qualify safe recovery release. No production token hook or worker is introduced.
 
 [ADR-0072](ADR-0072-version-human-cli-credentials-across-account-recovery.md) adds durable versions without changing native login or bulk cleanup. Late grants can remain active at Hydra while failing Inframeld authentication after block release. Production completion remains unwired until trusted native evidence and durable execution are qualified.

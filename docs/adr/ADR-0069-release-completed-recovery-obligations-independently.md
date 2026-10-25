@@ -39,6 +39,6 @@ Application workflows own short transactions. For linked identities, current-sta
 
 ## Links
 
-- [Recovery behavior](../development/access-control.md#identity-recovery-cleanup) and [completion workflow](../development/access-control.md#recovery-completion-workflow).
-- [Recovery records](../development/data-model.md#identity-cleanup-records) and [cleanup reconciliation](../development/jobs-and-idempotency.md#identity-cleanup).
+- [Recovery behavior](../../.agents/skills/inframeld-access-models/references/recovery.md#identity-recovery-cleanup) and [completion workflow](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#recovery-completion-workflow).
+- [Recovery records](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#identity-cleanup-records) and [cleanup reconciliation](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#identity-cleanup).
 - [Release policy](../../apps/backend/src/inframeld_backend/access/domain/policies/identity_recovery_release_policy.py), [completion service](../../apps/backend/src/inframeld_backend/access/application/services/identity_recovery_completion_service.py) and [PostgreSQL scenarios](../../apps/backend/tests/integration/access/test_identity_recovery_completion_postgres.py).

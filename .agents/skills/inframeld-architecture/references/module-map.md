@@ -1,5 +1,7 @@
 # Find the owner before designing the component
 
+<a id="find-the-owner-before-designing-the-component"></a>
+
 Alice replaces handbook B1 with B2 and wants Production to use the change. Several owners participate, but each protects a different decision. This map helps an engineer find the right module before choosing a service, repository or adapter.
 
 A module here is an area of responsibility inside one backend. API and worker processes reuse its application behaviour. The boxes do not prescribe separate services or a new class for every capability.
@@ -22,6 +24,8 @@ flowchart TB
 
 Releases supplies the selected serving version back to ordinary Pipeline execution. That return interaction is described here to keep the overview readable. Arrows show responsibility and information hand-offs. They are not an approved call graph or import direction. Access also protects later dispatch and disclosure. Evaluation results provide no publication authority. Deployment-selected configuration, current connection access and fixed execution inputs retain their separate meanings.
 
+<a id="pick-the-relevant-architecture"></a>
+
 ## Pick the relevant architecture
 
 | If the component must decide… | Start with… |
@@ -35,6 +39,8 @@ Releases supplies the selected serving version back to ordinary Pipeline executi
 
 Choose the owner's public application capability when crossing a boundary. A read projection can combine facts without acquiring another owner's mutation authority. The shared database does not make every module an independent writer of every record.
 
+<a id="shared-support-and-dependency-direction"></a>
+
 ## Shared support and dependency direction
 
 [Application Contracts](../../inframeld-application-contracts/references/components-and-services.md) explains transaction, retry, job and transport boundaries. [ModelGateway](../../inframeld-application-contracts/references/model-gateway-and-connections.md) controls remote model dispatch. Access owns management authority and secret protection, while Indexing owns embedding compatibility. Neither gateway nor jobs becomes another business domain.
@@ -43,15 +49,19 @@ Code dependencies point toward domain rules and application-owned capabilities. 
 
 For component design or structural code review, read the owning module architecture, relevant workflow and Coding Standards. Shared components use Application Contracts. A narrow behaviour question can use its workflow directly. It needs neither this entire map nor every architecture reference.
 
+<a id="accepted-responsibilities-and-pending-choices"></a>
+
 ## Accepted responsibilities and pending choices
 
 The domain responsibilities and focused internal boundaries are accepted. Each module architecture links the owning decisions and identifies contracts still to specify. Transaction handoffs, concurrency, concrete inputs/results and production qualification retain their stated status. An accepted component boundary does not select every public API, physical schema or implementation mechanism.
 
-[The architecture introduction](../../../../docs/ARCHITECTURE.md), [application structure](../../../../docs/development/application-structure.md) and [ADR-0001](../../../../docs/adr/ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md) own these boundaries. [The data model](../../../../docs/development/data-model.md) owns exact record relationships and their implementation status.
+[The architecture introduction](../../../../docs/ARCHITECTURE.md), [application structure](../../inframeld-application-contracts/references/components-and-services.md) and [ADR-0001](../../../../docs/adr/ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md) own these boundaries. [The data model](resource-names-and-identity.md) owns exact record relationships and their implementation status.
+
+<a id="pending-decision-navigation"></a>
 
 ## Pending decision navigation
 
-These entries retain unresolved review findings, not accepted specifications or a separate delivery backlog. Each has its own trigger, alternatives and non-binding recommendation. Read only the affected entry and its conditional dependencies. Qualification-only gaps limit claims and do not prevent the tests needed to gather evidence. Follow [the finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions).
+These entries retain unresolved review findings, not accepted specifications or a separate delivery backlog. Each has its own trigger, alternatives and non-binding recommendation. Read only the affected entry and its conditional dependencies. Qualification-only gaps limit claims and do not prevent the tests needed to gather evidence. Follow [the finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions).
 
 | Identifier | Owner | Discuss when |
 | --- | --- | --- |
@@ -81,3 +91,36 @@ These entries retain unresolved review findings, not accepted specifications or 
 | [PD-CONTRACTS-05](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md) | application-contracts | When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation. |
 | [PD-ARCHITECTURE-01](decision-supported-operating-envelope.md) | architecture | Before fixing production resource/admission limits or advertising supported corpus size, throughput, latency or concurrency. |
 | [PD-ARCHITECTURE-02](decision-availability-backup-and-restore.md) | architecture | When setting availability/recovery objectives, assembling the production topology or qualifying backup, upgrade, security clearance and restore claims. |
+
+<a id="business-areas-and-state-ownership"></a>
+
+### Business areas and state ownership
+
+The six areas below own different records and rules inside one codebase. These are not six separate microservices.
+
+| Area | What it owns |
+| --- | --- |
+| **Knowledge** | Source identity, document lifecycle and versions, collection revisions and their document memberships. |
+| **Indexing** | The settings and state needed to prepare searchable indexes: processing and embedding profiles, processing generations, vectorizations, layouts, materializations, publication, and reconciliation. |
+| **Pipelines** | Immutable pipeline configuration and its links to prepared indexes (materialization bindings). Retrieval and generation orchestration. It also owns answer receipts and their current feedback records, as explained below. |
+| **Evaluation** | Cases and immutable benchmark/evaluator inputs, evaluation-run evidence, metric results, and comparisons. |
+| **Releases** | Deployments, candidate cohorts (groups routed to a trial version), promotion, candidate abort, and rollback. |
+| **Access** | Mapping callers to application principals, organization and project scope, permission decisions. |
+
+A **principal** identifies the human or application making a request. An **index materialization** identifies search data prepared for particular documents and processing settings. **Reconciliation** means checking that recorded index state agrees with what is actually stored, then resolving any difference.
+
+Processing and indexes may be separate submodules inside Indexing. However, **only Indexing decides whether a materialization is ready**.
+
+The accepted internal operation boundaries are recorded in [ADR-0075](../../../../docs/adr/ADR-0075-separate-document-lifecycle-from-collection-selection.md), [ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md), [ADR-0077](../../../../docs/adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md), [ADR-0078](../../../../docs/adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md), [ADR-0079](../../../../docs/adr/ADR-0079-protect-deployment-transitions-with-a-focused-aggregate.md). Read the owning module architecture for its focused responsibilities and remaining contracts. These choices do not require a class, protocol or repository for every named concept. A Deployment aggregate owns its cohesive transition behavior, while services retain current authorization and transaction orchestration.
+
+<a id="how-modules-work-together"></a>
+
+### How modules work together
+
+To request a change owned by another module, use that module's public application operations. Unrelated modules must not update each other's tables directly.
+
+Modules may share IDs and a small value identifying the caller and relevant project. Putting every domain model into a shared package would make the modules depend on one another's internals and obscure who may change them.
+
+Jobs and audit records support the application. They do not become another owner of evaluations, Deployments, or documents.
+
+An evidence screen may combine information from several modules. Its read code can join their records, but it must not become another writer of evaluation or Deployment state. Showing information together does not change who owns it.

@@ -24,7 +24,7 @@ Access owns the cookie-only consent service and API. Every inspection and decisi
 
 Allow users to remember an explicit approval through Hydra. The operator-configurable positive whole duration defaults to one hour. A provider-reported remembered approval still receives current checks, and automatic continuation must not extend its lifetime. Client-wide automatic consent is not a substitute for the user's approval.
 
-The [browser API contract](../development/api-contracts.md#human-oauth-consent) owns inputs, outputs and failure behavior. Provider calls run outside SQL transactions with finite deadlines and no automatic retries. A timed-out approval may still finish remotely. The service returns only a checked continuation to the configured public Hydra authorization endpoint.
+The [browser API contract](../../.agents/skills/inframeld-access-models/references/human-cli-consent.md#human-oauth-consent) owns inputs, outputs and failure behavior. Provider calls run outside SQL transactions with finite deadlines and no automatic retries. A timed-out approval may still finish remotely. The service returns only a checked continuation to the configured public Hydra authorization endpoint.
 
 ## Consequences
 
@@ -32,7 +32,7 @@ The account UI can render Ory forms and consent details without becoming another
 
 Consent is external work, not an aggregate mutation needing an artificial entity or an application idempotency reservation. Hydra owns its flow state and final one-use verifier handling. An inspection result is display data, not an authorization certificate for a later decision.
 
-Recovery remains blocked until its own independently qualified workflow can finish safely. The [issuance observations](../development/access-control.md#native-hydra-consent) distinguish current approval checks, requests crossing token persistence, and approval between bulk cleanup calls. These do not qualify every provider-internal interleaving. No production token hook, credential inventory or recovery release wiring follows from this decision.
+Recovery remains blocked until its own independently qualified workflow can finish safely. The [issuance observations](../../.agents/skills/inframeld-access-models/references/human-cli-consent.md#native-hydra-consent) distinguish current approval checks, requests crossing token persistence, and approval between bulk cleanup calls. These do not qualify every provider-internal interleaving. No production token hook, credential inventory or recovery release wiring follows from this decision.
 
 ## Implementation notes
 
@@ -46,7 +46,7 @@ Recovery remains blocked until its own independently qualified workflow can fini
 - [Native login and consent tests](../../apps/backend/tests/integration/access/test_native_hydra_consent.py)
 - [Token-hook qualification](../../apps/backend/tests/integration/access/test_hydra_token_hook_cleanup.py)
 - [Pinned native integration](https://github.com/ory/kratos/blob/v26.2.0/hydra/hydra.go)
-- [Current provider versions and security review](../development/deployment.md#identity-provider-versions)
+- [Current provider versions and security review](../../.agents/skills/inframeld-architecture/references/runtime-deployment-and-storage.md)
 - [Ory login and consent flow](https://www.ory.com/docs/oauth2-oidc/custom-login-consent/flow)
 
 [ADR-0072](ADR-0072-version-human-cli-credentials-across-account-recovery.md) adds durable versions without changing native login or bulk cleanup. Late grants can remain active at Hydra while failing Inframeld authentication after block release. Production completion remains unwired until trusted native evidence and durable execution are qualified.

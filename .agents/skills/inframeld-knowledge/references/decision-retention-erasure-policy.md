@@ -58,6 +58,8 @@ Load neighboring decisions only under these conditions:
 
 ## Open questions and required evidence
 
+The deletion-status viewer subquestion was explicitly resolved on 2026-10-25 by [ADR-0080](../../../../docs/adr/ADR-0080-limit-product-deletion-status-to-the-initiating-human.md). Product status is initiator-only under current eligibility and the original operation binding. Administrator status alone is insufficient. This entry remains **PENDING** for the other questions below, including retention and exact delivery contracts.
+
 - What finite default and maximum apply to each record family?
 - Which live/rollback references prevent routine expiry?
 - Which non-content identity/audit markers may remain after erasure?
@@ -66,8 +68,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Retention and explicit erasure](../../../../docs/development/retention-and-deletion.md).
-- [Protected Evaluation history](../../../../docs/development/evaluation.md#history).
-- [Pipeline and supporting records](../../../../docs/development/data-model.md#shared-supporting-records).
+- [Retention and explicit erasure](deletion-and-retention.md).
+- [Protected Evaluation history](../../inframeld-evaluation/references/history-and-dataset-transfer.md#history).
+- [Pipeline and supporting records](../../inframeld-application-contracts/references/components-and-services.md#shared-supporting-records).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

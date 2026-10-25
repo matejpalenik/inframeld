@@ -33,5 +33,5 @@ Require documented and tested backup/restore for production. Retain the recorded
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current upgrades and recovery](../development/upgrades-and-recovery.md).
-- [Current retention and deletion](../development/retention-and-deletion.md).
+- [Current upgrades and recovery](../development/operations/upgrades.md).
+- [Current retention and deletion](../../.agents/skills/inframeld-knowledge/references/deletion-and-retention.md).

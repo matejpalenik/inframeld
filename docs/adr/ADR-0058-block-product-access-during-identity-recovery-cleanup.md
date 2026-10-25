@@ -23,7 +23,7 @@ Record Kratos-session cleanup and affected Hydra-grant cleanup independently. Fa
 
 After both outcomes are confirmed, release this operation's block only if the human is otherwise currently active/eligible and no newer cleanup remains pending. A suspended human still requires an authorized Restore users operation, verification of the same legitimate identity, security review and confirmed cleanup/current state. Neither path recreates removed memberships or grants.
 
-Deduplicate completed trusted events by their original identity. A duplicate cannot revoke credentials from later logins, and an older operation cannot release a newer block. The temporary obligation does not introduce a new `PrincipalStatus` or cache permissions in `AccessContextDTO`. Detailed procedures belong to [Access](../development/access-control.md#identity-recovery-cleanup); records and retry semantics belong to [the data model](../development/data-model.md#identity-cleanup-records) and [jobs](../development/jobs-and-idempotency.md#identity-cleanup).
+Deduplicate completed trusted events by their original identity. A duplicate cannot revoke credentials from later logins, and an older operation cannot release a newer block. The temporary obligation does not introduce a new `PrincipalStatus` or cache permissions in `AccessContextDTO`. Detailed procedures belong to [Access](../../.agents/skills/inframeld-access-models/references/recovery.md#identity-recovery-cleanup); records and retry semantics belong to [the data model](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#identity-cleanup-records) and [jobs](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#identity-cleanup).
 
 ## Consequences
 
@@ -33,12 +33,12 @@ Deduplicate completed trusted events by their original identity. A duplicate can
 
 - Product access fails closed during partial cleanup while routine recovery can finish without an extra administrator intervention.
 - Emergency suspension retains its immediate block, preserved-but-unusable assignments and deliberate security-review restoration rule.
-- [The private callback contract](../development/access-contracts.md#recovery-callbacks) records the dedicated service secret, bounded allowlisted inputs and stable flow/event/phase identity. The [version 1 private draft](../development/access-contracts.md#recovery-wire) now specifies declarations/evidence requirements for final review; hook ordering, delivery/reconciliation evidence and recovery-session preservation need pinned-release #117 qualification. Current upstream hook observations do not establish deployed behavior.
+- [The private callback contract](../../.agents/skills/inframeld-access-models/references/private-recovery-handoff.md#recovery-callbacks) records the dedicated service secret, bounded allowlisted inputs and stable flow/event/phase identity. The [version 1 private draft](../../.agents/skills/inframeld-access-models/references/private-recovery-handoff.md#recovery-wire) now specifies declarations/evidence requirements for final review; hook ordering, delivery/reconciliation evidence and recovery-session preservation need pinned-release #117 qualification. Current upstream hook observations do not establish deployed behavior.
 - Existing recovery tests establish identity-flow boundaries, not complete Kratos/Hydra cleanup or automatic block release. This decision changes no runtime configuration, code or schema.
 
 ## Links
 
 - [ADR-0019: emergency suspension and scoped recovery](ADR-0019-permit-emergency-suspension-with-scoped-operator-recovery.md).
 - [ADR-0053: Kratos/Hydra CLI authentication](ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md).
-- [Access implementation and qualification](../development/access-control.md#implemented-human-authentication).
+- [Access implementation and qualification](../../.agents/skills/inframeld-access-models/references/credential-dispatch.md#implemented-human-authentication).
 - [#116: Access contracts](https://github.com/matejpalenik/inframeld/issues/116), [#117: identity integration](https://github.com/matejpalenik/inframeld/issues/117).

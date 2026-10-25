@@ -34,19 +34,27 @@ Automatic mode coordinates ordinary preparation with separate conditional public
 4. Explain why failures preserve healthy current traffic and why no alternate target is silently chosen.
 5. Cite current rules and distinguish accepted design from inspected implementation. Loading this skill grants no release, deployment or external-action authority.
 
-Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+For backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
 ## Pending decisions for affected work
 
-Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
 - [PD-RELEASES-01](references/decision-deployment-state-and-concurrency.md): Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding.
 
 ## Read as needed
 
-- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-- For creation, first publication, current authority, modes and delayed automatic work, read [Publication and automatic updates](references/publication-and-automatic-updates.md).
-- For stable cohorts, candidates, rejection, promotion or rollback, read [Canaries and rollback](references/canaries-and-rollback.md).
+| Task | Direct reference |
+| --- | --- |
+| Module/component design or structural review | [Releases architecture: change traffic under current authority](references/architecture.md) |
+| Automatic publication concurrency | [Fence stale automatic publication](references/automatic-publication-concurrency.md) |
+| Canaries and rollback | [Try a candidate, promote it or roll back](references/canaries-and-rollback.md) |
+| Deployment creation and defaults | [Create a real Deployment and bind the default](references/deployment-creation-and-defaults.md) |
+| Publication and automatic updates | [Publish ready versions under current authority](references/publication-and-automatic-updates.md) |
+| Records and transitions | [Deployment state and release transitions](references/records-and-transitions.md) |
 
-The [Pipelines and Releases guide](../../../docs/development/pipelines-and-releases.md) owns transitions and races. [Release records](../../../docs/development/data-model.md#releases), [Access](../../../docs/development/access-control.md) and [onboarding](../../../docs/development/onboarding.md) own related contracts. Read those details only when they matter to the request.
+## Source ownership
+
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

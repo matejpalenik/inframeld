@@ -1,17 +1,10 @@
 # Implement capabilities and typed persistence
 
+<a id="implement-capabilities-and-typed-persistence"></a>
+
 Alice tests a workflow using a fake facts reader. The fake should implement the same declared capability as the PostgreSQL reader. Matching a method name by coincidence does not express that intent or prove that the workflow checks permissions before disclosure.
 
-## Contents
-
-- [Protocol implementations](#protocol-implementations)
-- [Typed database access](#typed-database-access)
-- [Worked example: add a capability and its test double](#worked-example-add-a-capability-and-its-test-double)
-- [Worked example: map a typed row](#worked-example-map-a-typed-row)
-- [Worked example: read a typed projection](#worked-example-read-a-typed-projection)
-- [Exact raw-statement exception](#exact-raw-statement-exception)
-- [Ownership and failure](#ownership-and-failure)
-- [Sources](#sources)
+<a id="protocol-implementations"></a>
 
 ## Protocol implementations
 
@@ -25,6 +18,8 @@ Put the shared behavioral contract on the protocol and its public methods. Imple
 
 For Access authorization families, read the [owning authorization workflow](../../inframeld-access-models/references/authorization.md). Shared type conformance cannot establish current permission, checked scope or replay eligibility.
 
+<a id="typed-database-access"></a>
+
 ## Typed database access
 
 An object-relational mapper (ORM) maps Python records to database rows. Generated application and test database access uses SQLAlchemy typed ORM mappings and expression APIs. Never use raw SQL strings or `text()` queries for application record access.
@@ -32,6 +27,8 @@ An object-relational mapper (ORM) maps Python records to database rows. Generate
 Use `MappedAsDataclass` with keyword-only typed constructors. Exclude database-generated fields from initialization and preserve database defaults. Use Alembic operations for schema changes.
 
 Read scalars, ORM records or typed tuples and immediately convert them to named domain/application results. Do not use string-keyed SQL result mappings. Shared technology-prefixed static mappers convert database values without I/O or authorization. Keep ORM and vendor types out of domain/application contracts.
+
+<a id="worked-example-add-a-capability-and-its-test-double"></a>
 
 ## Worked example: add a capability and its test double
 
@@ -48,7 +45,6 @@ from typing import Protocol
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
-
 
 class IdentityRecoveryBlockReader(Protocol):
     """Read recovery blocks independently of local account admission."""
@@ -86,7 +82,6 @@ from inframeld_backend.access.application.protocols.identity_recovery_block_read
     IdentityRecoveryBlockReader,
 )
 
-
 class MockIdentityRecoveryBlockReader(IdentityRecoveryBlockReader):
     """Control current block state, failures, and overdue reads in unit tests."""
 
@@ -117,6 +112,8 @@ class MockIdentityRecoveryBlockReader(IdentityRecoveryBlockReader):
 
 **Failures and alternatives.** Type conformance does not establish that callers check blocks or current permission at the right time. Exercise that behavior. Keep capability contracts on protocols and adapter details on implementations. Do not introduce a protocol for a hypothetical component or an empty record label.
 
+<a id="worked-example-map-a-typed-row"></a>
+
 ## Worked example: map a typed row
 
 **Situation.** A persistence adapter needs membership data and its database-generated assignment time.
@@ -127,7 +124,6 @@ class MockIdentityRecoveryBlockReader(IdentityRecoveryBlockReader):
 
 ```python
 from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
-
 
 class AccessPersistenceBase(MappedAsDataclass, DeclarativeBase, kw_only=True, eq=False):
     """Base for Access database row mappings."""
@@ -147,7 +143,6 @@ from inframeld_backend.access.infrastructure.rows.access_persistence_base import
     AccessPersistenceBase,
 )
 from inframeld_backend.access.infrastructure.types.enum_types import PRINCIPAL_KIND_TYPE
-
 
 class ProjectMembershipRow(AccessPersistenceBase):
     """Map a principal's membership in a project."""
@@ -179,6 +174,8 @@ class ProjectMembershipRow(AccessPersistenceBase):
 **Walkthrough.** `Mapped[UUID]` keeps storage values as UUIDs. The infrastructure enum type performs real conversion for `PrincipalKind`. The adapter constructs application IDs at its boundary. `assigned_at` has `init=False` and a database default, so callers do not manufacture a timestamp required to belong to the database.
 
 **Failure and limits.** An annotation alone does not validate an external UUID or migrate a database. Alembic owns schema changes, and these partial ORM read mappings are not a competing schema or autogeneration source. Preserve existing defaults and stored meanings. The [aggregate repository example](aggregates-and-repositories.md) explains transaction-bound persistence.
+
+<a id="worked-example-read-a-typed-projection"></a>
 
 ## Worked example: read a typed projection
 
@@ -215,7 +212,6 @@ from inframeld_backend.shared.application.errors.application_errors import (
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
 
-
 class PostgresHumanCredentialStateReader(HumanCredentialStateReader):
     """Read one committed projection in an independent session with a five-second deadline."""
 
@@ -238,11 +234,15 @@ class PostgresHumanCredentialStateReader(HumanCredentialStateReader):
 
 **Failure and alternatives.** Recognized timeout and database availability failures become `DependencyUnavailableError`. Missing installation metadata is also unavailable, not a default empty result. Unexpected failures propagate. A transaction-bound authorization reader instead uses its caller's session. Never generalize this independent-read lifetime to the membership repository or share its session across requests.
 
+<a id="exact-raw-statement-exception"></a>
+
 ## Exact raw-statement exception
 
 The only approved raw-statement exception is isolated test database provisioning in `apps/backend/tests/support/postgres.py`. Compose CREATE DATABASE/DROP DATABASE with `psycopg.sql.Identifier` and autocommit.
 
 That exception permits no raw record queries, startup probes, advisory-lock strings or application SQL. Use inspection, typed expressions and Alembic operations for those. If another limitation prevents the typed approach, explain it and request a specific exception. Do not infer an exception from convenience.
+
+<a id="ownership-and-failure"></a>
 
 ## Ownership and failure
 
@@ -250,7 +250,23 @@ Persistence adapters perform their specific I/O and boundary conversions. Their 
 
 Use an application-owned port when application/domain independence from an external adapter requires it. Otherwise a concrete infrastructure type is sufficient. Do not introduce interfaces solely because a future service might exist.
 
+<a id="sources"></a>
+
 ## Sources
 
-- [Application conventions](../../../../docs/development/application-structure.md#component-conventions), [typed authorization](../../../../docs/development/application-structure.md#typed-authorization) and [service ownership](../../inframeld-application-contracts/references/components-and-services.md).
+- [Application conventions](component-roles-and-imports.md#component-conventions), [typed authorization](../../inframeld-access-models/references/eligibility-and-current-authority.md#typed-authorization) and [service ownership](../../inframeld-application-contracts/references/components-and-services.md).
 - Inspected capability: [ProjectActionFactsReader](../../../../apps/backend/src/inframeld_backend/access/application/protocols/project_action_facts_reader.py). [ADR-0067](../../../../docs/adr/ADR-0067-standardize-authorization-capabilities-with-typed-requests.md) explains the Access family contracts.
+
+<a id="typed-persistence-and-boundary-conversions"></a>
+
+### Typed persistence and boundary conversions
+
+ORM rows stay inside PostgreSQL adapters and test support. Use `MappedAsDataclass` with keyword-only construction, typed `Mapped` fields, and database-generated fields excluded from initialization. Keep UUID columns as UUIDs. Unwrap `.value` when constructing predicates/rows and wrap returned UUIDs when creating domain results. Enum mappings convert real stored values to enum instances and preserve existing database strings.
+
+Use scalars, ORM records, or typed tuples and immediately construct named results. `PostgresProjectActionFactsReader` turns typed status and relationship expressions into `ProjectActionFactsDTO`. It never indexes a SQL result by arbitrary string keys. SQLAlchemy describes this type propagation in its [typed result documentation](https://docs.sqlalchemy.org/en/20/changelog/whatsnew_20.html#sql-expression-statement-result-set-typing).
+
+Use SQLAlchemy inspection and typed expressions for connectivity, revision checks, and advisory locks. Alembic owns schema creation, including test-only constraints. Partial ORM read mappings are not a replacement schema or an autogeneration source for the authoritative initial migration.
+
+The sole raw-statement exception is [`tests/support/postgres.py`](../../../../apps/backend/tests/support/postgres.py): PostgreSQL requires top-level database administration outside a transaction, so the isolated fixture composes `CREATE DATABASE` and `DROP DATABASE` with `psycopg.sql.Identifier`. Never interpolate identifiers or extend this exception to record queries or application code.
+
+Dictionaries are appropriate at ASGI, JSON/OpenAPI, environment-framework, and logging serialization boundaries. Narrow dynamic values there. Any unavoidable framework `Any` or cast stays documented in that adapter. Application records and database results use named types.

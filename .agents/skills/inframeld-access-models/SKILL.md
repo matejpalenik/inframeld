@@ -32,17 +32,13 @@ Suppose SupportBot has Query on Production and membership in SupportKnowledge. R
 
 ## Explain or review
 
-1. Identify the credential family, action and exact target. Introduce relationships through Alice or SupportBot.
-2. Follow verification, local identity resolution and current authorization in order. Explain visibility and failures at their owning boundaries.
-3. For changes or retries, trace admission, commit, dispatch and disclosure as applicable.
-4. Inspect code before claiming implementation. Separate accepted contracts, inspected behavior, recorded evidence and unfinished qualification.
-5. Cite the precise rule and report unresolved contradictions. Loading this skill authorizes no edits, grants, credential issuance, deployment or paid calls.
+Trace the chosen credential, local identity, current eligibility, exact action/target and protected evidence through a concrete example. Check admission, commit, dispatch and disclosure where relevant. Inspect code before claiming implementation and cite the owning rule.
 
-Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+Before backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
 ## Pending decisions for affected work
 
-Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
 - [PD-ACCESS-01](references/decision-key-currentness.md): Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
 - [PD-ACCESS-02](references/decision-admitted-work-authority.md): Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
@@ -53,13 +49,42 @@ Read only entries whose triggers match the proposed design, code suggestion or i
 
 ## Read as needed
 
-- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-- For cookie verification, credential dispatch, evidence or CSRF, read [Browser sessions](references/browser-sessions.md).
-- For human login, consent, refresh or credential versions, read [Human CLI login](references/human-cli-login.md).
-- For issuance, verification, overlap or lost-secret recovery, read [Application keys](references/application-keys.md).
-- For eligibility, grants, audiences, invitations or maintenance authority, read [Authorization](references/authorization.md).
-- For cleanup, completion and provider races, read [Recovery](references/recovery.md).
-- For connection management, encryption or budget authority, read [Model connections and provider credentials](references/model-connections-and-provider-credentials.md).
+| Task | Direct reference |
+| --- | --- |
+| Actions and initial grants | [Actions and explicit initial grants](references/actions-and-initial-grants.md) |
+| Admission and invitations | [Admit humans and activate invitations](references/admission-and-invitations.md) |
+| Application key contracts | [Application-key format and transport contracts](references/application-key-contracts.md) |
+| Application identity and key lifecycle | [Application accounts and keys](references/application-keys.md) |
+| Module/component design or structural review | [Access architecture: identify the caller, then check authority](references/architecture.md) |
+| Permission concepts and delegation | [Current permissions and bounded administration](references/authorization.md) |
+| Cookie verification and CSRF | [Browser sessions and authentication evidence](references/browser-sessions.md) |
+| Evidence, credential generations and recovery facts | [Credential evidence and recovery records](references/credential-and-recovery-records.md) |
+| Credential dispatch | [Choose one incoming credential](references/credential-dispatch.md) |
+| Eligibility and current authority | [Current account and credential eligibility](references/eligibility-and-current-authority.md) |
+| Grant administration | [Administer an exact action grant](references/grant-administration.md) |
+| Grant contracts | [Exact-target grant transport contracts](references/grant-contracts.md) |
+| Grant target contract | [Exact grant target variants](references/grant-target-contract.md) |
+| Host maintenance | [Host-authorized bootstrap and repair](references/host-maintenance.md) |
+| Human cli consent | [Approve a human CLI access request](references/human-cli-consent.md) |
+| Human cli credential lifecycle | [Store, refresh and revoke a human CLI login](references/human-cli-credential-lifecycle.md) |
+| Human OAuth login and local admission | [Human CLI login and consent](references/human-cli-login.md) |
+| Logical identities, memberships and grant meaning | [Identity, membership and grant records](references/identity-and-grant-records.md) |
+| Existing Principal/ProjectMembership and runtime IDs | [Implemented Access models](references/implemented-access-models.md) |
+| Database structure, scoped constraints, grants and audit | [Access persistence](references/access-persistence.md) |
+| Ordered relationship writes for demotion, departure or deletion | [Lifecycle persistence](references/access-lifecycle-persistence.md) |
+| Invitation contracts | [Invitation requests, responses and restrictions](references/invitation-contracts.md) |
+| Memberships groups and handover | [Memberships, groups and safe handover](references/memberships-groups-and-handover.md) |
+| Model connections and provider credentials | [Model connections and provider credentials](references/model-connections-and-provider-credentials.md) |
+| Private recovery handoff | [Private identity-recovery handoff](references/private-recovery-handoff.md) |
+| Provider credential storage | [Protect stored provider credentials](references/provider-credential-storage.md) |
+| Query and document authorization | [Authorize a question and its source evidence](references/query-and-document-authorization.md) |
+| Recovery completion | [Release only the completed recovery obligation](references/recovery-completion.md) |
+| Recovery provider cleanup | [Confirm provider cleanup without guessing](references/recovery-provider-cleanup.md) |
+| Recovery purpose, independent blocks and boundaries | [Recovery blocks, cleanup and completion](references/recovery.md) |
+| Session contracts | [Human and application session contracts](references/session-contracts.md) |
 
-The [Access guide](../../../docs/development/access-control.md) owns behavior, [Access contracts](../../../docs/development/access-contracts.md) owns exact mappings and delivery drafts, and the [data model](../../../docs/development/data-model.md#access) owns records. The references explain these sources without replacing them.
+## Source ownership
+
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

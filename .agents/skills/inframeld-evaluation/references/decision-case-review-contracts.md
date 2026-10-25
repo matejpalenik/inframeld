@@ -64,8 +64,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Generation and review](../../../../docs/development/evaluation.md).
+- [Generation and review](generation-and-review.md).
 - [Evaluation operation split](../../../../docs/adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md).
-- [Case and benchmark records](../../../../docs/development/data-model.md#evaluation).
+- [Case and benchmark records](records.md#evaluation).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

@@ -21,7 +21,7 @@ Use human-only `manage-evaluation-case-audiences` on the exact Pipeline. The cal
 
 Applications with case-editing authority may import into the saved current human-approved audience; they cannot select or override another audience. Persist protection before source linking. Changing the default affects future imports only. Existing-case changes require a separate explicit reviewed operation, current authority and expected-state checks.
 
-The [Evaluation guide](../development/evaluation.md#case-audiences) owns the procedure; [the data model](../development/data-model.md#evaluation) owns logical records. Neither the audience nor Pipeline grants replace current linked-source access.
+The [Evaluation guide](../../.agents/skills/inframeld-evaluation/references/case-audiences.md#case-audiences) owns the procedure; [the data model](../../.agents/skills/inframeld-evaluation/references/records.md#evaluation) owns logical records. Neither the audience nor Pipeline grants replace current linked-source access.
 
 ## Consequences
 
@@ -33,6 +33,6 @@ The [Evaluation guide](../development/evaluation.md#case-audiences) owns the pro
 
 ## Links
 
-- [Fixed Access actions](../development/access-contracts.md#capability-catalogue).
+- [Fixed Access actions](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#capability-catalogue).
 - [ADR-0015: separate audience and operation access](ADR-0015-keep-document-group-access-separate-from-operational-permissions.md).
 - [ADR-0049: managers are members](ADR-0049-require-group-managers-to-be-ordinary-members.md).

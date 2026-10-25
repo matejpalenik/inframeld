@@ -32,6 +32,6 @@ Store application-entered outbound credentials as authenticated ciphertext in Po
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current model connections](../development/model-connections.md).
-- [Current data model](../development/data-model.md).
-- [Current upgrades and recovery](../development/upgrades-and-recovery.md).
+- [Current model connections](../../.agents/skills/inframeld-application-contracts/references/model-gateway-and-connections.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
+- [Current upgrades and recovery](../development/operations/upgrades.md).

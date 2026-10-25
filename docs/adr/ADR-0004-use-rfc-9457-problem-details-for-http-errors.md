@@ -28,7 +28,7 @@ Use application/problem+json with the established Problem Details fields and bou
 
 ## Links
 
-- [Current error handling](../development/error-handling.md).
-- [Current error handling reference](../development/error-handling-reference.md).
-- [Current api contracts](../development/api-contracts.md).
+- [Current error handling](../../.agents/skills/inframeld-application-contracts/references/http-errors.md).
+- [Current error handling reference](../../.agents/skills/inframeld-application-contracts/references/http-errors.md).
+- [Current api contracts](../../.agents/skills/inframeld-application-contracts/references/http-mcp-and-generated-clients.md).
 - Related decisions: [ADR-0003](ADR-0003-generate-the-authoritative-openapi-contract-from-backend-code.md), [ADR-0005](ADR-0005-use-bounded-cursor-pagination-for-lists.md), [ADR-0006](ADR-0006-use-official-generated-clients-for-application-api-access.md), [ADR-0007](ADR-0007-keep-api-documentation-public-and-product-operations-protected.md).

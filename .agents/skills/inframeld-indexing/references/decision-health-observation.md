@@ -64,9 +64,9 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Health and retention protocol](../../../../docs/development/indexing.md#retirement).
-- [Remaining health contract](../../../../docs/development/indexing.md#indexing-capability-boundaries).
-- [Materialization records](../../../../docs/development/data-model.md#indexing).
-- [Restoration checks](../../../../docs/development/upgrades-and-recovery.md).
+- [Health and retention protocol](retirement-and-erasure.md#retirement).
+- [Remaining health contract](architecture.md#indexing-capability-boundaries).
+- [Materialization records](records.md#indexing).
+- [Restoration checks](../../../../docs/development/operations/upgrades.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

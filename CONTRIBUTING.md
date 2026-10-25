@@ -67,3 +67,5 @@ uv sync --locked --project apps/backend
 ```
 
 Commit the resulting `uv.lock` changes only when the resolution passes the configured release-age policy.
+
+For contributor routes, start with [developer documentation](docs/development/README.md). Detailed behavior has one owning skill reference. Older GitHub issue paths may refer to removed historical guides.

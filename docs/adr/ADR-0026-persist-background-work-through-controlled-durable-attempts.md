@@ -31,6 +31,6 @@ Record admitted work durably and execute it through controlled attempts. Use cur
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current jobs and idempotency](../development/jobs-and-idempotency.md).
-- [Current data model](../development/data-model.md).
+- [Current jobs and idempotency](../../.agents/skills/inframeld-application-contracts/references/jobs-and-recovery.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Related decisions: [ADR-0027](ADR-0027-identify-repeated-requests-by-caller-and-request-meaning.md), [ADR-0028](ADR-0028-recover-answer-requests-through-receipts-without-a-full-answer-replay-cache.md), [ADR-0029](ADR-0029-use-expected-revisions-to-protect-competing-changes.md).

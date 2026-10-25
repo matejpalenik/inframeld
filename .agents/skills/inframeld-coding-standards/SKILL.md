@@ -32,7 +32,7 @@ These conventions apply to backend Python suggestions and reviews as well as aut
 ## Explain, suggest or review
 
 1. Select the language and applicable directory guidance. For domain-specific backend component design, code generation or structural review, read the owning domain skill's architecture reference and relevant workflow. Shared components use [Application Contracts’ shared component view](../inframeld-application-contracts/references/components-and-services.md), with its transaction/job or gateway reference when applicable. Read domain context when product behaviour matters. Use accepted architecture and inspected implementation as their status permits. A proposal awaits a decision before code depends on it.
-2. Before code depends on an unresolved domain/shared contract, load the matching pending decision from its owning skill and follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Raise only decisions relevant to this component. Qualification gaps do not prohibit tests of accepted requirements.
+2. Before code depends on an unresolved domain/shared contract, load the matching pending decision from its owning skill and follow [the approval and consistency workflow](../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Raise only decisions relevant to this component. Qualification gaps do not prohibit tests of accepted requirements.
 3. Select the component's role, destination, declaration and behavioral contract. For backend Python, read component roles. Load only the references needed for that choice. Their worked examples explain the situation, decision, code, flow and failures. Do not copy every grant collaborator into a workflow that does not need it.
 4. Follow values from the external boundary through typed application contracts and back. Check current authority and resource ownership separately from type correctness.
 5. Show complete contextual examples with exact paths, imports and placement. Distinguish inspected code from illustrative suggestions and future design.
@@ -40,12 +40,18 @@ These conventions apply to backend Python suggestions and reviews as well as aut
 
 ## Read as needed
 
-- Before planning, suggesting, writing, refactoring or reviewing a backend component, read [Component roles and imports](references/component-roles-and-imports.md).
-- Before suggesting or reviewing a backend service or complete write, read [Services and use cases](references/services-and-use-cases.md) for the complete grant example and its workflow variations.
-- For backend aggregates or repositories, read [Aggregates and repositories](references/aggregates-and-repositories.md) for domain behavior, scoped loading, supported saves and lifetime.
-- For reusable helpers, policies or mappers, read [Static utilities and mappers](references/static-utilities-and-mappers.md).
-- For IDs, secrets, value objects, Commands, Queries or other records, read [Values and records](references/values-and-records.md).
-- For protocols, adapters, fakes or database access, read [Protocols and persistence](references/protocols-and-persistence.md).
-- For tests, scaffolding, docstrings or test-support records, read [Testing and documentation](references/testing-and-documentation.md).
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-The [application structure guide](../../../docs/development/application-structure.md#component-conventions) owns canonical conventions. [Application Contracts](../inframeld-application-contracts/SKILL.md) supplies service and transaction workflows when needed. Existing frontend guidance remains separate.
+| Task | Direct reference |
+| --- | --- |
+| Aggregates and repositories | [Change an aggregate through its specific repository](references/aggregates-and-repositories.md) |
+| Component roles and imports | [Choose a component and import its type](references/component-roles-and-imports.md) |
+| Protocols and persistence | [Implement capabilities and typed persistence](references/protocols-and-persistence.md) |
+| Services and use cases | [Write a service around a complete use case](references/services-and-use-cases.md) |
+| Static utilities and mappers | [Static utilities, policies and mappers](references/static-utilities-and-mappers.md) |
+| Testing and documentation | [Test behavior and explain the contract](references/testing-and-documentation.md) |
+| Values and records | [Give values their domain meaning](references/values-and-records.md) |
+
+## Source ownership
+
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

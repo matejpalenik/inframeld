@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Inframeld version 1 private recovery event, design contract",
+  "description": "Non-runtime five-field event envelope. A valid envelope is not trusted recovery evidence or successful cleanup.",
+  "$comment": "Owner: .agents/skills/inframeld-access-models/references/private-recovery-handoff.md. PD-ACCESS-03 and PD-ACCESS-04 remain PENDING. Runtime implementation must reconcile or supersede this schema. Separately enforce the 8 KiB received-byte bound, strict JSON tokens, duplicate-key rejection, one JSON value, route-phase matching, private service authentication and original trusted provider flow binding. JSON Schema integer validation accepts 1.0.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "flowId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "identityId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventKind": {
+      "enum": ["recovery", "password-reset"]
+    },
+    "phase": {
+      "enum": ["admit", "complete"]
+    }
+  },
+  "required": ["schemaVersion", "flowId", "identityId", "eventKind", "phase"],
+  "additionalProperties": false
+}

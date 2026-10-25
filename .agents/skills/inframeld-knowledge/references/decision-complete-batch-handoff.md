@@ -66,9 +66,9 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Accepted Knowledge boundary](../../../../docs/development/knowledge-lifecycle.md#knowledge-operation-boundaries).
+- [Accepted Knowledge boundary](architecture.md#knowledge-operation-boundaries).
 - [Focused operations decision](../../../../docs/adr/ADR-0075-separate-document-lifecycle-from-collection-selection.md).
-- [Automatic publication](../../../../docs/development/pipelines-and-releases.md#modes).
+- [Automatic publication](../../inframeld-releases/references/publication-and-automatic-updates.md#modes).
 - [Service transaction ownership](../../../../docs/adr/ADR-0065-application-services-own-write-transactions.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

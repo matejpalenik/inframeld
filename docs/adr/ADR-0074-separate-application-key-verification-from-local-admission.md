@@ -50,11 +50,11 @@ Application-key authentication and production qualification remain unfinished. T
 
 ## Links
 
-- [Current application-key architecture and remaining contracts](../development/access-control.md#application-key-authentication-boundary).
-- [Accepted key verification and lifetime](../development/access-control.md#application-key-contract).
-- [Minimal verified-key result](../development/data-model.md#application-key-verification-result), [authentication evidence records](../development/data-model.md#authentication-evidence-records) and [ADR-0073](ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md).
+- [Current application-key architecture and remaining contracts](../../.agents/skills/inframeld-access-models/references/application-keys.md#application-key-authentication-boundary).
+- [Accepted key verification and lifetime](../../.agents/skills/inframeld-access-models/references/application-key-contracts.md#application-key-contract).
+- [Minimal verified-key result](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#application-key-verification-result), [authentication evidence records](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#authentication-evidence-records) and [ADR-0073](ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md).
 - [Current account authority](ADR-0017-let-valid-application-keys-use-current-account-permissions.md) and [opaque application credentials](ADR-0018-use-opaque-expiring-and-revocable-application-credentials.md).
-- [Current-key authorization ownership](../development/access-control.md#application-key-current-authorization).
-- [Verification outcomes](../development/access-control.md#application-key-verification-outcomes) and [accepted public authentication errors](../development/error-handling.md#authentication-contract).
+- [Current-key authorization ownership](../../.agents/skills/inframeld-access-models/references/application-keys.md#application-key-current-authorization).
+- [Verification outcomes](../../.agents/skills/inframeld-access-models/references/application-key-contracts.md#verification-results-and-unresolved-currentness) and [accepted public authentication errors](../development/error-handling.md#authentication-contract).
 - [Inspected browser verifier contract](../../apps/backend/src/inframeld_backend/access/application/protocols/browser_session_verifier.py). Its rejection/availability pattern is reused, while application-key implementation remains unfinished.
-- [Component conventions](../development/application-structure.md#component-conventions) and [inspected browser authentication service](../../apps/backend/src/inframeld_backend/access/application/services/human_session_authentication_service.py). The browser implementation is an ownership example, not application-key implementation evidence.
+- [Component conventions](../../.agents/skills/inframeld-coding-standards/references/component-roles-and-imports.md#component-conventions) and [inspected browser authentication service](../../apps/backend/src/inframeld_backend/access/application/services/human_session_authentication_service.py). The browser implementation is an ownership example, not application-key implementation evidence.

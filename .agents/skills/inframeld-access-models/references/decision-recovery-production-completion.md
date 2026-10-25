@@ -64,10 +64,10 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Recovery and provider observations](../../../../docs/development/access-control.md#identity-recovery-cleanup).
-- [Private callback contract](../../../../docs/development/access-contracts.md#recovery-callbacks).
-- [Private recovery handoff](../../../../docs/development/access-contracts.md#recovery-wire).
+- [Recovery and provider observations](recovery.md#identity-recovery-cleanup).
+- [Private callback contract](private-recovery-handoff.md#recovery-callbacks).
+- [Private recovery handoff](private-recovery-handoff.md#recovery-wire).
 - [Independent release](../../../../docs/adr/ADR-0069-release-completed-recovery-obligations-independently.md).
 - [Bulk Hydra cleanup](../../../../docs/adr/ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

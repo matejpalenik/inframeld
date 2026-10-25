@@ -30,5 +30,5 @@ Use explicit application use cases for changes and direct scoped read models for
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current application structure](../development/application-structure.md).
+- [Current application structure](../../.agents/skills/inframeld-application-contracts/references/components-and-services.md).
 - Related decisions: [ADR-0001](ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md).

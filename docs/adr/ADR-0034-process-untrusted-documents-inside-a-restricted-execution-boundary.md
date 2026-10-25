@@ -31,5 +31,5 @@ Validate and bound uploads, then process document bytes in the documented restri
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current ingestion security](../development/ingestion-security.md).
-- [Current deployment](../development/deployment.md).
+- [Current ingestion security](../../.agents/skills/inframeld-knowledge/references/uploads-and-source-sync.md).
+- [Current deployment](../../.agents/skills/inframeld-architecture/references/runtime-deployment-and-storage.md).

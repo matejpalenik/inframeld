@@ -33,7 +33,7 @@ Freeze the connection/model meaning used by retained profiles and versions. Keep
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current model connections](../development/model-connections.md).
-- [Current data model](../development/data-model.md).
+- [Current model connections](../../.agents/skills/inframeld-application-contracts/references/model-gateway-and-connections.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Partially superseded by [ADR-0050](ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md).
 - Related decisions: [ADR-0023](ADR-0023-route-every-model-request-through-modelgateway.md), [ADR-0024](ADR-0024-approve-outbound-destinations-before-model-calls.md).

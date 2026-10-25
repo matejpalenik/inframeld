@@ -43,17 +43,29 @@ For example, changing R1={A1,B1} to R2={A1,B2} does not rewrite B1. Indexing can
 
 ## Pending decisions for affected work
 
-Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
 - [PD-ARCHITECTURE-01](references/decision-supported-operating-envelope.md): Before fixing production resource/admission limits or advertising supported corpus size, throughput, latency or concurrency.
 - [PD-ARCHITECTURE-02](references/decision-availability-backup-and-restore.md): When setting availability/recovery objectives, assembling the production topology or qualifying backup, upgrade, security clearance and restore claims.
 
 ## Read as needed
 
-- For product users, external systems and scope, read [System context](references/system-context.md).
-- For processes, infrastructure and trust boundaries, read [System overview](references/system-overview.md).
-- For domain ownership and choosing a module architecture, read [Module map](references/module-map.md).
-- For an unfamiliar shared term, read the relevant entry in [Glossary](references/glossary.md). Do not load the whole glossary for every question.
-- For onboarding and the complete knowledge-to-answer journey, read [Document to answer](references/document-to-answer.md).
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-The [architecture introduction](../../../docs/ARCHITECTURE.md) owns the product overview. Topic guides own current behavior, the [data model](../../../docs/development/data-model.md) owns records, and ADRs explain decisions. These references teach that accepted design without becoming another specification.
+| Task | Direct reference |
+| --- | --- |
+| End-to-end product journey | [From a document to an answer](references/document-to-answer.md) |
+| First use and private defaults | [First use and private defaults](references/first-use-and-private-defaults.md) |
+| An unfamiliar shared term | [Shared vocabulary](references/glossary.md) |
+| Cross-domain ownership and pending navigation | [Find the owner before designing the component](references/module-map.md) |
+| Resource names and identity | [Resource names, display names and identity](references/resource-names-and-identity.md) |
+| Runtime deployment and storage | [Runtime deployment and durable storage](references/runtime-deployment-and-storage.md) |
+| Storage topology | [Durable storage and ownership](references/storage-topology.md) |
+| Supported workload and qualification | [Supported workload and qualification](references/supported-workload-and-qualification.md) |
+| People and external systems | [Inframeld in its surroundings](references/system-context.md) |
+| Running processes and runtime connections | [System overview: runtime topology](references/system-overview.md) |
+| V1 scope and extension boundaries | [V1 scope and extension boundaries](references/v1-scope-and-extension-boundaries.md) |
+
+## Source ownership
+
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

@@ -67,9 +67,9 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Provisional backup and restoration](../../../../docs/development/upgrades-and-recovery.md).
-- [Supported topology and security qualification](../../../../docs/development/deployment.md).
+- [Provisional backup and restoration](../../../../docs/development/operations/upgrades.md).
+- [Supported topology and security qualification](runtime-deployment-and-storage.md).
 - [Backup decision](../../../../docs/adr/ADR-0038-recover-from-a-coordinated-backup-of-the-installation.md).
-- [Deletion and backups](../../../../docs/development/retention-and-deletion.md).
+- [Deletion and backups](../../inframeld-knowledge/references/deletion-and-retention.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

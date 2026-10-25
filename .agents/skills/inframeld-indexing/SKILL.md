@@ -9,7 +9,7 @@ Explain how admitted source versions become verified, reusable search data. Inde
 
 ## Working model
 
-Alice replaces B1 with B2 in a corpus containing unchanged A1. Indexing can reuse A1's compatible vectors, create B2's vectors and retain B1's vectors while an older revision needs them. It never edits A1's vectors merely to add new collection membership.
+Alice admits B2 and an authorized collection selection replaces B1 with it, keeping unchanged A1. Indexing can reuse A1's compatible vectors, create B2's vectors and retain B1's vectors while an older revision needs them. It never edits A1's vectors merely to add new collection membership.
 
 An embedding is a numerical representation used to find similar text. Its profile fixes the meaning of those numbers. A processing profile fixes parsing/chunking settings.
 
@@ -35,11 +35,11 @@ PostgreSQL records exact revision membership and authority. Chroma stores immuta
 4. Distinguish paid-call uncertainty from replaying a frozen storage payload. Explain what a stale attempt can still do remotely.
 5. Cite accepted protocols and qualification limits. Inspect implementation before claiming it exists. Loading this skill grants no model-call or mutation authority.
 
-Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+For backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
 ## Pending decisions for affected work
 
-Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
 - [PD-INDEXING-01](references/decision-capability-binding-contracts.md): Before defining preparation, retrieval or retirement application ports and their complete input/result records.
 - [PD-INDEXING-02](references/decision-health-observation.md): Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
@@ -49,11 +49,19 @@ Read only entries whose triggers match the proposed design, code suggestion or i
 
 ## Read as needed
 
-- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-- For profiles, source coordinates, compatibility or pre-build preparation, read [Profiles and preparation](references/profiles-and-preparation.md).
-- For singleton writes, captured payloads and failure recovery, read [Vector writes and retries](references/vector-writes-and-retries.md).
-- For exact filters, fan-out, merging and access changes, read [Retrieval and filtering](references/retrieval-and-filtering.md).
-- For pins, tombstones, delayed writes or final cleanup, read [Retirement and erasure](references/retirement-and-erasure.md).
+| Task | Direct reference |
+| --- | --- |
+| Module/component design or structural review | [Indexing architecture: prepare exact data and prove it is usable](references/architecture.md) |
+| Materialization verification | [Verify the exact prepared search data](references/materialization-verification.md) |
+| Parser isolation and validation | [Process untrusted documents in a restricted runtime](references/parser-isolation-and-validation.md) |
+| Profiles and preparation | [Profiles, generations and verified preparation](references/profiles-and-preparation.md) |
+| Logical records and representation ownership | [Index profiles, generations and bindings](references/records.md) |
+| Retirement and erasure | [Retire numerical data without restoring access](references/retirement-and-erasure.md) |
+| Retrieval and filtering | [Search only the permitted corpus](references/retrieval-and-filtering.md) |
+| Vector writes and retries | [Vector writes and frozen-payload retries](references/vector-writes-and-retries.md) |
 
-The [Indexing guide](../../../docs/development/indexing.md) owns protocols and qualification calculations. The [Indexing data model](../../../docs/development/data-model.md#indexing) owns records. Do not invent an engine or distributed coordination to preserve a failed backend assumption.
+## Source ownership
+
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

@@ -1,5 +1,7 @@
 # Shared vocabulary
 
+<a id="shared-vocabulary"></a>
+
 Alice can change a handbook, a model setting or the version serving Production. Each change has a different owner and identity. Use these definitions to keep those changes distinct. This is a vocabulary aid, not a replacement for exact record definitions.
 
 | Term | Owner | Meaning and example | Distinction |
@@ -35,4 +37,4 @@ Alice can change a handbook, a model setting or the version serving Production. 
 
 Names are scoped selectors, display names are presentation labels, and IDs are permanent relationship identities. For example, Alice may select Name `legal-research` while seeing Display name `Legal Research`. Display names never resolve identity. Preserve the distinction from existing physical fields and wire names.
 
-The [data model](../../../../docs/development/data-model.md) owns record definitions, constraints and implementation status. Its [resource naming contract](../../../../docs/development/data-model.md#resource-naming) owns selectors. The [architecture introduction](../../../../docs/ARCHITECTURE.md) and each topic guide explain lifecycle behavior. Do not create an entity, table, repository or aggregate merely because a term appears here.
+The [data model](resource-names-and-identity.md) owns record definitions, constraints and implementation status. Its [resource naming contract](resource-names-and-identity.md#resource-naming) owns selectors. The [architecture introduction](../../../../docs/ARCHITECTURE.md) and each topic guide explain lifecycle behavior. Do not create an entity, table, repository or aggregate merely because a term appears here.

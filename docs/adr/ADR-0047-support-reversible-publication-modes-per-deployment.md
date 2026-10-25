@@ -35,8 +35,8 @@ Make publication mode a Deployment property. The default onboarding path starts 
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current pipelines and releases](../development/pipelines-and-releases.md).
-- [Current onboarding](../development/onboarding.md).
-- [Current access control](../development/access-control.md).
-- [Current data model](../development/data-model.md).
+- [Current pipelines and releases](../../.agents/skills/inframeld-pipelines/references/configuration-queries-and-builds.md).
+- [Current onboarding](../../.agents/skills/inframeld-architecture/references/first-use-and-private-defaults.md).
+- [Current access control](../../.agents/skills/inframeld-access-models/references/authorization.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Related decisions: [ADR-0046](ADR-0046-provision-creator-private-defaults-through-ordinary-resources.md).

@@ -1,18 +1,10 @@
 # Static utilities, policies and mappers
 
+<a id="static-utilities-policies-and-mappers"></a>
+
 Alice needs the same parsed-UUID check in several identifier classes. A named `ValueValidation` class makes the shared operation visible at every call site. It is a group of pure static methods, not an object that holds a database connection or current user.
 
-## Contents
-
-- [Choose the right kind of behavior](#choose-the-right-kind-of-behavior)
-- [Shared validation](#shared-validation)
-- [Pure policies and boundary mappers](#pure-policies-and-boundary-mappers)
-- [Worked example: map an HTTP request without doing the work](#worked-example-map-an-http-request-without-doing-the-work)
-- [Worked example: share stored-value conversion](#worked-example-share-stored-value-conversion)
-- [Worked example: decide with a policy](#worked-example-decide-with-a-policy)
-- [Correct exceptions: private functions and injected helpers](#correct-exceptions-private-functions-and-injected-helpers)
-- [Failures and review](#failures-and-review)
-- [Status and sources](#status-and-sources)
+<a id="choose-the-right-kind-of-behavior"></a>
 
 ## Choose the right kind of behavior
 
@@ -22,6 +14,8 @@ Keep each class focused on one purpose. Do not collect unrelated helpers in `Uti
 
 Services stay instantiated because they orchestrate workflows through injected collaborators. Entities own their state transitions. Value objects own their specific invariants. A static utility must not take over those responsibilities. A check that performs provider or database I/O belongs to an appropriate instantiated service or adapter.
 
+<a id="shared-validation"></a>
+
 ## Shared validation
 
 Shared primitive checks belong to `ValueValidation` in `shared/domain/validation/value_validation.py`. Import the class and call `ValueValidation.require_uuid(value)` or `ValueValidation.require_string(value)`. Value-specific rules stay on the owning value object.
@@ -30,7 +24,6 @@ The following is an existing complete method in its class context from `apps/bac
 
 ```python
 from uuid import UUID
-
 
 class ValueValidation:
     """Check shared runtime types before values enforce their own invariants."""
@@ -44,6 +37,8 @@ class ValueValidation:
 
 This check rejects a raw string or another ID wrapper. It does not reject valid UUID versions or zero values, prove that a record exists, or decide access. Secret validation errors must not include secret contents.
 
+<a id="pure-policies-and-boundary-mappers"></a>
+
 ## Pure policies and boundary mappers
 
 Policies receive explicit inputs and have no I/O or mutable class state. Use `@staticmethod` and qualified calls such as `ActionAuthorizationPolicy.may_perform_action(policy_input)`. Policies may accept an existing entity or typed parameters. A new wrapper is not required merely for naming symmetry.
@@ -51,6 +46,8 @@ Policies receive explicit inputs and have no I/O or mutable class state. Use `@s
 Feature HTTP mappings use static `*Mapper` classes in `mappers/*_mapper.py`. They convert validated HTTP input into Command inputs and application results into responses. Shared database conversion uses technology-prefixed static `*Mapper` classes in `infrastructure/mappers` when several adapters need the same conversion. Neither kind performs I/O or authorization.
 
 In the existing `apps/backend/src/inframeld_backend/access/http/mappers/project_use_only_grant_mapper.py`, `ProjectUseOnlyGrantMapper.to_command` wraps parsed UUIDs as `ProjectId` and `PrincipalId`. It does not load membership, authorize the actor or decide fingerprint meaning. The application service owns those steps.
+
+<a id="worked-example-map-an-http-request-without-doing-the-work"></a>
 
 ## Worked example: map an HTTP request without doing the work
 
@@ -82,7 +79,6 @@ from inframeld_backend.shared.application.dtos.operation_admission_context_dto i
     OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
-
 
 class ProjectUseOnlyGrantMapper:
     """Convert the published grant contract without performing authorization or I/O."""
@@ -125,6 +121,8 @@ class ProjectUseOnlyGrantMapper:
 
 **Failures and alternatives.** The supported-action check can fail. It does not authorize the action or replace the request schema. Do not add membership reads, fingerprint decisions or persistence to this mapper. Preserve published names and supported values when adapting this convention.
 
+<a id="worked-example-share-stored-value-conversion"></a>
+
 ## Worked example: share stored-value conversion
 
 **Situation.** Credential readers need to turn a typed database result into a named application result. The conversion should not be copied between readers.
@@ -150,7 +148,6 @@ from inframeld_backend.shared.application.errors.application_errors import (
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
-
 class PostgresHumanCredentialStateMapper:
     """Convert stored credential state without initializing it or deciding eligibility."""
 
@@ -173,6 +170,8 @@ class PostgresHumanCredentialStateMapper:
 
 **Failure.** A missing installation row is unavailable metadata, not evidence of no recovery block or a successful empty result. The mapper neither initializes state nor decides eligibility. [The reader example](protocols-and-persistence.md#worked-example-read-a-typed-projection) shows where query execution and recognized availability translation belong.
 
+<a id="worked-example-decide-with-a-policy"></a>
+
 ## Worked example: decide with a policy
 
 **Situation.** Alice may delegate an action only if the supplied facts establish the required eligibility and exact-action permission. Loading those facts and deciding from them are separate jobs.
@@ -189,7 +188,6 @@ from inframeld_backend.access.domain.policies.principal_access_policy import (
 from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
     PrincipalAccessPolicyInput,
 )
-
 
 class ProjectGrantDelegationPolicy:
     @staticmethod
@@ -209,6 +207,8 @@ class ProjectGrantDelegationPolicy:
 ```
 
 **Walkthrough and failure.** The qualified class call makes the decision visible. A false decision becomes an application rejection in the authorizer, not database work inside the policy. This method alone does not establish recipient eligibility. The owning authorizer also invokes the recipient-specific policy after checking visibility and delegation. Keep [Access authorization](../../inframeld-access-models/references/authorization.md) authoritative for that order.
+
+<a id="correct-exceptions-private-functions-and-injected-helpers"></a>
 
 ## Correct exceptions: private functions and injected helpers
 
@@ -234,7 +234,6 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 )
 
 _ASSIGN_USE_ONLY_PURPOSE = "access.project-grant.assign-use-only:v1"
-
 
 class ProjectGrantChangeFingerprintService:
     """Define grant-command meaning before the shared keyed fingerprint is made."""
@@ -262,15 +261,47 @@ class ProjectGrantChangeFingerprintService:
 
 The exact purpose, canonical bytes and key stability matter to existing reservations. Reuse the operation's helper, not a new hash chosen by a mapper. Pure computation does not require static methods when the component deliberately holds injected configuration or collaborators. Fixtures and framework callables remain valid functions. See the [aggregate adapter example](aggregates-and-repositories.md) for local private helpers and the [service example](services-and-use-cases.md) for orchestration.
 
+<a id="failures-and-review"></a>
+
 ## Failures and review
 
 A conversion failure cannot become a permission denial or a successful empty result. Keep recognized domain-error translation in the service and leave I/O failures at their documented boundary. Pure utilities have no retry or transaction ownership.
 
 When reviewing a helper, ask whether it is reusable production behavior, a small private detail, a framework callback or stateful orchestration. Apply the matching convention instead of requiring every function or every service to become static.
 
+<a id="qualified-policy-calls"></a>
+
+### Qualified policy calls
+
+Call pure business decisions through their policy class:
+
+| Call | Decision |
+| --- | --- |
+| `HumanAuthenticationPolicy.may_authenticate(...)` | Is the linked principal a currently eligible human? |
+| `ProjectVisibilityPolicy.may_view_project(...)` | May this caller learn that the organization-scoped project exists? |
+| `ActionAuthorizationPolicy.may_perform_action(policy_input)` | Does current eligibility include the exact requested grant? |
+
+Policy methods use `@staticmethod`, explicit inputs, and no I/O or mutable class state. Services own orchestration and their injected collaborators.
+
+<a id="static-utilities-and-mappers"></a>
+
+### Static utilities and mappers
+
+Default reusable pure production conversion and validation utilities to cohesive named classes with `@staticmethod` methods. Import the class directly and call it by name. For example, import `ValueValidation` from its defining module and call `ValueValidation.require_uuid(value)`, rather than exposing a standalone check or using a module-qualified utility call. Shared primitive checks belong to `ValueValidation` in `shared/domain/validation/value_validation.py`. Value-specific invariants stay on their owning value objects.
+
+Keep static utility classes focused on one purpose and free of I/O or mutable class state. Do not collect unrelated functions in miscellaneous `Utils` classes. Small private helpers, test fixtures and framework-required callables may remain functions. Standard-library and SDK module imports remain valid where appropriate.
+
+Feature HTTP mappers and shared technology-prefixed persistence mappers retain their required static roles and perform no I/O or authorization. Services remain instantiated with injected collaborators. Entities own state transitions. This utility preference does not convert stateful workflows into static methods or automatically migrate existing helpers.
+
+Use dedicated value types when identity, invariants, secrecy or accidental mixing matter. Preserve enums/literals for closed vocabularies, free-form text and other documented primitive or serialization-boundary exceptions. Do not introduce a value object solely to wrap every scalar. The [Coding Standards skill](../SKILL.md) explains these conventions through contextual examples.
+
+Read the current [action policy input](../../../../apps/backend/src/inframeld_backend/access/domain/policy_inputs/action_authorization_policy_input.py) and [action policy](../../../../apps/backend/src/inframeld_backend/access/domain/policies/action_authorization_policy.py) for exact declarations. The contract below explains how they compose shared eligibility without maintaining a second copy of their signatures here.
+
+<a id="status-and-sources"></a>
+
 ## Status and sources
 
 The broader utility default is an agreed coding preference for future suggestions and authorized changes. It does not claim that every existing helper has been migrated.
 
-- [Canonical static utility convention](../../../../docs/development/application-structure.md#static-utilities-and-mappers), [qualified policies](../../../../docs/development/application-structure.md#qualified-policy-calls) and [component roles](../../../../docs/development/application-structure.md#component-conventions).
+- [Canonical static utility convention](#static-utilities-and-mappers), [qualified policies](#qualified-policy-calls) and [component roles](component-roles-and-imports.md#component-conventions).
 - Inspected examples: [ValueValidation](../../../../apps/backend/src/inframeld_backend/shared/domain/validation/value_validation.py), [PrincipalId](../../../../apps/backend/src/inframeld_backend/access/domain/value_objects/principal_id.py) and [ProjectUseOnlyGrantMapper](../../../../apps/backend/src/inframeld_backend/access/http/mappers/project_use_only_grant_mapper.py).

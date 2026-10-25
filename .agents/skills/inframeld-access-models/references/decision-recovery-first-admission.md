@@ -63,9 +63,9 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Shared eligibility and first-admission qualification](../../../../docs/development/access-control.md#shared-principal-eligibility).
-- [Invitation authority](../../../../docs/development/access-contracts.md#invitations).
-- [Completion workflow](../../../../docs/development/access-control.md#recovery-completion-workflow).
-- [Credential query boundaries](../../../../docs/development/application-structure.md#credential-query-and-policy-boundaries).
+- [Shared eligibility and first-admission qualification](eligibility-and-current-authority.md#shared-principal-eligibility).
+- [Invitation authority](admission-and-invitations.md#invitations).
+- [Completion workflow](recovery-completion.md#recovery-completion-workflow).
+- [Credential query boundaries](eligibility-and-current-authority.md#credential-query-and-policy-boundaries).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

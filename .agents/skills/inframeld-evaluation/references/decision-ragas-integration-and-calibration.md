@@ -64,8 +64,8 @@ Load neighboring decisions only under these conditions:
 
 ## Sources and finalization
 
-- [Ragas integration and calibration](../../../../docs/development/evaluation.md).
+- [Ragas integration and calibration](generation-and-review.md).
 - [Selected Ragas decision](../../../../docs/adr/ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md).
 - [All model requests share the gateway](../../../../docs/adr/ADR-0023-route-every-model-request-through-modelgateway.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.

@@ -1,16 +1,10 @@
 # Test behavior and explain the contract
 
+<a id="test-behavior-and-explain-the-contract"></a>
+
 Alice adds a grant workflow. A useful test proves what happens when authority is missing or a response is lost. A test that only checks the service's filename would not protect either behavior. Documentation should explain the same useful boundaries to a new maintainer.
 
-## Contents
-
-- [Behavioral TDD](#behavioral-tdd)
-- [Purpose before implementation detail](#purpose-before-implementation-detail)
-- [Examples and exceptions](#examples-and-exceptions)
-- [Worked example: test a rejected transition without mutation](#worked-example-test-a-rejected-transition-without-mutation)
-- [Worked example: test service ordering and replay](#worked-example-test-service-ordering-and-replay)
-- [Worked example: document the capability once](#worked-example-document-the-capability-once)
-- [Sources and status](#sources-and-status)
+<a id="behavioral-tdd"></a>
 
 ## Behavioral TDD
 
@@ -30,6 +24,8 @@ Test Command/Query inputs retain those suffixes without DTO. Other public test-s
 
 When qualifying generated code, check the actual proposed files with the existing backend Ruff rules and strict Pyright, alongside meaningful behavior tests. For isolated examples, adapt import/source roots without weakening the rules. A partial or in-memory check is not proof that the final files pass. Report checks actually run and any remaining diagnostics.
 
+<a id="purpose-before-implementation-detail"></a>
+
 ## Purpose before implementation detail
 
 Start class and method docstrings with a simple purpose and product context for a reader new to the codebase. Explain what the component does and why it exists before technical details. A brief example, such as Alice's recovery cleanup checklist, can clarify an unfamiliar concept.
@@ -42,6 +38,8 @@ Protocols own shared behavioral contracts. Implementations add useful details wi
 
 Use compact Google-style Args, Returns and Raises sections only when they add information beyond annotations and surrounding prose. Do not repeat annotated types or argument descriptions. Prefer removing repetition over enforcing a fixed length. Straightforward error subclasses need no individual boilerplate docstring.
 
+<a id="examples-and-exceptions"></a>
+
 ## Examples and exceptions
 
 Useful purpose-first wording includes “Open a phase gate - return 204 even when the flow is unknown.” Other examples are “Loads the current account status and project grants using the caller's transaction”, “Identifies the caller after authentication. Project permissions are checked separately”, and “Closes resources created before startup failed.”
@@ -49,6 +47,8 @@ Useful purpose-first wording includes “Open a phase gate - return 204 even whe
 Remove text that merely repeats a name, signature, decorator or obvious statement. Do not pursue blanket declaration coverage. Apply the same rule to tests, fixtures, helpers and modules. Preserve meaningful scenarios and unusual setup while omitting descriptions that repeat assertions or test names.
 
 Use no semicolons or em dashes in prose, comments or docstrings. Use separate sentences or a normal hyphen.
+
+<a id="worked-example-test-a-rejected-transition-without-mutation"></a>
 
 ## Worked example: test a rejected transition without mutation
 
@@ -87,7 +87,6 @@ ACTOR = PrincipalId(UUID(int=4))
 ACTION = ActionId("create-access-groups")
 EXISTING = ProjectActionGrant(PROJECT, RECIPIENT, ACTION, ProjectGrantLevel.USE_ONLY, None)
 
-
 def membership(
     *,
     grants: tuple[ProjectActionGrant, ...] = (),
@@ -100,7 +99,6 @@ def membership(
         principal_kind=kind,
         grants=grants,
     )
-
 
 @pytest.mark.parametrize("level", list(ProjectGrantLevel))
 def test_existing_assignment_cannot_be_replaced_or_downgraded(
@@ -120,6 +118,8 @@ The excerpt includes its actual typed fixtures. It is a complete runnable select
 
 **Walkthrough and failure.** The test exercises both grant levels. It checks the rejection, exact existing child instance, level and historical attribution after the attempted change. Those assertions protect meaningful state preservation. The neighboring successful-transition test covers attributed addition. An inheritance or filename assertion would protect neither behavior.
 
+<a id="worked-example-test-service-ordering-and-replay"></a>
+
 ## Worked example: test service ordering and replay
 
 **Situation.** A saved grant result must not bypass revoked authority, and a new change must finish its required writes before commit.
@@ -135,7 +135,6 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ResourceNotFoundError,
 )
-
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("error_type", [AccessDeniedError, ResourceNotFoundError])
@@ -175,7 +174,6 @@ from inframeld_backend.shared.application.services.request_fingerprint_service i
 from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
     RequestFingerprintKey,
 )
-
 
 @pytest.mark.asyncio
 async def test_replay_rechecks_authorization_before_returning_saved_result() -> None:
@@ -217,7 +215,6 @@ import pytest
 
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 
-
 @pytest.mark.asyncio
 async def test_new_assignment_completes_before_transaction_commit() -> None:
     scenario = GrantScenario()
@@ -243,6 +240,8 @@ async def test_new_assignment_completes_before_transaction_commit() -> None:
 
 **Failures and alternatives.** Neighboring tests cover mismatched returned scope, stale revision, narrow domain-error translation and reservation/save/completion/commit failures. Unit doubles cannot prove actual PostgreSQL rollback, locking or concurrency. The existing integration scenarios exercise those boundaries and must be qualified for a real affected implementation. Do not present a unit test as database evidence.
 
+<a id="worked-example-document-the-capability-once"></a>
+
 ## Worked example: document the capability once
 
 **Situation.** A new maintainer needs to know whether a recovery-block read opens a session, what its boolean means and how missing installation metadata fails.
@@ -251,8 +250,60 @@ async def test_new_assignment_completes_before_transaction_commit() -> None:
 
 Keep `@abstractmethod`, explicit protocol inheritance and `@override` on real implementations and doubles. A fake may expose controls for failure and overdue responses because those are useful test scenarios. No docstring is needed merely to repeat an annotated argument type, obvious constructor or test name.
 
+<a id="sources-and-status"></a>
+
 ## Sources and status
 
-- [Canonical service-writing guide](../../../../docs/development/application-structure.md#service-writing-guide) and [grant chain](../../../../docs/development/application-structure.md#grant-command-flow) supply actual workflow boundaries.
+- [Canonical service-writing guide](services-and-use-cases.md#service-writing-guide) and [grant chain](services-and-use-cases.md#grant-command-flow) supply actual workflow boundaries.
 - [Root guidance](../../../../AGENTS.md#behavioral-testing-and-documentation) makes this sequence mandatory. Loading a skill does not authorize file writes, test-database provisioning or paid calls.
 - [Backend tool configuration](../../../../apps/backend/pyproject.toml) and [strict Pyright configuration](../../../../apps/backend/pyrightconfig.json) supply the current rules. Do not install dependencies or modify those configurations merely to make an isolated example pass.
+
+<a id="contracts-and-useful-documentation"></a>
+
+### Contracts and useful documentation
+
+Operation and I/O contracts are explicit protocols. Required methods use `@abstractmethod`. Implementations and test doubles explicitly inherit their protocol and mark overrides with `@override`. Strict Pyright checks those contracts. Protocols normally describe behavior. `ProjectCommand` and `AuthorizedOperationScope` are the agreed exceptions for required fields, with explicit inheritance and concrete declarations. Do not add unrelated record-labeling protocols.
+
+Keep class and method docstrings focused on what callers need to use the component correctly. Start with a simple purpose and add essential context, such as trusted inputs, result meaning, side effects or transaction ownership. For public methods, prioritize prerequisites and failures that change what the caller must do next. Put the shared contract on the protocol and useful implementation details on the adapter. Follow the compact [docstring guidance](#purpose-before-implementation-detail).
+
+Use Google-style `Args`, `Returns` and `Raises` sections only when they add information beyond the signature and existing prose. Avoid repeating argument descriptions or the class contract. Internal algorithms, lists of persistence fields and ordinary exception propagation do not belong in the method contract unless they affect correct use. Longer workflow explanations belong in guides. There is no fixed length limit - keep essential safeguards and remove repetition.
+
+Remove comments and docstrings that only repeat a name, signature, decorator, or obvious statement. A straightforward error subclass does not need its own docstring. Explain exceptions when the distinction affects handling, such as a dependency failure that does not establish whether retrying is safe. Keep useful test/fixture explanations, especially for unusual setup. There is no blanket requirement to document every declaration.
+
+Before generating code, choose its owner, layer, role, destination, name, declaration style, and behavioral contract. Check its dependency direction and whether any documentation actually adds information. [AGENTS.md](../../../../AGENTS.md) makes these conventions mandatory for generated and suggested backend code.
+
+<a id="keeping-the-code-understandable-and-verifying-the-boundaries"></a>
+
+### Keeping the code understandable and verifying the boundaries
+
+Use names from the domain, keep related behavior together, return explicit errors, and keep interfaces focused on a clear responsibility.
+
+Use small functions where they improve readability, without a fixed line limit. Explain why consistency and security rules exist in comments and ADRs. Add another DTO only when it translates meaningfully between responsibilities.
+
+Tests should demonstrate business behavior, not just that methods were called. Examples include:
+
+| Scenario | Behavior to verify |
+| --- | --- |
+| A promotion uses an outdated deployment revision. | The stale promotion is rejected. |
+| A materialization has not been published. | It is unavailable for serving. |
+| An operation references a resource from another project. | The cross-project reference is denied. |
+| A process restarts and retries publication. | Publication is not duplicated. |
+
+The developer manually guards forbidden imports, dependency cycles, and repository organization, following the repository's setup-test policy. Do not add architecture/import-boundary tests, dependency-rule fixtures, or composition-root construction tests. Automated tests verify implemented product behavior, API contracts, and integrations.
+
+Tests of database and search behavior must use real PostgreSQL and the Chroma server shipped with the product. Mocks alone cannot show that real constraints, simultaneous changes, and search operations behave correctly.
+
+<a id="maintainer-checks"></a>
+
+<a id="5-maintainer-checks"></a>
+
+## Maintainer checks
+
+| Scenario | Expected outcome |
+| --- | --- |
+| An HTTP route, MCP tool, and worker perform the same operation | They call the owning application behavior with verified context. |
+| A read screen joins two domains | A purpose-built read projection may join data. It does not acquire write ownership. |
+| A grant changes while work is queued | The operation performs the current checks required by its owner. |
+| An external call times out | No long SQL transaction is held. The owning retry protocol decides what is safe. |
+| An index becomes ready | Readiness alone never changes Deployment traffic. |
+| A million-row corpus is selected | Use bounded queries and batches. Do not load an entire aggregate into memory. |

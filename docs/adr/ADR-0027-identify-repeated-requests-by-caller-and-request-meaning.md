@@ -31,7 +31,7 @@ Persist the accepted operation and its idempotency relationship atomically. Matc
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current jobs and idempotency](../development/jobs-and-idempotency.md).
-- [Current mcp](../development/mcp.md).
-- [Current onboarding](../development/onboarding.md).
+- [Current jobs and idempotency](../../.agents/skills/inframeld-application-contracts/references/jobs-and-recovery.md).
+- [Current mcp](../../.agents/skills/inframeld-application-contracts/references/mcp-transport.md).
+- [Current onboarding](../../.agents/skills/inframeld-architecture/references/first-use-and-private-defaults.md).
 - Related decisions: [ADR-0026](ADR-0026-persist-background-work-through-controlled-durable-attempts.md), [ADR-0028](ADR-0028-recover-answer-requests-through-receipts-without-a-full-answer-replay-cache.md), [ADR-0029](ADR-0029-use-expected-revisions-to-protect-competing-changes.md).

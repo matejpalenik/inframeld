@@ -1,12 +1,18 @@
 # Indexing architecture: prepare exact data and prove it is usable
 
-Alice replaces B1 with B2. The old revision still needs B1's vectors, while the new revision can reuse unchanged A1's vectors. Indexing must prepare only the required new data and prove each selected revision has its complete search bindings.
+<a id="indexing-architecture-prepare-exact-data-and-prove-it-is-usable"></a>
+
+Alice admits B2, then an authorized selection includes it in a new revision. The old revision still needs B1's vectors, while the newly selected revision can reuse unchanged A1's vectors. Indexing must prepare only the required new data and prove each selected revision has its complete search bindings.
+
+<a id="what-indexing-owns"></a>
 
 ## What Indexing owns
 
 Indexing owns processing/embedding profiles, processed chunks, numerical generations, physical vector layouts, materialization readiness, permission-filtered retrieval and numerical cleanup. Knowledge supplies admitted source versions and exact membership. Access supplies current permissions. Pipelines requests preparation or retrieval. Releases owns traffic.
 
 A profile fixes settings. A generation identifies actual processing or numerical execution. A materialization is the verified collection of exact source, profile and generation bindings needed to search. These concepts do not each require an aggregate, repository or runtime process.
+
+<a id="main-parts-and-boundaries"></a>
 
 ## Main parts and boundaries
 
@@ -30,6 +36,8 @@ flowchart TB
 ```
 
 Arrows describe data and lifecycle responsibilities. PostgreSQL owns membership, current authority and recorded readiness. Private SeaweedFS artifacts hold processed outputs and exact retry bytes through `ArtifactStore`. Chroma stores derived immutable vectors. A logical Collection is not a physical Chroma shard. API code may read through the retrieval path, while only the supported singleton worker writer mutates Chroma under its process-lifetime lock.
+
+<a id="follow-changed-content-and-an-uncertain-write"></a>
 
 ## Follow changed content and an uncertain write
 
@@ -72,6 +80,8 @@ A storage retry reuses known bytes. A provider timeout before those bytes exist 
 
 A prompt-only change may reuse a compatible ready materialization. Changing embedding meaning needs a distinct appropriate profile/connection and ordinary preparation. Reject incompatible or unproven shared embedding changes before activation. An alias, matching dimensions or a successful probe cannot prove unchanged numerical meaning.
 
+<a id="data-and-execution"></a>
+
 ## Data and execution
 
 Parsing is offline with pinned assets, bounded input/output and worker validation. Unsupported isolation fails without privileged fallback. Every remote embedding uses ModelGateway. Store source/artifact coordinates for text actually returned so Evaluation can measure passage coverage.
@@ -80,21 +90,49 @@ A query intersects exact revision membership with current access using server-ge
 
 Pins record that work still needs retained data. Tombstones retire identities before resumable deletion, including protection from late writes. Authorised erasure can invalidate historical versions. A historical ready label is not current dependency health or proof of complete erasure.
 
+<a id="what-exists-today"></a>
+
 ## What exists today
 
 This is accepted Indexing design. It does not claim an implemented parser coordinator, vector writer or retrieval service. Existing worker/backend assumptions still need the source-specific backend, security, failure and resource qualification in the guide. Reuse does not make full verification free or establish measured capacity.
 
 Read [profiles and preparation](profiles-and-preparation.md), [frozen vector retries](vector-writes-and-retries.md), [retrieval](retrieval-and-filtering.md) and [retirement](retirement-and-erasure.md) for their precise rules.
 
+<a id="decisions-still-needed-and-sources"></a>
+
 ## Decisions still needed and sources
 
-[ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) accepts focused preparation/readiness, retrieval and numerical retirement capabilities. The [owning guide](../../../../docs/development/indexing.md#indexing-capability-boundaries) retains exact trusted-input/binding contracts, current-health obligations, unavailable outcomes and cleanup coordination still to specify. The selected engine, frozen-byte retries and qualification limits remain in force.
+[ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) accepts focused preparation/readiness, retrieval and numerical retirement capabilities. The [owning guide](#indexing-capability-boundaries) retains exact trusted-input/binding contracts, current-health obligations, unavailable outcomes and cleanup coordination still to specify. The selected engine, frozen-byte retries and qualification limits remain in force.
 
-[The Indexing guide](../../../../docs/development/indexing.md), [Indexing records](../../../../docs/development/data-model.md#indexing), [model connections](../../../../docs/development/model-connections.md) and [ingestion security](../../../../docs/development/ingestion-security.md) own the accepted protocols and qualification limits.
+[The Indexing guide](profiles-and-preparation.md), [Indexing records](records.md#indexing), [model connections](../../inframeld-application-contracts/references/model-gateway-and-connections.md) and [ingestion security](../../inframeld-knowledge/references/uploads-and-source-sync.md) own the accepted protocols and qualification limits.
+
+<a id="proposed-internal-architecture---awaiting-decisions"></a>
+
+<a id="internal-architecture-decisions"></a>
+
+## Internal architecture decisions
+
+The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The precise contracts listed with each decision remain design work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
+
+<a id="indexing-capability-boundaries"></a> <a id="proposal-indexing-capabilities"></a>
+
+<a id="separate-index-preparation-retrieval-and-retirement"></a>
+
+### Separate index preparation, retrieval and retirement
+
+**Status:** Accepted in [ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md), with implementation and qualification unfinished.
+
+Indexing has focused preparation/readiness, retrieval and numerical retirement/cleanup capabilities. Preparation and retirement use the supported singleton vector writer. Retrieval exposes permission-filtered reads to query callers. These responsibilities remain inside the existing backend.
+
+Explicit typed bindings identify the exact corpus, profiles, generations and layout passed between these parts. Existing readiness verification, frozen-byte retries, current-health checks and shared retention gates remain authoritative. Reuse the existing jobs and transaction support. This split selects no new vector engine, process or generic workflow framework.
+
+**Remaining design and qualification.** Specify trusted inputs, complete binding/result contracts, readiness versus current-health obligations, unavailable outcomes and cleanup/retention coordination before coding the ports. These are logical capabilities, not a class, repository or process per box. Exact backend, security, resource and concurrency qualification remains required. A numerical reuse key cannot authorize redispatch of an uncertain paid request.
+
+<a id="pending-decisions-for-dependent-implementation"></a>
 
 ## Pending decisions for dependent implementation
 
-The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
 
 - [PD-INDEXING-01: Exchange complete prepared bindings between Indexing capabilities](decision-capability-binding-contracts.md). Before defining preparation, retrieval or retirement application ports and their complete input/result records.
 - [PD-INDEXING-02: Define what current index health can actually detect](decision-health-observation.md). Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.

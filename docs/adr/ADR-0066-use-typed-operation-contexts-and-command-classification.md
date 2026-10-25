@@ -44,7 +44,7 @@ The complete grant workflow checks that the returned project matches the Command
 - [ADR-0068: membership aggregate and repository](ADR-0068-model-project-grants-through-project-membership-aggregates.md) retains these input and scope contracts while moving assignment transitions into the domain model.
 - [ADR-0065: application-owned write transactions](ADR-0065-application-services-own-write-transactions.md).
 - [ADR-0067: typed authorization capabilities](ADR-0067-standardize-authorization-capabilities-with-typed-requests.md) adds the common calling convention and qualifies both existing consumers without changing these operation-context contracts.
-- [Command conventions and grant flow](../development/application-structure.md#component-conventions).
-- [Idempotency input sources](../development/jobs-and-idempotency.md#reservation-inputs) and [temporary records](../development/data-model.md#principal-eligibility-inputs).
-- [Access implementation evidence](../development/access-control.md#shared-principal-eligibility).
+- [Command conventions and grant flow](../../.agents/skills/inframeld-coding-standards/references/component-roles-and-imports.md#component-conventions).
+- [Idempotency input sources](../../.agents/skills/inframeld-application-contracts/references/idempotency-and-replay.md#reservation-inputs) and [temporary records](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#principal-eligibility-inputs).
+- [Access implementation evidence](../../.agents/skills/inframeld-access-models/references/eligibility-and-current-authority.md#shared-principal-eligibility).
 - [Python Protocol specification](https://typing.python.org/en/latest/spec/protocol.html), including explicit implementations and generic field invariance.

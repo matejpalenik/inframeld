@@ -1,6 +1,11 @@
 # Recovery blocks, cleanup and completion
 
-Alice recovers a compromised identity. She needs a legitimate recovery session, but the attacker must not keep using old product or CLI access. Access temporarily blocks product work, permanently invalidates the old CLI generation, and tracks the original cleanup checklist. Those three protections have different completion conditions.
+<a id="follow-recovery-admission"></a>
+
+## Choose a focused reading task
+
+- For provider cleanup and uncertainty, read [Recovery provider cleanup](recovery-provider-cleanup.md).
+- For local completion and independent block release, read [Recovery completion](recovery-completion.md).
 
 ## Follow recovery admission
 
@@ -14,48 +19,7 @@ An aggregate is the domain object responsible for cohesive state transitions. He
 
 If a changed save conflicts, roll back and load current state before another decision. Do not automatically repeat provider calls. An unchanged save performs no writes or freshness checks.
 
-## Bulk Hydra cleanup
-
-The caller establishes the original identity's trusted provider and installation binding. `HumanOAuthCredentialRevoker` separates two bounded capabilities: subject/client bulk revocation of CLI grants, and subject-wide deletion of remembered Hydra logins. These have independent outcomes.
-
-The SDK adapter lives in `infrastructure/revokers`. It makes one bounded attempt outside SQL transactions and translates provider outcomes. It owns no identity verification, durable scheduling or block release.
-
-There are no automatic retries. Ordinary selected-device logout keeps its narrower scope. Preserve Kratos's legitimate recovery session.
-
-Recovery uses bulk subject cleanup, not a per-login inventory, original-target snapshot or timestamp cutoff. Listed consent rows can be incomplete and must not choose cleanup targets. Neither a typed subject nor one successful acknowledgement establishes the whole recovery's Hydra outcome.
-
-## Delayed requests and failures
-
-An unfinished retry or an already dispatched cleanup call may invalidate newer CLI credentials. Report that possibility honestly. A durably completed event must not initiate new cleanup. Original obligations survive interruption and use the existing bounded reconciliation contract.
-
-A login approval or refresh can cross the cleanup calls. HTTP-ordering tests distinguish outstanding authorization codes, prepared approvals, late token responses and approval between bulk calls. A held request or response does not freeze Hydra internally. Staged records are test evidence, not a credential inventory or authority to release a block.
-
-The durable credential version supplements bulk cleanup. A late grant may remain accepted at Hydra and still receive Inframeld's invalid-token response. Refresh descendants keep the old version. Current Inframeld rejection does not establish Hydra-wide rejection or complete provider cleanup.
-
-Pinned Kratos observations also distinguish recovery-code acceptance from password replacement. Accepting the recovery code leaves the old password usable until replacement. Settings pre-save and post-save failures have different persistence effects. A recovery-created settings flow preserves original-flow evidence, while a fresh settings flow cannot claim it through a query parameter.
-
-## Track cleanup separately from access restoration
-
-**Accepted coordination view.** Checklist persistence/local completion have inspected code. Production callbacks and full provider-cleanup/reconciliation wiring remain unfinished. This flow describes obligations, not a new formal state enumeration.
-
-```mermaid
----
-title: "Recovery obligations - accepted coordination view"
----
-flowchart TB
-    Evidence["Trusted original recovery-flow evidence"] -->|"Admit once"| Admission["Save obligation and block<br/>Advance CLI credential version once"]
-    Admission -->|"Native session-cleanup responsibility"| Kratos["Kratos outcome<br/>Preserve legitimate recovery session"]
-    Admission -->|"Bounded subject-scoped cleanup"| Hydra["Hydra grant and remembered-login outcomes<br/>Independent provider calls"]
-    Kratos -->|"Trusted observation"| Checklist["IdentityRecovery checklist"]
-    Hydra -->|"Trusted observation"| Checklist
-    Checklist -->|"Evaluate current original-flow eligibility"| Eligible{"Provider outcomes confirmed<br/>and local release checks satisfied?"}
-    Eligible -->|"No"| Blocked["Keep this obligation unreleased"]
-    Eligible -->|"Yes"| Release["Release only this original obligation"]
-    Release -->|"Still check"| Other["Other blocks, suspension and current permissions"]
-    Admission -.->|"Never reset by completion"| Version["Old CLI binding remains invalid"]
-```
-
-Arrows show causal obligations and checks. Confirmed cleanup cannot replace current local eligibility, release another recovery or restore removed grants. A pending or uncertain provider outcome remains incomplete. An unfinished or already dispatched bulk call can invalidate newer CLI credentials, while a completed event must initiate no new cleanup. See the [aggregate](../../../../apps/backend/src/inframeld_backend/access/domain/entities/identity_recovery.py) and [local completion service](../../../../apps/backend/src/inframeld_backend/access/application/services/identity_recovery_completion_service.py) for the implemented subset.
+<a id="implementation-status-and-limits"></a>
 
 ## Implementation status and limits
 
@@ -65,16 +29,63 @@ Production callbacks, complete provider-cleanup orchestration, bounded reconcili
 
 Recovery never clears suspension, recreates removed permissions or lets an older completion release a newer independent block. Preserve ordinary account eligibility, current authorization on replay and product-specific visibility ordering.
 
-## Sources and rationale
+<a id="identity-recovery-cleanup"></a>
 
-- [Recovery cleanup](../../../../docs/development/access-control.md#identity-recovery-cleanup), [completion workflow](../../../../docs/development/access-control.md#recovery-completion-workflow), [credential versions](../../../../docs/development/access-control.md#human-credential-versions) and [cleanup records](../../../../docs/development/data-model.md#identity-cleanup-records).
-- [Bulk Hydra evidence](../../../../docs/development/access-control.md#hydra-cleanup-evidence), [discovery observations](../../../../docs/development/access-control.md#hydra-discovery-evidence), [issuance ordering](../../../../docs/development/access-control.md#hydra-issuance-evidence), [password-reset observations](../../../../docs/development/access-control.md#kratos-password-reset-evidence) and [reconciliation](../../../../docs/development/jobs-and-idempotency.md#identity-cleanup).
-- [ADR-0058](../../../../docs/adr/ADR-0058-block-product-access-during-identity-recovery-cleanup.md), [ADR-0069](../../../../docs/adr/ADR-0069-release-completed-recovery-obligations-independently.md), [ADR-0070](../../../../docs/adr/ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md) and [ADR-0072](../../../../docs/adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md).
-- [Private recovery handoff](../../../../docs/development/access-contracts.md#recovery-wire) remains a delivery draft, not a new public recovery bypass.
+<a id="block-product-access-until-verified-recovery-cleanup-finishes"></a>
+
+### Block product access until verified recovery cleanup finishes
+
+Alice can recover her password without having been suspended. At the authenticated server-side boundary, trusted flow-bound evidence of verified identity recovery/reset durably admits one cleanup operation and temporarily blocks her product access. Evidence of the verified reset is distinct from confirmation that both providers have finished session/grant cleanup. The Kratos recovery and password-setting screens remain usable. An anonymous request for a recovery email, a browser redirect or an OAuth callback is not proof of recovery completion and cannot trigger revocation.
+
+Track Kratos-session cleanup and affected Hydra-grant cleanup independently. A confirmed success from one provider does not establish the other outcome. Failure or uncertainty keeps the product block in place while bounded reconciliation continues the original operation. Provider calls happen outside a database transaction. The operation must distinguish the legitimate new recovery session from sessions to invalidate.
+
+| Current local account state | After both required cleanup outcomes are confirmed |
+| --- | --- |
+| Active admitted human | Release only this operation's block. Current admission, other recovery blocks and grants still apply. |
+| No local identity link | Release this finished obligation without creating an account or granting access. |
+| Suspended or retired local account | Do not release automatically or change account status. Suspension still needs a separately authorized Restore users operation and its security review. |
+| Another recovery is unreleased | It continues blocking product access. This completed eligible flow may release only its own block. |
+
+Deduplicate trusted completion using its original flow-bound event identity. A duplicate completed event returns its recorded outcome without initiating another provider call. An unfinished bulk retry or already-dispatched call may invalidate newer CLI credentials under [ADR-0070](../../../../docs/adr/ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md). Neither cleanup completion nor restoration recreates explicitly removed memberships or grants. Keep callback evidence bounded and credential-free: do not include session cookies/tokens in callback payloads or audit. The temporary block is an operation obligation, not a newly selected `Principal` status or permission snapshot. [ADR-0058](../../../../docs/adr/ADR-0058-block-product-access-during-identity-recovery-cleanup.md) records the cleanup block, refined by [ADR-0069](../../../../docs/adr/ADR-0069-release-completed-recovery-obligations-independently.md) for overlapping recoveries and completion before local admission. [Durable cleanup](recovery-completion.md#identity-cleanup) and [logical records](credential-and-recovery-records.md#identity-cleanup-records) own the related contracts.
+
+**Accepted production integration shape:** use authenticated server-side registration of the verified flow, native Kratos session cleanup, trusted cleanup evidence and independent durable Hydra cleanup. The admitted product block must protect the pending interval, including the password-setting gap described below. The pinned [Kratos v26.2.0 recovery webhook](https://github.com/ory/kratos/blob/v26.2.0/selfservice/hook/web_hook.go) still does not expose the recovery session in its template context. Both settings hooks now expose the current session, but its presence before saving does not prove cleanup. Neither a generic webhook response nor a completed password form proves both providers finished cleanup. [The provider tests below](recovery-provider-cleanup.md#kratos-password-reset-evidence) qualify selected hook ordering and identifier observations, without implementing production callback delivery or reconciliation. [The private callback contract](private-recovery-handoff.md#recovery-callbacks) still requires a dedicated rotatable service secret, a five-field allowlisted body limited to 8 KiB and stable original-flow/event/phase deduplication. Its authenticated sender alone does not establish the meaning of the evidence. The [private callback draft](private-recovery-handoff.md#recovery-wire) retains its original flow binding and qualification requirements for production integration.
+
+<a id="authorization-failure-scenarios"></a>
+
+## Authorization failure scenarios
+
+| Situation | Required outcome |
+| --- | --- |
+| Appoint a manager through normal administration, creation, or recovery. | Membership and management are saved together with the revision and audit. A manager without membership is invalid. |
+| Suspend the only manager, then recover the group. | Reading and administration stop immediately. Recovery gives both assignments to an eligible replacement and keeps the compromised account blocked. |
+| Exercise login, logout, recovery, MFA, CSRF, disabled identities, and provider or session-check outages. | Unverifiable identity is denied. Restoring an account follows the deliberate recovery process. |
+| Delete a Document, application, or project. | Each operation respects its own limits, cleanup, and handover rules. |
+
+| Situation | Required outcome |
+| --- | --- |
+| Verified recovery finishes Kratos cleanup while Hydra cleanup is uncertain. | Product access stays blocked and reconciliation uses the original operation. An unfinished bulk attempt may invalidate newer CLI credentials. A completed duplicate initiates no new cleanup. |
+| Project deletion succeeds but Alice loses the response and later her membership. | Recover the original operation under the narrow content-free status rule. Keep failed shutdown/cleanup blocked without recreating the project. |
+
+| Situation | Required outcome |
+| --- | --- |
+| Kratos cleanup succeeds but Hydra cleanup is uncertain. | Keep product blocked and reconcile the original operation. An unfinished bulk attempt may revoke newer CLI credentials, but a completed duplicate initiates no new cleanup. |
+| Private complete arrives before admission, or binds another identity to the flow. | Safe 409. No new obligation/block release. Reconcile the original trusted admission. |
+| A sole manager is suspended and provider cleanup fails. | Suspension succeeds without handover. Access stays blocked and its original obligation persists. Restore cannot bypass incomplete cleanup or security review. |
+
+<a id="pending-decisions-for-dependent-implementation"></a>
 
 ## Pending decisions for dependent implementation
 
-The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
 
 - [PD-ACCESS-03: Prove recovery cleanup before releasing product access](decision-recovery-production-completion.md). Before wiring production recovery admission/completion callbacks, cleanup orchestration, issuance coordination or block release.
 - [PD-ACCESS-04: Coordinate first account admission with identity recovery](decision-recovery-first-admission.md). Before implementing first local admission, invitation activation/provisioning or recovery completion that can race with admission.
+
+<a id="sources-and-rationale"></a>
+
+## Sources and rationale
+
+- [Recovery cleanup](#identity-recovery-cleanup), [completion workflow](recovery-completion.md#recovery-completion-workflow), [credential versions](human-cli-credential-lifecycle.md#human-credential-versions) and [cleanup records](credential-and-recovery-records.md#identity-cleanup-records).
+- [Bulk Hydra evidence](recovery-provider-cleanup.md#hydra-cleanup-evidence), [discovery observations](recovery-provider-cleanup.md#hydra-discovery-evidence), [issuance ordering](recovery-provider-cleanup.md#hydra-issuance-evidence), [password-reset observations](recovery-provider-cleanup.md#kratos-password-reset-evidence) and [reconciliation](recovery-completion.md#identity-cleanup).
+- [ADR-0058](../../../../docs/adr/ADR-0058-block-product-access-during-identity-recovery-cleanup.md), [ADR-0069](../../../../docs/adr/ADR-0069-release-completed-recovery-obligations-independently.md), [ADR-0070](../../../../docs/adr/ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md) and [ADR-0072](../../../../docs/adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md).
+- [Private recovery handoff](private-recovery-handoff.md#recovery-wire) remains a delivery draft, not a new public recovery bypass.

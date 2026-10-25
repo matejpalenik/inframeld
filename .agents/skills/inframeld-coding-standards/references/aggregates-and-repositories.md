@@ -1,15 +1,12 @@
 # Change an aggregate through its specific repository
 
+<a id="change-an-aggregate-through-its-specific-repository"></a>
+
 Bob can hold several direct action grants on Support. Adding one must preserve the others and reject an existing assignment. Loading one membership and its complete direct collection gives this rule a focused owner without loading every member of the Project.
 
 An aggregate is the domain object responsible for a group of state that must stay consistent. A repository is its application-owned loading and persistence capability. Neither term means a generic CRUD framework, a database row or proof of permission.
 
-## Contents
-
-- [Worked example: give the transition a domain owner](#worked-example-give-the-transition-a-domain-owner)
-- [Worked example: define the specific repository](#worked-example-define-the-specific-repository)
-- [Worked example: save supported changes without committing](#worked-example-save-supported-changes-without-committing)
-- [Status and evidence](#status-and-evidence)
+<a id="worked-example-give-the-transition-a-domain-owner"></a>
 
 ## Worked example: give the transition a domain owner
 
@@ -32,7 +29,6 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-
 
 class ProjectMembership:
     """Own one member's complete collection of direct project action grants.
@@ -133,6 +129,8 @@ The aggregate identity is project plus principal. Organization and kind are read
 
 Value objects protect their own invariants, and pure policies may consume several objects or explicit facts. Not every DTO or supporting audit record needs an aggregate.
 
+<a id="worked-example-define-the-specific-repository"></a>
+
 ## Worked example: define the specific repository
 
 **Situation.** The service must load Bob's existing membership, execute its action and save the supported change without knowing SQLAlchemy.
@@ -150,7 +148,6 @@ from inframeld_backend.access.domain.value_objects.organization_id import Organi
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
-
 
 class ProjectMembershipRepository(Protocol):
     """Load and save membership grants in an already authorized transaction.
@@ -228,6 +225,8 @@ The full [service example](services-and-use-cases.md#worked-example-add-a-comple
 
 **Failure and alternatives.** Loading a membership grants no action permission. A repository does not replace authorization. A read projection needs no save method. Creation needs a separately designed persistence contract rather than changing this `get` into an implicit create. Keep supporting audit and reservation writers as focused capabilities.
 
+<a id="worked-example-save-supported-changes-without-committing"></a>
+
 ## Worked example: save supported changes without committing
 
 **Situation.** PostgreSQL must preserve existing assignments and timestamps, add the supported grants, advance the Project revision once and append required audit. A failure must not leave the adapter's in-memory state trustworthy.
@@ -248,7 +247,6 @@ from inframeld_backend.access.domain.entities.project_membership import (
     ProjectMembership,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
-
 
 class PostgresProjectMembershipRepository(ProjectMembershipRepository):
     @override
@@ -289,12 +287,28 @@ class PostgresProjectMembershipRepository(ProjectMembershipRepository):
 
 The adapter opens no transaction, acquires no explicit coordination locks, commits nothing and retries nothing. The current authorizer/service and database constraints retain their existing coordination responsibilities. Do not catch a failed save and continue toward commit.
 
+<a id="status-and-evidence"></a>
+
 ## Status and evidence
 
 Only the current attributed use-only addition workflow is implemented by this repository. Membership creation/removal, arbitrary updates, revocation and cross-member lifecycle operations remain deferred. The existing boolean storage representation, nullable historical attribution and timestamps are preserved. Do not invent a membership revision, generic `Repository[T]`, Unit of Work service locator or additional schema to imitate this example.
 
 Behavior tests should cover accepted/rejected transitions, exact scoped instances, unchanged saves, value preservation, revision conflicts, required audit and rollback. Existing integration scenarios are evidence of what was recorded or inspected, not checks personally rerun by reading this reference.
 
-- [Canonical aggregate/repository explanation](../../../../docs/development/application-structure.md#membership-aggregate-and-repository), [data-model ownership](../../../../docs/development/data-model.md#project-membership-aggregate) and [ADR-0068](../../../../docs/adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md).
+- [Canonical aggregate/repository explanation](#membership-aggregate-and-repository), [data-model ownership](../../inframeld-access-models/references/implemented-access-models.md#project-membership-aggregate) and [ADR-0068](../../../../docs/adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md).
 - [Immutable grant child](../../../../apps/backend/src/inframeld_backend/access/domain/entities/project_action_grant.py), [repository adapter and helpers](../../../../apps/backend/src/inframeld_backend/access/infrastructure/repositories/postgres_project_membership_repository.py) and [PostgreSQL behavior scenarios](../../../../apps/backend/tests/integration/access/test_project_membership_repository_postgres.py).
 - [Application transaction ownership](../../inframeld-application-contracts/references/transactions-jobs-and-idempotency.md) and [behavioral testing examples](testing-and-documentation.md).
+
+<a id="membership-aggregate-and-repository"></a>
+
+### Membership aggregate and repository
+
+Bob can hold several direct project action grants on Support. [`ProjectMembership`](../../../../apps/backend/src/inframeld_backend/access/domain/entities/project_membership.py) owns that complete collection, identified by `(project_id, principal_id)`. Organization and principal kind remain read-only metadata. An immutable [`ProjectActionGrant`](../../../../apps/backend/src/inframeld_backend/access/domain/entities/project_action_grant.py) has natural identity `(project_id, recipient_principal_id, action_id)`. Its level and attribution are state, so comparing child identity does not prove those values are unchanged.
+
+The aggregate validates the complete reconstituted collection, rejects wrong-scope children, duplicate actions and application delegation, and adds attributed use-only assignments through domain behavior. It does not own eligibility, delegation authorization, project revisions or operation metadata. The whole Project is not loaded to change one member, but the existing project lock and revision still coordinate writes across members.
+
+[`ProjectMembershipRepository`](../../../../apps/backend/src/inframeld_backend/access/application/protocols/project_membership_repository.py) is a specific application port. Its [`Postgres` adapter](../../../../apps/backend/src/inframeld_backend/access/infrastructure/repositories/postgres_project_membership_repository.py) loads an existing scoped membership and all its direct grants through one typed outer join. Missing membership returns the existing not-found failure and never provisions anything. Repeated loads in one transaction return the same aggregate instance.
+
+The adapter keeps immutable value snapshots outside the entity, bound to that active session transaction. Only its exact loaded instances may be saved. It compares levels and attribution explicitly and rejects unsupported modifications or removals. An unchanged save writes nothing. A save with additions conditionally advances the active project's revision once, inserts without overwriting rows, and appends correlated audit events. The boolean database level, existing attribution and database timestamps retain their current storage format.
+
+Discard the repository and aggregates after commit, rollback or failed save. If a save fails or is cancelled, errors propagate and the transaction owner must roll back. Snapshots advance only after persistence and audit succeed. The adapter opens no transaction, acquires no explicit locks, commits nothing and performs no retries. Membership creation/removal, grant updates/revocation and cross-member lifecycle operations remain deferred. [ADR-0068](../../../../docs/adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md) records the decision.
