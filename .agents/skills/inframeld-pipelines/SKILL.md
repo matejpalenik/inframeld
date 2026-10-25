@@ -33,7 +33,11 @@ Alice can evaluate two fixed configurations before building. Desired changes mus
 4. For result claims, identify actual model/configuration and evidence attribution. For implementation claims, inspect code and separate accepted contracts from qualification.
 5. Cite the relevant rule. Loading this skill authorizes no edits, paid calls, releases or external mutations.
 
+Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+
 ## Read as needed
+
+- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
 
 - For working history, direct queries, overrides, portability or Build input selection, read [Configuration, queries and builds](references/configuration-queries-and-builds.md).
 - For context assembly, model settings, current checks or answer recovery, read [Answer execution and receipts](references/answer-execution-and-receipts.md).

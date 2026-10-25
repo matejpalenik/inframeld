@@ -34,7 +34,11 @@ Generation proposes cases. Review decides which revisions are suitable. Evaluati
 4. Trace preparation and nested calls when reviewing gateway safety. Separate source-inspected library compatibility from executed integration and human calibration.
 5. Cite the current rule. Loading this skill grants no edits, model calls, exports or releases.
 
+Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+
 ## Read as needed
+
+- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
 
 - For starter sampling and immutable review, read [Generation and review](references/generation-and-review.md).
 - For captured inputs, baselines and fresh execution, read [Benchmarks and comparisons](references/benchmarks-and-comparisons.md).

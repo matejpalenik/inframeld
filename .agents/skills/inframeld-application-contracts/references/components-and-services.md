@@ -24,6 +24,29 @@ Arrows show code dependency direction, not network calls. Infrastructure impleme
 
 Bootstrap owns aggregate settings, concrete dependency assembly, application construction and resource lifecycle. Entry points stay small. The frontend retains its existing Next.js conventions.
 
+## Shared support in an owning workflow
+
+Alice's grant operation needs a transaction and safe replay. A later document job also needs durable background progress. These are supporting capabilities supplied to the owning domain operation, not additional product domains or compulsory dependencies for every service.
+
+**Logical application view.** Transaction/idempotency foundations are implemented for the grant chain. Complete worker and gateway workflows retain their accepted target/qualification status.
+
+```mermaid
+---
+title: "Shared application support - logical capabilities"
+---
+flowchart TB
+    Entry["HTTP, CLI, MCP or worker entry point"] -->|"Invoke owning capability"| Operation["Domain-owned application operation"]
+    Operation -->|"Apply business transition"| Domain["Domain entities and pure policies"]
+    Operation -->|"Begin and finish local write"| Tx["TransactionManager"]
+    Operation -->|"Recognise checked original operation"| Retry["OperationIdempotency"]
+    Operation -->|"Admit bounded background work when needed"| Jobs["Durable job support"]
+    Operation -->|"Perform approved remote model work when needed"| Gateway["ModelGateway"]
+    Operation -->|"Read or persist typed state"| Ports["Specific application-owned persistence capabilities"]
+    Bootstrap["Bootstrap<br/>Concrete assembly and resource lifetime"] -.->|"Supply implementations and shared local resources"| Operation
+```
+
+Solid arrows show the support an operation may invoke. The dotted arrow means assembly. These are different from the source-dependency arrows above. Authentication happens before the grant transaction. Long provider waits and parsing remain outside SQL transactions. Typed results and shared process boundaries do not transfer authority between domains. See [the module map](../../inframeld-architecture/references/module-map.md) to choose the owner before its shared collaborators.
+
 ## State and decisions belong to domain objects
 
 An entity has stable identity and cohesive state. An aggregate owns its state-transition rules and keeps mutable collections private. A service invokes that behavior and persists through the aggregate's specific repository.

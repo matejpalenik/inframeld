@@ -12,6 +12,8 @@ Direct execution means **Query on a Pipeline**. There is no separate Experiment 
 
 Permission to query a Pipeline or inspect its traces does not grant unrestricted access to evaluation history. Evaluation evidence and query traces have separate access and retention rules.
 
+Read the [module architecture](../../.agents/skills/inframeld-evaluation/references/architecture.md) for the structural view and [internal architecture decisions](#internal-architecture-decisions) for accepted boundaries and remaining design work.
+
 ## Contents
 
 | Reader's question | Start here |
@@ -448,3 +450,21 @@ In **Automatic updates**, an authorized live-input source operation or explicit 
 Manual blank-form authoring, automatic multi-hop/negative synthesis, correctness/relevance judges, custom evaluator platforms, ensembles, optimizers, automatic remedies, and external Phoenix/LangSmith exporters remain deferred. These exclusions do not defer starter generation, review, or claim extraction. No hosted evaluation account, graph database, separate runner, or workflow engine is required.
 
 Official background: [single-hop generation](https://docs.ragas.io/en/stable/howtos/applications/singlehop_testset_gen/), [prechunked input](https://docs.ragas.io/en/stable/howtos/customizations/testgenerator/prechunked_data/), [faithfulness](https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/), and [runtime configuration](https://docs.ragas.io/en/stable/howtos/customizations/run_config/). Use the pinned source evidence above when rolling examples have different API shapes.
+
+<a id="proposed-internal-architecture---awaiting-decisions"></a>
+
+## Internal architecture decisions
+
+The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The precise contracts listed with each decision remain design work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
+
+<a id="evaluation-operation-boundaries"></a> <a id="proposal-evaluation-boundaries"></a>
+
+### Separate Evaluation case work, run coordination and scoring
+
+**Status:** Accepted in [ADR-0078](../adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md), with implementation and qualification unfinished.
+
+Evaluation separates case generation/review operations, run/comparison coordination and scoring adapters. These parts have different state, permissions and provider lifetimes. Their contracts must make progress, actual outcomes and protected results explicit.
+
+Ordinary question execution stays with Pipelines. Durable continuation uses existing jobs, and every remote synthesis/judge/repair uses ModelGateway. Ragas remains an embedded library. Separate execution success from metric eligibility, retain fixed benchmark membership and current inspection protection, and keep publication with Releases.
+
+**Remaining design and qualification.** Specify exact case/run inputs, per-metric outcomes, protected result representations, bounded progress and preparation/execution/scoring coordination before implementing the ports or persistence. No generic Dataset/Experiment platform, new runner or table per concept follows from this split. Runtime integration, library compatibility and human judge calibration remain qualification work.

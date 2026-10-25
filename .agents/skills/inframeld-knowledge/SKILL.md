@@ -35,7 +35,11 @@ Uploaded, admitted, parsed and searchable are different milestones. Admission me
 4. Separate knowledge admission from index preparation, evaluation-case generation and release selection.
 5. Cite the current rule and distinguish accepted design from inspected code. Loading this skill authorizes no edits, source contact or external mutations. Report contradictions instead of resolving policy by invention.
 
+Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+
 ## Read as needed
+
+- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
 
 - For versions, frozen corpora, manifests or portable configuration, read [Documents and collections](references/documents-and-collections.md).
 - For staged uploads, replacement, private setup or bounded sync, read [Uploads and source sync](references/uploads-and-source-sync.md).

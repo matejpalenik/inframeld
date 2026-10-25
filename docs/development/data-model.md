@@ -14,6 +14,7 @@ A **primary key (`PK`)** identifies a row. A **foreign key (`FK`)** makes the da
 | Who can act, and in which project? | [Access](#access) |
 | Is eligibility stored or read for one attempt? | [Principal eligibility inputs](#principal-eligibility-inputs) |
 | What does an authenticated request carry? | [Authentication evidence records](#authentication-evidence-records) |
+| What does application-key verification return? | [Verified application-key result](#application-key-verification-result) |
 | What keeps old CLI credentials invalid after recovery? | [Human credential version records](#human-credential-version-records) |
 | Which source bytes belong to a corpus? | [Knowledge](#knowledge) |
 | Which prepared data can a build reuse? | [Indexing](#indexing) |
@@ -126,7 +127,11 @@ Equality and hashing follow `PrincipalId`, so snapshots of one account remain th
 
 `PrincipalId`, `OrganizationId`, `ProjectId`, and `AccessGroupId` are distinct frozen, slotted objects wrapping a parsed UUID. They preserve all existing UUID values, while preventing accidental interchange in application contracts. ORM mappings keep UUID columns and adapters explicitly convert values. The historical initial migration remains authoritative; this reorganization adds no schema migration.
 
-`IdentityAuthority` and `IdentitySubject` remain validated exact strings carried together in `VerifiedHumanIdentityDTO`. The identity reader returns current principal state without applying admission in SQL. `AccessContextDTO` retains only `PrincipalId`; current account and grant checks still run when authorizing an operation. The implemented project target is `ProjectActionTargetDTO(ProjectId)`; no generic bare-UUID resource target is implied.
+`IdentityAuthority` and `IdentitySubject` remain validated exact strings carried together in `VerifiedHumanIdentityDTO`. The identity reader returns current principal state without applying admission in SQL.
+
+`AccessContextDTO` carries the authenticated `PrincipalId` and exactly one complete, non-secret [authentication evidence record](#authentication-evidence-records) for a browser session, human CLI OAuth credential or application key, as required by [ADR-0073](../adr/ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md). It retains no credential secret, mutable account status or permission snapshot. Current account and grant checks still run when authorizing an operation.
+
+The implemented project target is `ProjectActionTargetDTO(ProjectId)`; no generic bare-UUID resource target is implied.
 
 For component responsibilities and conversion examples, use [application conventions](application-structure.md#component-conventions). For HTTP outcomes and verification scope, use [the implemented authentication boundary](access-control.md#implemented-human-authentication).
 
@@ -207,6 +212,25 @@ The [accepted key contract](access-control.md#application-key-contract) requires
 | Safe lifecycle metadata | Issuance attribution/time, expiry and revocation state/time sufficient for the authorized management workflow. Public metadata excludes the secret and digest. |
 
 The secret is 32 cryptographically random bytes encoded as 43 unpadded base64url characters. The default lifetime is 90 days and the maximum 365 days, both operator-configurable; validate default against maximum. The account has at most two usable keys across audiences. Issuance coordinates the current usable count, full issuer delegation/group-management authority, bindings and audit under the Access write protocol. Revocation and retirement use their independent current human Revoke keys/Delete application account authority and lifecycle checks; they do not require issuance delegation or document-reading authority. Keys use current grants, not a historical issuer ceiling or cached permission snapshot. General UUID identifier constructors retain their existing valid-version/zero-value rules.
+
+<a id="application-key-verification-result"></a>
+
+#### Temporary verified application-key result
+
+SupportBot supplies a complete key. After credential verification, the authentication service needs to know which existing account to load. [ADR-0074](../adr/ADR-0074-separate-application-key-verification-from-local-admission.md) selects a minimal internal application result with exactly two values:
+
+| Value | Application type | Meaning |
+| --- | --- | --- |
+| Verified key identity | `ApplicationKeyId` | The key whose complete credential and required credential bindings/lifecycle checks passed. |
+| Associated application identity | `PrincipalId` | The application principal from that verified stored key/account binding. |
+
+The result carries no secret, verifier digest, account-state snapshot or grants. Its trusted verifier produces it after verification. A caller cannot authenticate merely by supplying the two identifiers, and the record cannot authenticate its own contents.
+
+The authentication service loads the current application account using the returned principal ID and applies eligibility rules. It then constructs the separate `AccessContextDTO` with actor identity and `ApplicationKeyAuthenticationDTO` containing the verified key ID. Existing Access authorizers obtain fresh stored key facts using the key ID in the authentication context. They check its actor binding, expiry and revocation alongside current account, permission and protected-input checks before protected work or replay. For writes, these checks participate in the owning transaction and applicable coordination. This intermediate result establishes neither future credential validity nor continuing authority.
+
+Successful verification produces this record. Credential rejection returns `None` instead of a fabricated or incomplete record. Recognized required verification-dependency availability failures raise `DependencyUnavailableError`. Unexpected failures and cancellation propagate. The [owning verification contract](access-control.md#application-key-verification-outcomes) defines service translation and existing HTTP outcomes.
+
+This is an accepted logical result, not an implemented class, public response or persisted record. Its concrete name and method signatures remain implementation work. Exact verification inputs, temporal lifecycle coordination and already-admitted job credential behavior still need specification. [Current-key authorization ownership](access-control.md#application-key-current-authorization) is accepted design, not an implemented application-key facts contract. It adds no table, migration or replacement for the [complete authentication evidence](#authentication-evidence-records).
 
 <a id="oauth-consent-records"></a>
 
@@ -507,6 +531,10 @@ Suppose R1 contains A1, B1, and C1, and B1 describes a 30-day refund period. Ali
 
 For an imported source, the connector and normalized bucket/key identify the logical Document. A provider ETag is not necessarily a content hash. Parsed output belongs to Indexing and does not create another DocumentVersion.
 
+### Knowledge application boundaries
+
+[ADR-0075](../adr/ADR-0075-separate-document-lifecycle-from-collection-selection.md) separates document/version operations from collection-selection operations, coordinated by an application workflow for complete batches. The records above do not each imply an aggregate or repository. Exact consistency boundaries and durable handoff remain design work.
+
 <a id="indexing"></a>
 
 ## Indexing: profiles, generations, and materializations
@@ -652,6 +680,10 @@ A health generation changes on loss, corruption, and recovery, but not unrelated
 
 The [Indexing guide](indexing.md) explains verification, saved-write retries, search filters, pins, and cleanup. PostgreSQL's current state determines the allowed search filter. Clients do not supply that authority, and vectors do not store changing collection membership, permission groups, or serving flags.
 
+### Indexing application boundaries
+
+[ADR-0076](../adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) separates preparation/readiness, retrieval and numerical retirement capabilities. They exchange exact typed bindings while preserving the singleton vector writer and shared retention gates. Concrete input/result and current-health/cleanup contracts remain design work.
+
 <a id="pipelines"></a>
 
 ## Pipelines: configuration, answers, and feedback
@@ -739,6 +771,10 @@ A unique answer/originating-principal pair prevents duplicate ratings even after
 
 [Feedback](answer-feedback.md) owns creation/editing, authorization, retention, and denominators. [Jobs](jobs-and-idempotency.md#answers) owns receipt-only recovery after a lost response. Later release changes never reattribute a receipt or its feedback.
 
+### Pipeline application boundaries
+
+[ADR-0077](../adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md) separates settings/capture, readiness-build and answer-execution capabilities. Direct questions, Evaluation and serving share ordinary execution with complete fixed inputs. Capture, binding/result, receipt and transaction handoffs remain to specify. No extra Experiment resource or executor is implied.
+
 <a id="releases"></a>
 
 ## Releases: endpoints, pointers, and publication control
@@ -797,6 +833,10 @@ The ready initial version remains current while that update runs. If the selecte
 
 Keep three kinds of change separate. A new complete authorized live-input batch or policy-controlled automatic Build creates a newer update-request identity, replacing older work. A mode or input-binding change advances the publication control revision, invalidating old permission to publish. Working saves/restores and direct-query/evaluation do neither. The job also records its expected serving revision and attempt fence, which identifies the attempt still allowed to finish. [Releases](pipelines-and-releases.md#modes) checks these together before publication.
 
+### Deployment transition owner
+
+[ADR-0079](../adr/ADR-0079-protect-deployment-transitions-with-a-focused-aggregate.md) selects a focused Deployment aggregate for related serving/mode/control state and valid transitions. Application services obtain current authorization/readiness facts and own the load, business action, save transaction. The exact aggregate/repository contract and concurrent-control mechanism remain design work. The logical state above does not prescribe physical tables.
+
 <a id="evaluation"></a>
 
 ## Evaluation: frozen inputs and recorded observations
@@ -844,6 +884,10 @@ Each run keeps bounded final answers, final-context evidence or immutable artifa
 [Evaluation](evaluation.md) owns running, scoring, comparing, inspecting, and calibrating evaluations. Physical case-revision and comparison tables remain undecided. Do not create a table or repository merely because a concept has a name.
 
 <a id="shared-supporting-records"></a> <a id="supporting-records"></a>
+
+### Evaluation application boundaries
+
+[ADR-0078](../adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md) separates case generation/review operations, run/comparison coordination and scoring adapters. Ordinary question execution stays with Pipelines, controlled progress with shared jobs and remote model calls with ModelGateway. Exact case/run, metric, progress and protected-result contracts remain to specify. The logical records do not imply a table or aggregate per concept.
 
 ## Supporting records: connections, credentials, and durable work
 

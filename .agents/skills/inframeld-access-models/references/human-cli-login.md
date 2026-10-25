@@ -22,6 +22,48 @@ Provider I/O stays outside SQL transactions, with finite deadlines and no automa
 
 The narrowly scoped credential-state initializer may commit metadata before browser verification but must close its transaction before provider I/O.
 
+## Login and approval across the boundary
+
+**Accepted end-to-end target with inspected backend consent.** The sequence groups protocol details for readability. The complete CLI/account-UI path remains unfinished, and the checks below do not establish a universal issuance fence.
+
+```mermaid
+---
+title: "Human CLI login - accepted target and inspected consent"
+---
+sequenceDiagram
+    actor Alice
+    participant CLI as Rust CLI
+    participant Browser as System browser and account UI
+    participant Kratos as Kratos native login
+    participant Hydra as Hydra OAuth
+    participant Consent as Access consent service
+    participant State as Local credential-state capabilities
+    Alice->>CLI: Start human login
+    CLI->>Browser: Open trusted installation flow with state and PKCE
+    Browser->>Kratos: Human sign-in through native Hydra integration
+    Kratos->>Hydra: Verified subject and provider-session binding
+    Hydra-->>Browser: Consent challenge
+    Browser->>Consent: Inspect or decide with current browser cookie
+    Consent->>Hydra: Read fresh challenge and validate requested client/access
+    alt Inspection or denial
+        Note over Consent,State: Read-only checks, no state initialization or approval
+        Consent-->>Browser: Inspection data or checked denial continuation
+    else Approval
+        Consent->>State: Capture or initialize credential version in bounded transaction
+        Note over State: Close metadata transaction before provider I/O
+        Consent->>Kratos: Verify browser identity and matching subject
+        Consent->>State: Reread version and recovery block
+        Note over Consent: Require unchanged unblocked observations and binding
+        Consent->>Hydra: Approve exact access with checked binding
+        Hydra-->>Browser: Checked public continuation and authorization code
+        Browser-->>CLI: Loopback callback with state
+        CLI->>Hydra: Exchange code with PKCE verifier
+        Hydra-->>CLI: Installation/account-bound credentials
+    end
+```
+
+The grouped read-only branch includes browser/subject and recovery checks before display or denial. It does not approve a login. The credential exchange is conditional on successful approval or checked permitted continuation. Consent supplies no local account, project grant or recovery-block release authority. [The inspected service](../../../../apps/backend/src/inframeld_backend/access/application/services/human_oauth_consent_service.py) retains the exact early-validation, capture and reread ordering.
+
 ## Remembering approval is not remembering authority
 
 Remembered login establishes who authenticated. Remembered consent records that Alice approved this client and access. New explicit remembered approvals default to one configurable hour.

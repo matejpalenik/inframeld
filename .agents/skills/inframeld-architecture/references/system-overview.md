@@ -1,6 +1,10 @@
-# System overview
+# System overview: runtime topology
 
 Alice runs Inframeld on one server and wants to know where her documents, questions and credentials travel. This is an interaction map of the accepted architecture. It is not a claim that every path is implemented or qualified.
+
+For who uses the product, start with [System context](system-context.md). For logical domain ownership, use [Module map](module-map.md). This view explains where work runs. A process is a running program, while a module is an area of shared code and responsibility.
+
+API, worker, parser, identity services and stores are runtime pieces. The Operations and ModelGateway boxes below represent code responsibilities reused by the backend processes. They do not add a process or service per domain.
 
 ## Processes and responsibilities
 

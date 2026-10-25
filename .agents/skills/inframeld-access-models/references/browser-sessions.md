@@ -22,6 +22,39 @@ Keep observation separate from decision. Credential-query helpers construct SQL 
 
 Every producer of an eligibility input must supply current credential facts explicitly rather than inheriting a permissive default. A missing observation must not silently become permission.
 
+## Browser authentication as a sequence
+
+**Inspected human path.** This diagram shows the responsibilities in `HumanSessionAuthenticationService`. Credential selection and applicable CSRF follow the HTTP boundary's existing ordering. They must finish before protected application work.
+
+```mermaid
+---
+title: "Browser authentication - inspected service path"
+---
+sequenceDiagram
+    actor Alice
+    participant HTTP as HTTP credential boundary
+    participant Auth as Human session authenticator
+    participant Kratos as Kratos session verifier
+    participant IdentityLinkReader as Local identity reader
+    participant Block as Current recovery-block reader
+    participant Operation as Protected application operation
+    Alice->>HTTP: Request with Kratos browser cookie
+    Note over HTTP: Reject malformed or competing credential mechanisms first
+    HTTP->>Auth: Selected browser credential
+    Auth->>Kratos: Verify within provider and total deadlines
+    Kratos-->>Auth: Verified provider identity or failure
+    Note over Auth: Invalid or unavailable verification cannot continue
+    Auth->>IdentityLinkReader: Read existing linked principal in a short session
+    Note over Auth: Missing principal is not provisioned
+    Auth->>Block: Read current independent recovery block
+    Note over Auth: Apply current human admission policy
+    Auth-->>HTTP: Actor identity and non-secret browser evidence
+    HTTP->>Operation: Invoke with unchanged AccessContextDTO
+    Note over Operation: Current operation authorization is still required
+```
+
+Only a valid provider identity and eligible existing principal reach the later steps. Rejections terminate the path. The local reads are separate short sessions, not one database transaction around Kratos. [The source service](../../../../apps/backend/src/inframeld_backend/access/application/services/human_session_authentication_service.py) and its capability contracts own the exact method/error ordering. The [module architecture](architecture.md) shows where this path fits with CLI and application authentication.
+
 ## Failures and changed state
 
 An invalid or unavailable provider check denies the operation. There is no positive permission snapshot in the context that can bypass suspension, recovery or grant removal.

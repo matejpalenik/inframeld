@@ -8,6 +8,8 @@ This guide follows Alice and SupportBot through those decisions. Start with sect
 
 **Contract decisions accepted on 2026-10-04:** the credential dispatch, application-key format and lifetimes, capability mappings, initial project grants, recovery block, maintenance boundary and deletion-status rules below record the reviewed decisions for [#116](https://github.com/matejpalenik/inframeld/issues/116). They are accepted design, not implementation evidence or a claim that the whole specification is complete. [The remaining contract work](#access-contract-review) stays explicit.
 
+Read the [module architecture](../../.agents/skills/inframeld-access-models/references/architecture.md) for the structural view and the [application-key authentication boundary](#application-key-authentication-boundary) for its accepted component split and remaining contracts.
+
 ## Contents
 
 | Reader's question | Start here |
@@ -1409,3 +1411,55 @@ New recovery admission advances the version atomically with the original obligat
 The future CLI must verify `/v1/session` before saving a login. After bounded refresh handling, confirmed invalid credentials require removing the selected target/account's stored pair and asking for explicit sign-in. Compare the saved credential revision so another process's fresh login survives. A 403 or outage does not clear credentials. Do not automatically repeat a paid or mutating command after reauthentication.
 
 This does not force Hydra to report a stale grant inactive. The real-provider scenario observes stale refresh and `/userinfo` independently of Inframeld rejection. Production completion remains unwired until native cleanup evidence, durable execution and the remaining races are qualified. The tests' direct cleanup recorder calls establish local state ordering, not production callback correctness.
+
+<a id="proposed-internal-architecture---awaiting-decisions"></a>
+
+## Application-key authentication architecture
+
+Alice gives SupportBot its own application key. When the bot queries Production, checking its credential, admitting its current account and authorizing the requested operation have distinct responsibilities.
+
+**Status:** [ADR-0074](../adr/ADR-0074-separate-application-key-verification-from-local-admission.md) accepts a focused verifier coordinated by an application authentication service. This is target architecture. Application-key authentication and its production qualification remain unfinished.
+
+<a id="application-key-authentication-boundary"></a> <a id="proposal-access-key-boundary"></a>
+
+### Separate credential verification from local admission
+
+The verifier checks the complete credential against the stored verifier and required credential bindings/lifecycle state. It returns only the verified `ApplicationKeyId` and the associated application `PrincipalId`, derived from the verified stored binding. This minimal internal result contains no secret, verifier digest, account state or grants.
+
+The authentication service uses that principal ID to load the current application account through a focused reader, applies current local admission checks and then constructs `AccessContextDTO` with the actor and `ApplicationKeyAuthenticationDTO` for the verified key ID. The [intermediate result](data-model.md#application-key-verification-result) and the final authentication context have different jobs. Operation authorizers retain current action and protected-input checks, including before replay.
+
+The service receives the verifier through an injected application-owned contract. Infrastructure performs credential I/O. These are components inside the existing backend, and neither the verifier nor the context supplies cached grants. Competing credentials fail before verification. Failed verification never falls back to another credential family.
+
+This split follows the responsibility separation in [implemented human authentication](#implemented-human-authentication), while preserving each path's own lifecycle. It keeps credential failure handling and account policy independently testable. It requires an explicit contract between them, unlike the combined authenticator considered in ADR-0074.
+
+<a id="application-key-verification-outcomes"></a>
+
+### Verification results and failures
+
+SupportBot might supply an expired key, or the database needed to verify it might be unavailable. The first is a completed credential rejection. The second means verification could not finish. Keep those outcomes distinct, following the existing [browser verifier contract](../../apps/backend/src/inframeld_backend/access/application/protocols/browser_session_verifier.py).
+
+| Verification outcome | Internal contract | Owning response |
+| --- | --- | --- |
+| Valid credential | Return the minimal verified-key result. | The authentication service loads the current account and checks admission. |
+| Invalid, expired or revoked credential | Return `None`. | The authentication service raises `AuthenticationRequiredError` before account loading. The HTTP boundary maps it to the existing generic 401. |
+| Recognized required verification-dependency availability failure | Raise `DependencyUnavailableError`. | Propagate to the existing safe 503 mapping, without cached success or fallback. |
+
+Unexpected failures and cancellation propagate. Do not catch them broadly and return `None`, which would disguise bugs, interrupted work or an outage as an invalid credential. A verifier constructs no HTTP response. After a valid result, an ineligible account remains a separate admission denial with the established 403 outcome. Existing header selection, challenge handling and [public authentication outcomes](error-handling.md#authentication-contract) still apply.
+
+This is accepted application-key design. The existing browser contract supplies the pattern, not evidence that application-key verification or its tests are implemented.
+
+<a id="application-key-current-authorization"></a>
+
+### Existing authorizers check current key state
+
+SupportBot's key can pass verification and then be revoked before a protected operation reaches authorization. The earlier verification result cannot authorize that operation.
+
+Existing Access authorizers own the fresh key-state check for incoming protected requests and replays. They use the key ID in `AccessContextDTO` to obtain current stored key facts and check its actor binding, expiry and revocation alongside current account and permission facts. The consuming application service calls its ordinary Access authorization capability. It does not need a separate mandatory credential-guard call.
+
+For writes, these checks participate in the operation's transaction and applicable coordination rules before protected work or replay. The verifier still establishes ownership of the submitted secret during authentication. Later key-state checks use the non-secret evidence and do not retain or forward that secret. Keep fact loading in infrastructure and interpretation/decisions in Access's application/domain components, following the [credential query and policy boundary](application-structure.md#credential-query-and-policy-boundaries).
+
+This is accepted ownership for the future application-key path. The current human OAuth generation flag does not prove key validity, and the inspected authorizers' synthetic application-key fixtures do not implement this fresh key-state check. Exact lifecycle checkpoints and concurrency mechanisms remain to specify.
+
+### Contracts still needed before implementation
+
+Agree exact verification inputs, expiry/revocation checkpoint and concurrency mechanics, and the credential lifecycle of already-admitted background work before implementing the affected paths. The component split, minimal two-ID result, rejection/availability contract and existing-authorizer ownership are settled, while those details remain open. Existing [public authentication outcomes](error-handling.md#authentication-contract) remain authoritative. The accepted [key format, verifier algorithm and lifetime](#application-key-contract), current-account authority, two-usable-key limit and show-once delivery remain unchanged.

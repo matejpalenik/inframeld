@@ -29,6 +29,40 @@ Durable jobs save accepted work and progress across client disconnects or worker
 
 A paid model timeout may mean the request ran and was billed. Missing output, a nonzero exit or unconfirmed cancellation cannot authorize a new dispatch. Frozen vector storage retries have a separate bounded protocol using already captured bytes. Identity-recovery cleanup has its own trusted original-obligation and bulk-provider boundaries, not another generic state machine.
 
+## A durable operation across transaction and provider boundaries
+
+**Accepted background-work pattern.** This explains the existing job contract, not a delivered universal runner. Fencing means checking an attempt/revision before publishing so an obsolete worker cannot publish a result.
+
+```mermaid
+---
+title: "Durable job boundaries - accepted pattern"
+---
+sequenceDiagram
+    actor Caller
+    participant App as Owning admission operation
+    participant DB as Authoritative records and jobs
+    participant Worker as Current job attempt
+    participant Gateway as ModelGateway
+    Caller->>App: Request protected operation with original meaning
+    Note over App,DB: Short transaction, current authorization and checked scope
+    App->>DB: Reserve operation and admit job together
+    App-->>Caller: Accepted outcome after commit
+    Worker->>DB: Claim bounded attempt and captured inputs
+    Note over Worker,Gateway: External work outside SQL transactions
+    Worker->>Gateway: Authorised remote work
+    alt Outcome uncertain
+        Gateway-->>Worker: Timeout without known outcome
+        Worker->>DB: Preserve uncertainty and original identity
+        Note over Worker: No automatic new paid dispatch
+    else Result available
+        Gateway-->>Worker: Validated outcome
+        Note over Worker,DB: Short guarded write, current attempt and applicable authority
+        Worker->>DB: Save progress or conditionally publish result
+    end
+```
+
+The current authority and attempt checks are workflow-specific, not a new generic execution framework. Client disconnection does not imply cancellation, failure or authority for replacement work. Storage retries from captured vector bytes retain their separate protocol. Complete synchronous writes such as the grant command finish inside their service-owned transaction instead of being forced through this job shape.
+
 ## Recovery boundaries
 
 Same-key replay resolves original inputs and target before new current settings. For a default alias, find the original logical-route record before resolving a rebound target, preventing another paid query. Stale reviewed revisions conflict. Preserve original installation/account/project identity through job recovery and imports.

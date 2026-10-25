@@ -35,7 +35,11 @@ PostgreSQL records exact revision membership and authority. Chroma stores immuta
 4. Distinguish paid-call uncertainty from replaying a frozen storage payload. Explain what a stale attempt can still do remotely.
 5. Cite accepted protocols and qualification limits. Inspect implementation before claiming it exists. Loading this skill grants no model-call or mutation authority.
 
+Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+
 ## Read as needed
+
+- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
 
 - For profiles, source coordinates, compatibility or pre-build preparation, read [Profiles and preparation](references/profiles-and-preparation.md).
 - For singleton writes, captured payloads and failure recovery, read [Vector writes and retries](references/vector-writes-and-retries.md).

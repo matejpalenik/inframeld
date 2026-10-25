@@ -38,7 +38,11 @@ Suppose SupportBot has Query on Production and membership in SupportKnowledge. R
 4. Inspect code before claiming implementation. Separate accepted contracts, inspected behavior, recorded evidence and unfinished qualification.
 5. Cite the precise rule and report unresolved contradictions. Loading this skill authorizes no edits, grants, credential issuance, deployment or paid calls.
 
+Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+
 ## Read as needed
+
+- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
 
 - For cookie verification, credential dispatch, evidence or CSRF, read [Browser sessions](references/browser-sessions.md).
 - For human login, consent, refresh or credential versions, read [Human CLI login](references/human-cli-login.md).

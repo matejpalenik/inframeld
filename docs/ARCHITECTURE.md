@@ -6,6 +6,8 @@ The central technique is **retrieval-augmented generation**, or RAG: find releva
 
 This introduction explains the **accepted design**. Acceptance means we have chosen the behavior; it does not mean every feature is implemented or tested. The guides distinguish selected rules, proposed implementation details, deferred features, and qualification still required. The [backend README](../apps/backend/README.md), [HTTP error reference](development/error-handling-reference.md), and [pagination reference](development/pagination.md) describe concrete foundations already present. Inspect the relevant code when answering what works today.
 
+For a diagram-led reading route, start with [system context](../.agents/skills/inframeld-architecture/references/system-context.md), then [runtime topology](../.agents/skills/inframeld-architecture/references/system-overview.md) and the [module map](../.agents/skills/inframeld-architecture/references/module-map.md). Each domain has its own architecture reference. These views explain the accepted guides and inspected code. Pending recommendations are explicitly labelled and do not become accepted decisions through publication here.
+
 ## A small journey from document to answer
 
 Suppose Alice wants a support assistant to answer questions about her company’s handbook.

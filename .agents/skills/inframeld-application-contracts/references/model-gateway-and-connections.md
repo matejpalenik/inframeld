@@ -34,6 +34,38 @@ Timeouts and cancellation do not prove a remote call stopped. Keep gateway retry
 
 Trace opt-out suppresses future capture/queued delivery. Re-enable does not resurrect suppressed executions. Diagnostic cleanup never regenerates a model answer.
 
+## One call through the shared boundary
+
+**Accepted target dispatch view.** The participants are responsibilities, not newly implemented interfaces. A role selects what a call is for, such as query embedding or answer generation. A connection's current access settings select how to reach the service, while credentials have their own lifecycle.
+
+```mermaid
+---
+title: "ModelGateway dispatch - accepted target"
+---
+sequenceDiagram
+    participant Consumer as Owning Pipeline, Indexing or Evaluation workflow
+    participant Gateway as ModelGateway
+    participant Access as Current authority and destination policy
+    participant Connection as Current connection and credential state
+    participant Provider as Approved model endpoint
+    Consumer->>Gateway: Captured role/model request and authorised context
+    Gateway->>Access: Enforce current use and approved destination
+    Gateway->>Connection: Resolve compatible current access and credential
+    Note over Gateway: Apply supported settings, spending and output bounds
+    Note over Gateway,Provider: No SQL transaction held during provider wait
+    Gateway->>Provider: Dispatch bounded request
+    alt Remote outcome uncertain
+        Provider-->>Gateway: Timeout or lost response
+        Gateway-->>Consumer: Explicit uncertainty, no automatic replacement call
+    else Valid response
+        Provider-->>Gateway: Actual model output and usage
+        Note over Gateway: Preserve required accounting and actual attribution
+        Gateway-->>Consumer: Validated typed outcome
+    end
+```
+
+The consumer still owns its saved results, current protected disclosure and workflow-specific retry/recovery. Relevant connection-access changes stop later dispatch rather than rebinding the operation to old or different settings. Metadata-only rename and credential-only rotation retain their documented exceptions. Failure of optional tracing cannot weaken mandatory controls. [The canonical model guide](../../../../docs/development/model-connections.md) owns exact dispatch and update rules.
+
 ## Status and sources
 
 These are accepted shared execution boundaries. Concrete actions, schemas, storage and runtime qualification stay with the owners. Do not infer another registry, arbitrary-header mechanism, SDK-distribution decision, workflow runner or quality approval.

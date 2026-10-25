@@ -8,6 +8,8 @@ Start with working configuration, execution-input snapshots, release versions an
 
 > **Design status:** This is the accepted v1 workflow. Feature endpoints, storage, model integration, and the tests below still need implementation and verification where noted.
 
+Read the [module architecture](../../.agents/skills/inframeld-pipelines/references/architecture.md) for the structural view and [internal architecture decisions](#internal-architecture-decisions) for accepted boundaries and remaining design work. Releases has its [own architecture view](../../.agents/skills/inframeld-releases/references/architecture.md).
+
 ## Contents
 
 | Reader’s question | Start here |
@@ -794,3 +796,33 @@ These checks cover the routing and transition contract, including the additional
 | [ADR-0040](../adr/ADR-0040-bind-pipeline-versions-to-verified-profile-specific-materializations.md) | Bind pipeline versions to verified profile-specific materializations. |
 | [ADR-0042](../adr/ADR-0042-rerank-selected-evidence-through-a-local-cross-encoder-boundary.md) | Rerank selected evidence through a local cross-encoder boundary. |
 | [ADR-0047](../adr/ADR-0047-support-reversible-publication-modes-per-deployment.md) | Support reversible publication modes per Deployment. |
+
+<a id="proposed-internal-architecture---awaiting-decisions"></a>
+
+## Internal architecture decisions
+
+The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The precise contracts listed with each decision remain design work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
+
+<a id="pipeline-operation-boundaries"></a> <a id="proposal-pipeline-boundaries"></a>
+
+### Separate Pipeline settings, builds and answer execution
+
+**Status:** Accepted in [ADR-0077](../adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md), with implementation and qualification unfinished.
+
+Pipelines separates settings management/input capture, readiness builds and ordinary answer execution. Direct questions, Evaluation and production use the same ordinary execution path with complete fixed inputs. Captured inputs are records of selected work, not independent executors.
+
+Readiness builds use the exact authorized saved configuration and corpus supplied by their owning caller, including the Deployment-selected inputs of automatic workflows. They do not follow later edits or use a run ID/unsaved override as release configuration. Publication stays with Releases. The split makes effects clear at the cost of explicit input/result and handoff contracts, without adding an Experiment resource, generic executor or command bus.
+
+**Remaining design and qualification.** Specify capture ownership at each operation boundary, complete binding/result contracts, receipt admission/finalization and transaction/external-work handoffs before defining the concrete ports. Existing current-access, connection-change, health/pin, paid-uncertainty and receipt-only recovery rules remain authoritative. The split does not implement or qualify query/build behavior.
+
+<a id="deployment-transition-boundary"></a> <a id="proposal-release-boundaries"></a>
+
+### Protect Deployment transitions with a focused aggregate
+
+**Status:** Accepted in [ADR-0079](../adr/ADR-0079-protect-deployment-transitions-with-a-focused-aggregate.md), with implementation and qualification unfinished.
+
+A focused Deployment aggregate owns related serving/mode/control state and protects valid transitions. The application service obtains current authority, readiness and dependency facts, loads the necessary state, invokes the aggregate's business action and saves through a specific repository inside the owning transaction. The repository does not commit or retry.
+
+Pure policies remain useful for explicit cross-object facts. Authorization, dependency checks and job admission stay in application workflows. The aggregate does not contain every Pipeline, document or job. Creation constructs new state under the existing first-ready-version and default-binding rules. This gives cohesive transitions a domain owner and requires a precise load/save/concurrency contract.
+
+**Remaining design and qualification.** Specify the aggregate's exact state/loading/save contract and how concurrent publication, mode changes and operator commands share the control check. Preserve atomic pointer/history/completion changes, expected revisions, newest-request/attempt fences and current health/authority checks. This decision selects no table layout, locking algorithm or endpoint and changes no existing mode, canary or rollback behavior. Runtime implementation and concurrency qualification remain unfinished.

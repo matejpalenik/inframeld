@@ -114,6 +114,18 @@ Keep one-level reference navigation and direct source citations. Canonical guide
 
 Architecture diagrams distinguish processes, logical owners and interaction arrows from code dependencies. The glossary explains terms and commonly confused meanings without duplicating exact record schemas.
 
+### Maintain architecture views
+
+Use [C4](https://c4model.com/diagrams) for progressively closer structural views and [arc42 runtime guidance](https://docs.arc42.org/section-6/) for selected interactions and failures. These guide how we explain architecture. They do not add product requirements or demand every possible diagram.
+
+Use system context for users and external systems, runtime topology for processes/stores, the module map for ownership, and each domain's `references/architecture.md` for internal responsibilities and selected workflows. Keep every reference directly linked from its skill with an explicit loading condition. For domain-specific backend component design, generation or structural review, read the owning architecture and relevant workflow. Shared components use Application Contracts. Behaviour-only questions need no automatic architecture prerequisite.
+
+Start each module view with a concrete problem. Explain ownership, main parts, normal flow, failures, data/execution boundaries, implementation status and pending decisions in that order. Define unfamiliar terms where they matter. Keep diagrams titled, readable and scoped. Label arrows and explain whether they show calls, information, state transitions or source dependencies. Runtime boxes, code roles and domain concepts are different views. A named concept does not imply a class, aggregate, table or service.
+
+Canonical guides own accepted behaviour, records and qualifications. Add unresolved architecture proposals in clearly marked sections of the owning guide, with evidence of the gap, viable options, a recommendation, trade-offs and the implementation dependent on acceptance. Link them briefly from the module view. Recording a proposal does not accept it. Do not silently fill a gap or reopen a settled decision. Later acceptance follows the existing ADR process.
+
+When a component, interface or workflow changes, recheck its architecture view, relevant diagrams and inspected paths together with the owning guide. Preserve distinctions among accepted design, inspected implementation, recorded verification and production qualification. Render every new or changed Mermaid diagram and inspect the result. Use read-only trials for explanation, failure/review and unrelated requests, plus a case that encounters an unaccepted proposal. Report unavailable runtime or visual checks explicitly.
+
 ### Maintain worked code examples
 
 Coding Standards keeps substantial examples in its seven focused references. Begin with a concrete component task, explain its owner/layer/role and placement, then show contextual code, normal flow, relevant failure and source limits. A junior reader should understand why that component exists without opening an ADR first.

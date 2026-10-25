@@ -42,6 +42,8 @@ A separate, restricted parser converts uploaded files. Because documents can be 
 
 **Docker Compose is the only supported deployment method.**
 
+For a human-readable map of each owner's main parts and selected workflows, read [the module map](../../.agents/skills/inframeld-architecture/references/module-map.md). Shared application support is explained in [Application Contracts](../../.agents/skills/inframeld-application-contracts/references/components-and-services.md). These logical views are distinct from process topology and source import direction. Proposed internal choices remain pending and must not be used as accepted component contracts.
+
 ### Architecture principles and dependency rules
 
 **Domain-Driven Design (DDD)** organizes code around the product's concepts and rules: documents, indexes, pipelines, evaluations, releases, and access. Each business area has a clear owner.
@@ -535,13 +537,15 @@ The six areas below own different records and rules inside one codebase. These a
 | **Knowledge** | Source identity, document lifecycle and versions, collection revisions and their document memberships. |
 | **Indexing** | The settings and state needed to prepare searchable indexes: processing and embedding profiles, processing generations, vectorizations, layouts, materializations, publication, and reconciliation. |
 | **Pipelines** | Immutable pipeline configuration and its links to prepared indexes (materialization bindings). Retrieval and generation orchestration. It also owns answer receipts and their current feedback records, as explained below. |
-| **Evaluation** | Datasets, evaluation-run evidence, metric results, and comparisons. |
+| **Evaluation** | Cases and immutable benchmark/evaluator inputs, evaluation-run evidence, metric results, and comparisons. |
 | **Releases** | Deployments, candidate cohorts (groups routed to a trial version), promotion, candidate abort, and rollback. |
 | **Access** | Mapping callers to application principals, organization and project scope, permission decisions. |
 
 A **principal** identifies the human or application making a request. An **index materialization** identifies search data prepared for particular documents and processing settings. **Reconciliation** means checking that recorded index state agrees with what is actually stored, then resolving any difference.
 
 Processing and indexes may be separate submodules inside Indexing. However, **only Indexing decides whether a materialization is ready**.
+
+The accepted internal operation boundaries are recorded in [ADR-0075](../adr/ADR-0075-separate-document-lifecycle-from-collection-selection.md), [ADR-0076](../adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md), [ADR-0077](../adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md), [ADR-0078](../adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md), [ADR-0079](../adr/ADR-0079-protect-deployment-transitions-with-a-focused-aggregate.md). Read the owning module architecture for its focused responsibilities and remaining contracts. These choices do not require a class, protocol or repository for every named concept. A Deployment aggregate owns its cohesive transition behavior, while services retain current authorization and transaction orchestration.
 
 ### How modules work together
 

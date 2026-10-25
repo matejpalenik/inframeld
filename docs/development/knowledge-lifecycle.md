@@ -8,6 +8,8 @@ Start with the four identities below, then follow an upload, a build selection, 
 
 > **Design status:** This is the accepted v1 lifecycle. The feature endpoints, database implementation, integrations, and tests still need verification where noted.
 
+Read the [module architecture](../../.agents/skills/inframeld-knowledge/references/architecture.md) for the structural view and [internal architecture decisions](#internal-architecture-decisions) for accepted boundaries and remaining design work.
+
 ## Contents
 
 | Reader’s question | Start here |
@@ -202,3 +204,21 @@ Knowing a result's origin does not guarantee identical model answers, permanent 
 | [ADR-0015](../adr/ADR-0015-keep-document-group-access-separate-from-operational-permissions.md) | Keep document-group access separate from operational permissions. |
 | [ADR-0036](../adr/ADR-0036-use-seaweedfs-through-the-application-s3-storage-boundary.md) | Use SeaweedFS through the application S3 storage boundary. |
 | [ADR-0039](../adr/ADR-0039-block-access-before-resumable-physical-deletion.md) | Block access before resumable physical deletion. |
+
+<a id="proposed-internal-architecture---awaiting-decisions"></a>
+
+## Internal architecture decisions
+
+The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The precise contracts listed with each decision remain design work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
+
+<a id="knowledge-operation-boundaries"></a> <a id="proposal-knowledge-boundaries"></a>
+
+### Separate document lifecycle from collection selection
+
+**Status:** Accepted in [ADR-0075](../adr/ADR-0075-separate-document-lifecycle-from-collection-selection.md), with implementation and qualification unfinished.
+
+Document/version lifecycle and exact collection selection have separate application operations. When Alice replaces B1 with B2, the document operation admits the new immutable version. An authorized selection or complete-batch workflow freezes a new collection revision, while earlier R1 membership stays fixed.
+
+A coordinating application workflow handles complete batches spanning both responsibilities. This needs an explicit consistency/handoff contract and preserves the existing atomic admission, audience, durable-content and retry requirements. A manifest remains an inventory, not a mandatory aggregate. Separate operations do not require separate transactions.
+
+**Remaining design and qualification.** Specify the transaction/consistency boundaries, durable artifact handoff, committed batch-membership outcome and retry/recovery behavior before implementing the corresponding ports. Separate operations do not imply separate commits or permission to expose a partial batch as complete. Indexing preparation and Releases publication keep their own authority and lifetimes.

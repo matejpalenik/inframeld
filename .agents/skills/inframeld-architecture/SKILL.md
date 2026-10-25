@@ -43,7 +43,9 @@ For example, changing R1={A1,B1} to R2={A1,B2} does not rewrite B1. Indexing can
 
 ## Read as needed
 
+- For product users, external systems and scope, read [System context](references/system-context.md).
 - For processes, infrastructure and trust boundaries, read [System overview](references/system-overview.md).
+- For domain ownership and choosing a module architecture, read [Module map](references/module-map.md).
 - For an unfamiliar shared term, read the relevant entry in [Glossary](references/glossary.md). Do not load the whole glossary for every question.
 - For onboarding and the complete knowledge-to-answer journey, read [Document to answer](references/document-to-answer.md).
 

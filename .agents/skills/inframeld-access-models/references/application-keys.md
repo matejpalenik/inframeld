@@ -18,6 +18,40 @@ Human and application principals share the local membership and grant model, but
 
 The CLI can accept an existing application key through hidden paste or its reviewed automation input. This is separate from issuance and human login. The application-connection wizard may offer a separately approved paid test, but verification must not hide a paid query or widen scope.
 
+## Issue a key, then use its current account authority
+
+**Accepted target, not an implemented authenticator.** Issuance and use are separate operations. The logical participants below do not establish new class or endpoint names.
+
+```mermaid
+---
+title: "Application key issuance and use - accepted target"
+---
+sequenceDiagram
+    actor Alice as Authorised human
+    participant Access as Access key lifecycle
+    participant DB as Account and credential persistence
+    participant Bot as SupportBot
+    participant Auth as Application authentication
+    participant Operation as Protected operation
+    Alice->>Access: Explicitly request key issuance
+    Access->>DB: Check current management, delegation and key-lifecycle limits
+    Note over Access,DB: Commit verifier, required audit and secret-safe operation outcome
+    Access-->>Alice: Show original secret once
+    Note over Alice: Lost response cannot replay the secret or justify another issuance
+    Bot->>Auth: Supply full application key deliberately
+    Auth->>DB: Verify stored credential, expiry, revocation and current account
+    Note over Auth: Public prefix alone is never verification
+    Auth->>Operation: Actor identity and complete non-secret key evidence
+    Operation->>DB: Check current exact action and document authority
+    Operation-->>Bot: Permitted result or owning failure
+```
+
+The successful arrows require their preceding checks to pass. A rejection has no credential-family fallback. The account remains SupportBot during key rotation, with its current grants and memberships.
+
+See [Access architecture](architecture.md) and [ADR-0074](../../../../docs/adr/ADR-0074-separate-application-key-verification-from-local-admission.md) for the accepted separation: a focused verifier checks the credential, an application authentication service applies local admission and constructs the context, and operation authorization checks current authority. The verifier returns the verified `ApplicationKeyId` and associated `PrincipalId` only. The authentication service loads the current account and checks eligibility. This [intermediate result](../../../../docs/development/data-model.md#application-key-verification-result) is distinct from the complete `AccessContextDTO`.
+
+A rejected credential returns `None`, which the authentication service translates to authentication rejection before account loading. Recognized required verification-dependency availability failures raise `DependencyUnavailableError`. Unexpected failures and cancellation propagate. The [verification contract](../../../../docs/development/access-control.md#application-key-verification-outcomes) retains safe 401/503 mappings and separate 403 account admission, without disguising an outage as invalid credentials. [Existing Access authorizers](../../../../docs/development/access-control.md#application-key-current-authorization) own later current key-state checks before protected work or replay. They use key-ID evidence without retaining the secret. Exact verification inputs, lifecycle checkpoints/concurrency and already-admitted job credential behavior remain open.
+
 ## Lost responses and partial effects
 
 Show-once delivery means the original successful response is the only opportunity to obtain the secret. Replay cannot recover it. A timeout/nonzero CLI exit is not proof that issuance failed or authority to create another key.

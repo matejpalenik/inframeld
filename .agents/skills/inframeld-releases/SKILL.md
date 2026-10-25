@@ -34,7 +34,11 @@ Automatic mode coordinates ordinary preparation with separate conditional public
 4. Explain why failures preserve healthy current traffic and why no alternate target is silently chosen.
 5. Cite current rules and distinguish accepted design from inspected implementation. Loading this skill grants no release, deployment or external-action authority.
 
+Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
+
 ## Read as needed
+
+- For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).
 
 - For creation, first publication, current authority, modes and delayed automatic work, read [Publication and automatic updates](references/publication-and-automatic-updates.md).
 - For stable cohorts, candidates, rejection, promotion or rollback, read [Canaries and rollback](references/canaries-and-rollback.md).

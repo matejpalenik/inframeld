@@ -31,7 +31,7 @@ These conventions apply to backend Python suggestions and reviews as well as aut
 
 ## Explain, suggest or review
 
-1. Select the language and applicable directory guidance. For backend Python, identify the owning workflow and read its domain context when product behavior matters.
+1. Select the language and applicable directory guidance. For domain-specific backend component design, code generation or structural review, read the owning domain skill's architecture reference and relevant workflow. Shared components use [Application Contracts’ shared component view](../inframeld-application-contracts/references/components-and-services.md), with its transaction/job or gateway reference when applicable. Read domain context when product behaviour matters. Use accepted architecture and inspected implementation as their status permits. A proposal awaits a decision before code depends on it.
 2. Select the component's role, destination, declaration and behavioral contract. For backend Python, read component roles. Load only the references needed for that choice. Their worked examples explain the situation, decision, code, flow and failures. Do not copy every grant collaborator into a workflow that does not need it.
 3. Follow values from the external boundary through typed application contracts and back. Check current authority and resource ownership separately from type correctness.
 4. Show complete contextual examples with exact paths, imports and placement. Distinguish inspected code from illustrative suggestions and future design.

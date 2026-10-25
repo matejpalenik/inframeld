@@ -38,6 +38,8 @@ Tracing existing request behavior, including inspecting its source, does not by 
 4. Before suggesting or reviewing any repository code, read [Coding Standards](../inframeld-coding-standards/SKILL.md), then applicable language guidance and the owning domain's rules. For backend services, read its [worked service example](../inframeld-coding-standards/references/services-and-use-cases.md). For aggregates or repositories, also read its [load, business action and save example](../inframeld-coding-standards/references/aggregates-and-repositories.md). Preserve runtime validation and protocol contracts.
 5. Inspect source before claiming implementation. Separate source compatibility, recorded verification and unfinished delivery. Loading this skill grants no edits, SDK extraction, deployment or external mutations.
 
+For domain-specific component design or structural code review, read that domain's architecture reference and relevant workflow. The [shared component view](references/components-and-services.md), [transaction/job view](references/transactions-jobs-and-idempotency.md) and [gateway view](references/model-gateway-and-connections.md) cover shared support. They create no additional business domain. A proposal in an owning guide remains pending until explicitly accepted.
+
 ## Read as needed
 
 - For ownership, dependency direction, services or provider/session boundaries, read [Application boundaries and services](references/components-and-services.md).

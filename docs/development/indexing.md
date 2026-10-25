@@ -8,6 +8,8 @@ Assume Alice builds Support from three documents under one processing profile an
 
 > **Design status:** This is the accepted v1 design. It does not mean the schema, integrations, or tests are complete. Capacity estimates and backend behavior still requiring tests are labelled below.
 
+Read the [module architecture](../../.agents/skills/inframeld-indexing/references/architecture.md) for the structural view and [internal architecture decisions](#internal-architecture-decisions) for accepted boundaries and remaining design work.
+
 ## Contents
 
 | Reader’s question | Start here |
@@ -623,3 +625,21 @@ Verify the supported paths with both one and two shards and limited-size invento
 | [ADR-0010](../adr/ADR-0010-save-deterministic-layouts-for-vector-shards.md) | Save deterministic layouts for vector shards. |
 | [ADR-0011](../adr/ADR-0011-retry-frozen-vector-identities-and-payloads.md) | Retry frozen vector identities and payloads. |
 | [ADR-0040](../adr/ADR-0040-bind-pipeline-versions-to-verified-profile-specific-materializations.md) | Bind pipeline versions to verified profile-specific materializations. |
+
+<a id="proposed-internal-architecture---awaiting-decisions"></a>
+
+## Internal architecture decisions
+
+The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The precise contracts listed with each decision remain design work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
+
+<a id="indexing-capability-boundaries"></a> <a id="proposal-indexing-capabilities"></a>
+
+### Separate index preparation, retrieval and retirement
+
+**Status:** Accepted in [ADR-0076](../adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md), with implementation and qualification unfinished.
+
+Indexing has focused preparation/readiness, retrieval and numerical retirement/cleanup capabilities. Preparation and retirement use the supported singleton vector writer. Retrieval exposes permission-filtered reads to query callers. These responsibilities remain inside the existing backend.
+
+Explicit typed bindings identify the exact corpus, profiles, generations and layout passed between these parts. Existing readiness verification, frozen-byte retries, current-health checks and shared retention gates remain authoritative. Reuse the existing jobs and transaction support. This split selects no new vector engine, process or generic workflow framework.
+
+**Remaining design and qualification.** Specify trusted inputs, complete binding/result contracts, readiness versus current-health obligations, unavailable outcomes and cleanup/retention coordination before coding the ports. These are logical capabilities, not a class, repository or process per box. Exact backend, security, resource and concurrency qualification remains required. A numerical reuse key cannot authorize redispatch of an uncertain paid request.

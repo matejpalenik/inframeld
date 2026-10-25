@@ -34,6 +34,29 @@ The durable credential version supplements bulk cleanup. A late grant may remain
 
 Pinned Kratos observations also distinguish recovery-code acceptance from password replacement. Accepting the recovery code leaves the old password usable until replacement. Settings pre-save and post-save failures have different persistence effects. A recovery-created settings flow preserves original-flow evidence, while a fresh settings flow cannot claim it through a query parameter.
 
+## Track cleanup separately from access restoration
+
+**Accepted coordination view.** Checklist persistence/local completion have inspected code. Production callbacks and full provider-cleanup/reconciliation wiring remain unfinished. This flow describes obligations, not a new formal state enumeration.
+
+```mermaid
+---
+title: "Recovery obligations - accepted coordination view"
+---
+flowchart TB
+    Evidence["Trusted original recovery-flow evidence"] -->|"Admit once"| Admission["Save obligation and block<br/>Advance CLI credential version once"]
+    Admission -->|"Native session-cleanup responsibility"| Kratos["Kratos outcome<br/>Preserve legitimate recovery session"]
+    Admission -->|"Bounded subject-scoped cleanup"| Hydra["Hydra grant and remembered-login outcomes<br/>Independent provider calls"]
+    Kratos -->|"Trusted observation"| Checklist["IdentityRecovery checklist"]
+    Hydra -->|"Trusted observation"| Checklist
+    Checklist -->|"Evaluate current original-flow eligibility"| Eligible{"Provider outcomes confirmed<br/>and local release checks satisfied?"}
+    Eligible -->|"No"| Blocked["Keep this obligation unreleased"]
+    Eligible -->|"Yes"| Release["Release only this original obligation"]
+    Release -->|"Still check"| Other["Other blocks, suspension and current permissions"]
+    Admission -.->|"Never reset by completion"| Version["Old CLI binding remains invalid"]
+```
+
+Arrows show causal obligations and checks. Confirmed cleanup cannot replace current local eligibility, release another recovery or restore removed grants. A pending or uncertain provider outcome remains incomplete. An unfinished or already dispatched bulk call can invalidate newer CLI credentials, while a completed event must initiate no new cleanup. See the [aggregate](../../../../apps/backend/src/inframeld_backend/access/domain/entities/identity_recovery.py) and [local completion service](../../../../apps/backend/src/inframeld_backend/access/application/services/identity_recovery_completion_service.py) for the implemented subset.
+
 ## Implementation status and limits
 
 The aggregate, repository, admission and local completion service are implemented foundations recorded in the guides.
