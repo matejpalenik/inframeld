@@ -1,6 +1,6 @@
 # ADR-0069: Release completed recovery obligations independently
 
-**Status:** Accepted. Partially supersedes [ADR-0058](ADR-0058-block-product-access-during-identity-recovery-cleanup.md) for overlapping recoveries and identities without local admission. Its provider-evidence, suspension and product-access requirements remain selected.
+**Status:** Accepted. Evidence provenance refined by [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md). Partially supersedes [ADR-0058](ADR-0058-block-product-access-during-identity-recovery-cleanup.md) for overlapping recoveries and identities without local admission. Its provider-evidence, suspension and product-access requirements remain selected.
 
 **Date:** 2026-10-23
 
@@ -34,8 +34,12 @@ Application workflows own short transactions. For linked identities, current-sta
 
 - Cleanup can finish before local admission, and overlapping completed checklists do not deadlock on each other's release state.
 - A released checklist is not an authorization certificate. Even a result reporting no other pending recovery is only an observation of that transaction.
-- The existing admission table, per-flow aggregate and conditional repository save remain sufficient. No new schema or public API is introduced.
+- The existing admission table, per-flow aggregate and conditional repository save support the local release operation. [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) additionally specifies durable evidence/run records for production delivery, without introducing a public API or changing the independent-release rule.
 - Completion service and PostgreSQL tests qualify local state recording and coordination. Production callbacks, provider cleanup, bounded reconciliation and concurrent first-local-admission qualification remain unfinished.
+
+## Evidence refinement
+
+[ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) permits a newer verified recovery to provide combined proof for explicitly linked older original operations. Each old checklist is still checked and released separately. An older completion cannot satisfy a newer obligation, reset a version or remove another pending block. The original independent-release rationale remains selected.
 
 ## Links
 

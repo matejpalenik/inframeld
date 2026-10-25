@@ -59,6 +59,8 @@ The domain responsibilities and focused internal boundaries are accepted. Each m
 
 <a id="pending-decision-navigation"></a>
 
+[PD-ACCESS-03 production recovery contracts](../../inframeld-access-models/references/decision-recovery-production-completion.md) are resolved by ADR-0085. Consult their acceptance matrix for the still-unimplemented callbacks, durable cleanup and host continuation. Their runtime qualification is separate from unresolved design.
+
 ## Pending decision navigation
 
 These entries retain unresolved review findings, not accepted specifications or a separate delivery backlog. Each has its own trigger, alternatives and non-binding recommendation. Read only the affected entry and its conditional dependencies. Qualification-only gaps limit claims and do not prevent the tests needed to gather evidence. Follow [the finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions).
@@ -67,7 +69,6 @@ These entries retain unresolved review findings, not accepted specifications or 
 | --- | --- | --- |
 | [PD-ACCESS-01](../../inframeld-access-models/references/decision-key-currentness.md) | access-models | Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay. |
 | [PD-ACCESS-02](../../inframeld-access-models/references/decision-admitted-work-authority.md) | access-models | Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement. |
-| [PD-ACCESS-03](../../inframeld-access-models/references/decision-recovery-production-completion.md) | access-models | Before wiring production recovery admission/completion callbacks, cleanup orchestration, issuance coordination or block release. |
 | [PD-ACCESS-05](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md) | access-models | When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified. |
 | [PD-ACCESS-06](../../inframeld-access-models/references/decision-setup-read-authority.md) | access-models | Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution. |
 | [PD-KNOWLEDGE-01](../../inframeld-knowledge/references/decision-complete-batch-handoff.md) | knowledge | Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff. |

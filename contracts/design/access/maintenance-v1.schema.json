@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Inframeld version 1 maintenance input, design contract",
-  "description": "Non-runtime design envelope. This schema does not implement a maintenance command or establish host authority.",
-  "$comment": "Design-only representation of the documented version 1 input. Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. PD-ACCESS-03 and PD-ACCESS-04 remain PENDING where recovery/admission integration applies. Runtime implementation must reconcile or supersede this schema. Enforce the 64 KiB received-byte bound, strict JSON token parsing, duplicate-key rejection, one JSON value, current authority, catalogue combinations and trusted identity proof separately. JSON Schema integer validation accepts 1.0.",
+  "description": "Non-runtime bootstrap, stranded-authority repair and recovery-cleanup continuation inputs. A valid shape does not establish host authority.",
+  "$comment": "Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. ADR-0085 resolves PD-ACCESS-03. Enforce the 64 KiB received-byte bound, strict JSON integer tokens, duplicate-key rejection, one JSON value and verified host/installation authority separately. Bootstrap/repair require current recipient proof and reviewed scope. Recovery continuation forbids that proof and reviewed-run inputs, deduplicates the operator request and checks current original recovery eligibility and active runs. Runtime implementation remains separate. JSON Schema integer validation accepts 1.0.",
   "$defs": {
     "target": {
       "oneOf": [
@@ -211,93 +211,146 @@
       ]
     }
   },
-  "type": "object",
-  "properties": {
-    "schemaVersion": {
-      "const": 1,
-      "type": "integer"
-    },
-    "mode": {
-      "enum": ["bootstrap-first-administrator", "repair-stranded-authority"]
-    },
-    "expectedInstallationId": {
-      "type": "string",
-      "format": "uuid"
-    },
-    "operationId": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128,
-      "pattern": "\\S"
-    },
-    "operatorLabel": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128,
-      "pattern": "\\S"
-    },
-    "reason": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 512,
-      "pattern": "\\S"
-    },
-    "expectedAccessRevision": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 9223372036854775807
-    },
-    "expectedIdentityId": {
-      "type": "string",
-      "format": "uuid"
-    },
-    "identityProof": {
+  "oneOf": [
+    {
       "type": "object",
       "properties": {
-        "kind": {
-          "const": "hydra-access-token"
+        "schemaVersion": {
+          "const": 1,
+          "type": "integer"
         },
-        "accessToken": {
+        "mode": {
+          "enum": ["bootstrap-first-administrator", "repair-stranded-authority"]
+        },
+        "expectedInstallationId": {
           "type": "string",
-          "minLength": 1
+          "format": "uuid"
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "operatorLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        },
+        "expectedAccessRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "expectedIdentityId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "identityProof": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "hydra-access-token"
+            },
+            "accessToken": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["kind", "accessToken"],
+          "additionalProperties": false
+        },
+        "responsibility": {
+          "$ref": "#/$defs/responsibility"
         }
       },
-      "required": ["kind", "accessToken"],
-      "additionalProperties": false
-    },
-    "responsibility": {
-      "$ref": "#/$defs/responsibility"
-    }
-  },
-  "required": [
-    "schemaVersion",
-    "mode",
-    "expectedInstallationId",
-    "operationId",
-    "operatorLabel",
-    "reason",
-    "expectedAccessRevision",
-    "expectedIdentityId",
-    "identityProof"
-  ],
-  "additionalProperties": false,
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "mode": {
-            "const": "bootstrap-first-administrator"
+      "required": [
+        "schemaVersion",
+        "mode",
+        "expectedInstallationId",
+        "operationId",
+        "operatorLabel",
+        "reason",
+        "expectedAccessRevision",
+        "expectedIdentityId",
+        "identityProof"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "bootstrap-first-administrator"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": ["responsibility"]
+            }
+          },
+          "else": {
+            "required": ["responsibility"]
           }
         }
-      },
-      "then": {
-        "not": {
-          "required": ["responsibility"]
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1,
+          "type": "integer"
+        },
+        "expectedInstallationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "operatorLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        },
+        "mode": {
+          "const": "resume-recovery-cleanup"
+        },
+        "recoveryOperationId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
         }
       },
-      "else": {
-        "required": ["responsibility"]
-      }
+      "required": [
+        "schemaVersion",
+        "expectedInstallationId",
+        "operationId",
+        "operatorLabel",
+        "reason",
+        "mode",
+        "recoveryOperationId"
+      ],
+      "additionalProperties": false
     }
   ]
 }

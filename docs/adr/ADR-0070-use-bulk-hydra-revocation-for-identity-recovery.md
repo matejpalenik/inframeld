@@ -37,6 +37,10 @@ The [HTTP-ordering qualification](../../.agents/skills/inframeld-access-models/r
 
 These are controlled HTTP boundaries, not pauses inside Hydra. Production issuance coordination, provider-internal races, durable execution and recovery completion remain unfinished. This evidence does not change the transaction, retry or release decisions above.
 
+## Production contract refinement
+
+[ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) resolves production evidence and durable reconciliation. Aggregate Hydra confirmation requires both scoped acknowledgments to be saved. Together with trusted Kratos cleanup, intact credential-version state and current local eligibility, that permits per-checklist release. It does not establish Hydra-wide inactivity or require preventing every later issuance. ADR-0072 supplies permanent Inframeld rejection of stale versions. Runtime callbacks, execution and operator continuation remain #243–#245 delivery work.
+
 ## Links
 
 - [Access behavior and provider evidence](../../.agents/skills/inframeld-access-models/references/recovery-provider-cleanup.md#hydra-cleanup-evidence).

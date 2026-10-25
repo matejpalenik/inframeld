@@ -30,7 +30,7 @@ Production callbacks, complete provider-cleanup orchestration, bounded reconcili
 
 The [Hydra retry budget](recovery-completion.md#hydra-cleanup-retry-budget) is accepted under [ADR-0083](../../../../docs/adr/ADR-0083-bound-hydra-recovery-cleanup-retries.md). [ADR-0084](../../../../docs/adr/ADR-0084-authorize-additional-recovery-cleanup-runs-through-host-maintenance.md) permits a fresh explicit host authorization for [another bounded run](recovery-completion.md#operator-cleanup-continuation) on the same unfinished recovery. Prior history and confirmed progress remain intact. These are design requirements for unfinished orchestration. Neither exhaustion nor operator authorization releases a recovery block.
 
-[The accepted failure policy](recovery-completion.md#hydra-cleanup-failure-handling) retries recoverable provider failures and uncertain bulk outcomes within budget. A known permanent rejection ends that run early while retaining the block and progress. After fixing the cause, the host operator may authorize continuation without waiting for the ended run's hour to expire. Exact provider-error mappings remain unfinished.
+[The accepted failure policy](recovery-completion.md#hydra-cleanup-failure-handling) retries recoverable provider failures and uncertain bulk outcomes within budget. A known permanent rejection ends that run early while retaining the block and progress. After fixing the cause, the host operator may authorize continuation without waiting for the ended run's hour to expire. [The exact mapping](recovery-completion.md#hydra-cleanup-failure-handling) is now accepted, while the richer adapter result and durable orchestration remain unimplemented.
 
 Recovery never clears suspension, recreates removed permissions or lets an older completion release a newer independent block. Preserve ordinary account eligibility, current authorization on replay and product-specific visibility ordering.
 
@@ -55,7 +55,7 @@ Deduplicate trusted completion using its original flow-bound event identity. A d
 
 **Accepted hook-based integration:** [ADR-0081](../../../../docs/adr/ADR-0081-use-native-kratos-hooks-for-recovery-evidence.md) selects the recovery webhook for admission after code verification, followed by a password-settings webhook after password persistence and native `revoke_active_sessions`. The latter supplies Kratos evidence for the original recovery before independent durable Hydra cleanup. The admitted block protects the password-setting gap. [The private handoff](private-recovery-handoff.md#native-hook-evidence) owns the sequence and each callback's meaning.
 
-A session ID in a pre-save callback does not prove password replacement or native cleanup. Neither a generic webhook response nor a completed password form proves both providers finished cleanup. [Provider observations](recovery-provider-cleanup.md#kratos-password-reset-evidence) distinguish inspected capability and earlier tests from unfinished production delivery and reconciliation. [The private callback contract](private-recovery-handoff.md#recovery-callbacks) retains its dedicated rotatable service secret, five-field body limited to 8 KiB and stable original-flow/event/phase deduplication. The hook choice is settled. Original-flow validation, delivery failures and remaining completion details stay pending under PD-ACCESS-03.
+A session ID in a pre-save callback does not prove password replacement or native cleanup. Neither a generic webhook response nor a completed password form proves both providers finished cleanup. [Provider observations](recovery-provider-cleanup.md#kratos-password-reset-evidence) distinguish inspected capability and earlier tests from unfinished production delivery and reconciliation. [The private callback contract](private-recovery-handoff.md#recovery-callbacks) retains its dedicated rotatable service secret, versioned allowlisted body limited to 8 KiB and stable native-flow/event-type deduplication. [ADR-0085](../../../../docs/adr/ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) settles the association, failure recovery and completion contract. Production delivery remains unfinished.
 
 <a id="authorization-failure-scenarios"></a>
 
@@ -81,13 +81,11 @@ A session ID in a pre-save callback does not prove password replacement or nativ
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Accepted contracts and remaining delivery
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+[PD-ACCESS-03 is resolved](decision-recovery-production-completion.md). Its acceptance matrix separates trusted callback delivery (#243), durable Hydra cleanup/release (#244) and protected operator continuation (#245). The specification does not implement those paths. A newer recovery may provide combined proof for explicitly linked older checklists under [the reconciliation rule](private-recovery-handoff.md#recover-original-evidence), but cannot bypass their individual release checks.
 
-- [PD-ACCESS-03: Prove recovery cleanup before releasing product access](decision-recovery-production-completion.md). The hook-based approach is accepted. Resolve its remaining correlation, reconciliation and completion details before dependent production wiring.
-
-First-account coordination is settled under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md), resolving [PD-ACCESS-04](decision-recovery-first-admission.md). Follow [the accepted identity workflow](identity-admission-coordination.md) when implementing its participating database operations. This is separate from the remaining production-evidence questions above.
+First-account coordination is settled under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md), resolving [PD-ACCESS-04](decision-recovery-first-admission.md). Follow [the accepted identity workflow](identity-admission-coordination.md) when implementing its participating database operations. This is separate from the unfinished production evidence and execution delivery above.
 
 <a id="sources-and-rationale"></a>
 

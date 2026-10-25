@@ -25,7 +25,7 @@ Only unfinished recovery cleanup may continue. A distinct authorization must not
 
 Host authority authorizes continued cleanup, not product access. A run does not release the block, restore an account, recreate permissions or advance the credential version. Existing trusted-evidence and local eligibility checks still govern completion.
 
-The [Access-owned continuation workflow](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#operator-cleanup-continuation) defines the rules. [Host maintenance](../../.agents/skills/inframeld-access-models/references/host-maintenance.md#recovery-cleanup-continuation) owns the authority boundary. Exact command/input shapes, persistence and implementation remain future work.
+The [Access-owned continuation workflow](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#operator-cleanup-continuation) defines the rules. [Host maintenance](../../.agents/skills/inframeld-access-models/references/host-maintenance.md#recovery-cleanup-continuation) owns the authority boundary. [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) resolves the protected input and logical persistence contract. Runtime implementation remains future work.
 
 ## Consequences
 
@@ -40,9 +40,9 @@ The [Access-owned continuation workflow](../../.agents/skills/inframeld-access-m
 
 The accepted [failure policy](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#hydra-cleanup-failure-handling) may end a run early for a known permanent rejection. After fixing the cause, a verified host operator may authorize another bounded run immediately. They need not wait for the ended run's deadline. Preserve its stop reason, consumed attempts, original deadline, confirmed progress and independent provider uncertainty.
 
-An ended run no longer supplies an active budget. A fresh authorization creates a separate run rather than reviving unused attempts. Distinct requests still cannot start parallel active runs. This clarification neither releases the recovery block nor supplies missing Kratos evidence. Exact error mappings, persistence and execution remain unfinished.
+An ended run no longer supplies an active budget. A fresh authorization creates a separate run rather than reviving unused attempts. Distinct requests still cannot start parallel active runs. This clarification neither releases the recovery block nor supplies missing Kratos evidence. [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) finalizes the owning failure mapping and record contract. The host command takes a unique request ID and original recovery ID, with no reviewed-run ID, recipient token or ordinary product-session requirement. Current-state checks and active-run exclusion remain mandatory. Runtime persistence and execution remain unfinished.
 
 ## Links
 
-- [ADR-0083: Initial retry limits](ADR-0083-bound-hydra-recovery-cleanup-retries.md), [ADR-0070: Bulk Hydra scope](ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md) and [remaining PD-ACCESS-03 questions](../../.agents/skills/inframeld-access-models/references/decision-recovery-production-completion.md).
+- [ADR-0083: Initial retry limits](ADR-0083-bound-hydra-recovery-cleanup-retries.md), [ADR-0070: Bulk Hydra scope](ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md) and [resolved PD-ACCESS-03 contract](../../.agents/skills/inframeld-access-models/references/decision-recovery-production-completion.md).
 - [Logical recovery records](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#identity-cleanup-records) and [shared resume behavior](../../.agents/skills/inframeld-application-contracts/references/jobs-and-recovery.md#resume-the-same-job-only-when-the-remaining-work-is-safe).

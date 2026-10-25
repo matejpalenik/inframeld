@@ -1,6 +1,6 @@
 # ADR-0081: Use native Kratos hooks for recovery evidence
 
-**Status:** Accepted for the hook-based integration approach. Production correlation, reconciliation and completion details remain pending under PD-ACCESS-03.
+**Status:** Accepted for native-hook integration. Partially superseded by [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) for the versioned evidence envelope and original-flow association. The production contract is resolved, with runtime delivery unfinished.
 
 **Date:** 2026-10-25
 
@@ -24,13 +24,13 @@ Choose native Kratos hooks plus durable reconciliation. The accepted sequence is
 3. An authenticated password-settings webhook runs after persistence and after native revocation. Its evidence must match the original admitted recovery and verified identity. A recovery webhook or pre-save settings callback cannot substitute.
 4. Inframeld performs the separate Hydra CLI-grant and remembered-login cleanup calls outside database transactions. It records their outcomes durably and releases only an eligible original checklist after all required evidence is confirmed.
 
-There is no single provider event certifying completion across Kratos, Hydra and Inframeld. Keep the existing private callback envelope and sender authentication. [The private handoff](../../.agents/skills/inframeld-access-models/references/private-recovery-handoff.md#native-hook-evidence) owns the evidence meanings. [Provider observations](../../.agents/skills/inframeld-access-models/references/recovery-provider-cleanup.md#documented-native-hook-support) distinguish documented capability, source inspection and earlier runtime tests.
+There is no single provider event certifying completion across Kratos, Hydra and Inframeld. This original decision retained the five-field draft. [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) replaces that envelope with three versioned evidence alternatives while preserving sender authentication. [The private handoff](../../.agents/skills/inframeld-access-models/references/private-recovery-handoff.md#native-hook-evidence) owns the evidence meanings. [Provider observations](../../.agents/skills/inframeld-access-models/references/recovery-provider-cleanup.md#documented-native-hook-support) distinguish documented capability, source inspection and earlier runtime tests.
 
 ## Consequences
 
 - Kratos owns password replacement and native session revocation. Inframeld owns durable receipt, independent Hydra cleanup and local release checks.
 - Missing or uncertain evidence keeps the block. A failed callback after persistence does not roll back the password change. Delivery loss must not be interpreted as failed password replacement or successful recovery completion.
-- Original recovery/settings association, lost acknowledgments, restart handling, aggregate Hydra confirmation and bounded retry/operator rules remain pending under PD-ACCESS-03. First-account coordination remains PD-ACCESS-04.
+- Original association, loss/restart reconciliation and completion are now resolved by [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) and the owning references. Retry/operator rules are recorded in ADR-0083/0084. ADR-0082 resolves first-account coordination, whose full admission integration remains unfinished.
 - Bulk retry effects, permanent rejection of older CLI versions, independent per-flow release and protection of the legitimate Kratos session remain unchanged. No production token hook is selected.
 - No application code, provider configuration or production completion wiring is introduced by this documentation decision.
 

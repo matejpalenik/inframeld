@@ -42,9 +42,10 @@ Load only matching triggers. Discuss and obtain approval before code depends on 
 
 - [PD-ACCESS-01](references/decision-key-currentness.md): Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
 - [PD-ACCESS-02](references/decision-admitted-work-authority.md): Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
-- [PD-ACCESS-03](references/decision-recovery-production-completion.md): Before wiring production recovery admission/completion callbacks, cleanup orchestration, issuance coordination or block release.
 - [PD-ACCESS-05](references/decision-provider-secret-lifecycle.md): When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
 - [PD-ACCESS-06](references/decision-setup-read-authority.md): Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
+
+Recovery production contracts are [resolved under PD-ACCESS-03](references/decision-recovery-production-completion.md). Read its acceptance matrix when implementing trusted callbacks, durable cleanup or host continuation. The design is accepted, while those production paths remain unimplemented.
 
 ## Read as needed
 

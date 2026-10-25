@@ -2,96 +2,81 @@
 
 <a id="private-identity-recovery-handoff"></a>
 
-Alice resets her password. A trusted server integration must record the original recovery obligation before old credentials can regain product access. A callback acknowledgment means durable receipt, not that cleanup or release has succeeded.
+Alice proves a recovery code, then saves a replacement password. Those are different facts. Access saves the original checklist before allowing recovery to continue, associates the native settings session, then accepts later evidence without trusting a recovery ID from the browser.
 
-> **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
+**Status:** accepted version 2 design under [ADR-0085](../../../../docs/adr/ADR-0085-bind-password-settings-evidence-to-original-recoveries.md). Production callbacks remain unimplemented. The [version 1 schema](../../../../contracts/design/access/recovery-event-v1.schema.json) is retained as a superseded design artifact, not a compatibility path.
 
-<a id="recovery-callbacks"></a>
+## Reading tasks
 
-<a id="private-recovery-admission-and-completion"></a>
+- [Native evidence](#native-hook-evidence) explains what each hook proves.
+- [Private wire contract](#recovery-wire) defines fields, authentication and receipts.
+- [Lost evidence and restarted flows](#recover-original-evidence) explains safe reconciliation.
+- [Completion](recovery-completion.md) owns Hydra execution, retries and release.
+
+<a id="recovery-callbacks"></a> <a id="private-recovery-admission-and-completion"></a>
 
 ## Private recovery admission and completion
 
-Private admission/completion callbacks use a dedicated rotatable hook secret. It is neither an application key nor a human credential, and these callbacks are not ordinary product client operations. Allowlist only `schemaVersion`, `flowId`, `identityId`, `eventKind` and `phase` in callback JSON, with a maximum of **8 KiB (8,192 bytes)**. The server validates the configured provider/installation binding. Do not accept caller-selected principals, assignments, sessions to revoke or provider success flags as authority. Callback bodies and audit contain no cookies/tokens.
+Use exactly one `X-Inframeld-Recovery-Key`, checked in constant time against dedicated rotatable service-secret material. Allow bounded current/next overlap during rotation. Product Authorization headers, application keys and browser cookies cannot substitute. Private handlers perform no product authentication or cookie CSRF and remain excluded from public ingress, product OpenAPI and generated clients.
 
-Derive stable event identity from the installation, flow, event kind and phase, rather than a randomly generated delivery ID. Save the original cleanup obligation and product block before pending cleanup could permit old credentials to regain access. Native Kratos cleanup follows, then trusted ordered completion evidence, independent durable Hydra cleanup and eligible release of this operation's block. A repeated admission recovers its original obligation. A completed duplicate cannot start broad cleanup of later logins. Failed/uncertain outcomes keep the block, and an older operation cannot release a newer one.
+Limit received JSON to **8 KiB (8,192 bytes)**. Reject unknown fields, duplicate keys, multiple JSON values and unsupported versions or event/route combinations. Installation and provider authority come from trusted configuration. Bodies and audit contain no passwords, cookies, tokens, arbitrary provider objects or caller-selected cleanup outcomes. A provider session ID identifies evidence association, not a session credential or instruction to revoke it.
 
-The hook secret authenticates the sending service. It does not, by itself, certify a verified reset or completed native cleanup. Those meanings follow the selected hook placement and checked original-flow binding below. The [version 1 recovery draft](#recovery-wire) supplies private route/header/version/enum declarations for final review. Product OpenAPI/generated clients do not gain a recovery bypass.
+The service key authenticates the sender. Trusted hook placement and the checked association establish what an event means. Neither constructing a typed event nor sending a successful generic webhook proves recovery completion.
 
 <a id="native-hook-evidence"></a>
 
 ## Native hook evidence
 
-**Accepted integration approach, production wiring unfinished.** [ADR-0081](../../../../docs/adr/ADR-0081-use-native-kratos-hooks-for-recovery-evidence.md) selects native hooks plus durable reconciliation. Alice's recovery follows these separate boundaries:
-
-| Boundary | Meaning for Inframeld |
+| Native boundary | Required effect |
 | --- | --- |
-| Kratos accepts the recovery code and invokes the recovery admission webhook | Durably register the original obligation, block product access and advance its CLI credential version once before allowing recovery to continue. The replacement password has not been saved yet. |
-| Kratos saves the replacement password and runs native `revoke_active_sessions` | Remove Alice's other browser sessions while preserving the session used to change her password. |
-| The following password-settings webhook runs after persistence and native revocation | Receive Kratos evidence only for the matching original recovery and verified identity. This is the selected source for the private `complete` phase, not proof of Hydra cleanup or permission to release access. |
-| Inframeld runs both Hydra cleanup operations | Record CLI-grant and remembered-login results independently before evaluating the aggregate Hydra outcome and local release rules. |
+| Recovery code verified, recovery hook runs | Admit the original flow once, atomically saving its block and advancing the CLI credential version. An anonymous email request cannot do this. |
+| Settings-flow creation hook runs | Bind the native settings-flow/session IDs and identity to the already admitted recovery before the flow is handed to the browser. This proves association only. |
+| Password is persisted, native `revoke_active_sessions` succeeds, following password-settings webhook runs | Accept Kratos cleanup evidence for that exact association. Preserve the session used to replace the password. This does not confirm Hydra cleanup. |
 
-Keep callbacks authenticated and the existing envelope unchanged. A routine settings change or caller-supplied recovery ID cannot claim the third boundary. The exact production association check remains pending. [Pinned source findings and earlier provider tests](recovery-provider-cleanup.md#documented-native-hook-support) establish the available hook stages, not the finished delivery mechanism.
+Configure the creation hook as waited-for and fail settings-flow creation if required association cannot be saved. The password callback must be the post-persistence mode, after native revocation, also waited-for. A failed callback at that later stage does not roll back the password or native cleanup. The recovery webhook's session is not exposed by the pinned template, so do not invent that field there.
 
-Missing evidence keeps the obligation blocked. A callback can fail after password persistence and session revocation, so its failure does not mean those changes rolled back. Lost acknowledgments and restarts need durable reconciliation rather than guessed success. PD-ACCESS-03 retains these details. [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md) resolves PD-ACCESS-04 through the accepted [identity turn](identity-admission-coordination.md) for local database steps. Recovery admission/completion and initialization implement that turn, while first admission remains unfinished. Provider I/O stays outside SQL transactions. [Recovery](recovery.md#identity-recovery-cleanup) owns the access invariant.
+For the first association, require a native recovery-created settings context, its exact configured Kratos recovery endpoint, the original recovery flow already admitted for the same identity, and the native settings/session IDs. The route and flow evidence must come from that hook context. A caller's query, body, transient payload or return URL is insufficient. #243 must qualify this distinction, including conflicting query/body identifiers, before production wiring is considered complete.
 
-<a id="recovery-wire"></a>
+For a fresh or restarted settings flow, a durable association for the same installation/provider/session/identity can identify the original operation even when the new flow has no native recovery source. Reject attempts to move a bound flow or session to another identity or original operation. Ordinary settings without a trusted recovery association cannot supply recovery proof.
 
-<a id="version-1-private-recovery-handoff"></a>
+<a id="recovery-wire"></a> <a id="version-1-private-recovery-handoff"></a>
 
-## Version 1 private recovery handoff
+## Version 2 private recovery handoff
 
-Expose only on the private service listener, excluded from public ingress/product OpenAPI/generated clients:
+The legacy anchor above remains for existing links. These are accepted private design routes, not implemented endpoints:
 
-| Route | Private operation ID | Input / acknowledgment |
+| POST route | Required `eventType` | Additional required fields |
 | --- | --- | --- |
-| `POST /internal/v1/identity-recovery/admit` | `admitIdentityRecovery` | `IdentityRecoveryEventRequest`, `phase: admit` / 202 `IdentityRecoveryEventResponse` |
-| `POST /internal/v1/identity-recovery/complete` | `completeIdentityRecovery` | Same named input, `phase: complete` / 202 same acknowledgment |
+| `/internal/v2/identity-recovery/admit` | `recovery-code-verified` | `recoveryFlowId`, `eventKind` |
+| `/internal/v2/identity-recovery/settings` | `settings-flow-associated` | `settingsFlowId`, `sessionId`, `sourceRecoveryFlowId` |
+| `/internal/v2/identity-recovery/password-saved` | `password-settings-saved` | `settingsFlowId`, `sessionId`, `sourceRecoveryFlowId` |
 
-Require exactly one `X-Inframeld-Recovery-Key`, verified in constant time against configured dedicated hook-secret material. Product cookie/Authorization credentials cannot substitute. Keep the service secret in protected configuration. Rotate with bounded current/next overlap, then retire the old secret. These adapters do not invoke product human/application authentication or cookie CSRF.
+Every alternative requires `schemaVersion: 2` and `identityId`. Identity, flow and session IDs are UUID strings. Admission's `eventKind` is `recovery` or `password-reset`, checked against the configured integration. `sourceRecoveryFlowId` is a required nullable field extracted from native context. It is null for a fresh ordinary settings flow. No alternative accepts installation, provider authority, principal, permission, credential version or provider-success assertions.
 
-**Design notation, a teaching view of [the existing input schema](../../../../contracts/design/access/recovery-event-v1.schema.json), not production implementation.** UUID values are serialized UUID strings.
+Resolve both settings events through the stored association. A non-null native source must agree with its original admission. A missing/conflicting recovery admission, changed identity/session binding or password event contradicting its association returns safe 409 without creating a replacement obligation. An ordinary settings event with null source and no recovery association returns 204 with no recovery acknowledgment, admission, version advancement or cleanup. This no-op is not completion evidence.
 
-```python
-from typing import Literal, TypedDict
-from uuid import UUID
+For a recovery-bound event, return HTTP 202 only after committing its receipt and required state. The safe response fields are `schemaVersion: 2`, the original `operationId`, the checked `eventType` and `recorded: true`. The first trusted password-saved receipt also commits the recoverable job handoff and initial eligibility time. HTTP 202 means durable receipt, not provider success or restored access.
 
-class IdentityRecoveryEventRequest(TypedDict):
-    schemaVersion: Literal[1]
-    flowId: UUID       # Original verified flow, shared by both phases
-    identityId: UUID   # Verified identity, not a local principal assertion
-    eventKind: Literal["recovery", "password-reset"]
-    phase: Literal["admit", "complete"]  # Must match the private route
-```
+Event identity is configured installation/provider plus event type and its native flow ID: recovery flow for admission, settings flow for association/password evidence. Stored identity, event kind and session/source association must agree on replay. They are checked immutable meaning, not extra key dimensions that permit conflicting second operations. Concurrent repeats return the original recorded acknowledgment. Random delivery IDs do not identify business events.
 
-The received body is at most 8 KiB. Reject unknown and duplicate fields through the required strict parsing boundary. The annotations do not enforce those checks. The phase must match the route. Configured provider/installation binding is server-owned. `flowId` identifies the original verified recovery/reset flow for both phases. An unrelated later settings flow cannot replace it. The trusted integration must retain/resolve any recovery-to-settings association needed by the chosen provider sequence. Routine profile edits, anonymous email requests and browser redirects are not these events.
+Use safe existing problem conventions: 401 invalid service credential, 409 conflicting/reordered evidence, 413 oversized body, 422 invalid fields/version/event/route, and 503 unavailable required state or unconfirmed receipt. Do not reflect the key, body or provider error. A released duplicate cannot dispatch provider work, reset a budget or release another block.
 
-The documented acknowledgment has this design shape. The input schema does not define this response.
+<a id="recover-original-evidence"></a>
 
-```python
-class IdentityRecoveryEventResponse(TypedDict):
-    operationId: str
-    eventKind: Literal["recovery", "password-reset"]
-    phase: Literal["admit", "complete"]
-    recorded: Literal[True]  # Durable receipt only
-```
+## Lost evidence and restarted flows
 
-HTTP 202 acknowledges durable receipt, not provider cleanup success or product access. Use the existing safe problems for 401 invalid service credential, 409 conflicting/reordered evidence, 413 oversize, 422 invalid envelope/version/phase and 503 unconfirmed required dependency. Identity/flow mismatches return a safe 409 without target details. No callback error reflects the hook secret, body, cookies or provider text.
+If the commit succeeded but the acknowledgment was lost, repeat the same evidence and recover its receipt. If the password callback was never saved, keep the block. A successful settings status, password timestamp or provider-call timeout cannot manufacture missing post-revocation proof.
 
-Derive the business event key from configured installation/provider, original flow, event kind and phase. The two phases bind to one original cleanup operation and one verified identity. A reused flow with a different identity/kind conflicts. A completion without its durable admission cannot create an obligation or clear a block: reject 409 and require reconciliation of the original admission. Concurrent repeats recover the one recorded acknowledgment. An already-completed duplicate returns that result without another native/broad Hydra revocation or a block release. Record event identity/evidence safely, not random delivery IDs as business identity and not proof credentials.
+Alice may save another password through a flow associated with the same trusted session. If that session is unavailable, she performs a new verified recovery. At its first admission, save explicit links to older unreleased operations for the same installation/provider/subject under [identity coordination](identity-admission-coordination.md). Duplicate admission never expands that set. A recovery admitted afterward is not covered.
 
-Callback receipt does not renew [a Hydra retry budget](recovery-completion.md#hydra-cleanup-retry-budget). Once trusted Kratos completion makes cleanup eligible, preserve its initial run's deadline, consumed attempts and confirmed progress across repeated delivery and restart. An exhausted operation stays blocked for operator attention. Only [fresh protected host authorization](recovery-completion.md#operator-cleanup-continuation) may grant another bounded run, recorded separately without erasing earlier history. Repeated delivery of that operator request also grants no new budget. HTTP 202 remains durable receipt only, and the five-field envelope is unchanged.
+Once the newer operation has trusted Kratos proof and both Hydra confirmations, its durable combined proof may satisfy those linked older checklists. Each still undergoes its own binding and current release checks. Preserve original operations, admission metadata, confirmed progress and all run history. Do not reset old budgets, start provider work for an already satisfied obligation or infer coverage from timestamps. An older completion cannot cover a newer recovery. [Logical records](credential-and-recovery-records.md#recovery-delivery-records) own the links and provenance.
 
-Access owns local blocking, the original durable obligation, independent provider outcomes and eligible release. The trusted Kratos integration owns verified reset evidence, ordered native cleanup and legitimate-session preservation. Its service-authenticated callback alone does not prove those outcomes. Admit must durably block before the pending cleanup interval can authorize product access. Confirmed native Kratos cleanup must precede trusted complete evidence. The worker then reconciles that subject's CLI grants and Hydra remembered logins independently. Under [ADR-0070](../../../../docs/adr/ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md), unfinished retries and already-dispatched calls may invalidate newer CLI credentials. Completed events initiate no new cleanup. Kratos's legitimate recovery session remains protected. Uncertain outcomes remain blocked, suspended users still need deliberate Restore users, and an older completion cannot release a newer block.
-
-**Production qualification gate:** demonstrate on selected pinned OSS releases that callback placement follows verified recovery/reset, admission failure prevents an unblocked reset, native cleanup preserves the legitimate new session, completion really follows confirmed native cleanup, changed recovery/settings flow IDs retain their original binding, and a lost callback/provider response can be reconciled with bounded subject-scoped bulk cleanup and completed-event deduplication. Later CLI credentials may be invalidated by an unfinished retry or already-dispatched call. Qualify coordination with token issuance, including authorization-code exchanges and refresh requests already underway, before treating Hydra cleanup as complete. Bound retries and persist unresolved obligations. Exhausted reconciliation stays blocked and visible to host operations. Do not publish a guessed hook configuration or mark cleanup confirmed just because the generic webhook returned success. The inspected [Kratos v25.4.0 recovery webhook](https://raw.githubusercontent.com/ory/kratos/v25.4.0/selfservice/hook/web_hook.go) supplies flow/identity but does not add the recovery session to that hook's template context. This source observation is not runtime qualification. Report an unsupported chosen placement as a contract conflict, rather than silently weakening the required block/evidence boundary.
-
-The original v25.4.0 source observation above remains historical evidence. The current [v26.2.0 recovery hook](https://github.com/ory/kratos/blob/v26.2.0/selfservice/hook/web_hook.go) still omits the recovery session, while both settings hooks now expose their current session. [Upgrade qualification](authorization.md) records the changed observation and preserved recovery assertions. A session ID in a pre-save callback is not confirmation of password persistence or native cleanup.
+The [completion workflow](recovery-completion.md#completion-proof) explains why acknowledged Hydra cleanup and permanent Inframeld rejection of old CLI versions are separate guarantees. Missing Kratos proof prevents Hydra execution even after host authorization. Provider calls remain outside database transactions.
 
 <a id="machine-readable-input-shape"></a>
 
-## Machine-readable input shape
+## Sources and machine-readable shape
 
-[The design-only JSON Schema](../../../../contracts/design/access/recovery-event-v1.schema.json) expresses the documented envelope. It is not a runtime model or proof of authorization, trusted event ordering or provider completion. The hook approach is accepted in ADR-0081. PD-ACCESS-03 retains the remaining correlation, reconciliation and completion details. PD-ACCESS-04 is resolved by ADR-0082, with its shared coordinator and recovery/initialization participants implemented. First-admission integration remains future work.
+[The version 2 design schema](../../../../contracts/design/access/recovery-event-v2.schema.json) expresses the three alternatives. It is not runtime validation. Byte limits, duplicate-key rejection, literal integer tokens, sender trust, native association and database state need separate checks. JSON Schema treats `2.0` as integer-valued, while strict parsing requires the integer token `2`.
 
-A structural validator cannot establish received-byte limits, reject duplicate JSON keys after decoding, verify a credential or enforce database state. JSON Schema treats `1` and `1.0` as the same integer value. Strict token parsing remains a separate requirement. Future implementation must reconcile or supersede this design schema with its runtime-owned definition.
+The [pinned webhook](https://github.com/ory/kratos/blob/v26.2.0/selfservice/hook/web_hook.go), [settings handler](https://github.com/ory/kratos/blob/v26.2.0/selfservice/flow/settings/handler.go) and [recovery transition](https://github.com/ory/kratos/blob/v26.2.0/selfservice/strategy/code/strategy_recovery.go) expose the selected stages. Historical v25.4.0 and current v26.2.0 recovery hooks omit session template data. Settings hooks supply it. [Provider observations](recovery-provider-cleanup.md#documented-native-hook-support) distinguish source inspection and earlier tests from unfinished production delivery. [The qualification matrix](decision-recovery-production-completion.md#open-questions-and-required-evidence) assigns the remaining runtime proof to #243–#245.

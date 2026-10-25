@@ -48,7 +48,7 @@ If recovery wins, a valid new invitation activation returns safe 409 with no acc
 
 Before implementing first local admission, invitation activation/provisioning or recovery completion that can race with admission.
 
-The coordination choice is settled. Implement affected paths against the accepted workflow after separate application-write approval. Existing linked-human authentication and grant operations retain their current behavior. Unresolved production completion evidence remains under PD-ACCESS-03.
+The coordination choice is settled. Implement affected paths against the accepted workflow after separate application-write approval. Existing linked-human authentication and grant operations retain their current behavior. The production completion contract is resolved under [PD-ACCESS-03](decision-recovery-production-completion.md), while its implementation and required evidence remain unfinished.
 
 ## Architectural impact and dependencies
 

@@ -81,7 +81,7 @@ Ordinary departure preserves required management. Emergency suspension immediate
 
 Invitation admission rechecks verified identity and current issuer authority for its exact assignments.
 
-Host maintenance supplies its own narrow authority. The version 1 maintenance draft uses a transient Hydra human token only for independent candidate-identity checks. Host execution authorizes the operation. Ordinary login cannot become host authority. Keep session budgets, mutation limits, invitation, grant-listing, private recovery and maintenance inputs under their exact contracts.
+Host maintenance supplies its own narrow authority. The version 1 bootstrap/repair modes use a transient Hydra human token only for independent candidate-identity checks. [Recovery-cleanup continuation](host-maintenance.md#recovery-cleanup-continuation) targets the stored recovery and needs no recipient token or reviewed-run ID. Host execution authorizes maintenance. Ordinary login cannot become host authority. Keep session budgets, mutation limits, invitation, grant-listing, private recovery and maintenance inputs under their exact contracts.
 
 <a id="status-and-authoritative-routes"></a>
 

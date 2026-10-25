@@ -23,9 +23,9 @@ Prefer help from an already authorized peer or recovery of the legitimate accoun
 
 The compromised account stays blocked. Recovery records the operator, reason, changed permissions, and the access change number together with the change. It does not give the operator ordinary document-reading permissions or let an in-app administrator take over private groups.
 
-The accepted boundary is a narrow one-shot maintenance command executed inside the verified managed backend using the operator's existing host/container-exec authority. Supply bounded protected input, an expected immutable installation identity, independently verified Ory identity and the exact reviewed request state. An ordinary bearer token, email address, target label or Docker context name is not operator authority or sufficient installation proof. Remote host maintenance remains separate from ordinary remote CLI login. Do not expose a public claim/maintenance API, shared claim password or backend Docker socket.
+For bootstrap and stranded-authority repair, the accepted boundary is a narrow one-shot maintenance command executed inside the verified managed backend using the operator's existing host/container-exec authority. Supply bounded protected input, an expected immutable installation identity, independently verified Ory identity and the exact reviewed request state. Recovery-cleanup continuation below reuses host authority without recipient proof or reviewed-run input. An ordinary bearer token, email address, target label or Docker context name is not operator authority or sufficient installation proof. Remote host maintenance remains separate from ordinary remote CLI login. Do not expose a public claim/maintenance API, shared claim password or backend Docker socket.
 
-First-administrator setup commits the verified identity link, admission, four explicit organization grants and audit together. Replaying the same original claim returns that result without recreating removed grants. A competing identity fails. For repair, the replacement must already be an active admitted verified human. Recheck under the applicable organization/project locks that the exact responsibility is still stranded and the reviewed revision is current. A stale review fails without partial assignments. Save the operator reason, before/after revisions and audit with the exact membership/management or use-and-grant repair. The audit explains the action but cannot prevent misuse by a trusted host operator. The [maintenance contract](#maintenance) selects `inframeld-maintenance`, one protected versioned JSON request limited to 64 KiB, independent verification of the candidate's current Ory session/identity, exact reviewed intent and safe output. Host execution authorizes repair. The session proof identifies its recipient. The [version 1 maintenance draft](#maintenance-wire) uses the transient Hydra human access token already obtained by the CLI as protected recipient identity proof. Private introspection and current Kratos identity checks precede local reads. Host execution supplies authority. First bootstrap may verify before local admission, while repair requires an active admitted eligible recipient. The draft specifies installation-identity initialization and versioned input/output/error/replay contracts for final review and qualification.
+First-administrator setup commits the verified identity link, admission, four explicit organization grants and audit together. Replaying the same original claim returns that result without recreating removed grants. A competing identity fails. For repair, the replacement must already be an active admitted verified human. Recheck under the applicable organization/project locks that the exact responsibility is still stranded and the reviewed revision is current. A stale review fails without partial assignments. Save the operator reason, before/after revisions and audit with the exact membership/management or use-and-grant repair. The audit explains the action but cannot prevent misuse by a trusted host operator. The [maintenance contract](#maintenance) selects `inframeld-maintenance`, one protected versioned JSON request limited to 64 KiB, independent verification of the candidate's current Ory session/identity, exact reviewed intent and safe output. Host execution authorizes repair. The session proof identifies its recipient. The [version 1 bootstrap/repair modes](#maintenance-wire) use the transient Hydra human access token already obtained by the CLI as protected recipient identity proof. Private introspection and current Kratos identity checks precede local reads. Host execution supplies authority. First bootstrap may verify before local admission, while repair requires an active admitted eligible recipient. The draft specifies installation-identity initialization and versioned input/output/error/replay contracts for final review and qualification.
 
 Deliver suspension/restoration and scoped operator maintenance as explicit capabilities, separate from ordinary membership/grant administration. The immediate local block, external Kratos/Hydra cleanup and deliberate restoration have separate recorded outcomes: cleanup failure cannot lift the block. A retry inspects or continues the original cleanup. It never restores access merely to make another provider request. Operator maintenance uses a privileged host boundary, not an unrestricted token or hidden bypass in ordinary CLI authentication. The [V1 scope](../../inframeld-architecture/references/v1-scope-and-extension-boundaries.md) assigns these workflows and their specification/security qualification prerequisites. No maintenance command is implemented by this guide.
 
@@ -33,13 +33,40 @@ Deliver suspension/restoration and scoped operator maintenance as explicit capab
 
 ## Continue unfinished recovery cleanup
 
-**Accepted policy, unimplemented.** [ADR-0084](../../../../docs/adr/ADR-0084-authorize-additional-recovery-cleanup-runs-through-host-maintenance.md) allows a verified host operator to authorize another bounded cleanup run after the previous run has ended. This includes budget exhaustion or [early termination for a known permanent rejection](recovery-completion.md#hydra-cleanup-failure-handling). After fixing the cause, the operator need not wait for the ended run's deadline. There is no lifetime cap on these explicit authorizations. Each new run uses the existing twelve-attempt/one-hour limits and requires fresh approval.
+**Accepted contract, unimplemented.** Alice's cleanup run ends, the operator fixes Hydra and explicitly authorizes another run of the same original recovery. [ADR-0084](../../../../docs/adr/ADR-0084-authorize-additional-recovery-cleanup-runs-through-host-maintenance.md) permits unlimited such authorizations over its lifetime. Each run still has twelve attempts within one hour. An early permanent rejection does not require waiting for the old deadline.
 
-Verify host authority and the expected installation through the protected maintenance boundary. The original stored recovery supplies the trusted provider/identity binding. Keep that operation unchanged and record the new authorization and budget separately, retaining earlier counts, deadlines, outcomes and confirmed progress. Repeated delivery of the same authorization returns its original result. A distinct request cannot start a parallel run while that recovery has an active budget.
+Use the backend-only `inframeld-maintenance` command with one protected stdin JSON object, at most **64 KiB (65,536 bytes)**. Host/container-exec authority authorizes this mode independently of any ordinary product session. It does not depend on delivering first-administrator or stranded-authority repair. There is no network maintenance API or shared claim password.
 
-Alice remains blocked throughout unfinished cleanup. Operator authority permits only the eligible remaining work. It cannot manufacture missing Kratos evidence, repeat confirmed steps, restart a completed recovery, restore account status or recreate permissions. [The continuation workflow](recovery-completion.md#operator-cleanup-continuation) owns current-state checks and release boundaries.
+| Required input | Value |
+| --- | --- |
+| `schemaVersion` | Integer token `1`. |
+| `mode` | `resume-recovery-cleanup`. |
+| `expectedInstallationId` | The independently operator-controlled installation UUID. |
+| `operationId` | Unique nonblank operator request ID, at most 128 characters, reused after response loss. |
+| `recoveryOperationId` | The nonblank original stored recovery operation ID. This differs from the operator request ID. |
+| `operatorLabel` | Nonblank accountable attribution, at most 128 characters. |
+| `reason` | Nonblank explanation, at most 512 characters. |
 
-This capability uses host authority, independently of the operator's ordinary application session. The existing maintenance draft below defines bootstrap and stranded-authority repair inputs. Recovery-continuation command/input shapes and persistence are still to be specified. This policy adds no executable, public endpoint or new wire declaration.
+No reviewed-run ID, access revision, identity assertion, recipient proof, cookie, token, password or scope override is accepted. Reject extra/duplicate fields and a second JSON value. The [design schema](../../../../contracts/design/access/maintenance-v1.schema.json) describes this mode separately from bootstrap/repair.
+
+Within short database work, verify authoritative installation metadata and load the original stored provider/identity binding. Take the identity turn before required organization/project and job/run coordination, then reread current state. Save the authorization, new budget, job handoff and required audit together. No provider call occurs in the command transaction.
+
+Deduplicate by installation and operator `operationId` across maintenance modes. Equal canonical mode/target/attribution/reason meaning recovers the original outcome before applying new-run checks. Different meaning returns `idempotency_key_reused`. Persist successful no-run outcomes too, so their replay cannot later authorize work. There is no operator-reviewed-run precondition.
+
+| Current state | Result for a fresh host request |
+| --- | --- |
+| Eligible unfinished cleanup and no active run | Create a separate run, preserving previous budgets/history and confirmed progress. |
+| Another run is active | Conflict `cleanup_run_active`, no parallel run. Settle expired/ended state under coordination before deciding. |
+| Trusted Kratos completion evidence is missing | Reject `recovery_evidence_missing`. The operator cannot manufacture it. |
+| Recovery already released | Return `already-completed`, no new run. |
+| Both Hydra steps are confirmed but release remains pending | Return `cleanup-confirmed` with the observed release state, no provider work. Normal local eligibility still governs release. |
+| Original recovery does not exist | Reject `recovery_not_found`, do not initialize an account or recovery. |
+
+A successful stdout JSON object contains `schemaVersion: 1`, `mode`, operator `operationId`, `installationId`, `recoveryOperationId`, `outcome` and observed `released`. `outcome: cleanup-authorized` additionally contains its original `runId` and UTC `deadline`. The two no-run outcomes omit those fields. A repeated accepted request returns its original output, not a claim about current access or a renewed deadline.
+
+Controlled errors use the existing safe `MaintenanceErrorResponse`, with the parsed operator request ID when available and no reflected input. Exit 0 means verified authorization/replayed/no-run success, 2 invalid input, and 1 operational failure. Reuse `installation_mismatch`, `idempotency_key_reused`, `dependency_unavailable` and `unexpected_error`, plus the three mode-specific codes above. A missing or interrupted response is unknown: repeat the same request ID, not a new authorization.
+
+Authorizing a run supplies neither provider success nor access. It cannot restart completed cleanup, repeat confirmed steps, clear another obligation, restore a principal or permissions, or advance/reset a credential version. Already-admitted calls can still finish late. [Completion](recovery-completion.md#operator-cleanup-continuation) owns execution and [records](credential-and-recovery-records.md#recovery-delivery-records) own retained authorizations and budgets.
 
 <a id="maintenance"></a>
 
@@ -47,7 +74,7 @@ This capability uses host authority, independently of the operator's ordinary ap
 
 ## One-shot maintenance through protected stdin
 
-The accepted backend-only command name is `inframeld-maintenance`, with separate first-administrator bootstrap and exact stranded-authority repair intents. Read one JSON request from protected stdin, limited to **64 KiB (65,536 bytes)**. This is a command contract, not an implemented executable or runnable example.
+The accepted backend-only command name is `inframeld-maintenance`, with separate bootstrap, exact stranded-authority repair and [recovery-cleanup continuation](#recovery-cleanup-continuation) intents. The table below describes bootstrap/repair. Recovery continuation has its own fields above. Read one JSON request from protected stdin, limited to **64 KiB (65,536 bytes)**. This is a command contract, not an implemented executable or runnable example.
 
 | Required input | Meaning |
 | --- | --- |
@@ -58,15 +85,15 @@ The accepted backend-only command name is `inframeld-maintenance`, with separate
 | Exact responsibility/target and reviewed revision | Bootstrap's fixed Organization assignments, or the one reviewed stranded relationship/action being repaired. |
 | Candidate identity and current Ory session proof | Independently verify the candidate's current session and trusted Ory identity, not a caller-supplied email or subject assertion. |
 
-Host/container execution authorizes maintenance. The candidate's proof identifies the human who receives the exact assignments. Bootstrap may admit a verified human not yet locally admitted. Repair requires an already active admitted human. Consume proof secrets only through protected input and verification. Never put them in argv, environment, logs, audit or replay records. Safe output contains exact outcome, IDs and revisions. The [version 1 maintenance draft](#maintenance-wire) specifies input/output models, mode literals, transient Hydra access-token proof and installation-identity initialization for final review. Runtime qualification remains required.
+For bootstrap/repair, host/container execution authorizes maintenance. The candidate's proof identifies the human who receives the exact assignments. Bootstrap may admit a verified human not yet locally admitted. Repair requires an already active admitted human. Consume proof secrets only through protected input and verification. Never put them in argv, environment, logs, audit or replay records. Safe output contains exact outcome, IDs and revisions. The [version 1 maintenance draft](#maintenance-wire) specifies input/output models, mode literals, transient Hydra access-token proof and installation-identity initialization for final review. Runtime qualification remains required.
 
-Existing host/container-exec authority admits maintenance. Verify installation identity against authoritative managed state and identity evidence through the trusted Ory boundary. Do not trust a caller's target label, email, Docker context or product bearer. Recheck stranded state and revisions under the normal organization/project coordination. Save only the reviewed replacement assignments and audit together. No network maintenance API, shared claim password or backend Docker socket is introduced.
+Existing host/container-exec authority admits maintenance. Bootstrap/repair verify installation identity against authoritative managed state and recipient identity evidence through the trusted Ory boundary. Do not trust a caller's target label, email, Docker context or product bearer. Recheck stranded state and revisions under the normal organization/project coordination. Save only the reviewed replacement assignments and audit together. No network maintenance API, shared claim password or backend Docker socket is introduced.
 
 <a id="maintenance-wire"></a>
 
 <a id="version-1-host-maintenance-input-and-proof"></a>
 
-## Version 1 host-maintenance input and proof
+## Version 1 bootstrap/repair input and proof
 
 Run the backend-only `inframeld-maintenance` command once with a versioned JSON object through protected stdin, maximum 64 KiB. Select `schemaVersion: 1` and `mode: bootstrap-first-administrator` or `repair-stranded-authority`. Reject unknown fields, duplicate object keys and a second JSON value. No secret argument, environment variable, browser-cookie extraction, refresh token or ID token is supported.
 
@@ -97,7 +124,7 @@ Retain a keyed fingerprint of normalized mode/installation/verified subject/targ
 
 ## Machine-readable input shape
 
-[The design-only JSON Schema](../../../../contracts/design/access/maintenance-v1.schema.json) expresses the documented envelope. It is not a runtime model or proof of authorization, trusted event ordering or provider completion. PD-ACCESS-03 retains its remaining pending scope. PD-ACCESS-04 is resolved under ADR-0082. Any maintenance path that first provisions a human must follow [the accepted identity-coordination workflow](identity-admission-coordination.md), whose shared coordinator and recovery/initialization participants are implemented. First provisioning through maintenance remains unfinished.
+[The design-only JSON Schema](../../../../contracts/design/access/maintenance-v1.schema.json) expresses the documented envelope. It is not a runtime model or proof of authorization, trusted event ordering or provider completion. PD-ACCESS-03 is resolved by ADR-0085. Recovery continuation has its own accepted mode above, with runtime delivery unfinished. PD-ACCESS-04 is resolved under ADR-0082. Any maintenance path that first provisions a human must follow [the accepted identity-coordination workflow](identity-admission-coordination.md), whose shared coordinator and recovery/initialization participants are implemented. First provisioning through maintenance remains unfinished.
 
 A structural validator cannot establish received-byte limits, reject duplicate JSON keys after decoding, verify a credential or enforce database state. JSON Schema treats `1` and `1.0` as the same integer value. Strict token parsing remains a separate requirement. Future implementation must reconcile or supersede this design schema with its runtime-owned definition.
 
