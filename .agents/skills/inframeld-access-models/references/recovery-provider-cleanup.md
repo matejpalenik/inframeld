@@ -19,11 +19,28 @@ Use bulk subject cleanup, not a frozen per-login inventory or timestamp cutoff. 
 
 An unfinished retry or an already dispatched cleanup call may invalidate newer CLI credentials. Report that possibility honestly. A durably completed event must not initiate new cleanup. Original obligations survive interruption and use the existing bounded reconciliation contract.
 
+The accepted [workflow retry budget](recovery-completion.md#hydra-cleanup-retry-budget) limits automatic attempts in each run for the original operation. An additional run needs [fresh explicit host authorization](recovery-completion.md#operator-cleanup-continuation), retaining earlier history and confirmed progress. Individual revoker calls retain their explicit finite deadlines and disabled SDK retries. A run's one-hour window does not extend a call's timeout or make an uncertain response confirmed. It also cannot recall calls dispatched by an earlier run. Production scheduling and durable budget enforcement remain unimplemented.
+
+[Failure handling](recovery-completion.md#hydra-cleanup-failure-handling) is accepted separately: retry recoverable provider failures and uncertain bulk outcomes within budget, but end the run early for a known permanent rejection. The adapter's current confirmed/failed/uncertain observation does not by itself supply the complete retry decision. In particular, failed cleanup evidence must not automatically be interpreted as a permanent error. Exact mappings and any additional safe observations remain future contract work. This policy does not change the inspected adapter behavior or authorize retries of arbitrary programming errors.
+
 A login approval or refresh can cross the cleanup calls. HTTP-ordering tests distinguish outstanding authorization codes, prepared approvals, late token responses and approval between bulk calls. A held request or response does not freeze Hydra internally. Staged records are test evidence, not a credential inventory or authority to release a block.
 
 The durable credential version supplements bulk cleanup. A late grant may remain accepted at Hydra and still receive Inframeld's invalid-token response. Refresh descendants keep the old version. Current Inframeld rejection does not establish Hydra-wide rejection or complete provider cleanup.
 
 Pinned Kratos observations also distinguish recovery-code acceptance from password replacement. Accepting the recovery code leaves the old password usable until replacement. Settings pre-save and post-save failures have different persistence effects. A recovery-created settings flow preserves original-flow evidence, while a fresh settings flow cannot claim it through a query parameter.
+
+<a id="documented-native-hook-support"></a>
+
+## Documented native-hook support
+
+**Documentation and source inspected on 2026-10-25, no new runtime checks.** [ADR-0081](../../../../docs/adr/ADR-0081-use-native-kratos-hooks-for-recovery-evidence.md) accepts native hooks plus durable reconciliation. The [private handoff](private-recovery-handoff.md#native-hook-evidence) owns the selected sequence. Current Ory pages also describe Ory Network, so the pinned OSS source establishes availability in our selected release.
+
+- [Ory's hook documentation](https://www.ory.com/docs/kratos/hooks/configure-hooks) lists recovery and password-settings hooks. Its [webhook guide](https://www.ory.com/docs/guides/integrate-with-ory-cloud-through-webhooks) documents configurable payloads and API-key authentication. These are integration capabilities, not a combined recovery-completion certificate.
+- The [Kratos v26.2.0 webhook implementation](https://github.com/ory/kratos/blob/v26.2.0/selfservice/hook/web_hook.go#L247-L277) places a settings webhook after persistence when `can_interrupt` and `response.parse` are false. Keeping `response.ignore` false makes it wait for the callback response. Its recovery hook supplies flow and identity but omits the session. Both settings stages supply the session.
+- The [settings executor](https://github.com/ory/kratos/blob/v26.2.0/selfservice/flow/settings/hook.go#L206-L269) persists the password change before its post-persistence hook loop. It stops on a hook error. A callback ordered after native revocation is therefore not reached through that loop when revocation fails. The [native revoker](https://github.com/ory/kratos/blob/v26.2.0/selfservice/hook/session_destroyer.go#L50-L56) excludes the session used for the change, consistent with [Ory's session-revocation documentation](https://www.ory.com/docs/actions/revoke-active-sessions).
+- [Hydra's pinned API contracts](https://github.com/ory/hydra/blob/v26.2.0/consent/handler.go#L58-L288) provide subject/client grant revocation and separate subject-wide remembered-login deletion. Inframeld calls these APIs. It does not wait for a Hydra password-recovery event or use token-customization hooks as cleanup evidence.
+
+This source inspection supports the chosen hook placement. It does not deliver callbacks durably, validate their original-flow association or make the provider sequence atomic with Inframeld. Earlier real-provider observations below remain separate evidence. Production correlation, failure reconciliation and aggregate completion details remain pending under PD-ACCESS-03.
 
 <a id="kratos-password-reset-evidence"></a>
 
@@ -34,6 +51,8 @@ Pinned Kratos observations also distinguish recovery-code acceptance from passwo
 Alice enters a valid recovery code and receives a session for changing her password. Her old browser session is revoked, but her old password still works for a new login until she saves a replacement. The [real Kratos tests](../../../../apps/backend/tests/integration/kratos/test_kratos_password_reset_hooks.py) exercise this interval on **Kratos v26.2.0**, following the original v25.4.0 qualification. Code verification and successful password replacement are separate events. Production integration must keep the recovery obligation effective across that interval.
 
 The test-only password-settings configuration runs an interrupting webhook before password persistence, native `revoke_active_sessions` after persistence, then a non-interrupting webhook that waits for its response. These are settings-specific test observations, separate from the production recovery envelope.
+
+The separate recovery probe in [the test configuration](../../../../config/kratos/test.yaml) also has a callback named `complete`. It runs during code recovery, before password replacement. That name is not password-completion evidence and must not be copied as the production release boundary. The selected later signal is the post-persistence password-settings webhook.
 
 | Observed boundary | Password and session behavior |
 | --- | --- |
@@ -63,7 +82,7 @@ A timeout or cancellation does not stop the SDK thread or establish its remote r
 
 ## Production qualification boundary
 
-The local recovery aggregate, repository and completion service exist. Real-provider fixtures can observe ordering and extract evidence, but test-only extraction is not trusted production evidence. Production callbacks, durable provider orchestration, bounded reconciliation, issuance coordination and concurrent first local admission remain unfinished. An acknowledgment cannot establish cleanup success. Follow PD-ACCESS-03 and PD-ACCESS-04 before depending on those mechanisms.
+The local recovery aggregate, repository and completion service exist. The native-hook approach is accepted in ADR-0081. Real-provider fixtures can observe ordering and extract evidence, but test-only extraction is not trusted production evidence. Production callbacks, durable provider orchestration, bounded reconciliation, issuance coordination and concurrent first local admission remain unfinished. An acknowledgment cannot establish cleanup success. Follow the remaining PD-ACCESS-03 questions for production completion and [the accepted PD-ACCESS-04 identity workflow](identity-admission-coordination.md) for local coordination. Acceptance does not establish implemented locking or new provider evidence.
 
 Bulk Hydra cleanup can affect credentials issued during an unfinished recovery. A completed duplicate starts no new cleanup. Kratos recovery/password-reset ordering and native completion must be verified for the deployed version. A stale provider login cookie can require reauthentication. Permanent credential versions protect Inframeld even when a delayed provider grant completes. These limitations remain separate from successful local checklist persistence.
 

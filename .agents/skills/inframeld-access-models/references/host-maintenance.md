@@ -29,6 +29,18 @@ First-administrator setup commits the verified identity link, admission, four ex
 
 Deliver suspension/restoration and scoped operator maintenance as explicit capabilities, separate from ordinary membership/grant administration. The immediate local block, external Kratos/Hydra cleanup and deliberate restoration have separate recorded outcomes: cleanup failure cannot lift the block. A retry inspects or continues the original cleanup. It never restores access merely to make another provider request. Operator maintenance uses a privileged host boundary, not an unrestricted token or hidden bypass in ordinary CLI authentication. The [V1 scope](../../inframeld-architecture/references/v1-scope-and-extension-boundaries.md) assigns these workflows and their specification/security qualification prerequisites. No maintenance command is implemented by this guide.
 
+<a id="recovery-cleanup-continuation"></a>
+
+## Continue unfinished recovery cleanup
+
+**Accepted policy, unimplemented.** [ADR-0084](../../../../docs/adr/ADR-0084-authorize-additional-recovery-cleanup-runs-through-host-maintenance.md) allows a verified host operator to authorize another bounded cleanup run after the previous run has ended. This includes budget exhaustion or [early termination for a known permanent rejection](recovery-completion.md#hydra-cleanup-failure-handling). After fixing the cause, the operator need not wait for the ended run's deadline. There is no lifetime cap on these explicit authorizations. Each new run uses the existing twelve-attempt/one-hour limits and requires fresh approval.
+
+Verify host authority and the expected installation through the protected maintenance boundary. The original stored recovery supplies the trusted provider/identity binding. Keep that operation unchanged and record the new authorization and budget separately, retaining earlier counts, deadlines, outcomes and confirmed progress. Repeated delivery of the same authorization returns its original result. A distinct request cannot start a parallel run while that recovery has an active budget.
+
+Alice remains blocked throughout unfinished cleanup. Operator authority permits only the eligible remaining work. It cannot manufacture missing Kratos evidence, repeat confirmed steps, restart a completed recovery, restore account status or recreate permissions. [The continuation workflow](recovery-completion.md#operator-cleanup-continuation) owns current-state checks and release boundaries.
+
+This capability uses host authority, independently of the operator's ordinary application session. The existing maintenance draft below defines bootstrap and stranded-authority repair inputs. Recovery-continuation command/input shapes and persistence are still to be specified. This policy adds no executable, public endpoint or new wire declaration.
+
 <a id="maintenance"></a>
 
 <a id="one-shot-maintenance-through-protected-stdin"></a>
@@ -85,7 +97,7 @@ Retain a keyed fingerprint of normalized mode/installation/verified subject/targ
 
 ## Machine-readable input shape
 
-[The design-only JSON Schema](../../../../contracts/design/access/maintenance-v1.schema.json) expresses the documented envelope. It is not a runtime model or proof of authorization, trusted event ordering or provider completion. PD-ACCESS-03 and PD-ACCESS-04 retain their existing pending scope.
+[The design-only JSON Schema](../../../../contracts/design/access/maintenance-v1.schema.json) expresses the documented envelope. It is not a runtime model or proof of authorization, trusted event ordering or provider completion. PD-ACCESS-03 retains its remaining pending scope. PD-ACCESS-04 is resolved under ADR-0082. Any maintenance path that first provisions a human must follow [the accepted identity-coordination workflow](identity-admission-coordination.md), which remains unimplemented.
 
 A structural validator cannot establish received-byte limits, reject duplicate JSON keys after decoding, verify a credential or enforce database state. JSON Schema treats `1` and `1.0` as the same integer value. Strict token parsing remains a separate requirement. Future implementation must reconcile or supersede this design schema with its runtime-owned definition.
 

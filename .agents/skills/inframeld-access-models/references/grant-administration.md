@@ -116,6 +116,7 @@ A database **lock** makes conflicting changes wait. The accepted design calls fo
 | Project access change | First a shared lock on the organization row, then an exclusive lock on the project row. Shared organization locks allow different projects to change at once. The exclusive project lock makes changes in that project take turns. |
 | Installation permission or account-status change | An exclusive organization-row lock. This makes a suspension and affected project administration wait for each other. |
 | Change involving multiple projects | Take the organization lock first, then project locks in stable ID order. Limit waiting time and handle transaction failures. |
+| First local admission, recovery admission/completion or credential-state initialization | Under accepted ADR-0082, acquire the exact identity's transaction-scoped advisory lock before any required organization/project locks, then reread current facts. This prerequisite is not implemented yet. Follow [identity coordination](identity-admission-coordination.md). |
 
 While holding the required locks, the backend checks current permissions and whether the accounts and resources still allow the change. It checks the expected revision where required, applies the change, increments the revision, and saves the audit event in one short transaction. Every path listed above must follow compatible locking rules, including recovery and deletion.
 

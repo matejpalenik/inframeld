@@ -68,7 +68,6 @@ These entries retain unresolved review findings, not accepted specifications or 
 | [PD-ACCESS-01](../../inframeld-access-models/references/decision-key-currentness.md) | access-models | Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay. |
 | [PD-ACCESS-02](../../inframeld-access-models/references/decision-admitted-work-authority.md) | access-models | Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement. |
 | [PD-ACCESS-03](../../inframeld-access-models/references/decision-recovery-production-completion.md) | access-models | Before wiring production recovery admission/completion callbacks, cleanup orchestration, issuance coordination or block release. |
-| [PD-ACCESS-04](../../inframeld-access-models/references/decision-recovery-first-admission.md) | access-models | Before implementing first local admission, invitation activation/provisioning or recovery completion that can race with admission. |
 | [PD-ACCESS-05](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md) | access-models | When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified. |
 | [PD-ACCESS-06](../../inframeld-access-models/references/decision-setup-read-authority.md) | access-models | Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution. |
 | [PD-KNOWLEDGE-01](../../inframeld-knowledge/references/decision-complete-batch-handoff.md) | knowledge | Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff. |
@@ -91,6 +90,10 @@ These entries retain unresolved review findings, not accepted specifications or 
 | [PD-CONTRACTS-05](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md) | application-contracts | When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation. |
 | [PD-ARCHITECTURE-01](decision-supported-operating-envelope.md) | architecture | Before fixing production resource/admission limits or advertising supported corpus size, throughput, latency or concurrency. |
 | [PD-ARCHITECTURE-02](decision-availability-backup-and-restore.md) | architecture | When setting availability/recovery objectives, assembling the production topology or qualifying backup, upgrade, security clearance and restore claims. |
+
+### Resolved decision references
+
+- [PD-ACCESS-04](../../inframeld-access-models/references/decision-recovery-first-admission.md) is accepted under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). Follow [identity coordination](../../inframeld-access-models/references/identity-admission-coordination.md) before implementing first admission, recovery admission/completion or credential-state initialization. The design is settled, while implementation and concurrency tests remain unfinished.
 
 <a id="business-areas-and-state-ownership"></a>
 

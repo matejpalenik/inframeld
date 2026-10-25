@@ -78,6 +78,8 @@ Read applicable directory instructions, including [web guidance](apps/web/AGENTS
 
 ## PR descriptions and maintenance
 
+Before authorized GitHub issue creation, rewriting or relationship changes, follow [Author delivery issues](docs/development/documentation-maintenance.md#author-delivery-issues). Use concrete delivery examples, focused authoritative reading and native parent/blocker relationships. Preserve closed evidence and distinguish unmerged work from completed delivery. Drafting or reviewing an issue does not authorize publishing it.
+
 Before drafting a PR title/description or creating a PR, read [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md). Use its headings/checklists and actual branch changes. Distinguish personally run, developer-reported and pending checks. Never mark unverified items complete. Drafting text does not authorize creating/updating a GitHub PR.
 
 For authorized domain changes, update the owning workflow/record references, affected human guidance and navigation together. Architectural choice changes receive a superseding ADR using [the template](docs/adr/template.md), preserving and cross-linking earlier rationale. Ordinary corrections/navigation may update an existing ADR. Never turn proposed or untested design into an implemented guarantee.

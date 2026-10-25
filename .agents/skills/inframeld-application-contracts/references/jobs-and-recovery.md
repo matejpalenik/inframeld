@@ -18,7 +18,7 @@ queued -> running -> succeeded | failed | canceled | recovery_required
 
 A **checkpoint** records a completed file, batch, or evaluation case. A safe later attempt can keep that work instead of starting over.
 
-Automatically retry only work known not to have been sent, or work proven safe to repeat. Limit waits between retries, called **backoff**, and allow **at most three application attempts**.
+Automatically retry only work known not to have been sent, or work proven safe to repeat. Limit waits between retries, called **backoff**, and by default allow **at most three application attempts**. [ADR-0083](../../../../docs/adr/ADR-0083-bound-hydra-recovery-cleanup-retries.md) selects a narrow exception for [Hydra recovery cleanup](../../inframeld-access-models/references/recovery-completion.md#hydra-cleanup-retry-budget). Access owns that budget. Other jobs keep the three-attempt limit.
 
 When safe retries run out, record `failed` with the defined exhausted-budget reason so clients can distinguish it. There is no separate `paused` state.
 
@@ -29,6 +29,10 @@ When safe retries run out, record `failed` with the defined exhausted-budget rea
 ### Resume the same job only when the remaining work is safe
 
 An authorized explicit resume can requeue the same job after checking current scope, ownership, retention, and whether the remaining work is safe to repeat. Keep completed checkpoints and attempt history.
+
+For Hydra recovery cleanup, this generic resume rule cannot reset an earlier budget. [Access's host-authorized continuation policy](../../inframeld-access-models/references/recovery-completion.md#operator-cleanup-continuation) allows a separate bounded run on the same unfinished recovery after fresh explicit host authorization. Retain previous budgets and confirmed progress, deduplicate authorization requests and prevent parallel active runs for the same operation. Exact command/input and persistence remain unimplemented. Other job types retain their existing rules.
+
+[Access's failure policy](../../inframeld-access-models/references/recovery-completion.md#hydra-cleanup-failure-handling) may end a Hydra cleanup run before budget exhaustion for a known permanent rejection. A fresh explicit host authorization can continue eligible unfinished work after repair without waiting for the old deadline. Preserve the ended run's reason and provider uncertainty. This recovery-specific rule changes no other job policy and grants no access-block release.
 
 Resume must not revive a permanently retired generation, change saved payload bytes, or silently authorize a second model call whose earlier outcome is unknown.
 
@@ -89,7 +93,7 @@ The arrows show calls. The fence protects database progress and publication. It 
 
 ### Checkpoints, cancellation, and safe resume
 
-Save progress between limited-size files, batches, or evaluation cases. Retry automatically only when work was definitely not sent or repeating it is known to be safe. Wait between retries with bounded backoff and allow **at most three application attempts**. Once the budget is exhausted, record `failed` with that reason. There is no `paused` job state.
+Save progress between limited-size files, batches, or evaluation cases. Retry automatically only when work was definitely not sent or repeating it is known to be safe. Apply [the default attempt limit and documented Hydra exception](#preserve-progress-and-distinguish-failure-from-uncertainty) with bounded backoff. Once the budget is exhausted, record `failed` with that reason. There is no `paused` job state. Exhausting a recovery job's budget does not confirm provider cleanup or release its access block.
 
 <a id="apply-the-same-jobs-to-ragas-work"></a>
 

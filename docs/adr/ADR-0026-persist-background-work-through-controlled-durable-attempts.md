@@ -24,6 +24,8 @@ Record admitted work durably and execute it through controlled attempts. Use cur
 
 ## Consequences
 
+[ADR-0083](ADR-0083-bound-hydra-recovery-cleanup-retries.md) adds a narrow Hydra recovery-cleanup exception to the shared guide's three-attempt limit. Other jobs retain that limit. Durable ownership, fenced progress, uncertainty handling and provider calls outside SQL transactions remain unchanged. The original rationale above is preserved.
+
 - Work can continue or be examined after disconnection or restart, with explicit ownership of state publication.
 - A lease or database fence cannot cancel a request already sent to another system. Recovery must preserve uncertainty and must not silently repeat chargeable model work.
 

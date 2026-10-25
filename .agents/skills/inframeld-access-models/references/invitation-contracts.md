@@ -184,7 +184,9 @@ Access loads the real Organization/Project/group relationships and Alice's curre
 
 Preview uses the verified Kratos cookie and cookie-write CSRF boundary before local admission. Its protected token is in a bounded JSON body. Although the method is POST, this is a read: no `Idempotency-Key`, reservation, consumption, account admission or assignment. Return authoritative baseline Organization, affected Projects and intended target labels only, deduplicated within 201 scope items. Do not expose issuer inventory, provider details or document content.
 
-New preview/activation uses safe 404 for invalid, expired, revoked or already-used tokens. Stale/ineligible intent uses safe 409. Current browser identity and any linked suspension/recovery restrictions still apply. Activation cannot restore a human or release a recovery block.
+New preview/activation uses safe 404 for invalid, expired, revoked or already-used tokens. Stale/ineligible intent uses safe 409. Current browser identity and recovery restrictions apply even before a local identity link exists. Linked suspension restrictions also remain authoritative. Activation cannot restore a human or release a recovery block.
+
+Under the accepted [identity-coordination rule](identity-admission-coordination.md), new activation takes the recipient's identity turn before organization/project locks and then reads current state. A valid new activation blocked by recovery returns safe 409 without creating an account, consuming the invitation or applying assignments. The invitation can be retried after recovery if its ordinary validity and authority checks still pass. Lock-budget exhaustion instead follows the unavailable outcome with rollback. This design does not change invalid-token 404 handling or completed-operation replay.
 
 Before local admission, bind the activation reservation to the independently verified configured Ory authority/subject, exact invitation and route/key. Preserve the resulting stable principal binding after commit. Consumption, exact assignments, audit and original outcome commit together.
 
@@ -194,4 +196,4 @@ Find original completed activation before treating consumed state as a fresh req
 
 [The human workflow](admission-and-invitations.md), [initial-grant catalogue](actions-and-initial-grants.md), [target variants](grant-target-contract.md) and [grant transport bounds](grant-contracts.md) own their respective details. [ADR-0062](../../../../docs/adr/ADR-0062-activate-invitations-under-current-issuer-authority.md) records the accepted invitation boundary.
 
-Before implementing first local admission overlapping recovery, resolve [PD-ACCESS-04](decision-recovery-first-admission.md). Documenting these draft shapes does not qualify the account UI, trusted provider integration or concurrent admission.
+[PD-ACCESS-04](decision-recovery-first-admission.md) is resolved by [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). Implement new activation against [the accepted coordination workflow](identity-admission-coordination.md). Documenting these draft shapes does not implement the identity lock, account UI or trusted provider integration, or establish concurrent-admission test evidence.

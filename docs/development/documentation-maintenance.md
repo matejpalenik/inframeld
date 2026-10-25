@@ -23,7 +23,37 @@ Use this guide when adding or rewriting documentation. A new maintainer should b
 
 Give each rule one detailed owner. A human guide may explain its purpose briefly, then link to that owner. Avoid parallel specifications, large required reading stacks and copies of exact code declarations. Existing code may intentionally lag accepted design. Label that gap rather than changing the target during editing.
 
-For authorized issue work, retain the [implementation template](../../.github/ISSUE_TEMPLATE/implementation.md) and [Definition of Done](definition-of-done.md). Issues own task tracking. Do not add delivery inventories, progress logs or reconciliation reports to developer guides or skills. Historical issue bodies are not rewritten merely because a documentation path moved.
+For authorized issue work, follow [Author delivery issues](#author-delivery-issues), the [implementation template](../../.github/ISSUE_TEMPLATE/implementation.md) and [Definition of Done](definition-of-done.md). Issues own task tracking. Do not add delivery inventories, progress logs or reconciliation reports to developer guides or skills. Historical issue bodies are not rewritten merely because a documentation path moved.
+
+<a id="author-delivery-issues"></a>
+
+## Author delivery issues
+
+An issue describes a stable delivery outcome, not an inventory of today's code. For example, “Reject Alice's expired browser cookie without trying her CLI token” tells a new engineer what to deliver. “Wire authentication and qualify the boundary” does not.
+
+Choose the smallest coherent delivery scope and one of these formats:
+
+| Format | Required contents |
+| --- | --- |
+| Implementation | Outcome through an example, concrete work, observable acceptance examples, boundaries/owning issues, focused reading and behavioral verification. |
+| Parent | Outcome, actual native child map, exclusions and completion boundary. Keep implementation instructions and acceptance evidence in the children. Use the existing `epic` label. |
+| Specification | Concrete unanswered questions, accepted constraints, outputs needing approval, affected consumers and review examples. Link the owning pending-decision analysis rather than copying it. |
+| Qualification | Behavior to demonstrate, tested artifacts/environment/inputs, injected failures, required evidence and limitations. A planned test is not a passing result. |
+| Deferred Studio | Intended UI behavior, delivered backend dependencies and explicit exclusion from v1. Do not invent future backend contracts. |
+
+Use `type:implementation`, `type:specification` or `type:qualification` on open leaves. Apply `needs-decision` only when an unresolved answer prevents that ticket's implementation. Missing qualification evidence alone does not forbid evidence-gathering tests.
+
+Before writing, compare the delivery scope with the owning skill workflow, exact contracts and accepted ADRs. The repository owns behavior. Issues own delivery and evidence. Follow explicit supersession, preserve unresolved choices and surface genuine contradictions before publishing affected requirements. Do not infer new permissions, endpoints or provider guarantees. Keep useful unique requirements visible as explicit questions if their authority is unclear.
+
+Give a junior engineer a short path to the relevant explanation. Link exact sections instead of copying field catalogues, global conventions or the same workflow into several issue sections. Include an exact value only when the acceptance example needs it. For accepted unpublished guidance, state the exact repository path and its pending publication. Link a real PR or published revision when available. Never link `main` to missing or materially older content as if it contained the accepted update.
+
+Reuse existing issues before creating a child. Use native parents for decomposition and native blockers for actual prerequisite capabilities, using GitHub's database issue IDs when an API requires them. Avoid blanket epic blockers where a particular child supplies the capability. Keep the graph acyclic and ensure v1 has no dependency on deferred Studio. Do not duplicate those relationships with manually maintained Ready/Blocked fields.
+
+Update an issue when delivery scope, acceptance, an authoritative reading route, a prerequisite capability or a genuine decision changes. Code reorganization alone does not require a new starting-point inventory. Record implementation progress through completed delivery tasks, linked PRs and scoped evidence. Preserve comments and closed historical scope/results. Add only necessary navigation or a clearly separated current clarification to closed records.
+
+Keep newly described work open while implementation is unmerged or required acceptance evidence is missing. A local adapter, an open PR or a successful ordinary path does not establish complete production integration. Distinguish source inspection, checks personally run, reported results and pending release gates. Qualification evidence should identify the tested artifacts, failures and limits.
+
+For authorized bulk changes, snapshot bodies, comments, metadata and relationships outside the repository. Prepare coverage and the complete graph before publishing. Recheck current bodies/update times before each edit, preserve intervening work, journal actual created IDs and read back mutations. After an uncertain create, locate the issue before retrying. Verify states, milestones, labels, parents, dependencies and scope after application. Do not create repetitive migration comments or a permanent parallel backlog.
 
 <a id="preserve-status-and-explain-evidence"></a>
 

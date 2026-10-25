@@ -43,7 +43,6 @@ Load only matching triggers. Discuss and obtain approval before code depends on 
 - [PD-ACCESS-01](references/decision-key-currentness.md): Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
 - [PD-ACCESS-02](references/decision-admitted-work-authority.md): Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
 - [PD-ACCESS-03](references/decision-recovery-production-completion.md): Before wiring production recovery admission/completion callbacks, cleanup orchestration, issuance coordination or block release.
-- [PD-ACCESS-04](references/decision-recovery-first-admission.md): Before implementing first local admission, invitation activation/provisioning or recovery completion that can race with admission.
 - [PD-ACCESS-05](references/decision-provider-secret-lifecycle.md): When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
 - [PD-ACCESS-06](references/decision-setup-read-authority.md): Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
 
@@ -55,6 +54,7 @@ Choose the row matching the task. Workflow, contract and architecture views are 
 | --- | --- |
 | Actions and initial grants | [Actions and explicit initial grants](references/actions-and-initial-grants.md) |
 | Admission and invitations | [Admit humans and activate invitations](references/admission-and-invitations.md) |
+| First admission, recovery and credential-state coordination | [Coordinate database steps for one identity](references/identity-admission-coordination.md), the accepted PD-ACCESS-04 resolution. |
 | Application key contracts | [Application-key format and transport contracts](references/application-key-contracts.md) |
 | Application identity and key lifecycle | [Application accounts and keys](references/application-keys.md) |
 | Module/component design or structural review | [Access architecture: identify the caller, then check authority](references/architecture.md) |

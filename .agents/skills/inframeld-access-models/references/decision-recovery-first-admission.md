@@ -1,29 +1,29 @@
 # PD-ACCESS-04: Coordinate first account admission with identity recovery
 
-**Status:** PENDING
+**Status:** ACCEPTED on 2026-10-25 in [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). Implementation and concurrency tests remain unfinished.
 
 **Owner:** `inframeld-access-models`
 
 **Issue kind:** Implementation contract.
 
-This reference supports a future discussion. Its recommendation is not accepted behavior. Current guides and ADRs retain authority.
+This stable decision reference preserves the alternatives and approved resolution. [The coordination workflow](identity-admission-coordination.md) owns the current rule. Acceptance does not claim implemented identity coordination.
 
 ## Contents
 
 - [Problem and example](#problem-and-example)
 - [Accepted context and evidence](#accepted-context-and-evidence)
 - [Alternatives and trade-offs](#alternatives-and-trade-offs)
-- [Non-binding recommendation](#non-binding-recommendation)
+- [Accepted resolution](#accepted-resolution)
 - [Decision trigger and stopping boundary](#decision-trigger-and-stopping-boundary)
 - [Architectural impact and dependencies](#architectural-impact-and-dependencies)
-- [Open questions and required evidence](#open-questions-and-required-evidence)
+- [Implementation details and required evidence](#implementation-details-and-required-evidence)
 - [Sources and finalization](#sources-and-finalization)
 
 ## Problem and example
 
 Alice has a verified Kratos identity but no local Principal. Recovery admits a block while an invitation is creating her first local account. A check that looks only for an organization-linked account can miss the race. Conversely, completing cleanup must not provision an account merely to find a lock.
 
-Linked-account recovery uses existing organization coordination. Before the account exists, both workflows still need a common ordering rule around the exact installation/provider identity. That rule and its interaction with credential-state initialization have not been selected. A check followed by an unrelated insert can admit Alice across a newly created block.
+Linked-account recovery uses existing organization coordination. Before the account exists, both workflows need a common ordering rule around the exact installation/provider identity. The accepted identity lock below supplies that ordering. A check followed by an unrelated insert remains insufficient.
 
 ## Accepted context and evidence
 
@@ -33,33 +33,39 @@ Preserve exact provider authority/subject and installation binding, organization
 
 ## Alternatives and trade-offs
 
-1. **Serialize through shared identity-scoped persistent coordination.** Have both admission and recovery coordinate on the same trusted provider identity before linking an account. This gives a visible ordering point before organization membership exists, but requires a real stable record or supported lock and an explicit lock order.
-2. **Use conditional admission against versioned recovery observations.** Admission checks a captured state and conditionally commits only if it still holds, using the same protection for concurrent initialization. This can avoid a broad lock but requires a reliable comparison/constraint covering the absent-account case.
+1. **Serialize through shared identity-scoped coordination. Selected.** Have admission and recovery coordinate on the same trusted provider identity before linking an account. A PostgreSQL transaction-scoped advisory lock supplies the ordering point without requiring an existing row.
+2. **Use conditional admission against versioned recovery observations. Not selected.** Admission checks a captured state and conditionally commits only if it still holds, using the same protection for concurrent initialization. This needs additional comparison/constraint and conflict-handling rules covering the absent-account case.
 
-## Non-binding recommendation
+<a id="non-binding-recommendation"></a>
 
-**Proposal only.** Prefer the smallest identity-scoped coordination compatible with the existing credential-state and recovery records. Establish an explicit ordering point shared by both operations. Do not invent an account, grant or generic locking framework to obtain it.
+## Accepted resolution
+
+The developer approved option A and its concrete design on 2026-10-25. [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md) records an exclusive transaction-scoped advisory lock for the trusted installation/provider/subject. First admission, recovery admission/completion and credential-state initialization acquire this identity turn before organization/project locks, then reread current facts. Existing version safeguards, organization-before-project order, bounded database work and provider separation remain in force.
+
+If recovery wins, a valid new invitation activation returns safe 409 with no account, consumption or assignments. If activation wins, recovery sees and blocks the newly linked account. Original-operation replay and unique identity links remain separate safeguards. [The owning workflow](identity-admission-coordination.md) explains failure handling and implementation limits.
 
 ## Decision trigger and stopping boundary
 
 Before implementing first local admission, invitation activation/provisioning or recovery completion that can race with admission.
 
-Pause the affected first-admission coordination only. Existing linked-human authentication and grant operations retain their current behavior.
+The coordination choice is settled. Implement affected paths against the accepted workflow after separate application-write approval. Existing linked-human authentication and grant operations retain their current behavior. Unresolved production completion evidence remains under PD-ACCESS-03.
 
 ## Architectural impact and dependencies
 
-Access admission, invitations, identity links, recovery facts/repositories and credential-state initialization. Update first-admission and recovery sequence diagrams together. Database constraints remain design work until approved.
+Access admission, invitations, identity links, recovery facts/repositories and credential-state initialization. The [shared sequence diagram](identity-admission-coordination.md#follow-the-protected-database-step) covers first admission and recovery together. Existing uniqueness and foreign-key safeguards remain. This design selects no new table or schema change.
 
 Load neighboring decisions only under these conditions:
 
 - [PD-ACCESS-03: Prove recovery cleanup before releasing product access](decision-recovery-production-completion.md). When production completion evidence or cleanup orchestration participates.
 
-## Open questions and required evidence
+<a id="open-questions-and-required-evidence"></a>
 
-- What exact record/condition serializes an identity before a Principal exists?
-- How does it order with organization/project locks and version initialization?
-- What outcome does a losing admission return and recover?
-- How do two simultaneous first admissions avoid duplicate linkage without retrying unexpected work?
+## Implementation details and required evidence
+
+- Implement one stable namespaced identity-key derivation and shared Access coordination boundary. Keep record access scoped to the full trusted identity.
+- Verify actual PostgreSQL waiting for both admission/recovery orderings and initialization races. A request that began waiting before the other commit must read its committed changes afterward, using separate Read Committed statements. Keep provider calls outside transactions.
+- Verify safe 409 leaves the invitation and account state unchanged, simultaneous activation preserves identity uniqueness and original-operation replay does not repeat effects.
+- Verify timeout, cancellation and rollback release transaction-owned coordination without weakening version-history checks or the existing recovery deadlines.
 
 ## Sources and finalization
 
@@ -67,5 +73,6 @@ Load neighboring decisions only under these conditions:
 - [Invitation authority](admission-and-invitations.md#invitations).
 - [Completion workflow](recovery-completion.md#recovery-completion-workflow).
 - [Credential query boundaries](eligibility-and-current-authority.md#credential-query-and-policy-boundaries).
+- [Accepted resolution](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md) and [owning coordination workflow](identity-admission-coordination.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+This entry is resolved at its approved design scope. Follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions) for a later architectural change. Acceptance does not establish runtime qualification or authorize application writes.
