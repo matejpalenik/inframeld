@@ -59,6 +59,8 @@ services:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
+    environment:
+      SESSION_LIFESPAN: 8h
     command:
       [
         "serve",
@@ -105,6 +107,8 @@ services:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
+    environment:
+      SESSION_LIFESPAN: 15s
     command:
       - serve
       - -c
@@ -153,6 +157,54 @@ services:
       - ./config/hydra/test.yaml:/etc/config/hydra/test.yaml:ro
     depends_on:
       hydra-migrate:
+        condition: service_completed_successfully
+      recovery-hooks:
+        condition: service_started
+
+  hydra-lifetimes-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: hydra_lifetimes
+      POSTGRES_USER: hydra_lifetimes
+      POSTGRES_PASSWORD: hydra-lifetimes-test-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydra_lifetimes -d hydra_lifetimes"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  hydra-lifetimes-migrate:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    command: ["migrate", "sql", "up", "-e", "--yes"]
+    environment:
+      DSN: postgres://hydra_lifetimes:hydra-lifetimes-test-only@hydra-lifetimes-postgres:5432/hydra_lifetimes?sslmode=disable
+    depends_on:
+      hydra-lifetimes-postgres:
+        condition: service_healthy
+
+  hydra-lifetimes:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    command:
+      [
+        "serve",
+        "all",
+        "--dev",
+        "--sqa-opt-out",
+        "-c",
+        "/etc/config/hydra/test.yaml",
+        "-c",
+        "/etc/config/hydra/test-lifetimes.yaml",
+      ]
+    volumes:
+      - ./config/hydra:/etc/config/hydra:ro
+    environment:
+      TTL_ACCESS_TOKEN: 30s
+      TTL_REFRESH_TOKEN: 120s
+      TTL_AUTH_CODE: 5s
+    depends_on:
+      hydra-lifetimes-migrate:
         condition: service_completed_successfully
       recovery-hooks:
         condition: service_started

@@ -12,11 +12,12 @@ import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from typing import Literal
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
 import httpx2
-from pydantic import BaseModel, ConfigDict, SecretStr
+from pydantic import BaseModel, ConfigDict, SecretStr, StrictInt
 
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
@@ -40,6 +41,25 @@ API_AUDIENCE = HumanAPIAudience("http://inframeld-api.test")
 CLIENT_ID = "inframeld-cli"
 REDIRECT_URI = "http://127.0.0.1:49152/oauth/callback"
 UI_ORIGIN = "http://hydra-test-ui.invalid"
+
+type PKCEChallenge = Literal["S256", "missing", "plain", "missing_method"]
+
+
+@dataclass(frozen=True, slots=True)
+class HydraTestEndpointsDTO:
+    public_url: str = HYDRA_PUBLIC_URL
+    admin_url: str = HYDRA_ADMIN_URL
+
+
+DEFAULT_HYDRA_ENDPOINTS = HydraTestEndpointsDTO()
+
+
+class HydraAuthorizationRejectedError(AssertionError):
+    """Expose only the OAuth error category from a validated test callback."""
+
+    def __init__(self, error: str) -> None:
+        self.error = error
+        super().__init__(f"Hydra rejected OAuth authorization with error category '{error}'.")
 
 
 class _RedirectResponse(BaseModel):
@@ -71,6 +91,22 @@ class _LoginRequest(BaseModel):
 class _IntrospectionResponse(BaseModel):
     model_config = ConfigDict(hide_input_in_errors=True)
     active: bool
+
+
+class _CredentialMetadata(BaseModel):
+    model_config = ConfigDict(hide_input_in_errors=True)
+    inframeld_installation_id: UUID
+    inframeld_credential_version: StrictInt
+
+
+class _BoundIntrospectionResponse(BaseModel):
+    model_config = ConfigDict(hide_input_in_errors=True)
+    active: bool
+    iss: str
+    sub: str
+    client_id: str
+    aud: list[str]
+    ext: _CredentialMetadata
 
 
 class _OAuthError(BaseModel):
@@ -162,21 +198,53 @@ def _challenge(response: httpx2.Response, phase: str) -> str:
     return _single_query_value(location, f"{phase}_challenge")
 
 
-def _hydra_redirect(response: httpx2.Response) -> str:
+def _hydra_redirect(response: httpx2.Response, *, public_url: str = HYDRA_PUBLIC_URL) -> str:
     _require_status(response, 200)
     location = _RedirectResponse.model_validate_json(response.text).redirect_to.get_secret_value()
     parsed = urlsplit(location)
-    assert f"{parsed.scheme}://{parsed.netloc}" == HYDRA_PUBLIC_URL
+    assert f"{parsed.scheme}://{parsed.netloc}" == public_url
     assert parsed.path == "/oauth2/auth"
     return location
+
+
+def _raise_for_oauth_error(
+    response: httpx2.Response, *, state: SecretStr, redirect_uri: str = REDIRECT_URI
+) -> None:
+    """Recognize a provider rejection only at our state-bound callback."""
+    if response.status_code not in {302, 303}:
+        return
+    location = response.headers.get("location", "")
+    parsed = urlsplit(location)
+    if f"{parsed.scheme}://{parsed.netloc}{parsed.path}" != redirect_uri:
+        return
+    params = parse_qs(parsed.query)
+    if "error" not in params:
+        return
+    assert secrets.compare_digest(_single_query_value(location, "state"), state.get_secret_value())
+    assert "code" not in params
+    errors = params["error"]
+    assert len(errors) == 1
+    assert errors[0] in {"invalid_request", "invalid_grant", "access_denied", "error"}, (
+        "Hydra returned an unexpected OAuth error category."
+    )
+    raise HydraAuthorizationRejectedError(errors[0])
 
 
 class HydraTestProvider:
     """Exercise real provider HTTP APIs on the private test network."""
 
-    def __init__(self, client: httpx2.AsyncClient, *, client_id: str = CLIENT_ID) -> None:
+    def __init__(
+        self,
+        client: httpx2.AsyncClient,
+        *,
+        client_id: str = CLIENT_ID,
+        endpoints: HydraTestEndpointsDTO = DEFAULT_HYDRA_ENDPOINTS,
+        redirect_uri: str = REDIRECT_URI,
+    ) -> None:
         self._client = client
         self._client_id = client_id
+        self._endpoints = endpoints
+        self._redirect_uri = redirect_uri
 
     async def begin_login(
         self,
@@ -184,6 +252,7 @@ class HydraTestProvider:
         *,
         include_audience: bool = True,
         browser: httpx2.AsyncClient | None = None,
+        pkce: PKCEChallenge = "S256",
     ) -> PendingHydraLoginDTO:
         """Verify Kratos once, then stop before approving the Hydra login.
 
@@ -198,7 +267,9 @@ class HydraTestProvider:
         subject = IdentitySubject(str(WhoamiResponse.model_validate_json(whoami.text).identity.id))
         assert subject == human.subject
 
-        return await self._start_login(subject, include_audience=include_audience, browser=browser)
+        return await self._start_login(
+            subject, include_audience=include_audience, browser=browser, pkce=pkce
+        )
 
     async def _start_login(
         self,
@@ -206,6 +277,7 @@ class HydraTestProvider:
         *,
         include_audience: bool,
         browser: httpx2.AsyncClient | None,
+        pkce: PKCEChallenge = "S256",
     ) -> PendingHydraLoginDTO:
         verifier = secrets.token_urlsafe(48)
         challenge = (
@@ -216,7 +288,7 @@ class HydraTestProvider:
         state = secrets.token_urlsafe(32)
         params = {
             "client_id": self._client_id,
-            "redirect_uri": REDIRECT_URI,
+            "redirect_uri": self._redirect_uri,
             "response_type": "code",
             # This increment exercises OAuth access/refresh tokens, not an ID token.
             "scope": "inframeld:api offline_access",
@@ -226,9 +298,19 @@ class HydraTestProvider:
         }
         if include_audience:
             params["audience"] = API_AUDIENCE.value
+        if pkce == "missing":
+            del params["code_challenge"]
+            del params["code_challenge_method"]
+        elif pkce in {"plain", "missing_method"}:
+            params["code_challenge"] = verifier
+            if pkce == "plain":
+                params["code_challenge_method"] = "plain"
+            else:
+                del params["code_challenge_method"]
 
         public = browser if browser is not None else self._client
-        started = await public.get(f"{HYDRA_PUBLIC_URL}/oauth2/auth", params=params)
+        started = await public.get(f"{self._endpoints.public_url}/oauth2/auth", params=params)
+        _raise_for_oauth_error(started, state=SecretStr(state), redirect_uri=self._redirect_uri)
         login_challenge = _challenge(started, "login")
         login = await self._read_login(login_challenge)
         if login.skip:
@@ -285,12 +367,13 @@ class HydraTestProvider:
             location = submitted.headers["location"]
         parsed = urlsplit(location)
         assert (
-            f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == f"{HYDRA_PUBLIC_URL}/oauth2/auth"
+            f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+            == f"{self._endpoints.public_url}/oauth2/auth"
         )
         consent_redirect = await browser.get(location)
         challenge = _challenge(consent_redirect, "consent")
         response = await self._client.get(
-            f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent",
+            f"{self._endpoints.admin_url}/admin/oauth2/auth/requests/consent",
             params={"consent_challenge": challenge},
         )
         _require_status(response, 200)
@@ -312,13 +395,14 @@ class HydraTestProvider:
         assert pending.client_id == self._client_id
         parsed = urlsplit(redirect_to)
         assert (
-            f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == f"{HYDRA_PUBLIC_URL}/oauth2/auth"
+            f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+            == f"{self._endpoints.public_url}/oauth2/auth"
         )
         response = await browser.get(redirect_to)
         assert response.status_code in {302, 303}
         callback = response.headers["location"]
         parsed = urlsplit(callback)
-        assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == REDIRECT_URI
+        assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == self._redirect_uri
         assert secrets.compare_digest(
             _single_query_value(callback, "state"), pending.state.get_secret_value()
         )
@@ -377,17 +461,20 @@ class HydraTestProvider:
                 }
             }
         accepted_consent = await self._client.put(
-            f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent/accept",
+            f"{self._endpoints.admin_url}/admin/oauth2/auth/requests/consent/accept",
             params={"consent_challenge": flow.challenge.get_secret_value()},
             json=payload,
         )
-        callback_redirect = await public.get(_hydra_redirect(accepted_consent))
+        callback_redirect = await public.get(
+            _hydra_redirect(accepted_consent, public_url=self._endpoints.public_url)
+        )
+        _raise_for_oauth_error(callback_redirect, state=flow.state, redirect_uri=self._redirect_uri)
         assert callback_redirect.status_code in {302, 303}
         callback = callback_redirect.headers["location"]
         parsed_callback = urlsplit(callback)
         assert (
             f"{parsed_callback.scheme}://{parsed_callback.netloc}{parsed_callback.path}"
-            == REDIRECT_URI
+            == self._redirect_uri
         )
         assert secrets.compare_digest(
             _single_query_value(callback, "state"), flow.state.get_secret_value()
@@ -403,19 +490,25 @@ class HydraTestProvider:
         )
 
     async def exchange_authorization_code(
-        self, authorization: HydraAuthorizationCodeDTO
+        self,
+        authorization: HydraAuthorizationCodeDTO,
+        *,
+        omit_verifier: bool = False,
+        redirect_uri: str | None = None,
     ) -> IssuedHydraTokensDTO | None:
         """Exchange once, returning None only for an explicit invalid-grant denial."""
         assert authorization.client_id == self._client_id
+        payload = {
+            "client_id": self._client_id,
+            "redirect_uri": self._redirect_uri if redirect_uri is None else redirect_uri,
+            "grant_type": "authorization_code",
+            "code": authorization.code.get_secret_value(),
+        }
+        if not omit_verifier:
+            payload["code_verifier"] = authorization.verifier.get_secret_value()
         exchanged = await self._client.post(
-            f"{HYDRA_PUBLIC_URL}/oauth2/token",
-            data={
-                "client_id": self._client_id,
-                "redirect_uri": REDIRECT_URI,
-                "grant_type": "authorization_code",
-                "code": authorization.code.get_secret_value(),
-                "code_verifier": authorization.verifier.get_secret_value(),
-            },
+            f"{self._endpoints.public_url}/oauth2/token",
+            data=payload,
         )
         if exchanged.status_code == 400:
             assert _OAuthError.model_validate_json(exchanged.text).error == "invalid_grant"
@@ -476,26 +569,20 @@ class HydraTestProvider:
     ) -> _ConsentFlow:
         assert pending.client_id == self._client_id
         accepted_login = await self._client.put(
-            f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/login/accept",
+            f"{self._endpoints.admin_url}/admin/oauth2/auth/requests/login/accept",
             params={"login_challenge": pending.challenge.get_secret_value()},
             json={"subject": pending.subject.value, "remember": remember_login},
         )
-        consent_redirect = await public.get(_hydra_redirect(accepted_login))
-        returned = consent_redirect.headers.get("location", "")
-        callback = urlsplit(returned)
-        errors = parse_qs(callback.query).get("error", [])
-        if f"{callback.scheme}://{callback.netloc}{callback.path}" == REDIRECT_URI and errors == [
-            "error"
-        ]:
-            assert secrets.compare_digest(
-                _single_query_value(returned, "state"), pending.state.get_secret_value()
-            )
-            # Keep the observed provider category, never its description or debug body.
-            raise AssertionError("Hydra rejected OAuth authorization with error category 'error'.")
+        consent_redirect = await public.get(
+            _hydra_redirect(accepted_login, public_url=self._endpoints.public_url)
+        )
+        _raise_for_oauth_error(
+            consent_redirect, state=pending.state, redirect_uri=self._redirect_uri
+        )
         consent_challenge = _challenge(consent_redirect, "consent")
 
         consent_response = await self._client.get(
-            f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent",
+            f"{self._endpoints.admin_url}/admin/oauth2/auth/requests/consent",
             params={"consent_challenge": consent_challenge},
         )
         _require_status(consent_response, 200)
@@ -522,15 +609,17 @@ class HydraTestProvider:
             human, public=browser, include_audience=True, remember_login=True
         )
         rejected = await self._client.put(
-            f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent/reject",
+            f"{self._endpoints.admin_url}/admin/oauth2/auth/requests/consent/reject",
             params={"consent_challenge": flow.challenge.get_secret_value()},
             json={"error": "access_denied", "error_description": "Test consent declined"},
         )
-        returned = await browser.get(_hydra_redirect(rejected))
+        returned = await browser.get(
+            _hydra_redirect(rejected, public_url=self._endpoints.public_url)
+        )
         assert returned.status_code in {302, 303}
         callback = returned.headers["location"]
         parsed = urlsplit(callback)
-        assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == REDIRECT_URI
+        assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == self._redirect_uri
         assert _single_query_value(callback, "error") == "access_denied"
         assert secrets.compare_digest(
             _single_query_value(callback, "state"), flow.state.get_secret_value()
@@ -538,7 +627,7 @@ class HydraTestProvider:
 
     async def _read_login(self, challenge: str) -> _LoginRequest:
         response = await self._client.get(
-            f"{HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/login",
+            f"{self._endpoints.admin_url}/admin/oauth2/auth/requests/login",
             params={"login_challenge": challenge},
         )
         _require_status(response, 200)
@@ -547,7 +636,7 @@ class HydraTestProvider:
     async def refresh_tokens(self, tokens: IssuedHydraTokensDTO) -> IssuedHydraTokensDTO | None:
         """Return rotated credentials, or None for an explicit invalid-grant denial."""
         response = await self._client.post(
-            f"{HYDRA_PUBLIC_URL}/oauth2/token",
+            f"{self._endpoints.public_url}/oauth2/token",
             data={
                 "client_id": self._client_id,
                 "grant_type": "refresh_token",
@@ -568,19 +657,49 @@ class HydraTestProvider:
 
     async def token_is_active(self, credential: HumanAccessTokenCredential) -> bool:
         response = await self._client.post(
-            f"{HYDRA_ADMIN_URL}/admin/oauth2/introspect",
+            f"{self._endpoints.admin_url}/admin/oauth2/introspect",
             data={"token": credential.value, "token_type_hint": "access_token"},
         )
         _require_status(response, 200)
         return _IntrospectionResponse.model_validate_json(response.text).active
 
+    async def assert_token_binding(
+        self, credential: HumanAccessTokenCredential, *, binding: HumanOAuthCredentialBindingDTO
+    ) -> None:
+        """Check only the expected identity and server-owned metadata, without printing tokens."""
+        response = await self._client.post(
+            f"{self._endpoints.admin_url}/admin/oauth2/introspect",
+            data={"token": credential.value, "token_type_hint": "access_token"},
+        )
+        _require_status(response, 200)
+        observed = _BoundIntrospectionResponse.model_validate_json(response.text)
+        assert observed.active
+        assert observed.iss == f"{self._endpoints.public_url}/"
+        assert observed.sub == binding.identity.subject.value
+        assert observed.client_id == self._client_id
+        assert observed.aud == [API_AUDIENCE.value]
+        assert observed.ext.inframeld_installation_id == binding.installation_id.value
+        assert observed.ext.inframeld_credential_version == binding.version.value
+
+    async def revoke_refresh_token(self, token: SecretStr) -> None:
+        """Request selected-login revocation once, leaving its effect for the test to verify."""
+        response = await self._client.post(
+            f"{self._endpoints.public_url}/oauth2/revoke",
+            data={
+                "client_id": self._client_id,
+                "token": token.get_secret_value(),
+                "token_type_hint": "refresh_token",
+            },
+        )
+        _require_status(response, 200)
+
     async def login_can_skip(self, browser: httpx2.AsyncClient) -> bool:
         """Observe a fresh login challenge without approving it or issuing more tokens."""
         started = await browser.get(
-            f"{HYDRA_PUBLIC_URL}/oauth2/auth",
+            f"{self._endpoints.public_url}/oauth2/auth",
             params={
                 "client_id": self._client_id,
-                "redirect_uri": REDIRECT_URI,
+                "redirect_uri": self._redirect_uri,
                 "response_type": "code",
                 "scope": "inframeld:api offline_access",
                 "audience": API_AUDIENCE.value,
@@ -593,7 +712,7 @@ class HydraTestProvider:
 
     async def revoke_access_token(self, credential: HumanAccessTokenCredential) -> None:
         response = await self._client.post(
-            f"{HYDRA_PUBLIC_URL}/oauth2/revoke",
+            f"{self._endpoints.public_url}/oauth2/revoke",
             data={
                 "client_id": self._client_id,
                 "token": credential.value,

@@ -15,6 +15,8 @@ pnpm --filter @inframeld/backend openapi:check
 
 These commands start the host API or run checks. They do not replace the setup and migration steps. Integration tests manage a private test stack and must run one invocation at a time.
 
+Development Compose includes Hydra with private administration. [Configure the official CLI client](../../docs/development/getting-started/local-setup.md#configure-the-cli-client) through `pnpm dev:oauth:configure`, or let `pnpm dev:compose` run that separate setup step before the API. Native lifetime settings live in root `.env`, separate from host API settings. The [isolated development check](../../docs/development/guides/testing.md#integration-tests) verifies setup without touching your existing databases. Account pages, Rust CLI interaction and packaged runtime delivery remain unfinished.
+
 For a new component, follow [the contributor example](../../docs/development/guides/adding-a-backend-feature.md) and mandatory [Coding Standards](../../.agents/skills/inframeld-coding-standards/SKILL.md). Reusable pure conversion/validation utilities default to named static classes. Injected services, private helpers, fixtures and framework callables retain their documented roles.
 
 Access recovery admission/completion and credential-state initialization share [identity coordination](../../.agents/skills/inframeld-access-models/references/identity-admission-coordination.md). The coordinator uses each operation's existing transaction before organization locks. Invitation activation remains unfinished and must reuse the same coordinator.

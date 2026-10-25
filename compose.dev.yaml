@@ -1,4 +1,35 @@
+x-provider-lifetimes: &provider-lifetimes
+  TTL_ACCESS_TOKEN: ${TTL_ACCESS_TOKEN:-5m}
+  TTL_REFRESH_TOKEN: ${TTL_REFRESH_TOKEN:-168h}
+  TTL_AUTH_CODE: ${TTL_AUTH_CODE:-1m}
+  SESSION_LIFESPAN: ${SESSION_LIFESPAN:-8h}
+
+x-oauth-settings: &oauth-settings
+  <<: *provider-lifetimes
+  INFRAMELD_HYDRA__ADMIN_URL: http://hydra:4445
+  INFRAMELD_HYDRA__PUBLIC_URL: http://127.0.0.1:14444
+  INFRAMELD_HYDRA__ISSUER: http://127.0.0.1:14444/
+  INFRAMELD_HYDRA__API_AUDIENCE: http://127.0.0.1:8001
+
+x-backend-image: &backend-image
+  image: localhost/inframeld-backend:dev
+  pull_policy: never
+  build:
+    context: .
+    dockerfile: apps/backend/Dockerfile
+
 services:
+  identity-config-check:
+    <<: *backend-image
+    command:
+      [
+        "python",
+        "-m",
+        "inframeld_backend.provision_oauth_client",
+        "--validate-only",
+      ]
+    environment: *oauth-settings
+
   postgres:
     image: docker.io/library/postgres:16-alpine
     environment:
@@ -70,19 +101,86 @@ services:
     #   ["serve", "-c", "/etc/config/kratos/dev.local.yaml", "--dev", "--watch-courier"]
     volumes:
       - ./config/kratos:/etc/config/kratos:ro
+    environment:
+      <<: *provider-lifetimes
+      OAUTH2_PROVIDER_URL: http://hydra:4445
+      SELFSERVICE_FLOWS_LOGIN_UI_URL:
     ports:
       - "127.0.0.1:14434:4433"
     depends_on:
+      identity-config-check:
+        condition: service_completed_successfully
       kratos-migrate:
         condition: service_completed_successfully
       mailpit:
         condition: service_started
 
-  backend:
-    build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
+  hydra-postgres:
+    image: docker.io/library/postgres:16-alpine
     environment:
+      POSTGRES_DB: hydra_dev
+      POSTGRES_USER: hydra_dev
+      POSTGRES_PASSWORD: hydra-dev-only
+    volumes:
+      - inframeld_hydra_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydra_dev -d hydra_dev"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  hydra-migrate:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    command: ["migrate", "sql", "up", "-e", "--yes"]
+    environment:
+      DSN: postgres://hydra_dev:hydra-dev-only@hydra-postgres:5432/hydra_dev?sslmode=disable
+    depends_on:
+      identity-config-check:
+        condition: service_completed_successfully
+      hydra-postgres:
+        condition: service_healthy
+
+  hydra:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    command:
+      [
+        "serve",
+        "all",
+        "--dev",
+        "--sqa-opt-out",
+        "-c",
+        "/etc/config/hydra/dev.yaml",
+      ]
+    environment:
+      <<: *provider-lifetimes
+      DSN: postgres://hydra_dev:hydra-dev-only@hydra-postgres:5432/hydra_dev?sslmode=disable
+      # Development-only server secrets, distinct from every other service.
+      SECRETS_SYSTEM: INFRAMELD-HYDRA-DEV-ONLY-SYSTEM-12345678
+      SECRETS_COOKIE: INFRAMELD-HYDRA-DEV-ONLY-COOKIE-12345678
+      URLS_CONSENT:
+      TTL_ID_TOKEN:
+      TTL_LOGIN_CONSENT_REQUEST:
+      TTL_AUTHENTICATION_SESSION:
+    volumes:
+      - ./config/hydra/dev.yaml:/etc/config/hydra/dev.yaml:ro
+    ports:
+      - "127.0.0.1:14444:4444"
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+
+  oauth-client-setup:
+    <<: *backend-image
+    command: ["python", "-m", "inframeld_backend.provision_oauth_client"]
+    environment: *oauth-settings
+    depends_on:
+      hydra:
+        condition: service_started
+
+  backend:
+    <<: *backend-image
+    environment:
+      <<: *oauth-settings
       INFRAMELD_ENVIRONMENT: local
       INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE: /run/secrets/idempotency_fingerprint_hmac
       INFRAMELD_DATABASE__HOST: postgres
@@ -92,12 +190,15 @@ services:
       INFRAMELD_DATABASE__PASSWORD: inframeld-dev-only
       INFRAMELD_KRATOS__PUBLIC_URL: http://kratos:4433
       INFRAMELD_KRATOS__AUTHORITY: kratos:local
+      INFRAMELD_KRATOS__ADMIN_URL: http://kratos:4434
       INFRAMELD_CSRF__TRUSTED_ORIGINS: '["http://127.0.0.1:8001"]'
     secrets:
       - idempotency_fingerprint_hmac
     ports:
       - "127.0.0.1:8001:8000"
     depends_on:
+      oauth-client-setup:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       kratos:
@@ -106,6 +207,7 @@ services:
 volumes:
   inframeld_postgres_data:
   inframeld_kratos_postgres_data:
+  inframeld_hydra_postgres_data:
 
 secrets:
   idempotency_fingerprint_hmac:

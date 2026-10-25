@@ -53,6 +53,8 @@ The actual service port numbers/routes are release configuration, not guessed de
 
 Publish only the needed public entry point(s). Never publish Hydra/Kratos admin, PostgreSQL or storage ports, even on loopback, merely because it is development. The host operator's narrow maintenance channel for initial host-authorized bootstrap remains separate. UI server code may use explicit private service addresses. The browser still uses the configured public loopback origins. Internal routing cannot redefine the issuer, audience or browser redirect destination.
 
+This is the CLI-managed runtime contract. Today's [developer Compose profile](../../../../compose.dev.yaml) also serves host-side backend development and publishes the application database on loopback. It does not yet implement that managed isolation contract. Its Hydra public endpoint is `127.0.0.1:14444`, with administration private, and its containerized API uses audience `http://127.0.0.1:8001`. [Explicit setup](../../../../docs/development/getting-started/local-setup.md#configure-the-cli-client) reconciles the official client before containerized API startup. The future runtime must reuse that provisioning capability with its own verified origins rather than exposing administration to the host CLI.
+
 [Docker's port-publishing documentation](https://docs.docker.com/engine/network/port-publishing/) warns that unqualified port mappings publish beyond localhost, and that versions older than 28.0.0 have a localhost/L2 exposure caveat. Do not qualify an affected runtime on the strength of the Compose binding alone. Require a supported fixed runtime and verify actual exposure, including VM/WSL networking where offered.
 
 <a id="http-exception-enforcement"></a>

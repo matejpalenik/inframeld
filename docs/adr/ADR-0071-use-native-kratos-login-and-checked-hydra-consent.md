@@ -28,13 +28,15 @@ The [browser API contract](../../.agents/skills/inframeld-access-models/referenc
 
 ## Consequences
 
-The account UI can render Ory forms and consent details without becoming another authentication or policy implementation. It must preserve the matching browser context and follow the returned Hydra continuation. Native login configuration and backend consent are implemented separately from deploying Hydra, provisioning its client and delivering the UI/CLI.
+The account UI can render Ory forms and consent details without becoming another authentication or policy implementation. It must preserve the matching browser context and follow the returned Hydra continuation. Native login, backend consent and the separate client setup command have distinct lifecycles. Delivering the account pages and Rust CLI remains separate work.
 
 Consent is external work, not an aggregate mutation needing an artificial entity or an application idempotency reservation. Hydra owns its flow state and final one-use verifier handling. An inspection result is display data, not an authorization certificate for a later decision.
 
 Recovery remains blocked until its own independently qualified workflow can finish safely. The [issuance observations](../../.agents/skills/inframeld-access-models/references/human-cli-consent.md#native-hydra-consent) distinguish current approval checks, requests crossing token persistence, and approval between bulk cleanup calls. These do not qualify every provider-internal interleaving. No production token hook, credential inventory or recovery release wiring follows from this decision.
 
 ## Implementation notes
+
+[Development Compose](../../compose.dev.yaml) configures native Kratos-to-Hydra login, private administration and an explicit CLI client setup step before API startup. The JSON consent API is not configured as a browser page. The [setup guide](../development/getting-started/local-setup.md#configure-the-cli-client) explains UI placeholders and native lifetime configuration. This does not wire production recovery completion.
 
 `_read_supported_request()` rejects unsupported access with 403 before browser verification or local-state work, including with an invalid supplied cookie. HTTP credential selection and CSRF retain precedence. Inspection and denial share `_check_read_only_request()`. Approval uses `_prepare_approval()` to capture state, verify the browser, reread state and return a required credential binding under ADR-0072. Denial submits its provider decision only after read-only checks. No optional binding, new workflow framework or automatic approval retry is introduced.
 

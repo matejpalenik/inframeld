@@ -2,13 +2,13 @@
 
 <a id="run-the-backend-locally"></a>
 
-Start here to develop today’s FastAPI backend. The delivered development stack includes PostgreSQL, Kratos and Mailpit. The accepted worker, vector and artifact topology is broader than this local stack. These instructions do not claim that the full CLI product is delivered.
+Start here to develop today’s FastAPI backend. The delivered development stack includes PostgreSQL, Kratos, Hydra and Mailpit. The accepted worker, vector and artifact topology is broader than this local stack. These instructions do not claim that the full CLI product is delivered.
 
 <a id="quick-start"></a>
 
 ## Quick start
 
-For normal local development, run PostgreSQL, Kratos, and Mailpit in Compose and the backend directly on your host.
+For normal local development, run the databases, Kratos, Hydra and Mailpit in Compose and the backend directly on your host.
 
 From a clean checkout, install the committed dependencies from the repository root:
 
@@ -31,6 +31,8 @@ cp apps/backend/.env.example apps/backend/.env
 
 Keep your existing `.env` on subsequent setups.
 
+Provider-container settings belong in a separate repository-root `.env`, based on the root `.env.example`. Copy that example only if you do not already have a root `.env`. It controls native lifetimes and optional account-UI URLs. It is different from `apps/backend/.env`, which configures the host API. Keep both files ignored.
+
 Create the separate backend test configuration before running checks:
 
 ```bash
@@ -43,7 +45,7 @@ Keep `.env.test` in the ignored local configuration. It is not committed.
 
 <a id="2-start-postgresql-kratos-and-mailpit"></a>
 
-### 2. Start PostgreSQL, Kratos, and Mailpit
+### 2. Start the development dependencies
 
 ```bash
 pnpm dev:db
@@ -77,7 +79,7 @@ When you're finished, stop the development containers with:
 pnpm dev:db:down
 ```
 
-The application database and Kratos identities are stored in separate named volumes and are preserved when the containers are stopped. Kratos's public endpoint is at http://127.0.0.1:14434. Mailpit's development inbox is at http://127.0.0.1:18024.
+Application, Kratos and Hydra databases use three separate named volumes, preserved when containers stop. Kratos's public endpoint is at http://127.0.0.1:14434, Hydra's at http://127.0.0.1:14444 and Mailpit's inbox at http://127.0.0.1:18024. Provider administration stays private. The host API workflow supports browser authentication without publishing administration ports.
 
 ---
 
@@ -181,7 +183,7 @@ The development passwords and Kratos secrets are only for local Compose and must
 
 ## Development services
 
-The application PostgreSQL, Kratos, and Mailpit services are managed by the root `compose.dev.yaml`. Kratos uses its own PostgreSQL service, `kratos_dev` database role, and `inframeld_kratos_postgres_data` volume, separate from the application database. Its public API is available on `127.0.0.1:14434`. Its admin API stays inside the Compose network. Mailpit's SMTP port stays inside that network, while its inbox UI is exposed only on the host loopback interface at `127.0.0.1:18024`.
+The root `compose.dev.yaml` manages application PostgreSQL, Kratos, Hydra and Mailpit. Kratos uses the `kratos_dev` role and `inframeld_kratos_postgres_data` volume. Hydra uses the `hydra_dev` role and `inframeld_hydra_postgres_data` volume. Both are separate from application storage. Kratos's public API uses `127.0.0.1:14434` and Hydra's uses `127.0.0.1:14444`. Neither admin API is published. Mailpit's SMTP stays private, with its inbox UI at `127.0.0.1:18024`.
 
 PostgreSQL is exposed to the host only at:
 
@@ -189,7 +191,7 @@ PostgreSQL is exposed to the host only at:
 127.0.0.1:15432
 ```
 
-Inside the Compose network, PostgreSQL listens on its standard port `5432` and Kratos's public API listens at `http://kratos:4433`. A host-run backend uses the public URL from `.env`. The backend Compose service overrides that URL with the internal address. Both use the `kratos:local` identity authority. The Kratos migration runs before the service starts.
+Inside Compose, PostgreSQL uses port `5432`, Kratos public/admin use `http://kratos:4433`/`4434` and Hydra public/admin use `http://hydra:4444`/`4445`. The backend uses private verification endpoints while retaining the public Hydra issuer `http://127.0.0.1:14444/` and canonical API audience `http://127.0.0.1:8001`. Both host and container API use authority `kratos:local`. Provider migrations finish before their services start.
 
 The development Kratos config enables password registration, login, and code-based recovery. Kratos sends development email to Mailpit. View captured messages at `http://127.0.0.1:18024`. Its self-service UI URLs are placeholders until browser pages are implemented. Mailpit is for local development. An operator deployment needs its own SMTP configuration. Deployment-level OIDC sign-in is not configured by this Compose setup.
 
@@ -202,20 +204,21 @@ For company sign-in, use [optional identity integration](../guides/identity-inte
 Run these commands from the repository root:
 
 ```bash
-pnpm dev:db               # Start PostgreSQL, Kratos, and Mailpit in the background
-pnpm dev:db:reset         # Recreate the application database; keep Kratos identities
+pnpm dev:db               # Validate settings, migrate and start development dependencies
+pnpm dev:db:reset         # Recreate the application database, preserving provider databases
 pnpm dev:db:restart       # Restart PostgreSQL without removing its volume
 pnpm dev:db:status        # Show development container status
-pnpm dev:db:down          # Stop development containers, preserving both database volumes
+pnpm dev:db:down          # Stop development containers, preserving all three database volumes
 
-pnpm dev:compose           # Start PostgreSQL, Kratos, Mailpit, and the backend
-pnpm dev:compose:restart   # Restart all currently created Compose containers
-pnpm dev:compose:down      # Stop all development containers, preserving both database volumes
+pnpm dev:compose           # Prepare providers and CLI registration, then start the API
+pnpm dev:oauth:configure   # Explicitly reconcile the official CLI client
+pnpm dev:compose:restart   # Restart existing services and reconcile registration before API
+pnpm dev:compose:down      # Stop development containers, preserving database volumes
 ```
 
 These commands use [`scripts/dev-compose.sh`](../../../scripts/dev-compose.sh), which automatically detects Podman Compose or Docker Compose.
 
-`pnpm dev:db`, `pnpm dev:db:reset`, and `pnpm dev:compose` wait for PostgreSQL and Kratos readiness, retrying up to 60 times with a one-second interval. If a service does not become ready, the command exits with an error and reports the last readiness check.
+Startup first builds the locked backend image and validates the four primary lifetime settings without provider I/O. It then starts databases, waits for readiness, runs provider migrations as completed setup steps and starts Kratos/Hydra. Database waits are bounded. Provider readiness runs inside the private Compose network using the same backend image, with at most 60 probes, two-second HTTP limits and one-second intervals. It does not depend on published host ports or inherited HTTP proxies. Setup failure stops the sequence. Explicit sequencing also avoids Podman restart problems with exited one-shot dependencies.
 
 The script can also be run directly:
 
@@ -223,6 +226,7 @@ The script can also be run directly:
 ./scripts/dev-compose.sh up
 ./scripts/dev-compose.sh reset-db
 ./scripts/dev-compose.sh all
+./scripts/dev-compose.sh configure-oauth
 ./scripts/dev-compose.sh restart-db
 ./scripts/dev-compose.sh restart-all
 ./scripts/dev-compose.sh status
@@ -254,8 +258,8 @@ pnpm dev:db:reset
 This:
 
 1. Stops and removes the development Compose containers.
-2. Keeps both named volumes and drops and recreates only the `inframeld` database.
-3. Starts Kratos again with its existing identities.
+2. Keeps all three named volumes and drops and recreates only the `inframeld` database.
+3. Starts the providers again with their existing identity and OAuth state.
 4. Leaves the Compose backend stopped.
 
 Migrations are not run automatically.
@@ -276,7 +280,7 @@ Running the backend image in Compose is an optional alternative to running the P
 
 The image uses the same source and locked dependencies as the host application, but it does not mount the source tree or run migrations during startup.
 
-Start PostgreSQL, Kratos, and Mailpit, apply application migrations, and then start the backend container:
+Start the development dependencies, apply application migrations, and then start the backend container:
 
 ```bash
 pnpm dev:db
@@ -294,9 +298,42 @@ Inside the Compose network, the backend connects to PostgreSQL using the `postgr
 
 A backend running directly on the host instead connects to PostgreSQL at `127.0.0.1:15432`. This allows you to use the same database setup whether you run the API on the host or in Compose.
 
-`pnpm dev:compose` builds the backend image and starts the backend, PostgreSQL, and Kratos containers.
+`pnpm dev:compose` prepares the providers, runs CLI client provisioning as a separate completed step, then starts the backend. API startup itself never creates or updates OAuth registrations. The image builder installs Git for the existing immutable SDK sources. Git is absent from the runtime image.
 
 The backend binds inside the Compose network, with only its API port published to the host on the loopback interface.
+
+<a id="configure-the-cli-client"></a>
+
+### Configure the CLI client
+
+Run the repeatable setup command after changing the managed client profile or API audience:
+
+```bash
+pnpm dev:oauth:configure
+```
+
+It prepares the private services and runs `python -m inframeld_backend.provision_oauth_client` inside their network. The command reads focused Hydra configuration directly from environment variables, with no dotenv loading, application database or fingerprint key requirement. `--validate-only` checks configuration without contacting Hydra. Readiness has a 60-second total budget, followed by a 10-second provisioning budget. Both are configurable through `INFRAMELD_OAUTH_PROVISIONING__READINESS_TIMEOUT_SECONDS` and `INFRAMELD_OAUTH_PROVISIONING__TIMEOUT_SECONDS`.
+
+Successful output identifies `inframeld-cli` and `created`, `updated` or `unchanged`. Exit 0 means the resulting profile was verified, 2 means invalid configuration/arguments and 1 means operational failure. Stopping and write admission share one synchronized decision. A stop that wins prevents mutation. Once a write is admitted, it may still be dispatched or finish late, and a timeout reports `outcome_unknown`. Do not infer failure or blindly repeat the mutation. After checking the provider, explicitly run setup again to reconcile current state. Diagnostics contain no client secrets or provider response bodies.
+
+The [registered profile](../../../.agents/skills/inframeld-access-models/references/human-cli-login.md#cli-client-registration) is public, requires S256 PKCE, uses opaque access tokens and registers `http://127.0.0.1/oauth/callback`. Hydra allows ephemeral callback ports with that fixed host/path. Setup repairs managed drift and removes client-specific lifetime overrides without deleting the client, other clients or existing login chains.
+
+Root `.env` can override these native settings:
+
+```dotenv
+TTL_ACCESS_TOKEN=5m
+TTL_REFRESH_TOKEN=168h
+TTL_AUTH_CODE=1m
+SESSION_LIFESPAN=8h
+```
+
+They must be positive finite provider durations with ASCII digits, such as `30s` or `1h30m`, within the signed 64-bit nanosecond range. Unlimited, zero, negative, malformed, non-ASCII and overflowing values fail preflight. These exact effective values also reach provider startup. Other native timers and their pinned defaults are [listed separately](../../../.agents/skills/inframeld-access-models/references/human-cli-credential-lifecycle.md#provider-lifetime-configuration).
+
+To apply provider environment changes, stop and recreate the stack with `pnpm dev:compose:down`, then `pnpm dev:compose`. Named volumes survive. Restarting an existing container or only reconciling the client does not load new environment values. Already issued credentials retain recorded deadlines. A shorter lifetime is not revocation.
+
+Kratos uses its native private Hydra login integration. Set `SELFSERVICE_FLOWS_LOGIN_UI_URL` and `URLS_CONSENT` in root `.env` when the account pages are available. Until then, Kratos uses its existing UI placeholders and Hydra uses its native consent fallback. `/v1/oauth/consent` is a JSON API for a future page, not Hydra's browser-page URL. Provisioning does not make interactive login or the Rust CLI complete. Packaged runtime delivery remains #95.
+
+The host API can keep its browser workflow. Bearer verification needs private Hydra and Kratos administration connectivity, supplied by the containerized API. Do not publish administration ports merely to enable host bearer development.
 
 Database startup checks schema compatibility and refuses to start against an unmigrated schema.
 

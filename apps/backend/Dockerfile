@@ -7,6 +7,10 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY apps/backend/pyproject.toml apps/backend/uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 

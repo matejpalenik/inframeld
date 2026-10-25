@@ -6,20 +6,35 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd -- "${script_dir}/.." && pwd)"
 compose_file="${repository_root}/compose.dev.yaml"
 test_compose_file="${repository_root}/compose.test.yaml"
+compose_project=""
+
+if [[ -n "${INFRAMELD_DEV_COMPOSE_FILE+x}" || -n "${INFRAMELD_DEV_COMPOSE_PROJECT+x}" ]]; then
+    if [[ -z "${INFRAMELD_DEV_COMPOSE_FILE:-}" || -z "${INFRAMELD_DEV_COMPOSE_PROJECT:-}" ]]; then
+        printf 'Supply INFRAMELD_DEV_COMPOSE_FILE and INFRAMELD_DEV_COMPOSE_PROJECT together.\n' >&2
+        exit 2
+    fi
+    if [[ "${INFRAMELD_DEV_COMPOSE_FILE}" != /* || ! -f "${INFRAMELD_DEV_COMPOSE_FILE}" ]]; then
+        printf 'INFRAMELD_DEV_COMPOSE_FILE must name an existing absolute file.\n' >&2
+        exit 2
+    fi
+    compose_file="${INFRAMELD_DEV_COMPOSE_FILE}"
+    compose_project="${INFRAMELD_DEV_COMPOSE_PROJECT}"
+fi
 
 usage() {
     cat <<'EOF'
 Usage: ./scripts/dev-compose.sh <command>
 
 Commands:
-  up           Start PostgreSQL and Kratos in the background and wait for readiness.
-  reset-db     Recreate only the application database; keep Kratos identities.
-  all          Build and start PostgreSQL, Kratos, and the backend image.
+  up           Start development databases, Kratos and Hydra, then wait for readiness.
+  reset-db     Recreate the application database, preserving provider databases.
+  all          Prepare providers and the CLI client, then start the backend.
   restart-db   Restart PostgreSQL without removing its persistent volume.
-  restart-all  Restart all currently created development containers.
+  restart-all  Restart services and reconcile the CLI client before the backend.
   down     Stop all development services without removing their database volumes.
   status   Show the service status.
   check    Verify that PostgreSQL is accepting connections.
+  configure-oauth    Reconcile the official CLI client through private Hydra administration.
   test-services-up    Prepare the integration image and start its private dependencies.
   test-run [args...]   Run integration tests; optional arguments are passed to pytest.
   test-services-down  Remove project-labelled test containers/networks; keep volumes.
@@ -81,7 +96,11 @@ if [[ "${container_command}" == "podman-compose" ]]; then
 fi
 
 compose() {
-    "${compose_command[@]}" -f "${compose_file}" "$@"
+    if [[ -n "${compose_project}" ]]; then
+        "${compose_command[@]}" -p "${compose_project}" -f "${compose_file}" "$@"
+    else
+        "${compose_command[@]}" -f "${compose_file}" "$@"
+    fi
 }
 
 test_compose() {
@@ -111,26 +130,53 @@ wait_for_postgres() {
     return 1
 }
 
-wait_for_kratos() {
-    local max_attempts=60
-    local attempt
-    local readiness_output=""
+wait_for_provider() {
+    local service="$1" endpoint="$2"
+    compose run --rm --no-deps -T identity-config-check python -c '
+import sys, time, urllib.error, urllib.request
+service, endpoint = sys.argv[1:]
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+for attempt in range(60):
+    try:
+        with opener.open(endpoint, timeout=2) as response:
+            if response.status == 200:
+                print(f"{service} is ready on the private development network.")
+                raise SystemExit(0)
+    except (OSError, urllib.error.URLError):
+        pass
+    if attempt < 59:
+        time.sleep(1)
+raise SystemExit(f"{service} did not become ready after 60 probes.")
+' "${service}" "${endpoint}"
+}
 
-    for ((attempt = 1; attempt <= max_attempts; attempt++)); do
-        if readiness_output="$(curl --fail --silent --show-error --max-time 2 http://127.0.0.1:14434/health/ready 2>&1)"; then
-            printf 'Kratos is ready at 127.0.0.1:14434.\n'
+wait_for_identity_database() {
+    local service="$1" database="$2" user="$3"
+    local readiness_deadline=$((SECONDS + 60))
+    while ((SECONDS < readiness_deadline)); do
+        if compose exec -T "${service}" pg_isready -t 2 -U "${user}" -d "${database}" >/dev/null 2>&1; then
             return 0
         fi
-
-        if ((attempt < max_attempts)); then
-            sleep 1
-        fi
+        sleep 0.25
     done
-
-    printf 'Kratos did not become ready after %s attempts.\n' "${max_attempts}" >&2
-    printf 'Required dependency: the kratos service from compose.dev.yaml.\n' >&2
-    printf 'Last readiness check: %s\n' "${readiness_output}" >&2
+    printf 'Identity database did not become ready: %s\n' "${service}" >&2
     return 1
+}
+
+start_development_services() {
+    # Explicit completed steps also work when a Compose provider cannot restart
+    # a native container whose one-shot dependencies have already exited.
+    compose build identity-config-check
+    compose run --rm --no-deps -T identity-config-check
+    compose up -d --no-deps postgres kratos-postgres hydra-postgres mailpit
+    wait_for_postgres
+    wait_for_identity_database kratos-postgres kratos_dev kratos_dev
+    wait_for_identity_database hydra-postgres hydra_dev hydra_dev
+    compose run --rm --no-deps -T kratos-migrate
+    compose run --rm --no-deps -T hydra-migrate
+    compose up -d --no-deps kratos hydra
+    wait_for_provider Kratos http://kratos:4433/health/ready
+    wait_for_provider Hydra http://hydra:4444/health/ready
 }
 
 # Read actual project resources, including containers left by older profiles.
@@ -232,9 +278,7 @@ shift || true
 
 case "${command_name}" in
     up)
-        compose up -d postgres kratos
-        wait_for_postgres
-        wait_for_kratos
+        start_development_services
         ;;
     reset-db)
         compose down
@@ -242,19 +286,31 @@ case "${command_name}" in
         wait_for_postgres
         compose exec -T postgres dropdb --maintenance-db=postgres --if-exists --force -U inframeld inframeld
         compose exec -T postgres createdb --maintenance-db=postgres -U inframeld inframeld
-        compose up -d kratos
-        wait_for_kratos
+        start_development_services
         ;;
     all)
-        compose up -d --build "$@"
-        wait_for_postgres
-        wait_for_kratos
+        start_development_services
+        compose run --rm --no-deps -T oauth-client-setup
+        compose up -d --no-deps backend "$@"
         ;;
     restart-db)
         compose restart postgres "$@"
         ;;
     restart-all)
-        compose restart "$@"
+        compose stop backend
+        compose restart postgres kratos-postgres hydra-postgres mailpit "$@"
+        wait_for_postgres
+        wait_for_identity_database kratos-postgres kratos_dev kratos_dev
+        wait_for_identity_database hydra-postgres hydra_dev hydra_dev
+        compose restart kratos hydra
+        wait_for_provider Kratos http://kratos:4433/health/ready
+        wait_for_provider Hydra http://hydra:4444/health/ready
+        compose run --rm --no-deps -T oauth-client-setup
+        compose up -d --no-deps backend
+        ;;
+    configure-oauth)
+        start_development_services
+        compose run --rm --no-deps -T oauth-client-setup "$@"
         ;;
     down)
         compose down "$@"
@@ -287,7 +343,7 @@ case "${command_name}" in
         else
             test_compose build integration-tests
         fi
-        test_compose up -d postgres mailpit mock-oidc recovery-hooks kratos kratos-expiring hydra
+        test_compose up -d postgres mailpit mock-oidc recovery-hooks kratos kratos-expiring hydra hydra-lifetimes
         ;;
     test-run)
         # Replace this shell so interruption can terminate the Compose process.

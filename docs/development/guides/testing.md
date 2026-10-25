@@ -41,7 +41,9 @@ A fixture such as `linked_human` or `grant_seed` runs when its name appears in t
 
 `pnpm test:integration` builds one locked test image and starts one stack from `compose.test.yaml`. A non-root `integration-tests` container waits up to 60 seconds for the required services, runs the existing application migration command, then runs the entire integration directory in one pytest process. All three database/Kratos/Hydra integration flags are enabled there, so provider scenarios run in the same summary. The browser tests cover registration, password login, session expiry, logout, disabled identities, code recovery, OIDC login, and password-confirmed OIDC account linking. Matching email alone must not link an account. Compose runs each provider's database migration before starting that provider.
 
-The test stack publishes no host ports. [Shared test endpoints](../../../apps/backend/tests/support/integration_services.py) use `postgres:5432`, Kratos public/admin at `kratos:4433`/`4434`, expiry-only Kratos at `kratos-expiring:4433`, Hydra public/admin at `hydra:4444`/`4445`, Mailpit at `mailpit:8025` and mock OIDC at `mock-oidc:8080`. The expiry instance issues 15-second sessions and shares the isolated Kratos database with standard Kratos. Hydra has its own ephemeral database and role.
+The test stack publishes no host ports. [Shared test endpoints](../../../apps/backend/tests/support/integration_services.py) use `postgres:5432`, Kratos public/admin at `kratos:4433`/`4434`, expiry-only Kratos at `kratos-expiring:4433`, Hydra public/admin at `hydra:4444`/`4445`, Mailpit at `mailpit:8025` and mock OIDC at `mock-oidc:8080`. Standard Kratos uses eight-hour sessions. The expiry instance retains 15-second sessions and shares the isolated Kratos database. Hydra has its own ephemeral database and role.
+
+The same graph includes `hydra-lifetimes:4444`/`4445` with a separate tmpfs database, access/refresh lifetimes of 30/120 seconds and a five-second code lifetime. [Provisioning scenarios](../../../apps/backend/tests/integration/access/test_hydra_cli_provisioning.py) run the production client provisioner and compare actual issued/introspected deadlines and expired-code exchange with the default provider. This remains one collection, without host ports or a container socket in the runner.
 
 The runner mounts source and tests read-only, reads the committed `.env.test.example` as its test configuration, and overrides endpoints and database credentials explicitly. It creates a temporary fingerprint key inside the container. Your host `.env.test`, development secrets and development database are not used by this command. Fast host-side checks still use the usual local test configuration and skip service-dependent scenarios.
 
@@ -59,6 +61,16 @@ podman compose -p inframeld-test -f compose.test.yaml logs kratos hydra
 ```
 
 Use `docker compose` for logs when `INFRAMELD_CONTAINER_RUNTIME=docker` selects Docker. Each `test-run` performs readiness checks and migrations before pytest. The public wrapper accepts the same optional pytest arguments and handles cleanup automatically, for example `pnpm test:integration tests/integration/kratos`.
+
+Qualify development OAuth setup separately without using existing developer databases:
+
+```bash
+bash scripts/test-dev-oauth.sh
+```
+
+This renders the development graph into a unique temporary project, removes published ports, assigns isolated volumes and supplies a temporary test-only key. It calls the real `dev-compose.sh` operations for dependency startup, API startup, explicit provisioning and restart. The qualification script prepares only the disposable application migration and observations, without copying the startup sequence. It checks API health, repeat provisioning and persisted registration after restart. Cleanup removes only that project's containers, network, volumes and unique image. The usual development volumes remain untouched. Select Docker with `INFRAMELD_CONTAINER_RUNTIME=docker` where available. A local Podman result does not establish Docker CI execution.
+
+The isolated check supplies `INFRAMELD_DEV_COMPOSE_FILE` and `INFRAMELD_DEV_COMPOSE_PROJECT` together. The file must be an existing absolute path. Missing, empty or incomplete overrides fail before container commands run. Normal development keeps the default Compose selection, and integration commands keep the fixed `inframeld-test` project. Provider readiness uses private service addresses, so the same startup path works without published ports.
 
 ---
 

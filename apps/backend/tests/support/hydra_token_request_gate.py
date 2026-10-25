@@ -27,6 +27,7 @@ class HydraTokenRequestGate(httpx2.AsyncBaseTransport):
         self._release = asyncio.Event()
         self._paused = False
         self._closed = False
+        self._response_status: int | None = None
 
     def arm(self, phase: TokenRequestPhase) -> None:
         if self._closed:
@@ -38,6 +39,12 @@ class HydraTokenRequestGate(httpx2.AsyncBaseTransport):
         self._arrived.clear()
         self._release.clear()
         self._phase = phase
+        self._response_status = None
+
+    @property
+    def response_status(self) -> int | None:
+        """Return the armed token response's status only after its complete body was read."""
+        return self._response_status
 
     async def wait_until_paused(self) -> None:
         async with asyncio.timeout(self._timeout_seconds):
@@ -77,6 +84,7 @@ class HydraTokenRequestGate(httpx2.AsyncBaseTransport):
         if phase == "after_response":
             try:
                 await response.aread()
+                self._response_status = response.status_code
                 await self._pause()
             except BaseException:
                 await response.aclose()

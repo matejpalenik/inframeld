@@ -44,6 +44,10 @@ Incoming application credentials remain Inframeld-issued opaque keys under ADR-0
 - Exact pinned releases/digests, credential dispatch, subject mapping, device-flow safety, local transport, rotation races and recovery behavior must pass the recorded release gates. Do not enable an unqualified flow or choose a paid distribution silently.
 - Inspection on 2026-09-29 found the Kratos cookie/CSRF adapter and Kratos Compose services, not a Hydra service or CLI bearer verifier. This ADR adds no implementation, configuration, migration or runtime-test evidence and makes no claim about an independently deployed installation.
 
+## Implementation notes
+
+The separate [client provisioning command](../../apps/backend/src/inframeld_backend/provision_oauth_client.py) reconciles the official registration in place through private Hydra administration. [Development setup](../development/getting-started/local-setup.md#configure-the-cli-client) includes Hydra, provider-owned lifetime settings and completed setup before containerized API startup. [Real-provider tests](../../apps/backend/tests/integration/access/test_hydra_cli_provisioning.py) exercise the production provisioner, callback restrictions and lifetime overrides. This supplements the historical inspection above, without claiming account-UI, Rust CLI storage or packaged runtime completion.
+
 ## Links
 
 - [Client registration](../../.agents/skills/inframeld-access-models/references/human-cli-login.md#cli-client-registration), [login transaction](../../.agents/skills/inframeld-access-models/references/human-cli-credential-lifecycle.md#cli-login-transaction), [credential lifecycle](../../.agents/skills/inframeld-access-models/references/human-cli-credential-lifecycle.md#cli-credential-lifecycle) and [qualification](../../.agents/skills/inframeld-access-models/references/human-cli-credential-lifecycle.md#cli-authentication-qualification): accepted detailed protocol, lifecycle and release requirements, relocated from the workshop without changing the decision.

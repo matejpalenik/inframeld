@@ -30,7 +30,7 @@ Keep ordinary selected-device logout, coordinated refresh, account recovery and 
 
 ## Implementation status and limits
 
-The guide records implemented backend cookie/bearer verification and native consent. Read-only inspection is display data, not authority for a later decision. Account pages, complete CLI login lifecycle, deployment-wide provisioning and safely coordinated production recovery remain unfinished.
+The guide records implemented backend cookie/bearer verification, native consent and the separate installation client provisioner. Read-only inspection is display data, not authority for a later decision. Account pages, complete CLI interaction, packaged runtime delivery and safely coordinated production recovery remain unfinished.
 
 Provider tests distinguish late approvals, outstanding codes and token responses. A held HTTP request does not pause Hydra internally. Test-only token-hook denials, transport gates and staged records establish bounded observations, not a production hook, credential inventory, universal issuance fence or authority to release a block. Keep historical provider-version observations separate from current qualified results.
 
@@ -109,6 +109,12 @@ Alice signs into local and dev with the same CLI executable. Each installation i
 | Excluded grants | Password, client credentials, arbitrary token exchange and delegated-user grants |
 
 An **issuer** identifies the trusted Hydra installation. An **audience** identifies the API a token is for. Neither is a project selector. `offline_access` permits refresh, not unattended administration. Do not put current project or document grants into tokens. ID tokens describe authentication to the CLI, refresh tokens go only to Hydra, and only access tokens go to the business API.
+
+The implemented [`HumanOAuthClientProvisioner`](../../../../apps/backend/src/inframeld_backend/access/application/protocols/human_oauth_client_provisioner.py) reconciles this fixed profile through the official Hydra SDK. The separate `python -m inframeld_backend.provision_oauth_client` setup command creates a missing client, updates managed drift in place or reports an unchanged registration after reading it back. It preserves display metadata, unrelated clients and independent login chains. It removes client-specific lifetime overrides so [native server settings](human-cli-credential-lifecycle.md#provider-lifetime-configuration) remain authoritative. It never deletes and recreates the client or runs during API startup.
+
+Register `http://127.0.0.1/oauth/callback` without a port. Hydra permits the native-client ephemeral-port variation at authorization, while code exchange must use the exact URI from that attempt. The [production provisioner scenarios](../../../../apps/backend/tests/integration/access/test_hydra_cli_provisioning.py) qualify both rules against the pinned provider.
+
+The host-authorized command needs only focused Hydra/lifetime configuration and private administration access, not an application database or fingerprint key. Bounded readiness reads may repeat. Mutations do not automatically retry. Stopping and write admission are synchronized: stopping first prevents mutation, while an admitted write may still dispatch or finish late. A timeout after admission reports an unknown outcome. Cancellation propagates without promising that no write occurred. A later explicit invocation reconciles the actual registration. [Local setup](../../../../docs/development/getting-started/local-setup.md#configure-the-cli-client) gives the development command and UI boundary. This does not implement the Rust CLI, account pages or packaged runtime.
 
 Target registration obtains the expected issuer/client/audience through validated one-server-URL discovery. Do not infer an issuer from the API hostname or replace it from an authentication error. Standard discovery must return exactly the expected issuer. Do not send existing credentials during discovery or forward credentials across origin-changing redirects.
 

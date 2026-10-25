@@ -19,7 +19,7 @@ For example, Alice already has a saved dev login when a new attempt fails after 
 3. Bind a temporary listener on literal `127.0.0.1` at an OS-assigned free port and the registered path. Open the system browser, not a WebView. No wildcard listener, LAN exposure or permanent authentication daemon.
 4. Kratos authenticates the human through the Ory account UI. Existing browser sign-in may avoid another password prompt, but identity and consent remain visible. The trusted UI integration uses documented Ory APIs and official clients. It does not issue its own tokens.
 5. Validate the callback's association with the pending transaction before exchanging the code. Validate the returned ID token's signature, issuer, audience, expiry and nonce through the maintained library. Tokens arrive at the token endpoint, not in a browser redirect.
-6. Where first-local-setup bootstrap is needed, perform the separately authorized host-maintenance claim after verified identity and before product admission. Then call the backend's current-human-session operation using the access token. Require an admitted, active human and use its stable principal ID. The existing cookie-only session operation needs explicit bearer contract work. Do not assume it already supports this.
+6. Where first-local-setup bootstrap is needed, perform the separately authorized host-maintenance claim after verified identity and before product admission. Then call the implemented `/v1/session` operation using the access token. Require an admitted, active human and use its stable principal ID. This operation supports cookie and human bearer authentication, while bootstrap remains a separate capability.
 7. An existing account alias must resolve to the same verified identity. A new alias requires visible confirmation. Atomically save the new coherent credential set only after validation and admission, and only if the captured local credential revision still matches.
 8. Close the listener and discard transient secrets. A minimal callback page may say to return to the terminal, but must not claim admission succeeded before the backend check. Use no third-party assets and redact callback query strings.
 
@@ -59,7 +59,7 @@ Ordinary commands refresh quietly when possible and otherwise print the exact ta
 | Browser session | 8 hours | Kratos `SESSION_LIFESPAN=8h` |
 | Interactive CLI wait | 10 minutes | CLI UX timeout. Exact option remains a contract deliverable |
 
-These are service-container settings, not CLI secret-input environment variables. All server lifetimes remain operator-configurable. Inventory the pinned release's ID-token (`TTL_ID_TOKEN`), login/consent-request (`TTL_LOGIN_CONSENT_REQUEST`), self-service-flow, privileged-session and remembered-login/consent settings without inventing unselected numeric defaults. Validate finite positive durations. Inherit service defaults or derive grant-specific client settings from the same explicit policy, never a hidden override. Qualify issuance and refresh after overrides. Document restart/reconciliation and clock/network behavior. A duration change does not revoke existing tokens.
+These are service-container settings, not CLI secret-input environment variables. The [configuration boundary below](#provider-lifetime-configuration) supplies the four provider defaults and their validation. Client provisioning removes per-client lifetime overrides. A duration change does not revoke existing tokens.
 
 Alice logs in Monday at 09:00. Her access token expires at 09:05 and refresh token the following Monday at 09:00. A successful refresh Thursday at 09:00 issues a replacement expiring the next Thursday. Selecting a target, leaving a terminal open or doing work that needs no refresh does not move that deadline. There is no idle keepalive or separately selected absolute login-age cap.
 
@@ -101,6 +101,39 @@ Before release, and require evidence for all of these behaviors, not just a happ
 Use 0 for success, 2 for usage errors and 1 for other ordinary failures. Precise signal/JSON contracts remain deliverables. Missing target/account/credentials produce explicit context-specific guidance, not fallback or surprise browser launch. `--no-input` is checked before interactive work. Invalid credentials map to 401, valid but unadmitted/ineligible humans to 403, and unavailable/malformed provider verification to 503 for the human-session operation. Ordinary product visibility rules remain unchanged. Saved-login replacement/logout cleanup uncertainty is a nonzero partial outcome, not success.
 
 Exact compatible version/digest pins, release advisories, managed origins, maintenance IPC, issuer mix-up defenses, remaining lifespan keys, wire schemas, OS matrix and recovery-hook sequencing remain engineering/qualification deliverables. The historical inspection of Hydra v26.2.0 was a candidate observation, not a permanent pin or evidence that later fixes exist there. Qualify a suitable maintained OSS release without floating tags, surprise startup upgrades, private protocol forks or silently switching to a paid distribution.
+
+### Provider lifecycle coverage
+
+The [real-provider lifecycle scenarios](../../../../apps/backend/tests/integration/access/test_hydra_cli_credential_lifecycle.py) exercise the digest-pinned Hydra v26.2.0 test stack. They verify rejection of missing/plain PKCE and an omitted challenge method, missing/incorrect/cross-flow verifiers, and reused authorization codes. Legitimate refresh replaces both secrets while preserving the subject, issuer, client, audience and installation/version metadata.
+
+Reusing a code or old refresh token revokes its affected login chain. A successful refresh response discarded before delivery leaves the caller without the replacement pair. The test explicitly probes reuse and obtains fresh credentials through another login. That probe is not an automatic retry strategy.
+
+Revoking the selected current refresh token through public `/oauth2/revoke` invalidates that login's credentials. Repetition preserves Alice's independent desktop and remembered-consent grants, her Kratos browser session, Bob's login and another client's credentials. Tests inspect activity and attempt refresh rather than inferring revocation from an empty success response.
+
+These scenarios use private test client registration and test login/consent approval. Separate [production provisioner tests](../../../../apps/backend/tests/integration/access/test_hydra_cli_provisioning.py) exercise installation reconciliation, callback restrictions, default and overridden deadlines, rolling refresh expiry and actual authorization-code expiry. The CLI's credential storage, replacement and logout interaction remain separate deliverables. Recovery's broader bulk cleanup remains unchanged.
+
+<a id="provider-lifetime-configuration"></a>
+
+### Configure provider lifetimes at installation
+
+Development Compose passes the same four effective primary settings to provider startup and the provisioning preflight. [`IdentityProviderLifetimeSettings`](../../../../apps/backend/src/inframeld_backend/access/infrastructure/settings/identity_provider_lifetime_settings.py) accepts positive finite native durations with ASCII digits within the provider's signed 64-bit nanosecond range. Zero, negative, unlimited, malformed, non-ASCII and overflowing values fail before provider I/O. Valid ASCII inputs are preserved exactly. These settings do not belong in business Commands or bearer-verification policy.
+
+The following other timers retain native defaults in the pinned v26.2.0 releases. They are not new Inframeld product defaults:
+
+| Purpose | Native key | Pinned default |
+| --- | --- | --- |
+| Hydra ID token | `TTL_ID_TOKEN` | `1h` |
+| Hydra login/consent request | `TTL_LOGIN_CONSENT_REQUEST` | `30m` |
+| Hydra remembered login | `TTL_AUTHENTICATION_SESSION` | `720h` |
+| Kratos login, registration, settings, recovery and verification flows | `selfservice.flows.<flow>.lifespan` | `1h` each |
+| Kratos recent authentication for sensitive settings | `selfservice.flows.settings.privileged_session_max_age` | `1h` |
+| Kratos recovery/verification link or code | `selfservice.methods.<link or code>.config.lifespan` | `1h` |
+
+The inventory comes from [Hydra's configuration schema](https://github.com/ory/hydra/blob/v26.2.0/.schema/config.schema.json) and [Kratos's schema](https://github.com/ory/kratos/blob/v26.2.0/embedx/config.schema.json) and [configuration accessors](https://github.com/ory/kratos/blob/v26.2.0/driver/config/config.go). Native Kratos session lifespan is `24h`, explicitly overridden to `8h` here. The expiry-only test instance retains `15s`. Optional native timers remain provider-validated. The focused preflight validates the four primary settings, not every provider option.
+
+Remembered consent is separate: Inframeld's server-controlled approval duration defaults to 3,600 seconds. Reusing that approval must not extend it, and it does not extend token or browser-session deadlines. Hydra's remembered login does not bypass Inframeld's current Kratos session checks.
+
+Apply changed provider environment/configuration by recreating the providers while preserving their databases. Rerunning client provisioning alone does not apply new provider environment values. Existing credentials keep their recorded deadlines. Reconciliation and restart are not revocation. [Local setup](../../../../docs/development/getting-started/local-setup.md#configure-the-cli-client) explains the commands and private administration boundary.
 
 <a id="human-credential-versions"></a>
 
@@ -152,7 +185,7 @@ The implemented bearer service now reuses the same `human_identity_links` and `p
 
 For example, a test provider can recognize Alice while the local test database contains no identity link for her. The session request returns 403. Requesting the `linked_human` test fixture first creates an active local principal and its link, so the same verified identity can return 200. Each test uses an isolated database, so admission from an earlier test does not carry over. [The implemented authentication boundary](credential-dispatch.md#implemented-human-authentication) links both the mocked-provider scenarios and real Hydra/Kratos tests that resolve cookie and bearer credentials to the same local principal.
 
-The table still describes ownership rather than new schema changes. The full Ory subject-mapping/login integration, credential lifecycle, protected CLI storage and recovery cleanup remain to be qualified or implemented. Incoming application-key records and their two-usable-key limit remain separate.
+The table describes ownership rather than new schema changes. Native Kratos/Hydra login, backend consent, client provisioning and provider lifecycle scenarios are implemented. Account pages, protected CLI storage and production recovery orchestration remain unfinished. Incoming application-key records and their two-usable-key limit remain separate.
 
 <a id="handle-invalidated-human-cli-credentials"></a>
 
