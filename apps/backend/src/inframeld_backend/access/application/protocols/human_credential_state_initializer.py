@@ -13,7 +13,8 @@ class HumanCredentialStateInitializer(Protocol):
     """Initialize security metadata for a subject read from a trusted Hydra challenge.
 
     This never admits an account, grants access or advances an existing version.
-    Finish the short initialization transaction before browser verification.
+    Coordinate the exact identity before reading or creating version state.
+    Finish that short READ COMMITTED transaction before browser verification.
     """
 
     @abstractmethod

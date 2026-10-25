@@ -29,6 +29,9 @@ from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id imp
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.infrastructure.resources.postgres_identity_coordinator import (
+    PostgresIdentityCoordinator,
+)
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
 )
@@ -51,7 +54,7 @@ _RECOVERY_COMPLETION_TIMEOUT_SECONDS = 5.0
 
 
 class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFactsReader):
-    """Lock the linked organization before projecting current recovery and account facts.
+    """Lock the original identity, then its organization before reading release facts.
 
     A five-second deadline includes lock waits. Refresh ORM observations even
     when this session previously loaded the same records.
@@ -93,12 +96,22 @@ class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFa
         authority: IdentityAuthority,
         flow_id: IdentityRecoveryFlowId,
     ) -> IdentityRecoveryCompletionFactsDTO:
+        installation_statement = select(InstallationIdentityRow.installation_id).where(
+            InstallationIdentityRow.singleton_key == 1
+        )
         current_installation = await self._session.scalar(
-            select(InstallationIdentityRow.installation_id).where(
-                InstallationIdentityRow.singleton_key == 1
-            )
+            installation_statement.execution_options(autoflush=False)
         )
         if current_installation != installation_id.value:
+            raise DependencyUnavailableError("The installation identity is not available.")
+
+        identity = await self._read_original_recovery_identity(
+            installation_id=installation_id, authority=authority, flow_id=flow_id
+        )
+        await PostgresIdentityCoordinator(self._session).acquire(
+            installation_id=installation_id, identity=identity
+        )
+        if await self._session.scalar(installation_statement) != installation_id.value:
             raise DependencyUnavailableError("The installation identity is not available.")
 
         # Derive the organization from the original admission, not callback subject claims.
@@ -116,6 +129,7 @@ class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFa
                 IdentityRecoveryAdmissionRow.installation_id == installation_id.value,
                 IdentityRecoveryAdmissionRow.authority == authority.value,
                 IdentityRecoveryAdmissionRow.flow_id == flow_id.value,
+                IdentityRecoveryAdmissionRow.subject == identity.subject.value,
             )
             .with_for_update(of=OrganizationRow)
         )
@@ -159,6 +173,8 @@ class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFa
         if result is None:
             raise ResourceNotFoundError()
         admission, link, account, has_other_pending = result
+        if admission.subject != identity.subject.value:
+            raise RuntimeError("The recovery admission changed its original identity binding.")
         principal = None
         if link is not None:
             if (
@@ -190,3 +206,24 @@ class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFa
             principal=principal,
             has_other_pending_recovery=has_other_pending,
         )
+
+    async def _read_original_recovery_identity(
+        self,
+        *,
+        installation_id: InstallationId,
+        authority: IdentityAuthority,
+        flow_id: IdentityRecoveryFlowId,
+    ) -> VerifiedHumanIdentityDTO:
+        """Find whose identity turn this recovery needs, without deciding release eligibility."""
+        subject = await self._session.scalar(
+            select(IdentityRecoveryAdmissionRow.subject)
+            .where(
+                IdentityRecoveryAdmissionRow.installation_id == installation_id.value,
+                IdentityRecoveryAdmissionRow.authority == authority.value,
+                IdentityRecoveryAdmissionRow.flow_id == flow_id.value,
+            )
+            .execution_options(autoflush=False)
+        )
+        if subject is None:
+            raise ResourceNotFoundError()
+        return VerifiedHumanIdentityDTO(authority, IdentitySubject(subject))

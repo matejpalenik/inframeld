@@ -17,4 +17,6 @@ These commands start the host API or run checks. They do not replace the setup a
 
 For a new component, follow [the contributor example](../../docs/development/guides/adding-a-backend-feature.md) and mandatory [Coding Standards](../../.agents/skills/inframeld-coding-standards/SKILL.md). Reusable pure conversion/validation utilities default to named static classes. Injected services, private helpers, fixtures and framework callables retain their documented roles.
 
+Access recovery admission/completion and credential-state initialization share [identity coordination](../../.agents/skills/inframeld-access-models/references/identity-admission-coordination.md). The coordinator uses each operation's existing transaction before organization locks. Invitation activation remains unfinished and must reuse the same coordinator.
+
 [Contracts and data](../../docs/development/guides/contracts-and-data.md) routes to implemented types, generated HTTP schema and migrations. [The architecture introduction](../../docs/ARCHITECTURE.md) explains the accepted product. [AGENTS.md](../../AGENTS.md) preserves read-only guidance and exact write confirmation.

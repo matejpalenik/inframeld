@@ -10,7 +10,7 @@
 ## Follow recovery admission
 
 1. Establish trusted provider/installation identity and original recovery-flow evidence. Do not accept caller-supplied identity or a fresh settings query parameter as original-flow proof.
-2. For the accepted target, take [the identity turn](identity-admission-coordination.md) around each participating local database step before required organization/project locks. This prerequisite is not implemented yet and never spans provider verification or cleanup.
+2. Take [the identity turn](identity-admission-coordination.md) around recovery admission/completion and credential initialization before required organization/project locks. These participants are implemented. Future first-admission integration remains unfinished, and no turn spans provider verification or cleanup.
 3. Record the recovery obligation. For a linked human, admission takes the conflicting exclusive organization lock so grant writes cannot ignore a newly committed block. Its fixed five-second database deadline includes waits and leaves rollback to the caller. An identity without a local link may still receive an obligation without local provisioning.
 4. Advance the human CLI credential version once atomically for a new recovery. Duplicate delivery and block release do not reset it. Current authentication/authorization rejects old binding evidence even after the temporary block is later released.
 5. Load the `IdentityRecovery` aggregate to record supported checklist transitions through its specific repository. Original admission metadata stays with infrastructure. Neither loading nor saving authenticates provider evidence or establishes release eligibility.

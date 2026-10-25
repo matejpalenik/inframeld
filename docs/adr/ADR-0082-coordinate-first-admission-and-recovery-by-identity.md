@@ -1,6 +1,6 @@
 # ADR-0082: Coordinate first admission and recovery by identity
 
-**Status:** Accepted design. Identity coordination is not yet implemented.
+**Status:** Accepted design. Shared identity coordination is implemented for recovery admission/completion and initialization. Complete first-admission integration remains unfinished.
 
 **Date:** 2026-10-25
 
@@ -33,7 +33,15 @@ The [owning coordination workflow](../../.agents/skills/inframeld-access-models/
 - Organization-before-project ordering remains in force. Participating operations must enter identity coordination first and must not acquire it after taking those locks.
 - All participating paths must use the same rule. PostgreSQL does not make an application-defined advisory lock a substitute for constraints or authorization.
 - Completion without local admission still creates no account and releases only its eligible original checklist. Credential versions are never reset or downgraded.
-- Current adapters, first-admission delivery and concurrency tests still need implementation. This documentation decision adds no code, configuration, migration or runtime evidence.
+- The decision originally added no runtime behavior. The implementation notes below record the subsequently delivered adapters and retain first-admission delivery as unfinished.
+
+## Implementation notes
+
+Issue #241 adds `PostgresIdentityCoordinator` and integrates recovery admission, recovery completion and credential-state initialization. The coordinator requires an active READ COMMITTED transaction, uses a stable namespaced signed 64-bit key and never starts or commits a transaction. Lock acquisition and current decision reads are separate statements. Existing five-second database stages include the identity wait.
+
+Completion derives its lock target from the original stored admission, then checks fresh binding and account facts after coordination. Initialization rereads state after acquiring its turn and cannot erase recovery history. The [owning workflow](../../.agents/skills/inframeld-access-models/references/identity-admission-coordination.md#reuse-the-implemented-coordinator) documents the reuse boundary.
+
+Controlled test-only identity linking exercises the ordering expected of future first admission. It does not deliver invitation activation, its HTTP response or simultaneous-activation replay. Those remain work for #27/#119. Production callbacks and provider cleanup remain separate work.
 
 ## Links
 

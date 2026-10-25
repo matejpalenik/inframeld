@@ -97,7 +97,7 @@ Retain a keyed fingerprint of normalized mode/installation/verified subject/targ
 
 ## Machine-readable input shape
 
-[The design-only JSON Schema](../../../../contracts/design/access/maintenance-v1.schema.json) expresses the documented envelope. It is not a runtime model or proof of authorization, trusted event ordering or provider completion. PD-ACCESS-03 retains its remaining pending scope. PD-ACCESS-04 is resolved under ADR-0082. Any maintenance path that first provisions a human must follow [the accepted identity-coordination workflow](identity-admission-coordination.md), which remains unimplemented.
+[The design-only JSON Schema](../../../../contracts/design/access/maintenance-v1.schema.json) expresses the documented envelope. It is not a runtime model or proof of authorization, trusted event ordering or provider completion. PD-ACCESS-03 retains its remaining pending scope. PD-ACCESS-04 is resolved under ADR-0082. Any maintenance path that first provisions a human must follow [the accepted identity-coordination workflow](identity-admission-coordination.md), whose shared coordinator and recovery/initialization participants are implemented. First provisioning through maintenance remains unfinished.
 
 A structural validator cannot establish received-byte limits, reject duplicate JSON keys after decoding, verify a credential or enforce database state. JSON Schema treats `1` and `1.0` as the same integer value. Strict token parsing remains a separate requirement. Future implementation must reconcile or supersede this design schema with its runtime-owned definition.
 

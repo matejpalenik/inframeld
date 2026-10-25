@@ -93,7 +93,7 @@ These entries retain unresolved review findings, not accepted specifications or 
 
 ### Resolved decision references
 
-- [PD-ACCESS-04](../../inframeld-access-models/references/decision-recovery-first-admission.md) is accepted under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). Follow [identity coordination](../../inframeld-access-models/references/identity-admission-coordination.md) before implementing first admission, recovery admission/completion or credential-state initialization. The design is settled, while implementation and concurrency tests remain unfinished.
+- [PD-ACCESS-04](../../inframeld-access-models/references/decision-recovery-first-admission.md) is accepted under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). Follow [identity coordination](../../inframeld-access-models/references/identity-admission-coordination.md) before implementing first admission, recovery admission/completion or credential-state initialization. The shared coordinator and recovery/initialization participants are implemented with PostgreSQL concurrency coverage. Complete first-admission integration remains unfinished.
 
 <a id="business-areas-and-state-ownership"></a>
 

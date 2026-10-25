@@ -2,7 +2,7 @@
 
 Alice already has a Kratos identity. Bob invites her into Inframeld, and she accepts while password recovery begins. Access must give account creation and recovery a common turn before a local account exists. Otherwise each could act on a picture taken before the other's change.
 
-> **Status:** accepted design under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md), resolving [PD-ACCESS-04](decision-recovery-first-admission.md). The identity lock and participating workflow changes are not implemented yet. Existing organization/project coordination remains implemented at its recorded scope.
+> **Status:** accepted design under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md), resolving [PD-ACCESS-04](decision-recovery-first-admission.md). The shared coordinator is implemented for recovery admission, recovery completion and credential-state initialization. First-admission and invitation-activation integration remain work for #27/#119. Existing organization/project coordination remains implemented at its recorded scope.
 
 ## One turn for the verified identity
 
@@ -45,6 +45,16 @@ flowchart TB
 
 Arrows show the shared ordering inside each database operation, not a network sequence or another service. Provider verification and cleanup stay outside these transactions. The diagram covers both first admission and recovery, including the case with no local account.
 
+## Reuse the implemented coordinator
+
+[PostgresIdentityCoordinator](../../../../apps/backend/src/inframeld_backend/access/infrastructure/resources/postgres_identity_coordinator.py) uses the operation's existing session. Its `acquire()` accepts the trusted `InstallationId` and `VerifiedHumanIdentityDTO`, requires an active READ COMMITTED transaction and holds the turn until that transaction ends. It does not start or commit transactions, authorize the caller or create identity records.
+
+The key uses a versioned namespace and a canonical installation/authority/subject encoding, hashed into a signed 64-bit PostgreSQL key. It is stable across processes and does not normalize identity text. Exact record predicates remain mandatory. Acquisition disables autoflush and uses typed SQLAlchemy expressions. The surrounding adapter's existing deadline includes the wait, without a separate retry or timeout budget.
+
+Recovery completion first reads the original admission's subject only to select its lock. It then takes the identity and organization turns and reads fresh release facts, rejecting a changed original binding. Initialization reads installation metadata to select its turn, then rereads security state before any version write. Recovery admission takes its identity turn before resolving the current local link.
+
+Future first-admission adapters must call this same coordinator before organization/project locks or writes, then check recovery in a later statement. The controlled link-creation tests exercise this boundary. They do not implement invitation consumption, activation replay or its HTTP conflict response.
+
 ## Conflicts, retries and competing changes
 
 | Situation | Required behavior |
@@ -63,7 +73,7 @@ Ordinary authentication reads do not acquire this lock, and existing project-gra
 
 ## Implementation boundary and sources
 
-Current recovery admission and completion coordinate linked identities through organization locks. The independent initializer protects version creation through its existing history checks and database constraints. None of these inspected adapters implements the identity turn yet. Add behavioral PostgreSQL coverage for both admission/recovery orderings, simultaneous first activation, initialization, timeout, cancellation and rollback when implementing the accepted design.
+Recovery admission and completion now take identity coordination before their existing organization locks. The independent initializer uses the same identity turn and retains its history checks and database constraints. [Coordinator tests](../../../../apps/backend/tests/integration/access/test_identity_coordination_postgres.py) cover actual waits, fresh observations, initialization in both orders, rollback, cancellation and bounded failure. Complete invitation activation and its simultaneous-first-activation scenarios remain deferred to #27/#119.
 
 - [Invitation workflow](admission-and-invitations.md#invitations), [invitation transport rules](invitation-contracts.md) and [existing Access write coordination](grant-administration.md#how-the-database-gives-each-change-its-turn).
 - [Credential and recovery records](credential-and-recovery-records.md), [local completion](recovery-completion.md#recovery-completion-workflow) and [remaining production-evidence questions](decision-recovery-production-completion.md).

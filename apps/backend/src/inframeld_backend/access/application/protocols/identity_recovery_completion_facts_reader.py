@@ -14,8 +14,9 @@ from inframeld_backend.shared.domain.value_objects.installation_id import Instal
 class IdentityRecoveryCompletionFactsReader(Protocol):
     """Read the existing recovery binding and current release facts without provisioning.
 
-    Use the caller's active transaction. For a linked human, hold the existing
-    exclusive organization lock through commit or rollback before reading facts.
+    Use the caller's active READ COMMITTED transaction. Coordinate the identity
+    from the original stored admission before locking its linked organization.
+    Read current release facts after waiting. The caller commits or rolls back.
     """
 
     @abstractmethod
@@ -32,7 +33,7 @@ class IdentityRecoveryCompletionFactsReader(Protocol):
             ResourceNotFoundError: This flow has no admission in the exact scope.
             DependencyUnavailableError: Installation metadata is unavailable or
                 mismatched, or the database deadline expires.
-            RuntimeError: No active caller transaction exists or stored identity
-                relationships are inconsistent.
+            RuntimeError: The transaction cannot supply fresh observations or
+                stored identity relationships are inconsistent.
         """
         ...

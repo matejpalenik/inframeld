@@ -24,7 +24,7 @@ Use the accepted shared organization-row lock followed by the affected projectâ€
 
 ## Consequences
 
-[ADR-0082](ADR-0082-coordinate-first-admission-and-recovery-by-identity.md) adds an identity-coordination prerequisite for first admission, recovery admission/completion and credential-state initialization. Those participating workflows acquire their transaction-scoped identity lock before any required organization/project locks, including when no local account exists. The organization-before-project order and original rationale above remain unchanged. This accepted extension is not implemented yet.
+[ADR-0082](ADR-0082-coordinate-first-admission-and-recovery-by-identity.md) adds an identity-coordination prerequisite for first admission, recovery admission/completion and credential-state initialization. Those participating workflows acquire their transaction-scoped identity lock before any required organization/project locks, including when no local account exists. The organization-before-project order and original rationale above remain unchanged. The shared identity coordinator and recovery admission/completion/initialization participants now implement this extension. Complete first-admission integration remains unfinished.
 
 - Same-project administration changes have a simple common coordination point, while ordinary changes in different projects can proceed concurrently.
 - Same-project writes can wait for one another. Use stable multi-project lock order, bounded waits, and failure handling. Never hold these transactions across uploads, identity-provider calls, model calls, or user waits. The protocol still requires implementation and concurrency tests.

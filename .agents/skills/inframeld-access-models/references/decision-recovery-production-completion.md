@@ -77,7 +77,7 @@ Access recovery coordinator, private callback validation, Kratos settings/recove
 
 Load neighboring decisions only under these conditions:
 
-- [Resolved PD-ACCESS-04](decision-recovery-first-admission.md) and its [accepted identity-coordination workflow](identity-admission-coordination.md). When the identity has no local account or first admission overlaps cleanup. The design is settled, while implementation remains unfinished.
+- [Resolved PD-ACCESS-04](decision-recovery-first-admission.md) and its [accepted identity-coordination workflow](identity-admission-coordination.md). When the identity has no local account or first admission overlaps cleanup. The design is settled. Recovery admission/completion and initialization use the shared coordinator, while complete first admission remains unfinished.
 - [PD-ACCESS-02: Keep durable work and credential lifetime explicit](decision-admitted-work-authority.md). When recovery must stop already-admitted product work.
 
 ## Open questions and required evidence

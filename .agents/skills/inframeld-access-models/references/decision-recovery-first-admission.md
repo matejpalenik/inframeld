@@ -1,12 +1,12 @@
 # PD-ACCESS-04: Coordinate first account admission with identity recovery
 
-**Status:** ACCEPTED on 2026-10-25 in [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). Implementation and concurrency tests remain unfinished.
+**Status:** ACCEPTED on 2026-10-25 in [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). The shared coordinator and its three recovery/initialization participants are implemented. Complete first-admission integration and activation concurrency tests remain unfinished.
 
 **Owner:** `inframeld-access-models`
 
 **Issue kind:** Implementation contract.
 
-This stable decision reference preserves the alternatives and approved resolution. [The coordination workflow](identity-admission-coordination.md) owns the current rule. Acceptance does not claim implemented identity coordination.
+This stable decision reference preserves the alternatives and approved resolution. [The coordination workflow](identity-admission-coordination.md) owns the current rule. The coordination workflow records the implemented subset separately from future first admission.
 
 ## Contents
 

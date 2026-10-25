@@ -29,6 +29,9 @@ from inframeld_backend.access.infrastructure.mappers.postgres_human_credential_s
 from inframeld_backend.access.infrastructure.readers.human_credential_state_queries import (
     HumanCredentialStateQueries,
 )
+from inframeld_backend.access.infrastructure.resources.postgres_identity_coordinator import (
+    PostgresIdentityCoordinator,
+)
 from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
     HumanCredentialVersionRow,
 )
@@ -86,6 +89,9 @@ class PostgresIdentityRecoveryAdmissionWriter(IdentityRecoveryAdmissionWriter):
             ) from error
 
     async def _reserve(self, event: IdentityRecoveryEventDTO) -> IdentityRecoveryAdmissionDTO:
+        await PostgresIdentityCoordinator(self._session).acquire(
+            installation_id=self._installation_id, identity=event.identity
+        )
         # An unlinked identity has no organization to lock and may still recover.
         await self._session.scalar(
             select(OrganizationRow.id)

@@ -1,6 +1,7 @@
 import asyncio
 from typing import override
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
@@ -20,13 +21,20 @@ from inframeld_backend.access.infrastructure.mappers.postgres_human_credential_s
 from inframeld_backend.access.infrastructure.readers.human_credential_state_queries import (
     HumanCredentialStateQueries,
 )
+from inframeld_backend.access.infrastructure.resources.postgres_identity_coordinator import (
+    PostgresIdentityCoordinator,
+)
 from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
     HumanCredentialVersionRow,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.rows.installation_identity_row import (
+    InstallationIdentityRow,
+)
 
 
 class PostgresHumanCredentialStateInitializer(HumanCredentialStateInitializer):
@@ -39,10 +47,22 @@ class PostgresHumanCredentialStateInitializer(HumanCredentialStateInitializer):
     async def initialize(self, identity: VerifiedHumanIdentityDTO) -> HumanCredentialStateDTO:
         try:
             async with asyncio.timeout(5.0), self._database.session() as session, session.begin():
+                installation = await session.scalar(
+                    select(InstallationIdentityRow.installation_id).where(
+                        InstallationIdentityRow.singleton_key == 1
+                    )
+                )
+                if installation is None:
+                    raise DependencyUnavailableError("The installation identity is not available.")
+                await PostgresIdentityCoordinator(session).acquire(
+                    installation_id=InstallationId(installation), identity=identity
+                )
                 statement = HumanCredentialStateQueries.for_identity(identity)
                 result = await session.execute(statement)
                 row = result.tuples().one_or_none()
                 state = PostgresHumanCredentialStateMapper.to_state(identity, row)
+                if state.installation_id.value != installation:
+                    raise DependencyUnavailableError("The installation identity is not available.")
                 if state.version is None:
                     if row is not None and row[3]:
                         raise DependencyUnavailableError(
