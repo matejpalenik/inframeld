@@ -37,6 +37,16 @@ PostgreSQL records exact revision membership and authority. Chroma stores immuta
 
 Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
 
+## Pending decisions for affected work
+
+Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+
+- [PD-INDEXING-01](references/decision-capability-binding-contracts.md): Before defining preparation, retrieval or retirement application ports and their complete input/result records.
+- [PD-INDEXING-02](references/decision-health-observation.md): Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
+- [PD-INDEXING-03](references/decision-source-coordinates.md): Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
+- [PD-INDEXING-04](references/decision-storage-retries-and-erasure.md): When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
+- [PD-INDEXING-05](references/decision-parser-runtime-profile.md): Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
+
 ## Read as needed
 
 - For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).

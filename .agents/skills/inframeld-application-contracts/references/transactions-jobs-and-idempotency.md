@@ -77,3 +77,11 @@ The grant chain is the implemented reference. Job workflows, later commands, rec
 
 - [Grant chain](../../../../docs/development/application-structure.md#grant-command-flow), [service guide](../../../../docs/development/application-structure.md#service-writing-guide), [membership repository](../../../../docs/development/application-structure.md#membership-aggregate-and-repository), [jobs/idempotency](../../../../docs/development/jobs-and-idempotency.md) and [supporting records](../../../../docs/development/data-model.md#shared-supporting-records).
 - [ADR-0065](../../../../docs/adr/ADR-0065-application-services-own-write-transactions.md), [ADR-0066](../../../../docs/adr/ADR-0066-use-typed-operation-contexts-and-command-classification.md), [ADR-0067](../../../../docs/adr/ADR-0067-standardize-authorization-capabilities-with-typed-requests.md), [ADR-0068](../../../../docs/adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md) and [error mapping](../../../../docs/development/error-handling.md#stable-domain-error-mapping).
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-CONTRACTS-05: Qualify cleanup and recovery under a full bounded queue](decision-queue-saturation-and-cleanup.md). When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation.

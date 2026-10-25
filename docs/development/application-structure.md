@@ -689,6 +689,14 @@ The developer manually guards forbidden imports, dependency cycles, and reposito
 
 Tests of database and search behavior must use real PostgreSQL and the Chroma server shipped with the product. Mocks alone cannot show that real constraints, simultaneous changes, and search operations behave correctly.
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../.agents/skills/inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](../../.agents/skills/inframeld-pipelines/references/decision-execution-build-receipt-contracts.md). Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
+- [PD-RELEASES-01: Persist Deployment transitions with one shared control check](../../.agents/skills/inframeld-releases/references/decision-deployment-state-and-concurrency.md). Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding.
+
 <a id="decision-map"></a>
 
 ## 6. Decision and reference map

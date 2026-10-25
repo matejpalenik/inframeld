@@ -39,3 +39,9 @@ These are accepted execution and replay contracts. Inspect implementation before
 
 - [Answer flow](../../../../docs/development/pipelines-and-releases.md), [generation context](../../../../docs/development/pipelines-and-releases.md#generation-context-contract), [generation parameters](../../../../docs/development/pipelines-and-releases.md#generation-parameters) and [receipt records](../../../../docs/development/data-model.md#pipelines).
 - [Jobs and answer recovery](../../../../docs/development/jobs-and-idempotency.md), [gateway dispatch](../../../../docs/development/model-connections.md#dispatch-freshness), [model roles](../../../../docs/development/model-connections.md#roles), [validation evidence](../../../../docs/development/data-model.md#model-validation-evidence) and [ADR-0050](../../../../docs/adr/ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md).
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](decision-execution-build-receipt-contracts.md). Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.

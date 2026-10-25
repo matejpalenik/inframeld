@@ -28,7 +28,7 @@ Use one pure domain policy for current principal eligibility. Authentication, ac
 
 The selected first implementation uses `PrincipalAccessPolicyInput` to carry the observed `Principal` and whether an unreleased recovery obligation blocks it. `PrincipalAccessPolicy` owns the active-account and no-pending-recovery decision. Both components are now implemented in human authentication, project action authorization and the supported human grant command.
 
-Operation DTOs and policy inputs carry that cohesive input instead of copying its fields into every operation signature. These are values for one attempt, not an aggregate, a persisted eligibility flag or a reusable authorization certificate. `AccessContextDTO` continues to contain only principal identity.
+Operation DTOs and policy inputs carry that cohesive input instead of copying its fields into every operation signature. These are values for one attempt, not an aggregate, a persisted eligibility flag or a reusable authorization certificate. At this decision’s initial boundary, `AccessContextDTO` contained only principal identity. [ADR-0073](ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md) later refines that context to require actor identity plus complete non-secret authentication evidence. The context still carries no cached account state or permission snapshot. This refinement does not replace the shared eligibility decision above.
 
 ### Stable authorization operations and explicit persistence
 

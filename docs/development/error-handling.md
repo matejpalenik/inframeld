@@ -261,7 +261,7 @@ This fragment belongs inside the problem object. Return at most 20 sanitized iss
 
 The implemented [consent API](api-contracts.md#human-oauth-consent) has an explicit precedence rule. After HTTP credential selection and POST CSRF, unsupported Hydra client/access returns 403 before browser verification, including when the supplied cookie is invalid. Supported requests keep the usual invalid-session 401, policy-denial 403 and unavailable-dependency 503 outcomes. This ordering initializes no credential state for unsupported requests.
 
-The [Access dispatch contract](access-control.md#credential-dispatch) selects one verifier before provider I/O. The following extension was accepted on 2026-10-04. It is not a claim that the bearer adapters, new error code or route declarations are implemented:
+The [Access dispatch contract](access-control.md#credential-dispatch) selects one verifier before provider I/O. The following extension was accepted on 2026-10-04. Human cookie/bearer dispatch, verification adapters, the `invalid_authentication_request` catalogue entry and route declarations now have inspected implementation, described in [Access](access-control.md#implemented-human-authentication). Application-key authentication and complete account-UI/CLI/recovery production qualification remain unfinished. This status correction reports source inspection, not tests rerun here:
 
 | Status | Condition | Public problem contract |
 | --- | --- | --- |
@@ -289,7 +289,7 @@ The new 400 definition uses these accepted literal values, within the existing `
 
 #### Invalid authentication request and trusted challenges
 
-`requestId` remains the generated correlation ID matching `X-Request-ID`; omit `instance` and validation-only `errors`. This definition is accepted design, not a new implemented catalogue entry. Existing 401/403/503 problem bodies and codes remain unchanged.
+`requestId` remains the generated correlation ID matching `X-Request-ID`; omit `instance` and validation-only `errors`. This definition is accepted design and is implemented by [the problem catalogue](../../apps/backend/src/inframeld_backend/shared/http/definitions/problem_catalogue.py). Source presence does not qualify every authentication lifecycle. Existing 401/403/503 problem bodies and codes remain unchanged.
 
 Use realm `inframeld` for applicable Bearer challenges. A missing credential receives `WWW-Authenticate: Bearer realm="inframeld"` without an `error` attribute. A failed bearer credential receives `Bearer realm="inframeld", error="invalid_token"`. For a malformed/competing Bearer authentication request, use `Bearer realm="inframeld", error="invalid_request"` with the 400 response where that Bearer challenge applies. Keep challenge production with the authentication adapter, not the shared problem handler.
 

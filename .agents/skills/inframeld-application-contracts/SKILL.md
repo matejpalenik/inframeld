@@ -40,6 +40,16 @@ Tracing existing request behavior, including inspecting its source, does not by 
 
 For domain-specific component design or structural code review, read that domain's architecture reference and relevant workflow. The [shared component view](references/components-and-services.md), [transaction/job view](references/transactions-jobs-and-idempotency.md) and [gateway view](references/model-gateway-and-connections.md) cover shared support. They create no additional business domain. A proposal in an owning guide remains pending until explicitly accepted.
 
+## Pending decisions for affected work
+
+Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+
+- [PD-CONTRACTS-01](references/decision-gateway-enforcement.md): Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
+- [PD-CONTRACTS-02](references/decision-spending-coordination.md): Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery.
+- [PD-CONTRACTS-03](references/decision-cli-server-compatibility.md): Before distributing independently installable CLI/runtime releases or making a compatibility-sensitive public contract change.
+- [PD-CONTRACTS-04](references/decision-import-review-and-recovery.md): Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery.
+- [PD-CONTRACTS-05](references/decision-queue-saturation-and-cleanup.md): When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation.
+
 ## Read as needed
 
 - For ownership, dependency direction, services or provider/session boundaries, read [Application boundaries and services](references/components-and-services.md).

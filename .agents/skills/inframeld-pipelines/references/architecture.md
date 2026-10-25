@@ -96,3 +96,10 @@ Read [configuration, queries and builds](configuration-queries-and-builds.md), [
 [ADR-0077](../../../../docs/adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md) accepts focused settings/capture, readiness-build and answer-execution capabilities, retaining one ordinary execution path. The [owning guide](../../../../docs/development/pipelines-and-releases.md#pipeline-operation-boundaries) retains complete binding/result, capture, receipt and transaction/external-work contracts still to specify. This selects no new framework or public API.
 
 [The Pipeline guide](../../../../docs/development/pipelines-and-releases.md), [Pipeline records](../../../../docs/development/data-model.md#pipelines), [jobs](../../../../docs/development/jobs-and-idempotency.md) and [feedback](../../../../docs/development/answer-feedback.md) own the contracts. [Releases architecture](../../inframeld-releases/references/architecture.md) explains separate traffic authority.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](decision-execution-build-receipt-contracts.md). Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
+- [PD-PIPELINES-02: Make a confirmed trace opt-out stop later capture and delivery](decision-trace-policy-fencing.md). Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.

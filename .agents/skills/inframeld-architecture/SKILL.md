@@ -41,6 +41,13 @@ For example, changing R1={A1,B1} to R2={A1,B2} does not rewrite B1. Indexing can
 4. For existing behavior, inspect the relevant implementation. Separate accepted design, inspected code, recorded verification and remaining qualification.
 5. Cite the exact current rule. Report unresolved disagreements rather than inventing a missing decision. Loading this skill grants no write or external-action authority.
 
+## Pending decisions for affected work
+
+Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+
+- [PD-ARCHITECTURE-01](references/decision-supported-operating-envelope.md): Before fixing production resource/admission limits or advertising supported corpus size, throughput, latency or concurrency.
+- [PD-ARCHITECTURE-02](references/decision-availability-backup-and-restore.md): When setting availability/recovery objectives, assembling the production topology or qualifying backup, upgrade, security clearance and restore claims.
+
 ## Read as needed
 
 - For product users, external systems and scope, read [System context](references/system-context.md).

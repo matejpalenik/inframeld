@@ -85,3 +85,10 @@ Read [documents and collections](documents-and-collections.md), [uploads and sou
 [ADR-0075](../../../../docs/adr/ADR-0075-separate-document-lifecycle-from-collection-selection.md) accepts focused document/version and collection-selection operations coordinated by an application workflow for complete batches. The [owning guide](../../../../docs/development/knowledge-lifecycle.md#knowledge-operation-boundaries) retains transaction/consistency, durable handoff and committed batch-membership contracts still to specify. This accepted split adds no schema or API and does not make replacement select a new corpus implicitly.
 
 [Knowledge lifecycle](../../../../docs/development/knowledge-lifecycle.md), [ingestion security](../../../../docs/development/ingestion-security.md), [Knowledge records](../../../../docs/development/data-model.md#knowledge) and [retention](../../../../docs/development/retention-and-deletion.md) remain authoritative. The proposed component split must preserve their accepted behaviour.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](decision-retention-erasure-policy.md). Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.

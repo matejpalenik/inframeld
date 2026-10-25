@@ -40,6 +40,17 @@ Suppose SupportBot has Query on Production and membership in SupportKnowledge. R
 
 Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
 
+## Pending decisions for affected work
+
+Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+
+- [PD-ACCESS-01](references/decision-key-currentness.md): Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
+- [PD-ACCESS-02](references/decision-admitted-work-authority.md): Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-ACCESS-03](references/decision-recovery-production-completion.md): Before wiring production recovery admission/completion callbacks, cleanup orchestration, issuance coordination or block release.
+- [PD-ACCESS-04](references/decision-recovery-first-admission.md): Before implementing first local admission, invitation activation/provisioning or recovery completion that can race with admission.
+- [PD-ACCESS-05](references/decision-provider-secret-lifecycle.md): When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
+- [PD-ACCESS-06](references/decision-setup-read-authority.md): Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
+
 ## Read as needed
 
 - For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).

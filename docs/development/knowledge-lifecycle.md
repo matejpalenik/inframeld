@@ -184,13 +184,19 @@ Leaving a document out of a new revision, changing its audience, and deleting it
 
 | Scenario | Expected outcome |
 | --- | --- |
-| Alice replaces B1 with B2 | New revision uses B2. Older revisions retain B1. |
+| Alice replaces B1 with B2 and an authorized selection includes it | The new collection revision uses B2. Replacing bytes alone does not select a corpus. Older revisions retain B1. |
 | The same upload is retried | Existing accepted identity may be reused without bypassing permission checks. |
 | S3 lists an unchanged ETag | Treat it as a provider marker, not necessarily a content hash. |
 | A source disappears | A new corpus may omit it. Old revision membership is unchanged. |
 | Parsing succeeds but indexing fails | Source admission remains distinct from readiness and publication. |
 | Deletion races a build | The tombstone prevents late publication or disclosure. |
 | An upload default is changed | Existing document audiences do not change. |
+
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../.agents/skills/inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
 
 <a id="decision-map"></a>
 

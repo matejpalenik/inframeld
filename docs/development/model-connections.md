@@ -581,6 +581,14 @@ Increasing or removing a limit also preserves consumed amounts and unresolved ob
 
 Connection TOML exports only current supported non-secret access settings and authentication requirements. Credentials are separately provisioned and consumer model settings remain with profiles/pipelines/evaluators. [Configuration portability](configuration-portability.md) preserves ordinary live-impact and embedding guards during import.
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-ACCESS-05: Implement and qualify the selected provider-secret lifecycle](../../.agents/skills/inframeld-access-models/references/decision-provider-secret-lifecycle.md). When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
+- [PD-CONTRACTS-01: Enforce model policy on the actual outbound path](../../.agents/skills/inframeld-application-contracts/references/decision-gateway-enforcement.md). Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
+- [PD-CONTRACTS-02: Coordinate budget policy, reservations and uncertain settlement](../../.agents/skills/inframeld-application-contracts/references/decision-spending-coordination.md). Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery.
+
 <a id="decision-map"></a>
 
 ## 9. Decision and reference map

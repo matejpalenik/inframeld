@@ -36,6 +36,14 @@ Generation proposes cases. Review decides which revisions are suitable. Evaluati
 
 Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
 
+## Pending decisions for affected work
+
+Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+
+- [PD-EVALUATION-01](references/decision-case-review-contracts.md): Before implementing case generation/review commands, revision preconditions, local acceptance or their public result contracts.
+- [PD-EVALUATION-02](references/decision-run-and-result-contracts.md): Before defining run/comparison inputs, durable progress, scoring outcomes, result inspection or summary/export schemas.
+- [PD-EVALUATION-03](references/decision-ragas-integration-and-calibration.md): Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.
+
 ## Read as needed
 
 - For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).

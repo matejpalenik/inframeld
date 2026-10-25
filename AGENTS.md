@@ -88,6 +88,10 @@ Before drafting a PR title/description or creating a PR, read [.github/PULL_REQU
 
 For authorized domain changes, update the current guide, affected record sections, navigation and relevant skill together. Architectural choice changes receive a superseding ADR using [the template](docs/adr/template.md), preserving and cross-linking earlier rationale. Ordinary corrections/navigation may update an existing ADR. Never turn proposed or untested design into an implemented guarantee.
 
+### Resolve architecture decisions when needed
+
+Before proposing code or implementing a contract that depends on a pending decision, read the matching reference in the owning skill. Explain why its trigger applies, the alternatives, recommendation and affected owners. Follow [the just-in-time workflow](docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits. Reconcile guides, records, ADRs, skill references and affected diagrams, then perform the repository-wide consistency pass before dependent implementation. Surface conflicts instead of silently changing accepted decisions. Unrelated pending decisions do not block work. Qualification gaps do not prohibit evidence-gathering tests. Approval of a proposal or its documentation does not authorize application edits.
+
 ### Offer and maintain skill updates
 
 Apply [Agent Skills](https://agentskills.io/skill-creation/best-practices), [Anthropic](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) and [OpenAI](https://developers.openai.com/plugins/build/skills) authoring principles: focused scope, concise core instructions, conditional references, concrete examples and realistic validation.

@@ -54,3 +54,10 @@ Default presets and flexible first-answer timing cannot weaken readiness. Unsupp
 - [Indexing model](../../../../docs/development/indexing.md#model), [readiness](../../../../docs/development/indexing.md#build), [profile portability](../../../../docs/development/indexing.md#portable-profiles), [embedding compatibility](../../../../docs/development/indexing.md#embedding-compatibility) and [records](../../../../docs/development/data-model.md#indexing).
 - [Ingestion security](../../../../docs/development/ingestion-security.md), [model connections](../../../../docs/development/model-connections.md), [passage identity](../../../../docs/development/evaluation.md#passages), [Evaluation records](../../../../docs/development/data-model.md#evaluation) and [configuration portability](../../../../docs/development/configuration-portability.md).
 - [ADR-0009](../../../../docs/adr/ADR-0009-keep-application-authority-in-postgresql-and-derived-vectors-in-chroma.md), [ADR-0010](../../../../docs/adr/ADR-0010-save-deterministic-layouts-for-vector-shards.md), [ADR-0040](../../../../docs/adr/ADR-0040-bind-pipeline-versions-to-verified-profile-specific-materializations.md), [ADR-0052](../../../../docs/adr/ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md) and [ADR-0054](../../../../docs/adr/ADR-0054-use-shared-current-model-connections.md).
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-INDEXING-03: Keep source passage identity stable when chunking changes](decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
+- [PD-INDEXING-05: Select and prove a bounded parser runtime](decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.

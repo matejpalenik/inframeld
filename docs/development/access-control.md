@@ -182,7 +182,7 @@ flowchart TB
 
 **Access owns the permission rules.** An application use case, such as answering a question, asks Access for permission as it carries out the work. An adapter translates between application concepts and an external system. For example, the Kratos adapter checks a session, and the vector adapter turns the permitted document selection into search filters. HTTP endpoints, MCP tools, and workers use the same Access rules. Indexing, pipeline configuration, and model-provider integration keep their own responsibilities.
 
-The verified caller travels in an application-owned **access context**. The current implementation retains only `PrincipalId`; typed operation inputs separately identify the project or resource. It is not a raw Kratos response, database object, or permission list supplied by a client. V1 integrations act as their application account. Acting on behalf of a separately verified person is a future feature.
+The verified caller travels in an application-owned **access context**. The current implementation carries the actor’s `PrincipalId` and complete non-secret authentication evidence under [ADR-0073](../adr/ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md). It retains no account-state or permission snapshot. Typed operation inputs separately identify the project or resource. It is not a raw Kratos response, database object, or permission list supplied by a client. V1 integrations act as their application account. Acting on behalf of a separately verified person is a future feature.
 
 <a id="section-use-kratoss-browser-session-flow-for-studio"></a> <a id="section-include-deployment-level-external-sign-in-in-oss-v1"></a>
 
@@ -1301,6 +1301,17 @@ These are acceptance cases to verify, not a claim that the tests already pass:
 | Delete a Document, application, or project. | Each operation respects its own limits, cleanup, and handover rules. |
 
 Test behavior and database integrity against the supported deployment. Code-layout checks, library selection, and accepted ADRs are not evidence that security behavior or integrations work.
+
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-ACCESS-01: Check application-key currentness at the right boundary](../../.agents/skills/inframeld-access-models/references/decision-key-currentness.md). Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
+- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../.agents/skills/inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-ACCESS-03: Prove recovery cleanup before releasing product access](../../.agents/skills/inframeld-access-models/references/decision-recovery-production-completion.md). Before wiring production recovery admission/completion callbacks, cleanup orchestration, issuance coordination or block release.
+- [PD-ACCESS-04: Coordinate first account admission with identity recovery](../../.agents/skills/inframeld-access-models/references/decision-recovery-first-admission.md). Before implementing first local admission, invitation activation/provisioning or recovery completion that can race with admission.
+- [PD-ACCESS-05: Implement and qualify the selected provider-secret lifecycle](../../.agents/skills/inframeld-access-models/references/decision-provider-secret-lifecycle.md). When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
+- [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../.agents/skills/inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
 
 <a id="decision-map"></a>
 

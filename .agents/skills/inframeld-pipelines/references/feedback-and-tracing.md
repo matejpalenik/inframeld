@@ -42,3 +42,9 @@ These are accepted product and display rules. Do not infer new storage, schemas,
 - [Feedback](../../../../docs/development/answer-feedback.md), [authority](../../../../docs/development/answer-feedback.md#authorization), [reporting](../../../../docs/development/answer-feedback.md#reporting), [Access tracing](../../../../docs/development/access-control.md#trace-authority) and [observability](../../../../docs/development/observability.md).
 - [CLI delivery](../../../../docs/development/cli-delivery-plan.md), [CLI feedback capability](https://github.com/matejpalenik/inframeld/issues/191), [non-query diagnostic deferral](../../../../docs/development/observability.md#non-query-diagnostics) and [retention/deletion](../../../../docs/development/retention-and-deletion.md).
 - [ADR-0043](../../../../docs/adr/ADR-0043-keep-one-current-feedback-rating-per-answer-and-originating-principal.md) explains one current rating. The exact catalogue and creator assignments remain with [Access contracts](../../../../docs/development/access-contracts.md).
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-PIPELINES-02: Make a confirmed trace opt-out stop later capture and delivery](decision-trace-policy-fencing.md). Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.

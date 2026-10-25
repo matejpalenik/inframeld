@@ -42,3 +42,11 @@ Publication modes and concurrency guards are accepted design. Scores, feedback, 
 
 - [Publication modes](../../../../docs/development/pipelines-and-releases.md#modes), [Pipelines and Releases](../../../../docs/development/pipelines-and-releases.md), [Release records](../../../../docs/development/data-model.md#releases), [onboarding](../../../../docs/development/onboarding.md), [Access](../../../../docs/development/access-control.md) and [creator assignments](../../../../docs/development/access-contracts.md#initial-assignments).
 - [Jobs and idempotency](../../../../docs/development/jobs-and-idempotency.md), [shared connections](../../../../docs/development/model-connections.md#shared-current), [ADR-0033](../../../../docs/adr/ADR-0033-separate-build-readiness-from-release-authority.md), [ADR-0040](../../../../docs/adr/ADR-0040-bind-pipeline-versions-to-verified-profile-specific-materializations.md), [ADR-0047](../../../../docs/adr/ADR-0047-support-reversible-publication-modes-per-deployment.md) and [ADR-0054](../../../../docs/adr/ADR-0054-use-shared-current-model-connections.md).
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-RELEASES-01: Persist Deployment transitions with one shared control check](decision-deployment-state-and-concurrency.md). Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding.
+- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.

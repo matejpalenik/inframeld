@@ -32,3 +32,11 @@ Evaluation supplies offline evidence, not release authority. Historic scores kee
 
 - [Passages](../../../../docs/development/evaluation.md#passages), [metrics](../../../../docs/development/evaluation.md#metrics), [human calibration](../../../../docs/development/evaluation.md#qualification), [result presentation](../../../../docs/development/evaluation.md#result-presentation), [Indexing](../../../../docs/development/indexing.md) and [Evaluation records](../../../../docs/development/data-model.md#evaluation).
 - [ADR-0051](../../../../docs/adr/ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md) owns the selected claim-based metric, gateway boundary and qualification limits.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-INDEXING-03: Keep source passage identity stable when chunking changes](../../inframeld-indexing/references/decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
+- [PD-EVALUATION-02: Coordinate fixed runs and expose honest protected results](decision-run-and-result-contracts.md). Before defining run/comparison inputs, durable progress, scoring outcomes, result inspection or summary/export schemas.
+- [PD-EVALUATION-03: Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.

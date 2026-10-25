@@ -172,3 +172,9 @@ After linking and review, optional evaluation uses the exact intended case set t
 Specification gates must settle exact schemas/defaults, semantic equivalence, coordinate proof, capability/target mapping, revision review and recovery output. Runtime gates must cover complete round trips, local overwrite races, concurrent destination edits, expired authority, uncertain writes, interrupted imports, retained local edits, hidden sources, erasure and every supported resource. Exported copies already downloaded cannot be recalled across installations.
 
 See [CLI delivery](cli-delivery-plan.md), [resource identities](data-model.md#resource-naming), [model connections](model-connections.md#shared-current), [jobs](jobs-and-idempotency.md) and [Definition of Done](definition-of-done.md).
+
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-CONTRACTS-04: Bind import review and partial recovery to exact actions](../../.agents/skills/inframeld-application-contracts/references/decision-import-review-and-recovery.md). Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery.

@@ -26,3 +26,9 @@ The guide owns the accepted filter, recall, resource and failure qualification p
 
 - [Indexing retrieval](../../../../docs/development/indexing.md), [current Access](../../../../docs/development/access-control.md), [exact membership records](../../../../docs/development/data-model.md#indexing) and [query execution](../../../../docs/development/pipelines-and-releases.md).
 - [Maintainer checks](../../../../docs/development/indexing.md#maintainer-checks), [Knowledge corpus](../../../../docs/development/knowledge-lifecycle.md#corpus) and [retention](../../../../docs/development/retention-and-deletion.md).
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-INDEXING-02: Define what current index health can actually detect](decision-health-observation.md). Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.

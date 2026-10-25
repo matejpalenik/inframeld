@@ -407,6 +407,15 @@ Measure uploads, reads, limited-size manifest operations, repeated small-corpus 
 
 A large sequential-transfer result does not predict thousands of small manifest operations. Parsing, embedding, or Chroma may dominate total build time, but that remains an assumption until measured.
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-ARCHITECTURE-01: Select a measured supported workload and resource envelope](../../.agents/skills/inframeld-architecture/references/decision-supported-operating-envelope.md). Before fixing production resource/admission limits or advertising supported corpus size, throughput, latency or concurrency.
+- [PD-ARCHITECTURE-02: Match availability and recovery claims to the supported deployment](../../.agents/skills/inframeld-architecture/references/decision-availability-backup-and-restore.md). When setting availability/recovery objectives, assembling the production topology or qualifying backup, upgrade, security clearance and restore claims.
+- [PD-INDEXING-05: Select and prove a bounded parser runtime](../../.agents/skills/inframeld-indexing/references/decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
+- [PD-CONTRACTS-01: Enforce model policy on the actual outbound path](../../.agents/skills/inframeld-application-contracts/references/decision-gateway-enforcement.md). Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
+
 <a id="decision-map"></a>
 
 ## 8. Decision and reference map

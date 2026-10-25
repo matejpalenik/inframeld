@@ -293,6 +293,13 @@ These are acceptance requirements, not evidence that the implementation has pass
 
 The checks above express accepted requirements. Backup timing proposals, future organization packaging, and finer access-control lists are separate work.
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](../../.agents/skills/inframeld-knowledge/references/decision-retention-erasure-policy.md). Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.
+- [PD-INDEXING-04: Qualify frozen storage retries and final erasure barriers](../../.agents/skills/inframeld-indexing/references/decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
+
 <a id="decision-map"></a>
 
 ## 8. Decision and reference map

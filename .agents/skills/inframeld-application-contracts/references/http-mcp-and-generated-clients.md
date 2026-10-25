@@ -36,3 +36,10 @@ The application-connection wizard uses ordinary account/grant/key operations. It
 
 - [API contracts](../../../../docs/development/api-contracts.md), [MCP](../../../../docs/development/mcp.md), [error handling](../../../../docs/development/error-handling.md), [error maintainer reference](../../../../docs/development/error-handling-reference.md), [pagination](../../../../docs/development/pagination.md) and [CLI delivery](../../../../docs/development/cli-delivery-plan.md).
 - [ADR-0003](../../../../docs/adr/ADR-0003-generate-the-authoritative-openapi-contract-from-backend-code.md), [ADR-0006](../../../../docs/adr/ADR-0006-use-official-generated-clients-for-application-api-access.md), [ADR-0053](../../../../docs/adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md), [ADR-0055](../../../../docs/adr/ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md) and [Access contracts](../../../../docs/development/access-contracts.md).
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-CONTRACTS-03: Define supported CLI and server release combinations](decision-cli-server-compatibility.md). Before distributing independently installable CLI/runtime releases or making a compatibility-sensitive public contract change.
+- [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.

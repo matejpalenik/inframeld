@@ -91,3 +91,13 @@ Read [profiles and preparation](profiles-and-preparation.md), [frozen vector ret
 [ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) accepts focused preparation/readiness, retrieval and numerical retirement capabilities. The [owning guide](../../../../docs/development/indexing.md#indexing-capability-boundaries) retains exact trusted-input/binding contracts, current-health obligations, unavailable outcomes and cleanup coordination still to specify. The selected engine, frozen-byte retries and qualification limits remain in force.
 
 [The Indexing guide](../../../../docs/development/indexing.md), [Indexing records](../../../../docs/development/data-model.md#indexing), [model connections](../../../../docs/development/model-connections.md) and [ingestion security](../../../../docs/development/ingestion-security.md) own the accepted protocols and qualification limits.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-INDEXING-01: Exchange complete prepared bindings between Indexing capabilities](decision-capability-binding-contracts.md). Before defining preparation, retrieval or retirement application ports and their complete input/result records.
+- [PD-INDEXING-02: Define what current index health can actually detect](decision-health-observation.md). Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
+- [PD-INDEXING-03: Keep source passage identity stable when chunking changes](decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
+- [PD-INDEXING-04: Qualify frozen storage retries and final erasure barriers](decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
+- [PD-INDEXING-05: Select and prove a bounded parser runtime](decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.

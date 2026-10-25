@@ -71,3 +71,10 @@ Recovery never clears suspension, recreates removed permissions or lets an older
 - [Bulk Hydra evidence](../../../../docs/development/access-control.md#hydra-cleanup-evidence), [discovery observations](../../../../docs/development/access-control.md#hydra-discovery-evidence), [issuance ordering](../../../../docs/development/access-control.md#hydra-issuance-evidence), [password-reset observations](../../../../docs/development/access-control.md#kratos-password-reset-evidence) and [reconciliation](../../../../docs/development/jobs-and-idempotency.md#identity-cleanup).
 - [ADR-0058](../../../../docs/adr/ADR-0058-block-product-access-during-identity-recovery-cleanup.md), [ADR-0069](../../../../docs/adr/ADR-0069-release-completed-recovery-obligations-independently.md), [ADR-0070](../../../../docs/adr/ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md) and [ADR-0072](../../../../docs/adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md).
 - [Private recovery handoff](../../../../docs/development/access-contracts.md#recovery-wire) remains a delivery draft, not a new public recovery bypass.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-ACCESS-03: Prove recovery cleanup before releasing product access](decision-recovery-production-completion.md). Before wiring production recovery admission/completion callbacks, cleanup orchestration, issuance coordination or block release.
+- [PD-ACCESS-04: Coordinate first account admission with identity recovery](decision-recovery-first-admission.md). Before implementing first local admission, invitation activation/provisioning or recovery completion that can race with admission.

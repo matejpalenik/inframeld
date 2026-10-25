@@ -149,3 +149,9 @@ Bound span/event size, retained content, query windows, exporter queues and reso
 Test permitted application inspection and denied application policy changes, denied unauthorized humans, separate deletion permission and access revoked before disclosure or commit. Also cover automatic expiry, source cleanup and imports that preserve or explicitly apply policies.
 
 These are requirements for future tests, not evidence that product tests ran. This guide selects no new trace engine, physical table, permission identifier, endpoint or external connector.
+
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-PIPELINES-02: Make a confirmed trace opt-out stop later capture and delivery](../../.agents/skills/inframeld-pipelines/references/decision-trace-policy-fencing.md). Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.

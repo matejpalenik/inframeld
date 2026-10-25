@@ -34,3 +34,9 @@ These are accepted protocols. Use the guide's backend-contract, failure and reso
 
 - [Frozen vector retries](../../../../docs/development/indexing.md#retries), [Indexing qualification](../../../../docs/development/indexing.md), [jobs and idempotency](../../../../docs/development/jobs-and-idempotency.md) and [retirement](../../../../docs/development/indexing.md#retirement).
 - [ADR-0011](../../../../docs/adr/ADR-0011-retry-frozen-vector-identities-and-payloads.md) explains why retries freeze both identity and payload. [ADR-0010](../../../../docs/adr/ADR-0010-save-deterministic-layouts-for-vector-shards.md) explains saved layouts.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-INDEXING-04: Qualify frozen storage retries and final erasure barriers](decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.

@@ -113,3 +113,5 @@ The index contains 79 records. ADR-0001 through ADR-0048 retain the numbering es
 Use the [ADR template](template.md) and [documentation-maintenance guide](../development/documentation-maintenance.md). Keep current IDs stable; a changed architectural choice receives a new superseding record. Ordinary corrections and navigation improvements may amend an existing record.
 
 The nine [skill reading routes](../development/documentation-maintenance.md#skill-reading-routes) lead to current guides. Documentation work does not authorize paid trials, code changes or migrations. Markdown and link checks establish editorial integrity, not runtime behavior. The [delivery plan](../development/cli-delivery-plan.md) tracks implementation and qualification separately.
+
+Pending analyses are discoverable through [the existing module map](../../.agents/skills/inframeld-architecture/references/module-map.md#pending-decision-navigation). They reserve no ADR numbers and do not change accepted decisions. Resolve relevant choices through [the just-in-time approval and consistency workflow](../development/documentation-maintenance.md#just-in-time-architecture-decisions).

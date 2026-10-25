@@ -37,6 +37,13 @@ Uploaded, admitted, parsed and searchable are different milestones. Admission me
 
 Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
 
+## Pending decisions for affected work
+
+Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+
+- [PD-KNOWLEDGE-01](references/decision-complete-batch-handoff.md): Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-KNOWLEDGE-02](references/decision-retention-erasure-policy.md): Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.
+
 ## Read as needed
 
 - For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).

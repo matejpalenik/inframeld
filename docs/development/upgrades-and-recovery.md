@@ -394,6 +394,13 @@ Operator availability, ready replacement resources, recoverable keys, and off-ho
 
 **These tests remain to be performed.** Keep the figures provisional until representative results support them. Recording estimates neither proves them nor selects a broader backup architecture.
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-ARCHITECTURE-02: Match availability and recovery claims to the supported deployment](../../.agents/skills/inframeld-architecture/references/decision-availability-backup-and-restore.md). When setting availability/recovery objectives, assembling the production topology or qualifying backup, upgrade, security clearance and restore claims.
+- [PD-ACCESS-05: Implement and qualify the selected provider-secret lifecycle](../../.agents/skills/inframeld-access-models/references/decision-provider-secret-lifecycle.md). When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
+
 <a id="decision-map"></a>
 
 ## 9. Decision and reference map

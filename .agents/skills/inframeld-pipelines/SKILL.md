@@ -35,6 +35,13 @@ Alice can evaluate two fixed configurations before building. Desired changes mus
 
 Before domain-specific backend component design, code generation or structural review, read [this module's architecture](references/architecture.md) and the relevant workflow, together with Coding Standards. Its accepted design, inspected implementation and proposals have different status. Resolve a pending architectural choice before suggesting code that depends on it. Behaviour-only questions can go directly to their workflow.
 
+## Pending decisions for affected work
+
+Read only entries whose triggers match the proposed design, code suggestion or implementation. Explain the unresolved choice and discuss it with the developer before code depends on it. Qualification gaps gate the stated claims, not tests needed to gather evidence. Follow [the approval and consistency workflow](../../../docs/development/documentation-maintenance.md#just-in-time-architecture-decisions). Unrelated entries do not block work.
+
+- [PD-PIPELINES-01](references/decision-execution-build-receipt-contracts.md): Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
+- [PD-PIPELINES-02](references/decision-trace-policy-fencing.md): Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.
+
 ## Read as needed
 
 - For module responsibilities, collaborators, data ownership or component design/review, read [Architecture](references/architecture.md).

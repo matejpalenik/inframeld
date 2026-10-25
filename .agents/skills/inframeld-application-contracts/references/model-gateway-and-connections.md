@@ -73,3 +73,11 @@ These are accepted shared execution boundaries. Concrete actions, schemas, stora
 - [Model connections](../../../../docs/development/model-connections.md), [shared access](../../../../docs/development/model-connections.md#shared-current), [dispatch freshness](../../../../docs/development/model-connections.md#dispatch-freshness), [roles](../../../../docs/development/model-connections.md#roles), [metadata](../../../../docs/development/model-connections.md#model-metadata) and [spending](../../../../docs/development/model-connections.md#spending).
 - [Embedding compatibility](../../../../docs/development/indexing.md#embedding-compatibility), [connection records](../../../../docs/development/data-model.md#shared-current-connections), [validation records](../../../../docs/development/data-model.md#model-validation-evidence), [observability](../../../../docs/development/observability.md) and [portability](../../../../docs/development/configuration-portability.md).
 - [ADR-0050](../../../../docs/adr/ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md), [ADR-0051](../../../../docs/adr/ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md) and [ADR-0054](../../../../docs/adr/ADR-0054-use-shared-current-model-connections.md).
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-CONTRACTS-01: Enforce model policy on the actual outbound path](decision-gateway-enforcement.md). Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
+- [PD-CONTRACTS-02: Coordinate budget policy, reservations and uncertain settlement](decision-spending-coordination.md). Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery.
+- [PD-ACCESS-05: Implement and qualify the selected provider-secret lifecycle](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md). When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.

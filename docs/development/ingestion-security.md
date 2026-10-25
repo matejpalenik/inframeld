@@ -80,7 +80,7 @@ Keep the existing typed internal contracts:
 | --- | --- |
 | **`DocumentProcessor`** | Document conversion, with a built-in adapter. |
 | **`Chunker`** | Bounded chunk production, with a built-in adapter. |
-| **`Reranker`** | Candidate scoring/ordering, with the built-in cross-encoder and explicit `none` choices. |
+| **`Reranker`** | Candidate scoring/ordering, with explicit local cross-encoder, hosted and `none` choices under [ADR-0056](../adr/ADR-0056-support-explicit-local-hosted-or-disabled-reranking.md). Hosted calls retain ModelGateway enforcement. |
 | **`PipelineHook`** | A synchronous, blocking stage contract with explicit timeout, egress, and failure behavior. It is not a privileged arbitrary-code runtime. |
 | **`WebhookDispatcher`** | An asynchronous notification contract. Subscriptions and delivery remain deferred. |
 
@@ -269,6 +269,12 @@ Test on the real supported host with the pinned deployment artifact. Report the 
 These are release criteria. They have not been performed by this documentation change.
 
 Also verify source locations and stable identities for fixed inputs, missing assets, changed profiles, and the text-first default without OCR or a judge. The [reranker guide](pipelines-and-releases.md#reranking) covers its score checks, local limits, and example fixture. A selected cross-encoder must never silently fall back to `none`.
+
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-INDEXING-05: Select and prove a bounded parser runtime](../../.agents/skills/inframeld-indexing/references/decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
 
 <a id="decision-map"></a>
 

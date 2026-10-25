@@ -533,6 +533,13 @@ The following acceptance cases verify the behavior above. They are implementatio
 | **Automatic updates and aliases** | Superseded work cannot publish, lost publication acknowledgements do not repeat transitions, and alias changes do not turn retries into new queries. |
 | **Restore** | Restored queue state does not automatically authorize replay when later provider activity may be missing from the backup. |
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../.agents/skills/inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-CONTRACTS-05: Qualify cleanup and recovery under a full bounded queue](../../.agents/skills/inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md). When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation.
+
 <a id="decision-map"></a>
 
 ## 9. Decision and reference map

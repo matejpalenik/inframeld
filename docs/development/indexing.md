@@ -611,6 +611,16 @@ Keep temporary saved batches for the required retry period, and keep unresolved-
 
 Default onboarding uses this same build process. Creating default records does not make them ready. A real EmbeddingProfile still needs configured model settings. Changing publication mode may leave a ready build unpublished, which does not change Indexing's responsibility.
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-INDEXING-01: Exchange complete prepared bindings between Indexing capabilities](../../.agents/skills/inframeld-indexing/references/decision-capability-binding-contracts.md). Before defining preparation, retrieval or retirement application ports and their complete input/result records.
+- [PD-INDEXING-02: Define what current index health can actually detect](../../.agents/skills/inframeld-indexing/references/decision-health-observation.md). Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
+- [PD-INDEXING-03: Keep source passage identity stable when chunking changes](../../.agents/skills/inframeld-indexing/references/decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
+- [PD-INDEXING-04: Qualify frozen storage retries and final erasure barriers](../../.agents/skills/inframeld-indexing/references/decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
+- [PD-INDEXING-05: Select and prove a bounded parser runtime](../../.agents/skills/inframeld-indexing/references/decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
+
 <a id="decision-map"></a>
 
 ## 8. Decision and reference map

@@ -26,3 +26,10 @@ The guide owns routing, limits, failure, network and human-calibration qualifica
 
 - [Gateway adapters and pinned source evidence](../../../../docs/development/evaluation.md#gateway), [Evaluation qualification](../../../../docs/development/evaluation.md#qualification), [Model connections](../../../../docs/development/model-connections.md), [Jobs](../../../../docs/development/jobs-and-idempotency.md) and [maintainer checks](../../../../docs/development/evaluation.md#maintainer-checks).
 - [ADR-0051](../../../../docs/adr/ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md) and [CLI delivery](../../../../docs/development/cli-delivery-plan.md) preserve application ownership and remaining qualification.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-EVALUATION-03: Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.
+- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.

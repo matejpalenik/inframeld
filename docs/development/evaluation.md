@@ -441,6 +441,15 @@ In **Automatic updates**, an authorized live-input source operation or explicit 
 | Candidate judge fails once | Show failure and smaller paired coverage, not a false improvement. |
 | Disable project tracing | No library export bypass; explicit evaluation records have their separately disclosed lifecycle. |
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-EVALUATION-01: Define exact case generation and review operations](../../.agents/skills/inframeld-evaluation/references/decision-case-review-contracts.md). Before implementing case generation/review commands, revision preconditions, local acceptance or their public result contracts.
+- [PD-EVALUATION-02: Coordinate fixed runs and expose honest protected results](../../.agents/skills/inframeld-evaluation/references/decision-run-and-result-contracts.md). Before defining run/comparison inputs, durable progress, scoring outcomes, result inspection or summary/export schemas.
+- [PD-EVALUATION-03: Qualify embedded Ragas without hidden calls or false confidence](../../.agents/skills/inframeld-evaluation/references/decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.
+- [PD-INDEXING-03: Keep source passage identity stable when chunking changes](../../.agents/skills/inframeld-indexing/references/decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
+
 <a id="decision-map"></a>
 
 ## 12. Decisions and scope

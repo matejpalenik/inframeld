@@ -35,3 +35,10 @@ The erasure and audience rules are accepted design. Exact retention periods and 
 - [Retention and deletion](../../../../docs/development/retention-and-deletion.md), [blocking before cleanup](../../../../docs/development/retention-and-deletion.md#operation), [Knowledge sharing](../../../../docs/development/knowledge-lifecycle.md) and [Access group managers](../../../../docs/development/access-control.md#group-managers).
 - [Group relationship constraint](../../../../docs/development/data-model.md#group-manager-membership-constraint), [protected evaluation history](../../../../docs/development/evaluation.md#history) and [Indexing retirement](../../../../docs/development/indexing.md#retirement).
 - [Maintainer lifecycle checks](../../../../docs/development/knowledge-lifecycle.md#maintainer-checks) cover replacement, retry, changed audiences and deletion races.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](decision-retention-erasure-policy.md). Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.
+- [PD-INDEXING-04: Qualify frozen storage retries and final erasure barriers](../../inframeld-indexing/references/decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.

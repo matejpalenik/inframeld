@@ -42,3 +42,11 @@ All commands remain scriptable with descriptive dry-run behavior, while exact wi
 
 - [CLI context](../../../../docs/development/api-contracts.md#cli-context), [configuration portability](../../../../docs/development/configuration-portability.md), [jobs and recovery](../../../../docs/development/jobs-and-idempotency.md), [shared change presentation](../../../../docs/development/api-contracts.md#cli-change-presentation) and [Pipeline change review](../../../../docs/development/pipelines-and-releases.md#change-review).
 - [CLI delivery](../../../../docs/development/cli-delivery-plan.md), [resource names](../../../../docs/development/data-model.md#resource-naming), [Evaluation transfer](../../../../docs/development/evaluation.md#dataset-portability), [Access automation](../../../../docs/development/access-control.md#cli-automation-authority) and [Access contracts](../../../../docs/development/access-contracts.md).
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-CONTRACTS-04: Bind import review and partial recovery to exact actions](decision-import-review-and-recovery.md). Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery.
+- [PD-CONTRACTS-03: Define supported CLI and server release combinations](decision-cli-server-compatibility.md). Before distributing independently installable CLI/runtime releases or making a compatibility-sensitive public contract change.
+- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.

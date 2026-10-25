@@ -40,3 +40,9 @@ These are accepted admission, permission and sync boundaries. Exact public schem
 - [Admission and replacement](../../../../docs/development/knowledge-lifecycle.md#admission), [Knowledge lifecycle](../../../../docs/development/knowledge-lifecycle.md), [ingestion security](../../../../docs/development/ingestion-security.md) and [jobs/retries](../../../../docs/development/jobs-and-idempotency.md).
 - [Private onboarding](../../../../docs/development/onboarding.md), [Access rules](../../../../docs/development/access-control.md), [portable sources](../../../../docs/development/knowledge-lifecycle.md#portable-knowledge) and [Access contracts](../../../../docs/development/access-contracts.md).
 - [Indexing](../../../../docs/development/indexing.md) owns preparation and [deployment](../../../../docs/development/deployment.md) owns artifact publication boundaries.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.

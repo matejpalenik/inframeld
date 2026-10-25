@@ -384,6 +384,13 @@ Use real PostgreSQL tests for simultaneous changes and the existing adapter-veri
 
 Client **parity** means that HTTP, Studio, SDKs, and MCP observe the same application behavior and state. They do not implement separate versions of the workflow.
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../.agents/skills/inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
+- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../.agents/skills/inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+
 <a id="decision-map"></a>
 
 ## 9. Decision and reference map

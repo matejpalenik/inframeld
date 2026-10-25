@@ -69,3 +69,10 @@ MCP retains the accepted preconfigured, header-capable two-tool profile without 
 - [Application authority](../../../../docs/development/access-control.md#applications), [key recognition](../../../../docs/development/access-control.md#application-key-prefix), [full verification/lifetimes](../../../../docs/development/access-control.md#application-key-contract), [key input](../../../../docs/development/access-control.md#cli-application-key-input) and [credential dispatch](../../../../docs/development/access-control.md#credential-dispatch).
 - [Secret retry contract](../../../../docs/development/jobs-and-idempotency.md), [Access key lifecycle](../../../../docs/development/access-contracts.md#key-lifecycle), [identity records](../../../../docs/development/data-model.md#access) and [MCP authentication](../../../../docs/development/mcp.md#authentication).
 - [ADR-0017](../../../../docs/adr/ADR-0017-let-valid-application-keys-use-current-account-permissions.md) explains current permissions. [ADR-0018](../../../../docs/adr/ADR-0018-use-opaque-expiring-and-revocable-application-credentials.md) explains opaque, expiring, revocable credentials.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-ACCESS-01: Check application-key currentness at the right boundary](decision-key-currentness.md). Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
+- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.

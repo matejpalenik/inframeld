@@ -457,6 +457,13 @@ Before release, run the SupportBot journey inside Inframeld while a separate cus
 | Studio makes a server-side request | It preserves the current user's context without a shared administrator key. |
 | An answer response is lost | The documented retry returns the original receipt outcome, without another paid query. |
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-CONTRACTS-03: Define supported CLI and server release combinations](../../.agents/skills/inframeld-application-contracts/references/decision-cli-server-compatibility.md). Before distributing independently installable CLI/runtime releases or making a compatibility-sensitive public contract change.
+- [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../.agents/skills/inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
+
 <a id="decision-map"></a>
 
 ## 6. Decision and reference map

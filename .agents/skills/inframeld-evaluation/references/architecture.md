@@ -94,3 +94,11 @@ Read [generation and review](generation-and-review.md), [benchmarks and comparis
 [ADR-0078](../../../../docs/adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md) accepts focused case generation/review operations, run/comparison coordination and scoring adapters. The [owning guide](../../../../docs/development/evaluation.md#evaluation-operation-boundaries) retains exact case/run, per-metric, protected-result and bounded-progress contracts still to specify. Ragas remains embedded, with runtime integration and calibration still unqualified.
 
 [Evaluation](../../../../docs/development/evaluation.md), [Evaluation records](../../../../docs/development/data-model.md#evaluation), [jobs](../../../../docs/development/jobs-and-idempotency.md) and [model connections](../../../../docs/development/model-connections.md) own accepted behaviour and qualification.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-EVALUATION-01: Define exact case generation and review operations](decision-case-review-contracts.md). Before implementing case generation/review commands, revision preconditions, local acceptance or their public result contracts.
+- [PD-EVALUATION-02: Coordinate fixed runs and expose honest protected results](decision-run-and-result-contracts.md). Before defining run/comparison inputs, durable progress, scoring outcomes, result inspection or summary/export schemas.
+- [PD-EVALUATION-03: Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.

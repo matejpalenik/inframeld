@@ -781,6 +781,14 @@ The following are acceptance conditions, not completed test results.
 
 These checks cover the routing and transition contract, including the additional publication-mode races.
 
+## Pending implementation decisions
+
+The accepted rules in this guide remain authoritative. These focused references explain unresolved choices and evidence without accepting their recommendations. Read only the entry whose trigger matches the affected work, following [the just-in-time process](documentation-maintenance.md#just-in-time-architecture-decisions).
+
+- [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](../../.agents/skills/inframeld-pipelines/references/decision-execution-build-receipt-contracts.md). Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
+- [PD-RELEASES-01: Persist Deployment transitions with one shared control check](../../.agents/skills/inframeld-releases/references/decision-deployment-state-and-concurrency.md). Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding.
+- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../.agents/skills/inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+
 <a id="decision-map"></a>
 
 ## 9. Decision and reference map

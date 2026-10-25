@@ -127,3 +127,14 @@ The [logical result](../../../../docs/development/data-model.md#application-key-
 Rejected credentials return no verified result. Recognized verification-dependency availability failures raise `DependencyUnavailableError`, while unexpected failures and cancellation propagate. The [owning guide](../../../../docs/development/access-control.md#application-key-verification-outcomes) defines their service/HTTP translation and retains exact input, temporal lifecycle/coordination and already-admitted job credential details still to resolve. The [current-key authorization section](../../../../docs/development/access-control.md#application-key-current-authorization) records the settled existing-authorizer ownership. This accepted boundary does not establish an implemented authenticator or change the key/evidence contract.
 
 [Access control](../../../../docs/development/access-control.md), [Access contracts](../../../../docs/development/access-contracts.md), [Access records](../../../../docs/development/data-model.md#access) and [the service guide](../../../../docs/development/application-structure.md#service-writing-guide) own the rules. The [architecture decision index](../../../../docs/adr/README.md) owns accepted choices and supersession.
+
+## Pending decisions for dependent implementation
+
+The ordinary behavior above remains owned by its current sources. Before choosing an unresolved implementation contract, load only the matching entry:
+
+- [PD-ACCESS-01: Check application-key currentness at the right boundary](decision-key-currentness.md). Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
+- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-ACCESS-03: Prove recovery cleanup before releasing product access](decision-recovery-production-completion.md). Before wiring production recovery admission/completion callbacks, cleanup orchestration, issuance coordination or block release.
+- [PD-ACCESS-04: Coordinate first account admission with identity recovery](decision-recovery-first-admission.md). Before implementing first local admission, invitation activation/provisioning or recovery completion that can race with admission.
+- [PD-ACCESS-05: Implement and qualify the selected provider-secret lifecycle](decision-provider-secret-lifecycle.md). When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
+- [PD-ACCESS-06: Authorize setup details before a Deployment exists](decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
