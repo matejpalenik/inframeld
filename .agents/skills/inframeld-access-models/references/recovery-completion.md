@@ -2,7 +2,7 @@
 
 Alice saves a replacement password, but Hydra is unavailable. Access keeps her recovery block, saves which cleanup steps remain, and continues the same operation within its budget. Completing one checklist never removes a newer recovery's block.
 
-**Status:** accepted production contract under [ADR-0085](../../../../docs/adr/ADR-0085-bind-password-settings-evidence-to-original-recoveries.md). The aggregate, repository, local completion service and bulk provider adapter exist. Trusted callbacks, durable execution and host continuation remain delivery work in #243–#245.
+**Status:** accepted production contract under [ADR-0085](../../../../docs/adr/ADR-0085-bind-password-settings-evidence-to-original-recoveries.md). The aggregate, repository, local completion service and bulk provider adapter exist. Private native callbacks are implemented under #243. Durable Hydra execution, proof propagation, release and host continuation remain #244–#245.
 
 ## Reading tasks
 
@@ -120,7 +120,7 @@ After Alice's recovery is admitted, [IdentityRecovery](../../../../apps/backend/
 
 Concurrent workers cannot overwrite changed stored progress. The PostgreSQL adapter checks the loaded values as part of the update. A conflict requires rollback and a fresh load before the application decides how to proceed. Reloading does not authorize repeating external revocation. Unchanged saves perform no writes and do not refresh the checklist. [The data model](credential-and-recovery-records.md#identity-cleanup-records) owns exact fields and snapshot lifetime.
 
-The repository is now used by the local completion service below. Repository-only tests arrange domain state directly. They do not qualify trusted provider evidence or real cleanup.
+The repository is used by the local completion service below and the private native notification service. The latter confirms Kratos only and never releases access. Repository-only tests arrange domain state directly. They do not qualify trusted provider evidence or real cleanup.
 
 <a id="recovery-completion-workflow"></a>
 
@@ -138,4 +138,4 @@ After both outcomes are confirmed, an active human's checklist may release its o
 
 An already released duplicate returns its stored cleanup states, timestamp and original operation identity without another save. An unreleased repeat rechecks current local state, including after separate authorized restoration. The result's `has_other_pending_recovery` reports that transaction's observation and grants no permission. Another recovery can be admitted after it commits. Every product request still checks current state.
 
-[Service unit tests](../../../../apps/backend/tests/unit/access/application/services/test_identity_recovery_completion_service.py) and [PostgreSQL tests](../../../../apps/backend/tests/integration/access/test_identity_recovery_completion_postgres.py) cover this local workflow. No production callback or provider-cleanup worker invokes it yet. The test-only Kratos callback probe remains separate. The accepted callback association, trusted native evidence and bounded execution contracts still need implementation and qualification in #243–#245. [PD-ACCESS-03](decision-recovery-production-completion.md) owns the acceptance matrix. Permanent Inframeld rejection of old versions supplies the selected late-issuance protection, not a claim of Hydra-wide inactivity. The bulk Hydra tests qualify provider calls, not the complete recovery workflow.
+[Service unit tests](../../../../apps/backend/tests/unit/access/application/services/test_identity_recovery_completion_service.py) and [PostgreSQL tests](../../../../apps/backend/tests/integration/access/test_identity_recovery_completion_postgres.py) cover this local workflow. No production callback or provider-cleanup worker invokes it yet. The test-only Kratos callback probe remains separate. Private callback association and native Kratos evidence are implemented under #243. Bounded Hydra execution, proof propagation, release and host continuation remain #244–#245. [PD-ACCESS-03](decision-recovery-production-completion.md) owns the acceptance matrix. Permanent Inframeld rejection of old versions supplies the selected late-issuance protection, not a claim of Hydra-wide inactivity. The bulk Hydra tests qualify provider calls, not the complete recovery workflow.

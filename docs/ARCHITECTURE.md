@@ -132,3 +132,5 @@ The ADRs explain choices. Focused skill references explain accepted behavior and
 Human CLI credentials carry a server-owned [credential version](../.agents/skills/inframeld-access-models/references/human-cli-credential-lifecycle.md#human-credential-versions). Recovery permanently invalidates the preceding generation at Inframeld, even when Hydra completes an old approval late. This supplements bulk cleanup and the temporary block. Production recovery completion still requires its own trusted evidence and execution qualification.
 
 For contributor routes, start with [developer documentation](development/README.md). Detailed behavior has one owning skill reference. Older GitHub issue paths may refer to removed historical guides.
+
+The private `recovery-callbacks` process reuses the backend image and Access application code. Kratos sends authenticated native evidence there without traversing the public API. It saves receipts and cleanup handoffs, while provider execution and block release remain separate worker responsibilities. See [ADR-0086](adr/ADR-0086-serve-recovery-notifications-through-a-private-backend-process.md).

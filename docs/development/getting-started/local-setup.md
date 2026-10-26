@@ -374,3 +374,17 @@ Integration tests run the migration command automatically against `.env.test` be
 Do not add migrations to `pnpm dev` or API startup.
 
 Read [testing](../guides/testing.md) next. For accepted production boundaries, see [runtime and networking](../operations/runtime-and-networking.md).
+
+<a id="private-recovery-callbacks"></a>
+
+## Private recovery callbacks
+
+The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects migration `0006_identity_recovery_delivery`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
+
+Supply a dedicated 32 to 256 byte printable ASCII key through `INFRAMELD_RECOVERY_KEY_HOST_FILE`. The mounted regular file must be readable by the container's runtime UID 10001, with mode 0400 or 0600 as seen inside the container. Compose file-backed secrets do not reliably remap host ownership. Provision the correct runtime ownership rather than making the file group/world-readable. Do not reuse an API, database or fingerprint secret.
+
+After configuration, explicitly start it with `podman compose -f compose.dev.yaml --profile recovery up -d --no-deps recovery-callbacks` (use `docker compose` on Docker). This assumes the development database already runs and has been migrated. There is no host-port publication. The process needs `INFRAMELD_DATABASE__*` and `INFRAMELD_RECOVERY__*`, without Hydra or fingerprint configuration.
+
+[The hook overlay example](../../../config/kratos/recovery-hooks.example.yaml) points directly to the private service. Render it into operator-owned protected Kratos configuration, replacing the placeholder with the same dedicated key and merging any existing provider overlay. Never commit that rendered file. Kratos must load both its normal configuration and this overlay. The three Jsonnet templates in `config/kratos/` emit identifiers only. The settings and password-saved templates intentionally repeat their source guards because Kratos forbids Jsonnet imports. Keep both files self-contained and validate both hooks after edits. Keep hook activation explicit until #244 implements Hydra execution, since accepted evidence currently leaves recovery blocked.
+
+For rotation, configure a current file plus optional retiring file and `INFRAMELD_RECOVERY__RETIRING_KEY_ACCEPT_UNTIL` with an explicit timezone. The instantiated file reader loads protected keys at process construction. Restart the callback process to load changed files. Update Kratos to send the current key, then remove the retiring configuration after overlap. No product cookie or bearer token substitutes for the hook key. See [the private contract](../../../.agents/skills/inframeld-access-models/references/private-recovery-handoff.md#recovery-wire).

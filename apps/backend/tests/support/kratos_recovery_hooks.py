@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from tests.support.hydra_token_hook import create_hydra_token_hook_router
+from tests.support.native_recovery_forwarder import create_native_recovery_forwarder_router
 
 RecoveryPhase = Literal["admit", "complete"]
 TEST_RECOVERY_KEY = SecretStr("inframeld-recovery-hook-test-only")
@@ -262,3 +263,5 @@ async def receive_settings(
 
 
 app.include_router(create_hydra_token_hook_router(_require_key))
+
+app.include_router(create_native_recovery_forwarder_router())

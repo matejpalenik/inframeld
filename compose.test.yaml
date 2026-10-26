@@ -232,6 +232,80 @@ services:
         "warning",
       ]
 
+  recovery-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: recovery_delivery_test
+      POSTGRES_USER: recovery_test
+      POSTGRES_PASSWORD: recovery-test-only
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U recovery_test -d recovery_delivery_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  recovery-migrate:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
+    environment: &recovery_environment
+      INFRAMELD_DATABASE__HOST: recovery-postgres
+      INFRAMELD_DATABASE__NAME: recovery_delivery_test
+      INFRAMELD_DATABASE__USER: recovery_test
+      INFRAMELD_DATABASE__PASSWORD: recovery-test-only
+      INFRAMELD_RECOVERY__AUTHORITY: http://kratos-recovery:4433
+      INFRAMELD_RECOVERY__CURRENT_KEY_FILE: /tmp/recovery-hook.key
+    volumes: &recovery_volumes
+      - ./apps/backend/src:/workspace/apps/backend/src:ro
+      - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+      - ./apps/backend/migrations:/workspace/apps/backend/migrations:ro
+      - ./apps/backend/alembic.ini:/workspace/apps/backend/alembic.ini:ro
+    entrypoint:
+      ["python", "-m", "tests.support.recovery_callback_runner", "migrate"]
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      recovery-postgres:
+        condition: service_healthy
+
+  recovery-callbacks:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
+    environment: *recovery_environment
+    volumes: *recovery_volumes
+    entrypoint: ["python", "-m", "tests.support.recovery_callback_runner"]
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      recovery-migrate:
+        condition: service_completed_successfully
+
+  kratos-recovery:
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    environment:
+      SESSION_LIFESPAN: 8h
+    command:
+      [
+        "serve",
+        "-c",
+        "/etc/config/kratos/test.yaml",
+        "-c",
+        "/etc/config/kratos/test-recovery-native.yaml",
+        "--dev",
+        "--watch-courier",
+      ]
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+      recovery-hooks:
+        condition: service_started
+      recovery-callbacks:
+        condition: service_started
+
   integration-tests:
     image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
     pull_policy: never

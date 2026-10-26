@@ -343,7 +343,7 @@ case "${command_name}" in
         else
             test_compose build integration-tests
         fi
-        test_compose up -d postgres mailpit mock-oidc recovery-hooks kratos kratos-expiring hydra hydra-lifetimes
+        test_compose up -d postgres mailpit mock-oidc recovery-hooks kratos kratos-expiring hydra hydra-lifetimes recovery-callbacks kratos-recovery
         ;;
     test-run)
         # Replace this shell so interruption can terminate the Compose process.

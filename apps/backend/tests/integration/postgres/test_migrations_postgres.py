@@ -284,3 +284,92 @@ async def test_version_migration_backfills_linked_and_unlinked_identities_withou
             assert set(await session.scalars(select(HumanCredentialVersionRow.version))) == {6}
     finally:
         await database.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_delivery_migration_preserves_prior_recovery_without_inventing_evidence(
+    temporary_postgres_settings: DatabaseSettings,
+) -> None:
+    from uuid import uuid4
+
+    from alembic import command
+    from alembic.config import Config
+
+    from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
+        IdentityRecoveryEventKind,
+    )
+    from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
+        HumanCredentialVersionRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
+        IdentityRecoveryAdmissionRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_cleanup_job_row import (
+        IdentityRecoveryCleanupJobRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_cleanup_run_row import (
+        IdentityRecoveryCleanupRunRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_evidence_receipt_row import (
+        IdentityRecoveryEvidenceReceiptRow,
+    )
+    from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
+        PostgresInstallationIdentityReader,
+    )
+
+    config = Config(str(BACKEND_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(BACKEND_ROOT / "migrations"))
+    config.attributes["database_settings"] = temporary_postgres_settings
+    command.upgrade(config, "0005_human_credential_versions")
+    database = Database(temporary_postgres_settings)
+    operation = "existing-recovery-operation"
+    flow = uuid4()
+    try:
+        installation = await PostgresInstallationIdentityReader(database).read()
+        async with database.session() as session, session.begin():
+            session.add(
+                IdentityRecoveryAdmissionRow(
+                    operation_id=operation,
+                    installation_id=installation.value,
+                    authority="kratos:test",
+                    subject="alice",
+                    flow_id=flow,
+                    event_kind=IdentityRecoveryEventKind.RECOVERY,
+                )
+            )
+            session.add(
+                HumanCredentialVersionRow(
+                    installation_id=installation.value,
+                    authority="kratos:test",
+                    subject="alice",
+                    version=9,
+                )
+            )
+        run_migrations(temporary_postgres_settings)
+        await database.startup()
+        async with database.session() as session:
+            original = await session.get(IdentityRecoveryAdmissionRow, operation)
+            assert original is not None
+            assert original.flow_id == flow and original.released_at is None
+            assert await session.scalar(select(HumanCredentialVersionRow.version)) == 9
+            assert (
+                await session.scalar(
+                    select(func.count()).select_from(IdentityRecoveryEvidenceReceiptRow)
+                )
+                == 0
+            )
+            assert (
+                await session.scalar(
+                    select(func.count()).select_from(IdentityRecoveryCleanupJobRow)
+                )
+                == 0
+            )
+            assert (
+                await session.scalar(
+                    select(func.count()).select_from(IdentityRecoveryCleanupRunRow)
+                )
+                == 0
+            )
+        assert await PostgresInstallationIdentityReader(database).read() == installation
+    finally:
+        await database.shutdown()

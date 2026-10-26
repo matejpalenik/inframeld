@@ -2,7 +2,7 @@ import asyncio
 from typing import override
 from uuid import uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import literal, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +40,9 @@ from inframeld_backend.access.infrastructure.rows.human_identity_link_row import
 )
 from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
     IdentityRecoveryAdmissionRow,
+)
+from inframeld_backend.access.infrastructure.rows.identity_recovery_proof_link_row import (
+    IdentityRecoveryProofLinkRow,
 )
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -110,6 +113,7 @@ class PostgresIdentityRecoveryAdmissionWriter(IdentityRecoveryAdmissionWriter):
             HumanCredentialStateQueries.for_identity(event.identity)
         )
         prior = prior_result.tuples().one_or_none()
+
         state = PostgresHumanCredentialStateMapper.to_state(event.identity, prior)
         if state.installation_id != self._installation_id:
             raise ConflictError("The installation identity does not match recovery configuration.")
@@ -128,10 +132,37 @@ class PostgresIdentityRecoveryAdmissionWriter(IdentityRecoveryAdmissionWriter):
             .returning(IdentityRecoveryAdmissionRow.operation_id)
         )
         if inserted is not None:
+            await self._session.execute(
+                insert(IdentityRecoveryProofLinkRow).from_select(
+                    [
+                        "installation_id",
+                        "authority",
+                        "subject",
+                        "covering_operation_id",
+                        "covered_operation_id",
+                    ],
+                    select(
+                        IdentityRecoveryAdmissionRow.installation_id,
+                        IdentityRecoveryAdmissionRow.authority,
+                        IdentityRecoveryAdmissionRow.subject,
+                        literal(inserted),
+                        IdentityRecoveryAdmissionRow.operation_id,
+                    ).where(
+                        IdentityRecoveryAdmissionRow.installation_id == self._installation_id.value,
+                        IdentityRecoveryAdmissionRow.authority == self._authority.value,
+                        IdentityRecoveryAdmissionRow.subject == event.identity.subject.value,
+                        IdentityRecoveryAdmissionRow.operation_id != inserted,
+                        IdentityRecoveryAdmissionRow.released_at.is_(None),
+                    ),
+                    include_defaults=False,
+                )
+            )
+
             if state.version is None and prior is not None and prior[3]:
                 raise DependencyUnavailableError(
                     "Credential history requires its original version state."
                 )
+
             await self._session.execute(
                 insert(HumanCredentialVersionRow)
                 .values(
@@ -142,6 +173,7 @@ class PostgresIdentityRecoveryAdmissionWriter(IdentityRecoveryAdmissionWriter):
                 )
                 .on_conflict_do_nothing()
             )
+
             advanced = await self._session.scalar(
                 update(HumanCredentialVersionRow)
                 .where(
@@ -153,8 +185,10 @@ class PostgresIdentityRecoveryAdmissionWriter(IdentityRecoveryAdmissionWriter):
                 .values(version=HumanCredentialVersionRow.version + 1)
                 .returning(HumanCredentialVersionRow.version)
             )
+
             if advanced is None:
                 raise DependencyUnavailableError("The credential version cannot be advanced.")
+
         row = await self._session.scalar(
             select(IdentityRecoveryAdmissionRow).where(
                 IdentityRecoveryAdmissionRow.installation_id == self._installation_id.value,

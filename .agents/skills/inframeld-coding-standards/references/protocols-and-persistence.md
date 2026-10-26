@@ -28,6 +28,26 @@ Use `MappedAsDataclass` with keyword-only typed constructors. Exclude database-g
 
 Read scalars, ORM records or typed tuples and immediately convert them to named domain/application results. Do not use string-keyed SQL result mappings. Shared technology-prefixed static mappers convert database values without I/O or authorization. Keep ORM and vendor types out of domain/application contracts.
 
+<a id="separate-observations-decisions-and-persistence"></a>
+
+## Separate observations, decisions and persistence
+
+Alice saves a replacement password. Stored facts identify possible recovery associations, but reading those rows does not decide which recovery her notification may complete. Keep that workflow choice visible in the application rather than hiding it in a PostgreSQL reader or writer.
+
+| Component | Responsibility |
+| --- | --- |
+| Reader | Return scoped observations, including missing or conflicting records needed for a decision. SQL may compute facts such as existence and counts. |
+| Mapper | Convert stored representations into typed values without I/O or workflow decisions. |
+| Application service | Interpret observations, select the original recovery, distinguish ordinary settings from recovery evidence and coordinate the operation. |
+| Aggregate or domain policy | Enforce domain transitions and business invariants. Follow the existing [decision-ownership guidance](services-and-use-cases.md#put-each-decision-with-its-owner). |
+| Writer or repository | Persist checked changes and enforce persistence safeguards without choosing the workflow or its operational budget. |
+
+Database scope predicates, coordination locks, uniqueness, foreign keys, immutable-binding checks, conditional writes, concurrency guards and transaction requirements remain legitimate adapter responsibilities. Preserve those safeguards. An adapter may reject invalid or conflicting persistence and fail closed on unavailable required metadata according to its contract. This rule does not require returning unusable data or moving database integrity checks into the service.
+
+Return observations when their meaning depends on an application choice. For example, the absence of a settings association is a fact. Deciding whether that means ordinary settings or conflicting recovery evidence belongs to the application. A missing installation identity can still be an adapter availability failure. Do not add a domain policy for every branch or introduce new wrappers merely to enforce this separation.
+
+[The implemented recovery workflow](../../inframeld-access-models/references/private-recovery-handoff.md#implemented-private-delivery) shows the facts reader, service decisions, aggregate transition and checked persistence. It also shows the application constructing a cleanup budget from the stored receipt time. Link its current contracts rather than copying recovery policy into this coding reference.
+
 <a id="worked-example-add-a-capability-and-its-test-double"></a>
 
 ## Worked example: add a capability and its test double

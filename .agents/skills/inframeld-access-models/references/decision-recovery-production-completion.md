@@ -1,6 +1,6 @@
 # PD-ACCESS-03: Prove recovery cleanup before releasing product access
 
-**Status:** RESOLVED for the production delivery contract on 2026-10-25 under [ADR-0085](../../../../docs/adr/ADR-0085-bind-password-settings-evidence-to-original-recoveries.md). Runtime implementation and qualification remain unfinished in #243–#245. This is not evidence that production recovery can already release access.
+**Status:** RESOLVED for the production delivery contract on 2026-10-25 under [ADR-0085](../../../../docs/adr/ADR-0085-bind-password-settings-evidence-to-original-recoveries.md). Private native notifications are implemented under #243. Provider execution and host continuation remain unfinished in #244–#245. This is not evidence that production recovery can already release access.
 
 **Owner:** `inframeld-access-models`
 
@@ -50,7 +50,7 @@ The design is settled. These are runtime acceptance scenarios, not new pending p
 | #243 | Valid code, failed admission commit | No successful receipt or unblocked continuation. |
 | #243 | Duplicate admission or lost acknowledgment | Same original operation and one version advancement. |
 | #243 | Wrong identity, conflicting session/source, unknown fields or invalid service key | Safe rejection without recovery effects. |
-| #243 | Ordinary settings with a recovery query parameter, or conflicting query/body IDs | Cannot establish a recovery association or completion proof. |
+| #243 | Ordinary settings with a recovery query parameter, or conflicting query/body IDs | Cannot select an unverified recovery or replace the provider-verified original binding. |
 | #243 | Native initial flow and restarted flow in its bound session | Preserve the original operation despite different settings-flow IDs. |
 | #243 | Password persisted but callback lost | Keep the block. Replay a saved receipt or obtain fresh trusted proof without claiming rollback. |
 | #243/#244 | New verified recovery after old evidence/session expires | Capture older operation links once. Only complete combined proof satisfies them. Never cover a later recovery or Bob. |
@@ -67,7 +67,7 @@ The design is settled. These are runtime acceptance scenarios, not new pending p
 | #245 | Two different requests race | At most one active run for the original recovery. No reviewed-run ID is required. |
 | #245 | Missing Kratos proof, completed recovery or no remaining provider work | No new run, manufactured proof, credential-version change or block release. |
 
-Existing provider tests remain supporting evidence with their recorded limits. The complete production path still needs native hook delivery, database failure/restart injection, worker execution and the protected host boundary. A failing required scenario remains a delivery gap.
+Existing provider tests remain supporting evidence with their recorded limits. The [native delivery tests](private-recovery-handoff.md#implemented-private-delivery) cover #243. The complete path still needs worker execution, restart/fencing qualification and the protected host boundary. A failing required scenario remains a delivery gap.
 
 ## Sources and finalization
 

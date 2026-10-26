@@ -128,3 +128,5 @@ Modules may share IDs and a small value identifying the caller and relevant proj
 Jobs and audit records support the application. They do not become another owner of evaluations, Deployments, or documents.
 
 An evidence screen may combine information from several modules. Its read code can join their records, but it must not become another writer of evaluation or Deployment state. Showing information together does not change who owns it.
+
+Private native recovery notifications use [the Access-owned callback process](../../inframeld-access-models/references/private-recovery-handoff.md#implemented-private-delivery), selected in [ADR-0086](../../../../docs/adr/ADR-0086-serve-recovery-notifications-through-a-private-backend-process.md). It shares the backend image. Durable provider execution and host continuation remain separate delivery.

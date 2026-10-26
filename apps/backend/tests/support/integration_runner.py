@@ -62,6 +62,8 @@ async def _wait_for_services() -> None:
         raise RuntimeError("The integration runner requires the private test database endpoint.")
     endpoints = {
         "kratos": f"{KRATOS_PUBLIC_URL}/health/ready",
+        "recovery-callbacks": "http://recovery-callbacks:8081/health",
+        "kratos-recovery": "http://kratos-recovery:4433/health/ready",
         "kratos-expiring": f"{EXPIRING_KRATOS_PUBLIC_URL}/health/ready",
         "hydra": f"{HYDRA_ADMIN_URL}/health/ready",
         "hydra-lifetimes": f"{LIFETIME_HYDRA_ADMIN_URL}/health/ready",

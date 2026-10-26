@@ -22,3 +22,9 @@ For a new component, follow [the contributor example](../../docs/development/gui
 Access recovery admission/completion and credential-state initialization share [identity coordination](../../.agents/skills/inframeld-access-models/references/identity-admission-coordination.md). The coordinator uses each operation's existing transaction before organization locks. Invitation activation remains unfinished and must reuse the same coordinator.
 
 [Contracts and data](../../docs/development/guides/contracts-and-data.md) routes to implemented types, generated HTTP schema and migrations. [The architecture introduction](../../docs/ARCHITECTURE.md) explains the accepted product. [AGENTS.md](../../AGENTS.md) preserves read-only guidance and exact write confirmation.
+
+## Private recovery notifications
+
+`inframeld_backend.recovery_main:app` serves the three private v2 Kratos callbacks on port 8081. It requires only database configuration, `INFRAMELD_RECOVERY__AUTHORITY` and protected hook-key files. It has no public documentation endpoint and is not mounted in the product API.
+
+[Local setup](../../docs/development/getting-started/local-setup.md#private-recovery-callbacks) explains explicit activation. [The owning contract](../../.agents/skills/inframeld-access-models/references/private-recovery-handoff.md#implemented-private-delivery) explains receipts, native association and replay. Migration `0006_identity_recovery_delivery` adds evidence and the original cleanup handoff/run. The process performs no Hydra cleanup or block release. Leave native hooks disabled in ordinary development until #244 supplies execution.

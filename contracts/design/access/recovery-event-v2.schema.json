@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Inframeld version 2 private recovery evidence, design contract",
-  "description": "Accepted non-runtime native recovery, settings-association and post-persistence password evidence. A valid shape is not trusted cleanup proof.",
-  "$comment": "Owner: .agents/skills/inframeld-access-models/references/private-recovery-handoff.md. ADR-0085 resolves PD-ACCESS-03. Separately enforce the 8 KiB received-byte bound, strict integer tokens, duplicate-key rejection, one JSON value, route/event matching, dedicated service authentication, native flow/session provenance and original identity binding. Null source without a trusted association is an ordinary-settings no-op, never a recovery receipt. JSON Schema integer validation accepts 2.0. Runtime implementation remains #243.",
+  "description": "Design description of the implemented private native recovery, settings-association and post-persistence password evidence. A valid shape is not trusted cleanup proof.",
+  "$comment": "Owner: .agents/skills/inframeld-access-models/references/private-recovery-handoff.md. ADR-0085 resolves PD-ACCESS-03. Separately enforce the 8 KiB received-byte bound, strict integer tokens, duplicate-key rejection, one JSON value, route/event matching, dedicated service authentication, native flow/session provenance and original identity binding. Null source without a trusted association is an ordinary-settings no-op, never a recovery receipt. JSON Schema integer validation accepts 2.0. Runtime parsing is owned by IdentityRecoveryNotificationMapper and the private callback application, outside public OpenAPI.",
   "oneOf": [
     {
       "type": "object",

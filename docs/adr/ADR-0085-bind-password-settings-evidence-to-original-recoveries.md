@@ -1,6 +1,6 @@
 # ADR-0085: Bind password-settings evidence to original recoveries
 
-**Status:** Accepted design. Partially supersedes ADR-0081's unchanged five-field envelope and refines ADR-0069's evidence provenance. Production delivery remains unimplemented.
+**Status:** Accepted design. Partially supersedes ADR-0081's unchanged five-field envelope and refines ADR-0069's evidence provenance. Private delivery is implemented under ADR-0086. Provider execution and host continuation remain unfinished.
 
 **Date:** 2026-10-25
 
@@ -41,3 +41,5 @@ Lost acknowledgments replay recorded receipts. Missing completion evidence is ne
 - [ADR-0058: Recovery block](ADR-0058-block-product-access-during-identity-recovery-cleanup.md), [ADR-0069: Independent release](ADR-0069-release-completed-recovery-obligations-independently.md) and [ADR-0070: Bulk Hydra cleanup](ADR-0070-use-bulk-hydra-revocation-for-identity-recovery.md).
 - [ADR-0072: Credential versions](ADR-0072-version-human-cli-credentials-across-account-recovery.md), [ADR-0081: Native hooks](ADR-0081-use-native-kratos-hooks-for-recovery-evidence.md), [ADR-0082: Identity coordination](ADR-0082-coordinate-first-admission-and-recovery-by-identity.md), [ADR-0083: Retry budget](ADR-0083-bound-hydra-recovery-cleanup-retries.md) and [ADR-0084: Host continuation](ADR-0084-authorize-additional-recovery-cleanup-runs-through-host-maintenance.md).
 - Pinned Kratos [settings hooks](https://github.com/ory/kratos/blob/v26.2.0/selfservice/hook/web_hook.go), [settings-flow creation](https://github.com/ory/kratos/blob/v26.2.0/selfservice/flow/settings/handler.go) and [recovery-to-settings transition](https://github.com/ory/kratos/blob/v26.2.0/selfservice/strategy/code/strategy_recovery.go). Source inspection supports the chosen seams, not finished runtime qualification.
+
+Implementation note: the [private notification process](ADR-0086-serve-recovery-notifications-through-a-private-backend-process.md) now saves native evidence and the original cleanup handoff. [Its owning implementation reference](../../.agents/skills/inframeld-access-models/references/private-recovery-handoff.md#implemented-private-delivery) separates that boundary from unfinished Hydra execution, proof propagation and release.

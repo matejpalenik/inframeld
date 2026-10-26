@@ -32,6 +32,7 @@ In the table below, **ingress** is the entry point for incoming traffic and **TL
 | **Python API** | Handles admission, authorization, queries, and release commands. Admission means durably accepting requested work. Database and vector services need no public ports. |
 | **Python worker** | Runs the same application release/image as the API through a different command. Executes bounded durable jobs from PostgreSQL. Initially, only one worker is supported. Vector mutation ownership follows [Preparing and searching reliable indexes](../../inframeld-indexing/references/profiles-and-preparation.md). |
 | **Isolated parser service** | Converts untrusted documents using [Processing untrusted documents safely](../../inframeld-knowledge/references/uploads-and-source-sync.md)’s per-attempt sandbox. Has no network, credentials, general artifact volume, or Docker socket. Its only worker connection is a private IPC socket. IPC means interprocess communication. |
+| **Recovery callbacks** | A private backend process on port 8081, sharing the backend image and application database. It accepts authenticated native Kratos evidence only. Publish no host port or public route. It requires no Hydra client or fingerprint key. |
 | **PostgreSQL** | Holds authoritative application state, jobs, permissions, and operation records on durable storage. Accessible only privately. Kratos and Hydra each use their own database and database role, separate from application state, with separately controlled migrations. One PostgreSQL server can host all three. |
 | **Chroma server** | A private HTTP service with its own durable volume. API and worker use its client API, not a shared embedded persistence directory. |
 | **SeaweedFS artifact storage** | A private S3-compatible service on durable storage behind the application-owned artifact interface. Its master, volume, filer, and S3 roles fit in one process/container. Their responsibilities are explained below. |
@@ -97,8 +98,12 @@ flowchart LR
     HTTPS --> Hydra[Hydra public endpoints]
     AccountUI --> IdentityAdmin[Private Kratos/Hydra administration]
     API --> IdentityAdmin
-    API --> Stores[Private PostgreSQL, Chroma, SeaweedFS]
+    API --> Stores[Private Chroma and SeaweedFS]
+    API --> AppDB[Private application PostgreSQL]
+    Kratos -->|authenticated native hooks| Callbacks[Private recovery callbacks]
+    Callbacks -->|short transactions| AppDB
     Worker[Worker] --> Stores
+    Worker --> AppDB
     Worker -->|private Unix socket| Parser[Offline parser]
     API -->|via ModelGateway| Models[Approved model endpoints]
     Worker -->|via ModelGateway| Models
@@ -150,7 +155,7 @@ Production security clearance remains pending. The reviewed official images had 
 
 Before production approval, review actual pinned image contents, supported base distributions, source-only SDKs and advisory reachability. The [reviewed Go TLS advisory](https://github.com/golang/vulndb/blob/master/data/reports/GO-2026-6607.yaml) and [Alpine support policy](https://alpinelinux.org/releases/) identify relevant review inputs. Historical scanner match counts have intentionally been removed. Recheck current primary sources when qualifying deployment.
 
-Provider upgrades may migrate identity databases independently of application migrations. Back up retained identity data and qualify each supported host/architecture. A private Podman/arm64 observation does not prove Docker/amd64 execution or production callback delivery. Follow [upgrades](../../../../docs/development/operations/upgrades.md) and the availability/recovery pending decision before making operating claims.
+Provider upgrades may migrate identity databases independently of application migrations. Back up retained identity data and qualify each supported host/architecture. A private Podman/arm64 observation does not prove Docker/amd64 execution or complete recovery execution. Native callback delivery has its own [private qualification](../../inframeld-access-models/references/private-recovery-handoff.md#implemented-private-delivery). Follow [upgrades](../../../../docs/development/operations/upgrades.md) and the availability/recovery pending decision before making operating claims.
 
 <a id="maintainer-checks"></a>
 

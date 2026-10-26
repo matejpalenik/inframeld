@@ -17,7 +17,9 @@ class IdentityRecoveryAdmissionWriter(Protocol):
     read current facts afterward. The caller bounds the complete database stage.
     Admission does not require or create a local principal, membership, or grant.
 
-    A new admission saves its cleanup obligation and product block atomically.
+    A new admission atomically saves its block, advances the credential version
+    once and links older unfinished recoveries for the same verified identity.
+    A repeat never expands those links.
 
     An existing admission returns its original binding without restarting cleanup,
     replacing its operation, or recreating a completed block. The caller commits

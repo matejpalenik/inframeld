@@ -210,3 +210,5 @@ External work is not guaranteed to happen exactly once. [Recovery](../../../../d
 | [ADR-0027](../../../../docs/adr/ADR-0027-identify-repeated-requests-by-caller-and-request-meaning.md) | Identify repeated requests by caller and request meaning. |
 | [ADR-0028](../../../../docs/adr/ADR-0028-recover-answer-requests-through-receipts-without-a-full-answer-replay-cache.md) | Recover answer requests through receipts without a full-answer replay cache. |
 | [ADR-0029](../../../../docs/adr/ADR-0029-use-expected-revisions-to-protect-competing-changes.md) | Use expected revisions to protect competing changes. |
+
+Access now commits the original cleanup handoff and initial bounded run with trusted password evidence. This is recoverable admission of work, not an executing worker. Claiming attempts, dispatch, checkpointing and additional host-authorized runs remain separate work. See [the owning records](../../inframeld-access-models/references/credential-and-recovery-records.md#recovery-delivery-records).

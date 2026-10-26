@@ -48,6 +48,54 @@ Remove text that merely repeats a name, signature, decorator or obvious statemen
 
 Use no semicolons or em dashes in prose, comments or docstrings. Use separate sentences or a normal hyphen.
 
+<a id="group-logical-steps-within-python-functions"></a>
+
+## Group logical steps within Python functions
+
+Use one genuinely empty line between distinct logical steps so the reader can follow the function in small sections. Separate independent checks, selection or loading, final validation and returning a result. Keep closely related statements together, such as obtaining a binding and handling its absence.
+
+Use judgment rather than inserting a blank line after every statement or block. Avoid multiple blank lines between steps, whitespace on empty lines and comments that only label each section. Review this grouping alongside normal formatter checks. These are backend Python conventions, not additional Rust or frontend standards.
+
+**Formatting illustration:** the complete `_select_password_admission()` method inside [IdentityRecoveryNotificationService](../../../../apps/backend/src/inframeld_backend/access/application/services/identity_recovery_notification_service.py). The statements, signature and ordering are unchanged. This is a method excerpt, not a replacement module. Its imports, enclosing class and other helper methods remain in the linked source.
+
+```python
+    def _select_password_admission(
+        self,
+        evidence: IdentityRecoverySettingsEvidenceDTO,
+        facts: IdentityRecoveryAssociationFactsDTO,
+    ) -> IdentityRecoveryAdmissionDTO | None:
+        settings = facts.settings_binding
+        if settings is None:
+            if evidence.source_recovery_flow_id is not None or facts.session_binding is not None:
+                raise ConflictError(
+                    "Password evidence requires an existing native settings association."
+                )
+            return None
+
+        if settings.settings_flow_id != evidence.settings_flow_id:
+            raise RuntimeError("The facts do not match the requested settings flow.")
+
+        if (settings.identity, settings.session_id) != (evidence.identity, evidence.session_id):
+            raise ConflictError("Password evidence does not match its native settings association.")
+
+        admission = self._require_matching_admission(facts.settings_admission, evidence)
+
+        if settings.operation_id != admission.operation_id:
+            raise RuntimeError("The settings facts do not match their original admission.")
+
+        if (
+            evidence.source_recovery_flow_id is not None
+            and evidence.source_recovery_flow_id != admission.event.flow_id
+        ):
+            raise ConflictError("Password evidence names a different original recovery.")
+
+        self._require_version(facts)
+
+        return admission
+```
+
+Obtaining `settings` and handling its absence form one step. Blank lines then distinguish the identity checks, admission selection, remaining checks and returned result without introducing more methods or comments.
+
 <a id="worked-example-test-a-rejected-transition-without-mutation"></a>
 
 ## Worked example: test a rejected transition without mutation

@@ -75,3 +75,9 @@ The isolated check supplies `INFRAMELD_DEV_COMPOSE_FILE` and `INFRAMELD_DEV_COMP
 ---
 
 For scaffold-first TDD, protocol doubles and meaningful tests, read [Testing and documentation](../../../.agents/skills/inframeld-coding-standards/references/testing-and-documentation.md). Architecture, import-boundary, naming and composition enforcement tests remain prohibited. Review those conventions manually.
+
+### Native recovery delivery
+
+The private integration graph adds an ephemeral application database, a migration prerequisite, the real callback app and a separate `kratos-recovery` instance. Existing provider probes retain their configurations. No test service publishes a port.
+
+[Native tests](../../../apps/backend/tests/integration/kratos/test_native_recovery_notifications.py) exercise source extraction, session association, password persistence, native revocation, rejected persistence and lost acknowledgments. Test-only forwarding gates delay or fail delivery to a fixed private target. They expose no production control routes and record only allowlisted identifiers. [PostgreSQL tests](../../../apps/backend/tests/integration/access/test_identity_recovery_notifications_postgres.py) cover coherent association observations, receipts, original budgets, rollback and concurrency. Application tests exercise association decisions before persistence and derive the initial budget from the stored receipt time. Later settings events must preserve the first job/run and confirmed progress. Middleware tests verify non-cacheable headers without buffering responses. Both self-contained Jsonnet templates are exercised through native hooks, including source recognition and session inheritance. These tests do not execute Hydra cleanup or release a block.

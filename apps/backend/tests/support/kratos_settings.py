@@ -18,14 +18,17 @@ class SettingsFlowResponse(BrowserFlow):
 
 
 async def read_recovery_settings(
-    browser: httpx2.AsyncClient, recovery_response: httpx2.Response
+    browser: httpx2.AsyncClient,
+    recovery_response: httpx2.Response,
+    *,
+    public_url: str = KRATOS_PUBLIC_URL,
 ) -> SettingsFlowResponse:
     """Read the settings flow selected by Kratos after verified recovery."""
     assert recovery_response.status_code in {302, 303}, "Recovery did not redirect to settings."
     location = recovery_response.headers.get("location")
     assert location is not None, "Recovery did not select a settings URL."
     selected = urlsplit(location)
-    expected = urlsplit(KRATOS_PUBLIC_URL)
+    expected = urlsplit(public_url)
     assert (selected.scheme, selected.netloc, selected.path) == (
         expected.scheme,
         expected.netloc,
@@ -46,11 +49,15 @@ async def read_recovery_settings(
 
 
 async def submit_password_settings(
-    browser: httpx2.AsyncClient, flow: SettingsFlowResponse, password: SecretStr
+    browser: httpx2.AsyncClient,
+    flow: SettingsFlowResponse,
+    password: SecretStr,
+    *,
+    public_url: str = KRATOS_PUBLIC_URL,
 ) -> httpx2.Response:
     """Return the provider response without assuming failure means no password change."""
     action = urlsplit(flow.ui.action)
-    expected = urlsplit(KRATOS_PUBLIC_URL)
+    expected = urlsplit(public_url)
     assert (action.scheme, action.netloc, action.path) == (
         expected.scheme,
         expected.netloc,

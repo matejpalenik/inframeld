@@ -7,6 +7,12 @@ from sqlalchemy import Enum
 from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
     IdentityRecoveryEventKind,
 )
+from inframeld_backend.access.application.enums.identity_recovery_evidence_type import (
+    IdentityRecoveryEvidenceType,
+)
+from inframeld_backend.access.application.enums.identity_recovery_run_source import (
+    IdentityRecoveryRunSource,
+)
 from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
     IdentityRecoveryCleanupState,
 )
@@ -57,5 +63,21 @@ IDENTITY_RECOVERY_CLEANUP_STATE_TYPE = Enum(
     native_enum=False,
     values_callable=_enum_values,
     length=16,
+    validate_strings=True,
+)
+
+IDENTITY_RECOVERY_EVIDENCE_TYPE = Enum(
+    IdentityRecoveryEvidenceType,
+    native_enum=False,
+    values_callable=_enum_values,
+    length=32,
+    validate_strings=True,
+)
+
+IDENTITY_RECOVERY_RUN_SOURCE_TYPE = Enum(
+    IdentityRecoveryRunSource,
+    native_enum=False,
+    values_callable=_enum_values,
+    length=24,
     validate_strings=True,
 )

@@ -177,6 +177,33 @@ services:
       hydra:
         condition: service_started
 
+  recovery-callbacks:
+    <<: *backend-image
+    profiles: [recovery]
+    command:
+      [
+        "uvicorn",
+        "inframeld_backend.recovery_main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8081",
+        "--no-access-log",
+      ]
+    environment:
+      INFRAMELD_DATABASE__HOST: postgres
+      INFRAMELD_DATABASE__PORT: "5432"
+      INFRAMELD_DATABASE__NAME: inframeld
+      INFRAMELD_DATABASE__USER: inframeld
+      INFRAMELD_DATABASE__PASSWORD: inframeld-dev-only
+      INFRAMELD_RECOVERY__AUTHORITY: kratos:local
+      INFRAMELD_RECOVERY__CURRENT_KEY_FILE: /run/secrets/recovery_hook_key
+    secrets:
+      - recovery_hook_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     <<: *backend-image
     environment:
@@ -210,5 +237,7 @@ volumes:
   inframeld_hydra_postgres_data:
 
 secrets:
+  recovery_hook_key:
+    file: ${INFRAMELD_RECOVERY_KEY_HOST_FILE:-/etc/inframeld/secrets/recovery_hook.key}
   idempotency_fingerprint_hmac:
     file: ${INFRAMELD_FINGERPRINT_KEY_HOST_FILE:-/etc/inframeld/secrets/idempotency_fingerprint_hmac.key}
