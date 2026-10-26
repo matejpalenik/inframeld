@@ -27,7 +27,7 @@ Queue/concurrency limits, checkpoints, saturation rejection and safe storage adm
 
 ## Accepted context and evidence
 
-Preserve one supported worker/queue, bounded attempts/backoff/deadlines and current checks. Deletion/recovery use existing durable mechanics. Tombstones and recovery blocks protect access before physical/provider work finishes. Workload-priority budget hierarchies remain deferred.
+Preserve PostgreSQL-backed durable work, bounded attempts/backoff/deadlines and current checks. [ADR-0087](../../../../docs/adr/ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) selects one dedicated recovery worker alongside the future application worker, with oldest-due-original ordering inside recovery. This narrow decision does not settle product queue saturation, mixed-load fairness or resource guarantees. Deletion/recovery use existing durable mechanics. Tombstones and recovery blocks protect access before physical/provider work finishes. Workload-priority budget hierarchies remain deferred.
 
 A finite queue limits total admitted work, not waiting time between projects. Monitoring the oldest job observes delay but does not resolve it. A new scheduler or reserved capacity is not required merely because no latency evidence exists.
 

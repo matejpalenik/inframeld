@@ -63,6 +63,8 @@ async def _wait_for_services() -> None:
     endpoints = {
         "kratos": f"{KRATOS_PUBLIC_URL}/health/ready",
         "recovery-callbacks": "http://recovery-callbacks:8081/health",
+        "recovery-execution-callbacks": "http://recovery-execution-callbacks:8081/health",
+        "kratos-recovery-execution": "http://kratos-recovery-execution:4433/health/ready",
         "kratos-recovery": "http://kratos-recovery:4433/health/ready",
         "kratos-expiring": f"{EXPIRING_KRATOS_PUBLIC_URL}/health/ready",
         "hydra": f"{HYDRA_ADMIN_URL}/health/ready",

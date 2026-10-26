@@ -20,3 +20,7 @@ class IdentityRecoveryProofLinkRow(AccessPersistenceBase):
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), init=False, server_default=func.now()
     )
+
+    reconciled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), init=False, default=None
+    )

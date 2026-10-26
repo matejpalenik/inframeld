@@ -30,7 +30,8 @@ In the table below, **ingress** is the entry point for incoming traffic and **TL
 | **Ory account UI integration** | Small browser login, consent and recovery experience needed for human CLI login independently of the full Studio. Uses official Ory clients and documented Kratos/Hydra flows. Private server-side administration credentials never reach the browser. Exact image/container arrangement remains release qualification work. |
 | **Full Studio (deferred)** | Not required in the v1 runtime or release chain. When delivered, use a production build and the same generated-client/identity contracts. The account UI above is required independently. |
 | **Python API** | Handles admission, authorization, queries, and release commands. Admission means durably accepting requested work. Database and vector services need no public ports. |
-| **Python worker** | Runs the same application release/image as the API through a different command. Executes bounded durable jobs from PostgreSQL. Initially, only one worker is supported. Vector mutation ownership follows [Preparing and searching reliable indexes](../../inframeld-indexing/references/profiles-and-preparation.md). |
+| **Python application worker** | Runs the same application release/image as the API through a different command. Executes bounded durable application jobs from PostgreSQL. Support one application worker alongside the dedicated recovery worker. Vector mutation ownership follows [Preparing and searching reliable indexes](../../inframeld-indexing/references/profiles-and-preparation.md). |
+| **Recovery worker** | Uses the backend image with a separate command and no listener. Executes one recovery attempt at a time through PostgreSQL ownership and proof reconciliation. It needs database and private Hydra access, without artifact volumes, model credentials or the callback key. [ADR-0087](../../../../docs/adr/ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) records the isolation boundary. |
 | **Isolated parser service** | Converts untrusted documents using [Processing untrusted documents safely](../../inframeld-knowledge/references/uploads-and-source-sync.md)’s per-attempt sandbox. Has no network, credentials, general artifact volume, or Docker socket. Its only worker connection is a private IPC socket. IPC means interprocess communication. |
 | **Recovery callbacks** | A private backend process on port 8081, sharing the backend image and application database. It accepts authenticated native Kratos evidence only. Publish no host port or public route. It requires no Hydra client or fingerprint key. |
 | **PostgreSQL** | Holds authoritative application state, jobs, permissions, and operation records on durable storage. Accessible only privately. Kratos and Hydra each use their own database and database role, separate from application state, with separately controlled migrations. One PostgreSQL server can host all three. |
@@ -91,7 +92,6 @@ title: "Accepted single-host exposure and private dependencies"
 ---
 flowchart LR
     Browser[Browser or application] --> HTTPS[Public HTTPS ingress]
-    HTTPS --> Web[Ory account UI]
     HTTPS --> AccountUI[Ory account UI integration]
     HTTPS --> API[API]
     HTTPS --> Kratos[Kratos public endpoints]
@@ -102,7 +102,9 @@ flowchart LR
     API --> AppDB[Private application PostgreSQL]
     Kratos -->|authenticated native hooks| Callbacks[Private recovery callbacks]
     Callbacks -->|short transactions| AppDB
-    Worker[Worker] --> Stores
+    RecoveryWorker[Dedicated recovery worker] -->|claims and proof checkpoints| AppDB
+    RecoveryWorker -->|Hydra cleanup| IdentityAdmin
+    Worker[Application worker] --> Stores
     Worker --> AppDB
     Worker -->|private Unix socket| Parser[Offline parser]
     API -->|via ModelGateway| Models[Approved model endpoints]

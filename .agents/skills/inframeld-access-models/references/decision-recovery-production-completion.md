@@ -32,7 +32,7 @@ Requiring a reviewed ended-run ID was considered and not selected. The simpler i
 
 ## Delivery boundary and neighboring decisions
 
-The design questions above no longer gate #243–#245. Each implementation still needs separate named-file write approval, its behavioral tests and its applicable qualification. Never report a specification, local checklist test or provider fixture as production completion. If pinned-provider behavior contradicts a required association or guarantee, report the conflict rather than silently weakening it.
+The design questions above no longer gate #243–#245. Runtime changes follow root repository authorization guidance and require behavioral tests and applicable qualification. Never report a specification, local checklist test or provider fixture as production completion. If pinned-provider behavior contradicts a required association or guarantee, report the conflict rather than silently weakening it.
 
 [Resolved identity coordination](identity-admission-coordination.md) applies to short database steps before organization/project locks, including identities without local accounts. Its three recovery/initialization participants are implemented. Complete first admission remains separate. Provider waits hold no SQL transaction.
 
@@ -67,7 +67,7 @@ The design is settled. These are runtime acceptance scenarios, not new pending p
 | #245 | Two different requests race | At most one active run for the original recovery. No reviewed-run ID is required. |
 | #245 | Missing Kratos proof, completed recovery or no remaining provider work | No new run, manufactured proof, credential-version change or block release. |
 
-Existing provider tests remain supporting evidence with their recorded limits. The [native delivery tests](private-recovery-handoff.md#implemented-private-delivery) cover #243. The complete path still needs worker execution, restart/fencing qualification and the protected host boundary. A failing required scenario remains a delivery gap.
+Existing provider tests remain supporting evidence with their recorded limits. The [native delivery tests](private-recovery-handoff.md#implemented-private-delivery) cover #243. The worker and linked PostgreSQL/native tests now cover execution, restart/fencing and proof-backed completion. The protected host boundary remains #245. A failing required scenario remains a delivery gap.
 
 ## Sources and finalization
 

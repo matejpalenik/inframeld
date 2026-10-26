@@ -53,6 +53,9 @@ from inframeld_backend.access.domain.value_objects.identity_subject import Ident
 from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
     PostgresIdentityRecoveryBlockReader,
 )
+from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_cleanup_proof_reader import (
+    PostgresIdentityRecoveryCleanupProofReader,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_completion_facts_reader import (
     PostgresIdentityRecoveryCompletionFactsReader,
 )
@@ -66,6 +69,9 @@ from inframeld_backend.access.infrastructure.rows.organization_row import Organi
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_admission_writer import (
     PostgresIdentityRecoveryAdmissionWriter,
+)
+from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_cleanup_proof_writer import (
+    PostgresIdentityRecoveryCleanupProofWriter,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
@@ -128,6 +134,12 @@ def _service(
         recoveries if recoveries is not None else PostgresIdentityRecoveryRepository(session),
         installation_id=installation_id,
         authority=AUTHORITY,
+        proofs=PostgresIdentityRecoveryCleanupProofReader(
+            session, installation_id=installation_id, authority=AUTHORITY
+        ),
+        proof_writer=PostgresIdentityRecoveryCleanupProofWriter(
+            session, installation_id=installation_id, authority=AUTHORITY
+        ),
     )
 
 

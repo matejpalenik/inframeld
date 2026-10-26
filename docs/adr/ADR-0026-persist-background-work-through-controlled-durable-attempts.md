@@ -29,6 +29,8 @@ Record admitted work durably and execute it through controlled attempts. Use cur
 - Work can continue or be examined after disconnection or restart, with explicit ownership of state publication.
 - A lease or database fence cannot cancel a request already sent to another system. Recovery must preserve uncertainty and must not silently repeat chargeable model work.
 
+[ADR-0087](ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) refines the runtime convention with a dedicated recovery process. PostgreSQL ownership, short transactions and uncertainty rules remain shared. It adds no generic priority scheduler.
+
 ## Links
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.

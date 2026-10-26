@@ -141,7 +141,7 @@ key.chmod(0o644)
 PY
 
 PODMAN_COMPOSE_WARNING_LOGS=false "${qualification_compose[@]}" -p "${qualification_project}" \
-    -f "${repository_root}/compose.dev.yaml" config > "${qualification_dir}/rendered.yaml"
+    -f "${repository_root}/compose.dev.yaml" --profile recovery config > "${qualification_dir}/rendered.yaml"
 
 uv run --project apps/backend python - "${qualification_dir}" "${qualification_project}" "${qualification_image}" "${repository_root}" <<'PY'
 import json
@@ -151,6 +151,9 @@ import yaml
 directory, project, image = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
 root = Path(sys.argv[4])
 config = yaml.safe_load((directory / 'rendered.yaml').read_text())
+# This check needs the worker, not a callback key or enabled native hooks.
+config['services'].pop('recovery-callbacks', None)
+config.get('secrets', {}).pop('recovery_hook_key', None)
 for service in config['services'].values():
     service.pop('ports', None)
     if 'build' in service:
@@ -207,3 +210,23 @@ lines = Path(sys.argv[1]).read_text().splitlines()
 assert json.loads(lines[-1]) == {'clientId': 'inframeld-cli', 'outcome': 'unchanged'}
 print('Development OAuth setup, API startup and persisted registration passed in an isolated project.')
 PY
+
+# Recovery has its own execution process and no hook-key requirement.
+run_step qualified_compose --profile recovery up -d --no-deps recovery-worker
+wait_for_recovery_worker() {
+    local expected="$1" attempt output count
+    for ((attempt = 1; attempt <= 60; attempt++)); do
+        output="$(qualified_compose --profile recovery logs recovery-worker 2>&1)"
+        count="$(printf '%s\n' "${output}" | awk '/recovery_worker_ready/ {n++} END {print n+0}')"
+        if ((count >= expected)); then
+            return 0
+        fi
+        sleep 0.25
+    done
+    printf 'The isolated recovery worker did not become ready.\n' >&2
+    return 1
+}
+run_step wait_for_recovery_worker 1
+run_step qualified_compose --profile recovery restart recovery-worker
+run_step wait_for_recovery_worker 2
+printf 'Dedicated recovery worker startup and restart passed without published ports.\n'

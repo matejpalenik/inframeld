@@ -22,6 +22,9 @@ from inframeld_backend.access.application.protocols.identity_recovery_completion
 )
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
     IdentityRecoveryFlowId,
@@ -31,6 +34,9 @@ from inframeld_backend.access.domain.value_objects.organization_id import Organi
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.infrastructure.resources.postgres_identity_coordinator import (
     PostgresIdentityCoordinator,
+)
+from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
+    HumanCredentialVersionRow,
 )
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
@@ -152,6 +158,7 @@ class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFa
                 Nullable(HumanIdentityLinkRow),
                 Nullable(PrincipalRow),
                 other_pending,
+                Nullable(HumanCredentialVersionRow),
             )
             .select_from(IdentityRecoveryAdmissionRow)
             .outerjoin(
@@ -162,6 +169,15 @@ class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFa
                 ),
             )
             .outerjoin(PrincipalRow, PrincipalRow.id == HumanIdentityLinkRow.principal_id)
+            .outerjoin(
+                HumanCredentialVersionRow,
+                and_(
+                    HumanCredentialVersionRow.installation_id
+                    == IdentityRecoveryAdmissionRow.installation_id,
+                    HumanCredentialVersionRow.authority == IdentityRecoveryAdmissionRow.authority,
+                    HumanCredentialVersionRow.subject == IdentityRecoveryAdmissionRow.subject,
+                ),
+            )
             .where(
                 IdentityRecoveryAdmissionRow.installation_id == installation_id.value,
                 IdentityRecoveryAdmissionRow.authority == authority.value,
@@ -172,7 +188,7 @@ class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFa
         result = (await self._session.execute(statement)).one_or_none()
         if result is None:
             raise ResourceNotFoundError()
-        admission, link, account, has_other_pending = result
+        admission, link, account, has_other_pending, version = result
         if admission.subject != identity.subject.value:
             raise RuntimeError("The recovery admission changed its original identity binding.")
         principal = None
@@ -205,6 +221,7 @@ class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFa
             ),
             principal=principal,
             has_other_pending_recovery=has_other_pending,
+            credential_version=None if version is None else HumanCredentialVersion(version.version),
         )
 
     async def _read_original_recovery_identity(

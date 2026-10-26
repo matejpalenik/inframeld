@@ -112,7 +112,7 @@ async def test_bulk_cleanup_removes_skipped_consent_tokens_missing_from_listing(
         assert await provider.token_is_active(skipped.access_token)
         assert await _listed_consent_count(alice.subject) == 1
 
-        assert await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0) == (
+        assert (await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0)).state == (
             IdentityRecoveryCleanupState.CONFIRMED
         )
 
@@ -135,9 +135,9 @@ async def test_bulk_cleanup_forgets_login_without_accepted_consent(
         assert await _listed_consent_count(alice.subject) == 0
         assert await provider.login_can_skip(browser)
 
-        assert await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0) == (
-            IdentityRecoveryCleanupState.CONFIRMED
-        )
+        assert (
+            await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0)
+        ).state == (IdentityRecoveryCleanupState.CONFIRMED)
         assert not await provider.login_can_skip(browser)
 
 
@@ -150,7 +150,7 @@ async def test_removing_last_visible_grant_still_requires_remembered_login_clean
     async with _browser() as browser:
         tokens = await provider.issue_tokens(alice, browser=browser, remember_login=True)
         assert await _listed_consent_count(alice.subject) == 1
-        assert await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0) == (
+        assert (await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0)).state == (
             IdentityRecoveryCleanupState.CONFIRMED
         )
         assert not await provider.token_is_active(tokens.access_token)
@@ -158,9 +158,9 @@ async def test_removing_last_visible_grant_still_requires_remembered_login_clean
         assert await _listed_consent_count(alice.subject) == 0
         assert await provider.login_can_skip(browser)
 
-        assert await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0) == (
-            IdentityRecoveryCleanupState.CONFIRMED
-        )
+        assert (
+            await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0)
+        ).state == (IdentityRecoveryCleanupState.CONFIRMED)
         assert not await provider.login_can_skip(browser)
 
 
@@ -203,12 +203,12 @@ async def test_bulk_cleanup_removes_password_gap_and_later_credentials_but_keeps
             later = await provider.issue_tokens(updated, browser=legitimate, remember_login=True)
             assert await provider.token_is_active(later.access_token)
 
-            assert await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0) == (
+            assert (await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0)).state == (
                 IdentityRecoveryCleanupState.CONFIRMED
             )
-            assert await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0) == (
-                IdentityRecoveryCleanupState.CONFIRMED
-            )
+            assert (
+                await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0)
+            ).state == (IdentityRecoveryCleanupState.CONFIRMED)
 
             for tokens in (old, gap, later):
                 assert not await provider.token_is_active(tokens.access_token)

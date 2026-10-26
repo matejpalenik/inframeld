@@ -4,6 +4,9 @@ from enum import Enum as PythonEnum
 
 from sqlalchemy import Enum
 
+from inframeld_backend.access.application.enums.identity_recovery_cleanup_step import (
+    IdentityRecoveryCleanupStep,
+)
 from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
     IdentityRecoveryEventKind,
 )
@@ -12,6 +15,10 @@ from inframeld_backend.access.application.enums.identity_recovery_evidence_type 
 )
 from inframeld_backend.access.application.enums.identity_recovery_run_source import (
     IdentityRecoveryRunSource,
+)
+from inframeld_backend.access.application.enums.oauth_cleanup_category import OAuthCleanupCategory
+from inframeld_backend.access.application.enums.oauth_cleanup_disposition import (
+    OAuthCleanupDisposition,
 )
 from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
     IdentityRecoveryCleanupState,
@@ -79,5 +86,29 @@ IDENTITY_RECOVERY_RUN_SOURCE_TYPE = Enum(
     native_enum=False,
     values_callable=_enum_values,
     length=24,
+    validate_strings=True,
+)
+
+IDENTITY_RECOVERY_CLEANUP_STEP_TYPE = Enum(
+    IdentityRecoveryCleanupStep,
+    native_enum=False,
+    values_callable=_enum_values,
+    length=32,
+    validate_strings=True,
+)
+
+OAUTH_CLEANUP_CATEGORY_TYPE = Enum(
+    OAuthCleanupCategory,
+    native_enum=False,
+    values_callable=_enum_values,
+    length=32,
+    validate_strings=True,
+)
+
+OAUTH_CLEANUP_DISPOSITION_TYPE = Enum(
+    OAuthCleanupDisposition,
+    native_enum=False,
+    values_callable=_enum_values,
+    length=32,
     validate_strings=True,
 )

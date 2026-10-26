@@ -12,7 +12,7 @@ API, worker, parser, identity services and stores are runtime pieces. The Operat
 
 ## Processes and responsibilities
 
-The API receives product requests. A worker carries out admitted background work. Both use the same backend application operations and domain rules.
+The API receives product requests. The application worker carries out document and product jobs. A dedicated recovery worker has its own execution slot for provider cleanup and checklist completion. All use the same backend release and owning application/domain rules. Shared database, CPU and provider resources still limit progress.
 
 A separate restricted parser handles untrusted documents. ModelGateway is the shared outbound model boundary, not a seventh domain or an independently required network service.
 
@@ -24,11 +24,13 @@ flowchart TB
     Ory["Kratos and Hydra<br/>Human identity, sessions and OAuth"]
     subgraph Backend["One modular backend - API and worker processes"]
         API["HTTP and MCP adapters"]
-        Worker["Background worker"]
+        Worker["Application worker"]
+        RecoveryWorker["Dedicated recovery worker"]
         Operations["Shared application operations<br/>Access, Knowledge, Indexing<br/>Pipelines, Evaluation, Releases"]
         Gateway["ModelGateway"]
         API --> Operations
         Worker --> Operations
+        RecoveryWorker -->|"Access recovery operations"| Operations
         Operations --> Gateway
     end
     Browser -->|"Cookie over HTTP"| API

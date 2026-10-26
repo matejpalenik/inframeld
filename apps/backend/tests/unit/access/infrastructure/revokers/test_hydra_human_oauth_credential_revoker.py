@@ -40,8 +40,8 @@ async def _revoke(
     revoker: HydraHumanOAuthCredentialRevoker, operation: Operation, timeout_seconds: float = 1.0
 ) -> IdentityRecoveryCleanupState:
     if operation == "grant":
-        return await revoker.revoke_cli_grants(SUBJECT, timeout_seconds=timeout_seconds)
-    return await revoker.revoke_remembered_logins(SUBJECT, timeout_seconds=timeout_seconds)
+        return (await revoker.revoke_cli_grants(SUBJECT, timeout_seconds=timeout_seconds)).state
+    return (await revoker.revoke_remembered_logins(SUBJECT, timeout_seconds=timeout_seconds)).state
 
 
 @pytest.mark.asyncio
@@ -55,9 +55,9 @@ async def test_acknowledged_cleanup_sends_the_exact_subject_and_required_client_
     with patch.object(client, METHODS[operation], return_value=response) as revoke:
         revoker = HydraHumanOAuthCredentialRevoker(client)
         if operation == "grant":
-            outcome = await revoker.revoke_cli_grants(subject, timeout_seconds=1.0)
+            outcome = (await revoker.revoke_cli_grants(subject, timeout_seconds=1.0)).state
         else:
-            outcome = await revoker.revoke_remembered_logins(subject, timeout_seconds=1.0)
+            outcome = (await revoker.revoke_remembered_logins(subject, timeout_seconds=1.0)).state
         assert outcome == IdentityRecoveryCleanupState.CONFIRMED
 
     revoke.assert_called_once()

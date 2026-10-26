@@ -40,7 +40,7 @@ Deploy the schema and backend together. Existing human CLI tokens lack metadata 
 
 The future CLI checks `/v1/session` before saving credentials, uses bounded refresh handling and removes confirmed invalid credentials only for the selected target/account. It protects concurrent replacement and asks for explicit sign-in. Local deletion does not revoke other copies. Permission denial or provider unavailability does not clear a login.
 
-Production completion remains unwired. Verified password replacement, native session cleanup, durable execution, trusted outcomes and remaining provider-internal race qualification are separate requirements. Controlled test completion does not establish production callback safety.
+The versioning slice originally left production completion unwired. Native callback delivery and the dedicated worker now supply [durable evidence and proof-backed release](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#implemented-execution-and-proof-backed-completion). Controlled token races remain narrower observations, not claims of Hydra-wide inactivity. Host continuation and packaged deployment remain separate.
 
 ## Implementation notes
 

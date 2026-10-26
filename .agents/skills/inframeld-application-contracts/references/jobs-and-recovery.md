@@ -52,9 +52,9 @@ Some IDs are discovered later. A source-sync job can find a document, create its
 
 <a id="one-worker-owns-the-supported-queue"></a>
 
-### One worker owns the supported queue
+### Workers own bounded execution
 
-One worker polls PostgreSQL for eligible jobs. For each claim, it:
+The application worker and a [dedicated recovery worker](../../../../docs/adr/ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) use PostgreSQL-backed durable mechanics. Recovery has one active attempt and no document-processing work. This separates execution capacity without adding a broker or generic priority scheduler. For each claim, a worker:
 
 1. **Claim one eligible job.** In a short transaction, lock the job and save the attempt, worker, expiry, and ownership token. Then finish the transaction.
 2. **Do the work.** Process files and call external services without keeping that SQL transaction open.
@@ -211,4 +211,4 @@ External work is not guaranteed to happen exactly once. [Recovery](../../../../d
 | [ADR-0028](../../../../docs/adr/ADR-0028-recover-answer-requests-through-receipts-without-a-full-answer-replay-cache.md) | Recover answer requests through receipts without a full-answer replay cache. |
 | [ADR-0029](../../../../docs/adr/ADR-0029-use-expected-revisions-to-protect-competing-changes.md) | Use expected revisions to protect competing changes. |
 
-Access now commits the original cleanup handoff and initial bounded run with trusted password evidence. This is recoverable admission of work, not an executing worker. Claiming attempts, dispatch, checkpointing and additional host-authorized runs remain separate work. See [the owning records](../../inframeld-access-models/references/credential-and-recovery-records.md#recovery-delivery-records).
+Access commits the original cleanup handoff/run with trusted evidence. Its dedicated worker now implements claims, fenced checkpoints and proof-backed local completion. Additional host-authorized runs remain separate work. See [the owning records](../../inframeld-access-models/references/credential-and-recovery-records.md#recovery-delivery-records).

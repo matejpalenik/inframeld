@@ -306,6 +306,85 @@ services:
       recovery-callbacks:
         condition: service_started
 
+  recovery-execution-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: recovery_execution_test
+      POSTGRES_USER: recovery_execution
+      POSTGRES_PASSWORD: recovery-execution-test-only
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U recovery_execution -d recovery_execution_test",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  recovery-execution-migrate:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
+    environment: &recovery_execution_environment
+      INFRAMELD_DATABASE__HOST: recovery-execution-postgres
+      INFRAMELD_DATABASE__NAME: recovery_execution_test
+      INFRAMELD_DATABASE__USER: recovery_execution
+      INFRAMELD_DATABASE__PASSWORD: recovery-execution-test-only
+      INFRAMELD_RECOVERY__AUTHORITY: http://kratos-recovery-execution:4433
+      INFRAMELD_RECOVERY__CURRENT_KEY_FILE: /tmp/recovery-hook.key
+    volumes: *recovery_volumes
+    entrypoint:
+      [
+        "python",
+        "-m",
+        "tests.support.recovery_execution_callback_runner",
+        "migrate",
+      ]
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      recovery-execution-postgres:
+        condition: service_healthy
+
+  recovery-execution-callbacks:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
+    environment: *recovery_execution_environment
+    volumes: *recovery_volumes
+    entrypoint:
+      ["python", "-m", "tests.support.recovery_execution_callback_runner"]
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      recovery-execution-migrate:
+        condition: service_completed_successfully
+
+  kratos-recovery-execution:
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
+    volumes:
+      - ./config/kratos:/etc/config/kratos:ro
+    environment:
+      SESSION_LIFESPAN: 8h
+    command:
+      [
+        "serve",
+        "-c",
+        "/etc/config/kratos/test.yaml",
+        "-c",
+        "/etc/config/kratos/test-recovery-execution.yaml",
+        "--dev",
+        "--watch-courier",
+      ]
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+      recovery-hooks:
+        condition: service_started
+      recovery-execution-callbacks:
+        condition: service_started
+
   integration-tests:
     image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
     pull_policy: never

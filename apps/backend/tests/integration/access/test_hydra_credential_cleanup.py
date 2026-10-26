@@ -64,8 +64,8 @@ async def _revoke(
     revoker: HydraHumanOAuthCredentialRevoker, operation: Operation, subject: IdentitySubject
 ) -> IdentityRecoveryCleanupState:
     if operation == "grant":
-        return await revoker.revoke_cli_grants(subject, timeout_seconds=3.0)
-    return await revoker.revoke_remembered_logins(subject, timeout_seconds=3.0)
+        return (await revoker.revoke_cli_grants(subject, timeout_seconds=3.0)).state
+    return (await revoker.revoke_remembered_logins(subject, timeout_seconds=3.0)).state
 
 
 @pytest.mark.asyncio
@@ -89,7 +89,7 @@ async def test_bulk_grants_remove_every_alice_cli_chain_and_preserve_bob(
         for tokens in (same_login, other, refreshed):
             assert await provider.token_is_active(tokens.access_token)
 
-        assert await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0) == (
+        assert (await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0)).state == (
             IdentityRecoveryCleanupState.CONFIRMED
         )
 
@@ -119,9 +119,9 @@ async def test_bulk_login_cleanup_forgets_alices_browsers_but_keeps_tokens_and_b
         assert await provider.login_can_skip(first_browser)
         assert await provider.login_can_skip(other_browser)
 
-        assert await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0) == (
-            IdentityRecoveryCleanupState.CONFIRMED
-        )
+        assert (
+            await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0)
+        ).state == (IdentityRecoveryCleanupState.CONFIRMED)
 
         assert not await provider.login_can_skip(first_browser)
         assert not await provider.login_can_skip(other_browser)
@@ -142,7 +142,7 @@ async def test_cli_grant_cleanup_preserves_alices_grants_for_another_client(
     async with hydra_test_provider(client_id="inframeld-test-other-client") as other_provider:
         other = await other_provider.issue_tokens(alice)
 
-        assert await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0) == (
+        assert (await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0)).state == (
             IdentityRecoveryCleanupState.CONFIRMED
         )
 
@@ -169,9 +169,9 @@ async def test_bulk_remembered_login_cleanup_applies_across_clients(
         assert await provider.login_can_skip(cli_browser)
         assert await other_provider.login_can_skip(other_browser)
 
-        assert await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0) == (
-            IdentityRecoveryCleanupState.CONFIRMED
-        )
+        assert (
+            await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0)
+        ).state == (IdentityRecoveryCleanupState.CONFIRMED)
 
         assert not await provider.login_can_skip(cli_browser)
         assert not await other_provider.login_can_skip(other_browser)
@@ -304,9 +304,9 @@ async def test_non_remembered_reauthentication_recovers_after_revoked_cookie_rej
     """Pinned Hydra clears a stale remembered cookie on rejection before a new attempt works."""
     async with _browser() as browser:
         old = await provider.issue_tokens(alice, browser=browser, remember_login=True)
-        assert await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0) == (
-            IdentityRecoveryCleanupState.CONFIRMED
-        )
+        assert (
+            await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0)
+        ).state == (IdentityRecoveryCleanupState.CONFIRMED)
         with pytest.raises(
             AssertionError,
             match=r"^Hydra rejected OAuth authorization with error category 'error'\.$",

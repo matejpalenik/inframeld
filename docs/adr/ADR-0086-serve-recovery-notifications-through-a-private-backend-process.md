@@ -36,3 +36,5 @@ The private service reads coordinated association facts and decides which origin
 Bootstrap assembles shared request-local collaborators and an instantiated protected-file key reader. Access HTTP middleware adds non-cacheable headers without buffering responses. The settings and password-saved Jsonnet templates remain self-contained because the pinned Kratos sandbox rejects imports. Both native hook paths receive behavioral coverage.
 
 [Private delivery](../../.agents/skills/inframeld-access-models/references/private-recovery-handoff.md#implemented-private-delivery) records implementation and qualification limits separately from this process decision.
+
+The dedicated worker now executes the saved handoff and applies complete proof through each original checklist's current release checks. [ADR-0087](ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) records its separate execution capacity. [Current completion guidance](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#implemented-execution-and-proof-backed-completion) owns behavior and tests. Host-authorized additional runs remain separate.

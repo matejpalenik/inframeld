@@ -6,6 +6,7 @@ from typing import Literal, override
 from uuid import UUID
 
 import pytest
+from tests.support.mock_identity_recovery_cleanup_proofs import MockIdentityRecoveryCleanupProofs
 
 from inframeld_backend.access.application.dtos.identity_recovery_admission_dto import (
     IdentityRecoveryAdmissionDTO,
@@ -40,6 +41,9 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.errors.identity_recovery_errors import (
     IdentityRecoveryTransitionError,
+)
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
 )
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
@@ -103,6 +107,7 @@ class MockIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFactsR
             admission=IdentityRecoveryAdmissionDTO(event=EVENT, operation_id=OPERATION),
             principal=ALICE,
             has_other_pending_recovery=False,
+            credential_version=HumanCredentialVersion(2),
         )
         self.error: Exception | None = None
         self.calls: list[tuple[InstallationId, IdentityAuthority, IdentityRecoveryFlowId]] = []
@@ -164,12 +169,15 @@ class MockCompletionScenario:
         self.transactions = MockTransactionManager(self.events)
         self.facts = MockIdentityRecoveryCompletionFactsReader(self.events)
         self.recoveries = MockIdentityRecoveryRepository(self.events)
+        self.proofs = MockIdentityRecoveryCleanupProofs(self.facts.facts.admission)
         self.service = IdentityRecoveryCompletionService(
             self.transactions,
             self.facts,
             self.recoveries,
             installation_id=INSTALLATION,
             authority=AUTHORITY,
+            proofs=self.proofs,
+            proof_writer=self.proofs,
         )
 
 
@@ -432,3 +440,25 @@ async def test_dependency_failures_propagate_without_a_success_result(
         )
     assert error.value is failure
     assert scenario.events[-1] == ("commit-failed" if stage == "commit" else "rollback")
+
+
+@pytest.mark.asyncio
+async def test_missing_durable_proof_cannot_release_a_recovery() -> None:
+    scenario = MockCompletionScenario()
+    with pytest.raises(ConflictError):
+        await scenario.service.reconcile_proof(operation_id=OPERATION)
+    assert scenario.recoveries.saved == []
+    assert scenario.proofs.checked == []
+
+
+@pytest.mark.asyncio
+async def test_missing_credential_state_cannot_release_even_with_provider_confirmations() -> None:
+    scenario = MockCompletionScenario()
+    scenario.facts.facts = replace(scenario.facts.facts, credential_version=None)
+    with pytest.raises(DependencyUnavailableError):
+        await scenario.service.record_cleanup(
+            event=EVENT,
+            kratos_outcome=IdentityRecoveryCleanupState.CONFIRMED,
+            hydra_outcome=IdentityRecoveryCleanupState.CONFIRMED,
+        )
+    assert scenario.recoveries.saved == []

@@ -99,12 +99,10 @@ async def test_cleanup_after_credential_validation_cannot_return_usable_credenti
                     revoker = HydraHumanOAuthCredentialRevoker(OAuth2Api(sdk))
                     assert (
                         await revoker.revoke_cli_grants(alice.subject, timeout_seconds=3.0)
-                        == IdentityRecoveryCleanupState.CONFIRMED
-                    )
+                    ).state == IdentityRecoveryCleanupState.CONFIRMED
                     assert (
                         await revoker.revoke_remembered_logins(alice.subject, timeout_seconds=3.0)
-                        == IdentityRecoveryCleanupState.CONFIRMED
-                    )
+                    ).state == IdentityRecoveryCleanupState.CONFIRMED
                     bobs_refreshed = await provider.refresh_tokens(bobs_tokens)
                     assert bobs_refreshed is not None
                     assert await provider.token_is_active(bobs_refreshed.access_token)

@@ -204,6 +204,27 @@ services:
       postgres:
         condition: service_healthy
 
+  recovery-worker:
+    <<: *backend-image
+    profiles: [recovery]
+    command: ["python", "-m", "inframeld_backend.recovery_worker"]
+    stop_grace_period: 15s
+    environment:
+      INFRAMELD_DATABASE__HOST: postgres
+      INFRAMELD_DATABASE__PORT: "5432"
+      INFRAMELD_DATABASE__NAME: inframeld
+      INFRAMELD_DATABASE__USER: inframeld
+      INFRAMELD_DATABASE__PASSWORD: inframeld-dev-only
+      INFRAMELD_DATABASE__POOL_SIZE: "2"
+      INFRAMELD_DATABASE__MAX_OVERFLOW: "0"
+      INFRAMELD_RECOVERY_CLEANUP__AUTHORITY: kratos:local
+      INFRAMELD_RECOVERY_CLEANUP__HYDRA_ADMIN_URL: http://hydra:4445
+    depends_on:
+      postgres:
+        condition: service_healthy
+      hydra:
+        condition: service_started
+
   backend:
     <<: *backend-image
     environment:

@@ -45,7 +45,7 @@ Load only matching triggers. Discuss and obtain approval before code depends on 
 - [PD-ACCESS-05](references/decision-provider-secret-lifecycle.md): When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
 - [PD-ACCESS-06](references/decision-setup-read-authority.md): Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
 
-Recovery production contracts are [resolved under PD-ACCESS-03](references/decision-recovery-production-completion.md). Read its acceptance matrix when implementing trusted callbacks, durable cleanup or host continuation. Private native notification delivery is implemented. Durable provider execution and host continuation remain unfinished. The owning handoff reference distinguishes these boundaries.
+Recovery production contracts are [resolved under PD-ACCESS-03](references/decision-recovery-production-completion.md). Read its acceptance matrix when implementing trusted callbacks, durable cleanup or host continuation. Private native delivery, bounded provider execution and proof-backed completion are implemented. Host continuation remains unfinished. The owning handoff reference distinguishes these boundaries.
 
 ## Read as needed
 

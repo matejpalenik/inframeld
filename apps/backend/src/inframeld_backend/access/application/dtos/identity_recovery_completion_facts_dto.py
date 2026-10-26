@@ -4,6 +4,9 @@ from inframeld_backend.access.application.dtos.identity_recovery_admission_dto i
     IdentityRecoveryAdmissionDTO,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
 
@@ -19,3 +22,5 @@ class IdentityRecoveryCompletionFactsDTO:
     admission: IdentityRecoveryAdmissionDTO
     principal: Principal | None
     has_other_pending_recovery: bool
+
+    credential_version: HumanCredentialVersion | None

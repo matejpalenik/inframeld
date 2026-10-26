@@ -30,3 +30,20 @@ class IdentityRecoveryCleanupJobRow(AccessPersistenceBase):
     remembered_logins_state: Mapped[IdentityRecoveryCleanupState] = mapped_column(
         IDENTITY_RECOVERY_CLEANUP_STATE_TYPE, init=False, server_default="pending"
     )
+
+    worker_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), init=False, default=None)
+    ownership_token: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), init=False, default=None
+    )
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), init=False, default=None
+    )
+    active_attempt_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), init=False, default=None
+    )
+    cli_confirmation_attempt_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), init=False, default=None
+    )
+    login_confirmation_attempt_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), init=False, default=None
+    )

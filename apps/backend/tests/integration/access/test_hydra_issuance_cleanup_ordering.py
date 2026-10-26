@@ -77,13 +77,12 @@ async def _scenario() -> AsyncGenerator[HydraIssuanceScenario]:
 
 
 async def _clean_up_alice(scenario: HydraIssuanceScenario) -> None:
-    assert await scenario.revoker.revoke_cli_grants(
-        scenario.alice.subject, timeout_seconds=3.0
-    ) == (IdentityRecoveryCleanupState.CONFIRMED)
+    assert (
+        await scenario.revoker.revoke_cli_grants(scenario.alice.subject, timeout_seconds=3.0)
+    ).state == (IdentityRecoveryCleanupState.CONFIRMED)
     assert (
         await scenario.revoker.revoke_remembered_logins(scenario.alice.subject, timeout_seconds=3.0)
-        == IdentityRecoveryCleanupState.CONFIRMED
-    )
+    ).state == IdentityRecoveryCleanupState.CONFIRMED
     assert await scenario.provider.token_is_active(scenario.bobs_tokens.access_token)
 
 
@@ -139,8 +138,7 @@ async def test_code_issued_before_cleanup_cannot_be_exchanged_afterward(
         assert code.consent_skipped == skipped_consent
         assert (
             await scenario.revoker.revoke_cli_grants(scenario.alice.subject, timeout_seconds=3.0)
-            == IdentityRecoveryCleanupState.CONFIRMED
-        )
+        ).state == IdentityRecoveryCleanupState.CONFIRMED
         assert await scenario.provider.exchange_authorization_code(code) is None
         await _assert_revoked(scenario.provider, previous)
         await _assert_bob_still_works(scenario)

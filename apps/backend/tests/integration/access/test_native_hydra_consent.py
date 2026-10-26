@@ -42,12 +42,18 @@ from inframeld_backend.access.domain.value_objects.identity_authority import Ide
 from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
     IdentityRecoveryFlowId,
 )
+from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_cleanup_proof_reader import (
+    PostgresIdentityRecoveryCleanupProofReader,
+)
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
 from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_admission_writer import (
     PostgresIdentityRecoveryAdmissionWriter,
+)
+from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_cleanup_proof_writer import (
+    PostgresIdentityRecoveryCleanupProofWriter,
 )
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import get_settings
@@ -371,8 +377,7 @@ async def test_delayed_approval_between_bulk_calls_cannot_bypass_recovery_block(
                     revoker = HydraHumanOAuthCredentialRevoker(OAuth2Api(sdk))
                     assert (
                         await revoker.revoke_cli_grants(scenario.alice.subject, timeout_seconds=3.0)
-                        == IdentityRecoveryCleanupState.CONFIRMED
-                    )
+                    ).state == IdentityRecoveryCleanupState.CONFIRMED
                     release.set()
                 decision = approval.result()
                 assert decision.status_code == 200
@@ -384,8 +389,7 @@ async def test_delayed_approval_between_bulk_calls_cannot_bypass_recovery_block(
             assert await scenario.provider.token_is_active(tokens.access_token)
             assert (
                 await revoker.revoke_remembered_logins(scenario.alice.subject, timeout_seconds=3.0)
-                == IdentityRecoveryCleanupState.CONFIRMED
-            )
+            ).state == IdentityRecoveryCleanupState.CONFIRMED
             assert await scenario.provider.token_is_active(tokens.access_token)
             response = await scenario.api.get(
                 "/v1/session", headers={"Authorization": f"Bearer {tokens.access_token.value}"}
@@ -498,12 +502,10 @@ async def test_approved_continuation_after_both_bulk_calls_is_rejected_by_pinned
             revoker = HydraHumanOAuthCredentialRevoker(OAuth2Api(sdk))
             assert (
                 await revoker.revoke_cli_grants(scenario.alice.subject, timeout_seconds=3.0)
-                == IdentityRecoveryCleanupState.CONFIRMED
-            )
+            ).state == IdentityRecoveryCleanupState.CONFIRMED
             assert (
                 await revoker.revoke_remembered_logins(scenario.alice.subject, timeout_seconds=3.0)
-                == IdentityRecoveryCleanupState.CONFIRMED
-            )
+            ).state == IdentityRecoveryCleanupState.CONFIRMED
         finally:
             sdk.rest_client.pool_manager.clear()
         resumed = await scenario.browser.get(decision.json()["redirectTo"])
@@ -579,6 +581,12 @@ async def _record_test_cleanup(database: Database, event: IdentityRecoveryEventD
             PostgresIdentityRecoveryRepository(session),
             installation_id=installation_id,
             authority=AUTHORITY,
+            proofs=PostgresIdentityRecoveryCleanupProofReader(
+                session, installation_id=installation_id, authority=AUTHORITY
+            ),
+            proof_writer=PostgresIdentityRecoveryCleanupProofWriter(
+                session, installation_id=installation_id, authority=AUTHORITY
+            ),
         )
         result = await service.record_cleanup(
             event=event,
