@@ -1,6 +1,6 @@
 # ADR-0055: Deliver CLI-first v1 through OpenAPI-generated clients
 
-**Status:** Accepted; partially supersedes ADR-0006's external tooling prerequisite.
+**Status:** Accepted. Partially supersedes ADR-0006's external tooling prerequisite. The Rust generator implementation is subsequently selected by [ADR-0088](ADR-0088-use-a-pinned-patched-generator-for-the-rust-sdk.md).
 
 **Date:** 2026-10-01. This is the recording date; the exact date of the earlier delivery agreement was not recorded.
 
@@ -18,7 +18,7 @@ The accepted CLI decisions now define v1 behavior. Keeping a competing Studio-fi
 
 ## Decision Outcome
 
-Select CLI-first v1 with the small Kratos/Hydra account UI, not a full Studio. Generate application clients from native FastAPI OpenAPI 3.1.x. No generator package is selected by this decision. Qualify the selected implementation against the actual schema and runtime behavior, starting with implemented foundations and extending coverage as features arrive. Backend development does not wait for Studio or a separate generator project.
+Select CLI-first v1 with the small Kratos/Hydra account UI, not a full Studio. Generate application clients from native FastAPI OpenAPI 3.1.x. No generator package was selected by this decision. [ADR-0088](ADR-0088-use-a-pinned-patched-generator-for-the-rust-sdk.md) subsequently selects the Rust implementation while retaining this delivery direction. Qualify the selected implementation against the actual schema and runtime behavior, starting with implemented foundations and extending coverage as features arrive. Backend development does not wait for Studio or a separate generator project.
 
 Keep Studio epics and issues for a later version. They must consume the same backend contracts and follow the accepted CLI-led model, evaluation, query/build/release, access and recovery behavior. Browser account integration may use official Ory clients for Ory's own contracts; that is not a competing Inframeld client.
 

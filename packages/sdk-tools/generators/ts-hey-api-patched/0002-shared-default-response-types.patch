@@ -1,0 +1,28 @@
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -1201,22 +1201,9 @@
+ 		}
+ 	}
+ 	if (defaultResponse) {
+-		let inferred = false;
+-		if (!Object.keys(responses.properties).length) {
+-			responses.properties.default = defaultResponse.schema;
+-			inferred = true;
+-		}
+-		const description = (defaultResponse.schema.description ?? "").toLocaleLowerCase();
+-		const $ref = (defaultResponse.schema.$ref ?? "").toLocaleLowerCase();
+-		if (["success"].some((keyword) => description.includes(keyword) || $ref.includes(keyword))) {
+-			responses.properties.default = defaultResponse.schema;
+-			inferred = true;
+-		}
+-		if (["error", "problem"].some((keyword) => description.includes(keyword) || $ref.includes(keyword))) {
+-			errors.properties.default = defaultResponse.schema;
+-			inferred = true;
+-		}
+-		if (!inferred) errors.properties.default = defaultResponse.schema;
++		// Default applies to unlisted successful and unsuccessful statuses alike.
++		responses.properties.default = defaultResponse.schema;
++		errors.properties.default = defaultResponse.schema;
+ 	}
+ 	const errorKeys = Object.keys(errors.properties);
+ 	if (errorKeys.length) {

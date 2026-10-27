@@ -1,0 +1,154 @@
+--- a/python/api.mustache
++++ b/python/api.mustache
+@@ -101,16 +101,16 @@
+ https://github.com/kubernetes-client/python/blob/6cc5456d79dd8c0ccc9e275a0811aeb025714bea/kubernetes/watch/watch.py#L36-L48
+ }}
+     @validate_call
+-    def {{operationId}}{{>partial_api_args_legacy}} -> {{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}:
++    def {{operationId}}{{>partial_api_args_legacy}} -> {{#allResponsesAreErrors}}None{{/allResponsesAreErrors}}{{^allResponsesAreErrors}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{#isDefault}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/isDefault}}{{/responses}}]{{/allResponsesAreErrors}}:
+ {{/async}}
+ {{#async}}
+     @validate_call
+-    async def {{operationId}}{{>partial_api_args}} -> {{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}:
++    async def {{operationId}}{{>partial_api_args}} -> {{#allResponsesAreErrors}}None{{/allResponsesAreErrors}}{{^allResponsesAreErrors}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{#isDefault}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/isDefault}}{{/responses}}]{{/allResponsesAreErrors}}:
+ {{/async}}
+ {{/compatibleWithPythonLegacyApi}}
+ {{^compatibleWithPythonLegacyApi}}
+     @validate_call
+-    {{#async}}async {{/async}}def {{operationId}}{{>partial_api_args}} -> {{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}:
++    {{#async}}async {{/async}}def {{operationId}}{{>partial_api_args}} -> {{#allResponsesAreErrors}}None{{/allResponsesAreErrors}}{{^allResponsesAreErrors}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{#isDefault}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/isDefault}}{{/responses}}]{{/allResponsesAreErrors}}:
+ {{/compatibleWithPythonLegacyApi}}
+ {{>partial_api}}
+ {{#compatibleWithPythonLegacyApi}}
+@@ -156,16 +156,16 @@
+ {{#compatibleWithPythonLegacyApi}}
+ {{^async}}
+     @validate_call
+-    def {{operationId}}_with_http_info{{>partial_api_args_legacy}} -> Tuple[{{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}, int, Any]:
++    def {{operationId}}_with_http_info{{>partial_api_args_legacy}} -> Tuple[{{#allResponsesAreErrors}}None{{/allResponsesAreErrors}}{{^allResponsesAreErrors}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{#isDefault}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/isDefault}}{{/responses}}]{{/allResponsesAreErrors}}, int, Any]:
+ {{/async}}
+ {{#async}}
+     @validate_call
+-    async def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}]:
++    async def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#allResponsesAreErrors}}None{{/allResponsesAreErrors}}{{^allResponsesAreErrors}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{#isDefault}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/isDefault}}{{/responses}}]{{/allResponsesAreErrors}}]:
+ {{/async}}
+ {{/compatibleWithPythonLegacyApi}}
+ {{^compatibleWithPythonLegacyApi}}
+     @validate_call
+-    {{#async}}async {{/async}}def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}]:
++    {{#async}}async {{/async}}def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#allResponsesAreErrors}}None{{/allResponsesAreErrors}}{{^allResponsesAreErrors}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{#isDefault}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/isDefault}}{{/responses}}]{{/allResponsesAreErrors}}]:
+ {{/compatibleWithPythonLegacyApi}}
+ {{>partial_api}}
+ {{#compatibleWithPythonLegacyApi}}
+@@ -218,7 +218,7 @@
+ 
+ {{#supportHttpxSync}}
+     @validate_call
+-    def {{operationId}}_sync{{>partial_api_args}} -> {{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}:
++    def {{operationId}}_sync{{>partial_api_args}} -> {{#allResponsesAreErrors}}None{{/allResponsesAreErrors}}{{^allResponsesAreErrors}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{#isDefault}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/isDefault}}{{/responses}}]{{/allResponsesAreErrors}}:
+         """{{#isDeprecated}}(Deprecated) {{/isDeprecated}}{{{summary}}}{{^summary}}{{operationId}}{{/summary}} (synchronous)
+ 
+         Synchronous variant of :meth:`{{operationId}}`. It calls the asynchronous
+@@ -239,7 +239,7 @@
+ 
+ 
+     @validate_call
+-    def {{operationId}}_sync_with_http_info{{>partial_api_args}} -> ApiResponse[{{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}]:
++    def {{operationId}}_sync_with_http_info{{>partial_api_args}} -> ApiResponse[{{#allResponsesAreErrors}}None{{/allResponsesAreErrors}}{{^allResponsesAreErrors}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{#isDefault}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/isDefault}}{{/responses}}]{{/allResponsesAreErrors}}]:
+         """{{#isDeprecated}}(Deprecated) {{/isDeprecated}}{{{summary}}}{{^summary}}{{operationId}}{{/summary}} (synchronous)
+ 
+         Synchronous variant of :meth:`{{operationId}}_with_http_info`. It calls the
+--- a/python/api_client.mustache
++++ b/python/api_client.mustache
+@@ -479,6 +479,8 @@
+             elif response_type is not None:
+                 match = None
+                 content_type = response_data.headers.get('content-type')
++                if content_type is None and isinstance(selected_response, Mapping) and len(selected_response) == 1:
++                    content_type = next(iter(selected_response))
+                 if content_type is not None:
+                     match = re.search(r"charset=([a-zA-Z\-\d]+)[\s;]?", content_type)
+                 encoding = "utf-8" if (content_type is None or re.match(r'^application/(json|[\w!#$&.+\-^_]+\+json)\s*(;|$)', content_type, re.IGNORECASE)) else (match.group(1) if match else "utf-8")
+@@ -584,16 +586,8 @@
+         """
+ 
+         # fetch data from response object
+-        if content_type is None:
+-            try:
+-                data = json.loads(response_text)
+-            except ValueError:
+-                data = response_text
+-        elif re.match(r'^application/(json|[\w!#$&.+\-^_]+\+json)\s*(;|$)', content_type, re.IGNORECASE):
+-            if response_text == "":
+-                data = ""
+-            else:
+-                data = json.loads(response_text)
++        if content_type is None or re.match(r'^application/(json|[\w!#$&.+\-^_]+\+json)\s*(;|$)', content_type, re.IGNORECASE):
++            data = json.loads(response_text)
+         elif re.match(r'^text\/[a-z.+-]+\s*(;|$)', content_type, re.IGNORECASE):
+             data = response_text
+         else:
+@@ -625,6 +619,8 @@
+                 return self.__deserialize(data, m.group(1))
+ 
+             if klass.startswith('List['):
++                if not isinstance(data, list):
++                    raise ValueError(f"Expected an array for {klass}")
+                 m = re.match(r'List\[(.*)]', klass)
+                 assert m is not None, "Malformed List type definition"
+                 sub_kls = m.group(1)
+@@ -632,6 +628,8 @@
+                         for sub_data in data]
+ 
+             if klass.startswith('Dict['):
++                if not isinstance(data, dict):
++                    raise ValueError(f"Expected an object for {klass}")
+                 m = re.match(r'Dict\[([^,]*), (.*)]', klass)
+                 assert m is not None, "Malformed Dict type definition"
+                 sub_kls = m.group(2)
+--- a/python/model_generic.mustache
++++ b/python/model_generic.mustache
+@@ -525,6 +525,32 @@
+ 
+         {{/isAdditionalPropertiesTrue}}
+         {{/disallowAdditionalPropertiesIfNotPresent}}
++        {{#allVars}}
++        {{#isArray}}
++        if {{{vendorExtensions.x-py-wire-name-literal}}} in obj and obj[{{{vendorExtensions.x-py-wire-name-literal}}}] is not None and not isinstance(obj[{{{vendorExtensions.x-py-wire-name-literal}}}], list):
++            raise ValueError("Expected array for " + {{{vendorExtensions.x-py-wire-name-literal}}})
++        {{#items.isArray}}
++        if obj.get({{{vendorExtensions.x-py-wire-name-literal}}}) is not None and any(item is not None and not isinstance(item, list) for item in obj[{{{vendorExtensions.x-py-wire-name-literal}}}]):
++            raise ValueError("Expected nested array for " + {{{vendorExtensions.x-py-wire-name-literal}}})
++        {{/items.isArray}}
++        {{#items.isMap}}
++        if obj.get({{{vendorExtensions.x-py-wire-name-literal}}}) is not None and any(item is not None and not isinstance(item, dict) for item in obj[{{{vendorExtensions.x-py-wire-name-literal}}}]):
++            raise ValueError("Expected nested object for " + {{{vendorExtensions.x-py-wire-name-literal}}})
++        {{/items.isMap}}
++        {{/isArray}}
++        {{#isMap}}
++        if {{{vendorExtensions.x-py-wire-name-literal}}} in obj and obj[{{{vendorExtensions.x-py-wire-name-literal}}}] is not None and not isinstance(obj[{{{vendorExtensions.x-py-wire-name-literal}}}], dict):
++            raise ValueError("Expected object for " + {{{vendorExtensions.x-py-wire-name-literal}}})
++        {{#items.isArray}}
++        if obj.get({{{vendorExtensions.x-py-wire-name-literal}}}) is not None and any(item is not None and not isinstance(item, list) for item in obj[{{{vendorExtensions.x-py-wire-name-literal}}}].values()):
++            raise ValueError("Expected nested array for " + {{{vendorExtensions.x-py-wire-name-literal}}})
++        {{/items.isArray}}
++        {{#items.isMap}}
++        if obj.get({{{vendorExtensions.x-py-wire-name-literal}}}) is not None and any(item is not None and not isinstance(item, dict) for item in obj[{{{vendorExtensions.x-py-wire-name-literal}}}].values()):
++            raise ValueError("Expected nested object for " + {{{vendorExtensions.x-py-wire-name-literal}}})
++        {{/items.isMap}}
++        {{/isMap}}
++        {{/allVars}}
+         _obj = cls.model_validate({key: value for key, value in {
+             {{#allVars}}
+             {{#isContainer}}
+--- a/python/partial_api.mustache
++++ b/python/partial_api.mustache
+@@ -58,7 +58,7 @@
+ 
+         _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+             {{#responses}}
+-            '{{code}}': {
++            '{{#isDefault}}default{{/isDefault}}{{^isDefault}}{{code}}{{/isDefault}}': {
+                 {{#content}}{{#entrySet}}
+                 '{{key}}': {{#value.schema.dataType}}"{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{{.}}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}"{{/value.schema.dataType}}{{^value.schema.dataType}}None{{/value.schema.dataType}},
+                 {{/entrySet}}{{/content}}

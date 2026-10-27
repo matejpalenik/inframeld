@@ -1,0 +1,277 @@
+--- a/python/api.mustache
++++ b/python/api.mustache
+@@ -28,7 +28,7 @@
+     Do not edit the class manually.
+     """
+ 
+-    def __init__(self, api_client=None) -> None:
++    def __init__(self, api_client: Optional[ApiClient] = None) -> None:
+ {{#useIndependentImplicitClients}}
+         # api_client remains publicly assignable. Retain the client acquired at
+         # construction so reassignment cannot transfer or discard ownership.
+@@ -97,16 +97,16 @@
+ https://github.com/kubernetes-client/python/blob/6cc5456d79dd8c0ccc9e275a0811aeb025714bea/kubernetes/watch/watch.py#L36-L48
+ }}
+     @validate_call
+-    def {{operationId}}{{>partial_api_args_legacy}} -> {{{returnType}}}{{^returnType}}None{{/returnType}}:
++    def {{operationId}}{{>partial_api_args_legacy}} -> {{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}:
+ {{/async}}
+ {{#async}}
+     @validate_call
+-    async def {{operationId}}{{>partial_api_args}} -> {{{returnType}}}{{^returnType}}None{{/returnType}}:
++    async def {{operationId}}{{>partial_api_args}} -> {{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}:
+ {{/async}}
+ {{/compatibleWithPythonLegacyApi}}
+ {{^compatibleWithPythonLegacyApi}}
+     @validate_call
+-    {{#async}}async {{/async}}def {{operationId}}{{>partial_api_args}} -> {{{returnType}}}{{^returnType}}None{{/returnType}}:
++    {{#async}}async {{/async}}def {{operationId}}{{>partial_api_args}} -> {{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}:
+ {{/compatibleWithPythonLegacyApi}}
+ {{>partial_api}}
+ {{#compatibleWithPythonLegacyApi}}
+@@ -152,16 +152,16 @@
+ {{#compatibleWithPythonLegacyApi}}
+ {{^async}}
+     @validate_call
+-    def {{operationId}}_with_http_info{{>partial_api_args_legacy}} -> Tuple[{{{returnType}}}{{^returnType}}None{{/returnType}}, int, Any]:
++    def {{operationId}}_with_http_info{{>partial_api_args_legacy}} -> Tuple[{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}, int, Any]:
+ {{/async}}
+ {{#async}}
+     @validate_call
+-    async def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{{returnType}}}{{^returnType}}None{{/returnType}}]:
++    async def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}]:
+ {{/async}}
+ {{/compatibleWithPythonLegacyApi}}
+ {{^compatibleWithPythonLegacyApi}}
+     @validate_call
+-    {{#async}}async {{/async}}def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{{returnType}}}{{^returnType}}None{{/returnType}}]:
++    {{#async}}async {{/async}}def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}]:
+ {{/compatibleWithPythonLegacyApi}}
+ {{>partial_api}}
+ {{#compatibleWithPythonLegacyApi}}
+@@ -214,7 +214,7 @@
+ 
+ {{#supportHttpxSync}}
+     @validate_call
+-    def {{operationId}}_sync{{>partial_api_args}} -> {{{returnType}}}{{^returnType}}None{{/returnType}}:
++    def {{operationId}}_sync{{>partial_api_args}} -> {{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}:
+         """{{#isDeprecated}}(Deprecated) {{/isDeprecated}}{{{summary}}}{{^summary}}{{operationId}}{{/summary}} (synchronous)
+ 
+         Synchronous variant of :meth:`{{operationId}}`. It calls the asynchronous
+@@ -235,7 +235,7 @@
+ 
+ 
+     @validate_call
+-    def {{operationId}}_sync_with_http_info{{>partial_api_args}} -> ApiResponse[{{{returnType}}}{{^returnType}}None{{/returnType}}]:
++    def {{operationId}}_sync_with_http_info{{>partial_api_args}} -> ApiResponse[{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}]:
+         """{{#isDeprecated}}(Deprecated) {{/isDeprecated}}{{{summary}}}{{^summary}}{{operationId}}{{/summary}} (synchronous)
+ 
+         Synchronous variant of :meth:`{{operationId}}_with_http_info`. It calls the
+--- a/python/api_client.mustache
++++ b/python/api_client.mustache
+@@ -21,7 +21,7 @@
+ 
+ from urllib.parse import quote
+ from typing import Tuple, Optional, List, Dict, Union{{#compatibleWithPythonLegacy}}, Any{{/compatibleWithPythonLegacy}}
+-from pydantic import SecretStr
++from pydantic import SecretStr, TypeAdapter
+ 
+ from {{packageName}}.configuration import Configuration
+ from {{packageName}}.api_response import ApiResponse, T as ApiResponseT
+@@ -83,7 +83,7 @@
+ 
+     def __init__(
+         self,
+-        configuration=None,
++        configuration: Configuration | None = None,
+         header_name=None,
+         header_value=None,
+         cookie=None{{#compatibleWithPythonLegacyApi}}{{^async}},
+@@ -100,7 +100,7 @@
+         self.configuration = configuration
+ 
+         self.rest_client = rest.RESTClientObject(configuration)
+-        self.default_headers = {}
++        self.default_headers: Dict[str, str] = {}
+         if header_name is not None:
+             self.default_headers[header_name] = header_value
+         self.cookie = cookie
+@@ -121,7 +121,7 @@
+     async def __aexit__(self, exc_type, exc_value, traceback):
+         await self.close()
+ 
+-    async def close(self):
++    async def close(self) -> None:
+         await self.rest_client.close()
+ {{/async}}
+ {{^async}}
+@@ -438,21 +438,22 @@
+         msg = "RESTResponse.read() must be called before passing it to response_deserialize()"
+         assert response_data.data is not None, msg
+ 
+-        response_type = response_types_map.get(str(response_data.status), None)
+-        if not response_type and isinstance(response_data.status, int) and 100 <= response_data.status <= 599:
+-            # if not found, look for '1XX', '2XX', etc.
+-            response_type = response_types_map.get(str(response_data.status)[0] + "XX", None)
+-
+-        # If the response_type has not matched (eg. did not match the previous if statements) and the default response is available, use it.
+-        if response_type is None and str(response_data.status) not in response_types_map \
+-            and (not isinstance(response_data.status, int) or not 100 <= response_data.status <= 599 or str(response_data.status)[0] + "XX" not in response_types_map) \
+-            and 'default' in response_types_map:
+-            response_type = response_types_map['default']
+-
+-        # deserialize response data
++        response_types_map = response_types_map or {}
++        response_key = str(response_data.status)
++        if response_key not in response_types_map:
++            response_key = str(response_data.status)[0] + "XX"
++        if response_key not in response_types_map:
++            response_key = "default"
++        declared_response = response_key in response_types_map
++        response_type = response_types_map.get(response_key)
++
+         response_text = None
+         return_data = None
+         try:
++            if 200 <= response_data.status <= 299 and not declared_response:
++                raise ValueError(f"Undeclared successful HTTP status {response_data.status}")
++            if declared_response and response_type is None and response_data.data:
++                raise ValueError("Unexpected body for a bodyless response")
+             if response_type in ("bytearray", "bytes"):
+                 return_data = response_data.data
+             elif response_type == "file":
+@@ -462,7 +463,7 @@
+                 content_type = response_data.headers.get('content-type')
+                 if content_type is not None:
+                     match = re.search(r"charset=([a-zA-Z\-\d]+)[\s;]?", content_type)
+-                encoding = match.group(1) if match else "utf-8"
++                encoding = "utf-8" if (content_type is None or re.match(r'^application/(json|[\w!#$&.+\-^_]+\+json)\s*(;|$)', content_type, re.IGNORECASE)) else (match.group(1) if match else "utf-8")
+                 response_text = response_data.data.decode(encoding)
+                 return_data = self.deserialize(response_text, response_type, content_type)
+         except Exception as error:
+@@ -470,15 +471,14 @@
+                 status=response_data.status,
+                 reason="Cannot decode the received HTTP response",
+                 http_resp=response_data,
+-                body=response_text,
++                body=response_text if response_text is not None else response_data.data,
+             ) from error
+-        finally:
+-            if not 200 <= response_data.status <= 299:
+-                raise ApiException.from_response(
+-                    http_resp=response_data,
+-                    body=response_text,
+-                    data=return_data,
+-                )
++        if not 200 <= response_data.status <= 299:
++            raise ApiException.from_response(
++                http_resp=response_data,
++                body=response_text if response_text is not None else response_data.data,
++                data=return_data,
++            )
+ 
+         return ApiResponse(
+             status_code = response_data.status,
+@@ -595,7 +595,9 @@
+         :return: object.
+         """
+         if data is None:
+-            return None
++            if klass is None or klass is object or (isinstance(klass, str) and klass.startswith('Optional[')):
++                return None
++            raise ValueError(f"Null is not permitted for {klass}")
+ 
+         if isinstance(klass, str):
+             if klass.startswith('Optional['):
+@@ -625,7 +627,7 @@
+                 klass = getattr({{modelPackage}}, klass)
+ 
+         if klass in self.PRIMITIVE_TYPES:
+-            return self.__deserialize_primitive(data, klass)
++            return TypeAdapter(klass).validate_python(data, strict=True)
+         elif klass is object:
+             return self.__deserialize_object(data)
+         elif klass is datetime.date:
+--- a/python/api_response.mustache
++++ b/python/api_response.mustache
+@@ -2,7 +2,8 @@
+ 
+ from __future__ import annotations
+ from typing import Optional, Generic, Mapping, TypeVar
+-from pydantic import Field, StrictInt, StrictBytes, BaseModel
++import httpx
++from pydantic import Field, StrictInt, StrictBytes, BaseModel, field_validator, field_serializer
+ 
+ T = TypeVar("T")
+ 
+@@ -12,10 +13,21 @@
+     """
+ 
+     status_code: StrictInt = Field(description="HTTP status code")
+-    headers: Optional[Mapping[str, str]] = Field(None, description="HTTP headers")
++    headers: Optional[httpx.Headers] = Field(None, description="HTTP headers")
+     data: T = Field(description="Deserialized data given the data type")
+     raw_data: StrictBytes = Field(description="Raw data (HTTP response body)")
+ 
+     model_config = {
+         "arbitrary_types_allowed": True
+     }
++
++    @field_validator("headers", mode="before")
++    @classmethod
++    def preserve_headers(cls, value: object) -> httpx.Headers | None:
++        if value is None or isinstance(value, httpx.Headers):
++            return value
++        return httpx.Headers(value)
++
++    @field_serializer("headers", when_used="json")
++    def serialize_headers(self, value: httpx.Headers | None) -> list[tuple[str, str]] | None:
++        return value.multi_items() if value is not None else None
+--- a/python/exceptions.mustache
++++ b/python/exceptions.mustache
+@@ -1,6 +1,7 @@
+ {{>partial_header}}
+ 
+ from typing import Any, Optional
++import httpx
+ from typing_extensions import Self
+ 
+ class OpenApiException(Exception):
+@@ -91,6 +92,13 @@
+ 
+ 
+ class ApiException(OpenApiException):
++    status: int | None
++    reason: str | None
++    headers: httpx.Headers | None
++    body: str | bytes | None
++    data: object
++    raw_data: bytes | None
++
+ 
+     def __init__(
+         self, 
+@@ -98,9 +106,10 @@
+         reason=None, 
+         http_resp=None,
+         *,
+-        body: Optional[str] = None,
+-        data: Optional[Any] = None,
++        body: str | bytes | None = None,
++        data: object = None,
+     ) -> None:
++        self.raw_data = http_resp.data if http_resp is not None else None
+         self.status = status
+         self.reason = reason
+         self.body = body
+--- a/python/partial_api.mustache
++++ b/python/partial_api.mustache
+@@ -59,7 +59,7 @@
+         _response_types_map: Dict[str, Optional[str]] = {
+             {{#responses}}
+             {{^isWildcard}}
+-            '{{code}}': {{#dataType}}"{{.}}"{{/dataType}}{{^dataType}}None{{/dataType}},
++            '{{code}}': {{#dataType}}"{{#schema.nullable}}Optional[{{/schema.nullable}}{{.}}{{#schema.nullable}}]{{/schema.nullable}}"{{/dataType}}{{^dataType}}None{{/dataType}},
+             {{/isWildcard}}
+             {{#isWildcard}}
+             {{#dataType}}

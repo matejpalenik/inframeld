@@ -61,7 +61,7 @@ A summary must preserve its relevant conditions or link to the precise owner. Fo
 
 ## Skill reading routes
 
-Keep one active `SKILL.md` for each of the nine capabilities below under `.agents/skills/`. Architecture is for orientation and journeys spanning owners, not a prerequisite for every domain question. Coding Standards loads for code work in every repository language. It teaches backend Python conventions and routes other languages to their existing guidance. Application Contracts covers application orchestration and transport. The former combined Pipelines/Releases skill has been replaced by the separate Pipelines and Releases names, without a compatibility body.
+Keep one active `SKILL.md` for each capability listed below under `.agents/skills/`. Architecture is for orientation and journeys spanning owners, not a prerequisite for every domain question. Coding Standards loads for code work in every repository language. It teaches backend Python conventions and routes other languages to their existing guidance. Application Contracts covers application orchestration and transport. The former combined Pipelines/Releases skill has been replaced by the separate Pipelines and Releases names, without a compatibility body.
 
 | Skill | Detailed owner |
 | --- | --- |
@@ -73,6 +73,11 @@ Keep one active `SKILL.md` for each of the nine capabilities below under `.agent
 | [Evaluation](../../../.agents/skills/inframeld-evaluation/SKILL.md) | [Focused references](../../../.agents/skills/inframeld-evaluation/references/architecture.md) and that skill’s direct workflow routes. |
 | [Releases](../../../.agents/skills/inframeld-releases/SKILL.md) | [Focused references](../../../.agents/skills/inframeld-releases/references/architecture.md) and that skill’s direct workflow routes. |
 | [Application Contracts](../../../.agents/skills/inframeld-application-contracts/SKILL.md) | [Focused references](../../../.agents/skills/inframeld-application-contracts/references/components-and-services.md) and that skill’s direct workflow routes. |
+| [Rust SDK](../../../.agents/skills/inframeld-rust-sdk/SKILL.md) | [Generator maintenance](../../../.agents/skills/inframeld-rust-sdk/references/generator-maintenance.md) and that skill’s conditional runbook routes. |
+| [SDKs](../../../.agents/skills/inframeld-sdks/SKILL.md) | [Shared generation maintenance](../../../.agents/skills/inframeld-sdks/references/generator-maintenance.md) and [cross-language qualification](../../../.agents/skills/inframeld-sdks/references/shared-qualification.md). |
+| [TypeScript SDK](../../../.agents/skills/inframeld-typescript-sdk/SKILL.md) | [Fetch/Zod usage and maintenance](../../../.agents/skills/inframeld-typescript-sdk/references/usage-and-maintenance.md). |
+| [Python SDK](../../../.agents/skills/inframeld-python-sdk/SKILL.md) | [HTTPX/Pydantic usage and maintenance](../../../.agents/skills/inframeld-python-sdk/references/usage-and-maintenance.md). |
+| [Testing](../../../.agents/skills/inframeld-testing/SKILL.md) | [Test strategy](../../../.agents/skills/inframeld-testing/references/test-strategy.md) and [isolation/evidence](../../../.agents/skills/inframeld-testing/references/isolation-and-evidence.md). |
 | [Coding Standards](../../../.agents/skills/inframeld-coding-standards/SKILL.md) | [Focused references](../../../.agents/skills/inframeld-coding-standards/references/component-roles-and-imports.md) and that skill’s direct workflow routes. |
 
 Read the selected skill and only the references relevant to the current question. Before any repository code planning, suggestions, additions, changes or reviews, including tests and code snippets, root AGENTS.md requires Coding Standards. Apply its Python references only to backend Python. Other languages retain their directory and language guidance. Backend services require its service example, and affected aggregates/repositories require their specific example. Services and execution boundaries also require the owning Application Contracts workflow. Moving detailed conventions out of root guidance does not make them optional. Domain-only explanations need no coding-standard load. Loading any skill grants no editing or external-action authority.
@@ -80,6 +85,8 @@ Read the selected skill and only the references relevant to the current question
 <a id="write-a-skill-for-both-people-and-agents"></a>
 
 ### Write a skill for both people and agents
+
+Follow current [OpenAI skill guidance](https://learn.chatgpt.com/docs/build-skills) and the [Agent Skills specification](https://agentskills.io/specification). Discovery reads metadata first. Put precise activation conditions in the description, essential instructions in the body and conditional detail in directly linked references. Normal automatic discovery needs no interface metadata. The SDK skills are siblings with explicit ownership links, not inherited parent instructions. Ordinary consumption can load one language skill. Testing loads for strategy, isolation or evidence questions rather than every code task. Evaluation remains the owner of product model-quality benchmarks.
 
 Frontmatter describes the actual capability and activation conditions. The body explains purpose, a small working model, essential constraints, a method for explaining/reviewing, and direct conditional reading routes. Aim for roughly 400–800 words per entry point, excluding diagrams. This is an editorial target, not permission to discard information.
 

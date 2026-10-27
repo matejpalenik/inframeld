@@ -4,6 +4,8 @@
 
 Alice adds a grant workflow. A useful test proves what happens when authority is missing or a response is lost. A test that only checks the service's filename would not protect either behavior. Documentation should explain the same useful boundaries to a new maintainer.
 
+This reference owns scaffold-first TDD, test-code conventions and documentation. For choosing test layers, dependency isolation or interpreting verification evidence, conditionally use the [Testing skill](../../inframeld-testing/SKILL.md). Routine code work does not require loading that strategy.
+
 <a id="behavioral-tdd"></a>
 
 ## Behavioral TDD

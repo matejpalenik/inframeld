@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+members = [
+  "packages/sdk-rust",
+  "packages/sdk-tools/drivers/rust",
+  "packages/sdk-tools/fixtures/rust",
+  "packages/sdk-tools/fixtures/rust-capabilities",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "Apache-2.0"
+repository = "https://github.com/matejpalenik/inframeld"

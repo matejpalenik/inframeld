@@ -14,3 +14,14 @@ apps/backend/uv.lock
 .husky/_
 contracts/openapi/v1/inframeld-v1.json
 apps/web/next-env.d.ts
+Cargo.lock
+
+
+packages/sdk-rust/generated/
+packages/sdk-typescript/generated/
+packages/sdk-python/generated/
+packages/sdk-tools/fixtures/*/generated/
+packages/sdk-tools/artifacts/
+packages/sdk-tools/requirements.lock
+
+packages/sdk-tools/fixtures/openapi.json

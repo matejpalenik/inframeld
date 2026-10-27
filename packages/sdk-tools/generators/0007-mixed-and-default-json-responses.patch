@@ -1,0 +1,174 @@
+--- a/src/analysis.rs
++++ b/src/analysis.rs
+@@ -8346,7 +8346,7 @@
+                                 let schema_name =
+                                     if response_info.media_type.as_ref() == Some(media_type) {
+                                         response_info.schema_name.clone()
+-                                    } else if let Some(reference) = schema.reference() {
++                                    } else if let Some(reference) = schema.reference().filter(|_| !self.schema_or_reference_is_nullable(schema)) {
+                                         self.extract_schema_name(reference).map(str::to_owned)
+                                     } else {
+                                         let preferred = format!(
+@@ -8357,11 +8357,12 @@
+                                             ),
+                                             base_param_ident(media_type)
+                                         );
+-                                        Some(self.add_inline_schema(
+-                                            &preferred,
+-                                            schema,
+-                                            &mut HashSet::new(),
+-                                        )?)
++                                        let name = self.add_inline_schema(&preferred, schema, &mut HashSet::new())?;
++                                        if let Some(analyzed) = self.resolved_cache.get(&name).cloned() {
++                                            let schema_type = self.nullable_container_value(schema, analyzed.schema_type);
++                                            self.resolved_cache.get_mut(&name).unwrap().schema_type = schema_type;
++                                        }
++                                        Some(name)
+                                     };
+                                 let Some(schema_name) = schema_name else {
+                                     continue;
+--- a/src/client_generator.rs
++++ b/src/client_generator.rs
+@@ -192,6 +192,13 @@
+     Empty,
+ }
+ 
++/// A declared buffered JSON representation or an explicitly bodyless response.
++#[derive(Clone, Copy)]
++struct JsonResponseAlternative<'a> {
++    status: &'a str,
++    representation: Option<(&'a str, &'a str)>,
++}
++
+ #[derive(Clone)]
+ struct ClientSuccessSelection<'a> {
+     statuses: Vec<&'a str>,
+@@ -213,7 +220,7 @@
+     pub builder_type_ident: Option<syn::Ident>,
+     pub content_type_method_ident: Option<syn::Ident>,
+     success: ClientSuccessSelection<'a>,
+-    json_alternatives: Vec<(&'a str, &'a str, &'a str)>,
++    json_alternatives: Vec<JsonResponseAlternative<'a>>,
+     validate_content_type: bool,
+ }
+ 
+@@ -768,7 +775,7 @@
+             let mut success = self.get_success_response(analysis, operation);
+             let alternatives = Self::json_response_alternatives(analysis, operation);
+             if alternatives.len() > 1 {
+-                success.statuses = alternatives.iter().map(|item| item.0).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
++                success.statuses = alternatives.iter().map(|item| item.status).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+                 success.excluded_statuses.retain(|status| !success.statuses.contains(status));
+                 success.accept = None;
+             }
+@@ -3875,6 +3882,10 @@
+                     .map(|(status, response)| (status.as_str(), response)),
+             );
+ 
++            if let Some(response) = responses.get("default") {
++                candidates.push(("default", response));
++            }
++
+             let selected = candidates
+                 .iter()
+                 .copied()
+@@ -3999,17 +4010,23 @@
+         }
+     }
+ 
+-    fn json_response_alternatives<'a>(analysis: &'a SchemaAnalysis, operation: &'a OperationInfo) -> Vec<(&'a str, &'a str, &'a str)> {
++    fn json_response_alternatives<'a>(analysis: &'a SchemaAnalysis, operation: &'a OperationInfo) -> Vec<JsonResponseAlternative<'a>> {
+         let Some(responses) = analysis.operation_responses.get(&operation.operation_id) else { return Vec::new(); };
+         let mut alternatives = Vec::new();
+-        for (status, response) in responses.iter().filter(|(status, _)| status.starts_with('2')) {
+-            if response.representations.is_empty() { return Vec::new(); }
++        for (status, response) in responses.iter().filter(|(status, _)| status.starts_with('2') || status.as_str() == "default") {
++            if response.representations.is_empty() {
++                if matches!(Self::response_body(response), ClientSuccessBody::Empty) {
++                    alternatives.push(JsonResponseAlternative { status, representation: None });
++                    continue;
++                }
++                return Vec::new();
++            }
+             for (media_type, representation) in &response.representations {
+                 let OperationRepresentation::Json { schema_name } = representation else { return Vec::new(); };
+-                alternatives.push((status.as_str(), media_type.as_str(), schema_name.as_str()));
+-            }
+-        }
+-        alternatives
++                alternatives.push(JsonResponseAlternative { status, representation: Some((media_type, schema_name)) });
++            }
++        }
++        if alternatives.iter().any(|item| item.representation.is_some()) { alternatives } else { Vec::new() }
+     }
+ 
+     fn json_response_enum_name(&self, operation: &OperationInfo) -> syn::Ident {
+@@ -4018,10 +4035,14 @@
+ 
+     fn generate_json_response_enum(&self, plan: &ClientMethodPlan<'_>) -> TokenStream {
+         let name = self.json_response_enum_name(plan.operation);
+-        let variants = plan.json_alternatives.iter().enumerate().map(|(index, (status, _, schema))| {
+-            let variant = Self::to_field_ident(&format!("Status{}Representation{}", status, index));
+-            let ty = Self::to_field_ident(&self.to_rust_type_name(schema));
+-            quote! { #variant(super::types::#ty) }
++        let variants = plan.json_alternatives.iter().enumerate().map(|(index, item)| {
++            let variant = Self::to_field_ident(&format!("Status{}Representation{}", item.status, index));
++            if let Some((_, schema)) = item.representation {
++                let ty = Self::to_field_ident(&self.to_rust_type_name(schema));
++                quote! { #variant(super::types::#ty) }
++            } else {
++                quote! { #variant }
++            }
+         });
+         quote! {
+             #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+@@ -4044,16 +4065,25 @@
+         }
+     }
+ 
+-    fn generate_json_response_decode(&self, operation: &OperationInfo, alternatives: &[(&str, &str, &str)]) -> TokenStream {
++    fn generate_json_response_decode(&self, operation: &OperationInfo, alternatives: &[JsonResponseAlternative<'_>]) -> TokenStream {
+         let name = self.json_response_enum_name(operation);
+-        let statuses: std::collections::BTreeSet<_> = alternatives.iter().map(|item| item.0).collect();
++        let statuses: std::collections::BTreeSet<_> = alternatives.iter().map(|item| item.status).collect();
+         let branches = statuses.into_iter().map(|status| {
+             let guard = Self::single_status_guard(status);
+-            let entries: Vec<_> = alternatives.iter().enumerate().filter(|(_, item)| item.0 == status).collect();
+-            let media: Vec<_> = entries.iter().map(|(_, item)| item.1).collect();
+-            let arms = entries.iter().enumerate().map(|(selection, (index, (_, _, schema)))| {
++            let entries: Vec<_> = alternatives.iter().enumerate().filter(|(_, item)| item.status == status).collect();
++            if entries[0].1.representation.is_none() {
++                let index = entries[0].0;
+                 let variant = Self::to_field_ident(&format!("Status{}Representation{}", status, index));
+-                let ty = Self::to_field_ident(&self.to_rust_type_name(schema));
++                return quote! {
++                    if #guard {
++                        return if raw_body.is_empty() { Ok(#name::#variant) } else { Err("Unexpected body for a bodyless response".into()) };
++                    }
++                };
++            }
++            let media: Vec<_> = entries.iter().map(|(_, item)| item.representation.unwrap().0).collect();
++            let arms = entries.iter().enumerate().map(|(selection, (index, item))| {
++                let variant = Self::to_field_ident(&format!("Status{}Representation{}", status, index));
++                let ty = Self::to_field_ident(&self.to_rust_type_name(item.representation.unwrap().1));
+                 quote! { #selection => serde_json::from_slice::<super::types::#ty>(&raw_body).map(#name::#variant).map_err(|error| error.to_string()) }
+             });
+             quote! {
+@@ -4131,7 +4161,7 @@
+         if !success
+             .statuses
+             .iter()
+-            .any(|status| status.eq_ignore_ascii_case("2XX"))
++            .any(|status| status.eq_ignore_ascii_case("2XX") || status.eq_ignore_ascii_case("default"))
+         {
+             return guard;
+         }
+@@ -4184,7 +4214,7 @@
+         &self,
+         op: &OperationInfo,
+         success: ClientSuccessSelection<'_>,
+-        alternatives: &[(&str, &str, &str)],
++        alternatives: &[JsonResponseAlternative<'_>],
+     ) -> TokenStream {
+         let op_error_type = self.op_error_type_token(op);
+         let success_body = success.body;

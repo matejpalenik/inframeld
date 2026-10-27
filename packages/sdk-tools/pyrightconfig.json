@@ -1,0 +1,12 @@
+{
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.11",
+  "include": ["drivers/python", "consumers/python"],
+  "extraPaths": [
+    "../sdk-python/generated",
+    "fixtures/python/generated",
+    "drivers/python"
+  ],
+  "venvPath": "../../node_modules/.cache/inframeld-sdk-tools",
+  "venv": "python"
+}

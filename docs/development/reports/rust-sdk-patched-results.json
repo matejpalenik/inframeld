@@ -1,0 +1,181 @@
+{
+  "observedOn": "2026-10-27",
+  "candidate": "openapi-to-rust-patched",
+  "productionSchemaSha256": "e8b3cb46d7de089319061f7920fec23df1a645401ce8021dfef921d3e174fed0",
+  "fixtureSchemaSha256": "abb443e148faa8576867a73a81d466b9f9525b318bf2e7504bc8f70f9e77fd24",
+  "capabilitySchemaSha256": "8c2a61498017953170115a066f11e60c78eeb7a90d3075cd0a3659a5e8371734",
+  "rustVersion": "1.95.0",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "generator": {
+    "key": "52cc4ffc512510e8f75d5679a9606ed37584f07fb08d874f671eccec01fcfde5",
+    "upstreamVersion": "0.23.0",
+    "revision": "inframeld.1",
+    "archiveUrl": "https://static.crates.io/crates/openapi-to-rust/openapi-to-rust-0.23.0.crate",
+    "archiveSha256": "3bd6e71bfeb9c084586ad4daa7373a662be1f779432f263fa291460a98803d7d",
+    "patches": [
+      {
+        "file": "0001-native-multipart-files.patch",
+        "sha256": "79e51f067d0bc6e2748f5fd942de7d69c5706f093e19afd853a844dfff47954c"
+      },
+      {
+        "file": "0002-success-response-metadata.patch",
+        "sha256": "41b9d6b343c8d1770928710298dfe2ace65fa7fd0fde4296a808cd7511836ebc"
+      }
+    ]
+  },
+  "sharedScenarios": [
+    {
+      "scenario": "health",
+      "status": "passed"
+    },
+    {
+      "scenario": "session-bearer",
+      "status": "passed"
+    },
+    {
+      "scenario": "session-cookie",
+      "status": "passed"
+    },
+    {
+      "scenario": "missing-auth",
+      "status": "passed"
+    },
+    {
+      "scenario": "invalid-auth",
+      "status": "passed"
+    },
+    {
+      "scenario": "denied",
+      "status": "passed"
+    },
+    {
+      "scenario": "unavailable",
+      "status": "passed"
+    },
+    {
+      "scenario": "competing",
+      "status": "passed"
+    },
+    {
+      "scenario": "consent-inspect",
+      "status": "passed"
+    },
+    {
+      "scenario": "consent-decide",
+      "status": "passed"
+    },
+    {
+      "scenario": "consent-csrf-denied",
+      "status": "passed"
+    },
+    {
+      "scenario": "consent-bearer-denied",
+      "status": "passed"
+    },
+    {
+      "scenario": "grant-bearer",
+      "status": "passed"
+    },
+    {
+      "scenario": "grant-cookie",
+      "status": "passed"
+    },
+    {
+      "scenario": "grant-invalid",
+      "status": "passed"
+    },
+    {
+      "scenario": "payload-integer",
+      "status": "passed"
+    },
+    {
+      "scenario": "payload-string",
+      "status": "passed"
+    },
+    {
+      "scenario": "optional-absent",
+      "status": "passed"
+    },
+    {
+      "scenario": "optional-null",
+      "status": "passed"
+    },
+    {
+      "scenario": "page-default",
+      "status": "passed"
+    },
+    {
+      "scenario": "page-explicit",
+      "status": "passed"
+    },
+    {
+      "scenario": "upload",
+      "status": "passed"
+    },
+    {
+      "scenario": "problem-path-union",
+      "status": "passed"
+    },
+    {
+      "scenario": "malformed-success",
+      "status": "passed"
+    },
+    {
+      "scenario": "unexpected-status",
+      "status": "passed"
+    },
+    {
+      "scenario": "redirect",
+      "status": "passed"
+    },
+    {
+      "scenario": "timeout",
+      "status": "passed"
+    },
+    {
+      "scenario": "lost-response",
+      "status": "passed"
+    },
+    {
+      "scenario": "response-headers",
+      "status": "passed"
+    },
+    {
+      "scenario": "success-headers",
+      "status": "passed"
+    }
+  ],
+  "generatorLibraryTests": {
+    "passed": 115,
+    "failed": 0
+  },
+  "capabilityWireTests": {
+    "passed": 14,
+    "failed": 0
+  },
+  "runnerTests": {
+    "passed": 7,
+    "failed": 0
+  },
+  "backendContractAndFixtureTests": {
+    "passed": 17,
+    "failed": 0
+  },
+  "cleanDefaultToolCacheGeneration": "passed",
+  "cleanRegenerationAndDependencyDrift": "passed",
+  "metadataDisabledMatchesBaselineProduction": "passed",
+  "packageAndExternalConsumer": "passed",
+  "buildCost": {
+    "cleanCheckMilliseconds": 19421.64,
+    "noOpCheckMilliseconds": 162.7622909999991,
+    "generatedRustFiles": 3,
+    "generatedRustBytes": 56832,
+    "runtimeDependencyEntries": 101
+  },
+  "limitations": [
+    "Local macOS ARM64 evidence only. The updated Linux/macOS CI matrix has not run.",
+    "Synthetic capability fixtures are not production workflow qualification.",
+    "No upstream repository integration suite, public SDK release, CLI implementation or HTTP escape hatch is included."
+  ]
+}

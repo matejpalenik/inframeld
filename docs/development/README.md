@@ -16,6 +16,13 @@ Start the backend, learn one workflow and follow its owner when you need details
 | Investigate a failure safely | [Debugging](guides/debugging.md) |
 | Add a backend behavior | [Worked contributor guide](guides/adding-a-backend-feature.md) |
 | Find an HTTP field, logical record or database constraint | [Contracts and data](guides/contracts-and-data.md) |
+| Consume or maintain the Rust SDK and generator patches | [Rust SDK skill](../../.agents/skills/inframeld-rust-sdk/SKILL.md) and [workspace runbook](../../packages/sdk-tools/README.md) |
+| Extend shared SDK coverage or maintain generator inputs | [SDKs skill](../../.agents/skills/inframeld-sdks/SKILL.md) |
+| Consume or maintain the TypeScript or Python SDK | [TypeScript](../../.agents/skills/inframeld-typescript-sdk/SKILL.md), [Python](../../.agents/skills/inframeld-python-sdk/SKILL.md) and [language runbook](../../packages/sdk-tools/README.md) |
+| Understand SDK tooling or add endpoint coverage | [Architecture map](../../packages/sdk-tools/docs/architecture.md), [endpoint walkthrough](../../packages/sdk-tools/docs/adding-endpoint.md) and [generator walkthrough](../../packages/sdk-tools/docs/generators.md) |
+| Choose test layers, isolation or interpret test evidence | [Testing skill](../../.agents/skills/inframeld-testing/SKILL.md) |
+| Read historical Rust generator qualification | [Rust SDK comparison](reports/rust-sdk-generator-comparison.md) |
+| Read historical TypeScript/Python generator qualification | [Language SDK comparison](reports/typescript-python-sdk-generator-comparison.md) and [runbook](../../packages/sdk-tools/README.md) |
 | Operate, upgrade or restore an installation | [Runtime](operations/runtime-and-networking.md), [upgrades](operations/upgrades.md), [backup and restore](operations/backup-and-restore.md) |
 | Understand a public HTTP problem | [Problem catalogue](error-handling.md) |
 | Finish or document a change | [Definition of Done](definition-of-done.md) and [documentation maintenance](documentation-maintenance.md) |
@@ -33,6 +40,11 @@ The skill references are written for people as well as coding agents. They own d
 - [Evaluation](../../.agents/skills/inframeld-evaluation/SKILL.md): cases, frozen tests, fresh comparisons and protected evidence.
 - [Releases](../../.agents/skills/inframeld-releases/SKILL.md): serving selection, Automatic/Manual transitions and rollback.
 - [Application Contracts](../../.agents/skills/inframeld-application-contracts/SKILL.md): transactions, jobs, transports, CLI and ModelGateway.
+- [Rust SDK](../../.agents/skills/inframeld-rust-sdk/SKILL.md): generated client consumption, qualification and pinned generator patches.
+- [SDKs](../../.agents/skills/inframeld-sdks/SKILL.md): common generation policy, endpoint delivery and cross-language qualification. Language skills remain independently discoverable.
+- [TypeScript SDK](../../.agents/skills/inframeld-typescript-sdk/SKILL.md): Hey API Fetch/Zod consumption, browser limits and packaging.
+- [Python SDK](../../.agents/skills/inframeld-python-sdk/SKILL.md): OpenAPI Generator HTTPX/Pydantic consumption, lifecycle and packaging.
+- [Testing](../../.agents/skills/inframeld-testing/SKILL.md): test layers, controlled dependencies, integration isolation and honest verification evidence.
 - [Coding Standards](../../.agents/skills/inframeld-coding-standards/SKILL.md): component placement and complete backend examples. Other languages keep their own guidance.
 - [Architecture](../../.agents/skills/inframeld-architecture/SKILL.md): system context, runtime and cross-domain journeys.
 
@@ -56,3 +68,7 @@ Historical GitHub issues may cite removed developer guides and anchors. Those is
 - [Author skills and references](guides/skill-authoring.md)
 - [Discuss architecture decisions](guides/architecture-decisions.md)
 - [Back up](operations/backups.md), [restore](operations/restore.md) and [qualify recovery](operations/recovery-qualification.md)
+
+For SDK response integrity, native typing and package-consumption evidence, see the [hardening report](reports/sdk-hardening-verification.md) and [SDK runbook](../../packages/sdk-tools/README.md).
+
+The subsequent [response-fix verification and architectural review](reports/sdk-response-fixes-verification.md) covers typed failures, status/media variants and safe transport defaults under [ADR-0094](../adr/ADR-0094-select-sdk-response-variants-and-safe-transport-defaults.md).

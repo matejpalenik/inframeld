@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.tools.json",
+  "include": [
+    "drivers/**/*.ts",
+    "tests/native/**/*.ts",
+    "fixtures/typescript/generated/**/*.ts",
+    "consumers/typescript/**/*.ts"
+  ]
+}

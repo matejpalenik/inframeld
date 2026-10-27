@@ -1,0 +1,37 @@
+--- a/src/client_generator.rs
++++ b/src/client_generator.rs
+@@ -414,6 +414,16 @@
+             .and_then(|http| http.max_response_body_bytes)
+             .unwrap_or(8 * 1024 * 1024);
+ 
++        let timeout_seconds = self.config().http_client_config.as_ref()
++            .and_then(|http| http.timeout_seconds).unwrap_or(5);
++        let default_transport = quote! {
++            reqwest::Client::builder()
++                .timeout(std::time::Duration::from_secs(#timeout_seconds))
++                .redirect(reqwest::redirect::Policy::none())
++                .retry(reqwest::retry::never())
++                .build().expect("Could not construct the default HTTP transport")
++        };
++
+         let retry_param = if has_retry {
+             quote! { retry_config: Option<RetryConfig>, }
+         } else {
+@@ -482,7 +492,7 @@
+             quote! {
+                 /// Create a new HTTP client with default configuration
+                 pub fn new() -> Self {
+-                    Self::with_client(reqwest::Client::new())
++                    Self::with_client(#default_transport)
+                 }
+             }
+         };
+@@ -498,7 +508,7 @@
+ 
+                 /// Create a new HTTP client with custom configuration
+                 pub fn with_config(#retry_param #tracing_param) -> Self {
+-                    Self::with_client_and_config(reqwest::Client::new(), #retry_arg #tracing_arg)
++                    Self::with_client_and_config(#default_transport, #retry_arg #tracing_arg)
+                 }
+ 
+                 /// Create an HTTP client using a preconfigured reqwest client.

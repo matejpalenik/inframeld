@@ -1,0 +1,62 @@
+--- a/src/analysis.rs
++++ b/src/analysis.rs
+@@ -8237,7 +8237,7 @@
+                     ..Default::default()
+                 };
+                 if let Some((media_type, schema)) = response.json_content() {
+-                    if let Some(schema_ref) = schema.reference() {
++                    if let Some(schema_ref) = schema.reference().filter(|_| !self.schema_or_reference_is_nullable(schema)) {
+                         // Named schema reference
+                         if let Some(schema_name) = self.extract_schema_name(schema_ref) {
+                             op_info
+@@ -8259,6 +8259,12 @@
+                         let mut deps = HashSet::new();
+                         let synthetic_name =
+                             self.add_inline_schema(&synthetic_name, schema, &mut deps)?;
++
++                        // Response roots have no property-level nullability carrier.
++                        if let Some(analyzed) = self.resolved_cache.get(&synthetic_name).cloned() {
++                            let schema_type = self.nullable_container_value(schema, analyzed.schema_type);
++                            self.resolved_cache.get_mut(&synthetic_name).unwrap().schema_type = schema_type;
++                        }
+ 
+                         op_info
+                             .response_schemas
+--- a/src/client_generator.rs
++++ b/src/client_generator.rs
+@@ -4114,7 +4114,7 @@
+             self.response_envelope_value(quote! { bytes::Bytes::from(body_bytes) });
+         let success_branch = match success_body {
+             ClientSuccessBody::Json(_) => quote! {
+-                match serde_json::from_str(&body_text) {
++                match serde_json::from_slice(&raw_body) {
+                     Ok(body) => Ok(#json_success),
+                     Err(e) => Err(ApiOpError::Api(ApiError {
+                         status: status_code,
+@@ -4344,7 +4344,7 @@
+ 
+                 Some(quote! {
+                     #pattern => {
+-                        match serde_json::from_str::<#payload_ty>(&body_text) {
++                        match serde_json::from_slice::<#payload_ty>(&raw_body) {
+                             Ok(v) => {
+                                 typed = Some(#enum_ident::#variant_ident(v));
+                                 parse_error = None;
+@@ -4388,7 +4388,7 @@
+             let enum_ident = self.op_error_enum_ident(op);
+             quote! {
+                 _ => {
+-                    match serde_json::from_str::<#payload_ty>(&body_text) {
++                    match serde_json::from_slice::<#payload_ty>(&raw_body) {
+                         Ok(v) => {
+                             typed = Some(#enum_ident::Default(v));
+                             parse_error = None;
+@@ -4411,7 +4411,7 @@
+             // No typed enum — op_error_type is serde_json::Value.
+             quote! {
+                 _ => {
+-                    match serde_json::from_str::<serde_json::Value>(&body_text) {
++                    match serde_json::from_slice::<serde_json::Value>(&raw_body) {
+                         Ok(v) => {
+                             typed = Some(v);
+                             parse_error = None;

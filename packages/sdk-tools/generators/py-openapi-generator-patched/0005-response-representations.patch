@@ -1,0 +1,157 @@
+--- a/python/api.mustache
++++ b/python/api.mustache
+@@ -11,6 +11,10 @@
+ {{#imports}}
+ {{import}}
+ {{/imports}}
++import {{modelPackage}} as response_models
++{{#operations}}{{#operation}}{{#responses}}{{#content}}{{#entrySet}}{{^value.schema.isModel}}{{#value.schema.complexType}}
++from {{modelPackage}}.{{#lambda.snakecase}}{{{.}}}{{/lambda.snakecase}} import {{{.}}}
++{{/value.schema.complexType}}{{/value.schema.isModel}}{{/entrySet}}{{/content}}{{/responses}}{{/operation}}{{/operations}}
+ 
+ from {{packageName}}.api_client import ApiClient, RequestSerialized
+ from {{packageName}}.api_response import ApiResponse
+@@ -97,16 +101,16 @@
+ https://github.com/kubernetes-client/python/blob/6cc5456d79dd8c0ccc9e275a0811aeb025714bea/kubernetes/watch/watch.py#L36-L48
+ }}
+     @validate_call
+-    def {{operationId}}{{>partial_api_args_legacy}} -> {{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}:
++    def {{operationId}}{{>partial_api_args_legacy}} -> {{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}:
+ {{/async}}
+ {{#async}}
+     @validate_call
+-    async def {{operationId}}{{>partial_api_args}} -> {{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}:
++    async def {{operationId}}{{>partial_api_args}} -> {{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}:
+ {{/async}}
+ {{/compatibleWithPythonLegacyApi}}
+ {{^compatibleWithPythonLegacyApi}}
+     @validate_call
+-    {{#async}}async {{/async}}def {{operationId}}{{>partial_api_args}} -> {{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}:
++    {{#async}}async {{/async}}def {{operationId}}{{>partial_api_args}} -> {{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}:
+ {{/compatibleWithPythonLegacyApi}}
+ {{>partial_api}}
+ {{#compatibleWithPythonLegacyApi}}
+@@ -152,16 +156,16 @@
+ {{#compatibleWithPythonLegacyApi}}
+ {{^async}}
+     @validate_call
+-    def {{operationId}}_with_http_info{{>partial_api_args_legacy}} -> Tuple[{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}, int, Any]:
++    def {{operationId}}_with_http_info{{>partial_api_args_legacy}} -> Tuple[{{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}, int, Any]:
+ {{/async}}
+ {{#async}}
+     @validate_call
+-    async def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}]:
++    async def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}]:
+ {{/async}}
+ {{/compatibleWithPythonLegacyApi}}
+ {{^compatibleWithPythonLegacyApi}}
+     @validate_call
+-    {{#async}}async {{/async}}def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}]:
++    {{#async}}async {{/async}}def {{operationId}}_with_http_info{{>partial_api_args}} -> ApiResponse[{{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}]:
+ {{/compatibleWithPythonLegacyApi}}
+ {{>partial_api}}
+ {{#compatibleWithPythonLegacyApi}}
+@@ -214,7 +218,7 @@
+ 
+ {{#supportHttpxSync}}
+     @validate_call
+-    def {{operationId}}_sync{{>partial_api_args}} -> {{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}:
++    def {{operationId}}_sync{{>partial_api_args}} -> {{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}:
+         """{{#isDeprecated}}(Deprecated) {{/isDeprecated}}{{{summary}}}{{^summary}}{{operationId}}{{/summary}} (synchronous)
+ 
+         Synchronous variant of :meth:`{{operationId}}`. It calls the asynchronous
+@@ -235,7 +239,7 @@
+ 
+ 
+     @validate_call
+-    def {{operationId}}_sync_with_http_info{{>partial_api_args}} -> ApiResponse[{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}]:
++    def {{operationId}}_sync_with_http_info{{>partial_api_args}} -> ApiResponse[{{#hasOnlyDefaultResponse}}{{#returnProperty.isNullable}}Optional[{{/returnProperty.isNullable}}{{{returnType}}}{{^returnType}}None{{/returnType}}{{#returnProperty.isNullable}}]{{/returnProperty.isNullable}}{{/hasOnlyDefaultResponse}}{{^hasOnlyDefaultResponse}}{{#returnType}}Union[{{#responses}}{{#is2xx}}{{#content}}{{#entrySet}}{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{#value.schema.isModel}}response_models.{{/value.schema.isModel}}{{{value.schema.dataType}}}{{^value.schema.dataType}}None{{/value.schema.dataType}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}, {{/entrySet}}{{/content}}{{^content}}None, {{/content}}{{/is2xx}}{{/responses}}]{{/returnType}}{{^returnType}}None{{/returnType}}{{/hasOnlyDefaultResponse}}]:
+         """{{#isDeprecated}}(Deprecated) {{/isDeprecated}}{{{summary}}}{{^summary}}{{operationId}}{{/summary}} (synchronous)
+ 
+         Synchronous variant of :meth:`{{operationId}}_with_http_info`. It calls the
+@@ -437,7 +441,7 @@
+ 
+         {{#hasProduces}}
+         # set the HTTP header `Accept`
+-        if 'Accept' not in _header_params:
++        if not any(name.lower() == 'accept' for name in _header_params):
+             _header_params['Accept'] = self.api_client.select_header_accept(
+                 [{{#produces}}
+                     '{{{mediaType}}}'{{^-last}}, {{/-last}}{{/produces}}
+--- a/python/api_client.mustache
++++ b/python/api_client.mustache
+@@ -20,7 +20,7 @@
+ {{/compatibleWithPythonLegacyApi}}
+ 
+ from urllib.parse import quote
+-from typing import Tuple, Optional, List, Dict, Union{{#compatibleWithPythonLegacy}}, Any{{/compatibleWithPythonLegacy}}
++from typing import Tuple, Optional, List, Dict, Union, Mapping{{#compatibleWithPythonLegacy}}, Any{{/compatibleWithPythonLegacy}}
+ from pydantic import SecretStr, TypeAdapter
+ 
+ from {{packageName}}.configuration import Configuration
+@@ -427,8 +427,8 @@
+     def response_deserialize(
+         self,
+         response_data: rest.RESTResponse,
+-        response_types_map: Optional[Dict[str, ApiResponseT]]=None
+-    ) -> ApiResponse[ApiResponseT]:
++        response_types_map: Optional[Mapping[str, Union[str, None, Mapping[str, Optional[str]]]]]=None
++    ) -> ApiResponse[object]:
+         """Deserializes response into an object.
+         :param response_data: RESTResponse object to be deserialized.
+         :param response_types_map: dict of response types.
+@@ -445,11 +445,29 @@
+         if response_key not in response_types_map:
+             response_key = "default"
+         declared_response = response_key in response_types_map
+-        response_type = response_types_map.get(response_key)
++        selected_response = response_types_map.get(response_key)
+ 
+         response_text = None
+         return_data = None
+         try:
++            if isinstance(selected_response, Mapping):
++                representations = {name.lower(): value for name, value in selected_response.items()}
++                supplied_type = response_data.headers.get('content-type')
++                if not representations:
++                    response_type = None
++                elif supplied_type is None:
++                    if len(representations) != 1:
++                        raise ValueError("Ambiguous missing response Content-Type")
++                    response_type = next(iter(representations.values()))
++                else:
++                    supplied_type = supplied_type.split(';')[0].strip().lower()
++                    selected_media = next((name for name in (supplied_type, supplied_type.split('/')[0] + '/*', '*/*') if name in representations), None)
++                    if selected_media is None:
++                        raise ValueError(f"Unexpected response Content-Type {supplied_type}")
++                    response_type = representations[selected_media]
++            else:
++                # Preserve direct users of the original flat deserialization map.
++                response_type = selected_response
+             if 200 <= response_data.status <= 299 and not declared_response:
+                 raise ValueError(f"Undeclared successful HTTP status {response_data.status}")
+             if declared_response and response_type is None and response_data.data:
+--- a/python/partial_api.mustache
++++ b/python/partial_api.mustache
+@@ -56,15 +56,12 @@
+             _host_index=_host_index
+         )
+ 
+-        _response_types_map: Dict[str, Optional[str]] = {
++        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+             {{#responses}}
+-            {{^isWildcard}}
+-            '{{code}}': {{#dataType}}"{{#schema.nullable}}Optional[{{/schema.nullable}}{{.}}{{#schema.nullable}}]{{/schema.nullable}}"{{/dataType}}{{^dataType}}None{{/dataType}},
+-            {{/isWildcard}}
+-            {{#isWildcard}}
+-            {{#dataType}}
+-            'default': "{{dataType}}",
+-            {{/dataType}}
+-            {{/isWildcard}}
++            '{{code}}': {
++                {{#content}}{{#entrySet}}
++                '{{key}}': {{#value.schema.dataType}}"{{#value.schema.isNullable}}Optional[{{/value.schema.isNullable}}{{{.}}}{{#value.schema.isNullable}}]{{/value.schema.isNullable}}"{{/value.schema.dataType}}{{^value.schema.dataType}}None{{/value.schema.dataType}},
++                {{/entrySet}}{{/content}}
++            },
+             {{/responses}}
+         }

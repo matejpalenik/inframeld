@@ -1,0 +1,356 @@
+{
+  "observedOn": "2026-10-27",
+  "environment": {
+    "os": "macOS 26.3.1 (a)",
+    "architecture": "arm64",
+    "rust": "1.95.0",
+    "node": "26.6.0",
+    "java": "Temurin 25.0.2+10"
+  },
+  "schemaSha256": "e8b3cb46d7de089319061f7920fec23df1a645401ce8021dfef921d3e174fed0",
+  "pins": {
+    "rust": "1.95.0",
+    "openapi-to-rust": "0.23.0",
+    "openapi-generator": "7.26.0",
+    "openapi-generator-sha256": "1760050094997b9cc790cc1350be095f15da8c08a996b184d3eadc4ccda5e35e"
+  },
+  "fixtureSchemaSha256": "abb443e148faa8576867a73a81d466b9f9525b318bf2e7504bc8f70f9e77fd24",
+  "candidates": [
+    {
+      "candidate": "openapi-to-rust",
+      "regeneration": "passed",
+      "productionCompilation": "passed",
+      "fixtureCompilation": "passed",
+      "packaging": "passed",
+      "passed": 28,
+      "failed": 2,
+      "scenarios": [
+        {
+          "scenario": "health",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "session-bearer",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "session-cookie",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "missing-auth",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "invalid-auth",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "denied",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "unavailable",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "competing",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "consent-inspect",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "consent-decide",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "consent-csrf-denied",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "consent-bearer-denied",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "grant-bearer",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "grant-cookie",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "grant-invalid",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "payload-integer",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "payload-string",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "optional-absent",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "optional-null",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "page-default",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "page-explicit",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "upload",
+          "status": "failed",
+          "error": "The generated SDK did not transmit the file bytes and filename"
+        },
+        {
+          "scenario": "problem-path-union",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "malformed-success",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "unexpected-status",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "redirect",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "timeout",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "lost-response",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "response-headers",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "success-headers",
+          "status": "failed",
+          "error": "success-headers did not preserve its required contract"
+        }
+      ],
+      "buildObservation": {
+        "cleanCheckMilliseconds": 14534.584083,
+        "noOpCheckMilliseconds": 143.0368329999983,
+        "generatedRustFiles": 3,
+        "generatedRustBytes": 55110,
+        "runtimeDependencyEntries": 101
+      }
+    },
+    {
+      "candidate": "openapi-generator",
+      "regeneration": "passed",
+      "productionCompilation": "passed",
+      "fixtureCompilation": "passed",
+      "packaging": "passed",
+      "passed": 21,
+      "failed": 9,
+      "scenarios": [
+        {
+          "scenario": "health",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "session-bearer",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "session-cookie",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "missing-auth",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "invalid-auth",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "denied",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "unavailable",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "competing",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "consent-inspect",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "consent-decide",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "consent-csrf-denied",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "consent-bearer-denied",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "grant-bearer",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "grant-cookie",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "grant-invalid",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "payload-integer",
+          "status": "failed",
+          "error": "payload-integer did not preserve its required contract"
+        },
+        {
+          "scenario": "payload-string",
+          "status": "failed",
+          "error": "payload-string did not preserve its required contract"
+        },
+        {
+          "scenario": "optional-absent",
+          "status": "failed",
+          "error": "optional-absent did not preserve its required contract"
+        },
+        {
+          "scenario": "optional-null",
+          "status": "failed",
+          "error": "optional-null did not preserve its required contract"
+        },
+        {
+          "scenario": "page-default",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "page-explicit",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "upload",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "problem-path-union",
+          "status": "failed",
+          "error": "problem-path-union did not preserve its required contract"
+        },
+        {
+          "scenario": "malformed-success",
+          "status": "failed",
+          "error": "malformed-success did not preserve its required contract"
+        },
+        {
+          "scenario": "unexpected-status",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "redirect",
+          "status": "failed",
+          "error": "redirect did not preserve its required contract"
+        },
+        {
+          "scenario": "timeout",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "lost-response",
+          "status": "passed",
+          "error": null
+        },
+        {
+          "scenario": "response-headers",
+          "status": "failed",
+          "error": "response-headers did not preserve its required contract"
+        },
+        {
+          "scenario": "success-headers",
+          "status": "failed",
+          "error": "success-headers did not preserve its required contract"
+        }
+      ],
+      "buildObservation": {
+        "cleanCheckMilliseconds": 11221.238875000003,
+        "noOpCheckMilliseconds": 151.54124999999476,
+        "generatedRustFiles": 17,
+        "generatedRustBytes": 33763,
+        "runtimeDependencyEntries": 106
+      }
+    }
+  ]
+}

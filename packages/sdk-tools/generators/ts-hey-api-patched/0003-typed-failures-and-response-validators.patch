@@ -1,0 +1,262 @@
+--- a/dist/clients/fetch/client.ts
++++ b/dist/clients/fetch/client.ts
+@@ -1,7 +1,7 @@
+ import { createSseClient } from '../core/serverSentEvents';
+ import type { HttpMethod } from '../core/types';
+ import { getValidRequestBody } from '../core/utils';
+-import type { Client, Config, RequestOptions, ResolvedRequestOptions } from './types';
++import type { Client, Config, RequestOptions, ResolvedRequestOptions, SdkFailure } from './types';
+ import {
+   buildUrl,
+   createConfig,
+@@ -76,6 +76,11 @@
+     let request: Request | undefined;
+     let response: Response | undefined;
+     let rawBody: string | undefined;
++    let phase: 'request' | 'transport' | 'decode' | 'http' = 'request';
++    let validatedError: unknown;
++    let hasValidatedError = false;
++    let httpBody: unknown;
++    let hasHttpBody = false;
+ 
+     try {
+       const { opts, url } = await beforeRequest(options);
+@@ -97,7 +102,9 @@
+       // TypeError: Failed to execute 'fetch' on 'Window': Illegal invocation
+       const _fetch = opts.fetch!;
+ 
++      phase = 'transport';
+       response = await _fetch(request);
++      phase = 'request';
+ 
+       for (const fn of interceptors.response.fns) {
+         if (fn) {
+@@ -110,21 +117,23 @@
+         response,
+       };
+ 
++      const contracts = opts.responseContract;
++      const key = String(response.status);
++      const contract = contracts?.[key] ?? contracts?.[`${key[0]}XX`] ?? contracts?.default;
++      phase = 'http';
++      if (response.ok && contracts && !contract) {
++        rawBody = await response.text();
++        throw new Error(`Undeclared successful HTTP status ${response.status}`);
++      }
++      const suppliedType = response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase();
++      const expectedType = contract?.mediaType?.toLowerCase();
++      const matchesType = !expectedType || !suppliedType || expectedType === suppliedType || expectedType === '*/*' || (expectedType.endsWith('/*') && suppliedType.startsWith(expectedType.slice(0, -1)));
++      if (contract && !matchesType) {
++        rawBody = await response.text();
++        throw new Error(`Unexpected response Content-Type ${suppliedType}`);
++      }
++
+       if (response.ok) {
+-        const contracts = opts.responseContract;
+-        const key = String(response.status);
+-        const contract = contracts?.[key] ?? contracts?.[`${key[0]}XX`] ?? contracts?.default;
+-        if (contracts && !contract) {
+-          rawBody = await response.text();
+-          throw new Error(`Undeclared successful HTTP status ${response.status}`);
+-        }
+-        const suppliedType = response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase();
+-        const expectedType = contract?.mediaType?.toLowerCase();
+-        const matchesType = !expectedType || !suppliedType || expectedType === suppliedType || expectedType === '*/*' || (expectedType.endsWith('/*') && suppliedType.startsWith(expectedType.slice(0, -1)));
+-        if (!matchesType) {
+-          rawBody = await response.text();
+-          throw new Error(`Unexpected response Content-Type ${suppliedType}`);
+-        }
+         if (contract && !contract.hasBody) {
+           rawBody = await response.text();
+           if (rawBody !== '') throw new Error('Unexpected body for a bodyless response');
+@@ -174,7 +183,9 @@
+           case 'json': {
+             // Some servers return 200 with no Content-Length and empty body.
+             // response.json() would throw; read as text and parse if non-empty.
++            phase = 'transport';
+             const bytes = await response.arrayBuffer();
++            phase = 'decode';
+             rawBody = new TextDecoder().decode(bytes);
+             const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+             data = contract ? JSON.parse(text) : (text ? JSON.parse(text) : {});
+@@ -189,7 +200,9 @@
+                 };
+         }
+ 
+-        if (opts.responseValidator) await opts.responseValidator(data);
++        phase = 'decode';
++        const validate = contract?.validator ?? opts.responseValidator;
++        if (validate) await validate(data);
+ 
+         if (parseAs === 'json') {
+ 
+@@ -206,41 +219,51 @@
+             };
+       }
+ 
+-      const textError = await response.text();
+-      rawBody = textError;
+-      let jsonError: unknown;
+-
++      phase = 'transport';
++      const errorBytes = await response.arrayBuffer();
++      rawBody = new TextDecoder().decode(errorBytes);
++      phase = 'http';
++      if (contract?.validator) {
++        phase = 'decode';
++        const text = new TextDecoder('utf-8', { fatal: true }).decode(errorBytes);
++        const candidate = JSON.parse(text);
++        await contract.validator(candidate);
++        validatedError = candidate;
++        hasValidatedError = true;
++        phase = 'http';
++      } else {
++        try {
++          httpBody = JSON.parse(rawBody);
++          hasHttpBody = true;
++        } catch {
++          // Undeclared HTTP content remains inspectable without claiming validation.
++        }
++      }
++      throw new Error(`HTTP ${response.status}`);
++    } catch (error) {
++      const original = error;
++      let diagnostic = error;
+       try {
+-        jsonError = JSON.parse(textError);
+-      } catch {
+-        // noop
+-      }
+-
+-      throw jsonError ?? textError;
+-    } catch (error) {
+-      let finalError = error;
+-
+-      for (const fn of interceptors.error.fns) {
+-        if (fn) {
+-          finalError = await fn(finalError, response, request, options as ResolvedRequestOptions);
+-        }
+-      }
+-
+-      finalError = finalError || {};
+-
+-      if (throwOnError) {
+-        throw finalError;
+-      }
+-
+-      // TODO: we probably want to return error and improve types
+-      return responseStyle === 'data'
+-        ? undefined
+-        : {
+-            error: finalError,
+-            rawBody,
+-            request,
+-            response,
+-          };
++        for (const fn of interceptors.error.fns) {
++          if (fn) diagnostic = await fn(diagnostic, response, request, options as ResolvedRequestOptions);
++        }
++      } catch (hookError) {
++        phase = 'request';
++        diagnostic = new AggregateError([original, hookError], 'Error interceptor failed');
++      }
++      // Hooks may customize diagnostics, never trusted body/kind/native context.
++      const message = diagnostic instanceof Error ? diagnostic.message : String(diagnostic);
++      const failure: SdkFailure<unknown> = phase === 'transport'
++        ? { kind: 'transport', reason: request?.signal.aborted ? (request.signal.reason?.name === 'TimeoutError' ? 'timeout' : 'aborted') : 'network', cause: original, message }
++        : phase === 'decode'
++          ? { kind: 'decode', cause: original, message }
++          : phase === 'request'
++            ? { kind: 'request', cause: diagnostic instanceof AggregateError ? diagnostic : original, message }
++            : hasValidatedError
++              ? { kind: 'api', body: validatedError, message }
++              : { kind: 'http', ...(hasHttpBody ? { body: httpBody } : {}), message };
++      if (throwOnError) throw failure;
++      return responseStyle === 'data' ? undefined : { error: failure, rawBody, request, response };
+     }
+   };
+ 
+--- a/dist/clients/fetch/index.ts
++++ b/dist/clients/fetch/index.ts
+@@ -20,6 +20,7 @@
+   RequestResult,
+   ResolvedRequestOptions,
+   ResponseStyle,
++  SdkFailure,
+   TDataShape,
+ } from './types';
+ export { createConfig, mergeHeaders } from './utils';
+--- a/dist/clients/fetch/types.ts
++++ b/dist/clients/fetch/types.ts
+@@ -7,6 +7,16 @@
+ import type { Middleware } from './utils';
+ 
+ export type ResponseStyle = 'data' | 'fields';
++
++/** A validated API error is distinct from failures without a trusted HTTP model. */
++export type SdkFailure<TError = unknown> = { message: string } & (
++  | { kind: 'api'; body: TError }
++  | { kind: 'http'; body?: unknown }
++  | { kind: 'decode'; cause: unknown }
++  | { kind: 'transport'; reason: 'network' | 'timeout' | 'aborted'; cause: unknown }
++  | { kind: 'request'; cause: unknown }
++);
++
+ 
+ export interface Config<T extends ClientOptions = ClientOptions>
+   extends Omit<RequestInit, 'body' | 'headers' | 'method'>, CoreConfig {
+@@ -72,7 +82,7 @@
+       | 'sseMaxRetryDelay'
+     > {
+   /** Response-selection metadata supplied by generated operations. */
+-  responseContract?: Record<string, { mediaType: string | null; hasBody: boolean }>;
++  responseContract?: Record<string, { mediaType: string | null; hasBody: boolean; validator?: (data: unknown) => Promise<unknown> }>;
+   /**
+    * Any body that you want to add to your request.
+    *
+@@ -124,7 +134,7 @@
+               }
+             | {
+                 data: undefined;
+-                error: TError extends Record<string, unknown> ? TError[keyof TError] : TError;
++                error: SdkFailure<TError extends Record<string, unknown> ? TError[keyof TError] : TError>;
+               }
+           ) & {
+             /** request may be undefined, because error may be from building the request object itself */
+--- a/dist/init-D6Y8JFUS.mjs
++++ b/dist/init-D6Y8JFUS.mjs
+@@ -4966,7 +4966,16 @@
+ 	reqOptions.prop("url", $.literal(operation.path));
+ 	reqOptions.spread("options");
+ 	if (client.name === "@hey-api/client-fetch" && responseHandlers.validator) reqOptions.prop("responseValidator", responseHandlers.validator);
+-	if (client.name === "@hey-api/client-fetch") reqOptions.prop("responseContract", $.fromValue(Object.fromEntries(Object.entries(operation.responses ?? {}).map(([status, response]) => [status, { mediaType: response.mediaType ?? null, hasBody: response.schema.type !== "void" }]))));
++	if (client.name === "@hey-api/client-fetch") {
++		const contracts = $.object();
++		for (const [status, response] of Object.entries(operation.responses ?? {})) {
++			const descriptor = $.object().prop("mediaType", $.fromValue(response.mediaType ?? null)).prop("hasBody", $.literal(response.schema.type !== "void"));
++			const symbol = plugin.querySymbol({ artifact: "zod", category: "schema", resource: "operation", resourceId: operation.id, role: `response-${status}` });
++			if (symbol) descriptor.prop("validator", $.func().async().param("data").do($(symbol).attr("parseAsync").call("data").await().return()));
++			contracts.prop(status, descriptor);
++		}
++		reqOptions.prop("responseContract", contracts);
++	}
+ 	const statements = [];
+ 	const hasParams = opParameters.argNames.length;
+ 	if (hasParams) {
+@@ -15496,6 +15505,16 @@
+ 	}
+ 	if (plugin.config.responses.enabled) {
+ 		if (operation.responses) {
++			for (const [status, response] of Object.entries(operation.responses)) {
++				if (response.schema.type === "void") continue;
++				processor.process({
++					meta: { resource: "operation", resourceId: operation.id, role: `response-${status}` },
++					naming: plugin.config.responses,
++					namingAnchor: `${operation.id}${status}`,
++					path: [...path, "responses", status],
++					plugin, schema: response.schema, tags
++				});
++			}
+ 			const { response } = operationResponsesMap(operation);
+ 			if (response) processor.process({
+ 				meta: {

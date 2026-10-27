@@ -1,0 +1,15 @@
+[generator]
+spec_path = "contracts/openapi/v1/inframeld-v1.json"
+output_dir = "generated"
+module_name = "inframeld"
+
+[features]
+enable_async_client = true
+
+[http_client]
+response_metadata = true
+timeout_seconds = 5
+max_response_body_bytes = 1048576
+
+[http_client.tracing]
+enabled = false

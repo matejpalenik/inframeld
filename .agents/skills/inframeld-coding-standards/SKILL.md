@@ -52,6 +52,7 @@ Choose the row matching the task. Workflow, contract and architecture views are 
 | Services and use cases | [Write a service around a complete use case](references/services-and-use-cases.md) |
 | Static utilities and mappers | [Static utilities, policies and mappers](references/static-utilities-and-mappers.md) |
 | Testing and documentation | [Test behavior and explain the contract](references/testing-and-documentation.md) |
+| Choosing test layers, dependency isolation or interpreting verification evidence | [Testing skill](../inframeld-testing/SKILL.md), only when that strategy question arises |
 | Values and records | [Give values their domain meaning](references/values-and-records.md) |
 
 ## Source ownership

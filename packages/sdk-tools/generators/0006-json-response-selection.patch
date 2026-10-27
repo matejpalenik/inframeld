@@ -1,0 +1,196 @@
+--- a/src/client_generator.rs
++++ b/src/client_generator.rs
+@@ -213,6 +213,7 @@
+     pub builder_type_ident: Option<syn::Ident>,
+     pub content_type_method_ident: Option<syn::Ident>,
+     success: ClientSuccessSelection<'a>,
++    json_alternatives: Vec<(&'a str, &'a str, &'a str)>,
+     validate_content_type: bool,
+ }
+ 
+@@ -683,6 +684,8 @@
+             .collect();
+ 
+         let plans = self.client_method_plans(analysis, operations);
++        let json_response_enums: Vec<_> = plans.iter().filter(|plan| !plan.json_alternatives.is_empty()).map(|plan| self.generate_json_response_enum(plan)).collect();
++        let json_media_helper = Self::generate_json_media_helper();
+         let request_content_type_helper = plans
+             .iter()
+             .any(|plan| plan.content_type_method_ident.is_some())
+@@ -707,6 +710,8 @@
+             #param_enums
+ 
+             #(#op_error_enums)*
++            #(#json_response_enums)*
++            #json_media_helper
+ 
+             #request_content_type_helper
+ 
+@@ -760,14 +765,20 @@
+         let mut plans = Vec::new();
+         for &operation in operations {
+             let method_ident = base_names[operation.operation_id.as_str()].clone();
+-            let success = self.get_success_response(analysis, operation);
+-            plans.push(self.make_client_method_plan(
+-                operation,
+-                method_ident.clone(),
+-                success.clone(),
+-                "buffered",
+-                false,
+-            ));
++            let mut success = self.get_success_response(analysis, operation);
++            let alternatives = Self::json_response_alternatives(analysis, operation);
++            if alternatives.len() > 1 {
++                success.statuses = alternatives.iter().map(|item| item.0).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
++                success.excluded_statuses.retain(|status| !success.statuses.contains(status));
++                success.accept = None;
++            }
++            let mut primary = self.make_client_method_plan(operation, method_ident.clone(), success, "buffered", false);
++            if alternatives.len() > 1 {
++                let name = self.json_response_enum_name(operation);
++                primary.response_type = self.response_envelope_type(quote! { self::#name });
++                primary.json_alternatives = alternatives;
++            }
++            plans.push(primary);
+             let Some(responses) = analysis.operation_responses.get(&operation.operation_id) else {
+                 continue;
+             };
+@@ -992,6 +1003,7 @@
+             builder_type_ident: None,
+             content_type_method_ident: None,
+             success,
++            json_alternatives: Vec::new(),
+             validate_content_type,
+         }
+     }
+@@ -2069,7 +2081,7 @@
+         let response_type = &plan.response_type;
+         let op_error_type = &plan.error_type;
+         let accept = success.accept;
+-        let error_handling = self.generate_error_handling(op, success.clone());
++        let error_handling = self.generate_error_handling(op, success.clone(), &plan.json_alternatives);
+         let content_validation = if plan.validate_content_type {
+             self.generate_response_content_type_validation(op, &success)
+         } else {
+@@ -3987,6 +3999,75 @@
+         }
+     }
+ 
++    fn json_response_alternatives<'a>(analysis: &'a SchemaAnalysis, operation: &'a OperationInfo) -> Vec<(&'a str, &'a str, &'a str)> {
++        let Some(responses) = analysis.operation_responses.get(&operation.operation_id) else { return Vec::new(); };
++        let mut alternatives = Vec::new();
++        for (status, response) in responses.iter().filter(|(status, _)| status.starts_with('2')) {
++            if response.representations.is_empty() { return Vec::new(); }
++            for (media_type, representation) in &response.representations {
++                let OperationRepresentation::Json { schema_name } = representation else { return Vec::new(); };
++                alternatives.push((status.as_str(), media_type.as_str(), schema_name.as_str()));
++            }
++        }
++        alternatives
++    }
++
++    fn json_response_enum_name(&self, operation: &OperationInfo) -> syn::Ident {
++        Self::to_field_ident(&format!("{}HttpResponseBody", self.to_rust_type_name(&operation.operation_id)))
++    }
++
++    fn generate_json_response_enum(&self, plan: &ClientMethodPlan<'_>) -> TokenStream {
++        let name = self.json_response_enum_name(plan.operation);
++        let variants = plan.json_alternatives.iter().enumerate().map(|(index, (status, _, schema))| {
++            let variant = Self::to_field_ident(&format!("Status{}Representation{}", status, index));
++            let ty = Self::to_field_ident(&self.to_rust_type_name(schema));
++            quote! { #variant(super::types::#ty) }
++        });
++        quote! {
++            #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
++            #[serde(untagged)]
++            pub enum #name { #(#variants),* }
++        }
++    }
++
++    fn generate_json_media_helper() -> TokenStream {
++        quote! {
++            fn __json_response_representation(headers: &reqwest::header::HeaderMap, declared: &[&str]) -> Result<usize, String> {
++                let Some(supplied) = headers.get(reqwest::header::CONTENT_TYPE) else {
++                    return if declared.len() == 1 { Ok(0) } else { Err("Ambiguous missing response Content-Type".into()) };
++                };
++                let supplied = supplied.to_str().map_err(|error| error.to_string())?.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
++                let exact = declared.iter().position(|item| item.eq_ignore_ascii_case(&supplied));
++                let wildcard = supplied.split_once('/').and_then(|(kind, _)| declared.iter().position(|item| item.eq_ignore_ascii_case(&format!("{kind}/*"))));
++                exact.or(wildcard).or_else(|| declared.iter().position(|item| *item == "*/*")).ok_or_else(|| format!("Unexpected response Content-Type {supplied}"))
++            }
++        }
++    }
++
++    fn generate_json_response_decode(&self, operation: &OperationInfo, alternatives: &[(&str, &str, &str)]) -> TokenStream {
++        let name = self.json_response_enum_name(operation);
++        let statuses: std::collections::BTreeSet<_> = alternatives.iter().map(|item| item.0).collect();
++        let branches = statuses.into_iter().map(|status| {
++            let guard = Self::single_status_guard(status);
++            let entries: Vec<_> = alternatives.iter().enumerate().filter(|(_, item)| item.0 == status).collect();
++            let media: Vec<_> = entries.iter().map(|(_, item)| item.1).collect();
++            let arms = entries.iter().enumerate().map(|(selection, (index, (_, _, schema)))| {
++                let variant = Self::to_field_ident(&format!("Status{}Representation{}", status, index));
++                let ty = Self::to_field_ident(&self.to_rust_type_name(schema));
++                quote! { #selection => serde_json::from_slice::<super::types::#ty>(&raw_body).map(#name::#variant).map_err(|error| error.to_string()) }
++            });
++            quote! {
++                if #guard {
++                    return match __json_response_representation(&headers, &[#(#media),*])? {
++                        #(#arms),*,
++                        _ => unreachable!(),
++                    };
++                }
++            }
++        });
++        quote! { (|| -> Result<#name, String> { #(#branches)* Err("No declared JSON response matched the status".into()) })() }
++    }
++
+     fn response_metadata_enabled(&self) -> bool {
+         self.config()
+             .http_client_config
+@@ -4103,6 +4184,7 @@
+         &self,
+         op: &OperationInfo,
+         success: ClientSuccessSelection<'_>,
++        alternatives: &[(&str, &str, &str)],
+     ) -> TokenStream {
+         let op_error_type = self.op_error_type_token(op);
+         let success_body = success.body;
+@@ -4123,20 +4205,23 @@
+         let binary_success =
+             self.response_envelope_value(quote! { bytes::Bytes::from(body_bytes) });
+         let success_branch = match success_body {
+-            ClientSuccessBody::Json(_) => quote! {
+-                match serde_json::from_slice(&raw_body) {
+-                    Ok(body) => Ok(#json_success),
+-                    Err(e) => Err(ApiOpError::Api(ApiError {
+-                        status: status_code,
+-                        headers: headers,
+-                        body: body_text,
+-                        raw_body,
+-                        typed: None,
+-                        parse_error: Some(format!(
+-                            "failed to deserialize 2xx response body: {}",
+-                            e
+-                        )),
+-                    })),
++            ClientSuccessBody::Json(_) => {
++                let decode = if alternatives.is_empty() {
++                    let media_type = success.accept.unwrap_or("application/json");
++                    quote! {
++                        __json_response_representation(&headers, &[#media_type]).and_then(|_| serde_json::from_slice(&raw_body).map_err(|error| error.to_string()))
++                    }
++                } else {
++                    self.generate_json_response_decode(op, alternatives)
++                };
++                quote! {
++                    match #decode {
++                        Ok(body) => Ok(#json_success),
++                        Err(error) => Err(ApiOpError::Api(ApiError {
++                            status: status_code, headers, body: body_text, raw_body, typed: None,
++                            parse_error: Some(format!("failed to deserialize 2xx response body: {}", error)),
++                        })),
++                    }
+                 }
+             },
+             ClientSuccessBody::Text => quote! {
