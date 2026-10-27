@@ -31,5 +31,5 @@ Apply an authoritative deletion marker first to block new use and late publicati
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current retention and deletion](../development/retention-and-deletion.md).
-- [Current knowledge lifecycle](../development/knowledge-lifecycle.md).
+- [Current retention and deletion](../../.agents/skills/inframeld-knowledge/references/deletion-and-retention.md).
+- [Current knowledge lifecycle](../../.agents/skills/inframeld-knowledge/references/documents-and-collections.md).

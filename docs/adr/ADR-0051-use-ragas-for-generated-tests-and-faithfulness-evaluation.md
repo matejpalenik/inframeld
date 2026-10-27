@@ -28,11 +28,11 @@ Generated cases begin unreviewed. Default regression benchmarks contain accepted
 
 Select existing generator and judge connections explicitly, offering reuse without another key. No mandatory Luna/OpenAI model or implicit fallback remains. Every nested call follows `Evaluation service -> Ragas infrastructure adapter -> ModelGateway -> embedded LiteLLM -> authorized model`. Give Ragas no independent provider credentials or clients.
 
-[Evaluation](../development/evaluation.md) owns lifecycle, passage identity/coverage, metric arithmetic, failures, and qualification. [Evaluation records](../development/data-model.md#evaluation) owns logical records, not a physical schema. [ADR-0031](ADR-0031-compare-fresh-executions-against-frozen-benchmarks.md) still requires fresh baseline/candidate runs against identical frozen inputs. Scores never authorize publication.
+[Evaluation](../../.agents/skills/inframeld-evaluation/references/generation-and-review.md) owns lifecycle, passage identity/coverage, metric arithmetic, failures, and qualification. [Evaluation records](../../.agents/skills/inframeld-evaluation/references/records.md#evaluation) owns logical records, not a physical schema. [ADR-0031](ADR-0031-compare-fresh-executions-against-frozen-benchmarks.md) still requires fresh baseline/candidate runs against identical frozen inputs. Scores never authorize publication.
 
 [ADR-0052](ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md) extends those execution inputs to captured working configurations (operation inputs, not an Experiment resource) before a release-ready build. It changes neither Ragas selection nor metric definitions, review rules or gateway obligations.
 
-[ADR-0054](ADR-0054-use-shared-current-model-connections.md) keeps selected connections current. Generator/evaluator definitions select connection IDs and model settings; operations separately observe active access revisions. Changes stop further calls rather than mixing configurations or selecting old access settings. [Evaluation's consistency contract](../development/evaluation.md#connection-consistency) governs partial outcomes and comparisons; this does not change Ragas or metric definitions.
+[ADR-0054](ADR-0054-use-shared-current-model-connections.md) keeps selected connections current. Generator/evaluator definitions select connection IDs and model settings; operations separately observe active access revisions. Changes stop further calls rather than mixing configurations or selecting old access settings. [Evaluation's consistency contract](../../.agents/skills/inframeld-evaluation/references/gateway-and-jobs.md#connection-consistency) governs partial outcomes and comparisons; this does not change Ragas or metric definitions.
 
 ## Consequences
 
@@ -48,5 +48,5 @@ Select existing generator and judge connections explicitly, offering reuse witho
 
 - [Superseded ADR-0030](ADR-0030-use-openevals-for-groundedness-evaluation.md), preserving its rationale.
 - [Fresh comparisons ADR-0031](ADR-0031-compare-fresh-executions-against-frozen-benchmarks.md), [ModelGateway ADR-0023](ADR-0023-route-every-model-request-through-modelgateway.md), and [optional preflight ADR-0050](ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md).
-- [Pinned source evidence](../development/evaluation.md#gateway), [qualification still required](../development/evaluation.md#qualification), and [CLI starter-evaluation journey](https://github.com/matejpalenik/inframeld/issues/179).
+- [Pinned source evidence](../../.agents/skills/inframeld-evaluation/references/gateway-and-jobs.md#gateway), [qualification still required](../../.agents/skills/inframeld-evaluation/references/gateway-and-jobs.md#qualification), and [CLI starter-evaluation journey](https://github.com/matejpalenik/inframeld/issues/179).
 - [Ragas v0.4.3 source](https://github.com/vibrantlabsai/ragas/tree/v0.4.3) and [faithfulness documentation](https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/).

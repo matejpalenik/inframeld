@@ -28,6 +28,6 @@ Use an optional opaque cursor and a limit from 1 to 100, defaulting to 25. Retur
 
 ## Links
 
-- [Current pagination](../development/pagination.md).
-- [Current api contracts](../development/api-contracts.md).
+- [Current pagination](../../.agents/skills/inframeld-application-contracts/references/pagination.md).
+- [Current api contracts](../../.agents/skills/inframeld-application-contracts/references/http-mcp-and-generated-clients.md).
 - Related decisions: [ADR-0003](ADR-0003-generate-the-authoritative-openapi-contract-from-backend-code.md), [ADR-0004](ADR-0004-use-rfc-9457-problem-details-for-http-errors.md), [ADR-0006](ADR-0006-use-official-generated-clients-for-application-api-access.md), [ADR-0007](ADR-0007-keep-api-documentation-public-and-product-operations-protected.md).

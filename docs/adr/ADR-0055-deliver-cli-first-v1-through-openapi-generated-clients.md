@@ -29,10 +29,10 @@ Assign all non-Studio existing and new delivery issues, including completed foun
 - CLI and account-UI qualification replace Studio qualification on the v1 release path. Upgrade, backup/restore, MCP, security and measured capacity gates remain.
 - Shared output, automation, context, cancellation and recovery contracts require explicit CLI implementation and qualification, not duplicated domain logic in Rust.
 - Generated-client compatibility is measured per supported client and feature; intended language targets are not automatically supported deliverables.
-- The backlog and [delivery plan](../development/cli-delivery-plan.md) track accepted decisions, unresolved specification prerequisites and evidence. This documentation is not runtime qualification.
+- The backlog and [delivery plan](../../.agents/skills/inframeld-architecture/references/v1-scope-and-extension-boundaries.md) track accepted decisions, unresolved specification prerequisites and evidence. This documentation is not runtime qualification.
 
 ## Links
 
 - [ADR-0006](ADR-0006-use-official-generated-clients-for-application-api-access.md), whose generated-client and thin-transport rationale remains.
-- [API contracts](../development/api-contracts.md) and [deployment](../development/deployment.md).
+- [API contracts](../../.agents/skills/inframeld-application-contracts/references/http-mcp-and-generated-clients.md) and [deployment](../../.agents/skills/inframeld-architecture/references/runtime-deployment-and-storage.md).
 - [CLI v1 delivery epic](https://github.com/matejpalenik/inframeld/issues/114) and [Definition of Done](../development/definition-of-done.md).

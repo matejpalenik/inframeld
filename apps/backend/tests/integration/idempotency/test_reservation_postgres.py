@@ -160,13 +160,13 @@ async def test_changed_secret_or_file_bytes_cannot_reuse_an_operation(
 
     original = await _reserve(
         database,
-        replace(request, fingerprint=original_fingerprint),
+        replace(request, fingerprint=original_fingerprint.value),
     )
 
     with pytest.raises(IdempotencyKeyReusedError):
         await _reserve(
             database,
-            replace(request, fingerprint=changed_fingerprint),
+            replace(request, fingerprint=changed_fingerprint.value),
         )
 
     async with database.session() as session:
@@ -177,7 +177,7 @@ async def test_changed_secret_or_file_bytes_cannot_reuse_an_operation(
         )
 
     assert saved is not None
-    assert saved.request_fingerprint == original_fingerprint
+    assert saved.request_fingerprint == original_fingerprint.value
     assert len(saved.request_fingerprint) == 32
 
 

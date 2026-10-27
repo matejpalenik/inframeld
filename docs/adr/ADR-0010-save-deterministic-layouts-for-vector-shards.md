@@ -30,7 +30,7 @@ Record the scoped index’s layout and physical shard references and use the doc
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current indexing](../development/indexing.md).
-- [Current data model](../development/data-model.md).
-- [Current deployment](../development/deployment.md).
+- [Current indexing](../../.agents/skills/inframeld-indexing/references/profiles-and-preparation.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
+- [Current deployment](../../.agents/skills/inframeld-architecture/references/runtime-deployment-and-storage.md).
 - Related decisions: [ADR-0009](ADR-0009-keep-application-authority-in-postgresql-and-derived-vectors-in-chroma.md), [ADR-0011](ADR-0011-retry-frozen-vector-identities-and-payloads.md).

@@ -33,7 +33,7 @@ Have ordinary builds publish readiness, not Deployment serving pointers. Release
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current pipelines and releases](../development/pipelines-and-releases.md).
-- [Current onboarding](../development/onboarding.md).
-- [Current access control](../development/access-control.md).
+- [Current pipelines and releases](../../.agents/skills/inframeld-pipelines/references/configuration-queries-and-builds.md).
+- [Current onboarding](../../.agents/skills/inframeld-architecture/references/first-use-and-private-defaults.md).
+- [Current access control](../../.agents/skills/inframeld-access-models/references/authorization.md).
 - Related decisions: [ADR-0032](ADR-0032-keep-canary-assignment-stable-for-the-same-caller-and-affinity-key.md).

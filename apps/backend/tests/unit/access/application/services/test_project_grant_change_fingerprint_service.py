@@ -1,5 +1,8 @@
 from uuid import UUID
 
+from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
+    AssignProjectUseOnlyGrantCommand,
+)
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
 )
@@ -29,53 +32,80 @@ def test_equivalent_grant_commands_have_the_same_fingerprint() -> None:
     service = _service()
 
     first = service.for_assign_use_only(
-        project_id=PROJECT_ID,
-        recipient_principal_id=RECIPIENT_ID,
-        action_id=ACTION_ID,
-        expected_access_revision=7,
+        AssignProjectUseOnlyGrantCommand(
+            project_id=PROJECT_ID,
+            recipient_principal_id=RECIPIENT_ID,
+            action_id=ACTION_ID,
+            expected_access_revision=7,
+        )
     )
     retry = service.for_assign_use_only(
-        project_id=PROJECT_ID,
-        recipient_principal_id=RECIPIENT_ID,
-        action_id=ACTION_ID,
-        expected_access_revision=7,
+        AssignProjectUseOnlyGrantCommand(
+            project_id=PROJECT_ID,
+            recipient_principal_id=RECIPIENT_ID,
+            action_id=ACTION_ID,
+            expected_access_revision=7,
+        )
     )
 
     assert first == retry
-    assert len(first) == 32
+    assert len(first.value) == 32
 
 
 def test_each_meaningful_grant_field_changes_the_fingerprint() -> None:
     """A reused key cannot silently change target, recipient, action, or revision."""
     service = _service()
     original = service.for_assign_use_only(
-        project_id=PROJECT_ID,
-        recipient_principal_id=RECIPIENT_ID,
-        action_id=ACTION_ID,
-        expected_access_revision=7,
+        AssignProjectUseOnlyGrantCommand(
+            project_id=PROJECT_ID,
+            recipient_principal_id=RECIPIENT_ID,
+            action_id=ACTION_ID,
+            expected_access_revision=7,
+        )
     )
 
     assert original != service.for_assign_use_only(
-        project_id=ProjectId(UUID(int=3)),
+        AssignProjectUseOnlyGrantCommand(
+            project_id=ProjectId(UUID(int=3)),
+            recipient_principal_id=RECIPIENT_ID,
+            action_id=ACTION_ID,
+            expected_access_revision=7,
+        )
+    )
+    assert original != service.for_assign_use_only(
+        AssignProjectUseOnlyGrantCommand(
+            project_id=PROJECT_ID,
+            recipient_principal_id=PrincipalId(UUID(int=4)),
+            action_id=ACTION_ID,
+            expected_access_revision=7,
+        )
+    )
+    assert original != service.for_assign_use_only(
+        AssignProjectUseOnlyGrantCommand(
+            project_id=PROJECT_ID,
+            recipient_principal_id=RECIPIENT_ID,
+            action_id=ActionId("delete-access-groups"),
+            expected_access_revision=7,
+        )
+    )
+    assert original != service.for_assign_use_only(
+        AssignProjectUseOnlyGrantCommand(
+            project_id=PROJECT_ID,
+            recipient_principal_id=RECIPIENT_ID,
+            action_id=ACTION_ID,
+            expected_access_revision=8,
+        )
+    )
+
+
+def test_fingerprint_matches_the_pre_refactor_contract() -> None:
+    """Retained reservations must recognize requests made before the refactor."""
+    command = AssignProjectUseOnlyGrantCommand(
+        project_id=PROJECT_ID,
         recipient_principal_id=RECIPIENT_ID,
         action_id=ACTION_ID,
         expected_access_revision=7,
     )
-    assert original != service.for_assign_use_only(
-        project_id=PROJECT_ID,
-        recipient_principal_id=PrincipalId(UUID(int=4)),
-        action_id=ACTION_ID,
-        expected_access_revision=7,
-    )
-    assert original != service.for_assign_use_only(
-        project_id=PROJECT_ID,
-        recipient_principal_id=RECIPIENT_ID,
-        action_id=ActionId("delete-access-groups"),
-        expected_access_revision=7,
-    )
-    assert original != service.for_assign_use_only(
-        project_id=PROJECT_ID,
-        recipient_principal_id=RECIPIENT_ID,
-        action_id=ACTION_ID,
-        expected_access_revision=8,
+    assert _service().for_assign_use_only(command).value.hex() == (
+        "318247e6c6ef37e22d5fefd65bb023dada7bac1fdc25003571ed739b7e34a10b"
     )

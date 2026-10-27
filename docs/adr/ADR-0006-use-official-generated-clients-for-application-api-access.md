@@ -31,5 +31,5 @@ The original decision selected the official generated TypeScript client in Studi
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current api contracts](../development/api-contracts.md).
+- [Current api contracts](../../.agents/skills/inframeld-application-contracts/references/http-mcp-and-generated-clients.md).
 - Related decisions: [ADR-0003](ADR-0003-generate-the-authoritative-openapi-contract-from-backend-code.md), [ADR-0004](ADR-0004-use-rfc-9457-problem-details-for-http-errors.md), [ADR-0005](ADR-0005-use-bounded-cursor-pagination-for-lists.md), [ADR-0007](ADR-0007-keep-api-documentation-public-and-product-operations-protected.md).

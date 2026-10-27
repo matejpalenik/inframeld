@@ -2,17 +2,16 @@
 
 import asyncio
 import os
-import subprocess
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 from ory_kratos_client.api.frontend_api import FrontendApi
 from ory_kratos_client.api_client import ApiClient
 from ory_kratos_client.configuration import Configuration
 from ory_kratos_client.models.session import Session
+from tests.support.integration_services import EXPIRING_KRATOS_PUBLIC_URL, KRATOS_PUBLIC_URL
+from tests.support.kratos_admin import disable_identity
 from tests.support.kratos_browser import (
-    KRATOS_PUBLIC_URL,
     create_browser,
     login_human,
     logout_human,
@@ -31,7 +30,6 @@ from inframeld_backend.access.infrastructure.verifiers.kratos_browser_session_ve
 )
 
 AUTHORITY = IdentityAuthority("kratos:test")
-EXPIRING_KRATOS_PUBLIC_URL = "http://127.0.0.1:14435"
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_KRATOS_INTEGRATION") != "1",
@@ -131,21 +129,6 @@ async def test_disabled_kratos_identity_rejects_existing_browser_cookie() -> Non
         human = await register_human(browser)
         assert await _verify(human.credential) == VerifiedHumanIdentityDTO(AUTHORITY, human.subject)
 
-        repository_root = Path(__file__).resolve().parents[5]  # noqa: ASYNC240
-
-        result = await asyncio.to_thread(
-            subprocess.run,
-            [
-                str(repository_root / "scripts/dev-compose.sh"),
-                "test-kratos-disable-identity",
-                human.subject.value,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
-        )
-
-        assert result.returncode == 0, result.stderr
+        await disable_identity(human.subject)
 
         assert await _verify(human.credential) is None

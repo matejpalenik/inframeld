@@ -1,0 +1,28 @@
+# Development only. Packaged installations supply protected server secrets and HTTPS.
+serve:
+  public:
+    port: 4444
+  admin:
+    port: 4445
+urls:
+  self:
+    issuer: http://127.0.0.1:14444/
+  login: http://127.0.0.1:14434/self-service/login/browser
+  # Native error page until URLS_CONSENT names the separately delivered account UI.
+  consent: http://127.0.0.1:14444/oauth2/fallbacks/consent
+strategies:
+  access_token: opaque
+oidc:
+  dynamic_client_registration:
+    enabled: false
+oauth2:
+  pkce:
+    enforced: true
+    enforced_for_public_clients: true
+  grant:
+    refresh_token:
+      rotation_grace_period: 0s
+      rotation_grace_reuse_count: 0
+log:
+  level: warn
+  leak_sensitive_values: false

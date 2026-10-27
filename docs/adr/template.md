@@ -25,3 +25,5 @@ Explain the benefits, costs, limitations, and obligations created by the choice.
 - Related or superseding decisions.
 - Current specifications and data-model sections.
 - Existing implementation or test evidence, if available; otherwise state that qualification is pending.
+
+When resolving a pending skill decision, link its stable ID and reference, the concrete approved scope/date and the owning current guide. Keep qualification evidence separate from acceptance. Follow [the finalization and consistency workflow](../development/guides/architecture-decisions.md#just-in-time-architecture-decisions).

@@ -24,13 +24,17 @@ Record admitted work durably and execute it through controlled attempts. Use cur
 
 ## Consequences
 
+[ADR-0083](ADR-0083-bound-hydra-recovery-cleanup-retries.md) adds a narrow Hydra recovery-cleanup exception to the shared guide's three-attempt limit. Other jobs retain that limit. Durable ownership, fenced progress, uncertainty handling and provider calls outside SQL transactions remain unchanged. The original rationale above is preserved.
+
 - Work can continue or be examined after disconnection or restart, with explicit ownership of state publication.
 - A lease or database fence cannot cancel a request already sent to another system. Recovery must preserve uncertainty and must not silently repeat chargeable model work.
+
+[ADR-0087](ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) refines the runtime convention with a dedicated recovery process. PostgreSQL ownership, short transactions and uncertainty rules remain shared. It adds no generic priority scheduler.
 
 ## Links
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current jobs and idempotency](../development/jobs-and-idempotency.md).
-- [Current data model](../development/data-model.md).
+- [Current jobs and idempotency](../../.agents/skills/inframeld-application-contracts/references/jobs-and-recovery.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Related decisions: [ADR-0027](ADR-0027-identify-repeated-requests-by-caller-and-request-meaning.md), [ADR-0028](ADR-0028-recover-answer-requests-through-receipts-without-a-full-answer-replay-cache.md), [ADR-0029](ADR-0029-use-expected-revisions-to-protect-competing-changes.md).

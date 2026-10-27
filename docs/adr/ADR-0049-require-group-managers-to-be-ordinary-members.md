@@ -36,10 +36,10 @@ Use the existing Access records and write coordination. No new service, authoriz
 
 ## Links
 
-- [Current group-management rules](../development/access-control.md#group-managers).
-- [Record constraint and proposed foreign key](../development/data-model.md#group-manager-membership-constraint).
-- [Private starter provisioning](../development/onboarding.md#model).
-- [Emergency suspension and recovery](../development/access-control.md#recovery).
+- [Current group-management rules](../../.agents/skills/inframeld-access-models/references/memberships-groups-and-handover.md#group-managers).
+- [Record constraint and proposed foreign key](../../.agents/skills/inframeld-access-models/references/access-lifecycle-persistence.md#group-manager-membership-constraint).
+- [Private starter provisioning](../../.agents/skills/inframeld-architecture/references/first-use-and-private-defaults.md#private-defaults-are-ordinary-resources).
+- [Emergency suspension and recovery](../../.agents/skills/inframeld-access-models/references/host-maintenance.md).
 - [ADR-0014: bounded delegation](ADR-0014-bound-permission-delegation-by-action-and-exact-target.md), partially superseded only for manager eligibility.
 - [ADR-0015: separate document access](ADR-0015-keep-document-group-access-separate-from-operational-permissions.md), retained.
 - [ADR-0019: scoped recovery](ADR-0019-permit-emergency-suspension-with-scoped-operator-recovery.md), retained.

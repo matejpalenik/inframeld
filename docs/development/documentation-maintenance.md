@@ -1,48 +1,61 @@
 # Maintaining Inframeld's architecture documentation
 
+<a id="maintaining-inframelds-architecture-documentation"></a>
+
 Use this guide when adding or rewriting documentation. A new maintainer should be able to find a current rule, understand it through an example, and follow a link to exact details without first reading the decision history.
 
 > **Status:** this is repository writing and maintenance guidance. It does not approve new product behavior or establish implementation evidence.
 
-## Contents
-
-| Reader's question | Start here |
-| --- | --- |
-| Where should a rule live? | [Ownership](#where-information-belongs) |
-| How do we record or supersede a choice? | [Decisions](#introduce-or-change-a-decision) |
-| How do I distinguish design from code? | [Status and evidence](#preserve-status-and-explain-evidence) |
-| How should a topic guide read? | [Writing pattern](#writing-pattern) |
-| Which skills need updating? | [Skill routes](#skill-reading-routes) |
-| What do I check before handoff? | [Review](#check-coverage-and-references) |
-| Which historical sources are unavailable? | [Missing material](#unavailable-historical-material) |
+<a id="where-information-belongs"></a>
 
 ## Where information belongs
 
-For authorized backlog maintenance, use [the implementation template](../../.github/ISSUE_TEMPLATE/implementation.md), [Definition of Done](definition-of-done.md) and [CLI delivery traceability](cli-delivery-plan.md). One ticket owns one coherent capability or transition. Epics map children; qualification issues specify evidence rather than claim to implement runtime behavior. Record a real architecture SHA and disclose any uncommitted overlay. Keep native parents/dependencies and issue-body tables aligned, preserve completion history and isolate unresolved contract design before labelling implementation ready.
+| Information | Authoritative home |
+| --- | --- |
+| Product introduction and contributor learning routes | `docs/ARCHITECTURE.md` and [developer guides](README.md). |
+| Accepted feature behavior, architectural constraints and failures | The focused workflow or architecture reference in the owning skill. |
+| Logical records and relationships | The owning skill’s focused record reference, with implemented definitions linked directly. |
+| Implemented values, HTTP fields and database constraints | Python/Pydantic definitions, native generated OpenAPI and migrations. Do not copy them into another schema manual. |
+| Architectural choice and supersession | [ADRs](../adr/README.md). |
+| Unresolved alternatives and decision trigger | The existing owning `decision-*.md` reference. |
+| Agent discovery and task method | Concise `SKILL.md` metadata/body with direct conditional links. |
+| Development and operator procedures | Human guides and runbooks, with current implementation limits explicit. |
 
-| Reader’s question | Owning document | What to put there |
-| --- | --- | --- |
-| What does this application do, and how do its parts work together? | [Architecture introduction](../ARCHITECTURE.md) | A connected explanation, vocabulary, a worked journey, and links to deeper material. |
-| Why did we choose this approach? | [Architecture decision records](../adr/README.md) | One architectural choice, its context, considered options, outcome, consequences, and status. |
-| How must this part of the product behave? | The relevant [topic guide](../ARCHITECTURE.md#reading-paths) | Current rules, procedures, examples, failures, limitations, and qualification requirements. |
-| Which records exist, and how do they relate? | [data-model.md](data-model.md) | Record identities, ownership, fields, relationships, lifecycle states, constraints, and whether physical tables are proposed or implemented. |
-| What has actually been implemented or tested? | Existing code, tests, and a dated evidence section or implementation reference | Concrete paths and what the check established. A design document is not test evidence. |
-| What should an assistant read and preserve for this task? | One of the six [repository skills](#skill-reading-routes) | Essential boundaries and precise reading routes. Skills must not become independent specifications. |
+Give each rule one detailed owner. A human guide may explain its purpose briefly, then link to that owner. Avoid parallel specifications, large required reading stacks and copies of exact code declarations. Existing code may intentionally lag accepted design. Label that gap rather than changing the target during editing.
 
-The [HTTP error guide](error-handling.md), [error maintainer reference](error-handling-reference.md), and [pagination guide](pagination.md) continue to own their established details. Link to them rather than reproducing their implementation instructions in the API guide.
+For authorized issue work, follow [Author delivery issues](#author-delivery-issues), the [implementation template](../../.github/ISSUE_TEMPLATE/implementation.md) and [Definition of Done](definition-of-done.md). Issues own task tracking. Do not add delivery inventories, progress logs or reconciliation reports to developer guides or skills. Historical issue bodies are not rewritten merely because a documentation path moved.
 
-For example, storing current permissions separately from audit history is an architectural decision. The Access guide explains what happens when Alice removes a permission. The data model defines the grant's unique key. Once implemented, a test can prove that removal and its audit event commit together. Link that test only when it exists.
+<a id="author-delivery-issues"></a>
 
-## Introduce or change a decision
+## Author delivery issues
 
-1. Check the [decision index](../adr/README.md) and the relevant guide. Find out whether the question is already decided, still proposed, or an implementation detail within an accepted choice.
-2. For a new architectural choice, copy the [ADR template](../adr/template.md), allocate the next unused ID, and give it a specific title. Explain the problem and the actual options in language a new contributor can follow.
-3. Record the status and the known decision date. If the original decision date was not recorded, use the ADR's writing date in the Date field and say in Context that the original date is unknown. Do not invent a rejected alternative, a benchmark result, or a historical date.
-4. Keep the decision focused. If two choices can change independently, consider separate ADRs. Length is a reason to review the scope, not a word limit. Move schemas, procedures, extensive examples, and teaching material into their owning references.
-5. When an accepted choice changes, create a new ADR that explicitly supersedes the old one. Update the old record’s status and links so readers can follow the history. Do not rewrite the old rationale to make the new choice look inevitable.
-6. Update the current guide, affected data-model sections, index, architecture introduction where needed, and relevant skills together. Ordinary corrections and navigation improvements can update an existing ADR without pretending a new decision was made.
+An issue describes a stable delivery outcome, not an inventory of today's code. For example, “Reject Alice's expired browser cookie without trying her CLI token” tells a new engineer what to deliver. “Wire authentication and qualify the boundary” does not.
 
-Keep assigned ADR IDs stable. Use the next unused ID in the index for a new choice. Reorganizing an explanation does not create a new architectural decision.
+Choose the smallest coherent delivery scope and one of these formats:
+
+| Format | Required contents |
+| --- | --- |
+| Implementation | Outcome through an example, concrete work, observable acceptance examples, boundaries/owning issues, focused reading and behavioral verification. |
+| Parent | Outcome, actual native child map, exclusions and completion boundary. Keep implementation instructions and acceptance evidence in the children. Use the existing `epic` label. |
+| Specification | Concrete unanswered questions, accepted constraints, outputs needing approval, affected consumers and review examples. Link the owning pending-decision analysis rather than copying it. |
+| Qualification | Behavior to demonstrate, tested artifacts/environment/inputs, injected failures, required evidence and limitations. A planned test is not a passing result. |
+| Deferred Studio | Intended UI behavior, delivered backend dependencies and explicit exclusion from v1. Do not invent future backend contracts. |
+
+Use `type:implementation`, `type:specification` or `type:qualification` on open leaves. Apply `needs-decision` only when an unresolved answer prevents that ticket's implementation. Missing qualification evidence alone does not forbid evidence-gathering tests.
+
+Before writing, compare the delivery scope with the owning skill workflow, exact contracts and accepted ADRs. The repository owns behavior. Issues own delivery and evidence. Follow explicit supersession, preserve unresolved choices and surface genuine contradictions before publishing affected requirements. Do not infer new permissions, endpoints or provider guarantees. Keep useful unique requirements visible as explicit questions if their authority is unclear.
+
+Give a junior engineer a short path to the relevant explanation. Link exact sections instead of copying field catalogues, global conventions or the same workflow into several issue sections. Include an exact value only when the acceptance example needs it. For accepted unpublished guidance, state the exact repository path and its pending publication. Link a real PR or published revision when available. Never link `main` to missing or materially older content as if it contained the accepted update.
+
+Reuse existing issues before creating a child. Use native parents for decomposition and native blockers for actual prerequisite capabilities, using GitHub's database issue IDs when an API requires them. Avoid blanket epic blockers where a particular child supplies the capability. Keep the graph acyclic and ensure v1 has no dependency on deferred Studio. Do not duplicate those relationships with manually maintained Ready/Blocked fields.
+
+Update an issue when delivery scope, acceptance, an authoritative reading route, a prerequisite capability or a genuine decision changes. Code reorganization alone does not require a new starting-point inventory. Record implementation progress through completed delivery tasks, linked PRs and scoped evidence. Preserve comments and closed historical scope/results. Add only necessary navigation or a clearly separated current clarification to closed records.
+
+Keep newly described work open while implementation is unmerged or required acceptance evidence is missing. A local adapter, an open PR or a successful ordinary path does not establish complete production integration. Distinguish source inspection, checks personally run, reported results and pending release gates. Qualification evidence should identify the tested artifacts, failures and limits.
+
+For authorized bulk changes, snapshot bodies, comments, metadata and relationships outside the repository. Prepare coverage and the complete graph before publishing. Recheck current bodies/update times before each edit, preserve intervening work, journal actual created IDs and read back mutations. After an uncertain create, locate the issue before retrying. Verify states, milestones, labels, parents, dependencies and scope after application. Do not create repetitive migration comments or a permanent parallel backlog.
+
+<a id="preserve-status-and-explain-evidence"></a>
 
 ## Preserve status and explain evidence
 
@@ -59,47 +72,7 @@ Keep estimates and external observations in context. An illustrative workload, p
 
 If sources disagree, identify the passages and explain why the difference matters. Follow an explicit superseding decision if one exists. Otherwise record the unresolved question instead of choosing a new policy during editing.
 
-## Writing pattern
-
-Use [Access control](access-control.md) as the writing example. A topic guide should explain how the area works before presenting its detailed operating rules:
-
-1. Briefly explain the reader's problem, prerequisites, reading route, and design status.
-2. Link practical reader questions to their answers in a contents table.
-3. Introduce concepts through a small example, then give them their technical names.
-4. Explain which domain owns each responsibility. Use a diagram only where it helps.
-5. Follow one successful operation, then show what changes when it fails, repeats, or competes with another change.
-6. Explain why important records and transaction boundaries exist. Link exact fields and constraints to the data model.
-7. Give maintainers a compact table of scenarios and expected results.
-8. Link owning decisions and references, and identify deferred work and tests still needed.
-
-Adapt this pattern to the document. Pagination needs a short contract and example, not eight padded chapters. The data model needs domain navigation and exact constraints. HTTP references need precise response and implementation details.
-
-Use short, connected paragraphs and familiar words. Keep exact code names, but explain what they mean before using them heavily. Prefer “save the change and its audit event together” to “commit the mutation and transactional audit atomically.” Introduce a term such as transaction when it helps the reader understand the mechanism.
-
-Use the shared [resource-naming vocabulary](data-model.md#resource-naming): **name** is the exact command/configuration selector, **display name** is the presentation label, and **ID** is the permanent identity. Screen columns should say `NAME` and `DISPLAY NAME`; distinguish them in prompts and rename examples too. Do not use display names as implicit references. Preserve exact third-party symbols and existing code/database/wire field names when documenting them, and explain legacy mappings rather than silently renaming them or implying a migration. This terminology does not turn every internal record into a user-named resource.
-
-Use Alice, SupportBot, Support, Test, and Production consistently, with each example's assumptions stated. Explain what diagram arrows mean and whether boxes are parts of the backend or separate services. Tables work well for comparisons and exact rules. Avoid semicolons in prose.
-
-Give each rule one owning document. Remove duplicated explanations and obsolete comparisons, while keeping warnings next to the operation they constrain. Keep dated historical evidence clearly separate from current instructions. Preserve limits, exceptions, calculations, open questions and untested assumptions. If detail belongs elsewhere, move it to an active reference and link it. A shorter document is not better if it loses the reason a safeguard exists.
-
-State the rule directly rather than citing shorthand from a design workshop. For example, explain which operations an application account may perform and which permissions it needs. Link the owning guide with descriptive text. A reader should not need a retired discussion document to decode a decision number.
-
-Introduce precise technical terms when they are useful. For example, "save and validate the operation before starting background work" explains admission. Prefer "check current permission before saving" to "revalidate mutation authority at commit" when the distinction does not require the more technical wording. Separate a rule, its reason and its failure behavior instead of packing them into one sentence.
-
-## Skill reading routes
-
-Keep one active `SKILL.md` per domain under `.agents/skills/`. Preserve its frontmatter, discovery purpose, read-only default, and task boundaries. A small question should load the relevant guide section, not every guide in the repository.
-
-| Skill | Read for current behavior | Read for records |
-| --- | --- | --- |
-| [Access Models](../../.agents/skills/inframeld-access-models/SKILL.md) | [Access control](access-control.md), [model connections](model-connections.md) | [Access](data-model.md#access), [connections and credentials](data-model.md#shared-supporting-records) |
-| [Application Contracts](../../.agents/skills/inframeld-application-contracts/SKILL.md) | [Application structure](application-structure.md), [API contracts](api-contracts.md), [jobs and idempotency](jobs-and-idempotency.md), [MCP](mcp.md), HTTP error and pagination references | [Supporting records](data-model.md#shared-supporting-records) |
-| [Knowledge](../../.agents/skills/inframeld-knowledge/SKILL.md) | [Knowledge lifecycle](knowledge-lifecycle.md), [ingestion security](ingestion-security.md), [retention and deletion](retention-and-deletion.md), [onboarding](onboarding.md) | [Knowledge](data-model.md#knowledge) |
-| [Indexing](../../.agents/skills/inframeld-indexing/SKILL.md) | [Indexing](indexing.md), [ingestion security](ingestion-security.md), [model connections](model-connections.md) | [Indexing](data-model.md#indexing) |
-| [Pipelines and Releases](../../.agents/skills/inframeld-pipelines-releases/SKILL.md) | [Pipelines and releases](pipelines-and-releases.md), [answer feedback](answer-feedback.md), [onboarding](onboarding.md) | [Pipelines](data-model.md#pipelines), [Releases](data-model.md#releases) |
-| [Evaluation](../../.agents/skills/inframeld-evaluation/SKILL.md) | [Evaluation](evaluation.md), relevant [model](model-connections.md) and [access](access-control.md) boundaries | [Evaluation](data-model.md#evaluation) |
-
-After a substantive skill change, check its frontmatter and links, then follow realistic questions through its reading routes. Skills keep essential warnings and task boundaries. Guides own the full explanation. Loading a skill does not authorize edits.
+<a id="check-coverage-and-references"></a>
 
 ## Check coverage and references
 
@@ -113,22 +86,12 @@ Inspect source before describing behavior as implemented or presenting copyable 
 
 Preserve [AGENTS.md](../../AGENTS.md), its TDD and read-only safeguards, and [web directory guidance](../../apps/web/AGENTS.md). Documentation maintenance does not authorize code changes, paid calls, migrations, commits, or publishing.
 
+<a id="unavailable-historical-material"></a>
+
 ## Unavailable historical material
 
-Four previously referenced documents were unavailable in the reviewed checkout and available Git history. The availability notes below identify the missing files and link to existing specifications. No missing report or test result has been reconstructed.
+Four earlier sources remain unavailable: the external client-tooling feasibility report, `docs/reviews/v1-architecture-review.md`, `docs/reviews/onboarding-reference.md` and `docs/development/repository-skills-plan.md`. No report or test evidence has been reconstructed. ADR-0055 supplies the current generator-neutral CLI direction. Current first-use and qualification references preserve only the requirements actually available. Flexible first-answer timing is not a measured result.
 
-### Missing historical client review
+## Choose the maintenance task
 
-The previously referenced external client-tooling feasibility report is unavailable and establishes no qualification evidence. [ADR-0055](../adr/ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md) replaces the earlier tooling dependency with generator-neutral OpenAPI clients and CLI-first v1. See [API contracts](api-contracts.md) for current delivery requirements.
-
-### Missing closing review
-
-`docs/reviews/v1-architecture-review.md` is unavailable. The [decision index](../adr/README.md) and topic guides preserve the scope and qualification statements actually present in the available sources. This does not recover the closing review’s analysis or create a new review gate.
-
-### Missing onboarding reference
-
-`docs/reviews/onboarding-reference.md` is unavailable. The [onboarding guide](onboarding.md) retains the available first-use journey, private provisioning rules, retry behavior, and flexible timing goal. That goal is not evidence of a measured first-answer time.
-
-### Missing skills plan
-
-`docs/development/repository-skills-plan.md` is unavailable. [Skill reading routes](#skill-reading-routes) provides current maintenance guidance without claiming to recover that plan.
+For writing, routing, examples and evaluation, follow [Skill authoring](guides/skill-authoring.md). For pending decisions, explicit approval and repository-wide reconciliation, follow [Architecture decisions](guides/architecture-decisions.md). These are mandatory procedures for their affected work, not a requirement to load both for every correction.

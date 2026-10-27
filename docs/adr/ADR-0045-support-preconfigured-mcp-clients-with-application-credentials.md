@@ -33,6 +33,6 @@ Support the accepted preconfigured client profile: the client supplies the appli
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current mcp](../development/mcp.md).
-- [Current access control](../development/access-control.md).
+- [Current mcp](../../.agents/skills/inframeld-application-contracts/references/mcp-transport.md).
+- [Current access control](../../.agents/skills/inframeld-access-models/references/authorization.md).
 - Related decisions: [ADR-0044](ADR-0044-provide-mcp-through-a-thin-adapter-in-the-existing-api-process.md).

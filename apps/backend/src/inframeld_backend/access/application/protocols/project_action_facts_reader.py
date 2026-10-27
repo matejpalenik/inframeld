@@ -26,6 +26,9 @@ class ProjectActionFactsReader(Protocol):
         membership in the returned facts; policies decide their consequences.
         The organization ID comes from the matched project row.
 
+        Include the stored principal kind and current OAuth binding/version facts.
+        The authorizer interprets evidence and decides credential currentness.
+
         The caller owns the transaction. Do not commit it, cache permissions,
         or treat a returned facts object as proof of visibility or authority.
         """

@@ -1,40 +1,52 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+# Give each asynchronous step its own process group so cancellation also stops
+# a build or Compose subprocess before project cleanup begins.
+set -m
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd -- "${script_dir}/.." && pwd)"
-test_env_file="${repository_root}/apps/backend/.env.test"
 cd "${repository_root}"
-
-if [[ ! -f "${test_env_file}" ]]; then
-    printf 'Backend test configuration is missing: %s\n' "${test_env_file}" >&2
-    printf 'Create it with: cp apps/backend/.env.test.example apps/backend/.env.test\n' >&2
-    exit 1
-fi
+active_pid=""
 
 cleanup_test_services() {
     local exit_status=$?
     trap - EXIT
-    "${script_dir}/dev-compose.sh" test-services-down || true
+    trap '' INT TERM
+    if ! "${script_dir}/dev-compose.sh" test-services-down; then
+        printf 'Integration cleanup failed. Run ./scripts/dev-compose.sh test-services-down to retry.\n' >&2
+        if [[ "${exit_status}" -eq 0 ]]; then
+            exit_status=1
+        fi
+    fi
     exit "${exit_status}"
 }
 
+interrupt_run() {
+    local exit_status="$1"
+    trap '' INT TERM
+    if [[ -n "${active_pid}" ]]; then
+        kill -TERM -- "-${active_pid}" 2>/dev/null || true
+        wait "${active_pid}" 2>/dev/null || true
+    fi
+    exit "${exit_status}"
+}
+
+run_step() {
+    # These steps are noninteractive. With job control enabled, inheriting the
+    # terminal lets Podman suspend the background job when it reads stdin.
+    "$@" </dev/null &
+    active_pid=$!
+    local exit_status=0
+    wait "${active_pid}" || exit_status=$?
+    active_pid=""
+    return "${exit_status}"
+}
+
 trap cleanup_test_services EXIT
+trap 'interrupt_run 130' INT
+trap 'interrupt_run 143' TERM
 
-"${script_dir}/dev-compose.sh" test-services-up
-
-# These values deliberately select the application PostgreSQL service in the
-# test-only Compose project. Environment variables override .env.test.
-export INFRAMELD_ENVIRONMENT=test
-export INFRAMELD_TEST_ENV_FILE=.env.test
-export INFRAMELD_DATABASE__HOST=127.0.0.1
-export INFRAMELD_DATABASE__PORT=15433
-export INFRAMELD_DATABASE__NAME=inframeld_test
-export INFRAMELD_DATABASE__USER=inframeld_test
-export INFRAMELD_DATABASE__PASSWORD=inframeld-test-only
-export UV_LOCKED=1
-
-pnpm --filter @inframeld/backend migrate
-INFRAMELD_RUN_DB_INTEGRATION=1 INFRAMELD_RUN_KRATOS_INTEGRATION=1 \
-    uv run --project apps/backend pytest apps/backend/tests/integration -q
+run_step "${script_dir}/dev-compose.sh" test-services-up
+run_step "${script_dir}/dev-compose.sh" test-run "$@"

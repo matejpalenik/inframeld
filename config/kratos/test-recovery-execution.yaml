@@ -1,0 +1,70 @@
+# Test-only native production callbacks. The key has no authority outside this graph.
+serve:
+  public:
+    base_url: http://kratos-recovery-execution:4433/
+  admin:
+    base_url: http://kratos-recovery-execution:4434/
+selfservice:
+  default_browser_return_url: http://kratos-recovery-execution:4433/
+  flows:
+    login:
+      ui_url: http://kratos-recovery-execution:4433/login
+    registration:
+      ui_url: http://kratos-recovery-execution:4433/registration
+    recovery:
+      ui_url: http://kratos-recovery-execution:4433/recovery
+      after:
+        hooks:
+          - hook: web_hook
+            config:
+              url: http://recovery-execution-callbacks:8081/internal/v2/identity-recovery/admit
+              method: POST
+              body: file:///etc/config/kratos/recovery-admit.jsonnet
+              can_interrupt: true
+              auth:
+                type: api_key
+                config:
+                  name: X-Inframeld-Recovery-Key
+                  value: inframeld-native-recovery-hook-test-only
+                  in: header
+              response:
+                ignore: false
+                parse: false
+          - hook: revoke_active_sessions
+    settings:
+      ui_url: http://kratos-recovery-execution:4433/settings
+      before:
+        hooks:
+          - hook: web_hook
+            config:
+              url: http://recovery-execution-callbacks:8081/internal/v2/identity-recovery/settings
+              method: POST
+              body: file:///etc/config/kratos/recovery-settings.jsonnet
+              auth:
+                type: api_key
+                config:
+                  name: X-Inframeld-Recovery-Key
+                  value: inframeld-native-recovery-hook-test-only
+                  in: header
+              response:
+                ignore: false
+                parse: false
+      after:
+        password:
+          hooks:
+            - hook: revoke_active_sessions
+            - hook: web_hook
+              config:
+                url: http://recovery-execution-callbacks:8081/internal/v2/identity-recovery/password-saved
+                method: POST
+                body: file:///etc/config/kratos/recovery-password-saved.jsonnet
+                can_interrupt: false
+                auth:
+                  type: api_key
+                  config:
+                    name: X-Inframeld-Recovery-Key
+                    value: inframeld-native-recovery-hook-test-only
+                    in: header
+                response:
+                  ignore: false
+                  parse: false

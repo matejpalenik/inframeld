@@ -2,7 +2,7 @@
 
 Status: Superseded by [ADR-0051](ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md).
 
-This record preserves the original narrower OpenEvals decision and its rationale. It is historical, not current implementation guidance. Ragas now supplies starter generation and claim-based faithfulness; see [the current Evaluation guide](../development/evaluation.md).
+This record preserves the original narrower OpenEvals decision and its rationale. It is historical, not current implementation guidance. Ragas now supplies starter generation and claim-based faithfulness; see [the current Evaluation guide](../../.agents/skills/inframeld-evaluation/references/generation-and-review.md).
 
 **Date:** 2026-09-17
 
@@ -34,7 +34,7 @@ Use OpenEvals for the selected holistic groundedness check. Qualify configurable
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current evaluation](../development/evaluation.md).
-- [Current model connections](../development/model-connections.md).
-- [Current data model](../development/data-model.md).
+- [Current evaluation](../../.agents/skills/inframeld-evaluation/references/generation-and-review.md).
+- [Current model connections](../../.agents/skills/inframeld-application-contracts/references/model-gateway-and-connections.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Related decisions: [ADR-0031](ADR-0031-compare-fresh-executions-against-frozen-benchmarks.md).

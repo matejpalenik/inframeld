@@ -31,6 +31,6 @@ Send every Inframeld remote model request through ModelGateway. Domain and appli
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current model connections](../development/model-connections.md).
-- [Current evaluation](../development/evaluation.md).
+- [Current model connections](../../.agents/skills/inframeld-application-contracts/references/model-gateway-and-connections.md).
+- [Current evaluation](../../.agents/skills/inframeld-evaluation/references/generation-and-review.md).
 - Related decisions: [ADR-0024](ADR-0024-approve-outbound-destinations-before-model-calls.md), [ADR-0025](ADR-0025-separate-connection-meaning-from-replaceable-credentials.md).

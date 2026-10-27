@@ -2,6 +2,9 @@
 
 from hmac import digest
 
+from inframeld_backend.shared.application.value_objects.request_fingerprint import (
+    RequestFingerprint,
+)
 from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
     RequestFingerprintKey,
 )
@@ -15,7 +18,7 @@ class RequestFingerprintService:
     def __init__(self, key: RequestFingerprintKey) -> None:
         self._key = key
 
-    def fingerprint(self, *, purpose: str, canonical_request: bytes) -> bytes:
+    def fingerprint(self, *, purpose: str, canonical_request: bytes) -> RequestFingerprint:
         """Return a domain-separated HMAC of the caller's canonical request bytes.
 
         The owning operation decides which validated fields those bytes include.
@@ -35,4 +38,4 @@ class RequestFingerprintService:
             _DOMAIN + len(purpose_bytes).to_bytes(2, "big") + purpose_bytes + canonical_request
         )
 
-        return digest(self._key.value, message, "sha256")
+        return RequestFingerprint(digest(self._key.value, message, "sha256"))

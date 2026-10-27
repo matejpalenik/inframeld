@@ -7,8 +7,16 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY apps/backend/pyproject.toml apps/backend/uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
+
+COPY apps/backend/README.md ./README.md
+COPY apps/backend/src ./src
+RUN uv sync --locked --no-dev --no-editable
 
 FROM python:3.13.12-slim AS runtime
 

@@ -4,14 +4,13 @@ from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 import httpx2
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
 from inframeld_backend.access.application.value_objects.browser_session_credential import (
     BrowserSessionCredential,
 )
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
-
-KRATOS_PUBLIC_URL = "http://127.0.0.1:14433"
+from tests.support.integration_services import KRATOS_PUBLIC_URL
 
 
 class InputAttributes(BaseModel):
@@ -78,7 +77,7 @@ def create_browser(*, public_url: str = KRATOS_PUBLIC_URL) -> httpx2.AsyncClient
     )
 
 
-def _csrf_token(flow: BrowserFlow) -> str:
+def read_browser_csrf_token(flow: BrowserFlow) -> str:
     """Require a textual CSRF input before submitting a browser form."""
     for node in flow.ui.nodes:
         if node.attributes.name == "csrf_token" and isinstance(node.attributes.value, str):
@@ -110,7 +109,7 @@ async def register_human(
     completed = await browser.post(
         flow.ui.action,
         data={
-            "csrf_token": _csrf_token(flow),
+            "csrf_token": read_browser_csrf_token(flow),
             "traits.email": resolved_email,
             "password": password,
             "method": "password",
@@ -133,23 +132,32 @@ async def login_human(
     browser: httpx2.AsyncClient, human: RegisteredHumanDTO
 ) -> BrowserSessionCredential:
     """Authenticate an existing test human in an independent browser session."""
+    completed = await submit_password_login(
+        browser, email=human.email, password=SecretStr(human.password)
+    )
+    assert completed.status_code in {200, 303}, "Could not authenticate the test human."
+    return _credential(browser)
+
+
+async def submit_password_login(
+    browser: httpx2.AsyncClient, *, email: str, password: SecretStr
+) -> httpx2.Response:
+    """Submit a password login so tests can observe rejection as well as success."""
     started = await browser.get(
         "/self-service/login/browser", headers={"Accept": "application/json"}
     )
-    assert started.status_code == 200, started.text
+    assert started.status_code == 200, "Could not start the password login."
     flow = BrowserFlow.model_validate_json(started.text)
-    completed = await browser.post(
+    return await browser.post(
         flow.ui.action,
         data={
-            "csrf_token": _csrf_token(flow),
-            "identifier": human.email,
-            "password": human.password,
+            "csrf_token": read_browser_csrf_token(flow),
+            "identifier": email,
+            "password": password.get_secret_value(),
             "method": "password",
         },
         headers={"Accept": "application/json"},
     )
-    assert completed.status_code in {200, 303}, completed.text
-    return _credential(browser)
 
 
 async def begin_oidc_login(browser: httpx2.AsyncClient) -> str:
@@ -169,7 +177,7 @@ async def begin_oidc_login(browser: httpx2.AsyncClient) -> str:
     submitted = await browser.post(
         flow.ui.action,
         data={
-            "csrf_token": _csrf_token(flow),
+            "csrf_token": read_browser_csrf_token(flow),
             "provider": "company",
             "method": "oidc",
         },

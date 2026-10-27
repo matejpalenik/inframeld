@@ -17,12 +17,16 @@ from inframeld_backend.shared.http.definitions.problem_catalogue import (
     DEPENDENCY_UNAVAILABLE_PROBLEM,
     IDEMPOTENCY_IN_PROGRESS_PROBLEM,
     INTERNAL_ERROR_PROBLEM,
+    INVALID_AUTHENTICATION_REQUEST_PROBLEM,
     VALIDATION_ERROR_PROBLEM,
 )
 from inframeld_backend.shared.http.dependencies.request_identity import request_identity
 from inframeld_backend.shared.http.mappers.problem_mapper import (
     for_application_error,
     for_http_status,
+)
+from inframeld_backend.shared.http.validation.invalid_authentication_request_error import (
+    InvalidAuthenticationRequestError,
 )
 from inframeld_backend.shared.http.validation.request_validation_translator import (
     issues_from_request_error,
@@ -74,10 +78,15 @@ async def _http_exception_handler(
     request: Request,
     error: StarletteHTTPException,
 ) -> Response:
-    """Return a safe generic problem while preserving trusted HTTP headers."""
+    """Preserve trusted headers and select the specific authentication 400 problem."""
+    definition = (
+        INVALID_AUTHENTICATION_REQUEST_PROBLEM
+        if isinstance(error, InvalidAuthenticationRequestError)
+        else for_http_status(error.status_code)
+    )
     return build_problem_response(
         request,
-        for_http_status(error.status_code),
+        definition,
         protocol_headers=error.headers,
     )
 

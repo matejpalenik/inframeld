@@ -31,6 +31,6 @@ Mount the MCP adapter inside the existing API process and expose the selected qu
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current mcp](../development/mcp.md).
-- [Current api contracts](../development/api-contracts.md).
+- [Current mcp](../../.agents/skills/inframeld-application-contracts/references/mcp-transport.md).
+- [Current api contracts](../../.agents/skills/inframeld-application-contracts/references/http-mcp-and-generated-clients.md).
 - Related decisions: [ADR-0045](ADR-0045-support-preconfigured-mcp-clients-with-application-credentials.md).

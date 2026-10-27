@@ -30,6 +30,6 @@ Keep the documented OpenAPI, Swagger UI, ReDoc, and health endpoints unauthentic
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current api contracts](../development/api-contracts.md).
-- [Current access control](../development/access-control.md).
+- [Current api contracts](../../.agents/skills/inframeld-application-contracts/references/http-mcp-and-generated-clients.md).
+- [Current access control](../../.agents/skills/inframeld-access-models/references/authorization.md).
 - Related decisions: [ADR-0003](ADR-0003-generate-the-authoritative-openapi-contract-from-backend-code.md), [ADR-0004](ADR-0004-use-rfc-9457-problem-details-for-http-errors.md), [ADR-0005](ADR-0005-use-bounded-cursor-pagination-for-lists.md), [ADR-0006](ADR-0006-use-official-generated-clients-for-application-api-access.md).

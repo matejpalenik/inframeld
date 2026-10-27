@@ -31,7 +31,7 @@ Provision the admitted human’s private starter project, group, and normal setu
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current onboarding](../development/onboarding.md).
-- [Current access control](../development/access-control.md).
-- [Current data model](../development/data-model.md).
+- [Current onboarding](../../.agents/skills/inframeld-architecture/references/first-use-and-private-defaults.md).
+- [Current access control](../../.agents/skills/inframeld-access-models/references/authorization.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Related decisions: [ADR-0047](ADR-0047-support-reversible-publication-modes-per-deployment.md).

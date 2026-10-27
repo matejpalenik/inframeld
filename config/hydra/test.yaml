@@ -1,0 +1,49 @@
+# Test-only Hydra configuration. Never reuse these credentials in a deployment.
+dsn: postgres://hydra_test:hydra-test-only@hydra-postgres:5432/hydra_test?sslmode=disable
+
+serve:
+  public:
+    port: 4444
+  admin:
+    port: 4445
+
+urls:
+  self:
+    issuer: http://hydra:4444/
+  login: http://kratos:4433/self-service/login/browser
+  consent: http://hydra-test-ui.invalid/consent
+
+secrets:
+  system:
+    - INFRAMELD-HYDRA-TEST-ONLY-SECRET-12345678
+  cookie:
+    - INFRAMELD-HYDRA-TEST-COOKIE-SECRET-12345678
+
+strategies:
+  access_token: opaque
+
+ttl:
+  access_token: 5m
+  refresh_token: 168h
+  auth_code: 1m
+
+oauth2:
+  token_hook:
+    url: http://recovery-hooks:8080/internal/test/hydra/token
+    auth:
+      type: api_key
+      config:
+        in: header
+        name: X-Inframeld-Recovery-Key
+        value: inframeld-recovery-hook-test-only
+  pkce:
+    enforced: true
+    enforced_for_public_clients: true
+  grant:
+    refresh_token:
+      rotation_grace_period: 0s
+      rotation_grace_reuse_count: 0
+
+log:
+  level: warn
+  leak_sensitive_values: false

@@ -1,5 +1,6 @@
 """Construct the HTTP application and connect its concrete resources and services."""
 
+from contextlib import ExitStack
 from functools import partial
 
 from fastapi import FastAPI
@@ -13,7 +14,13 @@ from inframeld_backend.access.http.dependencies.csrf_protection_dependency impor
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
+from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler import (
+    register_human_oauth_credential_error_handler,
+)
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
+from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
+    create_human_oauth_consent_router,
+)
 from inframeld_backend.access.http.routes.project_grant_routes import (
     create_project_grant_router,
 )
@@ -21,6 +28,7 @@ from inframeld_backend.bootstrap.access_composition import create_access_compone
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
+from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -43,8 +51,8 @@ API_VERSION = "0.1.0"
 def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
     """Construct resources, wire application services, and register HTTP behavior.
 
-    Construction performs no network I/O. The lifespan starts PostgreSQL checks
-    and releases both database and provider resources, including startup failure.
+    Construction performs no network I/O. Release provider clients if assembly
+    fails; otherwise transfer their ownership to the application lifespan.
     """
     resolved_settings = settings if settings is not None else get_settings()
 
@@ -52,38 +60,72 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
 
     database = Database(resolved_settings.database)
 
-    access = create_access_components(resolved_settings.kratos, database)
-
-    fingerprints = ProjectGrantChangeFingerprintService(
-        RequestFingerprintService(
-            FileRequestFingerprintKeyReader(resolved_settings.request_fingerprint.key_file).read()
+    with ExitStack() as provider_cleanup:
+        access = create_access_components(
+            resolved_settings.kratos,
+            resolved_settings.hydra,
+            database,
+            human_authentication_settings=resolved_settings.human_authentication,
         )
-    )
+        for client in (
+            access.kratos_client,
+            access.kratos_admin_client,
+            access.hydra_client,
+        ):
+            if client is not None:
+                provider_cleanup.callback(client.rest_client.pool_manager.clear)
 
-    resources = ApplicationResources(database, access.kratos_client)
+        fingerprints = ProjectGrantChangeFingerprintService(
+            RequestFingerprintService(
+                FileRequestFingerprintKeyReader(
+                    resolved_settings.request_fingerprint.key_file
+                ).read()
+            )
+        )
 
-    application = FastAPI(
-        debug=False,
-        title=API_TITLE,
-        version=API_VERSION,
-        description="Governed retrieval and release workflows.",
-        openapi_url="/v1/openapi.json",
-        docs_url="/docs",
-        redoc_url="/redoc",
-        lifespan=partial(application_lifespan, resources),
-    )
+        resources = ApplicationResources(
+            database=database,
+            kratos_client=access.kratos_client,
+            kratos_admin_client=access.kratos_admin_client,
+            hydra_client=access.hydra_client,
+        )
 
-    register_error_handlers(application)
-    configure_problem_openapi(application)
-    application.include_router(health_router)
+        application = FastAPI(
+            debug=False,
+            title=API_TITLE,
+            version=API_VERSION,
+            description="Governed retrieval and release workflows.",
+            openapi_url="/v1/openapi.json",
+            docs_url="/docs",
+            redoc_url="/redoc",
+            lifespan=partial(application_lifespan, resources),
+        )
 
-    human_session = HumanSessionDependency(
-        access.authenticator,
-        CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
-    )
-    application.include_router(create_session_router(human_session))
-    application.include_router(create_project_grant_router(human_session, database, fingerprints))
+        register_error_handlers(application)
+        register_human_oauth_credential_error_handler(application)
+        configure_problem_openapi(application)
+        application.include_router(health_router)
 
-    application.add_middleware(RequestContextMiddleware)
+        human_session = HumanSessionDependency(
+            access.authenticator,
+            CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
+            access_token_authenticator=access.access_token_authenticator,
+        )
 
-    return application
+        application.include_router(create_session_router(human_session))
+        application.include_router(
+            create_human_oauth_consent_router(
+                access.oauth_consent_handler,
+                CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
+            )
+        )
+        application.include_router(
+            create_project_grant_router(
+                human_session, partial(open_project_grant_change, database, fingerprints)
+            )
+        )
+
+        application.add_middleware(RequestContextMiddleware)
+
+        provider_cleanup.pop_all()
+        return application

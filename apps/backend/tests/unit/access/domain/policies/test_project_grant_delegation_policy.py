@@ -7,6 +7,9 @@ from inframeld_backend.access.domain.enums.principal_status import PrincipalStat
 from inframeld_backend.access.domain.policies.project_grant_delegation_policy import (
     ProjectGrantDelegationPolicy,
 )
+from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
+    PrincipalAccessPolicyInput,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 
@@ -33,9 +36,14 @@ def _may_assign(
     actor_is_member: bool = True,
     recipient_is_member: bool = True,
     actor_can_grant: bool = True,
+    has_pending_recovery: bool = False,
 ) -> bool:
     return ProjectGrantDelegationPolicy.may_assign_use_only_to_human(
-        actor=actor if actor is not None else _principal(1),
+        actor_access=PrincipalAccessPolicyInput(
+            principal=actor if actor is not None else _principal(1),
+            has_pending_recovery=has_pending_recovery,
+            credential_is_current=True,
+        ),
         recipient=recipient if recipient is not None else _principal(2),
         actor_is_project_member=actor_is_member,
         recipient_is_project_member=recipient_is_member,
@@ -58,3 +66,15 @@ def test_grant_requires_eligible_members_in_the_same_organization() -> None:
     assert not _may_assign(recipient=replace(_principal(2), status=PrincipalStatus.SUSPENDED))
     assert not _may_assign(recipient=_principal(2, kind=PrincipalKind.APPLICATION))
     assert not _may_assign(recipient=_principal(2, organization=2))
+
+
+def test_recovery_blocks_delegation_despite_existing_authority() -> None:
+    """An existing can_grant assignment cannot bypass the recovery block."""
+    assert not _may_assign(has_pending_recovery=True)
+
+
+def test_application_cannot_delegate_despite_existing_authority() -> None:
+    """Application use permissions do not make it a human grant administrator."""
+    assert not _may_assign(
+        actor=_principal(1, kind=PrincipalKind.APPLICATION),
+    )

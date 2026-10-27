@@ -31,7 +31,7 @@ Use the selected SeaweedFS S3 service through ArtifactStore and the documented p
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current deployment](../development/deployment.md).
-- [Current knowledge lifecycle](../development/knowledge-lifecycle.md).
-- [Current upgrades and recovery](../development/upgrades-and-recovery.md).
+- [Current deployment](../../.agents/skills/inframeld-architecture/references/runtime-deployment-and-storage.md).
+- [Current knowledge lifecycle](../../.agents/skills/inframeld-knowledge/references/documents-and-collections.md).
+- [Current upgrades and recovery](../development/operations/upgrades.md).
 - Related decisions: [ADR-0035](ADR-0035-deploy-v1-on-one-server-through-docker-compose.md).

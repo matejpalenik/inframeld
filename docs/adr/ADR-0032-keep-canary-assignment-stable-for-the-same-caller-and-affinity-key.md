@@ -31,6 +31,6 @@ Use the documented deterministic affinity scheme for a Deployment canary. Keep a
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current pipelines and releases](../development/pipelines-and-releases.md).
-- [Current data model](../development/data-model.md).
+- [Current pipelines and releases](../../.agents/skills/inframeld-pipelines/references/configuration-queries-and-builds.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Related decisions: [ADR-0033](ADR-0033-separate-build-readiness-from-release-authority.md).

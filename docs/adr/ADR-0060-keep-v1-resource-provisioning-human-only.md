@@ -17,7 +17,7 @@ The developer reconsidered both alternatives and selected the latter for now.
 
 ## Decision Outcome
 
-Keep Project/resource provisioning human-only as enumerated in [the provisioning contract](../development/access-contracts.md#provisioning). Applications may perform supported updates and operational work on existing resources with explicit eligible grants. Versions, Documents, jobs and Evaluation cases produced by those operations remain permitted workflow output.
+Keep Project/resource provisioning human-only as enumerated in [the provisioning contract](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#provisioning). Applications may perform supported updates and operational work on existing resources with explicit eligible grants. Versions, Documents, jobs and Evaluation cases produced by those operations remain permitted workflow output.
 
 Application configuration imports may reuse existing compatible resources and apply eligible updates. A plan requiring resource creation is ineligible; reject it before known-invalid mutations and identify the necessary human step. Human-only administration remains human-only through imports, with no saved-human fallback.
 
@@ -30,8 +30,8 @@ Application configuration imports may reuse existing compatible resources and ap
 
 ## Links
 
-- [Access workflow authority](../development/access-control.md#cli-automation-authority).
-- [Configuration import](../development/configuration-portability.md#destination-review).
+- [Access workflow authority](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#cli-automation-authority).
+- [Configuration import](../../.agents/skills/inframeld-application-contracts/references/configuration-import-review.md#destination-review).
 - [ADR-0016: shared principals](ADR-0016-use-stable-shared-principals-with-an-application-account-extension.md).
 - [ADR-0059: fixed creator grants](ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md).
 - Implementation and qualification remain pending; this decision does not alter application code.

@@ -22,7 +22,7 @@ Keep source admission, processing, numerical generations, and materialization re
 
 **Example.** Changing a prompt may reuse the same materialization. Changing embedding meaning requires the matching profile and prepared numerical records before the version can serve.
 
-[ADR-0054](ADR-0054-use-shared-current-model-connections.md) preserves this numerical contract with shared current connections: reject a connection update when prepared or in-progress embedding data would become incompatible or compatibility is unproven. A deliberate embedding-model migration still creates the appropriate profile and prepared data before execution. See [Indexing](../development/indexing.md#embedding-compatibility).
+[ADR-0054](ADR-0054-use-shared-current-model-connections.md) preserves this numerical contract with shared current connections: reject a connection update when prepared or in-progress embedding data would become incompatible or compatibility is unproven. A deliberate embedding-model migration still creates the appropriate profile and prepared data before execution. See [Indexing](../../.agents/skills/inframeld-indexing/references/materialization-verification.md#embedding-compatibility).
 
 ## Consequences
 
@@ -33,6 +33,6 @@ Keep source admission, processing, numerical generations, and materialization re
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current indexing](../development/indexing.md).
-- [Current data model](../development/data-model.md).
-- [Current pipelines and releases](../development/pipelines-and-releases.md).
+- [Current indexing](../../.agents/skills/inframeld-indexing/references/profiles-and-preparation.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
+- [Current pipelines and releases](../../.agents/skills/inframeld-pipelines/references/configuration-queries-and-builds.md).

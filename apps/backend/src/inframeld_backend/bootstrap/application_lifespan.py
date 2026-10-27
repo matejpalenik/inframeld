@@ -1,7 +1,7 @@
 """Start and release application resources around request serving."""
 
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import ExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -12,14 +12,19 @@ from inframeld_backend.bootstrap.application_resources import ApplicationResourc
 async def application_lifespan(
     resources: ApplicationResources, _application: FastAPI | None = None
 ) -> AsyncGenerator[None]:
-    """Own database startup and release every resource, including after partial startup."""
-    try:
-        await resources.database.startup()
-        yield
-    finally:
+    """Release every provider pool even when database startup or shutdown fails."""
+    with ExitStack() as provider_cleanup:
+        for client in (
+            resources.kratos_client,
+            resources.kratos_admin_client,
+            resources.hydra_client,
+        ):
+            if client is not None:
+                # The SDK context-manager exit does not release urllib3 pools.
+                provider_cleanup.callback(client.rest_client.pool_manager.clear)
+
         try:
-            await resources.database.shutdown()
+            await resources.database.startup()
+            yield
         finally:
-            if resources.kratos_client is not None:
-                # The SDK __exit__ is a no-op; release the actual urllib3 pools.
-                resources.kratos_client.rest_client.pool_manager.clear()
+            await resources.database.shutdown()

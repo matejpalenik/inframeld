@@ -1,51 +1,67 @@
 ---
 name: inframeld-indexing
-description: Explain or review Inframeld processing and embedding profiles, chunks, immutable vector generations, shard layouts, materialization readiness, filtered retrieval and index cleanup. Use for index correctness or reuse; ordinary release decisions belong to Pipelines and Releases.
+description: Explains and reviews Inframeld processing profiles, embeddings, vector reuse, materialization readiness, filtered retrieval and cleanup. Use for index correctness and numerical lifecycle, rather than release authority.
 ---
 
 # Inframeld Indexing
 
-Explain how admitted source versions become verified, reusable search data. Indexing owns processing and embedding profiles, generations, layouts, and materialization readiness. Knowledge owns membership; Access owns grants; Releases owns publication.
+Explain how admitted source versions become verified, reusable search data. Indexing owns processing/embedding profiles, chunks, numerical generations, saved layouts and materialization readiness. Knowledge owns corpus membership, Access owns current grants and Releases owns publication.
 
-## Scope and reading route
+## Working model
 
-For the accepted #116 catalogue, assignments and remaining schema/route/maintenance handoff, read [Access contracts](../../../docs/development/access-contracts.md). Guides own behavior; the new reference is accepted design, not implemented API or runtime evidence.
+Alice admits B2 and an authorized collection selection replaces B1 with it, keeping unchanged A1. Indexing can reuse A1's compatible vectors, create B2's vectors and retain B1's vectors while an older revision needs them. It never edits A1's vectors merely to add new collection membership.
 
-Default to read-only assistance. Loading this skill grants no edit, model-call, or mutation permission. Start with the relevant protocol, then its record definitions; cite current sources and separate designed guarantees from verified code.
+An embedding is a numerical representation used to find similar text. Its profile fixes the meaning of those numbers. A processing profile fixes parsing/chunking settings.
 
-- [Indexing](../../../docs/development/indexing.md) owns writes, filters, verification, reuse, retirement, and qualification calculations. [Indexing records](../../../docs/development/data-model.md#indexing) defines profiles, generations, saved layouts, and materializations.
-- Decisions: [PostgreSQL and Chroma](../../../docs/adr/ADR-0009-keep-application-authority-in-postgresql-and-derived-vectors-in-chroma.md), [saved layouts](../../../docs/adr/ADR-0010-save-deterministic-layouts-for-vector-shards.md), [frozen payload retries](../../../docs/adr/ADR-0011-retry-frozen-vector-identities-and-payloads.md), and [verified bindings](../../../docs/adr/ADR-0040-bind-pipeline-versions-to-verified-profile-specific-materializations.md).
-- [Ingestion security](../../../docs/development/ingestion-security.md) covers Docling and isolation; [Model connections](../../../docs/development/model-connections.md) covers embedding semantics and egress. Read [Access](../../../docs/development/access-control.md), [Jobs](../../../docs/development/jobs-and-idempotency.md), [Deletion](../../../docs/development/retention-and-deletion.md), or [Onboarding](../../../docs/development/onboarding.md) when crossing those boundaries.
-- [Maintainer checks](../../../docs/development/indexing.md#maintainer-checks) summarize reuse, failure, and cleanup scenarios.
+Generations record actual executions. A materialization verifies the exact corpus, profiles and generations a query needs. These are useful distinctions, not a requirement for a class or repository per noun.
 
-- For reuse, start with [shared generations](../../../docs/development/indexing.md#model), then [readiness](../../../docs/development/indexing.md#build). For uncertainty, distinguish [saved-payload retries](../../../docs/development/indexing.md#retries) from [final cleanup](../../../docs/development/indexing.md#retirement).
+PostgreSQL records exact revision membership and authority. Chroma stores immutable derived records in physical collections called shards. A logical Knowledge collection need not match one shard.
 
-- For shared connectivity, follow [embedding compatibility](../../../docs/development/indexing.md#embedding-compatibility), [gateway dispatch](../../../docs/development/model-connections.md#dispatch-freshness) and [ADR-0054](../../../docs/adr/ADR-0054-use-shared-current-model-connections.md). Profiles select connection IDs plus expected vector meaning, not historical access revisions.
+## Essential rules
 
-## Essential boundaries
+- Search only exact revision membership intersected with current access, using server-generated filters. Empty authorized scope performs no Chroma search. A failed required shard fails visibly.
+- Only the singleton worker writer mutates Chroma under its process-lifetime local lock. API handlers do not write vectors.
+- Capture exact bounded vector IDs and payload bytes before dispatch. Safe storage retries reuse those bytes and verify actual records. Partial success stays unready.
+- A provider timeout before captured embedding bytes does not authorize another paid embedding request. SQL fencing prevents stale publication, not remote execution.
+- Reject incompatible or unproven shared embedding changes before mutation. Aliases, dimensions or a probe cannot prove unchanged meaning. Credential-only rotation does not itself require new vectors.
+- Pins, retirement and cleanup share the retention gate. Erasure can invalidate old versions. A historical ready label is not current health or final-erasure proof.
+- Parsing stays offline in the supported sandbox with pinned assets and validated output. Unsupported isolation has no privileged fallback. Every remote embedding uses ModelGateway.
 
-For portable profiles, read [Indexing's profile contract](../../../docs/development/indexing.md#portable-profiles), [configuration portability](../../../docs/development/configuration-portability.md) and [delivery prerequisites](../../../docs/development/cli-delivery-plan.md). Use the supported Docling hybrid chunking option, preserve the complete embedding configuration and reject silent truncation. Changed meaning needs a distinct named immutable profile and ordinary preparation. [Exact profile View/Use actions and creator assignments](../../../docs/development/access-contracts.md#initial-assignments) are accepted; no profile Edit or force-deletion workflow is introduced. Export transfers settings, not vectors or a guarantee that a provider alias stays unchanged. Exact schemas, assets and limits still need qualification. Do not reopen completed foundations to invent another engine.
+## Explain or review
 
-For pre-build Pipeline queries, follow [direct-query preparation](../../../docs/development/indexing.md#preparation-can-serve-an-experiment-without-creating-a-release-version), [Pipeline queries](../../../docs/development/pipelines-and-releases.md#preview) and [ADR-0052](../../../docs/adr/ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md). Complete captured working-configuration inputs can use verified materializations without creating a PipelineVersion. Reuse ordinary preparation and the single writer; never permit partial/incompatible search or mutate live generations. Preparation acquires no publication authority. Bounded active pins and current erasure rules apply; snapshot history is not a permanent numerical archive.
+1. Show the PostgreSQL, artifact and Chroma state before and after one changed document.
+2. Identify what is reused, newly executed, verified, pinned or retired. State the exact identity used for each decision.
+3. For retrieval, name membership, current scope, filters, required shards and failure behavior.
+4. Distinguish paid-call uncertainty from replaying a frozen storage payload. Explain what a stale attempt can still do remotely.
+5. Cite accepted protocols and qualification limits. Inspect implementation before claiming it exists. Loading this skill grants no model-call or mutation authority.
 
-For generated evaluation cases or changed chunking, follow [expected passage identity](../../../docs/development/evaluation.md#passages) and [Evaluation records](../../../docs/development/data-model.md#evaluation). Indexing supplies source-version/artifact spans and mappings for the text actually returned, including truncation. Evaluation owns full-coverage scoring. Different chunk boundaries may cover the same passage; chunk IDs or fuzzy resemblance cannot prove it. Missing mappings are unscorable. Ragas starter generation reuses processed text without additional embeddings, reparsing or a relationship graph; these mappings still require qualification.
+For backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
-Reject a shared connection update before mutation if prepared or in-progress embedding dependencies would become incompatible or compatibility is unproven, including retained/hidden dependencies. Matching aliases, dimensions or a probe are insufficient. Another model remains allowed through a new appropriate profile/connection and ordinary verified preparation; never search old vectors with incompatible query embeddings. Record actual access revisions and stop further model dispatch after a relevant admitted-access change. Credential-only rotation does not itself require new vectors. Provider-side alias drift cannot always be detected.
+## Pending decisions for affected work
 
-A ProcessingProfile fixes parser/chunker inputs; a ProcessingGeneration records actual output for one DocumentVersion. Chunks carry source spans. An EmbeddingProfile fixes numerical meaning. A semantic Vectorization is a reuse key; a physical VectorGeneration identifies one actual numerical execution. A VectorIndex has a saved layout of physical Chroma collections, or shards. An IndexMaterialization verifies exact revision/profile/generation bindings. These concepts do not require an aggregate or repository each.
+Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
-PostgreSQL owns exact revision membership and current policy. Chroma holds immutable derived records, never mutable membership arrays, group lists, or serving flags. Logical collections and physical shards are not one-to-one.
+- [PD-INDEXING-01](references/decision-capability-binding-contracts.md): Before defining preparation, retrieval or retirement application ports and their complete input/result records.
+- [PD-INDEXING-02](references/decision-health-observation.md): Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
+- [PD-INDEXING-03](references/decision-source-coordinates.md): Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
+- [PD-INDEXING-04](references/decision-storage-retries-and-erasure.md): When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
+- [PD-INDEXING-05](references/decision-parser-runtime-profile.md): Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
 
-For R1={A1,B1} and R2={A1,B2}, reuse GA, insert GB2, and retain GB1 while R1 needs it. GA receives no membership write. Snapshot assembly may still read O(documents), and verification O(chunks); numerical reuse does not make every build proportional only to changes. A fresh numerical execution gets fresh identities. Changing embedding meaning creates a profile; credential-only rotation does not. Prompt-only changes can reuse a ready materialization.
+## Read as needed
 
-The singleton vector writer stays in the existing worker with its process-lifetime local lock. API handlers do not mutate Chroma. Freeze exact bounded IDs and payload bytes before dispatch; retries use those same bytes, verify actual records, then conditionally publish readiness. Partial success remains unready. A provider timeout before captured bytes does not authorize another paid embedding request. SQL fencing protects publication, not cancellation of external work.
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-Queries intersect exact revision membership with current access and use server-generated filters. Empty scope makes no Chroma search. Failed required shards fail visibly. Merge comparable results with bounded fan-out and stable ties; global top-k followed only by permission checks is insufficient. Pins and ordinary retirement share the SQL retention gate; current health and access are rechecked at the documented boundaries.
+| Task | Direct reference |
+| --- | --- |
+| Module/component design or structural review | [Indexing architecture: prepare exact data and prove it is usable](references/architecture.md) |
+| Materialization verification | [Verify the exact prepared search data](references/materialization-verification.md) |
+| Parser isolation and validation | [Process untrusted documents in a restricted runtime](references/parser-isolation-and-validation.md) |
+| Profiles and preparation | [Profiles, generations and verified preparation](references/profiles-and-preparation.md) |
+| Logical records and representation ownership | [Index profiles, generations and bindings](references/records.md) |
+| Retirement and erasure | [Retire numerical data without restoring access](references/retirement-and-erasure.md) |
+| Retrieval and filtering | [Search only the permitted corpus](references/retrieval-and-filtering.md) |
+| Vector writes and retries | [Vector writes and frozen-payload retries](references/vector-writes-and-retries.md) |
 
-Retired physical identities are permanently tombstoned before cleanup. Delayed writes can recreate unreachable bytes, so observing absence once is not proof of final erasure. Ordinary frozen retries do not require routine Chroma restart; corruption and unresolved cleanup can require intervention. A ready label is not proof of current health. Erasure can invalidate old releases, while ordinary expiry respects references.
+## Source ownership
 
-Parsing remains offline inside the per-attempt sandbox with pinned assets and validated output. Unsupported isolation fails without privileged fallback. Chroma never embeds independently; embeddings use ModelGateway. Default presets and the flexible first-answer timing goal never weaken readiness.
-
-## Explain and review
-
-Show PostgreSQL, Chroma, and artifact state before and after one changed document. For a query, identify membership, current scope, filter, required shards, and failure. Use the guide’s failure, recall, and resource qualification plans without claiming they have run. Reconsider a failed backend assumption instead of adding unbounded filter splitting, distributed coordination, or another search engine.
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

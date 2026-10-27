@@ -19,7 +19,7 @@ These are the alternatives reviewed for this expansion. An open-ended administra
 
 Seed exactly eleven can-use-and-grant actions on the newly created project: Manage project members, Create access groups, Create application accounts, Create Pipeline, Create Deployment, Manage upload defaults, Delete project, `inspect-budget`, `manage-budget`, `manage-trace-policy` and `delete-trace-history`.
 
-Preserve the published `create-access-groups` identifier. Exact wire identifiers for the remaining core display names still need specification. The owning [initial-grant contract](../development/access-control.md#initial-project-grants) records the live list; [the capability catalogue](../development/access-control.md#reviewed-capability-catalogue) records eligibility and extra checks.
+Preserve the published `create-access-groups` identifier. Exact wire identifiers for the remaining core display names still need specification. The owning [initial-grant contract](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#initial-project-grants) records the live list; [the capability catalogue](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#reviewed-capability-catalogue) records eligibility and extra checks.
 
 Ordinary additional-project creation checks current human eligibility and organization-level Create projects authority, then commits project, creator membership, these grants, audit and original-request result together. An original retry cannot create another project or restore grants removed afterward. Private starter provisioning remains independent and neither requires nor grants organization-level Create projects.
 
@@ -33,5 +33,5 @@ Ordinary additional-project creation checks current human eligibility and organi
 ## Links
 
 - [ADR-0014: bounded delegation](ADR-0014-bound-permission-delegation-by-action-and-exact-target.md).
-- [Access initial grants](../development/access-control.md#initial-project-grants), [onboarding](../development/onboarding.md#guided-setup-entry) and [Access records](../development/data-model.md#access).
+- [Access initial grants](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#initial-project-grants), [onboarding](../../.agents/skills/inframeld-architecture/references/first-use-and-private-defaults.md#guided-setup-entry) and [Access records](../../.agents/skills/inframeld-access-models/references/identity-and-grant-records.md#access).
 - [#116: Access contracts](https://github.com/matejpalenik/inframeld/issues/116), [#28: ordinary administration](https://github.com/matejpalenik/inframeld/issues/28), [#27: private starter provisioning](https://github.com/matejpalenik/inframeld/issues/27).

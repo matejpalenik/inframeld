@@ -1,47 +1,66 @@
 ---
 name: inframeld-knowledge
-description: Explain or review Inframeld source admission, document versions, logical collection membership, upload batches, source sync and deletion. Use for knowledge lifecycle or onboarding upload questions; use Indexing for numerical vector protocols.
+description: Explains and reviews Inframeld documents, immutable versions, collections, uploads, source sync and deletion. Use for knowledge lifecycle and upload onboarding, rather than numerical index protocols.
 ---
 
 # Inframeld Knowledge
 
-Explain source information before it becomes searchable. Knowledge owns Documents, immutable DocumentVersions, Collections, exact CollectionRevisions, upload admission, and source synchronization. Indexing owns readiness; Releases owns traffic.
+Explain how source information becomes admitted product knowledge. Knowledge owns source identity, Documents, immutable DocumentVersions, Collections, exact CollectionRevisions, upload admission and source synchronization. Indexing owns verified search readiness. Releases owns publication.
 
-## Scope and reading route
+## Working model
 
-For the accepted #116 catalogue, assignments and remaining schema/route/maintenance handoff, read [Access contracts](../../../docs/development/access-contracts.md). Guides own behavior; the new reference is accepted design, not implemented API or runtime evidence.
+Alice uploads two Support documents, A1 and B1. A Document is the stable identity of a logical source. A DocumentVersion identifies the immutable bytes observed for it.
 
-Default to read-only help; loading this skill grants no edit or execution permission. Read only the relevant current section. Report contradictions and distinguish accepted design from code actually inspected.
+A Collection groups documents. A CollectionRevision freezes exact versions, forming a corpus, the source material selected for an operation.
 
-- [Knowledge lifecycle](../../../docs/development/knowledge-lifecycle.md) owns behavior; [Knowledge records](../../../docs/development/data-model.md#knowledge) defines identities and relationships. [ADR-0008](../../../docs/adr/ADR-0008-preserve-immutable-versions-and-their-provenance.md) explains immutable provenance.
-- [Ingestion security](../../../docs/development/ingestion-security.md) covers admission and parsing; [Jobs and idempotency](../../../docs/development/jobs-and-idempotency.md) covers retries; [Retention and deletion](../../../docs/development/retention-and-deletion.md) covers erasure.
-- [Onboarding](../../../docs/development/onboarding.md) covers private defaults and first publication. Read [Access control](../../../docs/development/access-control.md) for group/action checks, [Indexing](../../../docs/development/indexing.md) for preparation, and [Deployment](../../../docs/development/deployment.md) for artifact publication only when needed.
-- [Maintainer checks](../../../docs/development/knowledge-lifecycle.md#maintainer-checks) summarize the lifecycle scenarios to review.
+If Alice admits replacement B2, the earlier R1={A1,B1} does not change. Only a separately authorized selection can create R2={A1,B2}. That lets a retained query explain which source version it used. Replacing a source, removing it from a new corpus and erasing its history are different operations.
 
-- For replacement, follow [admission](../../../docs/development/knowledge-lifecycle.md#admission) → [frozen corpus](../../../docs/development/knowledge-lifecycle.md#corpus). For deletion races, read [blocking access before cleanup](../../../docs/development/retention-and-deletion.md#operation).
+Uploaded, admitted, parsed and searchable are different milestones. Admission means the application has accepted complete validated source input. Parsing and embeddings belong to later preparation. Indexing can prepare another profile without another upload.
 
-## Essential boundaries
+## Essential rules
 
-For configuration recreation, use [portable Knowledge resources](../../../docs/development/knowledge-lifecycle.md#portable-knowledge), [portability](../../../docs/development/configuration-portability.md) and [delivery ownership](../../../docs/development/cli-delivery-plan.md). Imported collections are empty; reuse does not alter contents. [The fixed Access catalogue](../../../docs/development/access-contracts.md#capability-catalogue) separates Collection view/edit/delete from Source configuration, sync, credentials and deletion. Collection/source retirement does not erase admitted Documents; source sync uses saved scope and current group/collection mutation authority. Sources require explicit destination audience IDs and separate backend-bound credentials before a separately reviewed bounded sync. No implicit source contact, ambient laptop credentials, upstream ACL import or disappearance inference from incomplete inventory. Evaluation owns protected dataset transfer; those excerpts are not admitted corpus documents.
+- Admit only complete bounded supported input through private staging and durable artifact verification. Filenames are display text, not storage keys or identity.
+- Re-observing authoritative equal content reuses its version. Changed bytes create another version. Arbitrary S3 ETags are not content checksums.
+- Document audiences are explicit, same-project and nonempty. Upload, replacement, sharing and deletion require their own current permissions.
+- Historical versions, downloads and citations remain subject to current access and erasure. Immutable identity does not promise permanent availability.
+- Source sync uses approved saved scope and current mutation authority. It does not import upstream ACLs or infer complete absence from an incomplete inventory.
+- Complete authorized batches can feed normal automatic-update workflows. Partial uploads, upload-only rights and unrelated working edits cannot acquire release authority.
+- A manifest records identities and fingerprints. It is not a permission authority or numerical vector backup. A concept does not require its own aggregate or repository.
 
-For query inputs, follow [frozen corpus selection](../../../docs/development/knowledge-lifecycle.md#corpus), [direct queries](../../../docs/development/pipelines-and-releases.md#preview) and [ADR-0052](../../../docs/adr/ADR-0052-separate-experimental-execution-from-release-ready-pipeline-builds.md). Capture exact source revisions before direct-query/evaluation preparation; no release version is required. Development-only uploads explicitly use ordinary collections outside live-watched inputs. Do not silently clone collections or suppress their automatic update behavior. Live-input updates retain the Deployment's selected configuration, never an unrelated working edit. Erasure can invalidate historical query inputs as well as releases.
+## Explain or review
 
-For starter tests derived from knowledge, read [Evaluation generation](../../../docs/development/evaluation.md#generation), [protected history](../../../docs/development/evaluation.md#history), and [Retention and deletion](../../../docs/development/retention-and-deletion.md). Sample permitted frozen versions across documents/sections, not only successful search results. Generated questions and references can reveal their source and retain its access/erasure obligations. Source replacement does not silently retarget a frozen passage expectation; erasure can make it unavailable. Evaluation owns cases and scoring, not Knowledge or the CLI.
+1. Start with two documents and one replacement, a duplicate retry, or a deletion during preparation.
+2. Name the source, version, collection revision and owner at each step. Explain which identities remain fixed.
+3. Check current permissions at the documented admission/commit boundaries. Explain the effect on existing queries and retained versions.
+4. Separate knowledge admission from index preparation, evaluation-case generation and release selection.
+5. Cite the owning rule and distinguish design from implementation. Surface conflicts.
 
-A Document identifies a logical source; a DocumentVersion identifies immutable bytes. A Collection names a corpus; a CollectionRevision freezes exact versions. Uploaded, admitted, parsed, and searchable are different states. A manifest inventories identities and fingerprints; it is not a permission authority or numerical vector backup. Avoid a class, repository, or aggregate per noun and avoid loading a whole large collection into memory.
+For backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
-Admit bounded supported input through private staging, byte/metadata validation, server-generated storage keys, and complete durable artifact verification. Filenames are display text. Partial upload does not admit a source. Add documents is required on every selected same-project group, including defaults, and the initial allowlist must be nonempty. It does not authorize reading, replacement, deletion, audience changes, or release.
+## Pending decisions for affected work
 
-Re-observing authoritative equal content reuses its version; changed bytes create a new one. Names are not stable identity and arbitrary S3 ETags are not content checksums. Update documents is separately required on every group in the persisted current allowlist, with current checks at commit. Preserve source identity and groups; never rewrite old versions.
+Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
-For R1={A1,B1}, replacing B creates B2 and R2={A1,B2}. R1 remains unchanged. Retained pipelines follow exact versions, not mutable latest values. Indexing can prepare the same admitted source under another profile without another upload; Knowledge cannot declare it ready because upload completed.
+- [PD-KNOWLEDGE-01](references/decision-complete-batch-handoff.md): Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-KNOWLEDGE-02](references/decision-retention-erasure-policy.md): Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.
 
-Current access protects historical versions, downloads, and citations. Changing a Document’s audience requires a human managing every group in the current or proposed allowlist. Each manager must also have ordinary membership in that same group under the [Access rule](../../../docs/development/access-control.md#group-managers). Reading alone does not permit audience changes. Group deletion is blocked by Document or active upload/source references; it never cascades into document deletion or replacement defaults. Source sync does not import upstream ACLs or grant all project members access. Manual read-only S3 sync preserves approved scope, checkpoints, and source identity; missing observations inform a new revision, not a rewrite of retained releases.
+## Read as needed
 
-Delete documents is a separate action required for every current group. Deletion covers the Document’s versions: first deny access and publication through a scoped marker, then perform reference-aware resumable cleanup. Late jobs cannot republish it. A corpus omission, audience change, and erasure are different operations; erasure can invalidate retained releases and evidence.
+Choose the row matching the task. Workflow, contract and architecture views are separate reading units. Do not load this whole table.
 
-Private onboarding uses ordinary resources and nonempty defaults. Changing upload defaults requires Manage upload defaults plus management of all current/proposed groups; it affects future admissions only, which still require Add documents. Automatic mode cannot turn upload-only rights, a draft, or a partial batch into release authority. A complete authorized batch freezes the full corpus, including unchanged documents. New authorized selections supersede old publication requests; manual mode leaves inputs unpublished. Initial setup needs no benchmark or judge.
+| Task | Direct reference |
+| --- | --- |
+| Module/component design or structural review | [Knowledge architecture: preserve which source version was accepted](references/architecture.md) |
+| Collection selection and batches | [Select a complete corpus after admission](references/collection-selection-and-batches.md) |
+| Decision retention erasure policy | [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](references/decision-retention-erasure-policy.md) |
+| Deletion and retention | [Sharing, deletion and retained evidence](references/deletion-and-retention.md) |
+| Documents and collections | [Documents, collections and frozen inputs](references/documents-and-collections.md) |
+| Project deletion | [Block a Project and finish its original deletion](references/project-deletion.md) |
+| Logical records and representation ownership | [Knowledge identities and relationships](references/records.md) |
+| Retention and pins | [Expire retained data without confusing erasure](references/retention-and-pins.md) |
+| Source configuration and credentials | [Source configuration, audiences and credentials](references/source-configuration-and-credentials.md) |
+| Uploads and source sync | [Uploads, replacement and bounded source sync](references/uploads-and-source-sync.md) |
 
-## Explain and review
+## Source ownership
 
-Trace two documents and one replacement, a duplicate upload retry, or deletion during a build. Identify the owner at each step, current permissions, stable identities, and failure outcome. Cite the exact rule, suggest behavior checks when appropriate, and do not introduce a connector framework, event bus, source-ACL platform, or operations programme.
+Focused references own accepted behavior and logical design. Code, generated OpenAPI and migrations own implemented representations. Read exact definitions when fields matter, ADRs for rationale or conflicts, and matching pending decisions before dependent design. Human guides own development procedures.

@@ -32,4 +32,4 @@ Run migrations once through an operator-controlled command or job protected by a
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current upgrades and recovery](../development/upgrades-and-recovery.md).
+- [Current upgrades and recovery](../development/operations/upgrades.md).

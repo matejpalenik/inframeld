@@ -23,10 +23,10 @@ Domain job, case and Evaluation result inspection remains available through its 
 - Applications and humans cannot obtain non-query diagnostics through a query-inspection grant.
 - Future product diagnostic browsing needs reviewed owner/target permissions and protection rules.
 - Host operators retain their existing infrastructure trust boundary; ordinary login does not acquire host authority.
-- Implementation and qualification are pending. [Observability](../development/observability.md#non-query-diagnostics) owns the current scope.
+- Implementation and qualification are pending. [Observability](../../.agents/skills/inframeld-pipelines/references/query-tracing-and-privacy.md#non-query-diagnostics) owns the current scope.
 
 ## Links
 
-- [Access trace authority](../development/access-control.md#trace-authority).
-- [Evaluation result inspection](../development/evaluation.md#history).
-- [CLI delivery](../development/cli-delivery-plan.md).
+- [Access trace authority](../../.agents/skills/inframeld-pipelines/references/query-tracing-and-privacy.md#trace-authority).
+- [Evaluation result inspection](../../.agents/skills/inframeld-evaluation/references/history-and-dataset-transfer.md#history).
+- [CLI delivery](../../.agents/skills/inframeld-architecture/references/v1-scope-and-extension-boundaries.md).

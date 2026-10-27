@@ -1,14 +1,19 @@
 from dataclasses import dataclass
 
+from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
+    HumanOAuthCredentialFactsDTO,
+)
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 
 
 @dataclass(frozen=True, slots=True)
 class ProjectGrantChangeFactsDTO:
-    """Current facts read while the project's Access change lock is held."""
+    """Current grant facts observed while the Access change locks are held."""
 
     actor: Principal
+    has_pending_recovery: bool
+    oauth_credential_facts: HumanOAuthCredentialFactsDTO | None
     recipient: Principal | None
     project_status: ProjectStatus
     project_access_revision: int

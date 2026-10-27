@@ -35,6 +35,6 @@ An explicit Compare operation freezes the selected baseline and candidate, bench
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current evaluation](../development/evaluation.md).
-- [Current data model](../development/data-model.md).
+- [Current evaluation](../../.agents/skills/inframeld-evaluation/references/generation-and-review.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Related decisions: [ADR-0051](ADR-0051-use-ragas-for-generated-tests-and-faithfulness-evaluation.md) selects Ragas; [ADR-0030](ADR-0030-use-openevals-for-groundedness-evaluation.md) preserves the historical library choice. Neither changes this record's fresh-comparison policy.

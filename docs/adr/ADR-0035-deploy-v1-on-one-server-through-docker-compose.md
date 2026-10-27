@@ -31,6 +31,6 @@ Use the same single-server Docker Compose model for supported v1 installations. 
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current deployment](../development/deployment.md).
-- [Current upgrades and recovery](../development/upgrades-and-recovery.md).
+- [Current deployment](../../.agents/skills/inframeld-architecture/references/runtime-deployment-and-storage.md).
+- [Current upgrades and recovery](../development/operations/upgrades.md).
 - Related decisions: [ADR-0036](ADR-0036-use-seaweedfs-through-the-application-s3-storage-boundary.md).

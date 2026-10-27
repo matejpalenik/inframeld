@@ -1,18 +1,16 @@
 """Verify that mock OIDC login creates a Kratos session without granting local access."""
 
-import asyncio
 import os
-import subprocess
-from pathlib import Path
 
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
-from ory_kratos_client.models.identity import Identity as KratosIdentity
 from pydantic import HttpUrl
 from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.integration_services import KRATOS_PUBLIC_URL, MOCK_OIDC_URL
+from tests.support.kratos_admin import get_identity
 from tests.support.kratos_browser import (
-    KRATOS_PUBLIC_URL,
     BrowserFlow,
     RegisteredHumanDTO,
     WhoamiResponse,
@@ -23,8 +21,8 @@ from tests.support.kratos_browser import (
 )
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.project_action_target_dto import (
-    ProjectActionTargetDTO,
+from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
+    ProjectActionAuthorizationRequestDTO,
 )
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
@@ -50,7 +48,6 @@ from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 AUTHORITY = IdentityAuthority("kratos:test")
-REPOSITORY_ROOT = Path(__file__).resolve().parents[5]
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1"
@@ -65,18 +62,16 @@ async def _matching_email_challenge(
 ) -> tuple[BrowserFlow, RegisteredHumanDTO, str]:
     """Start OIDC with the email of a separately registered password account."""
     authorization_url = httpx2.URL(await begin_oidc_login(oidc_browser))
-    assert authorization_url.host == "mock-oidc"
-    assert authorization_url.port == 8080
+    assert authorization_url.host == httpx2.URL(MOCK_OIDC_URL).host
+    assert authorization_url.port == httpx2.URL(MOCK_OIDC_URL).port
 
-    public_url = authorization_url.copy_with(host="127.0.0.1", port=15556)
     async with httpx2.AsyncClient(
         follow_redirects=False,
         timeout=15.0,
         trust_env=False,
     ) as upstream_browser:
         authorized = await upstream_browser.get(
-            public_url,
-            headers={"Host": "mock-oidc:8080"},
+            authorization_url,
         )
     assert authorized.status_code in {302, 303}, authorized.text
 
@@ -113,24 +108,6 @@ async def _matching_email_challenge(
     return flow, human, code
 
 
-async def _get_test_kratos_identity(subject: IdentitySubject) -> KratosIdentity:
-    """Read credential identifiers without publishing the test admin port."""
-    result = await asyncio.to_thread(
-        subprocess.run,
-        [
-            str(REPOSITORY_ROOT / "scripts/dev-compose.sh"),
-            "test-kratos-get-identity",
-            subject.value,
-        ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    return KratosIdentity.model_validate_json(result.stdout)
-
-
 @pytest.mark.asyncio
 async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
     database: Database,
@@ -139,25 +116,22 @@ async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
     """Complete OIDC login, then check identity admission and project authority."""
     async with create_browser() as browser:
         authorization_url = httpx2.URL(await begin_oidc_login(browser))
-        assert authorization_url.host == "mock-oidc"
-        assert authorization_url.port == 8080
+        assert authorization_url.host == httpx2.URL(MOCK_OIDC_URL).host
+        assert authorization_url.port == httpx2.URL(MOCK_OIDC_URL).port
 
-        # The host-run test reaches the Compose provider through its published port.
-        public_url = authorization_url.copy_with(host="127.0.0.1", port=15556)
         async with httpx2.AsyncClient(
             follow_redirects=False,
             timeout=15.0,
             trust_env=False,
         ) as upstream_browser:
             authorized = await upstream_browser.get(
-                public_url,
-                headers={"Host": "mock-oidc:8080"},
+                authorization_url,
             )
 
         assert authorized.status_code in {302, 303}, authorized.text
         callback_url = authorized.headers["location"]
         assert callback_url.startswith(
-            "http://127.0.0.1:14433/self-service/methods/oidc/callback/company"
+            f"{KRATOS_PUBLIC_URL}/self-service/methods/oidc/callback/company"
         )
 
         # Use the original browser: it holds Kratos's login-flow and CSRF cookies.
@@ -235,10 +209,16 @@ async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
     async with database.session() as session, session.begin():
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
         with pytest.raises(AccessDeniedError):
-            await authorizer.require_action(
-                access=AccessContextDTO(actor_principal_id=scenario.principal_id),
-                action_id=scenario.action,
-                target=ProjectActionTargetDTO(project_id=scenario.project_id),
+            await authorizer.require_authorization(
+                access=AccessContextDTO(
+                    actor_principal_id=scenario.principal_id,
+                    authentication_evidence=MockAuthenticationEvidence.browser(
+                        VerifiedHumanIdentityDTO(AUTHORITY, subject)
+                    ),
+                ),
+                request=ProjectActionAuthorizationRequestDTO(
+                    project_id=scenario.project_id, action_id=scenario.action
+                ),
             )
 
 
@@ -253,7 +233,7 @@ async def test_matching_email_does_not_silently_link_oidc() -> None:
 
         assert (await oidc_browser.get("/sessions/whoami")).status_code == 401
 
-        identity = await _get_test_kratos_identity(human.subject)
+        identity = await get_identity(human.subject)
         assert identity.credentials is not None
         assert "password" in identity.credentials
         assert "oidc" not in identity.credentials
@@ -291,8 +271,8 @@ async def test_password_proof_links_oidc_to_existing_identity() -> None:
             == human.subject.value
         )
 
-        identity = await _get_test_kratos_identity(human.subject)
-        assert identity.id == human.subject.value
+        identity = await get_identity(human.subject)
+        assert str(identity.id) == human.subject.value
         assert identity.credentials is not None
         assert {"password", "oidc"} <= identity.credentials.keys()
 

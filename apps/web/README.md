@@ -21,6 +21,8 @@ pnpm --filter @inframeld/web typecheck
 pnpm --filter @inframeld/web build
 ```
 
+Type checking uses TypeScript 7 through the `@typescript/native` package alias. The `typescript` alias supplies Microsoft's TypeScript 6 compatibility API for ESLint and other API consumers, following [Microsoft's side-by-side guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0). Keep both aliases when updating compiler and lint tooling.
+
 UI components are managed with shadcn/ui. Add a component with:
 
 ```bash

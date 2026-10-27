@@ -234,6 +234,7 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "ory-hydra-client" },
     { name = "ory-kratos-client" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
@@ -257,7 +258,8 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.20.0" },
     { name = "fastapi", specifier = ">=0.141.1" },
-    { name = "ory-kratos-client", specifier = ">=25.4.0" },
+    { name = "ory-hydra-client", git = "https://github.com/ory/hydra-client-python.git?rev=756e95a40b4ddefd3d67006b62d43577f2856be6" },
+    { name = "ory-kratos-client", git = "https://github.com/ory/kratos-client-python.git?rev=13a5b1e8b2baa3c4bf52700ecfdbb641bdb493a5" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.5" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
@@ -359,17 +361,25 @@ wheels = [
 ]
 
 [[package]]
-name = "ory-kratos-client"
-version = "25.4.0"
-source = { registry = "https://pypi.org/simple" }
+name = "ory-hydra-client"
+version = "26.2.0"
+source = { git = "https://github.com/ory/hydra-client-python.git?rev=756e95a40b4ddefd3d67006b62d43577f2856be6#756e95a40b4ddefd3d67006b62d43577f2856be6" }
 dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
     { name = "typing-extensions" },
     { name = "urllib3" },
 ]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/38/95b1579756d79e877b8fd48532b66d2114677fe46f26e210ffdb5cc92bd7/ory_kratos_client-25.4.0-py3-none-any.whl", hash = "sha256:8aee4c3f5ec8d7694f2dfe9e01d4569e3b00872acdc506f3e30cfe9dde4aeb13", size = 312748, upload-time = "2025-11-07T12:37:07.978Z" },
+
+[[package]]
+name = "ory-kratos-client"
+version = "26.2.0"
+source = { git = "https://github.com/ory/kratos-client-python.git?rev=13a5b1e8b2baa3c4bf52700ecfdbb641bdb493a5#13a5b1e8b2baa3c4bf52700ecfdbb641bdb493a5" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "python-dateutil" },
+    { name = "typing-extensions" },
+    { name = "urllib3" },
 ]
 
 [[package]]

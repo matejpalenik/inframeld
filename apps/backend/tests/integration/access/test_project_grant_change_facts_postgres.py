@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import update
 from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
@@ -80,7 +81,10 @@ async def test_reads_exact_current_grant_level(
 
     async with database.session() as session, session.begin():
         reader = PostgresProjectGrantChangeFactsReader(session)
-        access = AccessContextDTO(actor_principal_id=scenario.principal_id)
+        access = AccessContextDTO(
+            actor_principal_id=scenario.principal_id,
+            authentication_evidence=MockAuthenticationEvidence.browser(),
+        )
 
         facts = await reader.read_for_change(
             access=access,
@@ -96,7 +100,9 @@ async def test_reads_exact_current_grant_level(
         )
 
     assert facts is not None
+
     assert facts.actor.id == scenario.principal_id
+    assert facts.oauth_credential_facts is None
     assert facts.recipient is not None
     assert facts.recipient.id == recipient_id
     assert facts.project_status is ProjectStatus.ACTIVE

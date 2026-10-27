@@ -1,0 +1,5 @@
+# Test-only override, with separate protocol state and native environment lifetimes.
+dsn: postgres://hydra_lifetimes:hydra-lifetimes-test-only@hydra-lifetimes-postgres:5432/hydra_lifetimes?sslmode=disable
+urls:
+  self:
+    issuer: http://hydra-lifetimes:4444/

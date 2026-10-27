@@ -30,6 +30,6 @@ Use a modular backend with Knowledge, Indexing, Pipelines, Evaluation, Releases,
 
 Implementation evidence and qualification limits are recorded in the current guides below. This ADR records the design choice; the editorial rewrite did not verify runtime behavior.
 
-- [Current application structure](../development/application-structure.md).
-- [Current data model](../development/data-model.md).
+- [Current application structure](../../.agents/skills/inframeld-application-contracts/references/components-and-services.md).
+- [Current data model](../../.agents/skills/inframeld-architecture/references/resource-names-and-identity.md).
 - Related decisions: [ADR-0002](ADR-0002-separate-commands-and-queries-without-a-command-bus-framework.md).
