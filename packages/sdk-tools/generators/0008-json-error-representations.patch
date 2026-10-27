@@ -1,0 +1,221 @@
+--- a/src/client_generator.rs
++++ b/src/client_generator.rs
+@@ -687,7 +687,7 @@
+         let op_error_enums: Vec<TokenStream> = operations
+             .iter()
+             .copied()
+-            .filter_map(|op| self.generate_op_error_enum(op))
++            .filter_map(|op| self.generate_op_error_enum(analysis, op))
+             .collect();
+ 
+         let plans = self.client_method_plans(analysis, operations);
+@@ -1944,7 +1944,7 @@
+     /// responses with a body schema. Returns None when the op has no declared
+     /// error bodies — those operations use `ApiOpError<serde_json::Value>` so
+     /// the raw response body is still inspectable.
+-    fn generate_op_error_enum(&self, op: &OperationInfo) -> Option<TokenStream> {
++    fn generate_op_error_enum(&self, analysis: &SchemaAnalysis, op: &OperationInfo) -> Option<TokenStream> {
+         let variants: Vec<(String, String)> = op
+             .response_schemas
+             .iter()
+@@ -1957,12 +1957,28 @@
+         }
+ 
+         let enum_ident = self.op_error_enum_ident(op);
++        let mut media_enums = Vec::new();
+         let variant_decls: Vec<TokenStream> = variants
+             .iter()
+             .map(|(code, schema)| {
+                 let variant_ident = Self::op_error_variant_ident(code);
+-                let payload_ty_name = self.to_rust_type_name(schema);
+-                let payload_ty = syn::Ident::new(&payload_ty_name, proc_macro2::Span::call_site());
++                let representations = Self::error_json_representations(analysis, op, code);
++                let payload_ty = if representations.len() > 1 {
++                    let name = self.error_media_enum_name(op, code);
++                    let members = representations.iter().enumerate().map(|(index, (_, schema))| {
++                        let variant = Self::to_field_ident(&format!("Representation{index}"));
++                        let ty = Self::to_field_ident(&self.to_rust_type_name(schema));
++                        quote! { #variant(#ty) }
++                    });
++                    media_enums.push(quote! {
++                        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
++                        #[serde(untagged)]
++                        pub enum #name { #(#members),* }
++                    });
++                    name
++                } else {
++                    Self::to_field_ident(&self.to_rust_type_name(schema))
++                };
+                 quote! { #variant_ident(#payload_ty) }
+             })
+             .collect();
+@@ -1973,6 +1989,7 @@
+         );
+ 
+         Some(quote! {
++            #(#media_enums)*
+             #[doc = #doc]
+             #[derive(Debug, Clone)]
+             pub enum #enum_ident {
+@@ -2088,9 +2105,9 @@
+         let response_type = &plan.response_type;
+         let op_error_type = &plan.error_type;
+         let accept = success.accept;
+-        let error_handling = self.generate_error_handling(op, success.clone(), &plan.json_alternatives);
++        let error_handling = self.generate_error_handling(analysis, op, success.clone(), &plan.json_alternatives);
+         let content_validation = if plan.validate_content_type {
+-            self.generate_response_content_type_validation(op, &success)
++            self.generate_response_content_type_validation(analysis, op, &success)
+         } else {
+             TokenStream::new()
+         };
+@@ -3260,6 +3277,7 @@
+ 
+     fn generate_response_content_type_validation(
+         &self,
++        analysis: &SchemaAnalysis,
+         operation: &OperationInfo,
+         success: &ClientSuccessSelection<'_>,
+     ) -> TokenStream {
+@@ -3267,7 +3285,7 @@
+             return TokenStream::new();
+         };
+         let guard = self.success_selection_guard(operation, success);
+-        let errors = self.generate_error_match_arms(operation);
++        let errors = self.generate_error_match_arms(analysis, operation);
+         let error_type = self.op_error_type_token(operation);
+         let raw_body = if matches!(
+             success.body,
+@@ -4212,6 +4230,7 @@
+     /// inspectable `ApiError`s rather than being fed to an incompatible parser.
+     fn generate_error_handling(
+         &self,
++        analysis: &SchemaAnalysis,
+         op: &OperationInfo,
+         success: ClientSuccessSelection<'_>,
+         alternatives: &[JsonResponseAlternative<'_>],
+@@ -4269,7 +4288,7 @@
+             | ClientSuccessBody::ParsedSse => quote! {},
+         };
+ 
+-        let error_match_arms = self.generate_error_match_arms(op);
++        let error_match_arms = self.generate_error_match_arms(analysis, op);
+ 
+         // Streaming success path: hand back the live byte stream instead of
+         // buffering it. Reading an SSE body to a string blocks until the server
+@@ -4438,15 +4457,47 @@
+ 
+     /// Generate the match arms that select which per-op error variant to
+     /// deserialize the response body into based on the runtime status code.
+-    fn generate_error_match_arms(&self, op: &OperationInfo) -> TokenStream {
++    fn error_json_representations<'a>(analysis: &'a SchemaAnalysis, op: &OperationInfo, status: &str) -> Vec<(&'a str, &'a str)> {
++        analysis.operation_responses.get(&op.operation_id).and_then(|responses| responses.get(status)).map(|response| {
++            response.representations.iter().filter_map(|(media, representation)| {
++                if let OperationRepresentation::Json { schema_name } = representation { Some((media.as_str(), schema_name.as_str())) } else { None }
++            }).collect()
++        }).unwrap_or_default()
++    }
++
++    fn error_media_enum_name(&self, op: &OperationInfo, status: &str) -> syn::Ident {
++        Self::to_field_ident(&format!("{}{}ErrorBody", self.to_rust_type_name(&op.operation_id), self.to_rust_type_name(status)))
++    }
++
++    fn generate_error_json_decode(&self, analysis: &SchemaAnalysis, op: &OperationInfo, status: &str, schema: &str) -> TokenStream {
++        let representations = Self::error_json_representations(analysis, op, status);
++        let media: Vec<_> = representations.iter().map(|(media, _)| *media).collect();
++        if representations.len() > 1 {
++            let name = self.error_media_enum_name(op, status);
++            let arms = representations.iter().enumerate().map(|(index, (_, schema))| {
++                let variant = Self::to_field_ident(&format!("Representation{index}"));
++                let ty = Self::to_field_ident(&self.to_rust_type_name(schema));
++                quote! { #index => serde_json::from_slice::<#ty>(&raw_body).map(#name::#variant).map_err(|error| error.to_string()) }
++            });
++            quote! { __json_response_representation(&headers, &[#(#media),*]).and_then(|selection| match selection { #(#arms),*, _ => unreachable!() }) }
++        } else {
++            let ty = Self::to_field_ident(&self.to_rust_type_name(schema));
++            if media.is_empty() {
++                quote! { serde_json::from_slice::<#ty>(&raw_body).map_err(|error| error.to_string()) }
++            } else {
++                quote! { __json_response_representation(&headers, &[#(#media),*]).and_then(|_| serde_json::from_slice::<#ty>(&raw_body).map_err(|error| error.to_string())) }
++            }
++        }
++    }
++
++    fn generate_error_match_arms(&self, analysis: &SchemaAnalysis, op: &OperationInfo) -> TokenStream {
+         let arms: Vec<TokenStream> = op
+             .response_schemas
+             .iter()
+             .filter(|(code, _)| !code.starts_with('2'))
+             .filter_map(|(code, schema)| {
+                 let variant_ident = Self::op_error_variant_ident(code);
+-                let payload_ty_name = self.to_rust_type_name(schema);
+-                let payload_ty = syn::Ident::new(&payload_ty_name, proc_macro2::Span::call_site());
++                let decode = self.generate_error_json_decode(analysis, op, code, schema);
+                 let enum_ident = self.op_error_enum_ident(op);
+ 
+                 // T8: range-keyed responses (1XX/2XX/3XX/4XX/5XX) per OAS
+@@ -4469,7 +4520,7 @@
+ 
+                 Some(quote! {
+                     #pattern => {
+-                        match serde_json::from_slice::<#payload_ty>(&raw_body) {
++                        match #decode {
+                             Ok(v) => {
+                                 typed = Some(#enum_ident::#variant_ident(v));
+                                 parse_error = None;
+@@ -4506,14 +4557,13 @@
+             .response_schemas
+             .iter()
+             .find(|(code, _)| matches!(code.as_str(), "default" | "Default"))
+-            .map(|(_, schema)| self.to_rust_type_name(schema));
+-
+-        let default_arm = if let Some(payload_ty_name) = default_payload {
+-            let payload_ty = syn::Ident::new(&payload_ty_name, proc_macro2::Span::call_site());
++            .map(|(code, schema)| self.generate_error_json_decode(analysis, op, code, schema));
++
++        let default_arm = if let Some(decode) = default_payload {
+             let enum_ident = self.op_error_enum_ident(op);
+             quote! {
+                 _ => {
+-                    match serde_json::from_slice::<#payload_ty>(&raw_body) {
++                    match #decode {
+                         Ok(v) => {
+                             typed = Some(#enum_ident::Default(v));
+                             parse_error = None;
+@@ -4550,7 +4600,19 @@
+             }
+         };
+ 
+-        if arms.is_empty() {
++        let bodyless: Vec<_> = analysis.operation_responses.get(&op.operation_id).into_iter().flat_map(|responses| {
++            responses.iter().filter(|(code, response)| !code.starts_with('2') && code.as_str() != "default" && matches!(Self::response_body(response), ClientSuccessBody::Empty)).map(|(code, _)| {
++                let guard = Self::single_status_guard(code);
++                if code.bytes().all(|value| value.is_ascii_digit()) { return guard; }
++                let exact: Vec<_> = responses.keys().filter(|candidate| candidate.bytes().all(|value| value.is_ascii_digit())).map(|candidate| Self::single_status_guard(candidate)).collect();
++                quote! { (#guard) && !(false #( || #exact )*) }
++            }).collect::<Vec<_>>()
++        }).collect();
++        let default_is_bodyless = analysis.operation_responses.get(&op.operation_id).and_then(|responses| responses.get("default")).is_some_and(|response| matches!(Self::response_body(response), ClientSuccessBody::Empty));
++        let default_arm = if default_is_bodyless {
++            quote! { _ => { typed = None; parse_error = if raw_body.is_empty() { None } else { Some("Unexpected body for a bodyless response".into()) }; } }
++        } else { default_arm };
++        let dispatch = if arms.is_empty() {
+             // No declared status arms — just the fallback.
+             quote! {
+                 match status_code {
+@@ -4564,7 +4626,14 @@
+                     #default_arm
+                 }
+             }
+-        }
++        } ;
++        quote! {
++            if false #( || #bodyless )* {
++                typed = None;
++                parse_error = if raw_body.is_empty() { None } else { Some("Unexpected body for a bodyless response".into()) };
++            } else { #dispatch }
++        }
++
+     }
+ 
+     /// Generate URL construction with path parameter substitution

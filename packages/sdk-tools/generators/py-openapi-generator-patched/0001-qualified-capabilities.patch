@@ -1,0 +1,45 @@
+--- a/python/model_generic.mustache
++++ b/python/model_generic.mustache
+@@ -128,7 +128,7 @@
+         {{/isMap}}
+         {{/isContainer}}
+         {{^isContainer}}
+-        if value not in set([{{#allowableValues}}{{#enumVars}}{{{value}}}{{^-last}}, {{/-last}}{{/enumVars}}{{/allowableValues}}]):
++        if value not in {{#isBoolean}}{item == "true" for item in {{/isBoolean}}set([{{#allowableValues}}{{#enumVars}}{{{value}}}{{^-last}}, {{/-last}}{{/enumVars}}{{/allowableValues}}]){{#isBoolean}}}{{/isBoolean}}:
+             raise ValueError("must be one of enum values ({{#allowableValues}}{{#enumVars}}{{{value}}}{{^-last}}, {{/-last}}{{/enumVars}}{{/allowableValues}})")
+         {{/isContainer}}
+         return value
+@@ -515,7 +515,7 @@
+ 
+         {{/isAdditionalPropertiesTrue}}
+         {{/disallowAdditionalPropertiesIfNotPresent}}
+-        _obj = cls.model_validate({
++        _obj = cls.model_validate({key: value for key, value in {
+             {{#allVars}}
+             {{#isContainer}}
+             {{#isArray}}
+@@ -621,7 +621,7 @@
+             {{/isPrimitiveType}}
+             {{/isContainer}}
+             {{/allVars}}
+-        })
++        }.items() if key in obj})
+         {{#isAdditionalPropertiesTrue}}
+         # store additional fields in additional_properties
+         for _key in obj.keys():
+--- a/python/api_client.mustache
++++ b/python/api_client.mustache
+@@ -465,6 +465,13 @@
+                 encoding = match.group(1) if match else "utf-8"
+                 response_text = response_data.data.decode(encoding)
+                 return_data = self.deserialize(response_text, response_type, content_type)
++        except Exception as error:
++            raise ApiException(
++                status=response_data.status,
++                reason="Cannot decode the received HTTP response",
++                http_resp=response_data,
++                body=response_text,
++            ) from error
+         finally:
+             if not 200 <= response_data.status <= 299:
+                 raise ApiException.from_response(

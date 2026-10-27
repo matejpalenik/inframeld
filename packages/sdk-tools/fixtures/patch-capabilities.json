@@ -1,0 +1,233 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Synthetic generator patch capabilities, not product workflows",
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/json": {
+      "get": {
+        "operationId": "getJson",
+        "responses": {
+          "200": {
+            "description": "Test-only generator capability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Example"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/text": {
+      "get": {
+        "operationId": "getText",
+        "responses": {
+          "200": {
+            "description": "Test-only generator capability",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/empty": {
+      "get": {
+        "operationId": "getEmpty",
+        "responses": {
+          "204": {
+            "description": "Test-only generator capability"
+          }
+        }
+      }
+    },
+    "/binary": {
+      "get": {
+        "operationId": "getBinary",
+        "responses": {
+          "200": {
+            "description": "Test-only generator capability",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "operationId": "getEvents",
+        "responses": {
+          "200": {
+            "description": "Test-only generator capability",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload": {
+      "post": {
+        "operationId": "uploadVariants",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadVariants"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Test-only upload acknowledged"
+          }
+        }
+      }
+    },
+    "/builder-json": {
+      "get": {
+        "operationId": "getBuilderJson",
+        "parameters": [
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Test-only builder response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Example"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stream": {
+      "post": {
+        "operationId": "streamEvents",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/*": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Test-only streaming response",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/default-only": {
+      "get": {
+        "operationId": "getDefaultOnly",
+        "responses": {
+          "default": {
+            "description": "Default JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Example"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Example": {
+        "type": "object",
+        "required": ["value"],
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "UploadVariants": {
+        "type": "object",
+        "required": ["file", "label", "encoded"],
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream"
+          },
+          "optionalFile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilePart"
+            }
+          },
+          "label": {
+            "type": "string",
+            "contentMediaType": "application/json"
+          },
+          "encoded": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "contentEncoding": "base64"
+          }
+        }
+      },
+      "FilePart": {
+        "type": "string",
+        "contentMediaType": "application/octet-stream"
+      }
+    }
+  }
+}

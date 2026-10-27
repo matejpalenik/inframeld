@@ -2,81 +2,17 @@
 
 import json
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import Any, cast
 
 import pytest
-from fastapi import FastAPI, File, Form, Query, UploadFile
 from fastapi.testclient import TestClient
-from pydantic import BaseModel, Field
+from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
 from inframeld_backend.bootstrap.application_factory import create_app
-from inframeld_backend.shared.http.definitions.problem_catalogue import VALIDATION_ERROR_PROBLEM
-from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
-from inframeld_backend.shared.http.middleware.request_context_middleware import (
-    RequestContextMiddleware,
-)
-from inframeld_backend.shared.http.openapi.problem_openapi import (
-    configure_problem_openapi,
-    problem_responses,
-)
-from inframeld_backend.shared.http.requests.pagination_query import PaginationQuery
-from inframeld_backend.shared.http.responses.page_response import PageResponse
 
 CONTRACT_PATH = (
     Path(__file__).resolve().parents[5] / "contracts" / "openapi" / "v1" / "inframeld-v1.json"
 )
-
-
-class ContractFixturePayload(BaseModel):
-    """Exercise required, nullable, union, and constrained fields on a test-only route."""
-
-    required_name: str = Field(min_length=1, max_length=40, pattern="^[a-z]+$")
-    required_nullable: str | None
-    optional_nullable: str | None = None
-    score: float = Field(ge=0, le=1)
-    choice: str | int
-
-
-def _create_schema_fixture_app() -> FastAPI:
-    """Register test-only payload, upload, and pagination routes for schema assertions."""
-    application = FastAPI()
-    register_error_handlers(application)
-    application.add_middleware(RequestContextMiddleware)
-    configure_problem_openapi(application)
-
-    @application.post(
-        "/contract-fixture/payload",
-        operation_id="contractFixturePayload",
-        responses=problem_responses(VALIDATION_ERROR_PROBLEM),
-    )
-    async def contract_fixture_payload(payload: ContractFixturePayload) -> ContractFixturePayload:
-        """Expose the fixture payload's request and response schemas."""
-        return payload
-
-    @application.post(
-        "/contract-fixture/upload",
-        operation_id="contractFixtureUpload",
-        responses=problem_responses(VALIDATION_ERROR_PROBLEM),
-    )
-    async def contract_fixture_upload(
-        file: Annotated[UploadFile, File(description="fixture upload")],
-        label: Annotated[str, Form(min_length=1, max_length=20)],
-    ) -> dict[str, str]:
-        """Exercise multipart upload schema generation."""
-        return {"filename": file.filename or "", "label": label}
-
-    @application.get(
-        "/contract-fixture/page",
-        operation_id="contractFixturePage",
-        responses=problem_responses(VALIDATION_ERROR_PROBLEM),
-    )
-    async def contract_fixture_page(
-        pagination: Annotated[PaginationQuery, Query()],
-    ) -> PageResponse[int]:
-        """Expose the common pagination query and response contract."""
-        return PageResponse[int](items=[pagination.limit], next_cursor=None)
-
-    return application
 
 
 def test_openapi_contract_matches_application() -> None:
@@ -156,7 +92,7 @@ def test_human_routes_declare_cookie_or_bearer_and_authentication_errors(
 def test_schema_fixture_preserves_native_field_semantics() -> None:
     """Prove native OpenAPI preserves required, nullable, union and field constraints."""
 
-    schema = _create_schema_fixture_app().openapi()
+    schema = create_schema_fixture_app().openapi()
     payload_schema = schema["components"]["schemas"]["ContractFixturePayload"]
     properties = payload_schema["properties"]
 
@@ -188,7 +124,7 @@ def test_schema_fixture_preserves_native_field_semantics() -> None:
 def test_schema_fixture_preserves_multipart_uploads() -> None:
     """Prove native OpenAPI describes multipart files and constrained form fields."""
 
-    schema = _create_schema_fixture_app().openapi()
+    schema = create_schema_fixture_app().openapi()
     request_body = schema["paths"]["/contract-fixture/upload"]["post"]["requestBody"]
 
     assert set(request_body["content"]) == {"multipart/form-data"}
@@ -210,7 +146,7 @@ def test_schema_fixture_preserves_multipart_uploads() -> None:
 
 def test_validation_error_media_type_matches_openapi() -> None:
     """Ensure clients are told the actual media type of validation errors."""
-    application = _create_schema_fixture_app()
+    application = create_schema_fixture_app()
 
     with TestClient(application) as client:
         response = client.post("/contract-fixture/payload", json={})
@@ -237,7 +173,7 @@ def test_validation_error_media_type_matches_openapi() -> None:
 
 def test_upload_validation_error_matches_openapi() -> None:
     """Document the problem returned when an upload omits a required form field."""
-    application = _create_schema_fixture_app()
+    application = create_schema_fixture_app()
 
     with TestClient(application) as client:
         response = client.post(
@@ -260,7 +196,7 @@ def test_upload_validation_error_matches_openapi() -> None:
 
 def test_problem_components_preserve_wire_contract() -> None:
     """Preserve public field names, optionality, limits, and descriptions."""
-    schema = _create_schema_fixture_app().openapi()
+    schema = create_schema_fixture_app().openapi()
     components = schema["components"]["schemas"]
 
     problem = components["ProblemDetails"]
@@ -320,7 +256,7 @@ def test_production_contract_excludes_fixture_routes() -> None:
 
 def test_pagination_fixture_preserves_query_and_response_contract() -> None:
     """Publish bounded query parameters and the camel-case page response."""
-    schema = _create_schema_fixture_app().openapi()
+    schema = create_schema_fixture_app().openapi()
     operation = schema["paths"]["/contract-fixture/page"]["get"]
 
     parameters = {parameter["name"]: parameter["schema"] for parameter in operation["parameters"]}

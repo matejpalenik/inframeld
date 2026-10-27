@@ -1,0 +1,97 @@
+--- a/src/analysis.rs
++++ b/src/analysis.rs
+@@ -805,6 +805,7 @@
+ /// generator to emit doc comments and/or `#[validate(...)]` attrs.
+ #[derive(Debug, Clone, Default)]
+ pub struct PropertyConstraints {
++    pub boolean_const: Option<bool>,
+     pub minimum: Option<f64>,
+     pub maximum: Option<f64>,
+     pub exclusive_minimum: Option<f64>,
+@@ -848,6 +849,7 @@
+             _ => None,
+         };
+         Self {
++            boolean_const: details.const_value.as_ref().and_then(serde_json::Value::as_bool),
+             minimum: details
+                 .minimum
+                 .as_ref()
+--- a/src/generator.rs
++++ b/src/generator.rs
+@@ -1191,6 +1191,34 @@
+             _ => TokenStream::new(),
+         };
+ 
++        // Field presence and explicit null are separate OpenAPI constraints.
++        let presence_helpers = quote! {
++            #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
++            pub struct BooleanConstant<const VALUE: bool>;
++            impl<const VALUE: bool> serde::Serialize for BooleanConstant<VALUE> {
++                fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
++                    serializer.serialize_bool(VALUE)
++                }
++            }
++            impl<'de, const VALUE: bool> serde::Deserialize<'de> for BooleanConstant<VALUE> {
++                fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
++                    let actual = bool::deserialize(deserializer)?;
++                    if actual == VALUE { Ok(Self) }
++                    else { Err(serde::de::Error::custom(format!("expected boolean constant {VALUE}"))) }
++                }
++            }
++            #[allow(dead_code)]
++            mod presence_serde {
++                use serde::{Deserialize, Deserializer};
++                pub fn required_nullable<'de, D: Deserializer<'de>, T: Deserialize<'de>>(de: D) -> Result<Option<T>, D::Error> {
++                    Option::<T>::deserialize(de)
++                }
++                pub fn optional_nonnull<'de, D: Deserializer<'de>, T: Deserialize<'de>>(de: D) -> Result<Option<T>, D::Error> {
++                    T::deserialize(de).map(Some)
++                }
++            }
++        };
++
+         let tri_state_helper = if uses_plain_tri_state {
+             quote! {
+                 /// Serde normally maps both a missing `Option<T>` field and an
+@@ -1358,6 +1386,7 @@
+ 
+             #multipart_file_helper
+ 
++            #presence_helpers
+             #tri_state_helper
+ 
+             #time_date_helper
+@@ -4430,6 +4459,10 @@
+     ) -> TokenStream {
+         use crate::analysis::SchemaType;
+ 
++        if let Some(value) = prop.constraints.boolean_const {
++            return quote! { BooleanConstant<#value> };
++        }
++
+         match &prop.schema_type {
+             SchemaType::Primitive { rust_type, .. } => {
+                 // syn handles generics + complex paths
+@@ -4582,12 +4615,21 @@
+             // missing-field → None handling for Option fields
+             // (serde-rs/serde#2878); without `default` a request
+             // that simply omits the field fails to deserialize.
+-            if is_option_wrapped {
++            if is_option_wrapped && !is_required {
+                 attrs.push(quote! { default });
+             }
+         } else if is_tri_state {
+             attrs.push(quote! { default });
+             attrs.push(quote! { deserialize_with = "tri_state_serde::deserialize" });
++        }
++
++        if self.schema_type_serde_codec(&prop.schema_type, analysis).is_none() && !is_tri_state {
++            if is_required && self.property_is_nullable(schema_name, field_name, prop) {
++                attrs.push(quote! { deserialize_with = "presence_serde::required_nullable" });
++            } else if !is_required {
++                attrs.push(quote! { default });
++                attrs.push(quote! { deserialize_with = "presence_serde::optional_nonnull" });
++            }
+         }
+ 
+         if attrs.is_empty() {

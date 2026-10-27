@@ -1,0 +1,17 @@
+diff --git a/src/analysis.rs b/src/analysis.rs
+index 83adfa5..1416090 100644
+--- a/src/analysis.rs
++++ b/src/analysis.rs
+@@ -9751,7 +9751,11 @@ fn is_multipart_file_schema(schema: &Value, component_schemas: &BTreeMap<String,
+     };
+     let is_string = |schema: &Value| schema.get("type").and_then(Value::as_str) == Some("string");
+     let is_binary = |schema: &Value| {
+-        is_string(schema) && schema.get("format").and_then(Value::as_str) == Some("binary")
++        is_string(schema)
++            && (schema.get("format").and_then(Value::as_str) == Some("binary")
++                || (schema.get("contentMediaType").and_then(Value::as_str)
++                    == Some("application/octet-stream")
++                    && schema.get("contentEncoding").is_none()))
+     };
+     if is_binary(schema) {
+         return true;

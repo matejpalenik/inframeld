@@ -1,0 +1,94 @@
+--- a/dist/clients/fetch/client.ts
++++ b/dist/clients/fetch/client.ts
+@@ -78,6 +78,7 @@
+     let response: Response | undefined;
+     let rawBody: string | undefined;
+     let timer: ReturnType<typeof setTimeout> | undefined;
++    let deadline: AbortSignal | undefined;
+     let phase: 'request' | 'transport' | 'decode' | 'http' = 'request';
+     let validatedError: unknown;
+     let hasValidatedError = false;
+@@ -88,9 +89,10 @@
+       const { opts, url } = await beforeRequest(options);
+       const timeoutMs = opts.timeoutMs === undefined ? 5000 : opts.timeoutMs;
+       if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new RangeError('timeoutMs must be positive and finite');
+-      const deadline = new AbortController();
+-      timer = setTimeout(() => deadline.abort(new DOMException('Request deadline exceeded', 'TimeoutError')), timeoutMs);
+-      opts.signal = opts.signal ? AbortSignal.any([opts.signal, deadline.signal]) : deadline.signal;
++      const timeoutController = new AbortController();
++      deadline = timeoutController.signal;
++      timer = setTimeout(() => timeoutController.abort(new DOMException('Request deadline exceeded', 'TimeoutError')), timeoutMs);
++      opts.signal = opts.signal ? AbortSignal.any([opts.signal, deadline]) : deadline;
+       const requestInit: ReqInit = {
+         redirect: 'manual',
+         ...opts,
+@@ -129,7 +131,9 @@
+       const contract = contracts?.[key] ?? contracts?.[`${key[0]}XX`] ?? contracts?.default;
+       phase = 'http';
+       if (response.ok && contracts && !contract) {
++        phase = 'transport';
+         rawBody = await response.text();
++        phase = 'http';
+         throw new Error(`Undeclared successful HTTP status ${response.status}`);
+       }
+       const suppliedType = response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase();
+@@ -141,13 +145,17 @@
+         : representations.length === 1 ? representations[0] : undefined;
+       const expectedType = representation?.mediaType.toLowerCase();
+       if (contract?.hasBody && !representation) {
++        phase = 'transport';
+         rawBody = await response.text();
++        phase = 'http';
+         throw new Error(`Unexpected or ambiguous response Content-Type ${suppliedType ?? '(missing)'}`);
+       }
+ 
+       if (response.ok) {
+         if (contract && !contract.hasBody) {
+-          rawBody = await response.text();
++          phase = 'transport';
++        rawBody = await response.text();
++        phase = 'http';
+           if (rawBody !== '') throw new Error('Unexpected body for a bodyless response');
+           return opts.responseStyle === 'data' ? undefined : { data: undefined, ...result };
+         }
+@@ -254,26 +262,26 @@
+       throw new Error(`HTTP ${response.status}`);
+     } catch (error) {
+       const original = error;
++      const message = error instanceof Error ? error.message : String(error);
++      let failure: SdkFailure<unknown> = phase === 'transport'
++        ? { kind: 'transport', reason: request?.signal.aborted ? (deadline?.aborted && request.signal.reason === deadline.reason ? 'timeout' : 'aborted') : 'network', cause: original, message }
++        : phase === 'decode'
++          ? { kind: 'decode', cause: original, message }
++          : phase === 'request'
++            ? { kind: 'request', cause: original, message }
++            : hasValidatedError
++              ? { kind: 'api', body: validatedError, message }
++              : { kind: 'http', ...(hasHttpBody ? { body: httpBody } : {}), message };
+       let diagnostic = error;
+       try {
+         for (const fn of interceptors.error.fns) {
+           if (fn) diagnostic = await fn(diagnostic, response, request, options as ResolvedRequestOptions);
+         }
++        // Returned diagnostics cannot replace trusted classification or evidence.
++        failure.message = diagnostic instanceof Error ? diagnostic.message : String(diagnostic);
+       } catch (hookError) {
+-        phase = 'request';
+-        diagnostic = new AggregateError([original, hookError], 'Error interceptor failed');
+-      }
+-      // Hooks may customize diagnostics, never trusted body/kind/native context.
+-      const message = diagnostic instanceof Error ? diagnostic.message : String(diagnostic);
+-      const failure: SdkFailure<unknown> = phase === 'transport'
+-        ? { kind: 'transport', reason: request?.signal.aborted ? (request.signal.reason?.name === 'TimeoutError' ? 'timeout' : 'aborted') : 'network', cause: original, message }
+-        : phase === 'decode'
+-          ? { kind: 'decode', cause: original, message }
+-          : phase === 'request'
+-            ? { kind: 'request', cause: diagnostic instanceof AggregateError ? diagnostic : original, message }
+-            : hasValidatedError
+-              ? { kind: 'api', body: validatedError, message }
+-              : { kind: 'http', ...(hasHttpBody ? { body: httpBody } : {}), message };
++        failure = { kind: 'request', message: 'Error interceptor failed', cause: new AggregateError([failure, hookError], 'Error interceptor failed') };
++      }
+       if (throwOnError) throw failure;
+       return responseStyle === 'data' ? undefined : { error: failure, rawBody, request, response };
+     } finally {

@@ -1,0 +1,98 @@
+--- a/dist/clients/fetch/client.ts
++++ b/dist/clients/fetch/client.ts
+@@ -133,11 +133,16 @@
+         throw new Error(`Undeclared successful HTTP status ${response.status}`);
+       }
+       const suppliedType = response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase();
+-      const expectedType = contract?.mediaType?.toLowerCase();
+-      const matchesType = !expectedType || !suppliedType || expectedType === suppliedType || expectedType === '*/*' || (expectedType.endsWith('/*') && suppliedType.startsWith(expectedType.slice(0, -1)));
+-      if (contract && !matchesType) {
++      const representations = contract?.representations ?? [];
++      const representation = suppliedType
++        ? representations.find((entry) => entry.mediaType.toLowerCase() === suppliedType)
++          ?? representations.find((entry) => entry.mediaType.toLowerCase() === suppliedType.split('/')[0] + '/*')
++          ?? representations.find((entry) => entry.mediaType === '*/*')
++        : representations.length === 1 ? representations[0] : undefined;
++      const expectedType = representation?.mediaType.toLowerCase();
++      if (contract?.hasBody && !representation) {
+         rawBody = await response.text();
+-        throw new Error(`Unexpected response Content-Type ${suppliedType}`);
++        throw new Error(`Unexpected or ambiguous response Content-Type ${suppliedType ?? '(missing)'}`);
+       }
+ 
+       if (response.ok) {
+@@ -208,7 +213,7 @@
+         }
+ 
+         phase = 'decode';
+-        const validate = contract?.validator ?? opts.responseValidator;
++        const validate = representation?.validator ?? opts.responseValidator;
+         if (validate) await validate(data);
+ 
+         if (parseAs === 'json') {
+@@ -230,11 +235,11 @@
+       const errorBytes = await response.arrayBuffer();
+       rawBody = new TextDecoder().decode(errorBytes);
+       phase = 'http';
+-      if (contract?.validator) {
++      if (representation?.validator) {
+         phase = 'decode';
+         const text = new TextDecoder('utf-8', { fatal: true }).decode(errorBytes);
+         const candidate = JSON.parse(text);
+-        await contract.validator(candidate);
++        await representation.validator(candidate);
+         validatedError = candidate;
+         hasValidatedError = true;
+         phase = 'http';
+--- a/dist/clients/fetch/types.ts
++++ b/dist/clients/fetch/types.ts
+@@ -84,7 +84,7 @@
+       | 'sseMaxRetryDelay'
+     > {
+   /** Response-selection metadata supplied by generated operations. */
+-  responseContract?: Record<string, { mediaType: string | null; hasBody: boolean; validator?: (data: unknown) => Promise<unknown> }>;
++  responseContract?: Record<string, { hasBody: boolean; representations: readonly { mediaType: string; validator?: (data: unknown) => Promise<unknown> }[] }>;
+   /**
+    * Any body that you want to add to your request.
+    *
+--- a/dist/init-D6Y8JFUS.mjs
++++ b/dist/init-D6Y8JFUS.mjs
+@@ -4969,9 +4969,15 @@
+ 	if (client.name === "@hey-api/client-fetch") {
+ 		const contracts = $.object();
+ 		for (const [status, response] of Object.entries(operation.responses ?? {})) {
+-			const descriptor = $.object().prop("mediaType", $.fromValue(response.mediaType ?? null)).prop("hasBody", $.literal(response.schema.type !== "void"));
+-			const symbol = plugin.querySymbol({ artifact: "zod", category: "schema", resource: "operation", resourceId: operation.id, role: `response-${status}` });
+-			if (symbol) descriptor.prop("validator", $.func().async().param("data").do($(symbol).attr("parseAsync").call("data").await().return()));
++			const representations = response.representations ?? (response.schema.type === "void" ? [] : [{ mediaType: response.mediaType, schema: response.schema }]);
++			const entries = $.array();
++			for (const [index, representation] of representations.entries()) {
++				const entry = $.object().prop("mediaType", $.fromValue(representation.mediaType ?? "application/json"));
++				const symbol = plugin.querySymbol({ artifact: "zod", category: "schema", resource: "operation", resourceId: operation.id, role: `response-${status}-${index}` });
++				if (symbol) entry.prop("validator", $.func().async().param("data").do($(symbol).attr("parseAsync").call("data").await().return()));
++				entries.element(entry);
++			}
++			const descriptor = $.object().prop("hasBody", $.literal(representations.length > 0)).prop("representations", entries);
+ 			contracts.prop(status, descriptor);
+ 		}
+ 		reqOptions.prop("responseContract", contracts);
+@@ -15506,13 +15512,13 @@
+ 	if (plugin.config.responses.enabled) {
+ 		if (operation.responses) {
+ 			for (const [status, response] of Object.entries(operation.responses)) {
+-				if (response.schema.type === "void") continue;
+-				processor.process({
+-					meta: { resource: "operation", resourceId: operation.id, role: `response-${status}` },
++				const representations = response.representations ?? (response.schema.type === "void" ? [] : [{ mediaType: response.mediaType, schema: response.schema }]);
++				for (const [index, representation] of representations.entries()) processor.process({
++					meta: { resource: "operation", resourceId: operation.id, role: `response-${status}-${index}` },
+ 					naming: plugin.config.responses,
+-					namingAnchor: `${operation.id}${status}`,
+-					path: [...path, "responses", status],
+-					plugin, schema: response.schema, tags
++					namingAnchor: `${operation.id}${status}Representation${index}`,
++					path: [...path, "responses", status, String(index)],
++					plugin, schema: representation.schema, tags
+ 				});
+ 			}
+ 			const { response } = operationResponsesMap(operation);

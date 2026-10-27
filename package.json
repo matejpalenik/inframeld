@@ -25,7 +25,12 @@
     "openapi:check": "turbo run openapi:check --filter=@inframeld/backend",
     "commit": "cz",
     "commitlint": "commitlint",
-    "prepare": "husky"
+    "prepare": "husky",
+    "sdk:setup": "pnpm --filter @inframeld/sdk-tools exec tsx src/cli.ts setup",
+    "sdk:generate": "pnpm --filter @inframeld/sdk-tools exec tsx src/cli.ts generate",
+    "sdk:check": "pnpm --filter @inframeld/sdk-tools exec tsx src/cli.ts check",
+    "sdk:test": "pnpm --filter @inframeld/sdk-tools exec tsx src/cli.ts test",
+    "sdk:verify": "pnpm --filter @inframeld/sdk-tools exec tsx src/cli.ts verify"
   },
   "engines": {
     "node": "26.6.0",

@@ -1,0 +1,44 @@
+--- a/python/httpx/rest.mustache
++++ b/python/httpx/rest.mustache
+@@ -3,6 +3,7 @@
+ {{>partial_header}}
+ 
+ 
++import asyncio
+ import io
+ import json
+ import re
+@@ -111,7 +112,7 @@
+ 
+         post_params = post_params or {}
+         headers = headers or {}
+-        timeout = _request_timeout or 5 * 60
++        timeout = 5.0 if _request_timeout is None else _request_timeout
+ 
+         if 'Content-Type' not in headers:
+             headers['Content-Type'] = 'application/json'
+@@ -171,7 +172,15 @@
+         if self.pool_manager is None:
+             self.pool_manager = self._create_pool_manager()
+ 
+-        r = await self.pool_manager.request(**args)
++        if isinstance(timeout, (int, float)):
++            try:
++                async with asyncio.timeout(timeout):
++                    r = await self.pool_manager.request(**args)
++            except TimeoutError as error:
++                raise httpx.ReadTimeout("Buffered request deadline exceeded") from error
++        else:
++            # An explicit tuple retains HTTPX's phase-budget semantics.
++            r = await self.pool_manager.request(**args)
+         return RESTResponse(r)
+ 
+     def _create_pool_manager(self) -> {{httpxModule}}.AsyncClient:
+@@ -185,6 +194,7 @@
+             )
+ 
+         return {{httpxModule}}.AsyncClient(
++            follow_redirects=False,
+             limits=limits,
+             proxy=proxy,
+             verify=self.ssl_context,

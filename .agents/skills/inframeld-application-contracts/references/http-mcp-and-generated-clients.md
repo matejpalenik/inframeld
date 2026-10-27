@@ -20,7 +20,9 @@ Feature HTTP conversions use static Mapper methods without I/O. Routes serialize
 
 OpenAPI is the machine-readable description of the HTTP operations and their inputs/results. Selected FastAPI/Pydantic output is authoritative native OpenAPI 3.1.x. Do not hand-edit generated output, weaken backend semantics for a generator or build a custom generator by implication. V1 delivers a Rust CLI and small Ory account UI. Full Studio is deferred and later uses its generated TypeScript client and the same CLI-led product rules.
 
-Generate application clients from native OpenAPI without prescribing a generator package or adding a replacement handwritten client. Qualify incrementally against implemented contracts. Intended language targets are not qualified deliverables. Ory's clients serve Ory contracts, not a second Inframeld API. Historical client reviews do not establish current interoperability.
+Generate application clients from native OpenAPI without adding a replacement handwritten client. [ADR-0088](../../../../docs/adr/ADR-0088-use-a-pinned-patched-generator-for-the-rust-sdk.md) selects the pinned patched Rust generator. [ADR-0089](../../../../docs/adr/ADR-0089-select-patched-typescript-and-python-sdk-generators.md) selects the patched TypeScript and Python configurations. Follow the independently discoverable [Rust](../../inframeld-rust-sdk/SKILL.md), [TypeScript](../../inframeld-typescript-sdk/SKILL.md) or [Python](../../inframeld-python-sdk/SKILL.md) skill for consumption. Qualify incrementally against implemented contracts. Intended language targets are not qualified deliverables. Ory's clients serve Ory contracts, not a second Inframeld API. Historical client reviews do not establish current interoperability.
+
+The [Rust comparison](../../../../docs/development/reports/rust-sdk-generator-comparison.md) and [TypeScript/Python comparison](../../../../docs/development/reports/typescript-python-sdk-generator-comparison.md) retain dated evidence and limitations. Selection does not establish released SDK support. The [shared SDK maintenance reference](../../inframeld-sdks/references/generator-maintenance.md) owns common patch and upgrade policy. Language references own their specific obligations, while runbooks retain commands and caches. [Shared conformance qualification](../../inframeld-sdks/references/shared-qualification.md), accepted in [ADR-0090](../../../../docs/adr/ADR-0090-qualify-sdks-with-shared-contract-scenarios.md), targets one scenario suite across the three SDKs. The unified SDK runner and operation-coverage gate are implemented. Automatic Linux checks cover applicable PRs, with macOS for generator changes and manual runs. Report actual platform execution separately, and configure external branch rules to require the SDK conformance aggregate. C# and Java delivery remain tentative. Application Contracts retains HTTP semantics and server-version compatibility policy.
 
 Browser writes preserve user-session/CSRF protection. Server rendering retains the user's context without a global administrator key or cache shared between users. Backend work proceeds independently of deferred Studio.
 
@@ -59,7 +61,7 @@ The application-connection wizard uses ordinary account/grant/key operations. It
 
 Studio calls the application HTTP API through the official generated TypeScript **SDK**, a client library for working with the backend.
 
-Generate those clients from native OpenAPI without choosing a generator package here. **V1 delivers the Rust CLI and small Ory account UI, not full Studio.** Backend work proceeds independently. Client compatibility is qualified incrementally against actual contracts. The future Studio follows the same application behavior under [ADR-0055](../../../../docs/adr/ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md).
+Generate those clients from native OpenAPI. The selected Rust implementation is maintained under [ADR-0088](../../../../docs/adr/ADR-0088-use-a-pinned-patched-generator-for-the-rust-sdk.md). **V1 delivers the Rust CLI and small Ory account UI, not full Studio.** Backend work proceeds independently. Client compatibility is qualified incrementally against actual contracts. The future Studio follows the same application behavior under [ADR-0055](../../../../docs/adr/ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md).
 
 Repository skills are guidance for developers and agents. They do not run inside the application.
 
@@ -132,11 +134,11 @@ flowchart LR
 
 The arrows show how definitions become generated files, not runtime calls. Change the backend, regenerate its contract, review the public effect, and check that the files agree. Never patch JSON to disguise a mismatch.
 
-Use an OpenAPI generator without selecting its package in the architecture. Begin client qualification against implemented contract foundations, then extend it alongside feature delivery. Late upload/receipt operations do not block initial integration. Backend implementation proceeds independently. Neither a separate generator project nor deferred Studio is a v1 prerequisite.
+Use the language configurations selected by ADR-0088 and ADR-0089 under the shared SDK maintenance policy. Begin client qualification against implemented contract foundations, then extend it alongside feature delivery. Late upload/receipt operations do not block initial integration. Backend implementation proceeds independently. Neither a separate generator project nor deferred Studio is a v1 prerequisite.
 
 Keep generated transport types at the client boundary and thin application-owned presentation adapters above them. Do not write a competing application HTTP client or weaken native schema meaning to satisfy a generator. [ADR-0055](../../../../docs/adr/ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md) owns this delivery choice.
 
-Python, Java, TypeScript and Rust are possible client targets, not automatically supported releases. Qualify the Rust CLI's selected client and future Studio's generated TypeScript client against errors, authentication, nullable/union results, pagination and asynchronous/recovery outcomes before claiming support.
+Rust, TypeScript and Python have selected unpublished SDK configurations. They are not automatically supported public releases. C# and Java remain tentative. Qualify each delivered client against errors, authentication, nullable/union results, pagination and delivered asynchronous/recovery outcomes before claiming support. Workflows without production HTTP contracts remain pending.
 
 Generating and releasing an SDK package is repository-development work. It is unrelated to promoting a customer's PipelineVersion.
 

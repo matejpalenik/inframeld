@@ -1,0 +1,125 @@
+{
+  "typescript": {
+    "upstreamVersion": "0.99.0",
+    "archiveUrl": "https://registry.npmjs.org/@hey-api/openapi-ts/-/openapi-ts-0.99.0.tgz",
+    "archiveFile": "hey-api-openapi-ts-0.99.0.tgz",
+    "archiveRoot": "package",
+    "archiveSha256": "f52af682c08eee78e6e413a0e8b85bf848abe1d4c7ab88996a11f2511ab37068",
+    "patches": [
+      {
+        "file": "ts-hey-api-patched/0001-qualified-capabilities.patch",
+        "sha256": "b7323bd97e55f60593785c95f5e5434d314079ac42ff73db1376d5fc95811479"
+      },
+      {
+        "file": "ts-hey-api-patched/0002-response-integrity.patch",
+        "sha256": "6b7eb8dce1f316934c78b997d88f44f3e15141dd36708688d4db96a2ae0f181b"
+      },
+      {
+        "file": "ts-hey-api-patched/0003-typed-failures-and-response-validators.patch",
+        "sha256": "7a798ebe2a3fb0584b616a1676c5deac5bf9621e005262dc6f76418847186c68"
+      },
+      {
+        "file": "ts-hey-api-patched/0004-default-transport-policy.patch",
+        "sha256": "dee4e9381af5120e57ac904fe4404e3016dca79359a7b1ee0eff1849d6dbc894"
+      },
+      {
+        "file": "ts-hey-api-patched/0005-response-representations.patch",
+        "sha256": "67717a94542790fd248923fdee576a6a7a6ac8221b0e8a2a08d4ea666dbc4f6f"
+      },
+      {
+        "file": "ts-hey-api-patched/0006-preserve-classified-failure-evidence.patch",
+        "sha256": "c1765a24744128d11c17d575c6d6cfa17b3a09f743c2ffaab075fa9789c31474"
+      }
+    ],
+    "sharedParser": {
+      "upstreamVersion": "0.5.0",
+      "archiveUrl": "https://registry.npmjs.org/@hey-api/shared/-/shared-0.5.0.tgz",
+      "archiveFile": "hey-api-shared-0.5.0.tgz",
+      "archiveRoot": "package",
+      "archiveSha256": "4b913092c55d64d5cf85eae5fc94a2ec4a075305aaf4395adafc37986c95060c",
+      "patches": [
+        {
+          "file": "ts-hey-api-patched/0001-shared-response-representations.patch",
+          "sha256": "9d668d101e9a62974a960b923347cc4bd584b758f2e2156bad560263dab223d1"
+        },
+        {
+          "file": "ts-hey-api-patched/0002-shared-default-response-types.patch",
+          "sha256": "5e4149d9fcf30afa7310cddcedb2a349b46ba7a7a4ceca600255d09452e35b40"
+        }
+      ]
+    }
+  },
+  "python": {
+    "upstreamVersion": "7.26.0",
+    "archiveUrl": "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/7.26.0/openapi-generator-cli-7.26.0.jar",
+    "archiveFile": "openapi-generator-cli-7.26.0.jar",
+    "archiveSha256": "1760050094997b9cc790cc1350be095f15da8c08a996b184d3eadc4ccda5e35e",
+    "patches": [
+      {
+        "file": "py-openapi-generator-patched/0001-qualified-capabilities.patch",
+        "sha256": "72c8534f9ea632be45af164c493a4c73725c6fa670657e0e0a76064588483b77"
+      },
+      {
+        "file": "py-openapi-generator-patched/0002-preserve-field-presence.patch",
+        "sha256": "f09e3e6609ac1fb13a77a16855374ff4141030446903cc47c3ff874422499d41"
+      },
+      {
+        "file": "py-openapi-generator-patched/0003-response-integrity.patch",
+        "sha256": "d3dfb46bcf0096a6d562f4d7207570630fcc7ae6072e12a1222837bf44150b4f"
+      },
+      {
+        "file": "py-openapi-generator-patched/0004-default-buffered-deadline.patch",
+        "sha256": "40becd423af6705037896d78447882edc7b3f9fb70620738f29357c592e0a58f"
+      },
+      {
+        "file": "py-openapi-generator-patched/0005-response-representations.patch",
+        "sha256": "a7865362b22e203022ad55e1a8bbbd272dcd2833f8aa8f40a76f7c37cdf32586"
+      },
+      {
+        "file": "py-openapi-generator-patched/0006-strict-container-and-default-responses.patch",
+        "sha256": "446bbfcd67b00f88b38bf64ee8620677a97489baaa2ae5e59a93d7797a3e328f"
+      }
+    ]
+  },
+  "rust": {
+    "upstreamVersion": "0.23.0",
+    "revision": "inframeld.4",
+    "archiveUrl": "https://static.crates.io/crates/openapi-to-rust/openapi-to-rust-0.23.0.crate",
+    "archiveSha256": "3bd6e71bfeb9c084586ad4daa7373a662be1f779432f263fa291460a98803d7d",
+    "patches": [
+      {
+        "file": "0001-native-multipart-files.patch",
+        "sha256": "79e51f067d0bc6e2748f5fd942de7d69c5706f093e19afd853a844dfff47954c"
+      },
+      {
+        "file": "0002-success-response-metadata.patch",
+        "sha256": "41b9d6b343c8d1770928710298dfe2ace65fa7fd0fde4296a808cd7511836ebc"
+      },
+      {
+        "file": "0003-preserve-presence-and-boolean-constants.patch",
+        "sha256": "042d5a2f63a8b8b2492a88a2ddd149eae5f3adff57418316c122ff4c28ef06f5"
+      },
+      {
+        "file": "0004-nullable-response-roots.patch",
+        "sha256": "9f11924e2246caa1cd6584b0240198190f6812094b2ab897e6822858964ae2b4"
+      },
+      {
+        "file": "0005-default-transport-policy.patch",
+        "sha256": "c0ba4dde602c515027458c99839e0e4971230cd1a8850078b311ac81064ca967"
+      },
+      {
+        "file": "0006-json-response-selection.patch",
+        "sha256": "fca64d35341b43571d0376ef5576d3bffe795c38d6c1b2f54e083802b6c8f2b5"
+      },
+      {
+        "file": "0007-mixed-and-default-json-responses.patch",
+        "sha256": "ab7443f6a702c36ed9d6ccd085c6c6d0d844f6dd7efdad5d881a0a6fd6a98a9e"
+      },
+      {
+        "file": "0008-json-error-representations.patch",
+        "sha256": "e2d1eeaf18aba0d7be6320848c37ad263c38495938b699ab6d2684ebc4de2662"
+      }
+    ],
+    "archiveRoot": "openapi-to-rust-0.23.0"
+  }
+}

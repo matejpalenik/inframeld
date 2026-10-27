@@ -19,6 +19,8 @@ uv sync --project apps/backend --locked
 
 Use the Node and pnpm versions in the root `package.json` and the Python version in `apps/backend/.python-version`. CI's tool versions are pinned in `.github/workflows/ci.yml`.
 
+Linux CI jobs explicitly use `ubuntu-26.04`, including backend, Quality, CodeQL and SDK qualification. CI installs its pinned Python version with the pinned uv tool before provisioning test keys. This avoids requiring an Ubuntu-specific build from GitHub's Python setup action. SDK macOS qualification remains a separate matrix target. Changing the CI host does not change the container base images or the product's supported operating systems.
+
 <a id="1-create-your-local-environment"></a>
 
 ### 1. Create your local environment

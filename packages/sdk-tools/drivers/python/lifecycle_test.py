@@ -1,0 +1,131 @@
+"""Public async cancellation releases a used transport and permits client reuse."""
+
+import asyncio
+import unittest
+from time import monotonic
+
+import httpx
+import inframeld_sdk
+from inframeld_sdk.api.health_api import HealthApi
+from inframeld_sdk.sync_helper import run_sync
+
+
+class LifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancel_active_operation_then_reuse_and_close_used_pool(self) -> None:
+        entered = asyncio.Event()
+        cancelled = asyncio.Event()
+        slow = True
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            if slow:
+                entered.set()
+                try:
+                    await asyncio.sleep(30)
+                except asyncio.CancelledError:
+                    cancelled.set()
+                    raise
+            return httpx.Response(200, json={"status": "ok"})
+
+        client = inframeld_sdk.ApiClient(inframeld_sdk.Configuration(host="http://sdk.test"))
+        client.rest_client.pool_manager = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        try:
+            task = asyncio.create_task(
+                HealthApi(client).get_health_with_http_info(_request_timeout=2.0)
+            )
+            await asyncio.wait_for(entered.wait(), timeout=1)
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            self.assertTrue(cancelled.is_set())
+            slow = False
+            result = await HealthApi(client).get_health_with_http_info(_request_timeout=2.0)
+            self.assertEqual(result.data, {"status": "ok"})
+        finally:
+            await client.close()
+        self.assertTrue(client.rest_client.pool_manager.is_closed)
+
+
+class DeadlineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_default_deadline_bounds_a_buffered_response(self) -> None:
+        async def handler(request: httpx.Request) -> httpx.Response:
+            await asyncio.sleep(6)
+            return httpx.Response(200, json={"status": "ok"})
+
+        client = inframeld_sdk.ApiClient(inframeld_sdk.Configuration(host="http://sdk.test"))
+        client.rest_client.pool_manager = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        started = monotonic()
+        try:
+            with self.assertRaises(httpx.TimeoutException):
+                await HealthApi(client).get_health_with_http_info()
+            self.assertGreater(monotonic() - started, 4.5)
+            self.assertLess(monotonic() - started, 5.8)
+        finally:
+            await client.close()
+        self.assertTrue(client.rest_client.pool_manager.is_closed)
+
+    async def test_scalar_deadline_cancels_then_allows_reuse(self) -> None:
+        count = 0
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal count
+            count += 1
+            if count == 1:
+                await asyncio.sleep(0.2)
+            return httpx.Response(200, json={"status": "ok"})
+
+        client = inframeld_sdk.ApiClient(inframeld_sdk.Configuration(host="http://sdk.test"))
+        client.rest_client.pool_manager = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        try:
+            with self.assertRaises(httpx.TimeoutException):
+                await HealthApi(client).get_health_with_http_info(_request_timeout=0.025)
+            self.assertEqual(
+                (await HealthApi(client).get_health_with_http_info(_request_timeout=0.1)).data,
+                {"status": "ok"},
+            )
+            self.assertEqual(count, 2)
+        finally:
+            await client.close()
+
+    async def test_explicit_tuple_keeps_native_phase_budgets(self) -> None:
+        async def handler(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(request.extensions["timeout"]["connect"], 0.1)
+            self.assertEqual(request.extensions["timeout"]["read"], 0.2)
+            return httpx.Response(200, json={"status": "ok"})
+
+        client = inframeld_sdk.ApiClient(inframeld_sdk.Configuration(host="http://sdk.test"))
+        client.rest_client.pool_manager = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        try:
+            self.assertEqual(
+                (
+                    await HealthApi(client).get_health_with_http_info(_request_timeout=(0.1, 0.2))
+                ).status_code,
+                200,
+            )
+        finally:
+            await client.close()
+
+
+class SyncDeadlineTests(unittest.TestCase):
+    def test_sync_deadline_then_reuse_and_close_used_pool(self) -> None:
+        count = 0
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal count
+            count += 1
+            if count == 1:
+                await asyncio.sleep(0.2)
+            return httpx.Response(200, json={"status": "ok"})
+
+        client = inframeld_sdk.ApiClient(inframeld_sdk.Configuration(host="http://sdk.test"))
+        client.rest_client.pool_manager = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        try:
+            with self.assertRaises(httpx.TimeoutException):
+                HealthApi(client).get_health_sync_with_http_info(_request_timeout=0.025)
+            self.assertEqual(
+                HealthApi(client).get_health_sync_with_http_info(_request_timeout=0.1).data,
+                {"status": "ok"},
+            )
+            self.assertEqual(count, 2)
+        finally:
+            run_sync(client.close())
+        self.assertTrue(client.rest_client.pool_manager.is_closed)

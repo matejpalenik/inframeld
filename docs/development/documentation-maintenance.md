@@ -19,6 +19,8 @@ Use this guide when adding or rewriting documentation. A new maintainer should b
 | Architectural choice and supersession | [ADRs](../adr/README.md). |
 | Unresolved alternatives and decision trigger | The existing owning `decision-*.md` reference. |
 | Agent discovery and task method | Concise `SKILL.md` metadata/body with direct conditional links. |
+| Shared SDK maintenance and cross-language qualification | [SDKs](../../.agents/skills/inframeld-sdks/SKILL.md), with independently discoverable language skills for specific behavior. Application Contracts retains HTTP semantics and compatibility. |
+| Test layers, dependency isolation and verification evidence | [Testing](../../.agents/skills/inframeld-testing/SKILL.md). Coding Standards retains TDD and test-code conventions, domains retain business expectations, and runbooks retain commands. |
 | Development and operator procedures | Human guides and runbooks, with current implementation limits explicit. |
 
 Give each rule one detailed owner. A human guide may explain its purpose briefly, then link to that owner. Avoid parallel specifications, large required reading stacks and copies of exact code declarations. Existing code may intentionally lag accepted design. Label that gap rather than changing the target during editing.
@@ -90,7 +92,7 @@ Preserve [AGENTS.md](../../AGENTS.md), its TDD and read-only safeguards, and [we
 
 ## Unavailable historical material
 
-Four earlier sources remain unavailable: the external client-tooling feasibility report, `docs/reviews/v1-architecture-review.md`, `docs/reviews/onboarding-reference.md` and `docs/development/repository-skills-plan.md`. No report or test evidence has been reconstructed. ADR-0055 supplies the current generator-neutral CLI direction. Current first-use and qualification references preserve only the requirements actually available. Flexible first-answer timing is not a measured result.
+Four earlier sources remain unavailable: the external client-tooling feasibility report, `docs/reviews/v1-architecture-review.md`, `docs/reviews/onboarding-reference.md` and `docs/development/repository-skills-plan.md`. No report or test evidence has been reconstructed. [ADR-0055](../adr/ADR-0055-deliver-cli-first-v1-through-openapi-generated-clients.md) supplies the CLI-first generated-client direction. [ADR-0088](../adr/ADR-0088-use-a-pinned-patched-generator-for-the-rust-sdk.md) subsequently selects its Rust generator implementation. Current first-use and qualification references preserve only the requirements actually available. Flexible first-answer timing is not a measured result.
 
 ## Choose the maintenance task
 

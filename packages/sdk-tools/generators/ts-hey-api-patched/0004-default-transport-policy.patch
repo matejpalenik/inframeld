@@ -1,0 +1,53 @@
+--- a/dist/clients/fetch/client.ts
++++ b/dist/clients/fetch/client.ts
+@@ -40,6 +40,7 @@
+     const opts = {
+       ..._config,
+       ...options,
++      timeoutMs: options.timeoutMs === undefined ? _config.timeoutMs : options.timeoutMs,
+       fetch: options.fetch ?? _config.fetch ?? globalThis.fetch,
+       headers: mergeHeaders(_config.headers, options.headers),
+       serializedBody: undefined as string | undefined,
+@@ -76,6 +77,7 @@
+     let request: Request | undefined;
+     let response: Response | undefined;
+     let rawBody: string | undefined;
++    let timer: ReturnType<typeof setTimeout> | undefined;
+     let phase: 'request' | 'transport' | 'decode' | 'http' = 'request';
+     let validatedError: unknown;
+     let hasValidatedError = false;
+@@ -84,8 +86,13 @@
+ 
+     try {
+       const { opts, url } = await beforeRequest(options);
++      const timeoutMs = opts.timeoutMs === undefined ? 5000 : opts.timeoutMs;
++      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new RangeError('timeoutMs must be positive and finite');
++      const deadline = new AbortController();
++      timer = setTimeout(() => deadline.abort(new DOMException('Request deadline exceeded', 'TimeoutError')), timeoutMs);
++      opts.signal = opts.signal ? AbortSignal.any([opts.signal, deadline.signal]) : deadline.signal;
+       const requestInit: ReqInit = {
+-        redirect: 'follow',
++        redirect: 'manual',
+         ...opts,
+         body: getValidRequestBody(opts),
+       };
+@@ -264,6 +271,8 @@
+               : { kind: 'http', ...(hasHttpBody ? { body: httpBody } : {}), message };
+       if (throwOnError) throw failure;
+       return responseStyle === 'data' ? undefined : { error: failure, rawBody, request, response };
++    } finally {
++      clearTimeout(timer);
+     }
+   };
+ 
+--- a/dist/clients/fetch/types.ts
++++ b/dist/clients/fetch/types.ts
+@@ -24,6 +24,8 @@
+    * Base URL for all requests made by this client.
+    */
+   baseUrl?: T['baseUrl'];
++  /** Buffered network deadline in milliseconds, combined with caller cancellation. Default: 5000. */
++  timeoutMs?: number;
+   /**
+    * Fetch API implementation. You can use this option to provide a custom
+    * fetch instance.

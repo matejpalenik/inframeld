@@ -1,0 +1,25 @@
+[package]
+name = "inframeld-sdk-test-rust"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Unpublished openapi-to-rust fixtures qualification candidate for Inframeld"
+publish = false
+readme = "README.md"
+include = ["generated/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
+
+[lib]
+path = "generated/mod.rs"
+
+[dependencies]
+bytes = { version = "1", features = ["serde"] }
+futures-util = "0.3"
+reqwest = { version = "0.13", default-features = false, features = ["multipart", "query", "rustls", "stream"] }
+reqwest-middleware = { version = "0.5", features = ["multipart", "query"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+url = { version = "2", features = ["serde"] }
+uuid = { version = "1", features = ["serde"] }

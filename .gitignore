@@ -25,3 +25,11 @@ config/kratos/dev.local.yaml
 
 data/
 .DS_Store
+
+target/
+packages/sdk-python/**/.build/
+packages/sdk-python/**/build/
+
+packages/sdk-tools/artifacts/
+packages/sdk-tools/fixtures/python/build/
+*.egg-info/

@@ -1,0 +1,223 @@
+diff --git a/src/client_generator.rs b/src/client_generator.rs
+index 060075d..a8fe5b8 100644
+--- a/src/client_generator.rs
++++ b/src/client_generator.rs
+@@ -354,8 +354,31 @@ impl CodeGenerator {
+ 
+         };
+ 
++        let response_envelope = if self.response_metadata_enabled() {
++            quote! {
++                /// Response metadata stays attached to its own body, including live streams.
++                pub mod response {
++                    #[derive(Debug)]
++                    pub struct ApiResponse<T> {
++                        pub status: u16,
++                        pub headers: reqwest::header::HeaderMap,
++                        pub body: T,
++                    }
++
++                    impl<T> ApiResponse<T> {
++                        pub fn map_body<U>(self, map: impl FnOnce(T) -> U) -> ApiResponse<U> {
++                            ApiResponse { status: self.status, headers: self.headers, body: map(self.body) }
++                        }
++                    }
++                }
++            }
++        } else {
++            TokenStream::new()
++        };
++
+         // Combine all parts
+         quote! {
++            #response_envelope
+             #retry_config_struct
+             #client_struct
+ 
+@@ -922,6 +945,7 @@ impl CodeGenerator {
+         } else {
+             self.response_type_for_body(success.body)
+         };
++        let response_type = self.response_envelope_type(response_type);
+         let kind = match success.body {
+             ClientSuccessBody::Json(_) => "json",
+             ClientSuccessBody::Text => "text",
+@@ -1335,21 +1359,32 @@ impl CodeGenerator {
+             call_arguments.push(quote! { self.#body_ident });
+         }
+ 
+-        let response_type = self.response_type_for_body(plan.success.body);
++        let response_type =
++            self.response_envelope_type(self.response_type_for_body(plan.success.body));
+         let error_type = &plan.error_type;
+         let operation_id = &operation.operation_id;
+         let send = if let (Some(companion), Some(field)) =
+             (&plan.content_type_method_ident, content_type_field)
+         {
+-            let (with_type, without_type) =
+-                if matches!(plan.success.body, ClientSuccessBody::EventStream) {
+-                    (
+-                        quote! { .map(futures_util::future::Either::Left) },
+-                        quote! { .map(futures_util::future::Either::Right) },
+-                    )
+-                } else {
+-                    (TokenStream::new(), TokenStream::new())
+-                };
++            let (with_type, without_type) = if matches!(
++                plan.success.body,
++                ClientSuccessBody::EventStream
++            ) {
++                (
++                    if self.response_metadata_enabled() {
++                        quote! { .map(|response| response.map_body(futures_util::future::Either::Left)) }
++                    } else {
++                        quote! { .map(futures_util::future::Either::Left) }
++                    },
++                    if self.response_metadata_enabled() {
++                        quote! { .map(|response| response.map_body(futures_util::future::Either::Right)) }
++                    } else {
++                        quote! { .map(futures_util::future::Either::Right) }
++                    },
++                )
++            } else {
++                (TokenStream::new(), TokenStream::new())
++            };
+             quote! {
+                 match self.#field {
+                     Some(content_type) => self.client.#companion(#(#call_arguments,)* &content_type).await #with_type,
+@@ -3942,6 +3977,29 @@ impl CodeGenerator {
+         }
+     }
+ 
++    fn response_metadata_enabled(&self) -> bool {
++        self.config()
++            .http_client_config
++            .as_ref()
++            .is_some_and(|config| config.response_metadata)
++    }
++
++    fn response_envelope_type(&self, body: TokenStream) -> TokenStream {
++        if self.response_metadata_enabled() {
++            quote! { self::response::ApiResponse<#body> }
++        } else {
++            body
++        }
++    }
++
++    fn response_envelope_value(&self, body: TokenStream) -> TokenStream {
++        if self.response_metadata_enabled() {
++            quote! { self::response::ApiResponse { status: status_code, headers, body: #body } }
++        } else {
++            body
++        }
++    }
++
+     fn response_type_for_body(&self, body: ClientSuccessBody<'_>) -> TokenStream {
+         match body {
+             ClientSuccessBody::Json(response_type) => {
+@@ -4049,10 +4107,15 @@ impl CodeGenerator {
+         // branch that rejects unexpected ones.
+         let rejects_unexpected_success = !success.statuses.is_empty();
+ 
++        let json_success = self.response_envelope_value(quote! { body });
++        let text_success = self.response_envelope_value(quote! { body_text });
++        let empty_success = self.response_envelope_value(quote! { () });
++        let binary_success =
++            self.response_envelope_value(quote! { bytes::Bytes::from(body_bytes) });
+         let success_branch = match success_body {
+             ClientSuccessBody::Json(_) => quote! {
+                 match serde_json::from_str(&body_text) {
+-                    Ok(body) => Ok(body),
++                    Ok(body) => Ok(#json_success),
+                     Err(e) => Err(ApiOpError::Api(ApiError {
+                         status: status_code,
+                         headers: headers,
+@@ -4068,13 +4131,13 @@ impl CodeGenerator {
+             },
+             ClientSuccessBody::Text => quote! {
+                 let _ = raw_body;
+-                Ok(body_text)
++                Ok(#text_success)
+             },
+             ClientSuccessBody::Empty => quote! {
+                 let _ = body_text;
+                 let _ = raw_body;
+                 let _ = headers;
+-                Ok(())
++                Ok(#empty_success)
+             },
+             ClientSuccessBody::Binary
+             | ClientSuccessBody::EventStream
+@@ -4096,6 +4159,7 @@ impl CodeGenerator {
+             } else {
+                 quote! { response.bytes_stream() }
+             };
++            let stream_success = self.response_envelope_value(stream);
+             let reject_unexpected_success = if rejects_unexpected_success {
+                 quote! {
+                     if status.is_success() {
+@@ -4122,7 +4186,7 @@ impl CodeGenerator {
+                 let headers = response.headers().clone();
+ 
+                 if #success_status_guard {
+-                    Ok(#stream)
++                    Ok(#stream_success)
+                 } else {
+                     #reject_unexpected_success
+                     let body_bytes = __read_bounded_response_body(
+@@ -4177,7 +4241,7 @@ impl CodeGenerator {
+                     self.max_response_body_bytes,
+                 ).await?;
+                 if #success_status_guard {
+-                    Ok(bytes::Bytes::from(body_bytes))
++                    Ok(#binary_success)
+                 } else {
+                     let raw_body = body_bytes;
+                     let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+diff --git a/src/config.rs b/src/config.rs
+index 5525923..5b9cce7 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -368,6 +368,9 @@ impl ServerSection {
+ #[derive(Debug, Clone, Deserialize, Serialize)]
+ #[serde(deny_unknown_fields)]
+ pub struct HttpClientSection {
++    /// Return successful bodies together with their HTTP status and headers.
++    #[serde(default)]
++    pub response_metadata: bool,
+     pub base_url: Option<String>,
+     pub timeout_seconds: Option<u64>,
+     pub max_response_body_bytes: Option<usize>,
+@@ -916,6 +919,7 @@ impl ConfigFile {
+             base_url: http.base_url.clone(),
+             timeout_seconds: http.timeout_seconds,
+             max_response_body_bytes: http.max_response_body_bytes,
++            response_metadata: http.response_metadata,
+             default_headers: http
+                 .headers
+                 .iter()
+diff --git a/src/generator.rs b/src/generator.rs
+index 2f56001..5787dfa 100644
+--- a/src/generator.rs
++++ b/src/generator.rs
+@@ -255,6 +255,7 @@ impl GeneratorConfig {
+                     base_url: Some(url.to_string()),
+                     timeout_seconds: None,
+                     max_response_body_bytes: None,
++                    response_metadata: false,
+                     default_headers: Default::default(),
+                 })
+             }
+diff --git a/src/http_config.rs b/src/http_config.rs
+index 7fa8708..eca4f03 100644
+--- a/src/http_config.rs
++++ b/src/http_config.rs
+@@ -14,6 +14,8 @@ pub struct HttpClientConfig {
+     pub timeout_seconds: Option<u64>,
+     /// Maximum response-body bytes buffered in memory
+     pub max_response_body_bytes: Option<usize>,
++    /// Include status and headers with generated successful responses.
++    pub response_metadata: bool,
+     /// Default headers to include in all requests
+     pub default_headers: HashMap<String, String>,
+ }

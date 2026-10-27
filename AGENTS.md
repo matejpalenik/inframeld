@@ -31,8 +31,15 @@ Read the skill whose invariant or behavior the question concerns. Domain skills 
 | Serving selection, publication modes, canaries or rollback | [Releases](.agents/skills/inframeld-releases/SKILL.md) |
 | Any repository code planning, suggestions, additions, changes, refactoring or review, including tests and code snippets | [Coding Standards](.agents/skills/inframeld-coding-standards/SKILL.md) |
 | Application boundaries, HTTP/MCP/CLI contracts, orchestration, jobs or idempotency | [Application Contracts](.agents/skills/inframeld-application-contracts/SKILL.md) |
+| Rust SDK consumption, generation, qualification or generator patches/upgrades | [Rust SDK](.agents/skills/inframeld-rust-sdk/SKILL.md) |
+| Shared SDK generation policy, new endpoint coverage or cross-language qualification | [SDKs](.agents/skills/inframeld-sdks/SKILL.md) |
+| TypeScript SDK consumption, Fetch/Zod behavior or generator maintenance | [TypeScript SDK](.agents/skills/inframeld-typescript-sdk/SKILL.md) |
+| Python SDK consumption, HTTPX/Pydantic behavior or generator maintenance | [Python SDK](.agents/skills/inframeld-python-sdk/SKILL.md) |
+| Choosing test layers, dependency isolation or interpreting verification evidence | [Testing](.agents/skills/inframeld-testing/SKILL.md) |
 
 Use the client's skill invocation mechanism when available. If discovery misses a skill, read its linked SKILL.md directly, for example through `$inframeld-pipelines`. Actually read the relevant body and reference. Briefly identify a skill on first use. Follow specific neighboring guide sections when a dependency matters, adding another skill only when its broader context matters. Do not load all skills or every linked document for a small question. Unrelated styling/general programming needs no domain skill.
+
+SDK skills are independently discoverable siblings. The shared SDK skill owns common policy, without being a prerequisite for ordinary language-specific consumption. Testing is conditional guidance for test strategy and evidence, not an additional prerequisite for every code change. Coding Standards remains mandatory for repository code work.
 
 ## Mandatory code guidance
 
@@ -72,7 +79,7 @@ For substantive domain answers, read the owning workflow. Read exact code contra
 
 Preserve Apache-2.0 OSS, single-server Docker Compose, strict DDD/Clean Architecture, lightweight CQRS and a scope one developer can maintain. Knowledge, Indexing, Pipelines, Evaluation, Releases and Access are owners in one backend. All remote model calls use ModelGateway. Private starter resources are ordinary resources. Readiness, current health, publication authority and shared connection changes remain distinct. First-answer timing is flexible and cannot weaken correctness.
 
-Backend work comes first. V1 delivers a Rust CLI and small Kratos/Hydra account UI. Full Studio is deferred and follows the same CLI-led contracts. Use native selected FastAPI OpenAPI 3.1.x and generated application clients without choosing a generator package or adding a competing handwritten client. Follow ADR-0055 and the [V1 scope](.agents/skills/inframeld-architecture/references/v1-scope-and-extension-boundaries.md). Use the implementation issue template and shared Definition of Done for authorized backlog work, preserving issue history and independence from Studio.
+Backend work comes first. V1 delivers a Rust CLI and small Kratos/Hydra account UI. Full Studio is deferred and follows the same CLI-led contracts. Use native selected FastAPI OpenAPI 3.1.x and generated application clients without adding a competing handwritten client. The Rust SDK uses the pinned patched generator selected by [ADR-0088](docs/adr/ADR-0088-use-a-pinned-patched-generator-for-the-rust-sdk.md) and maintained through the [Rust SDK](.agents/skills/inframeld-rust-sdk/SKILL.md) skill. The TypeScript and Python selections are recorded in [ADR-0089](docs/adr/ADR-0089-select-patched-typescript-and-python-sdk-generators.md). The [SDKs skill](.agents/skills/inframeld-sdks/SKILL.md) owns common maintenance and shared conformance, whose runner and operation coverage are implemented through the private SDK tooling. [ADR-0091](docs/adr/ADR-0091-promote-selected-sdks-and-retire-generator-comparisons.md) promotes the three unpublished SDKs and retires comparison reproduction. Automatic checks and external branch-rule activation remain distinct. Follow ADR-0055 and the [V1 scope](.agents/skills/inframeld-architecture/references/v1-scope-and-extension-boundaries.md). Use the implementation issue template and shared Definition of Done for authorized backlog work, preserving issue history and independence from Studio.
 
 Read applicable directory instructions, including [web guidance](apps/web/AGENTS.md). Guidance does not enforce filesystem security. Use the client's read-only controls when enforcement is needed.
 
@@ -97,3 +104,5 @@ Check owning sources and distinguish design, implementation and verification. Su
 Follow the mandatory [skill-authoring procedure](docs/development/guides/skill-authoring.md) for evidence, ownership, writing and validation, including realistic positive/negative trials when activation or substantial workflows change. Report checks actually run and unavailable evaluations. Routine work needs no offer.
 
 Follow [documentation maintenance](docs/development/documentation-maintenance.md) for detailed procedures. Preserve the recorded unavailability of historical material. In a read-only review, report needed corrections instead of making them. Loading any context never grants write authority.
+
+For SDK tooling work, start with the [SDK runbook](packages/sdk-tools/README.md) and its [architecture map](packages/sdk-tools/docs/architecture.md). Ordinary Node feature tests own shared expectations. Native drivers call generated APIs, and filtered local runs cannot establish full qualification. [ADR-0092](docs/adr/ADR-0092-maintain-sdks-with-typed-workflows-and-native-conformance-tests.md) records the tooling choice.

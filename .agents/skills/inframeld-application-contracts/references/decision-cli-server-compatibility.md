@@ -27,7 +27,7 @@ Native OpenAPI and generated clients qualify one contract, not a supported versi
 
 ## Accepted context and evidence
 
-Preserve native FastAPI OpenAPI 3.1.x, generated application clients and independent explicit installation/account selection. Do not choose a generator or add a competing handwritten client here. The /v1 prefix alone does not establish every future release combination.
+Preserve native FastAPI OpenAPI 3.1.x, generated application clients and independent explicit installation/account selection. The [Rust SDK decision](../../../../docs/adr/ADR-0088-use-a-pinned-patched-generator-for-the-rust-sdk.md) owns generator selection. Do not add a competing handwritten client or infer a release compatibility policy from that selection. The /v1 prefix alone does not establish every future release combination.
 
 Stable operation identities and no automatic paid replay remain mandatory after acknowledgment/decode failure. API/worker/schema compatibility is separate from external CLI compatibility. Unsupported combinations should fail before effects where possible, without claiming certainty when admission may already have succeeded.
 

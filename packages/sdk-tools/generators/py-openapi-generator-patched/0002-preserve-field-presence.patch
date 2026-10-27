@@ -1,0 +1,48 @@
+--- a/python/model_generic.mustache
++++ b/python/model_generic.mustache
+@@ -12,6 +12,7 @@
+ from typing import Optional, Set
+ from typing_extensions import Self
+ from pydantic_core import to_jsonable_python
++from pydantic import field_validator
+ {{#vendorExtensions.x-py-has-public-name-properties}}
+ from typing import TYPE_CHECKING
+ {{/vendorExtensions.x-py-has-public-name-properties}}
+@@ -77,6 +78,14 @@
+ {{/compatibleWithPythonLegacy}}
+     __properties: ClassVar[List[str]] = [{{#allVars}}{{{vendorExtensions.x-py-wire-name-literal}}}{{^-last}}, {{/-last}}{{/allVars}}]
+ {{#vars}}
++    {{^isNullable}}
++    @field_validator('{{{name}}}', mode='before')
++    def {{{name}}}_reject_explicit_null(cls, value):
++        """Reject a supplied null without treating an omitted field as supplied."""
++        if value is None:
++            raise ValueError("{{{baseName}}} cannot be null")
++        return value
++    {{/isNullable}}
+     {{#vendorExtensions.x-regex}}
+ 
+     @field_validator('{{{name}}}', mode="before")
+@@ -346,6 +355,7 @@
+             by_alias=True,
+             exclude=excluded_fields,
+             exclude_none=True,
++            exclude_unset=True,
+         )
+         {{#allVars}}
+         {{#isContainer}}
+@@ -608,12 +618,12 @@
+             {{{vendorExtensions.x-py-wire-name-literal}}}: {{{dataType}}}.from_dict(obj[{{{vendorExtensions.x-py-wire-name-literal}}}]) if obj.get({{{vendorExtensions.x-py-wire-name-literal}}}) is not None else None{{^-last}},{{/-last}}
+             {{/isEnumOrRef}}
+             {{#isEnumOrRef}}
+-            {{{vendorExtensions.x-py-wire-name-literal}}}: obj.get({{{vendorExtensions.x-py-wire-name-literal}}}){{#defaultValue}} if {{#isNullable}}{{{vendorExtensions.x-py-wire-name-literal}}} in obj{{/isNullable}}{{^isNullable}}obj.get({{{vendorExtensions.x-py-wire-name-literal}}}) is not None{{/isNullable}} else {{{defaultValue}}}{{/defaultValue}}{{^-last}},{{/-last}}
++            {{{vendorExtensions.x-py-wire-name-literal}}}: obj.get({{{vendorExtensions.x-py-wire-name-literal}}}){{#defaultValue}} if {{#isNullable}}{{{vendorExtensions.x-py-wire-name-literal}}} in obj{{/isNullable}}{{^isNullable}}{{{vendorExtensions.x-py-wire-name-literal}}} in obj{{/isNullable}} else {{{defaultValue}}}{{/defaultValue}}{{^-last}},{{/-last}}
+             {{/isEnumOrRef}}
+             {{/isPrimitiveType}}
+             {{#isPrimitiveType}}
+             {{#defaultValue}}
+-            {{{vendorExtensions.x-py-wire-name-literal}}}: obj.get({{{vendorExtensions.x-py-wire-name-literal}}}) if {{#isNullable}}{{{vendorExtensions.x-py-wire-name-literal}}} in obj{{/isNullable}}{{^isNullable}}obj.get({{{vendorExtensions.x-py-wire-name-literal}}}) is not None{{/isNullable}} else {{{defaultValue}}}{{^-last}},{{/-last}}
++            {{{vendorExtensions.x-py-wire-name-literal}}}: obj.get({{{vendorExtensions.x-py-wire-name-literal}}}) if {{#isNullable}}{{{vendorExtensions.x-py-wire-name-literal}}} in obj{{/isNullable}}{{^isNullable}}{{{vendorExtensions.x-py-wire-name-literal}}} in obj{{/isNullable}} else {{{defaultValue}}}{{^-last}},{{/-last}}
+             {{/defaultValue}}
+             {{^defaultValue}}
+             {{{vendorExtensions.x-py-wire-name-literal}}}: obj.get({{{vendorExtensions.x-py-wire-name-literal}}}){{^-last}},{{/-last}}
