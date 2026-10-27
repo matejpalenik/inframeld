@@ -27,7 +27,7 @@ env:
 jobs:
   backend:
     name: Backend foundation
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
 
     steps:
@@ -54,10 +54,21 @@ jobs:
       - name: Install backend check dependencies
         run: pnpm install --filter inframeld --filter @inframeld/backend --frozen-lockfile
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Set up uv
+        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: |
+            apps/backend/pyproject.toml
+            apps/backend/uv.lock
+
+      - name: Install pinned Python
+        run: |
+          uv python install "$PYTHON_VERSION"
+          python_executable="$(uv python find --managed-python "$PYTHON_VERSION")"
+          dirname "$python_executable" >> "$GITHUB_PATH"
 
       - name: Provision test fingerprint key
         run: |
@@ -71,16 +82,6 @@ jobs:
           Path(sys.argv[1]).write_bytes(secrets.token_bytes(32))
           PY
           printf 'INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE=%s\n' "$key_file" >> "$GITHUB_ENV"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa
-        with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-          cache-dependency-glob: |
-            apps/backend/pyproject.toml
-            apps/backend/uv.lock
 
       - name: Check uv lockfile
         run: uv lock --check --project apps/backend
@@ -116,7 +117,7 @@ jobs:
 
   quality:
     name: Quality
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
 
     steps:
@@ -142,10 +143,21 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Set up uv
+        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: |
+            apps/backend/pyproject.toml
+            apps/backend/uv.lock
+
+      - name: Install pinned Python
+        run: |
+          uv python install "$PYTHON_VERSION"
+          python_executable="$(uv python find --managed-python "$PYTHON_VERSION")"
+          dirname "$python_executable" >> "$GITHUB_PATH"
 
       - name: Provision test fingerprint key
         run: |
@@ -159,16 +171,6 @@ jobs:
           Path(sys.argv[1]).write_bytes(secrets.token_bytes(32))
           PY
           printf 'INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE=%s\n' "$key_file" >> "$GITHUB_ENV"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa
-        with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-          cache-dependency-glob: |
-            apps/backend/pyproject.toml
-            apps/backend/uv.lock
 
       - name: Verify toolchain versions
         run: |

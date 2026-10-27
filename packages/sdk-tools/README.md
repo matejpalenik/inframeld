@@ -78,7 +78,20 @@ Rust's metadata-disabled consumer and synthetic binary/streaming/SSE/builder tes
 
 ## CI and proof boundaries
 
-The workflow runs independent Linux language jobs for SDK/API-affecting changes. Generator, patch, configuration and platform-sensitive process/browser/lifecycle changes also select macOS. Changes to the SDK workflow or workspace dependency approvals select macOS too, so bootstrap changes qualify on both platforms. Manual qualification remains available. Its stable **SDK conformance** aggregate rejects failed jobs, partial runs and missing or incomplete evidence. Configure the external branch ruleset to require that aggregate separately.
+The workflow runs independent Ubuntu 26.04 language jobs for SDK/API-affecting changes, using the explicit `ubuntu-26.04` runner label. The existing pinned uv installs the pinned Python interpreter before key provisioning, without relying on GitHub's OS-specific Python builds. Generator, patch, configuration and platform-sensitive process/browser/lifecycle changes also select macOS. Changes to the SDK workflow or workspace dependency approvals select macOS too, so bootstrap changes qualify on both platforms. Manual qualification remains available. Its stable **SDK conformance** aggregate rejects failed jobs, partial runs and missing or incomplete evidence. Configure the external branch ruleset to require that aggregate separately.
+
+The long verification jobs are selected by the path groups in the [workflow's change-detection step](../../.github/workflows/sdk-conformance.yml). Unrelated changes run only lightweight change detection and the aggregate, with no SDK dependency installation, generator setup or runtime verification. Job-level selection keeps the required aggregate reporting, following [GitHub's skipped-check guidance](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks).
+
+| Changed files | Long SDK verification |
+| --- | --- |
+| SDK code, tools, generators, patches, consumers, generated artifacts and fixture data | Run |
+| Native OpenAPI, backend runtime source, contract tests, their controlled fixtures or backend test/dependency configuration | Run |
+| Shared workspace manifests, locks, toolchain/build settings, dependency trust policy or SDK workflows | Run |
+| Authored Markdown/MDX documentation, web-only code, database migrations or unrelated backend unit/provider-integration tests | Skip, unless the same change also contains a relevant file |
+
+Backend runtime changes remain conservatively relevant because they can change HTTP behavior before OpenAPI is regenerated. Generated Markdown and Markdown fixture payloads remain artifacts, so they still select verification. When adding backend fixture dependencies, update the workflow's explicit input paths with the fixture imports.
+
+PR selection uses the complete merge-base-to-head diff, including earlier commits in that PR. A later documentation-only commit in a PR that already changes SDK inputs still requires verification at the new head. Changes made only on the base branch do not select that PR's jobs. Main-branch pushes compare before/after commits. Manual execution always qualifies the selected platform set, and a missing initial baseline selects verification conservatively. A failed Git comparison fails change detection and cannot produce a successful skip.
 
 Tests use real production HTTP routers with controlled authentication/application collaborators. They do not call a database, real identity provider or paid endpoint. They establish SDK and HTTP-adapter behavior, not database atomicity, real Kratos/Hydra login, production CORS or a complete CLI/account-UI journey. Local macOS execution does not establish Linux or remote macOS execution.
 

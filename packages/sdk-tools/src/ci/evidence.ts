@@ -123,7 +123,7 @@ export async function assertEvidence(
       await readFile(join(root, "contracts/openapi/v1/inframeld-v1.json")),
     )
     .digest("hex");
-  for (const os of ["ubuntu-24.04", ...(macos ? ["macos-15"] : [])])
+  for (const os of ["ubuntu-26.04", ...(macos ? ["macos-15"] : [])])
     for (const language of languages) {
       const artifact = join(directory, `sdk-${language}-${os}`);
       const summary = summarySchema.parse(

@@ -17,7 +17,7 @@ async function evidence(directory: string): Promise<void> {
     )
     .digest("hex");
   for (const language of languages) {
-    const target = join(directory, `sdk-${language}-ubuntu-24.04`);
+    const target = join(directory, `sdk-${language}-ubuntu-26.04`);
     await mkdir(target, { recursive: true });
     const names = [
       "regeneration-drift",
@@ -150,7 +150,7 @@ test("CI requires all profiles, common/native stages and applicable platforms", 
     await assert.rejects(assertEvidence(directory, true), /ENOENT/);
     const file = join(
       directory,
-      "sdk-typescript-ubuntu-24.04/typescript/typescript-chromium/report.json",
+      "sdk-typescript-ubuntu-26.04/typescript/typescript-chromium/report.json",
     );
     await rm(file);
     await assert.rejects(assertEvidence(directory), /ENOENT/);
@@ -162,7 +162,7 @@ test("a passing HTTP report cannot hide a missing verification stage or partial 
   const directory = await mkdtemp(join(tmpdir(), "sdk-evidence-"));
   try {
     await evidence(directory);
-    const file = join(directory, "sdk-rust-ubuntu-24.04/rust-summary.json");
+    const file = join(directory, "sdk-rust-ubuntu-26.04/rust-summary.json");
     const summary = JSON.parse(await readFile(file, "utf8")) as {
       partial: boolean;
       results: { stages: unknown[] }[];
@@ -198,7 +198,7 @@ test("CI rejects missing archive identity or installed runtime evidence", async 
   const directory = await mkdtemp(join(tmpdir(), "sdk-runtime-evidence-"));
   try {
     await evidence(directory);
-    const file = join(directory, "sdk-python-ubuntu-24.04/python-summary.json");
+    const file = join(directory, "sdk-python-ubuntu-26.04/python-summary.json");
     const value: unknown = JSON.parse(await readFile(file, "utf8"));
     const { z } = await import("zod");
     const summary = z
