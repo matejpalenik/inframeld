@@ -211,7 +211,7 @@ These are design-review scenarios, not executed tests:
 | Alice queries Project A's recipient directory with a target owned by Project B. | Reject the scope mismatch without exposing either directory. Exact-target authority cannot cross-bind Projects. |
 | A different candidate or responsibility reuses the host operation ID. | Fail `idempotency_key_reused`. No grants or identity-link replacement. |
 
-The session, grant command and cookie-only consent operations are implemented. Other routes and models remain unimplemented. Maintenance and private callback envelopes are design contracts. Production recovery still requires trusted original-flow evidence, durable admission, provider cleanup, reconciliation and release qualification. A passing local persistence test does not qualify those production boundaries.
+The session, grant command and cookie-only consent operations are implemented. Other product routes and models retain their stated design status. The [private callback envelope](private-recovery-handoff.md#recovery-wire) and [recovery-continuation maintenance mode](host-maintenance.md#recovery-cleanup-continuation) are implemented. Bootstrap and stranded-authority repair remain design-only. Recovery release still requires trusted original-flow evidence, durable admission, both provider confirmations and current local eligibility. The [completion workflow](recovery-completion.md#implemented-execution-and-proof-backed-completion) records the implemented orchestration and its qualification limits. A passing local persistence test alone does not qualify those production boundaries.
 
 <a id="maintainer-checks"></a> <a id="section-verify-the-security-boundaries-before-release"></a>
 

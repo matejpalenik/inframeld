@@ -1,54 +1,27 @@
 from typing import override
 
-from sqlalchemy import Nullable, and_, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from inframeld_backend.access.application.dtos.human_oauth_cleanup_outcome_dto import (
-    HumanOAuthCleanupOutcomeDTO,
-)
-from inframeld_backend.access.application.dtos.identity_recovery_admission_dto import (
-    IdentityRecoveryAdmissionDTO,
-)
-from inframeld_backend.access.application.dtos.identity_recovery_cleanup_claim_dto import (
-    IdentityRecoveryCleanupClaimDTO,
-)
-from inframeld_backend.access.application.dtos.identity_recovery_cleanup_run_dto import (
-    IdentityRecoveryCleanupRunDTO,
-)
-from inframeld_backend.access.application.dtos.identity_recovery_cleanup_step_dto import (
-    IdentityRecoveryCleanupStepDTO,
-)
 from inframeld_backend.access.application.dtos.identity_recovery_cleanup_work_dto import (
     IdentityRecoveryCleanupWorkDTO,
-)
-from inframeld_backend.access.application.dtos.identity_recovery_event_dto import (
-    IdentityRecoveryEventDTO,
 )
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
-from inframeld_backend.access.application.enums.identity_recovery_evidence_type import (
-    IdentityRecoveryEvidenceType,
-)
 from inframeld_backend.access.application.protocols.identity_recovery_cleanup_facts_reader import (
     IdentityRecoveryCleanupFactsReader,
 )
-from inframeld_backend.access.domain.value_objects.human_credential_version import (
-    HumanCredentialVersion,
-)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
-from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
-    IdentityRecoveryFlowId,
-)
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.infrastructure.mappers.postgres_identity_recovery_cleanup_work_mapper import (
+    PostgresIdentityRecoveryCleanupWorkMapper,
+)
+from inframeld_backend.access.infrastructure.readers.identity_recovery_cleanup_work_queries import (
+    IdentityRecoveryCleanupWorkQueries,
+)
 from inframeld_backend.access.infrastructure.resources.postgres_identity_coordinator import (
     PostgresIdentityCoordinator,
-)
-from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
-    HumanCredentialVersionRow,
-)
-from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
-    IdentityRecoveryAdmissionRow,
 )
 from inframeld_backend.access.infrastructure.rows.identity_recovery_cleanup_job_row import (
     IdentityRecoveryCleanupJobRow,
@@ -58,9 +31,6 @@ from inframeld_backend.access.infrastructure.rows.identity_recovery_cleanup_run_
 )
 from inframeld_backend.access.infrastructure.rows.identity_recovery_cleanup_step_row import (
     IdentityRecoveryCleanupStepRow,
-)
-from inframeld_backend.access.infrastructure.rows.identity_recovery_evidence_receipt_row import (
-    IdentityRecoveryEvidenceReceiptRow,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
@@ -145,125 +115,28 @@ class PostgresIdentityRecoveryCleanupFactsReader(IdentityRecoveryCleanupFactsRea
         )
         await self._require_scope()
 
-        statement = (
-            select(
-                IdentityRecoveryCleanupJobRow,
-                IdentityRecoveryCleanupRunRow,
-                IdentityRecoveryAdmissionRow,
-                IdentityRecoveryEvidenceReceiptRow,
-                Nullable(HumanCredentialVersionRow),
-            )
-            .select_from(IdentityRecoveryCleanupJobRow)
-            .join(
-                IdentityRecoveryCleanupRunRow,
-                IdentityRecoveryCleanupRunRow.operation_id
-                == IdentityRecoveryCleanupJobRow.operation_id,
-            )
-            .join(
-                IdentityRecoveryAdmissionRow,
-                IdentityRecoveryAdmissionRow.operation_id
-                == IdentityRecoveryCleanupJobRow.operation_id,
-            )
-            .join(
-                IdentityRecoveryEvidenceReceiptRow,
-                IdentityRecoveryEvidenceReceiptRow.id
-                == IdentityRecoveryCleanupJobRow.evidence_receipt_id,
-            )
-            .outerjoin(
-                HumanCredentialVersionRow,
-                and_(
-                    HumanCredentialVersionRow.installation_id
-                    == IdentityRecoveryCleanupJobRow.installation_id,
-                    HumanCredentialVersionRow.authority == IdentityRecoveryCleanupJobRow.authority,
-                    HumanCredentialVersionRow.subject == IdentityRecoveryCleanupJobRow.subject,
-                ),
-            )
-            .where(
-                IdentityRecoveryCleanupJobRow.operation_id == operation_id.value,
-                IdentityRecoveryCleanupJobRow.installation_id == self._installation_id.value,
-                IdentityRecoveryCleanupJobRow.authority == self._authority.value,
-                IdentityRecoveryCleanupRunRow.ended_at.is_(None),
-            )
-            .with_for_update(
-                of=(IdentityRecoveryCleanupJobRow, IdentityRecoveryCleanupRunRow), skip_locked=True
-            )
-            .execution_options(populate_existing=True, autoflush=False)
+        statement = IdentityRecoveryCleanupWorkQueries.statement(
+            installation_id=self._installation_id, identity=identity, operation_id=operation_id
         )
         result = (await self._session.execute(statement)).one_or_none()
         if result is None:
             return None
 
         job, run, admission, receipt, version = result
-        binding = (self._installation_id.value, self._authority.value, subject)
-        if (job.installation_id, job.authority, job.subject) != binding or (
-            admission.installation_id,
-            admission.authority,
-            admission.subject,
-        ) != binding:
-            raise RuntimeError("Cleanup records changed their original identity binding.")
-
-        claim = None
-        if job.active_attempt_id is not None:
-            if job.worker_id is None or job.ownership_token is None or job.lease_expires_at is None:
-                raise RuntimeError("The cleanup ownership record is incomplete.")
-            claim = IdentityRecoveryCleanupClaimDTO(
-                operation_id,
-                run.id,
-                job.active_attempt_id,
-                job.worker_id,
-                job.ownership_token,
-                job.lease_expires_at,
-            )
-
         steps = ()
-        if claim is not None:
+        if job.active_attempt_id is not None:
             stored_steps = await self._session.scalars(
                 select(IdentityRecoveryCleanupStepRow)
-                .where(IdentityRecoveryCleanupStepRow.attempt_id == claim.attempt_id)
+                .where(IdentityRecoveryCleanupStepRow.attempt_id == job.active_attempt_id)
                 .execution_options(populate_existing=True)
             )
-            steps = tuple(self._step(row) for row in stored_steps)
-
-        return IdentityRecoveryCleanupWorkDTO(
-            self._installation_id,
-            IdentityRecoveryAdmissionDTO(
-                IdentityRecoveryEventDTO(
-                    IdentityRecoveryFlowId(admission.flow_id), identity, admission.event_kind
-                ),
-                operation_id,
-            ),
-            receipt.id,
-            receipt.event_type is IdentityRecoveryEvidenceType.PASSWORD_SETTINGS_SAVED
-            and (receipt.installation_id, receipt.authority, receipt.subject, receipt.operation_id)
-            == (*binding, operation_id.value),
-            None if version is None else HumanCredentialVersion(version.version),
-            admission.kratos_cleanup_state,
-            admission.released_at,
-            job.cli_grants_state,
-            job.remembered_logins_state,
-            job.cli_confirmation_attempt_id,
-            job.login_confirmation_attempt_id,
-            IdentityRecoveryCleanupRunDTO(
-                run.id,
-                run.authorized_at,
-                run.deadline,
-                run.next_attempt_at,
-                run.max_attempts,
-                run.consumed_attempts,
-                run.ended_at,
-                run.terminal_reason,
-            ),
-            claim,
-            steps,
-        )
-
-    @staticmethod
-    def _step(row: IdentityRecoveryCleanupStepRow) -> IdentityRecoveryCleanupStepDTO:
-        outcome = None
-        if row.state is not None:
-            if row.disposition is None or row.category is None or row.checkpointed_at is None:
-                raise RuntimeError("The cleanup checkpoint is incomplete.")
-            outcome = HumanOAuthCleanupOutcomeDTO(
-                row.state, row.disposition, row.category, row.http_status, row.retry_after_seconds
+            steps = tuple(
+                PostgresIdentityRecoveryCleanupWorkMapper.step(row) for row in stored_steps
             )
-        return IdentityRecoveryCleanupStepDTO(row.step, row.dispatched_at, outcome)
+
+        work = PostgresIdentityRecoveryCleanupWorkMapper.from_rows(
+            self._installation_id, job, run, admission, receipt, version, steps
+        )
+        if work.admission.event.identity != identity:
+            raise RuntimeError("Cleanup records changed their original identity binding.")
+        return work

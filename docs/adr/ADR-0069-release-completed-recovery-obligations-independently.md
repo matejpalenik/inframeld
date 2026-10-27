@@ -35,7 +35,7 @@ Application workflows own short transactions. For linked identities, current-sta
 - Cleanup can finish before local admission, and overlapping completed checklists do not deadlock on each other's release state.
 - A released checklist is not an authorization certificate. Even a result reporting no other pending recovery is only an observation of that transaction.
 - The existing admission table, per-flow aggregate and conditional repository save support the local release operation. [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) additionally specifies durable evidence/run records for production delivery, without introducing a public API or changing the independent-release rule.
-- Completion service and PostgreSQL tests qualify local state recording and coordination. Production callbacks, provider cleanup, bounded reconciliation and concurrent first-local-admission qualification remain unfinished.
+- Completion service and PostgreSQL tests qualify local state recording and coordination. Later private callbacks, provider cleanup and proof reconciliation have inspected implementations and separate [native worker tests](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#implemented-execution-and-proof-backed-completion). Complete first-local-admission integration and its concurrent qualification remain unfinished.
 
 ## Evidence refinement
 

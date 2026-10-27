@@ -14,6 +14,7 @@ Follow domain → layer → component role. Preserve the existing frontend's Nex
 | --- | --- |
 | Domain | `entities`, `value_objects`, `enums`, `policy_inputs`, `policies`, `errors`, `validation` |
 | Application | `services`, `protocols`, `commands`, `queries`, `dtos`, `value_objects`, `enums`, `errors` |
+| CLI | `mappers`, `errors`, and the owning thin `*Cli` adapter |
 | HTTP | `routes`, `dependencies`, `requests`, `responses`, `middleware`, `handlers`, `mappers`, `builders`, `openapi`, `definitions`, `types`, `validation` |
 | Infrastructure | `readers`, `repositories`, `mappers`, `verifiers`, `revokers`, `rows`, `settings`, `resources`, `migrations`, `logging`, `diagnostics`, `timing`, `errors`, `types` |
 
@@ -26,6 +27,7 @@ Follow domain → layer → component role. Preserve the existing frontend's Nex
 | Infrastructure adapter | Technology-prefixed class, such as `PostgresHumanIdentityLinkReader`, in its role folder. |
 | FastAPI dependency | `*Dependency` extracts inputs and invokes the operation. |
 | Route registration | `*_routes.py` translates HTTP input/output. |
+| Backend CLI transport | Instantiated `*Cli` under its owner's `cli/` maps bounded input and safe output to the application capability. Static `*Mapper` performs pure conversion. Bootstrap owns settings, resources and process exit. This introduces no Rust CLI conventions. |
 | Feature HTTP mapping | Static `*Mapper` in `mappers/*_mapper.py`, converting Command input and responses without I/O. |
 | ASGI middleware | `*Middleware` in `*_middleware.py`, wrapping request lifecycle. |
 | Change input | `*Command` in `commands/*_command.py`, never `CommandDTO`. |

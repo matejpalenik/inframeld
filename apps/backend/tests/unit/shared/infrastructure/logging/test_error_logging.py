@@ -1,6 +1,7 @@
 """Verify that final rendered exception diagnostics never expose secrets."""
 
 import logging
+import sys
 from typing import override
 
 import pytest
@@ -61,6 +62,26 @@ def _raise_nested_failure() -> None:
             GROUP_SECRET,
             [RuntimeError(MEMBER_SECRET)],
         ) from cause
+
+
+@pytest.mark.parametrize("log_format", ["json", "console"])
+@pytest.mark.parametrize("use_stderr", [False, True])
+def test_standard_and_structured_logs_use_selected_stream(
+    log_format: LogFormat,
+    use_stderr: bool,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure_logging(
+        level="ERROR", log_format=log_format, stream=sys.stderr if use_stderr else None
+    )
+    logging.getLogger("test.error_logging.stdlib").error("standard_channel_event")
+    structlog.get_logger("test.error_logging.structured").error("structured_channel_event")
+
+    captured = capsys.readouterr()
+    rendered = captured.err if use_stderr else captured.out
+    assert (captured.out if use_stderr else captured.err) == ""
+    assert rendered.count("standard_channel_event") == 1
+    assert rendered.count("structured_channel_event") == 1
 
 
 @pytest.mark.parametrize("log_format", ["json", "console"])

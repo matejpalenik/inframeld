@@ -1,6 +1,6 @@
 # ADR-0084: Authorize additional recovery-cleanup runs through host maintenance
 
-**Status:** Accepted policy. Operator continuation is not implemented yet.
+**Status:** Accepted and implemented for recovery-cleanup continuation. Other maintenance modes remain separate.
 
 **Date:** 2026-10-25
 
@@ -25,7 +25,7 @@ Only unfinished recovery cleanup may continue. A distinct authorization must not
 
 Host authority authorizes continued cleanup, not product access. A run does not release the block, restore an account, recreate permissions or advance the credential version. Existing trusted-evidence and local eligibility checks still govern completion.
 
-The [Access-owned continuation workflow](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#operator-cleanup-continuation) defines the rules. [Host maintenance](../../.agents/skills/inframeld-access-models/references/host-maintenance.md#recovery-cleanup-continuation) owns the authority boundary. [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) resolves the protected input and logical persistence contract. Runtime implementation remains future work.
+The [Access-owned continuation workflow](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#operator-cleanup-continuation) defines the rules. [Host maintenance](../../.agents/skills/inframeld-access-models/references/host-maintenance.md#recovery-cleanup-continuation) owns the authority boundary. [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) resolves the protected input and logical persistence contract. The implemented recovery mode is described below.
 
 ## Consequences
 
@@ -33,14 +33,14 @@ The [Access-owned continuation workflow](../../.agents/skills/inframeld-access-m
 - The initial and later runs remain bounded. No worker or callback can renew a budget automatically, and previous budgets remain part of the operation's history.
 - Concurrent and repeated authorization requests need durable deduplication and active-run checks. These requirements select no new table, job state or public endpoint.
 - Already-dispatched provider calls may finish late. A new run does not prove they stopped or change the accepted effects of bulk cleanup on newer Alice credentials.
-- Ordinary product credentials do not supply host authority. Other jobs retain their existing attempt limits, and production recovery completion remains unwired.
+- Ordinary product credentials do not supply host authority. Other jobs retain their existing attempt limits. At policy acceptance, production completion was unwired. The dedicated recovery worker now applies proof-backed local completion.
 - This documentation decision introduces no application code, configuration, migrations or new runtime evidence.
 
 ## Implementation notes
 
 The accepted [failure policy](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#hydra-cleanup-failure-handling) may end a run early for a known permanent rejection. After fixing the cause, a verified host operator may authorize another bounded run immediately. They need not wait for the ended run's deadline. Preserve its stop reason, consumed attempts, original deadline, confirmed progress and independent provider uncertainty.
 
-An ended run no longer supplies an active budget. A fresh authorization creates a separate run rather than reviving unused attempts. Distinct requests still cannot start parallel active runs. This clarification neither releases the recovery block nor supplies missing Kratos evidence. [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) finalizes the owning failure mapping and record contract. The host command takes a unique request ID and original recovery ID, with no reviewed-run ID, recipient token or ordinary product-session requirement. Current-state checks and active-run exclusion remain mandatory. Runtime persistence and execution remain unfinished.
+An ended run no longer supplies an active budget. A fresh authorization creates a separate run rather than reviving unused attempts. Distinct requests still cannot start parallel active runs. This clarification neither releases the recovery block nor supplies missing Kratos evidence. [ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) finalizes the owning failure mapping and record contract. The host command takes a unique request ID and original recovery ID, with no reviewed-run ID, recipient token or ordinary product-session requirement. Current-state checks and active-run exclusion remain mandatory. The recovery mode now uses one immutable maintenance receipt as both replay record and operator audit history. Migration 0008 makes request-key uniqueness immediate and defers only the optional new-run foreign key, so the complete receipt is inserted before run changes in one transaction. No organization-scoped audit event or synthetic operator principal is introduced. The command leaves provider dispatch and release to the existing worker.
 
 ## Links
 

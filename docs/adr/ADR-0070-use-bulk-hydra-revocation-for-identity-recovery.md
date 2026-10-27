@@ -29,17 +29,17 @@ Preserve the legitimate Kratos recovery browser session. Ordinary selected-devic
 - Alice may need to authenticate again, and CLI work can fail until she does. Bob remains unaffected.
 - Kratos and Hydra outcomes remain independent. One acknowledged request does not establish complete recovery cleanup or permission to release a block.
 - The standalone adapter performs bounded provider I/O without database work or automatic retries. Existing recovery admission, checklist persistence and local release rules remain unchanged.
-- Production callbacks, durable execution/reconciliation and coordination with authorization-code issuance and refresh remain unfinished. Provider tests do not qualify the account UI or complete CLI lifecycle.
+- The standalone adapter delivery did not implement production callbacks, durable execution/reconciliation or coordination with authorization-code issuance and refresh. The later production contract refinement below selects the completion proof and late-issuance protection. Provider tests do not qualify the account UI or complete CLI lifecycle.
 
 ## Implementation evidence
 
 The [HTTP-ordering qualification](../../.agents/skills/inframeld-access-models/references/recovery-provider-cleanup.md#hydra-issuance-evidence), verified on 2026-10-24 against Hydra v26.2.0, covers outstanding codes, refresh requests sent after cleanup and successful token responses delivered late. Revoked codes cannot be exchanged, and holding an earlier successful response does not preserve its revoked credentials. A login approved after cleanup can still issue working credentials.
 
-These are controlled HTTP boundaries, not pauses inside Hydra. Production issuance coordination, provider-internal races, durable execution and recovery completion remain unfinished. This evidence does not change the transaction, retry or release decisions above.
+These are controlled HTTP boundaries, not pauses inside Hydra. This HTTP-ordering evidence did not implement durable execution or recovery completion and does not qualify every provider-internal race. The later production contract refinement below records their separate implementation and the selected protection against late issuance. This evidence does not change the transaction, retry or release decisions above.
 
 ## Production contract refinement
 
-[ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) resolves production evidence and durable reconciliation. Aggregate Hydra confirmation requires both scoped acknowledgments to be saved. Together with trusted Kratos cleanup, intact credential-version state and current local eligibility, that permits per-checklist release. It does not establish Hydra-wide inactivity or require preventing every later issuance. ADR-0072 supplies permanent Inframeld rejection of stale versions. Runtime callbacks, execution and operator continuation remain #243–#245 delivery work.
+[ADR-0085](ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) resolves production evidence and durable reconciliation. Aggregate Hydra confirmation requires both scoped acknowledgments to be saved. Together with trusted Kratos cleanup, intact credential-version state and current local eligibility, that permits per-checklist release. It does not establish Hydra-wide inactivity or require preventing every later issuance. ADR-0072 supplies permanent Inframeld rejection of stale versions. Native callbacks, bounded execution and protected operator continuation now have implementations and behavioral tests. The owning recovery references describe their boundaries.
 
 ## Links
 

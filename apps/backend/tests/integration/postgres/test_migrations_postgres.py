@@ -501,3 +501,101 @@ async def test_recovery_execution_upgrade_preserves_original_handoff_without_inv
             )
     finally:
         await database.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_maintenance_migration_from_0007_preserves_recovery_history(
+    temporary_postgres_settings: DatabaseSettings,
+) -> None:
+    from uuid import uuid4
+
+    from alembic import command
+    from alembic.config import Config
+    from tests.support.recovery_notifications import notification_service
+
+    from inframeld_backend.access.application.dtos.identity_recovery_event_dto import (
+        IdentityRecoveryEventDTO,
+    )
+    from inframeld_backend.access.application.dtos.identity_recovery_settings_evidence_dto import (
+        IdentityRecoverySettingsEvidenceDTO,
+    )
+    from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+        VerifiedHumanIdentityDTO,
+    )
+    from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
+        IdentityRecoveryEventKind,
+    )
+    from inframeld_backend.access.application.value_objects.identity_session_id import (
+        IdentitySessionId,
+    )
+    from inframeld_backend.access.application.value_objects.identity_settings_flow_id import (
+        IdentitySettingsFlowId,
+    )
+    from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+    from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
+        IdentityRecoveryFlowId,
+    )
+    from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+    from inframeld_backend.access.infrastructure.rows.host_maintenance_receipt_row import (
+        HostMaintenanceReceiptRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
+        HumanCredentialVersionRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_cleanup_run_row import (
+        IdentityRecoveryCleanupRunRow,
+    )
+    from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
+        PostgresInstallationIdentityReader,
+    )
+
+    config = Config(str(BACKEND_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(BACKEND_ROOT / "migrations"))
+    config.attributes["database_settings"] = temporary_postgres_settings
+    command.upgrade(config, "0007_recovery_cleanup_execution")
+    database = Database(temporary_postgres_settings)
+    try:
+        installation = await PostgresInstallationIdentityReader(database).read()
+        authority = IdentityAuthority("kratos:maintenance-upgrade-test")
+        event = IdentityRecoveryEventDTO(
+            IdentityRecoveryFlowId(uuid4()),
+            VerifiedHumanIdentityDTO(authority, IdentitySubject("Alice")),
+            IdentityRecoveryEventKind.RECOVERY,
+        )
+        async with database.session() as session:
+            service = notification_service(session, installation, authority)
+            admitted = await service.admit(event)
+            evidence = IdentityRecoverySettingsEvidenceDTO(
+                event.identity,
+                IdentitySettingsFlowId(uuid4()),
+                IdentitySessionId(uuid4()),
+                event.flow_id,
+            )
+            await service.associate_settings(evidence)
+            await service.record_password_saved(evidence)
+        async with database.session() as session:
+            previous = (await session.scalars(select(IdentityRecoveryCleanupRunRow))).one()
+            original_budget = (
+                previous.id,
+                previous.authorized_at,
+                previous.deadline,
+                previous.consumed_attempts,
+            )
+        run_migrations(temporary_postgres_settings)
+        await database.startup()
+        async with database.session() as session:
+            current = (await session.scalars(select(IdentityRecoveryCleanupRunRow))).one()
+            assert current.operation_id == admitted.operation_id.value
+            assert (
+                current.id,
+                current.authorized_at,
+                current.deadline,
+                current.consumed_attempts,
+            ) == original_budget
+            assert await session.scalar(select(HumanCredentialVersionRow.version)) == 2
+            assert (
+                await session.scalar(select(func.count()).select_from(HostMaintenanceReceiptRow))
+                == 0
+            )
+    finally:
+        await database.shutdown()

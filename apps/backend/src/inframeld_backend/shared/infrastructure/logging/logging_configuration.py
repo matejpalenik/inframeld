@@ -4,7 +4,7 @@ import json
 import logging
 import sys
 from types import TracebackType
-from typing import cast, override
+from typing import TextIO, cast, override
 
 import structlog
 from structlog.typing import EventDict, ExcInfo, Processor
@@ -152,12 +152,15 @@ def _format_safe_exception_for_console(
     return event_dict
 
 
-def configure_logging(*, level: LogLevel, log_format: LogFormat) -> None:
+def configure_logging(
+    *, level: LogLevel, log_format: LogFormat, stream: TextIO | None = None
+) -> None:
     """Configure Structlog and standard-library logging.
 
     Args:
         level: Minimum application logging level.
         log_format: Final JSON or developer-console representation.
+        stream: Diagnostic destination, defaulting to stdout at configuration time.
     """
     timestamper = structlog.processors.TimeStamper(fmt="iso", utc=True)
 
@@ -214,7 +217,7 @@ def configure_logging(*, level: LogLevel, log_format: LogFormat) -> None:
         processors=renderer_processors,
     )
 
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(sys.stdout if stream is None else stream)
     handler.addFilter(_SafeExceptionFilter())
     handler.setFormatter(formatter)
 

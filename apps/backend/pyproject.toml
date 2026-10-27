@@ -32,6 +32,9 @@ index-strategy = "first-index"
 ory-hydra-client = { git = "https://github.com/ory/hydra-client-python.git", rev = "756e95a40b4ddefd3d67006b62d43577f2856be6" }
 ory-kratos-client = { git = "https://github.com/ory/kratos-client-python.git", rev = "13a5b1e8b2baa3c4bf52700ecfdbb641bdb493a5" }
 
+[project.scripts]
+inframeld-maintenance = "inframeld_backend.bootstrap.maintenance:main"
+
 [dependency-groups]
 dev = [
     "httpx2>=2.12.0",

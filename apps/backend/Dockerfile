@@ -14,6 +14,10 @@ RUN apt-get update \
 COPY apps/backend/pyproject.toml apps/backend/uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
+COPY apps/backend/README.md ./README.md
+COPY apps/backend/src ./src
+RUN uv sync --locked --no-dev --no-editable
+
 FROM python:3.13.12-slim AS runtime
 
 ENV PATH="/app/.venv/bin:$PATH" \

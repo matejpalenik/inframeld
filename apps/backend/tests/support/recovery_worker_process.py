@@ -56,14 +56,9 @@ async def recovery_worker_process(
                 ready.set()
 
     reader = asyncio.create_task(drain())
-    try:
-        async with asyncio.timeout(10):
-            await ready.wait()
-        assert process.returncode is None, (
-            "The production recovery command exited before readiness."
-        )
-        yield process
-    finally:
+
+    async def stop() -> None:
+        forced = False
         if process.returncode is None:
             process.terminate()
             try:
@@ -72,6 +67,24 @@ async def recovery_worker_process(
             except TimeoutError:
                 process.kill()
                 await process.wait()
-                raise AssertionError("Recovery worker exceeded its shutdown grace.") from None
+                forced = True
         await reader
+        if forced:
+            raise AssertionError("Recovery worker exceeded its shutdown grace.")
         assert process.returncode == 0, "The production recovery command failed."
+
+    try:
+        async with asyncio.timeout(10):
+            await ready.wait()
+        assert process.returncode is None, (
+            "The production recovery command exited before readiness."
+        )
+        yield process
+    finally:
+        # A scenario deadline can arrive while context exit is already waiting.
+        cleanup = asyncio.create_task(stop())
+        try:
+            await asyncio.shield(cleanup)
+        except asyncio.CancelledError:
+            await asyncio.gather(cleanup, return_exceptions=True)
+            raise

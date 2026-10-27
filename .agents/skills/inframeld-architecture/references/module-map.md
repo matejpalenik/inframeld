@@ -59,7 +59,7 @@ The domain responsibilities and focused internal boundaries are accepted. Each m
 
 <a id="pending-decision-navigation"></a>
 
-[PD-ACCESS-03 production recovery contracts](../../inframeld-access-models/references/decision-recovery-production-completion.md) are resolved by ADR-0085. Consult their acceptance matrix for the still-unimplemented callbacks, durable cleanup and host continuation. Their runtime qualification is separate from unresolved design.
+[PD-ACCESS-03 production recovery contracts](../../inframeld-access-models/references/decision-recovery-production-completion.md) are resolved by ADR-0085. Consult their acceptance matrix and owning workflows for the implemented private callbacks, durable cleanup and protected host continuation, with their qualification limits. First-local-admission integration, account restoration and other maintenance modes remain separate work.
 
 ## Pending decision navigation
 
@@ -129,4 +129,4 @@ Jobs and audit records support the application. They do not become another owner
 
 An evidence screen may combine information from several modules. Its read code can join their records, but it must not become another writer of evaluation or Deployment state. Showing information together does not change who owns it.
 
-Private native recovery notifications use [the Access-owned callback process](../../inframeld-access-models/references/private-recovery-handoff.md#implemented-private-delivery), selected in [ADR-0086](../../../../docs/adr/ADR-0086-serve-recovery-notifications-through-a-private-backend-process.md). It shares the backend image. Durable provider execution and host continuation remain separate delivery.
+Private native recovery notifications use [the Access-owned callback process](../../inframeld-access-models/references/private-recovery-handoff.md#implemented-private-delivery), selected in [ADR-0086](../../../../docs/adr/ADR-0086-serve-recovery-notifications-through-a-private-backend-process.md). It shares the backend image. The [dedicated worker](../../inframeld-access-models/references/recovery-completion.md#implemented-execution-and-proof-backed-completion) executes durable provider cleanup and proof-backed release. The separate [host-maintenance command](../../inframeld-access-models/references/host-maintenance.md#recovery-cleanup-continuation) authorizes additional bounded runs.

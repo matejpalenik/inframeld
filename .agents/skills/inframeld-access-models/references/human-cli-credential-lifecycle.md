@@ -153,7 +153,7 @@ New recovery admission advances the version atomically with the original obligat
 
 The future CLI must verify `/v1/session` before saving a login. After bounded refresh handling, confirmed invalid credentials require removing the selected target/account's stored pair and asking for explicit sign-in. Compare the saved credential revision so another process's fresh login survives. A 403 or outage does not clear credentials. Do not automatically repeat a paid or mutating command after reauthentication.
 
-This does not force Hydra to report a stale grant inactive. The real-provider scenario observes stale refresh and `/userinfo` independently of Inframeld rejection. Production completion remains unwired until native cleanup evidence, durable execution and the remaining races are qualified. The tests' direct cleanup recorder calls establish local state ordering, not production callback correctness.
+This does not force Hydra to report a stale grant inactive. The real-provider scenario observes stale refresh and `/userinfo` independently of Inframeld rejection. These tests' direct cleanup recorder calls establish local state ordering, not production callback correctness. The separate [native worker scenarios](recovery-completion.md#implemented-execution-and-proof-backed-completion) exercise implemented native evidence delivery, durable execution and proof-backed completion, with their own qualification limits.
 
 <a id="credential-generations-supplement-the-recovery-block"></a>
 
@@ -185,7 +185,7 @@ The implemented bearer service now reuses the same `human_identity_links` and `p
 
 For example, a test provider can recognize Alice while the local test database contains no identity link for her. The session request returns 403. Requesting the `linked_human` test fixture first creates an active local principal and its link, so the same verified identity can return 200. Each test uses an isolated database, so admission from an earlier test does not carry over. [The implemented authentication boundary](credential-dispatch.md#implemented-human-authentication) links both the mocked-provider scenarios and real Hydra/Kratos tests that resolve cookie and bearer credentials to the same local principal.
 
-The table describes ownership rather than new schema changes. Native Kratos/Hydra login, backend consent, client provisioning and provider lifecycle scenarios are implemented. Account pages, protected CLI storage and production recovery orchestration remain unfinished. Incoming application-key records and their two-usable-key limit remain separate.
+The table describes ownership rather than new schema changes. Native Kratos/Hydra login, backend consent, client provisioning and provider lifecycle scenarios are implemented. The separate [recovery workflow](recovery-completion.md#implemented-execution-and-proof-backed-completion) owns implemented cleanup orchestration and its qualification limits. Account pages, protected CLI storage and first-local-admission integration remain unfinished. Incoming application-key records and their two-usable-key limit remain separate.
 
 <a id="handle-invalidated-human-cli-credentials"></a>
 

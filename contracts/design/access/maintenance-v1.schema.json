@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Inframeld version 1 maintenance input, design contract",
-  "description": "Non-runtime bootstrap, stranded-authority repair and recovery-cleanup continuation inputs. A valid shape does not establish host authority.",
-  "$comment": "Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. ADR-0085 resolves PD-ACCESS-03. Enforce the 64 KiB received-byte bound, strict JSON integer tokens, duplicate-key rejection, one JSON value and verified host/installation authority separately. Bootstrap/repair require current recipient proof and reviewed scope. Recovery continuation forbids that proof and reviewed-run inputs, deduplicates the operator request and checks current original recovery eligibility and active runs. Runtime implementation remains separate. JSON Schema integer validation accepts 1.0.",
+  "description": "Bootstrap and stranded-authority repair remain design-only. Recovery-cleanup continuation is implemented by the backend maintenance command. A valid shape does not establish host authority.",
+  "$comment": "Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. ADR-0085 resolves PD-ACCESS-03. Enforce the 64 KiB received-byte bound, strict JSON integer tokens, duplicate-key rejection, one JSON value and verified host/installation authority separately. Bootstrap/repair require current recipient proof and reviewed scope. Recovery continuation forbids that proof and reviewed-run inputs, deduplicates the operator request and checks current original recovery eligibility and active runs. Only resume-recovery-cleanup is implemented by apps/backend/src/inframeld_backend/access/cli/mappers/recovery_maintenance_mapper.py. Bootstrap/repair remain design-only. JSON Schema integer validation accepts 1.0.",
   "$defs": {
     "target": {
       "oneOf": [

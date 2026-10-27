@@ -1,6 +1,6 @@
 # PD-ACCESS-03: Prove recovery cleanup before releasing product access
 
-**Status:** RESOLVED for the production delivery contract on 2026-10-25 under [ADR-0085](../../../../docs/adr/ADR-0085-bind-password-settings-evidence-to-original-recoveries.md). Private native notifications are implemented under #243. Provider execution and host continuation remain unfinished in #244–#245. This is not evidence that production recovery can already release access.
+**Status:** RESOLVED for the production delivery contract on 2026-10-25 under [ADR-0085](../../../../docs/adr/ADR-0085-bind-password-settings-evidence-to-original-recoveries.md). Private native notifications, dedicated provider execution, proof-backed local completion and protected host continuation have inspected implementations. The owning references and behavioral tests describe their delivered boundaries. Account restoration and the other maintenance modes remain separate work.
 
 **Owner:** `inframeld-access-models`
 
@@ -67,7 +67,7 @@ The design is settled. These are runtime acceptance scenarios, not new pending p
 | #245 | Two different requests race | At most one active run for the original recovery. No reviewed-run ID is required. |
 | #245 | Missing Kratos proof, completed recovery or no remaining provider work | No new run, manufactured proof, credential-version change or block release. |
 
-Existing provider tests remain supporting evidence with their recorded limits. The [native delivery tests](private-recovery-handoff.md#implemented-private-delivery) cover #243. The worker and linked PostgreSQL/native tests now cover execution, restart/fencing and proof-backed completion. The protected host boundary remains #245. A failing required scenario remains a delivery gap.
+Existing provider tests remain supporting evidence with their recorded limits. The [native delivery tests](private-recovery-handoff.md#implemented-private-delivery) cover #243. The worker and linked PostgreSQL/native tests now cover execution, restart/fencing and proof-backed completion. The protected host command and its PostgreSQL/native tests now cover operator continuation. Other maintenance modes remain design-only. A failing required scenario remains a delivery gap.
 
 ## Sources and finalization
 

@@ -1,6 +1,6 @@
 # ADR-0064: Centralize principal eligibility and keep Access aggregates focused
 
-**Status:** Accepted. Grant transaction placement is partially superseded by [ADR-0065](ADR-0065-application-services-own-write-transactions.md). Shared eligibility, linked-recovery/write coordination and the recovery checklist aggregate/repository are implemented. Provider cleanup and safe release orchestration remain unfinished.
+**Status:** Accepted. Grant transaction placement is partially superseded by [ADR-0065](ADR-0065-application-services-own-write-transactions.md). Shared eligibility, linked-recovery/write coordination and the recovery checklist aggregate/repository are implemented. Later [provider cleanup and proof-backed release](../../.agents/skills/inframeld-access-models/references/recovery-completion.md#implemented-execution-and-proof-backed-completion) implement the separate orchestration under the owning recovery contract and its qualification limits.
 
 **Date:** 2026-10-18
 

@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import httpx2
+from pydantic import BaseModel
 from sqlalchemy import literal, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -17,8 +18,10 @@ from inframeld_backend.bootstrap.application_settings import get_settings
 from tests.support.integration_services import (
     EXPIRING_KRATOS_PUBLIC_URL,
     HYDRA_ADMIN_URL,
+    HYDRA_PUBLIC_URL,
     KRATOS_PUBLIC_URL,
     LIFETIME_HYDRA_ADMIN_URL,
+    LIFETIME_HYDRA_PUBLIC_URL,
     MAILPIT_URL,
     MOCK_OIDC_URL,
     POSTGRES_HOST,
@@ -55,6 +58,28 @@ async def _wait_for_http(
         await asyncio.sleep(0.25)
 
 
+class _PublicKeySet(BaseModel):
+    keys: list[dict[str, object]]
+
+
+async def wait_for_hydra_signing_keys(
+    client: httpx2.AsyncClient, name: str, public_url: str, pending: set[str]
+) -> None:
+    """Let native key creation finish within the runner's shared startup deadline."""
+    while True:
+        try:
+            response = await client.get(f"{public_url}/.well-known/jwks.json", timeout=30.0)
+            if (
+                response.status_code == 200
+                and _PublicKeySet.model_validate_json(response.content).keys
+            ):
+                pending.remove(name)
+                return
+        except (httpx2.TransportError, ValueError):
+            pass
+        await asyncio.sleep(0.25)
+
+
 async def _wait_for_services() -> None:
     """Share one startup deadline, with service names rather than sensitive error bodies."""
     settings = get_settings().database
@@ -73,7 +98,11 @@ async def _wait_for_services() -> None:
         "mock-oidc": f"{MOCK_OIDC_URL}/isalive",
         "recovery-hooks": f"{RECOVERY_HOOKS_URL}/health/ready",
     }
-    pending = {"postgres", *endpoints}
+    key_endpoints = {
+        "hydra-signing-keys": HYDRA_PUBLIC_URL,
+        "hydra-lifetimes-signing-keys": LIFETIME_HYDRA_PUBLIC_URL,
+    }
+    pending = {"postgres", *endpoints, *key_endpoints}
     engine = create_async_engine(
         database_url(settings),
         connect_args={"connect_timeout": 2},
@@ -89,6 +118,8 @@ async def _wait_for_services() -> None:
             tasks.create_task(_wait_for_database(engine, pending))
             for name, url in endpoints.items():
                 tasks.create_task(_wait_for_http(client, name, url, pending))
+            for name, public_url in key_endpoints.items():
+                tasks.create_task(wait_for_hydra_signing_keys(client, name, public_url, pending))
     except TimeoutError:
         raise RuntimeError(
             f"Test services not ready after 60 seconds: {', '.join(sorted(pending))}"

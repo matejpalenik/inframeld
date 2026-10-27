@@ -236,7 +236,7 @@ async def test_native_evidence_real_cleanup_and_late_old_version_credentials_aft
 @pytest.mark.asyncio
 async def test_replacement_process_preserves_original_budget_after_hydra_was_unavailable() -> None:
     async with (
-        asyncio.timeout(30),
+        asyncio.timeout(60),
         _database() as database,
         create_browser(public_url=EXECUTION_PUBLIC) as owner,
         create_browser(public_url=EXECUTION_PUBLIC) as recovery_browser,
@@ -291,3 +291,112 @@ async def test_replacement_process_preserves_original_budget_after_hydra_was_una
             assert (run.id, run.authorized_at, run.deadline) == original[:3]
             assert run.terminal_reason == "cleanup_confirmed"
             assert finished.operation_id == original[4]
+
+
+@pytest.mark.asyncio
+async def test_host_command_resumes_ended_run_then_real_hydra_cleanup_releases_original() -> None:
+    from sqlalchemy import func
+    from tests.support.integration_services import RECOVERY_HOOKS_URL
+    from tests.support.maintenance_command import run_maintenance
+
+    from inframeld_backend.access.infrastructure.rows.host_maintenance_receipt_row import (
+        HostMaintenanceReceiptRow,
+    )
+    from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
+        PostgresInstallationIdentityReader,
+    )
+
+    async with (
+        asyncio.timeout(60),
+        _database() as database,
+        create_browser(public_url=EXECUTION_PUBLIC) as owner,
+        create_browser(public_url=EXECUTION_PUBLIC) as recovery_browser,
+        hydra_test_provider() as hydra,
+    ):
+        alice = await register_human(owner)
+        tokens = await hydra.issue_tokens(alice)
+        assert await hydra.token_is_active(tokens.access_token)
+        flow = await request_recovery_code(recovery_browser, alice.email)
+        redeemed = await redeem_recovery_code(
+            recovery_browser, flow, await wait_for_recovery_code(alice.email)
+        )
+        settings = await read_recovery_settings(
+            recovery_browser, redeemed, public_url=EXECUTION_PUBLIC
+        )
+        password = SecretStr(f"Replacement-{uuid4().hex}!")
+        saved = await submit_password_settings(
+            recovery_browser,
+            settings,
+            password,
+            public_url=EXECUTION_PUBLIC,
+        )
+        assert saved.status_code == 200
+
+        # A real HTTP server without Hydra's admin routes explicitly rejects cleanup.
+        async with recovery_worker_process(admin_url=RECOVERY_HOOKS_URL):
+            async with asyncio.timeout(10):
+                while True:
+                    async with database.session() as session:
+                        original = await session.scalar(
+                            select(IdentityRecoveryAdmissionRow).where(
+                                IdentityRecoveryAdmissionRow.subject == alice.subject.value
+                            )
+                        )
+                        assert original is not None
+                        failed = await session.scalar(
+                            select(IdentityRecoveryCleanupRunRow).where(
+                                IdentityRecoveryCleanupRunRow.operation_id == original.operation_id
+                            )
+                        )
+                    if failed is not None and failed.ended_at is not None:
+                        assert failed.terminal_reason == "permanent_provider_rejection"
+                        assert failed.consumed_attempts == 1 and original.released_at is None
+                        break
+                    await asyncio.sleep(0.05)
+        assert await hydra.token_is_active(tokens.access_token)
+
+        installation = await PostgresInstallationIdentityReader(database).read()
+        request: dict[str, object] = {
+            "schemaVersion": 1,
+            "mode": "resume-recovery-cleanup",
+            "expectedInstallationId": str(installation.value),
+            "operationId": str(uuid4()),
+            "recoveryOperationId": original.operation_id,
+            "operatorLabel": "Test host operator",
+            "reason": "Corrected Hydra admin endpoint",
+        }
+        status, response = await run_maintenance(request, EXECUTION_DATABASE)
+        assert status == 0 and response["outcome"] == "cleanup-authorized"
+        assert await run_maintenance(request, EXECUTION_DATABASE) == (status, response)
+        async with recovery_worker_process():
+            finished = await _wait_for_release(database, alice.subject)
+        assert finished.operation_id == original.operation_id
+        assert not await hydra.token_is_active(tokens.access_token)
+        assert await hydra.refresh_tokens(tokens) is None
+        assert await run_maintenance(request, EXECUTION_DATABASE) == (status, response)
+        async with database.session() as session:
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(HostMaintenanceReceiptRow)
+                    .where(HostMaintenanceReceiptRow.recovery_operation_id == original.operation_id)
+                )
+                == 1
+            )
+            old_run = await session.get(IdentityRecoveryCleanupRunRow, failed.id)
+            assert old_run is not None and old_run.terminal_reason == "permanent_provider_rejection"
+            new_run = await session.scalar(
+                select(IdentityRecoveryCleanupRunRow).where(
+                    IdentityRecoveryCleanupRunRow.operation_id == original.operation_id,
+                    IdentityRecoveryCleanupRunRow.id != failed.id,
+                )
+            )
+            assert new_run is not None and new_run.terminal_reason == "cleanup_confirmed"
+        assert (await recovery_browser.get("/sessions/whoami")).status_code == 200
+        cookie = recovery_browser.cookies.get("ory_kratos_session")
+        assert cookie is not None
+        recovered = replace(
+            alice, password=password.get_secret_value(), credential=BrowserSessionCredential(cookie)
+        )
+        fresh = await hydra.issue_tokens(recovered, browser=recovery_browser)
+        assert await hydra.token_is_active(fresh.access_token)

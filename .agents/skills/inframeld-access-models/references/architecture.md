@@ -18,7 +18,7 @@ Browser and human CLI paths identify Alice. An Inframeld application key identif
 
 ## Main parts and boundaries
 
-**Accepted responsibility view.** The human paths, consent and focused grant/recovery foundations have inspected code. Application-key authentication and protected host continuation remain unfinished. Native callbacks, the dedicated cleanup worker and proof-backed completion are implemented.
+**Accepted responsibility view.** The human paths, consent and focused grant/recovery foundations have inspected code. Application-key authentication remains unfinished. Protected host continuation is implemented separately from product authentication. Native callbacks, the dedicated cleanup worker and proof-backed completion are implemented.
 
 ```mermaid
 ---
@@ -41,6 +41,8 @@ Arrows show workflow responsibilities, not source import direction. Infrastructu
 The implemented human services are `HumanSessionAuthenticationService` and `HumanAccessTokenAuthenticationService`. `HumanOAuthConsentService` checks a fresh Hydra request and browser identity, independently of local product admission. Consent approval carries a checked credential binding. Inspection and denial initialise no credential state. The [CLI workflow](human-cli-login.md) explains the capture/verify/reread ordering and its limits.
 
 `HumanOAuthClientProvisioner` is the separate host-authorized installation capability for Hydra's fixed CLI registration. Its SDK adapter reconciles foreign provider state without an application transaction, account creation or grant mutation. Bootstrap owns the short-lived client and command lifecycle. API startup does not mutate registration. See [client provisioning](human-cli-login.md#cli-client-registration) and [provider lifetimes](human-cli-credential-lifecycle.md#provider-lifetime-configuration).
+
+`IdentityRecoveryCleanupResumeService` implements the protected host-maintenance capability. Its thin Access CLI maps stdin and results. Bootstrap owns database resources, and the service coordinates current recovery facts and atomic receipt/run persistence. Host access supplies authority, without a product session or a synthetic principal. [Maintenance](host-maintenance.md#recovery-cleanup-continuation) owns its exact contract.
 
 Current operation checks use focused authorizers and policies. `PrincipalAccessEvaluationService` interprets authentication evidence against current facts. `ActionAuthorizationService` and `ProjectGrantAuthorizationService` coordinate their specific decisions. Neither a typed ID nor an `AccessContextDTO` proves current authority.
 
@@ -141,7 +143,7 @@ Rejected credentials return no verified result. Recognized verification-dependen
 
 ### Shared Access eligibility and focused lifecycle behavior
 
-Alice's recovery block affects authentication, action use and delegation. Adding a separate boolean argument to every operation would spread one rule across the backend. [ADR-0064](../../../../docs/adr/ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md) instead gives common product eligibility one domain-policy owner and a cohesive input. Human authentication, project action authorization and the supported grant command now use this structure. The focused recovery aggregate, repository and completion service implement local checklist transitions, persistence and per-flow release. Native callback delivery and the dedicated provider-cleanup worker now connect those pieces. Protected host continuation remains unfinished.
+Alice's recovery block affects authentication, action use and delegation. Adding a separate boolean argument to every operation would spread one rule across the backend. [ADR-0064](../../../../docs/adr/ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md) instead gives common product eligibility one domain-policy owner and a cohesive input. Human authentication, project action authorization and the supported grant command now use this structure. The focused recovery aggregate, repository and completion service implement local checklist transitions, persistence and per-flow release. Native callback delivery and the dedicated provider-cleanup worker now connect those pieces. Protected host continuation uses the separate [maintenance capability](host-maintenance.md#recovery-cleanup-continuation).
 
 | Component | Current responsibility or planned lifecycle work |
 | --- | --- |
@@ -167,7 +169,7 @@ The shared input, composed policies, authorization boundaries and linked-recover
 
 [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md) accepts an additional [identity-coordination boundary](identity-admission-coordination.md) for first admission, recovery admission/completion and credential-state initialization. It precedes required organization/project locks and works before any account or version row exists. Access owns this specific coordination, while the application transaction owns its lifetime. The diagram in that workflow covers first admission and recovery together. The shared coordinator and recovery admission/completion/initialization adapters implement this ordering. First admission remains future work. Ordinary project-grant operations retain their current coordination.
 
-[Access behavior](eligibility-and-current-authority.md#shared-principal-eligibility) owns failure ordering and recovery exceptions. [Attempt-local inputs](credential-and-recovery-records.md#principal-eligibility-inputs) own the record distinction. Database authorization evidence is separate from the unfinished provider cleanup and account-UI/CLI lifecycle qualification.
+[Access behavior](eligibility-and-current-authority.md#shared-principal-eligibility) owns failure ordering and recovery exceptions. [Attempt-local inputs](credential-and-recovery-records.md#principal-eligibility-inputs) own the record distinction. Database authorization evidence is separate from the implemented provider-cleanup workflow and the remaining account-UI/CLI lifecycle qualification.
 
 The [recovery repository](../../../../apps/backend/src/inframeld_backend/access/application/protocols/identity_recovery_repository.py) follows the same specific-repository boundary as membership persistence. It loads an already admitted `IdentityRecovery` by trusted installation/provider and original flow. The [PostgreSQL adapter](../../../../apps/backend/src/inframeld_backend/access/infrastructure/repositories/postgres_identity_recovery_repository.py) tracks exact instances and private value snapshots on one active transaction. It saves only provider outcomes and release time, conditional on the original admission and loaded values still matching. A changed stored value raises `ConflictError`, requiring rollback and a new repository/load before another decision. Unchanged saves perform no writes or freshness check. The adapter adds no explicit coordination locks, commits, provider calls or automatic retries. Original operation ID, event kind and admission time remain infrastructure metadata, outside the domain entity. [Recovery records](credential-and-recovery-records.md#identity-cleanup-records) describe the mapping and [PostgreSQL tests](../../../../apps/backend/tests/integration/access/test_identity_recovery_repository_postgres.py) exercise its behavior.
 
@@ -226,7 +228,7 @@ Authentication establishes the caller. A later `ActionAuthorizationService.requi
 
 ## Pending decisions for dependent implementation
 
-[PD-ACCESS-03 is resolved](decision-recovery-production-completion.md). Use the accepted [private handoff](private-recovery-handoff.md) and [completion workflow](recovery-completion.md), distinguishing implemented private delivery/execution from unfinished host continuation. Other choices below remain pending.
+[PD-ACCESS-03 is resolved](decision-recovery-production-completion.md). Use the accepted [private handoff](private-recovery-handoff.md), [completion workflow](recovery-completion.md) and [host continuation](host-maintenance.md#recovery-cleanup-continuation) for their inspected implementations and qualification limits. Bootstrap, stranded-authority repair and account restoration remain separate work. Other choices below remain pending.
 
 Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
 

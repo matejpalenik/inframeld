@@ -30,7 +30,7 @@ Keep ordinary selected-device logout, coordinated refresh, account recovery and 
 
 ## Implementation status and limits
 
-The guide records implemented backend cookie/bearer verification, native consent and the separate installation client provisioner. Read-only inspection is display data, not authority for a later decision. Account pages, complete CLI interaction, packaged runtime delivery and safely coordinated production recovery remain unfinished.
+The guide records implemented backend cookie/bearer verification, native consent and the separate installation client provisioner. Read-only inspection is display data, not authority for a later decision. The [recovery workflow](recovery-completion.md#implemented-execution-and-proof-backed-completion) and [protected host continuation](host-maintenance.md#recovery-cleanup-continuation) have inspected implementations. Account pages, complete CLI interaction, packaged runtime delivery and first-local-admission integration remain unfinished.
 
 Provider tests distinguish late approvals, outstanding codes and token responses. A held HTTP request does not pause Hydra internally. Test-only token-hook denials, transport gates and staged records establish bounded observations, not a production hook, credential inventory, universal issuance fence or authority to release a block. Keep historical provider-version observations separate from current qualified results.
 

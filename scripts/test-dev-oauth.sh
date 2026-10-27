@@ -230,3 +230,29 @@ run_step wait_for_recovery_worker 1
 run_step qualified_compose --profile recovery restart recovery-worker
 run_step wait_for_recovery_worker 2
 printf 'Dedicated recovery worker startup and restart passed without published ports.\n'
+
+# Exercise the installed console script without source-path or provider settings.
+run_step qualified_compose exec -T backend python -c '
+import asyncio, json, os, subprocess
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import PostgresInstallationIdentityReader
+from pydantic_settings import BaseSettings, SettingsConfigDict
+class FocusedSettings(BaseSettings):
+    database: DatabaseSettings
+    model_config = SettingsConfigDict(env_prefix="INFRAMELD_", env_nested_delimiter="__", extra="ignore")
+async def installation():
+    database = Database(FocusedSettings().database)
+    try:
+        return str((await PostgresInstallationIdentityReader(database).read()).value)
+    finally:
+        await database.shutdown()
+assert os.getuid() == 10001
+request = {"schemaVersion": 1, "mode": "resume-recovery-cleanup", "expectedInstallationId": asyncio.run(installation()), "operationId": "isolated-package-check", "recoveryOperationId": "absent-recovery", "operatorLabel": "Qualification operator", "reason": "Verify packaged maintenance boundary"}
+environment = {key: value for key, value in os.environ.items() if (not key.startswith("INFRAMELD_") or key.startswith("INFRAMELD_DATABASE__")) and key != "PYTHONPATH"}
+for executable in (["inframeld-maintenance"], ["python", "-m", "inframeld_backend.maintenance"]):
+    result = subprocess.run(executable, input=json.dumps(request), capture_output=True, text=True, env=environment, timeout=15)
+    assert result.returncode == 1
+    assert json.loads(result.stdout) == {"schemaVersion": 1, "operationId": "isolated-package-check", "code": "recovery_not_found"}
+print("Installed non-root maintenance entry points passed with database-only configuration.")
+'

@@ -16,6 +16,10 @@ RUN apt-get update \
 COPY apps/backend/pyproject.toml apps/backend/uv.lock ./
 RUN uv sync --locked --no-install-project
 
+COPY apps/backend/README.md ./README.md
+COPY apps/backend/src ./src
+RUN uv sync --locked --no-editable
+
 RUN groupadd --system --gid 10001 app \
     && useradd --uid 10001 --gid app --no-create-home app
 
