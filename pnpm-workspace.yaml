@@ -12,6 +12,7 @@ minimumReleaseAgeIgnoreMissingTime: false
 trustLockfile: false
 blockExoticSubdeps: true
 allowBuilds:
+  esbuild@0.28.2: true
   unrs-resolver: true
 
 strictDepBuilds: true

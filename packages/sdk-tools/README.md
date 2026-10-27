@@ -19,9 +19,15 @@ For example, changing consent must preserve `decision: "allow"` and `remember: t
 
 Use the repository's pinned Node/pnpm, Rust and Python toolchains. Python generation also needs Java. Source preparation and bounded process cleanup use standard `git`, `tar`, `unzip`, `jar` and POSIX `ps` tools. Install workspace dependencies with `pnpm install --frozen-lockfile`, prepare `apps/backend/.env.test` from its committed example and run `uv sync --project apps/backend --locked`.
 
+The example test configuration does not include a fingerprint key. Follow the existing [fingerprint-key setup](../../docs/development/getting-started/local-setup.md#idempotency-fingerprint-key) and configure its absolute path before running backend contract checks or SDK verification. CI creates a separate 32-byte test key in each job's temporary directory and exports only its path. It does not use development keys or upload the test key with SDK artifacts.
+
+Dependency installation runs only explicitly approved dependency build scripts. The workspace approves the pinned esbuild version used by the SDK tools. Keep strict build approval enabled and review a changed version's installation script before updating its approval. Do not suppress scripts to bypass a missing approval.
+
 Run `pnpm sdk:setup` once to prepare all selected generators and development tools. Append `rust`, `typescript` or `python` to prepare one SDK. Python uses an isolated environment from [hashed tooling requirements](requirements.lock). TypeScript setup installs Playwright's full Chromium build for its [modern headless channel](https://playwright.dev/docs/browsers#chromium-new-headless-mode). Linux also needs `pnpm --filter @inframeld/sdk-tools exec playwright install-deps chromium`.
 
 The default tool cache is `node_modules/.cache/inframeld-sdk-tools`. `INFRAMELD_SDK_TOOLS_DIR` selects another cache. `PLAYWRIGHT_BROWSERS_PATH` selects provisioned Chromium. Preparation verifies source and patch digests even when tools are cached. Downloads and installation are separate from SDK compilation.
+
+Use the default cache for complete qualification. Python's native Pyright configuration still resolves its environment at that default location, so a custom cache can fail native typing despite successful preparation. The [CI-bootstrap follow-up](../../docs/development/reports/sdk-response-fixes-verification.md#ci-bootstrap-follow-up-2026-10-27) records this separate limitation.
 
 ## Commands
 
@@ -72,7 +78,7 @@ Rust's metadata-disabled consumer and synthetic binary/streaming/SSE/builder tes
 
 ## CI and proof boundaries
 
-The workflow runs independent Linux language jobs for SDK/API-affecting changes. Generator, patch, configuration and platform-sensitive process/browser/lifecycle changes also select macOS. Manual qualification remains available. Its stable **SDK conformance** aggregate rejects failed jobs, partial runs and missing or incomplete evidence. Configure the external branch ruleset to require that aggregate separately.
+The workflow runs independent Linux language jobs for SDK/API-affecting changes. Generator, patch, configuration and platform-sensitive process/browser/lifecycle changes also select macOS. Changes to the SDK workflow or workspace dependency approvals select macOS too, so bootstrap changes qualify on both platforms. Manual qualification remains available. Its stable **SDK conformance** aggregate rejects failed jobs, partial runs and missing or incomplete evidence. Configure the external branch ruleset to require that aggregate separately.
 
 Tests use real production HTTP routers with controlled authentication/application collaborators. They do not call a database, real identity provider or paid endpoint. They establish SDK and HTTP-adapter behavior, not database atomicity, real Kratos/Hydra login, production CORS or a complete CLI/account-UI journey. Local macOS execution does not establish Linux or remote macOS execution.
 
