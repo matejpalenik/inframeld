@@ -263,3 +263,11 @@ Successful tests followed by failed or timed-out cleanup return `1`. Existing no
 Environment: local macOS ARM64, Podman 5.8.1 and pinned repository toolchains. Docker is unavailable locally. Docker execution and final published-revision Backend foundation, Quality, SDK and native CLI checks remain pending. Local Podman evidence does not establish those results. No commit, push or workflow dispatch was performed. Production behavior, generated SDKs, Rust CLI behavior and password policy remain unchanged. The existing AnyIO deprecation warning remains.
 
 A final spot check observed a new `pnpm test:integration` run started from an interactive terminal after these smoke checks finished. Its active resources were left untouched. The resource-removal results above describe the completed verification runs, not this subsequent run, whose outcome was not observed.
+
+## Final review test hardening, 28 October 2026
+
+Both readiness failure-reporting tests now impose a five-second outer deadline. This bounds a regressed retry loop without changing individual HTTP requests or production readiness limits. Both native Kratos registration tests record the fixture lookup count before registration and require it to increase afterward, so earlier lookups cannot satisfy the assertion.
+
+Temporary failure-injection probes exercised the existing test functions with stalled waiters and unchanged pre-existing lookup counts. All four controls exposed the missing protections before these edits. Afterward, both readiness tests rejected stalled waiters within their own deadlines and both registration tests rejected unchanged counts. The probes remained outside the repository. The focused readiness module passed eight tests in 1.58 seconds. All three native password-breach scenarios passed on the private Podman stack in 0.70 seconds, followed by successful automatic teardown.
+
+The preceding published revision, `8b8287b9869414b7671d224a6623c14f2af71957`, passed all 16 GitHub checks, including Docker Backend foundation, Quality, all three native SDK jobs and their evidence aggregate, CodeQL, CLI dependency auditing and all four native CLI targets. This supersedes the earlier lack of Docker CI evidence for that revision. CI must still qualify the subsequent review-fix commit. Production behavior, test selection and dependencies are unchanged.

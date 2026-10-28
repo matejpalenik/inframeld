@@ -50,12 +50,13 @@ async def _lookup_count(prefix: str) -> int:
 
 @pytest.mark.asyncio
 async def test_registration_checks_ordinary_password_against_local_breach_service() -> None:
+    lookups_before = await _lookup_count(CLEAN_PASSWORD_PREFIX)
     async with create_browser() as browser:
         completed = await _submit_registration(
             browser, email=f"clean-{uuid4().hex}@example.test", password=CLEAN_PASSWORD
         )
         assert completed.status_code == 200
-        assert await _lookup_count(CLEAN_PASSWORD_PREFIX) >= 1
+        assert await _lookup_count(CLEAN_PASSWORD_PREFIX) > lookups_before
         assert (await browser.get("/sessions/whoami")).status_code == 200
 
 
@@ -81,11 +82,12 @@ async def _submit_registration(
 
 @pytest.mark.asyncio
 async def test_breached_password_creates_neither_identity_nor_authenticated_session() -> None:
+    lookups_before = await _lookup_count(BREACHED_PASSWORD_SHA1[:5])
     email = f"breached-{uuid4().hex}@example.test"
     async with create_browser() as browser:
         rejected = await _submit_registration(browser, email=email, password=BREACHED_PASSWORD)
         assert rejected.status_code == 400
-        assert await _lookup_count(BREACHED_PASSWORD_SHA1[:5]) >= 1
+        assert await _lookup_count(BREACHED_PASSWORD_SHA1[:5]) > lookups_before
         assert (await browser.get("/sessions/whoami")).status_code == 401
 
         # Reusing the email successfully proves the rejected attempt created no identity.
