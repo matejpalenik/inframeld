@@ -2,7 +2,35 @@ import asyncio
 
 import httpx2
 import pytest
-from tests.support.integration_runner import wait_for_hydra_signing_keys
+from tests.support.integration_runner import wait_for_http, wait_for_hydra_signing_keys
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["tls", "unavailable"])
+async def test_breach_service_readiness_cannot_accept_tls_failure_or_unavailability(
+    failure: str,
+) -> None:
+    pending = {"password-breaches"}
+    attempted = False
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        nonlocal attempted
+        attempted = True
+        if failure == "tls":
+            raise httpx2.ConnectError("CERTIFICATE_VERIFY_FAILED", request=request)
+        return httpx2.Response(503)
+
+    async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as client:
+        with pytest.raises(TimeoutError):
+            async with asyncio.timeout(0.05):
+                await wait_for_http(
+                    client,
+                    "password-breaches",
+                    "https://password-breaches:8443/health/ready",
+                    pending,
+                )
+    assert attempted
+    assert pending == {"password-breaches"}
 
 
 @pytest.mark.asyncio

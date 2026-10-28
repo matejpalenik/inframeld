@@ -132,7 +132,7 @@ async def test_native_evidence_real_cleanup_and_late_old_version_credentials_aft
         asyncio.timeout(30),
         _database() as database,
         _api() as api,
-        hydra_test_provider() as provider,
+        hydra_test_provider(kratos_public_url=EXECUTION_PUBLIC) as provider,
         create_browser(public_url=EXECUTION_PUBLIC) as owner,
         create_browser(public_url=EXECUTION_PUBLIC) as recovery_browser,
         create_browser(public_url=EXECUTION_PUBLIC) as bob_browser,
@@ -311,7 +311,7 @@ async def test_host_command_resumes_ended_run_then_real_hydra_cleanup_releases_o
         _database() as database,
         create_browser(public_url=EXECUTION_PUBLIC) as owner,
         create_browser(public_url=EXECUTION_PUBLIC) as recovery_browser,
-        hydra_test_provider() as hydra,
+        hydra_test_provider(kratos_public_url=EXECUTION_PUBLIC) as hydra,
     ):
         alice = await register_human(owner)
         tokens = await hydra.issue_tokens(alice)

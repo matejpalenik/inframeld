@@ -24,10 +24,12 @@ from tests.support.integration_services import (
     LIFETIME_HYDRA_PUBLIC_URL,
     MAILPIT_URL,
     MOCK_OIDC_URL,
+    PASSWORD_BREACHES_URL,
     POSTGRES_HOST,
     POSTGRES_PORT,
     RECOVERY_HOOKS_URL,
 )
+from tests.support.password_breaches import create_client as create_password_breaches_client
 from tests.support.postgres import database_url
 
 
@@ -43,9 +45,7 @@ async def _wait_for_database(engine: AsyncEngine, pending: set[str]) -> None:
             return
 
 
-async def _wait_for_http(
-    client: httpx2.AsyncClient, name: str, url: str, pending: set[str]
-) -> None:
+async def wait_for_http(client: httpx2.AsyncClient, name: str, url: str, pending: set[str]) -> None:
     while True:
         try:
             response = await client.get(url)
@@ -102,7 +102,7 @@ async def _wait_for_services() -> None:
         "hydra-signing-keys": HYDRA_PUBLIC_URL,
         "hydra-lifetimes-signing-keys": LIFETIME_HYDRA_PUBLIC_URL,
     }
-    pending = {"postgres", *endpoints, *key_endpoints}
+    pending = {"postgres", "password-breaches", *endpoints, *key_endpoints}
     engine = create_async_engine(
         database_url(settings),
         connect_args={"connect_timeout": 2},
@@ -112,12 +112,21 @@ async def _wait_for_services() -> None:
     try:
         async with (
             httpx2.AsyncClient(timeout=2.0, trust_env=False) as client,
+            create_password_breaches_client() as breach_client,
             asyncio.timeout(60.0),
             asyncio.TaskGroup() as tasks,
         ):
             tasks.create_task(_wait_for_database(engine, pending))
+            tasks.create_task(
+                wait_for_http(
+                    breach_client,
+                    "password-breaches",
+                    f"{PASSWORD_BREACHES_URL}/health/ready",
+                    pending,
+                )
+            )
             for name, url in endpoints.items():
-                tasks.create_task(_wait_for_http(client, name, url, pending))
+                tasks.create_task(wait_for_http(client, name, url, pending))
             for name, public_url in key_endpoints.items():
                 tasks.create_task(wait_for_hydra_signing_keys(client, name, public_url, pending))
     except TimeoutError:

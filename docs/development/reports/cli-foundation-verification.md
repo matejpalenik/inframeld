@@ -89,3 +89,43 @@ The earlier archive hashes in this report precede the selected dependency baseli
 This is repeated-build equality for the local development worktree. It remains neither final committed-revision evidence nor qualification of another platform or released runtime pair. Complete SDK verification and full repository checks were not rerun for this dependency-only step. Their earlier results above retain their original scope.
 
 The native CI matrix and final committed-source evidence remain required for issue #157. The compatibility decision is accepted locally through ADR-0095, while the GitHub issue still carries its older needs-decision label. Reconcile that tracking when publishing the accepted work. General JSON/dry-run contracts and implementation remain #156/#158, with login and target selection in their owning issues.
+
+## PR #268 CI repair verification, 28 October 2026
+
+The [PR checks](https://github.com/matejpalenik/inframeld/pull/268/checks) associated with head `01acf402416cac00bd5170ad2e8097298373b455` passed all four native CLI targets and the dependency audit. Quality and the three SDK jobs failed during frozen pnpm installation because the new CLI workspace had no lockfile importer. The SDK evidence aggregate then failed because those jobs produced no evidence. Backend integration separately reported 502 passed and three failed.
+
+The repair adds only the empty CLI importer to pnpm-lock.yaml, without changing a locked dependency version. Pinned pnpm 12.4.0 initially left the missing empty importer unchanged during lockfile-only generation. After adding that entry, lockfile-only generation and both full and backend-filtered frozen installations passed with the existing supply-chain policies.
+
+The original three recovery-worker scenarios passed unchanged on local Podman before the routing repair. A separate probe sent one saved execution-instance cookie to both private Kratos endpoints and received HTTP 200 from each. No cookie or response body was printed. This does not reproduce or explain the CI-only HTTP 401 rejection. The helper now explicitly verifies against the execution instance selected by those scenarios. Unit regressions cover default/selected endpoints, exact cookie forwarding, context-manager forwarding and rejection before OAuth authorization. Diagnostics retain the endpoint and status without reflecting credentials.
+
+The external HIBP response-body timeout is removed from the test path through the selected local HTTPS fixture. Real Kratos still performs breach validation. The fixture returns a breach for one public test password and no listed breaches for other passwords. All test Kratos variants trust its dedicated CA and reject lookup network errors. TLS verification remains enabled. The existing runner deadline covers verified HTTPS readiness. The same non-root integration image serves the fixture, with no additional runtime, Python dependency or published port.
+
+### Behavioral failure evidence
+
+- Frozen installation reproduced the missing CLI importer error.
+- Endpoint-selection and context-forwarding tests failed because the helper used the default Kratos instance.
+- Six fixture tests failed against an API-only scaffold before its routes were implemented.
+- Native registration tests failed before wiring: the fixture hostname was unavailable, and the designated test password was accepted rather than classified as breached.
+- After wiring, seven focused native scenarios passed, including the original recovery failures and ordinary/breached-password registration.
+
+The test TLS key is deliberately public and grants no deployment authority. Both certificates expire on 25 October 2036. [Fixture instructions](../../../apps/backend/tests/fixtures/password-breaches/README.md) own regeneration. Production password policy, application code, persistence and generated SDK source are unchanged by these repairs.
+
+### Local repair results
+
+Environment: macOS ARM64 with Podman 5.8.1, Python 3.13.12, pnpm 12.4.0 and the pinned repository toolchains. These checks ran against the local repair worktree:
+
+| Check | Result |
+| --- | --- |
+| Full and backend-filtered frozen pnpm installations | Passed with unchanged supply-chain policies and dependency versions |
+| Focused helper, breach-fixture and readiness regressions | 59 passed |
+| Complete private integration suite | 508 passed, no skipped tests, in 232.01 seconds. Includes explicit CA-trust rejection and the original CI recovery failures |
+| Backend checks | Formatting, Ruff, strict Pyright, fast tests and OpenAPI checks passed |
+| Complete pnpm check | Passed. Backend fast tests: 1567 passed and 508 service-dependent cases skipped. CLI/xtask behavior checks ran uncached. Unchanged other tasks could use Turbo cache |
+| Complete pnpm build | Passed. CLI/xtask rebuilt, with unchanged other packages using cache |
+| Complete unfiltered pnpm sdk:verify | Passed for Rust, TypeScript Node/Chromium and Python sync/async. The evidence summary records partial=false and passed common/language stages, including archive and external-consumer checks |
+| Test certificate chain and hostname | OpenSSL verification passed. Native tests reject the fixture without explicit test-CA trust |
+| Documentation formatting, shell syntax and git diff checks | Passed |
+
+An intermediate quality run caught a missing import in the added TLS regression. It was corrected before the final full suite. Strict typing also caught a private readiness-helper import, which was replaced by a public test-support function and rechecked without suppressions. The existing AnyIO deprecation warning remains. Sandbox network failures were rerun with the required local/network access, without weakening dependency or test policies.
+
+The [PR checks](https://github.com/matejpalenik/inframeld/pull/268/checks) remain the authority for remote results on the revision being merged. Local Podman execution does not establish Docker CI execution, and the earlier green native CLI matrix does not qualify a later repair revision. Merge requires the applicable Quality, Backend foundation, SDK conformance and native CLI checks to pass on that revision. No test skips, blanket timeout increases, SDK-gate bypasses or production password-policy changes were introduced.

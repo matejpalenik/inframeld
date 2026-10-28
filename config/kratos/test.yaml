@@ -16,6 +16,11 @@ selfservice:
   methods:
     password:
       enabled: true
+      config:
+        haveibeenpwned_enabled: true
+        haveibeenpwned_host: password-breaches:8443
+        max_breaches: 0
+        ignore_network_errors: false
     code:
       enabled: true
     oidc:
