@@ -1,6 +1,5 @@
 """Supply deterministic password-breach responses inside the private test network."""
 
-import hashlib
 import ssl
 from pathlib import Path as FilePath
 from typing import Annotated
@@ -12,7 +11,10 @@ from fastapi.responses import PlainTextResponse
 from tests.support.integration_services import PASSWORD_BREACHES_URL
 
 BREACHED_PASSWORD = "Test-only-breached-Passphrase-987!"
-_BREACHED_HASH = hashlib.sha1(BREACHED_PASSWORD.encode(), usedforsecurity=False).hexdigest().upper()
+# Public HIBP protocol vectors, checked independently by native Kratos tests.
+BREACHED_PASSWORD_SHA1 = "F9F2973407885FA3286156776CBD37453BC010C2"
+CLEAN_PASSWORD = "Test-only-clean-Passphrase-753!"
+CLEAN_PASSWORD_PREFIX = "AB3EC"
 HashPrefix = Annotated[str, Path(pattern=r"^[0-9a-fA-F]{5}$")]
 CA_FILE = FilePath(__file__).resolve().parents[1] / "fixtures/password-breaches/ca.pem"
 
@@ -36,7 +38,9 @@ def create_app() -> FastAPI:
     async def lookup(prefix: HashPrefix) -> str:
         normalized = prefix.upper()
         lookups[normalized] = lookups.get(normalized, 0) + 1
-        return f"{_BREACHED_HASH[5:]}:1\n" if normalized == _BREACHED_HASH[:5] else ""
+        return (
+            f"{BREACHED_PASSWORD_SHA1[5:]}:1\n" if normalized == BREACHED_PASSWORD_SHA1[:5] else ""
+        )
 
     @application.get("/observations/{prefix}")
     async def observation(prefix: HashPrefix) -> dict[str, int]:

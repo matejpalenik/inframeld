@@ -4,7 +4,7 @@ These files are public test credentials for the private integration network. The
 
 Kratos calls `https://password-breaches:8443/range/{prefix}`. Only the test Kratos containers and explicit fixture clients trust this CA. Certificate verification and hostname verification remain enabled. The server certificate names only `password-breaches`, and both certificates expire on 25 October 2036.
 
-The fixture returns a single breach for the public test password defined in `tests/support/password_breaches.py`. Other passwords have no listed breaches. Lookup observations retain only five-character SHA-1 prefixes and counts. No submitted password or real breach database is stored or fetched.
+The fixture returns a single breach for the public test password defined in `tests/support/password_breaches.py`. Other passwords have no listed breaches. Precomputed public clean and breached vectors avoid password hashing in test support. Native Kratos tests independently verify their HIBP protocol meaning. Lookup observations retain only five-character SHA-1 prefixes and counts. No submitted password or real breach database is stored or fetched.
 
 ## Regenerate the certificates
 

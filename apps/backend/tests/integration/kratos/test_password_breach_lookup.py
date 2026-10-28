@@ -1,6 +1,5 @@
 """Keep real Kratos password validation independent of the public HIBP service."""
 
-import hashlib
 import os
 from uuid import uuid4
 
@@ -14,7 +13,13 @@ from tests.support.kratos_browser import (
     read_browser_csrf_token,
     register_human,
 )
-from tests.support.password_breaches import BREACHED_PASSWORD, create_client
+from tests.support.password_breaches import (
+    BREACHED_PASSWORD,
+    BREACHED_PASSWORD_SHA1,
+    CLEAN_PASSWORD,
+    CLEAN_PASSWORD_PREFIX,
+    create_client,
+)
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_KRATOS_INTEGRATION") != "1",
@@ -36,8 +41,7 @@ async def test_fixture_requires_explicit_test_ca_trust() -> None:
             await untrusted.get(f"{PASSWORD_BREACHES_URL}/health/ready")
 
 
-async def _lookup_count(password: str) -> int:
-    prefix = hashlib.sha1(password.encode(), usedforsecurity=False).hexdigest()[:5].upper()
+async def _lookup_count(prefix: str) -> int:
     async with create_client() as client:
         response = await client.get(f"/observations/{prefix}")
         assert response.status_code == 200
@@ -47,32 +51,41 @@ async def _lookup_count(password: str) -> int:
 @pytest.mark.asyncio
 async def test_registration_checks_ordinary_password_against_local_breach_service() -> None:
     async with create_browser() as browser:
-        human = await register_human(browser)
-        assert await _lookup_count(human.password) >= 1
+        completed = await _submit_registration(
+            browser, email=f"clean-{uuid4().hex}@example.test", password=CLEAN_PASSWORD
+        )
+        assert completed.status_code == 200
+        assert await _lookup_count(CLEAN_PASSWORD_PREFIX) >= 1
         assert (await browser.get("/sessions/whoami")).status_code == 200
+
+
+async def _submit_registration(
+    browser: httpx2.AsyncClient, *, email: str, password: str
+) -> httpx2.Response:
+    started = await browser.get(
+        "/self-service/registration/browser", headers={"Accept": "application/json"}
+    )
+    assert started.status_code == 200
+    flow = BrowserFlow.model_validate_json(started.content)
+    return await browser.post(
+        flow.ui.action,
+        data={
+            "csrf_token": read_browser_csrf_token(flow),
+            "traits.email": email,
+            "password": password,
+            "method": "password",
+        },
+        headers={"Accept": "application/json"},
+    )
 
 
 @pytest.mark.asyncio
 async def test_breached_password_creates_neither_identity_nor_authenticated_session() -> None:
     email = f"breached-{uuid4().hex}@example.test"
     async with create_browser() as browser:
-        started = await browser.get(
-            "/self-service/registration/browser", headers={"Accept": "application/json"}
-        )
-        assert started.status_code == 200
-        flow = BrowserFlow.model_validate_json(started.content)
-        rejected = await browser.post(
-            flow.ui.action,
-            data={
-                "csrf_token": read_browser_csrf_token(flow),
-                "traits.email": email,
-                "password": BREACHED_PASSWORD,
-                "method": "password",
-            },
-            headers={"Accept": "application/json"},
-        )
+        rejected = await _submit_registration(browser, email=email, password=BREACHED_PASSWORD)
         assert rejected.status_code == 400
-        assert await _lookup_count(BREACHED_PASSWORD) >= 1
+        assert await _lookup_count(BREACHED_PASSWORD_SHA1[:5]) >= 1
         assert (await browser.get("/sessions/whoami")).status_code == 401
 
         # Reusing the email successfully proves the rejected attempt created no identity.
