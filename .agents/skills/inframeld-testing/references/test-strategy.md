@@ -27,7 +27,7 @@ HTTP contract work also checks native OpenAPI drift and exact request/response b
 
 Language checks complement observable behavior. TypeScript compilation can reject an invalid model expression, while runtime validation is needed for received JSON. Rust model/type checks and Python model probes have their own mechanics. Do not force identical exception classes or test syntax across languages to claim common behavior.
 
-Use controlled collaborators when they isolate the decision under test. For backend Python, [Coding Standards](../../inframeld-coding-standards/references/testing-and-documentation.md) owns protocol doubles, typing, naming, TDD and complete contextual examples. Fixtures and framework callables retain their valid function exceptions. No source-layout or import-boundary enforcement suite is introduced by this strategy.
+Use controlled collaborators when they isolate the decision under test. The [shared core](../../inframeld-coding-standards/references/testing-and-documentation.md) owns TDD. For backend Python, [Python Standards](../../inframeld-python-standards/references/testing-and-documentation.md) owns protocol doubles, typing, naming and complete contextual examples. Fixtures and framework callables retain their valid function exceptions. No source-layout or import-boundary enforcement suite is introduced by this strategy.
 
 ## What to run and report
 

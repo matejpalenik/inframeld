@@ -38,7 +38,7 @@ Both consumers compare returned project scope with the requested project before 
 
 ## Links
 
-- [Typed authorization capabilities](../../.agents/skills/inframeld-access-models/references/eligibility-and-current-authority.md#typed-authorization) and [grant request chain](../../.agents/skills/inframeld-coding-standards/references/services-and-use-cases.md#grant-command-flow).
+- [Typed authorization capabilities](../../.agents/skills/inframeld-access-models/references/eligibility-and-current-authority.md#typed-authorization) and [grant request chain](../../.agents/skills/inframeld-python-standards/references/services-and-use-cases.md#grant-command-flow).
 - [Current Access behavior and evidence](../../.agents/skills/inframeld-access-models/references/eligibility-and-current-authority.md#shared-principal-eligibility).
 - [Authorization and idempotency ordering](../../.agents/skills/inframeld-application-contracts/references/idempotency-and-replay.md#reservation-inputs) and [temporary records](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#principal-eligibility-inputs).
 - [ADR-0064: shared eligibility and focused boundaries](ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md), [ADR-0065: transaction ownership](ADR-0065-application-services-own-write-transactions.md) and [ADR-0066: typed operation contexts](ADR-0066-use-typed-operation-contexts-and-command-classification.md).

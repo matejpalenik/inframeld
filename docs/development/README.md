@@ -45,7 +45,10 @@ The skill references are written for people as well as coding agents. They own d
 - [TypeScript SDK](../../.agents/skills/inframeld-typescript-sdk/SKILL.md): Hey API Fetch/Zod consumption, browser limits and packaging.
 - [Python SDK](../../.agents/skills/inframeld-python-sdk/SKILL.md): OpenAPI Generator HTTPX/Pydantic consumption, lifecycle and packaging.
 - [Testing](../../.agents/skills/inframeld-testing/SKILL.md): test layers, controlled dependencies, integration isolation and honest verification evidence.
-- [Coding Standards](../../.agents/skills/inframeld-coding-standards/SKILL.md): component placement and complete backend examples. Other languages keep their own guidance.
+- [Coding Standards](../../.agents/skills/inframeld-coding-standards/SKILL.md): shared engineering, TDD/documentation and language routing.
+- [Python Standards](../../.agents/skills/inframeld-python-standards/SKILL.md): backend component conventions and complete Python examples, with client/tooling exclusions.
+- [Rust Standards](../../.agents/skills/inframeld-rust-standards/SKILL.md): authored Rust idioms, checks, [selected CLI libraries](../../.agents/skills/inframeld-rust-standards/references/cli-libraries.md) and the [accepted CLI structure and lifecycle](../../.agents/skills/inframeld-rust-standards/references/cli-structure.md).
+- [Shared CLI presentation](../../.agents/skills/inframeld-application-contracts/references/cli-presentation-components.md): accepted component responsibilities consuming the output/result contracts, with runtime integration pending.
 - [Architecture](../../.agents/skills/inframeld-architecture/SKILL.md): system context, runtime and cross-domain journeys.
 
 <a id="authority-and-unresolved-choices"></a>
@@ -72,3 +75,5 @@ Historical GitHub issues may cite removed developer guides and anchors. Those is
 For SDK response integrity, native typing and package-consumption evidence, see the [hardening report](reports/sdk-hardening-verification.md) and [SDK runbook](../../packages/sdk-tools/README.md).
 
 The subsequent [response-fix verification and architectural review](reports/sdk-response-fixes-verification.md) covers typed failures, status/media variants and safe transport defaults under [ADR-0094](../adr/ADR-0094-select-sdk-response-variants-and-safe-transport-defaults.md).
+
+- [Rust CLI foundation](../../apps/cli/README.md): commands, strict Rust checks, native archives and explicit installation/removal.

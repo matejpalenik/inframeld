@@ -58,6 +58,10 @@ Explain known destinations, outgoing data categories, charges, effects and unres
 
 Removing the flag does not approve execution or reserve the reviewed state. Actual admission still needs consent, current authority, budget and revision guards. A later configuration or policy change conflicts normally. The CLI output contract still needs exact response schemas, metadata bounds, protected-input handling and behavioral coverage. No generic planning service or new public endpoint is selected.
 
+## Shared presentation implementation
+
+[Shared presentation components](cli-presentation-components.md) owns the accepted presentation responsibilities, typed result boundary and reusable terminal components. [Rust CLI structure](../../inframeld-rust-standards/references/cli-structure.md) owns accepted target placement, command-local clap declarations and the lifecycle diagram under ADR-0097. Exact schemas, per-command mappings and runtime integration remain separate specification and delivery work.
+
 ## Inspect outcomes or review changes
 
 Use [CLI result contracts](cli-result-contracts.md) for admission versus completion, structured outcomes, bounded status, waiting, cancellation and uncertainty. Use [change review](cli-change-review.md) for current/proposed and before/after presentation. Neither display grants authority or repeats remote work.

@@ -15,6 +15,7 @@ apps/backend/uv.lock
 contracts/openapi/v1/inframeld-v1.json
 apps/web/next-env.d.ts
 Cargo.lock
+target/
 
 
 packages/sdk-rust/generated/

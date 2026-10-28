@@ -1,0 +1,21 @@
+[workspace]
+members = ["cargo:."]
+
+[dist]
+cargo-dist-version = "0.33.0"
+packages = ["inframeld-cli"]
+precise-builds = true
+auto-includes = false
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu"]
+installers = []
+ci = []
+hosting = []
+publish-jobs = []
+create-release = false
+unix-archive = ".tar.xz"
+checksum = "sha256"
+source-tarball = false
+include = ["LICENSE", "apps/cli/README.md", "apps/cli/compatibility.json"]
+
+[dist.min-glibc-version]
+"*" = "2.35"

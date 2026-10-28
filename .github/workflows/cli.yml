@@ -1,0 +1,116 @@
+name: CLI foundation
+
+on:
+  pull_request:
+    paths:
+      - "apps/cli/**"
+      - "packages/sdk-rust/**"
+      - ".cargo/**"
+      - "Cargo.*"
+      - "rust-toolchain.toml"
+      - "dist-workspace.toml"
+      - "deny.toml"
+      - ".github/workflows/cli.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "turbo.json"
+  push:
+    branches: [main]
+    paths:
+      - "apps/cli/**"
+      - "packages/sdk-rust/**"
+      - ".cargo/**"
+      - "Cargo.*"
+      - "rust-toolchain.toml"
+      - "dist-workspace.toml"
+      - "deny.toml"
+      - ".github/workflows/cli.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "turbo.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: CLI ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up pinned Rust
+        shell: bash
+        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+      - name: Strict checks and behavior
+        shell: bash
+        run: |
+          cargo fmt -p inframeld-cli -p inframeld-cli-xtask --check
+          cargo clippy --locked -p inframeld-cli -p inframeld-cli-xtask --all-targets --all-features --no-deps -- -D warnings
+          cargo test --locked -p inframeld-cli -p inframeld-cli-xtask --all-features
+          cargo test --locked -p inframeld-cli-xtask --release --test qualification
+          RUSTDOCFLAGS='-D warnings' cargo doc --locked -p inframeld-cli -p inframeld-cli-xtask --no-deps
+      - name: Install checksum-verified packaging tool
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          tool_dir="$RUNNER_TEMP/cli-dist-tool"
+          mkdir -p "$tool_dir"
+          cd "$tool_dir"
+          archive="cargo-dist-$TARGET.tar.xz"
+          url="https://github.com/axodotdev/cargo-dist/releases/download/v0.33.0/$archive"
+          curl --fail --silent --show-error --location "$url" -o "$archive"
+          curl --fail --silent --show-error --location "$url.sha256" -o "$archive.sha256"
+          shasum -a 256 -c "$archive.sha256"
+          tar -xf "$archive"
+          echo "$tool_dir/cargo-dist-$TARGET" >> "$GITHUB_PATH"
+      - name: Native archives, installation and repeated-build evidence
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          cargo xtask package --target="$TARGET" --reproducible
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cli-${{ matrix.target }}
+          path: |
+            target/distrib/
+            target/cli-evidence/
+          if-no-files-found: error
+
+  dependencies:
+    name: CLI dependencies
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - run: cargo install --locked --version 0.20.2 cargo-deny
+      - run: cargo deny --manifest-path apps/cli/Cargo.toml --locked check
+      - run: cargo deny --manifest-path apps/cli/xtask/Cargo.toml --locked check

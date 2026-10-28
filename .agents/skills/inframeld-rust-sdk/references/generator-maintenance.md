@@ -44,7 +44,7 @@ Source verification precedes that SDK's generation. Successful other SDKs or lat
 
 The [Rust report](../../../../docs/development/reports/rust-sdk-generator-comparison.md) retains dated findings, while its unselected implementations and reproduction tooling are retired. Local Cargo path dependencies need no registry publication. Keep version 0.0.0 and `publish = false` until separate release work changes them.
 
-Application Contracts retains [HTTP meaning and server-version compatibility](../../inframeld-application-contracts/references/decision-cli-server-compatibility.md). Follow the pending decision's actual trigger before dependent release work. Promotion changes neither the generator choice nor historical qualification results.
+Application Contracts retains [HTTP meaning and server-version compatibility](../../inframeld-application-contracts/references/decision-cli-server-compatibility.md). Follow the accepted matching-release policy in ADR-0095. Remote enforcement and release-pair qualification remain separate work. Promotion changes neither the generator choice nor historical qualification results.
 
 Read the [hardening report](../../../../docs/development/reports/sdk-hardening-verification.md) for current native consumer, typing and preparation evidence. Production generator pins remain authoritative in configuration, and no newer-release upgrade is implied by clean preparation of the current source.
 

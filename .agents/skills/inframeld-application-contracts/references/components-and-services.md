@@ -4,7 +4,7 @@
 
 Alice asks where a new grant workflow belongs. Access owns the rule. A service coordinates the operation, domain objects decide valid changes, and adapters handle HTTP or database details. These boundaries keep one workflow from acquiring several competing implementations.
 
-For code suggestions or reviews, read [Coding Standards](../../inframeld-coding-standards/SKILL.md). Its [service example](../../inframeld-coding-standards/references/services-and-use-cases.md) and [aggregate/repository example](../../inframeld-coding-standards/references/aggregates-and-repositories.md) teach the Python implementation. This reference owns how the components cooperate and retains the dependency-direction diagram.
+For code suggestions or reviews, read [Coding Standards](../../inframeld-coding-standards/SKILL.md). Python Standards' [service example](../../inframeld-python-standards/references/services-and-use-cases.md) and [aggregate/repository example](../../inframeld-python-standards/references/aggregates-and-repositories.md) teach the Python implementation. This reference owns how the components cooperate and retains the dependency-direction diagram.
 
 <a id="owners-layers-and-dependencies"></a>
 
@@ -59,7 +59,7 @@ Solid arrows show the support an operation may invoke. The dotted arrow means as
 
 An entity has stable identity and cohesive state. An aggregate owns its state-transition rules and keeps mutable collections private. A service invokes that behavior and persists through the aggregate's specific repository.
 
-Use pure policies for decisions involving explicit facts or several domain objects. Commands and Queries describe requested work, not an independent executor. Current authorization and state checks remain with services and domain rules. [Values and records](../../inframeld-coding-standards/references/values-and-records.md) explain record roles and their narrow interface exceptions.
+Use pure policies for decisions involving explicit facts or several domain objects. Commands and Queries describe requested work, not an independent executor. Current authorization and state checks remain with services and domain rules. [Values and records](../../inframeld-python-standards/references/values-and-records.md) explain record roles and their narrow interface exceptions.
 
 Supporting audit and reservation writers do not need artificial aggregates. Creation, reads, authentication and external work have appropriate variations. Do not impose one generic execution framework on them.
 
@@ -73,7 +73,7 @@ For a complete write, inject `TransactionManager`, the specific authorizer, `Ope
 
 Authentication runs first. Authorization precedes reservation or replay. Required audit and completion commit with the change. The implemented grant command demonstrates this ordering. It does not require a generic repository, command bus or workflow engine.
 
-Follow the [service-writing guide](../../inframeld-coding-standards/references/services-and-use-cases.md#service-writing-guide) and [transaction/grant chain](transactions-jobs-and-idempotency.md) before suggesting a service or complete write.
+Follow the [service-writing guide](../../inframeld-python-standards/references/services-and-use-cases.md#service-writing-guide) and [transaction/grant chain](transactions-jobs-and-idempotency.md) before suggesting a service or complete write.
 
 <a id="provider-waits-and-session-ownership"></a>
 
@@ -211,11 +211,11 @@ Transactions, jobs, spending, traces and imports support the six domains. They d
 
 ## Status and sources
 
-These are mandatory application boundaries for generated, suggested and implemented backend components. Coding Standards owns declaration, organization, typed values, protocols, persistence conventions, tests and docstrings.
+These are mandatory application boundaries for generated, suggested and implemented backend components. The shared Coding Standards owns cross-language principles, TDD and documentation. Python Standards owns backend declaration, organization, typed values, protocols, persistence, Python test conventions and docstrings.
 
 The current component map and supported grant/authentication flows have implementation references. Later upload and worker journeys remain accepted design where identified. Loading guidance authorizes no edits.
 
-- [Component conventions](../../inframeld-coding-standards/references/component-roles-and-imports.md#component-conventions), [service-writing guide](../../inframeld-coding-standards/references/services-and-use-cases.md#service-writing-guide), [grant chain](../../inframeld-coding-standards/references/services-and-use-cases.md#grant-command-flow), [authentication flow](../../inframeld-access-models/references/architecture.md#authentication-flow) and [stable domain-error mapping](http-errors.md#stable-domain-error-mapping).
+- [Component conventions](../../inframeld-python-standards/references/component-roles-and-imports.md#component-conventions), [service-writing guide](../../inframeld-python-standards/references/services-and-use-cases.md#service-writing-guide), [grant chain](../../inframeld-python-standards/references/services-and-use-cases.md#grant-command-flow), [authentication flow](../../inframeld-access-models/references/architecture.md#authentication-flow) and [stable domain-error mapping](http-errors.md#stable-domain-error-mapping).
 - [ADR-0001](../../../../docs/adr/ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md), [ADR-0002](../../../../docs/adr/ADR-0002-separate-commands-and-queries-without-a-command-bus-framework.md) and [ADR-0065](../../../../docs/adr/ADR-0065-application-services-own-write-transactions.md).
 
 ### Private provider notifications

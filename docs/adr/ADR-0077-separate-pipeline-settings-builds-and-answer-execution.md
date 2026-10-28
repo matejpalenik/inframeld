@@ -30,4 +30,4 @@ This records accepted target architecture. Implementation and qualification rema
 - [Current owning guide and remaining design](../../.agents/skills/inframeld-pipelines/references/architecture.md#pipeline-operation-boundaries).
 - [Logical records](../../.agents/skills/inframeld-pipelines/references/records.md#pipelines).
 - [Module architecture](../../.agents/skills/inframeld-pipelines/references/architecture.md).
-- [Application/component conventions](../../.agents/skills/inframeld-coding-standards/references/component-roles-and-imports.md#component-conventions) and [modular-backend decision](ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md).
+- [Application/component conventions](../../.agents/skills/inframeld-python-standards/references/component-roles-and-imports.md#component-conventions) and [modular-backend decision](ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md).

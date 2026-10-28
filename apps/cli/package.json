@@ -1,0 +1,15 @@
+{
+  "name": "@inframeld/cli",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --locked -p inframeld-cli -p inframeld-cli-xtask",
+    "lint": "cargo clippy --locked -p inframeld-cli -p inframeld-cli-xtask --all-targets --all-features --no-deps -- -D warnings",
+    "typecheck": "cargo check --locked -p inframeld-cli -p inframeld-cli-xtask --all-targets --all-features && RUSTDOCFLAGS='-D warnings' cargo doc --locked -p inframeld-cli -p inframeld-cli-xtask --no-deps",
+    "test": "cargo test --locked -p inframeld-cli -p inframeld-cli-xtask --all-features",
+    "format": "cargo fmt -p inframeld-cli -p inframeld-cli-xtask",
+    "format:check": "cargo fmt -p inframeld-cli -p inframeld-cli-xtask --check",
+    "audit": "cargo deny --manifest-path Cargo.toml --locked check && cargo deny --manifest-path xtask/Cargo.toml --locked check",
+    "package": "cargo xtask package"
+  }
+}

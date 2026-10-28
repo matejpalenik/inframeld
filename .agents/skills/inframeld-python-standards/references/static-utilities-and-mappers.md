@@ -293,7 +293,7 @@ Keep static utility classes focused on one purpose and free of I/O or mutable cl
 
 Feature HTTP mappers and shared technology-prefixed persistence mappers retain their required static roles and perform no I/O or authorization. Services remain instantiated with injected collaborators. Entities own state transitions. This utility preference does not convert stateful workflows into static methods or automatically migrate existing helpers.
 
-Use dedicated value types when identity, invariants, secrecy or accidental mixing matter. Preserve enums/literals for closed vocabularies, free-form text and other documented primitive or serialization-boundary exceptions. Do not introduce a value object solely to wrap every scalar. The [Coding Standards skill](../SKILL.md) explains these conventions through contextual examples.
+Use dedicated value types when identity, invariants, secrecy or accidental mixing matter. Preserve enums/literals for closed vocabularies, free-form text and other documented primitive or serialization-boundary exceptions. Do not introduce a value object solely to wrap every scalar. The [Python Standards skill](../SKILL.md) explains these conventions through contextual examples.
 
 Read the current [action policy input](../../../../apps/backend/src/inframeld_backend/access/domain/policy_inputs/action_authorization_policy_input.py) and [action policy](../../../../apps/backend/src/inframeld_backend/access/domain/policies/action_authorization_policy.py) for exact declarations. The contract below explains how they compose shared eligibility without maintaining a second copy of their signatures here.
 

@@ -60,5 +60,5 @@ All commands remain scriptable with descriptive dry-run behavior, while exact wi
 Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
 
 - [PD-CONTRACTS-04: Bind import review and partial recovery to exact actions](decision-import-review-and-recovery.md). Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery.
-- [PD-CONTRACTS-03: Define supported CLI and server release combinations](decision-cli-server-compatibility.md). Before distributing independently installable CLI/runtime releases or making a compatibility-sensitive public contract change.
+- [PD-CONTRACTS-03: Matching qualified CLI/runtime releases](decision-cli-server-compatibility.md) is accepted through ADR-0095. Offline metadata does not verify remote compatibility. Runtime enforcement and release-pair qualification remain separate work.
 - [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.

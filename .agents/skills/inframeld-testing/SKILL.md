@@ -5,7 +5,7 @@ description: Guides Inframeld test-layer selection, dependency isolation and ver
 
 # Inframeld Testing
 
-Help a developer choose the boundary that can demonstrate the requested behavior, run the relevant checks within scope and explain what their result establishes. This skill owns test strategy and evidence boundaries. Coding Standards retains scaffold-first TDD, test-code conventions, typing and documentation. Domain skills retain business behavior.
+Help a developer choose the boundary that can demonstrate the requested behavior, run the relevant checks within scope and explain what their result establishes. This skill owns test strategy and evidence boundaries. The shared Coding Standards retains scaffold-first TDD and documentation. Python Standards and Rust Standards own language-specific test/code conventions and typing. Domain skills retain business behavior.
 
 ## Working model
 
@@ -28,7 +28,9 @@ An SDK test can additionally show that the generated client sent the right reque
 | Choose a unit, HTTP, database or provider test | [Test strategy](references/test-strategy.md) |
 | Investigate fixtures, integration setup, cleanup or evidence claims | [Isolation and evidence](references/isolation-and-evidence.md) |
 | Run a focused check or integration stack | [Testing runbook](../../../docs/development/guides/testing.md) |
-| Implement a test or review its conventions | [Coding Standards testing reference](../inframeld-coding-standards/references/testing-and-documentation.md) |
+| Shared TDD and documentation | [Core testing contract](../inframeld-coding-standards/references/testing-and-documentation.md) |
+| Python test conventions and doubles | [Python test/code examples](../inframeld-python-standards/references/testing-and-documentation.md), for authored Python tests |
+| Rust test and process conventions | [Rust Standards](../inframeld-rust-standards/SKILL.md), for authored Rust tests |
 | Qualify generated SDK behavior | [SDK strategy](../inframeld-sdks/SKILL.md), or the relevant language skill directly |
 
 Ordinary code changes do not automatically need this whole strategy guide. For a narrow test implementation, keep the mandatory coding guidance and owning behavior in view without loading unrelated integration references. Model-quality evaluation, frozen benchmarks and faithfulness belong to [Evaluation](../inframeld-evaluation/SKILL.md). This skill does not invent a frontend runner or qualify an unimplemented Studio/CLI journey.

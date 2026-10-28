@@ -4,7 +4,7 @@
 
 Alice changes grant handling. A focused behavioral test explains the rejected or successful outcome first. Integration tests then check the real database or provider boundary. Passing one layer does not qualify every product journey.
 
-The [Testing skill](../../../.agents/skills/inframeld-testing/SKILL.md) owns layer selection, dependency isolation and interpretation of evidence. [Coding Standards](../../../.agents/skills/inframeld-coding-standards/references/testing-and-documentation.md) retains scaffold-first TDD and test-code conventions. This runbook retains commands and detailed environment procedures. For cross-language client conformance, use the [SDK qualification reference](../../../.agents/skills/inframeld-sdks/references/shared-qualification.md). The unified SDK runner and operation-coverage gate are implemented. Automatic Linux checks cover applicable PRs, with macOS for generator and platform-sensitive process/browser/lifecycle changes, plus manual runs. Report actual platform execution separately, and configure external branch rules to require the SDK conformance aggregate.
+The [Testing skill](../../../.agents/skills/inframeld-testing/SKILL.md) owns layer selection, dependency isolation and interpretation of evidence. [Coding Standards](../../../.agents/skills/inframeld-coding-standards/references/testing-and-documentation.md) retains shared TDD/documentation, while [Python Standards](../../../.agents/skills/inframeld-python-standards/SKILL.md) and [Rust Standards](../../../.agents/skills/inframeld-rust-standards/SKILL.md) retain language-specific test-code conventions. This runbook retains commands and detailed environment procedures. For cross-language client conformance, use the [SDK qualification reference](../../../.agents/skills/inframeld-sdks/references/shared-qualification.md). The unified SDK runner and operation-coverage gate are implemented. Automatic Linux checks cover applicable PRs, with macOS for generator and platform-sensitive process/browser/lifecycle changes, plus manual runs. Report actual platform execution separately, and configure external branch rules to require the SDK conformance aggregate.
 
 <a id="checks"></a>
 
@@ -76,7 +76,7 @@ The isolated check supplies `INFRAMELD_DEV_COMPOSE_FILE` and `INFRAMELD_DEV_COMP
 
 ---
 
-For scaffold-first TDD, protocol doubles and meaningful tests, read [Testing and documentation](../../../.agents/skills/inframeld-coding-standards/references/testing-and-documentation.md). Architecture, import-boundary, naming and composition enforcement tests remain prohibited. Review those conventions manually.
+For scaffold-first TDD and meaningful documentation, read the [shared testing contract](../../../.agents/skills/inframeld-coding-standards/references/testing-and-documentation.md). Read [Python test conventions](../../../.agents/skills/inframeld-python-standards/references/testing-and-documentation.md) for backend protocol doubles and [Rust Standards](../../../.agents/skills/inframeld-rust-standards/SKILL.md) for Rust tests. Architecture, import-boundary, naming and composition enforcement tests remain prohibited. Review those conventions manually.
 
 ### Native recovery delivery
 

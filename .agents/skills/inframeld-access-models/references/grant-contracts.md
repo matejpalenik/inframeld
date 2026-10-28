@@ -289,7 +289,7 @@ Project-deletion admission has the following accepted application boundary: inpu
 
 `RequestFingerprint` wraps the existing immutable 32-byte HMAC digest, rejects other byte lengths and hides the digest from its representation. `IdempotencyService` unwraps the same bytes at the reservation boundary. The nominal `Command` base and required-field `ProjectCommand` interface add no stored state or execution. [ADR-0066](../../../../docs/adr/ADR-0066-use-typed-operation-contexts-and-command-classification.md) records these input contracts.
 
-These records add no tables or persisted flags. Existing grant, audit and idempotency records retain their schema and values. The [implemented grant chain](../../inframeld-coding-standards/references/services-and-use-cases.md#grant-command-flow) and [ADR-0065](../../../../docs/adr/ADR-0065-application-services-own-write-transactions.md) own orchestration and transaction placement.
+These records add no tables or persisted flags. Existing grant, audit and idempotency records retain their schema and values. The [implemented grant chain](../../inframeld-python-standards/references/services-and-use-cases.md#grant-command-flow) and [ADR-0065](../../../../docs/adr/ADR-0065-application-services-own-write-transactions.md) own orchestration and transaction placement.
 
 Access also owns `ProjectOperationAdmissionRequestDTO`, used by its caller-transaction-bound admission helper. It carries project, method, canonical route, retry key and fingerprint. The helper obtains the actor from authentication and scope from current authorization. Generic admission context, outcomes and reservation persistence remain shared.
 

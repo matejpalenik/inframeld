@@ -196,7 +196,7 @@ These backend checks proceed before Studio and SDK verification. CI also checks 
 
 Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
 
-- [PD-CONTRACTS-03: Define supported CLI and server release combinations](decision-cli-server-compatibility.md). Before distributing independently installable CLI/runtime releases or making a compatibility-sensitive public contract change.
+- [PD-CONTRACTS-03: Matching qualified CLI/runtime releases](decision-cli-server-compatibility.md) is accepted through ADR-0095. Offline metadata does not verify remote compatibility. Runtime enforcement and release-pair qualification remain separate work.
 - [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
 
 <a id="decision-and-reference-map"></a>

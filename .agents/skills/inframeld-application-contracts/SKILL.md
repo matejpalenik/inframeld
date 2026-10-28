@@ -1,6 +1,6 @@
 ---
 name: inframeld-application-contracts
-description: Explains and reviews Inframeld application boundaries, shared HTTP/MCP/CLI behavior, transactions, jobs and safe retries. Use for orchestration and transport contracts. Backend Python conventions belong to Coding Standards.
+description: Explains and reviews Inframeld application boundaries, shared HTTP/MCP/CLI behavior, transactions, jobs and safe retries. Use for orchestration and transport contracts. Backend declarations belong to Python Standards, and authored Rust conventions belong to Rust Standards.
 ---
 
 # Inframeld Application Contracts
@@ -32,7 +32,9 @@ The domain owns business decisions. Application services coordinate them. Adapte
 
 Trace validated input, verified identity, owning use case, transaction/external work and typed outcome. Then check response loss, repetition and changed state. Compare transports by scope, fixed inputs, receipts and outcomes. Inspect source before claiming implementation.
 
-Code suggestions/reviews require Coding Standards and the affected language guidance. Backend services require its [service example](../inframeld-coding-standards/references/services-and-use-cases.md), aggregates/repositories its [load/action/save example](../inframeld-coding-standards/references/aggregates-and-repositories.md). Use the domain architecture/workflow for domain components, or the relevant shared architecture below. Behavior tracing alone adds no Coding Standards prerequisite.
+Code suggestions/reviews require Coding Standards and the affected language guidance. Backend services require Python Standards' [service example](../inframeld-python-standards/references/services-and-use-cases.md), aggregates/repositories its [load/action/save example](../inframeld-python-standards/references/aggregates-and-repositories.md). Use the domain architecture/workflow for domain components, or the relevant shared architecture below. Behavior tracing alone adds no Coding Standards prerequisite.
+
+The [matching qualified CLI/runtime release policy](references/decision-cli-server-compatibility.md) is accepted through ADR-0095. Offline metadata does not verify a remote server. Release-pair qualification and remote enforcement remain delivery work.
 
 ## Pending decisions for affected work
 
@@ -40,7 +42,6 @@ Load only matching triggers. Discuss and obtain approval before code depends on 
 
 - [PD-CONTRACTS-01](references/decision-gateway-enforcement.md): Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
 - [PD-CONTRACTS-02](references/decision-spending-coordination.md): Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery.
-- [PD-CONTRACTS-03](references/decision-cli-server-compatibility.md): Before distributing independently installable CLI/runtime releases or making a compatibility-sensitive public contract change.
 - [PD-CONTRACTS-04](references/decision-import-review-and-recovery.md): Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery.
 - [PD-CONTRACTS-05](references/decision-queue-saturation-and-cleanup.md): When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation.
 
@@ -51,6 +52,8 @@ Choose the row matching the task. Workflow, contract and architecture views are 
 | Task | Direct reference |
 | --- | --- |
 | Artifact storage | [Publish immutable artifacts through the storage boundary](references/artifact-storage.md) |
+| Shared CLI presentation components | [Share CLI presentation mechanics](references/cli-presentation-components.md), when designing presenters or shared output. |
+| Rust CLI structure and lifecycle | [Typed command results and module boundaries](../inframeld-rust-standards/references/cli-structure.md), when designing the Rust adapter. |
 | Cli change review | [Present an explicit before-and-after review](references/cli-change-review.md) |
 | Cli context portability and recovery | [CLI context, portability and recovery](references/cli-context-portability-and-recovery.md) |
 | Cli local runtime | [Manage the local runtime and its HTTP boundary](references/cli-local-runtime.md) |

@@ -172,6 +172,9 @@ jobs:
           PY
           printf 'INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE=%s\n' "$key_file" >> "$GITHUB_ENV"
 
+      - name: Set up pinned Rust for CLI checks
+        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+
       - name: Verify toolchain versions
         run: |
           node --version
