@@ -40,7 +40,7 @@ The initial shared API received the admission context, explicit principal/organi
 
 ## Links
 
-- [Implemented request chain and component responsibilities](../../.agents/skills/inframeld-coding-standards/references/services-and-use-cases.md#grant-command-flow).
+- [Implemented request chain and component responsibilities](../../.agents/skills/inframeld-python-standards/references/services-and-use-cases.md#grant-command-flow).
 - [Current Access checks](../../.agents/skills/inframeld-access-models/references/eligibility-and-current-authority.md#shared-principal-eligibility), [idempotency](../../.agents/skills/inframeld-application-contracts/references/idempotency-and-replay.md#requests) and [attempt-local records](../../.agents/skills/inframeld-access-models/references/credential-and-recovery-records.md#principal-eligibility-inputs).
 - [ADR-0064](ADR-0064-centralize-principal-eligibility-and-keep-access-aggregates-focused.md) retains shared eligibility and focused aggregate boundaries. [ADR-0022](ADR-0022-coordinate-access-writes-by-project-with-scope-revisions.md) retains write coordination.
 - [SQLAlchemy transaction contexts](https://docs.sqlalchemy.org/en/20/orm/session_transaction.html#managing-transactions).

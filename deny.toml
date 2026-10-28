@@ -1,0 +1,18 @@
+[graph]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu"]
+all-features = true
+
+[advisories]
+unmaintained = "workspace"
+
+[licenses]
+allow = ["Apache-2.0", "MIT", "BSD-3-Clause", "ISC", "Unicode-3.0"]
+
+[bans]
+# Transitive SDK dependencies can legitimately select more than one compatible major.
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

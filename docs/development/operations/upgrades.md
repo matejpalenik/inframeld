@@ -20,6 +20,10 @@ Future production ingress must keep Hydra administration private and expose only
 
 <a id="1-understand-the-compatibility-boundary"></a>
 
+## CLI and runtime release pairing
+
+[ADR-0095](../../adr/ADR-0095-support-matching-qualified-cli-and-runtime-releases.md) selects explicitly qualified matching CLI/runtime releases initially. Upgrade them as a coordinated pair. Development CLI builds claim no released runtime support. Offline version output identifies the supported pair when one has been qualified, but remote compatibility remains unverified until a backend version contract is delivered. Health and login success cannot replace that check. A decode failure never authorizes repeating a write.
+
 ## Understand the compatibility boundary
 
 API and worker releases must be compatible with the same stored data. That includes the database **schema**, its tables, fields, and relationships.

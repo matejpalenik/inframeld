@@ -240,11 +240,13 @@ class HydraTestProvider:
         client_id: str = CLIENT_ID,
         endpoints: HydraTestEndpointsDTO = DEFAULT_HYDRA_ENDPOINTS,
         redirect_uri: str = REDIRECT_URI,
+        kratos_public_url: str = KRATOS_PUBLIC_URL,
     ) -> None:
         self._client = client
         self._client_id = client_id
         self._endpoints = endpoints
         self._redirect_uri = redirect_uri
+        self._kratos_public_url = kratos_public_url
 
     async def begin_login(
         self,
@@ -260,10 +262,13 @@ class HydraTestProvider:
         an approval which was prepared before cleanup and submitted afterward.
         """
         whoami = await self._client.get(
-            f"{KRATOS_PUBLIC_URL}/sessions/whoami",
+            f"{self._kratos_public_url}/sessions/whoami",
             headers={"Cookie": f"ory_kratos_session={human.credential.value}"},
         )
-        _require_status(whoami, 200)
+        assert whoami.status_code == 200, (
+            f"Kratos session check at {self._kratos_public_url} returned "
+            f"{whoami.status_code} - expected 200."
+        )
         subject = IdentitySubject(str(WhoamiResponse.model_validate_json(whoami.text).identity.id))
         assert subject == human.subject
 
@@ -727,6 +732,7 @@ async def hydra_test_provider(
     *,
     client_id: str = CLIENT_ID,
     transport: httpx2.AsyncBaseTransport | None = None,
+    kratos_public_url: str = KRATOS_PUBLIC_URL,
 ) -> AsyncGenerator[HydraTestProvider]:
     """Own one test client registration and remove it even after a scenario fails.
 
@@ -764,7 +770,9 @@ async def hydra_test_provider(
             )
             _require_status(created, 201)
             try:
-                yield HydraTestProvider(client, client_id=client_id)
+                yield HydraTestProvider(
+                    client, client_id=client_id, kratos_public_url=kratos_public_url
+                )
             finally:
                 _require_status(await client.delete(client_url), 204)
     finally:

@@ -184,6 +184,7 @@ async def test_stages_stop_before_approval_and_exchange_with_the_original_pkce_v
     async with httpx2.AsyncClient(transport=transport) as client:
         provider = HydraTestProvider(client)
         pending = await provider.begin_login(HUMAN)
+        assert str(transport.requests[0].url) == f"{KRATOS_PUBLIC_URL}/sessions/whoami"
         assert [request.url.path for request in transport.requests] == [
             "/sessions/whoami",
             "/oauth2/auth",
@@ -266,6 +267,57 @@ async def test_wrong_kratos_identity_is_rejected_before_starting_authorization()
         with pytest.raises(AssertionError):
             await HydraTestProvider(client).begin_login(HUMAN)
     assert len(transport.requests) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kratos_public_url", [KRATOS_PUBLIC_URL, "http://kratos-recovery-execution:4433"]
+)
+async def test_session_verification_uses_selected_kratos_and_original_cookie(
+    kratos_public_url: str,
+) -> None:
+    transport = MockHydraTransport()
+    async with httpx2.AsyncClient(transport=transport) as client:
+        await HydraTestProvider(client, kratos_public_url=kratos_public_url).begin_login(HUMAN)
+    assert str(transport.requests[0].url) == f"{kratos_public_url}/sessions/whoami"
+    assert transport.requests[0].headers["cookie"] == "ory_kratos_session=cookie-secret"
+
+
+@pytest.mark.asyncio
+async def test_kratos_rejection_stops_before_authorization_and_exposes_no_cookie() -> None:
+    calls: list[httpx2.Request] = []
+
+    def reject(request: httpx2.Request) -> httpx2.Response:
+        calls.append(request)
+        return httpx2.Response(401, json={"error": {"id": "session_inactive"}})
+
+    async with httpx2.AsyncClient(transport=httpx2.MockTransport(reject)) as client:
+        with pytest.raises(AssertionError) as failure:
+            await HydraTestProvider(client).begin_login(HUMAN)
+    assert len(calls) == 1
+    assert str(calls[0].url) == f"{KRATOS_PUBLIC_URL}/sessions/whoami"
+    assert "cookie-secret" not in str(failure.value)
+
+
+@pytest.mark.asyncio
+async def test_provider_context_forwards_selected_kratos_endpoint() -> None:
+    from tests.support.hydra_provider import hydra_test_provider
+
+    transport = MockHydraTransport()
+
+    async def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path.startswith("/admin/clients"):
+            return httpx2.Response(204 if request.method == "DELETE" else 201)
+        return await transport.handle_async_request(request)
+
+    async with hydra_test_provider(
+        transport=httpx2.MockTransport(respond),
+        kratos_public_url="http://kratos-recovery-execution:4433",
+    ) as provider:
+        await provider.begin_login(HUMAN)
+    assert str(transport.requests[0].url) == (
+        "http://kratos-recovery-execution:4433/sessions/whoami"
+    )
 
 
 @pytest.mark.asyncio

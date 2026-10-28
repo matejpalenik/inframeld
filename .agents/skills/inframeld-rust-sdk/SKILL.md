@@ -23,7 +23,7 @@ The [generated client](../../../packages/sdk-rust/generated/client.rs) owns impl
 
 ## Explain or change
 
-For a question, inspect and explain. Loading this skill grants no edit, publication or external-action authority. Repository code planning, suggestions and changes require [Coding Standards](../inframeld-coding-standards/SKILL.md), applying the existing Rust guidance rather than backend-only conventions.
+For a question, inspect and explain. Loading this skill grants no edit, publication or external-action authority. Repository code planning, suggestions and changes require [Coding Standards](../inframeld-coding-standards/SKILL.md), plus [Rust Standards](../inframeld-rust-standards/SKILL.md), without applying backend Python declarations. Generated sources remain generator-owned.
 
 For ordinary SDK consumption, read only the relevant generated model/method and its native contract. Keep login orchestration, credential storage and command presentation with their existing owners. Load Application Contracts when HTTP behavior or retry meaning is affected, rather than importing backend domain rules into the SDK.
 

@@ -420,3 +420,7 @@ Use `docker compose` on Docker. Do not add a root/privileged override or expose 
 Exit 0 returns the original accepted result: `cleanup-authorized` includes its run ID and UTC deadline, while `already-completed` and `cleanup-confirmed` create no provider run. Exit 2 means invalid input/configuration. Exit 1 means an operational failure or controlled rejection, with a safe code. `cleanup_run_active` means the existing budget still owns the work, including a live final attempt. A missing or interrupted stdout response is unknown. Send the **same exact request and request ID** to recover its original result. A new ID authorizes new work and is not a substitute for recovering a lost acknowledgment.
 
 One immutable receipt retains both replay meaning and operator audit history. The command preserves prior runs, consumed attempts and confirmed steps. It neither calls Hydra nor releases access. The existing recovery worker executes unfinished work and applies normal proof-backed completion. See [the complete maintenance contract](../../../.agents/skills/inframeld-access-models/references/host-maintenance.md#recovery-cleanup-continuation).
+
+## Rust CLI development
+
+The [CLI guide](../../../apps/cli/README.md) covers the pinned Rust toolchain, clap-based offline commands, generated SDK adapter, strict checks and build-only packaging. `cargo run --locked -p inframeld-cli -- --help` requires no running backend. Installing the executable does not start the managed runtime.

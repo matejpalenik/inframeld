@@ -43,8 +43,9 @@ services:
         "-e",
         "--yes",
       ]
-    volumes:
+    volumes: &kratos_test_volumes
       - ./config/kratos:/etc/config/kratos:ro
+      - inframeld_test_tls_trust:/run/inframeld-test-tls/trust:ro
     depends_on:
       kratos-postgres:
         condition: service_healthy
@@ -55,12 +56,51 @@ services:
       MP_SMTP_TLS_KEY: sans:mailpit
       MP_SMTP_REQUIRE_STARTTLS: "true"
       MP_SMTP_AUTH_ACCEPT_ANY: "true"
+  test-tls-init:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    volumes:
+      - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+      - inframeld_test_tls_trust:/run/inframeld-test-tls/trust
+      - inframeld_test_tls_identity:/run/inframeld-test-tls/identity
+    entrypoint: ["python", "-m", "tests.support.generate_test_tls"]
+
+  password-breaches:
+    image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
+    pull_policy: never
+    volumes:
+      - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+      - inframeld_test_tls_identity:/run/inframeld-test-tls/identity:ro
+    read_only: true
+    tmpfs: [/tmp]
+    entrypoint:
+      [
+        "python",
+        "-m",
+        "uvicorn",
+        "tests.support.password_breaches:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8443",
+        "--ssl-keyfile",
+        "/run/inframeld-test-tls/identity/server.key",
+        "--ssl-certfile",
+        "/run/inframeld-test-tls/identity/server.pem",
+        "--no-access-log",
+        "--log-level",
+        "warning",
+      ]
+
   kratos:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
-    volumes:
-      - ./config/kratos:/etc/config/kratos:ro
+    volumes: *kratos_test_volumes
     environment:
       SESSION_LIFESPAN: 8h
+      SSL_CERT_FILE: /run/inframeld-test-tls/trust/ca.pem
     command:
       [
         "serve",
@@ -75,6 +115,8 @@ services:
       mailpit:
         condition: service_started
       recovery-hooks:
+        condition: service_started
+      password-breaches:
         condition: service_started
 
   mock-oidc:
@@ -105,10 +147,10 @@ services:
 
   kratos-expiring:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
-    volumes:
-      - ./config/kratos:/etc/config/kratos:ro
+    volumes: *kratos_test_volumes
     environment:
       SESSION_LIFESPAN: 15s
+      SSL_CERT_FILE: /run/inframeld-test-tls/trust/ca.pem
     command:
       - serve
       - -c
@@ -282,10 +324,10 @@ services:
 
   kratos-recovery:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
-    volumes:
-      - ./config/kratos:/etc/config/kratos:ro
+    volumes: *kratos_test_volumes
     environment:
       SESSION_LIFESPAN: 8h
+      SSL_CERT_FILE: /run/inframeld-test-tls/trust/ca.pem
     command:
       [
         "serve",
@@ -361,10 +403,10 @@ services:
 
   kratos-recovery-execution:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
-    volumes:
-      - ./config/kratos:/etc/config/kratos:ro
+    volumes: *kratos_test_volumes
     environment:
       SESSION_LIFESPAN: 8h
+      SSL_CERT_FILE: /run/inframeld-test-tls/trust/ca.pem
     command:
       [
         "serve",
@@ -409,6 +451,7 @@ services:
       - ./apps/backend/migrations:/workspace/apps/backend/migrations:ro
       - ./apps/backend/alembic.ini:/workspace/apps/backend/alembic.ini:ro
       - ./apps/backend/.env.test.example:/workspace/apps/backend/.env.test:ro
+      - inframeld_test_tls_trust:/run/inframeld-test-tls/trust:ro
     read_only: true
     tmpfs:
       - /tmp
@@ -416,6 +459,14 @@ services:
     command: ["tests/integration"]
 
 volumes:
+  inframeld_test_tls_trust:
+    name: inframeld_test_tls_trust
+    labels: &test_tls_labels
+      org.inframeld.test-project: inframeld-test
+      org.inframeld.disposable-tls: "true"
+  inframeld_test_tls_identity:
+    name: inframeld_test_tls_identity
+    labels: *test_tls_labels
   inframeld_test_postgres_data:
     name: inframeld_test_postgres_data
   inframeld_test_kratos_postgres_data:

@@ -20,7 +20,7 @@ Use this guide when adding or rewriting documentation. A new maintainer should b
 | Unresolved alternatives and decision trigger | The existing owning `decision-*.md` reference. |
 | Agent discovery and task method | Concise `SKILL.md` metadata/body with direct conditional links. |
 | Shared SDK maintenance and cross-language qualification | [SDKs](../../.agents/skills/inframeld-sdks/SKILL.md), with independently discoverable language skills for specific behavior. Application Contracts retains HTTP semantics and compatibility. |
-| Test layers, dependency isolation and verification evidence | [Testing](../../.agents/skills/inframeld-testing/SKILL.md). Coding Standards retains TDD and test-code conventions, domains retain business expectations, and runbooks retain commands. |
+| Test layers, dependency isolation and verification evidence | [Testing](../../.agents/skills/inframeld-testing/SKILL.md). The shared Coding Standards retains TDD/documentation, language standards retain test-code conventions, domains retain business expectations, and runbooks retain commands. |
 | Development and operator procedures | Human guides and runbooks, with current implementation limits explicit. |
 
 Give each rule one detailed owner. A human guide may explain its purpose briefly, then link to that owner. Avoid parallel specifications, large required reading stacks and copies of exact code declarations. Existing code may intentionally lag accepted design. Label that gap rather than changing the target during editing.

@@ -4,7 +4,7 @@ Alice loses a permission while the same local principal still identifies her. Bo
 
 **Status:** the linked Python definitions implement the models described here. Their existence does not establish all account, membership or credential workflows. Code owns exact declarations. No new application type, stored field or lifecycle operation is introduced by this reference.
 
-Read only the relevant model below. For logical relationships use [Identity and grants](identity-and-grant-records.md). For database structure use [Access persistence](access-persistence.md). For complete implementation examples use [Coding Standards](../../inframeld-coding-standards/references/aggregates-and-repositories.md).
+Read only the relevant model below. For logical relationships use [Identity and grants](identity-and-grant-records.md). For database structure use [Access persistence](access-persistence.md). For complete implementation examples use [Python Standards](../../inframeld-python-standards/references/aggregates-and-repositories.md).
 
 <a id="implemented-principal-model"></a>
 
@@ -31,7 +31,7 @@ Equality and hashing follow `PrincipalId`, so snapshots of one account remain th
 
 The implemented project target is `ProjectActionTargetDTO(ProjectId)`. No generic bare-UUID resource target is implied.
 
-For component responsibilities and conversion examples, use [application conventions](../../inframeld-coding-standards/references/component-roles-and-imports.md#component-conventions). For HTTP outcomes and verification scope, use [the implemented authentication boundary](credential-dispatch.md#implemented-human-authentication).
+For component responsibilities and conversion examples, use [application conventions](../../inframeld-python-standards/references/component-roles-and-imports.md#component-conventions). For HTTP outcomes and verification scope, use [the implemented authentication boundary](credential-dispatch.md#implemented-human-authentication).
 
 <a id="project-membership-aggregate"></a>
 
@@ -45,11 +45,11 @@ Each immutable `ProjectActionGrant` child is identified by project, recipient an
 
 The specific repository reconstitutes this model from `project_memberships` and all matching direct `project_action_grants` rows with one scoped typed outer join. Its private infrastructure snapshots compare complete values independently of entity identity. Loaded instances and snapshots belong to one active transaction, are never cached across requests, and must be discarded after a failed save or transaction end.
 
-The supported delta is attributed use-only additions. An unchanged save does no writes. Additions preserve existing grant values, attribution and database-generated timestamps, conditionally increment the existing project-wide access revision once, and append required audit with the original operation ID. No membership version, new grant ID or schema migration is introduced. Authorization readers retain current eligibility/delegation checks and existing locks. [ADR-0068](../../../../docs/adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md) owns the aggregate decision, and [application structure](../../inframeld-coding-standards/references/aggregates-and-repositories.md#membership-aggregate-and-repository) owns transaction/snapshot behavior. Membership provisioning, updates/revocation and cross-member lifecycle operations remain deferred.
+The supported delta is attributed use-only additions. An unchanged save does no writes. Additions preserve existing grant values, attribution and database-generated timestamps, conditionally increment the existing project-wide access revision once, and append required audit with the original operation ID. No membership version, new grant ID or schema migration is introduced. Authorization readers retain current eligibility/delegation checks and existing locks. [ADR-0068](../../../../docs/adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md) owns the aggregate decision, and [application structure](../../inframeld-python-standards/references/aggregates-and-repositories.md#membership-aggregate-and-repository) owns transaction/snapshot behavior. Membership provisioning, updates/revocation and cross-member lifecycle operations remain deferred.
 
 ## Failures and implementation limits
 
-An ID wrapper proves neither existence nor authority. `ProjectMembership` rejects duplicate assignments without replacing state, while persistence or audit failures propagate to the owning transaction. Its supported repository delta remains attributed use-only additions. Use the [complete service example](../../inframeld-coding-standards/references/services-and-use-cases.md) for authorization, replay, revision checking and commit ordering. Creating or removing memberships needs its separately approved workflow.
+An ID wrapper proves neither existence nor authority. `ProjectMembership` rejects duplicate assignments without replacing state, while persistence or audit failures propagate to the owning transaction. Its supported repository delta remains attributed use-only additions. Use the [complete service example](../../inframeld-python-standards/references/services-and-use-cases.md) for authorization, replay, revision checking and commit ordering. Creating or removing memberships needs its separately approved workflow.
 
 ## Sources
 

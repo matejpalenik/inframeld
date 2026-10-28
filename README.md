@@ -61,6 +61,7 @@ Inframeld is intentionally structured as a small monorepo so the API, web client
 | Path                | Purpose                                           |
 | ------------------- | ------------------------------------------------- |
 | `apps/backend`      | Typed FastAPI application and OpenAPI export      |
+| `apps/cli`          | Rust CLI foundation using the generated SDK       |
 | `apps/web`          | Next.js App Router web client                     |
 | `contracts/openapi` | Committed API contract generated from FastAPI     |
 | `docs`              | Architecture, development documentation, and ADRs |
@@ -117,7 +118,7 @@ Start with [Understanding Inframeld](docs/ARCHITECTURE.md) for the product, its 
 
 Architecture documentation describes both implemented and planned behavior. Acceptance does not mean a feature has been implemented or qualified. The previously linked v1 review and skills plan are [unavailable historical material](docs/development/documentation-maintenance.md#unavailable-historical-material), not evidence recovered by this rewrite.
 
-V1 is CLI-first, with a Rust CLI and the small Ory browser account UI needed for human login. The full Studio is deferred. Backend implementation continues first; application clients are generated from native OpenAPI without selecting a generator package here. The commands above run today's repository scaffolding, not an already delivered CLI. See the [delivery plan](.agents/skills/inframeld-architecture/references/v1-scope-and-extension-boundaries.md) and [Definition of Done](docs/development/definition-of-done.md).
+V1 is CLI-first, with a Rust CLI and the small Ory browser account UI needed for human login. The full Studio is deferred. Backend implementation continues first; application clients are generated from native OpenAPI without selecting a generator package here. The [CLI foundation](apps/cli/README.md) provides offline help and version information. Product commands and complete login remain delivery work. See the [delivery plan](.agents/skills/inframeld-architecture/references/v1-scope-and-extension-boundaries.md) and [Definition of Done](docs/development/definition-of-done.md).
 
 ## Contributing
 

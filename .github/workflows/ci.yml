@@ -110,10 +110,32 @@ jobs:
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,version=2,scope=inframeld-integration-linux-amd64,mode=min,ignore-error=true,timeout=2m' || '' }}
 
       - name: Run backend integration tests with PostgreSQL, Kratos and Hydra
+        id: integration
         env:
           INFRAMELD_CONTAINER_RUNTIME: docker
           INFRAMELD_INTEGRATION_IMAGE: localhost/inframeld-integration-tests:ci
         run: pnpm test:integration
+
+      - name: Verify integration teardown
+        if: ${{ !cancelled() && steps.integration.outcome != 'skipped' }}
+        run: |
+          set -euo pipefail
+          containers="$(docker ps -aq --filter label=com.docker.compose.project=inframeld-test)"
+          networks="$(docker network ls -q --filter label=com.docker.compose.project=inframeld-test)"
+          if [[ -n "$containers" || -n "$networks" ]]; then
+            printf 'Integration containers or networks survived teardown.\n' >&2
+            exit 1
+          fi
+          volumes="$(docker volume ls --format '{{.Name}}')"
+          for volume in inframeld_test_tls_trust inframeld_test_tls_identity; do
+            case $'\n'"$volumes"$'\n' in
+              *$'\n'"$volume"$'\n'*)
+                printf 'Disposable TLS volume survived teardown: %s\n' "$volume" >&2
+                exit 1
+                ;;
+            esac
+          done
+          docker volume inspect inframeld_test_postgres_data inframeld_test_kratos_postgres_data >/dev/null
 
   quality:
     name: Quality
@@ -171,6 +193,9 @@ jobs:
           Path(sys.argv[1]).write_bytes(secrets.token_bytes(32))
           PY
           printf 'INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE=%s\n' "$key_file" >> "$GITHUB_ENV"
+
+      - name: Set up pinned Rust for CLI checks
+        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
 
       - name: Verify toolchain versions
         run: |

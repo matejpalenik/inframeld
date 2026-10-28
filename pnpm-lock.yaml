@@ -196,6 +196,8 @@ importers:
 
   apps/backend: {}
 
+  apps/cli: {}
+
   apps/web:
     dependencies:
       '@base-ui/react':

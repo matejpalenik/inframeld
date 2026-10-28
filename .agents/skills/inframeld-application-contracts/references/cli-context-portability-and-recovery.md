@@ -52,6 +52,7 @@ All commands remain scriptable with descriptive dry-run behavior, while exact wi
 
 - [CLI context](cli-targets-and-accounts.md#cli-context), [configuration portability](configuration-export-and-import.md), [jobs and recovery](jobs-and-recovery.md), [shared change presentation](cli-change-review.md#cli-change-presentation) and [Pipeline change review](cli-change-review.md#change-review).
 - [V1 scope](../../inframeld-architecture/references/v1-scope-and-extension-boundaries.md), [resource names](../../inframeld-architecture/references/resource-names-and-identity.md#resource-naming), [Evaluation transfer](../../inframeld-evaluation/references/history-and-dataset-transfer.md#dataset-portability), [Access automation](../../inframeld-access-models/references/actions-and-initial-grants.md#cli-automation-authority) and [Access contracts](../../inframeld-access-models/references/actions-and-initial-grants.md).
+- [CLI/runtime compatibility](decision-cli-server-compatibility.md), accepted under [ADR-0095](../../../../docs/adr/ADR-0095-support-matching-qualified-cli-and-runtime-releases.md).
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
@@ -60,5 +61,4 @@ All commands remain scriptable with descriptive dry-run behavior, while exact wi
 Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
 
 - [PD-CONTRACTS-04: Bind import review and partial recovery to exact actions](decision-import-review-and-recovery.md). Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery.
-- [PD-CONTRACTS-03: Define supported CLI and server release combinations](decision-cli-server-compatibility.md). Before distributing independently installable CLI/runtime releases or making a compatibility-sensitive public contract change.
 - [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.

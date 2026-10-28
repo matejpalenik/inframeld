@@ -37,7 +37,7 @@ Commands:
   configure-oauth    Reconcile the official CLI client through private Hydra administration.
   test-services-up    Prepare the integration image and start its private dependencies.
   test-run [args...]   Run integration tests; optional arguments are passed to pytest.
-  test-services-down  Remove project-labelled test containers/networks; keep volumes.
+  test-services-down  Remove test containers/networks and TLS volumes; keep database volumes.
 EOF
 }
 
@@ -216,12 +216,30 @@ test_container_command() {
     return 0
 }
 
+cleanup_test_tls_volumes() {
+    local volumes volume project disposable
+    volumes="$("${container_command}" volume ls --format '{{.Name}}')" || return 1
+    for volume in inframeld_test_tls_trust inframeld_test_tls_identity; do
+        case $'\n'"${volumes}"$'\n' in
+            *$'\n'"${volume}"$'\n'*) ;;
+            *) continue ;;
+        esac
+        project="$("${container_command}" volume inspect --format '{{index .Labels "org.inframeld.test-project"}}' "${volume}")" || return 1
+        disposable="$("${container_command}" volume inspect --format '{{index .Labels "org.inframeld.disposable-tls"}}' "${volume}")" || return 1
+        if [[ "${project}" != inframeld-test || "${disposable}" != true ]]; then
+            printf 'Refusing to remove TLS volume with unexpected ownership labels: %s\n' "${volume}" >&2
+            return 1
+        fi
+        "${container_command}" volume rm "${volume}" >/dev/null || return 1
+    done
+}
+
 cleanup_test_services() {
     local remaining id dependencies attempt networks service runners
     local ids=()
     # One-off runners have no runtime dependencies under run --no-deps. Stop
     # them explicitly before touching providers, including the old Hydra runner.
-    for service in integration-tests hydra-tests; do
+    for service in integration-tests hydra-tests test-tls-init; do
         runners="$(test_resource_ids container "${service}")" || return 1
         if [[ -n "${runners}" ]]; then
             while IFS= read -r id; do
@@ -271,6 +289,18 @@ cleanup_test_services() {
         printf 'Test network cleanup failed; remaining IDs:\n%s\n' "${remaining}" >&2
         return 1
     fi
+    cleanup_test_tls_volumes
+}
+
+cleanup_failed_test_startup() {
+    local startup_status=$?
+    trap - EXIT
+    if ! cleanup_test_services; then
+        if [[ "${startup_status}" -eq 0 ]]; then
+            startup_status=1
+        fi
+    fi
+    exit "${startup_status}"
 }
 
 command_name="${1:-}"
@@ -331,6 +361,8 @@ case "${command_name}" in
         fi
         ;;
     test-services-up)
+        # Direct startup also cleans partial initialization after a failure.
+        trap cleanup_failed_test_startup EXIT
         cleanup_test_services
         if [[ -n "${INFRAMELD_INTEGRATION_IMAGE:-}" ]]; then
             # CI loads the current image after a cache-aware Buildx build.
@@ -343,7 +375,9 @@ case "${command_name}" in
         else
             test_compose build integration-tests
         fi
-        test_compose up -d postgres mailpit mock-oidc recovery-hooks kratos kratos-expiring hydra hydra-lifetimes recovery-callbacks kratos-recovery recovery-execution-callbacks kratos-recovery-execution
+        test_compose run --rm --no-deps -T test-tls-init
+        test_compose up -d postgres mailpit mock-oidc password-breaches recovery-hooks kratos kratos-expiring hydra hydra-lifetimes recovery-callbacks kratos-recovery recovery-execution-callbacks kratos-recovery-execution
+        trap - EXIT
         ;;
     test-run)
         # Replace this shell so interruption can terminate the Compose process.

@@ -86,7 +86,6 @@ These entries retain unresolved review findings, not accepted specifications or 
 | [PD-RELEASES-01](../../inframeld-releases/references/decision-deployment-state-and-concurrency.md) | releases | Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding. |
 | [PD-CONTRACTS-01](../../inframeld-application-contracts/references/decision-gateway-enforcement.md) | application-contracts | Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism. |
 | [PD-CONTRACTS-02](../../inframeld-application-contracts/references/decision-spending-coordination.md) | application-contracts | Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery. |
-| [PD-CONTRACTS-03](../../inframeld-application-contracts/references/decision-cli-server-compatibility.md) | application-contracts | Before distributing independently installable CLI/runtime releases or making a compatibility-sensitive public contract change. |
 | [PD-CONTRACTS-04](../../inframeld-application-contracts/references/decision-import-review-and-recovery.md) | application-contracts | Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery. |
 | [PD-CONTRACTS-05](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md) | application-contracts | When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation. |
 | [PD-ARCHITECTURE-01](decision-supported-operating-envelope.md) | architecture | Before fixing production resource/admission limits or advertising supported corpus size, throughput, latency or concurrency. |
@@ -94,6 +93,7 @@ These entries retain unresolved review findings, not accepted specifications or 
 
 ### Resolved decision references
 
+- [PD-CONTRACTS-03](../../inframeld-application-contracts/references/decision-cli-server-compatibility.md) is accepted under [ADR-0095](../../../../docs/adr/ADR-0095-support-matching-qualified-cli-and-runtime-releases.md). Follow its CLI/runtime compatibility policy. Remote enforcement and release-pair qualification remain separate delivery work.
 - [PD-ACCESS-04](../../inframeld-access-models/references/decision-recovery-first-admission.md) is accepted under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). Follow [identity coordination](../../inframeld-access-models/references/identity-admission-coordination.md) before implementing first admission, recovery admission/completion or credential-state initialization. The shared coordinator and recovery/initialization participants are implemented with PostgreSQL concurrency coverage. Complete first-admission integration remains unfinished.
 
 <a id="business-areas-and-state-ownership"></a>

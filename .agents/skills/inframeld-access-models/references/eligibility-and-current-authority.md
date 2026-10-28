@@ -38,7 +38,7 @@ The complete grant service also checks that authorization returned the project r
 
 <a id="project-membership-grant-model"></a>
 
-The supported use-only grant applies these checks before its [load, business action and save sequence](../../inframeld-coding-standards/references/services-and-use-cases.md). Its repository supports attributed additions, not membership provisioning or arbitrary grant updates. The [aggregate/repository example](../../inframeld-coding-standards/references/aggregates-and-repositories.md) owns snapshots, persistence failures and transaction lifetime.
+The supported use-only grant applies these checks before its [load, business action and save sequence](../../inframeld-python-standards/references/services-and-use-cases.md). Its repository supports attributed additions, not membership provisioning or arbitrary grant updates. The [aggregate/repository example](../../inframeld-python-standards/references/aggregates-and-repositories.md) owns snapshots, persistence failures and transaction lifetime.
 
 <a id="human-credential-version-flow"></a>
 

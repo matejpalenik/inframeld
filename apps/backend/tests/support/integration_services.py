@@ -1,4 +1,11 @@
-"""Addresses reachable only inside the dedicated integration Compose network."""
+"""Private integration endpoints and shared fixture paths."""
+
+from pathlib import Path
+
+TLS_TRUST_DIRECTORY = Path("/run/inframeld-test-tls/trust")
+TLS_IDENTITY_DIRECTORY = Path("/run/inframeld-test-tls/identity")
+TLS_CA_FILE = TLS_TRUST_DIRECTORY / "ca.pem"
+TLS_EXPIRY_FILE = TLS_TRUST_DIRECTORY / "server-not-after.txt"
 
 POSTGRES_HOST = "postgres"
 POSTGRES_PORT = 5432
@@ -12,3 +19,4 @@ LIFETIME_HYDRA_ADMIN_URL = "http://hydra-lifetimes:4445"
 MAILPIT_URL = "http://mailpit:8025"
 MOCK_OIDC_URL = "http://mock-oidc:8080"
 RECOVERY_HOOKS_URL = "http://recovery-hooks:8080"
+PASSWORD_BREACHES_URL = "https://password-breaches:8443"
