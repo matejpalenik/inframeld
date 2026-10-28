@@ -92,3 +92,45 @@ async def test_cancelled_key_setup_does_not_claim_readiness() -> None:
         finally:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_readiness_retains_safe_status_until_success() -> None:
+    pending = {"fixture"}
+    failures: dict[str, str] = {}
+    calls = 0
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx2.Response(503, text="secret upstream response")
+        assert failures == {"fixture": "HTTP 503"}
+        return httpx2.Response(200)
+
+    async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
+        await wait_for_http(client, "fixture", "https://fixture/health", pending, failures)
+    assert not pending
+    assert not failures
+
+
+@pytest.mark.asyncio
+async def test_signing_key_readiness_retains_safe_failure_and_clears_it_on_success() -> None:
+    pending = {"hydra-keys"}
+    failures: dict[str, str] = {}
+    calls = 0
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx2.Response(503, text="secret upstream text")
+        assert failures == {"hydra-keys": "HTTP 503"}
+        return httpx2.Response(200, json={"keys": [{"kid": "test-key"}]})
+
+    async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
+        await wait_for_hydra_signing_keys(
+            client, "hydra-keys", "http://hydra:4444", pending, failures
+        )
+    assert not pending
+    assert not failures

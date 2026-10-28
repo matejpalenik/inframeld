@@ -1,14 +1,13 @@
 """Supply deterministic password-breach responses inside the private test network."""
 
 import ssl
-from pathlib import Path as FilePath
 from typing import Annotated
 
 import httpx2
 from fastapi import FastAPI, Path
 from fastapi.responses import PlainTextResponse
 
-from tests.support.integration_services import PASSWORD_BREACHES_URL
+from tests.support.integration_services import PASSWORD_BREACHES_URL, TLS_CA_FILE
 
 BREACHED_PASSWORD = "Test-only-breached-Passphrase-987!"
 # Public HIBP protocol vectors, checked independently by native Kratos tests.
@@ -16,14 +15,13 @@ BREACHED_PASSWORD_SHA1 = "F9F2973407885FA3286156776CBD37453BC010C2"
 CLEAN_PASSWORD = "Test-only-clean-Passphrase-753!"
 CLEAN_PASSWORD_PREFIX = "AB3EC"
 HashPrefix = Annotated[str, Path(pattern=r"^[0-9a-fA-F]{5}$")]
-CA_FILE = FilePath(__file__).resolve().parents[1] / "fixtures/password-breaches/ca.pem"
 
 
 def create_client() -> httpx2.AsyncClient:
     """Verify the fixture's hostname and test CA without trusting proxy environment variables."""
     return httpx2.AsyncClient(
         base_url=PASSWORD_BREACHES_URL,
-        verify=ssl.create_default_context(cafile=str(CA_FILE)),
+        verify=ssl.create_default_context(cafile=str(TLS_CA_FILE)),
         timeout=2,
         trust_env=False,
     )

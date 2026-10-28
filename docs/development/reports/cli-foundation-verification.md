@@ -131,3 +131,135 @@ An intermediate quality run caught a missing import in the added TLS regression.
 The first pushed repair commit, `48e3e06`, exposed CodeQL findings for runtime SHA-1 calculations in HIBP test support. HIBP requires SHA-1 protocol values, but this fixture does not need to calculate them. The follow-up uses precomputed hashes/prefixes for public clean and breached test passwords. Real Kratos independently computes the protocol values, and the native tests verify both lookup observations and acceptance/rejection. All three native breach scenarios passed after that change, alongside the six fixture unit cases, Ruff and strict Pyright. No security query, scan gate or TLS check is suppressed.
 
 The [PR checks](https://github.com/matejpalenik/inframeld/pull/268/checks) remain the authority for remote results on the revision being merged. Local Podman execution does not establish Docker CI execution, and the earlier green native CLI matrix does not qualify a later repair revision. Merge requires the applicable Quality, Backend foundation, SDK conformance and native CLI checks to pass on that revision. No test skips, blanket timeout increases, SDK-gate bypasses or production password-policy changes were introduced.
+
+## Disposable integration TLS verification, 28 October 2026
+
+This work supersedes the checked-in public certificates used by the initial PR repair above. The private stack now generates one CA and a 24-hour server identity per stack lifetime using the locked development dependency `trustme==1.2.1`. The proposed `1.3.0` pin was unavailable from PyPI, so the implementation uses the verified published release. Existing locked dependency versions remain unchanged. The only added packages are trustme, cryptography, cffi and pycparser.
+
+The network-isolated initializer uses the existing integration image. It prepares fresh volume ownership as container root, clears supplementary groups and switches to UID/GID `10001` before key generation. Only the public CA is distributed to Kratos and the runner. Only the breach fixture receives the server key. The CA signing key is never exported. All consumers mount their material read-only, and verified HTTPS readiness retains the existing startup deadline. Teardown removes only the two exact-name, ownership-labelled TLS volumes and retains database volumes.
+
+### Behavioral evidence
+
+- All six new certificate tests failed against the API-only scaffold with `NotImplementedError`, then passed against generation behavior.
+- Real TLS connections accepted the generated CA and rejected an incorrect hostname, an unrelated stack's CA and an expired server certificate. Tests checked the exact DNS identity, validity interval, exported files and permissions, plus rejection of non-empty output directories.
+- Local Podman confirmed that the fixture runs as UID `10001`, reads a `0600` key owned by that user, and has no trust-volume mount. Both TLS volumes carried the expected ownership labels.
+- Six native breach and recovery-worker scenarios passed, followed by both browser recovery-boundary scenarios. The public CA fingerprint remained identical across these repeated runs.
+- Selecting the cached base Python image deliberately broke TLS initialization before provider startup. Startup exited nonzero, and cleanup left no project containers or disposable TLS volumes. Both named database volumes survived.
+- Requesting a nonexistent test deliberately produced wrapper exit `4` after verified readiness. Teardown removed project containers and TLS volumes while preserving the database volumes.
+- Sending TERM to the wrapper after verified readiness produced exit `143`. Teardown again removed project containers and TLS volumes while preserving the database volumes.
+- A standalone initializer left volumes behind to simulate abrupt termination. The next full integration startup removed them and generated a different public CA fingerprint.
+- An empty volume with the exact TLS trust-volume name but incorrect ownership labels caused teardown to fail visibly. The guard preserved it. The deliberately created negative-test volume was then removed explicitly.
+
+### Checks on the implementation worktree
+
+| Check | Result |
+| --- | --- |
+| Focused certificate, breach-fixture and readiness unit tests | 18 passed |
+| Native breach and recovery-worker tests | 6 passed |
+| Browser recovery-boundary tests | 2 passed |
+| Backend checks | Passed. Ruff, formatting, strict Pyright, 1573 fast tests passed with 508 service-dependent cases skipped, and 13 OpenAPI checks passed |
+| Complete pnpm check | Passed. Backend fast tests ran with the same counts. CLI/xtask and other workspace tasks passed, with unchanged tasks eligible for Turbo cache |
+| Full private integration suite | 508 passed, no skipped tests, in 217.57 seconds. Successful teardown removed TLS volumes and retained both named database volumes |
+| Shell syntax, documentation formatting and diff checks | Passed, including the final report update |
+| Testing skill validation | Passed. Cleanup guidance was reconciled with the implemented lifetime. No discovery or activation rules changed |
+
+Environment: local macOS ARM64 with Podman 5.8.1 and the pinned repository toolchains. Docker is not installed on this host. Docker CI and final-revision remote PR checks have not been run for this worktree. The earlier CI results above do not qualify these uncommitted changes. No production policy, generated SDK or Rust CLI behavior changed. The existing AnyIO deprecation warning remains.
+
+## Superseded coordination experiment, 28 October 2026
+
+Historical evidence only. The lock supervisor, worktree ownership protocol and dedicated lifecycle suite described in this section were subsequently removed. Their commands and guarantees are no longer supported. The serial-harness verification below supersedes this implementation.
+
+The experimental shared stack used a standard-library `fcntl.flock` supervisor, launched through pinned Python 3.13.12 using uv. Commands acquired a stable per-user lock before touching stack resources. Nested calls validated the inherited descriptor and kernel lock. The wrapper retained ownership through cleanup, and a separate record protected a running manual stack between commands. Ownership records used atomic replacement. The lock inode was not removed during release. The recorded runtime was checked when switching between Docker and Podman.
+
+The runner reports safe readiness categories without arbitrary exception text or response bodies. Public expiry metadata is exported beside the CA and checked before network readiness. Expired or incomplete metadata fails immediately with the exact stop, start and rerun sequence. Certificate verification and the shared 60-second startup deadline remain unchanged. TLS paths now live in neutral integration configuration rather than the generator module.
+
+The removed `pnpm test:integration:lifecycle` command ran a host-side suite against the real scripts and a prebuilt private test image. Temporary JSON Compose overrides supplied controlled initializer failures and success, failure or blocking pytest cases inside the existing test image. No tracked test source was rewritten. The experimental Backend foundation configuration ran this qualification before the complete application integration suite without changing the job timeout.
+
+### Behavioral failure and recovery evidence
+
+- Four initial lock regressions failed against the scaffold, then passed with real competing processes, inherited-descriptor validation and abrupt-exit recovery.
+- Eleven diagnostic tests failed against API-only scaffolds before implementation. Tests cover structured certificate errors, transport categories, expiry and missing or invalid metadata without reflecting injected sensitive text.
+- The native initialization-failure scenario failed before override support because startup incorrectly succeeded. A separate initial fixture error was corrected first because Podman rejects creating an already-existing volume.
+- A signing-key readiness regression observed missing HTTP failure classification before implementation. Successful readiness now clears previous failure state.
+- A failed owner-record replacement test failed before atomic writes were added, then passed while retaining the previous owner record.
+- All seven lifecycle scenarios passed on local Podman in 191.91 seconds. They covered controlled startup and test failures, successful teardown, cancellation, conflicting commands, stale TLS recovery and reuse, immediate expiry rejection, incorrect volume ownership and foreign manual-stack protection.
+- Container termination events established that cancellation stopped the runner before providers. Database-volume creation identities remained unchanged through all scenario teardowns. Conflicting and foreign-worktree commands left the active container IDs unchanged.
+
+### Historical coordination verification
+
+| Check | Result |
+| --- | --- |
+| Complete host lifecycle suite on Podman | 7 passed in 191.91 seconds |
+| Lifecycle checks after atomic ownership-record hardening | Initialization failure and foreign manual-stack protection: 2 passed, 5 deliberately deselected |
+| Focused lock, diagnostics, TLS and readiness regressions | 30 passed before the final signing-key and atomic-record tests. Both added regressions subsequently passed in the full backend suite |
+| Complete application integration suite | 508 passed, no skipped cases, in 241.49 seconds |
+| Final backend checks | Formatting, Ruff, strict Pyright and OpenAPI checks passed. Fast tests: 1593 passed, 515 skipped. Skips are 508 service-dependent cases plus 7 dedicated host lifecycle cases, executed separately above |
+| Final complete pnpm check | Passed. Backend fast tests ran with the same counts. Unchanged workspace tasks were eligible for Turbo cache |
+| Shell syntax, documentation formatting and diff checks | Passed |
+| Testing skill validation | Passed. No activation metadata changed. Source walkthrough and real positive/negative lifecycle scenarios support the updated guidance. No independent model activation trials were run |
+
+Successful final teardown left no project containers, networks or disposable TLS volumes, and retained both named database volumes. A subsequent supported ownership check acquired and released the command lock successfully.
+
+Environment: local macOS ARM64 with Podman 5.8.1 and pinned repository toolchains. Docker is unavailable on this host, so the newly added Docker CI step remains unexecuted locally. These local results do not establish final-revision remote PR success. No production behavior, generated SDK, Rust CLI or application password policy changed. The existing AnyIO deprecation warning remains.
+
+## Serial harness simplification, 28 October 2026
+
+This implementation replaces the superseded coordination experiment above with one supported local integration operation at a time. The Python lock supervisor, worktree ownership records, descriptor inheritance and Bash re-entry protocol have been deleted. The dedicated host lifecycle suite, its launcher, package command, Compose override interface and CI qualification step have also been removed. No compatibility aliases, dormant implementations or replacement ownership mechanism remain. Unrelated Access ownership logic and Indexing process safeguards are unchanged.
+
+The Bash wrapper owns the automatic startup, test and cleanup sequence. Direct manual commands remain available without reservations. The wrapper is sourceable behind its main guard, with fast tests exercising its actual process and exit functions. Only the external cleanup operation is stubbed in those tests. Termination targets the entire active process group, including descendants whose leader has exited. TERM has a five-second grace period, followed by KILL and a further five seconds. The immediate child is reaped, surviving processes cause failure and original nonzero exit codes are preserved. INT and TERM retain `130` and `143`.
+
+Deterministic breach responses, generated TLS, hostname verification, restricted key permissions, public expiry metadata, safe diagnostics and the 60-second startup deadline are retained. Exact-name and resource-label checks still protect TLS-volume deletion. Named database volumes survive cleanup. Backend foundation CI runs the application integration suite and a small post-run resource check, without a second lifecycle runner, new skips or a timeout increase.
+
+### Behavioral evidence
+
+- Refactoring the wrapper into a sourceable entrypoint preserved six existing exit/cancellation behaviors. Two new tests then failed against the original shutdown behavior: a TERM-ignoring child timed out and a grandchild survived after its leader exited.
+- After bounded process-group shutdown was implemented, all eight wrapper process cases passed in 4.92 seconds. The focused wrapper, TLS and readiness group passed 33 tests in 6.51 seconds.
+- The manual start/run/stop workflow passed all three native password-breach scenarios. Its public CA fingerprint remained unchanged during testing. The next automatic stack generated a different CA fingerprint.
+- Manual teardown preserved both named database-volume creation identities. Existing commands stopped the prior implementation before switching. No process held its old lock. Two obsolete harness cache files and fourteen obsolete pytest cache entries were removed, along with deleted modules' generated bytecode and empty directories.
+- The complete application integration suite passed 508 tests with no skips in 237.60 seconds. Normal teardown passed the CI resource checks, executed locally against Podman, and preserved both named database-volume identities.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Backend formatting, Ruff and strict Pyright | Passed |
+| Backend fast suite | 1594 passed, 508 service-dependent cases skipped |
+| OpenAPI checks | 13 passed |
+| Complete pnpm check | Passed, with unchanged tasks eligible for Turbo cache |
+| Workflow YAML and post-run Bash script | Parsed and passed Bash syntax validation |
+| Local documentation links and Testing skill validation | 39 local links validated. Skill validation passed. Activation metadata was unchanged |
+| Final real-stack smoke checks | Passed. Invalid pytest arguments returned 4, cancellation after verified readiness returned 143, and the active host process group was gone. Both runs passed the CI resource checks against Podman and preserved database-volume identities |
+
+Current guidance now describes the serial workflow and unsupported local overlap. The only executable-interface references to the removed experiment retained in documentation are explicitly superseded historical evidence. No independent model activation trials were run for the focused Testing reference correction. Docker is unavailable locally, so Docker CI remains pending. Local Podman results do not qualify final-revision remote PR checks. Production behavior, generated SDKs, Rust CLI behavior and password policy remain unchanged. The existing AnyIO deprecation warning remains.
+
+## Bounded automatic teardown, 28 October 2026
+
+Automatic wrapper cleanup now runs once in its own process group, with disconnected stdin and a fixed 60-second work budget. The cleanup child resets EXIT, INT and TERM handling and disables nested job control. The parent continues shielding finalization. Cleanup timeout reuses the existing five-second TERM and five-second KILL grace periods, for a maximum nominal cleanup duration of 70 seconds excluding OS scheduling delays. The immediate child is reaped and remaining group members are terminated before return.
+
+Successful tests followed by failed or timed-out cleanup return `1`. Existing nonzero results remain unchanged, including INT `130` and TERM `143`. Timeout reports potentially incomplete cleanup and the existing manual recovery command. Terminating the host CLI does not establish remote resource removal. Direct manual teardown, startup readiness, verified TLS, resource-label checks and database retention are unchanged. No new dependency, public timeout setting, retry, watchdog or coordination mechanism was added.
+
+### Behavioral and real-stack evidence
+
+- Before implementing the deadline, the selected hanging-cleanup regression failed with an outer `TimeoutExpired` after 13 seconds. Its bounded finalizer removed the controlled probe processes.
+- All eight original process cases remain. Four added hanging-cleanup cases preserve prior statuses `0`, `7`, `130` and `143` as final statuses `1`, `7`, `130` and `143`. A fifth added case verifies KILL escalation for TERM-ignoring cleanup and its descendant. Assertions check process disappearance, process-group termination and immediate-child reaping. Only the external cleanup operation is stubbed.
+- All 13 wrapper cases passed in 15.42 seconds. A final rerun after polishing the diagnostic message passed all 13 in 15.20 seconds. The focused wrapper, certificate, readiness and runner group passed 38 tests in 17.04 seconds.
+- The complete private integration suite passed 508 tests with no skips in 234.74 seconds. The automatic wrapper returned `0`. The measured interval from pytest's final summary to wrapper exit was 11.62 seconds, including CLI return overhead and teardown, comfortably below the cleanup work budget.
+- A real-stack runner-argument failure returned `4`, preserving the original failure through automatic cleanup. Sending TERM after verified readiness returned `143` in 19.49 seconds, including active-phase shutdown and teardown. Its recorded active host process group no longer existed.
+- Successful, failed and cancelled runs passed the CI post-run resource assertions executed against Podman. No private project containers, networks or disposable TLS volumes remained. Both named database volumes retained their original creation identities throughout.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Backend formatting, Ruff and strict Pyright | Passed. No typing errors or warnings |
+| Backend fast suite | 1599 passed, 508 service-dependent cases skipped |
+| OpenAPI checks | 13 passed |
+| Complete pnpm check | Passed, including CLI/xtask and SDK-tooling checks. Unchanged tasks were eligible for Turbo cache |
+| Wrapper and driver Bash syntax | Passed |
+| Workflow configuration | Parsed successfully. Post-run Bash syntax passed. No workflow change or timeout increase was required for this deadline |
+| Documentation and Testing guidance | Formatting, local links and skill validation passed. This focused reference update changes no activation metadata. No independent model activation trials were run |
+| Repository consistency | Diff checks passed. Removed coordination interfaces remain absent from executable code and current guidance. Explicitly superseded historical evidence remains above |
+
+Environment: local macOS ARM64, Podman 5.8.1 and pinned repository toolchains. Docker is unavailable locally. Docker execution and final published-revision Backend foundation, Quality, SDK and native CLI checks remain pending. Local Podman evidence does not establish those results. No commit, push or workflow dispatch was performed. Production behavior, generated SDKs, Rust CLI behavior and password policy remain unchanged. The existing AnyIO deprecation warning remains.
+
+A final spot check observed a new `pnpm test:integration` run started from an interactive terminal after these smoke checks finished. Its active resources were left untouched. The resource-removal results above describe the completed verification runs, not this subsequent run, whose outcome was not observed.

@@ -15,6 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from inframeld_backend.bootstrap.application_settings import get_settings
+from tests.support.integration_readiness import (
+    check_fixture_certificate_expiry,
+    classify_transport_failure,
+    describe_readiness_failure,
+)
 from tests.support.integration_services import (
     EXPIRING_KRATOS_PUBLIC_URL,
     HYDRA_ADMIN_URL,
@@ -28,33 +33,49 @@ from tests.support.integration_services import (
     POSTGRES_HOST,
     POSTGRES_PORT,
     RECOVERY_HOOKS_URL,
+    TLS_EXPIRY_FILE,
 )
 from tests.support.password_breaches import create_client as create_password_breaches_client
 from tests.support.postgres import database_url
 
 
-async def _wait_for_database(engine: AsyncEngine, pending: set[str]) -> None:
+async def _wait_for_database(
+    engine: AsyncEngine, pending: set[str], failures: dict[str, str]
+) -> None:
     while True:
         try:
             async with engine.connect() as connection:
                 await connection.execute(select(literal(1)))
         except OperationalError:
+            failures["postgres"] = "connection failure"
             await asyncio.sleep(0.25)
         else:
             pending.remove("postgres")
+            failures.pop("postgres", None)
             return
 
 
-async def wait_for_http(client: httpx2.AsyncClient, name: str, url: str, pending: set[str]) -> None:
+async def wait_for_http(
+    client: httpx2.AsyncClient,
+    name: str,
+    url: str,
+    pending: set[str],
+    failures: dict[str, str] | None = None,
+) -> None:
     while True:
         try:
             response = await client.get(url)
-        except httpx2.TransportError:
-            pass
+        except httpx2.TransportError as error:
+            if failures is not None:
+                failures[name] = classify_transport_failure(error)
         else:
             if response.status_code == 200:
                 pending.remove(name)
+                if failures is not None:
+                    failures.pop(name, None)
                 return
+            if failures is not None:
+                failures[name] = f"HTTP {response.status_code}"
         await asyncio.sleep(0.25)
 
 
@@ -63,25 +84,39 @@ class _PublicKeySet(BaseModel):
 
 
 async def wait_for_hydra_signing_keys(
-    client: httpx2.AsyncClient, name: str, public_url: str, pending: set[str]
+    client: httpx2.AsyncClient,
+    name: str,
+    public_url: str,
+    pending: set[str],
+    failures: dict[str, str] | None = None,
 ) -> None:
     """Let native key creation finish within the runner's shared startup deadline."""
     while True:
         try:
             response = await client.get(f"{public_url}/.well-known/jwks.json", timeout=30.0)
-            if (
-                response.status_code == 200
-                and _PublicKeySet.model_validate_json(response.content).keys
-            ):
+            if response.status_code != 200:
+                if failures is not None:
+                    failures[name] = f"HTTP {response.status_code}"
+            elif _PublicKeySet.model_validate_json(response.content).keys:
                 pending.remove(name)
+                if failures is not None:
+                    failures.pop(name, None)
                 return
-        except (httpx2.TransportError, ValueError):
-            pass
+            elif failures is not None:
+                failures[name] = "signing keys unavailable"
+        except httpx2.TransportError as error:
+            if failures is not None:
+                failures[name] = classify_transport_failure(error)
+        except ValueError:
+            if failures is not None:
+                failures[name] = "invalid signing keys"
         await asyncio.sleep(0.25)
 
 
 async def _wait_for_services() -> None:
     """Share one startup deadline, with service names rather than sensitive error bodies."""
+    check_fixture_certificate_expiry(TLS_EXPIRY_FILE)
+    failures: dict[str, str] = {}
     settings = get_settings().database
     if (settings.host, settings.port) != (POSTGRES_HOST, POSTGRES_PORT):
         raise RuntimeError("The integration runner requires the private test database endpoint.")
@@ -116,23 +151,24 @@ async def _wait_for_services() -> None:
             asyncio.timeout(60.0),
             asyncio.TaskGroup() as tasks,
         ):
-            tasks.create_task(_wait_for_database(engine, pending))
+            tasks.create_task(_wait_for_database(engine, pending, failures))
             tasks.create_task(
                 wait_for_http(
                     breach_client,
                     "password-breaches",
                     f"{PASSWORD_BREACHES_URL}/health/ready",
                     pending,
+                    failures,
                 )
             )
             for name, url in endpoints.items():
-                tasks.create_task(wait_for_http(client, name, url, pending))
+                tasks.create_task(wait_for_http(client, name, url, pending, failures))
             for name, public_url in key_endpoints.items():
-                tasks.create_task(wait_for_hydra_signing_keys(client, name, public_url, pending))
+                tasks.create_task(
+                    wait_for_hydra_signing_keys(client, name, public_url, pending, failures)
+                )
     except TimeoutError:
-        raise RuntimeError(
-            f"Test services not ready after 60 seconds: {', '.join(sorted(pending))}"
-        ) from None
+        raise RuntimeError(describe_readiness_failure(pending, failures)) from None
     finally:
         await engine.dispose()
     print("Integration services are ready on the private Compose network.", flush=True)

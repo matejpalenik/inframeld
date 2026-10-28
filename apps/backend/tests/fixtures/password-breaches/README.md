@@ -1,44 +1,47 @@
 # Password-breach fixture TLS
 
-These files are public test credentials for the private integration network. They grant no deployment authority. The fixture's private key is deliberately checked in so the existing non-root test image can serve HTTPS without another runtime or certificate-generation dependency.
+The private integration stack generates fresh TLS credentials automatically. No certificate or private key is checked in, supplied through CI secrets or installed in the host trust store.
 
-Kratos calls `https://password-breaches:8443/range/{prefix}`. Only the test Kratos containers and explicit fixture clients trust this CA. Certificate verification and hostname verification remain enabled. The server certificate names only `password-breaches`, and both certificates expire on 25 October 2036.
+Kratos calls `https://password-breaches:8443/range/{prefix}`. All test Kratos variants and explicit fixture clients trust that stack's generated CA. Certificate and hostname verification remain enabled. The fixture returns a single breach for the public test password defined in `tests/support/password_breaches.py`. Other passwords have no listed breaches. Precomputed public vectors avoid password hashing in test support. Native Kratos tests independently verify the HIBP protocol meaning. Observations retain only five-character SHA-1 prefixes and counts.
 
-The fixture returns a single breach for the public test password defined in `tests/support/password_breaches.py`. Other passwords have no listed breaches. Precomputed public clean and breached vectors avoid password hashing in test support. Native Kratos tests independently verify their HIBP protocol meaning. Lookup observations retain only five-character SHA-1 prefixes and counts. No submitted password or real breach database is stored or fetched.
+## Automatic lifecycle
 
-## Regenerate the certificates
+`pnpm test:integration` uses the same startup and cleanup path locally and in CI:
 
-Run the following from the repository root with OpenSSL 3. Replace the complete certificate set together, then rerun the real Kratos breach-lookup tests. The CA signing key is temporary and is not committed. Keep `server.key` readable by the non-root test container because it is a public fixture.
+1. Remove stale test containers, networks and the two labelled TLS volumes. Preserve named database volumes.
+2. Build or select the locked integration image, including the development-only `trustme` dependency.
+3. Run `test-tls-init` without network access. Container root prepares volume ownership, then drops supplementary groups and switches to UID/GID `10001` before generating keys.
+4. Generate a fresh CA and a server certificate for exactly `password-breaches`. The server certificate is valid from five minutes before generation until 24 hours after generation. The CA signing key stays in process memory and is never exported.
+5. Start the fixture and providers. The runner requires verified HTTPS readiness within its existing startup deadline before executing tests.
+6. Stop consumers, then delete only the TLS volumes. Failure and cancellation use the same cleanup. Startup recovers leftovers from abrupt termination.
 
-```bash
-fixture_dir=apps/backend/tests/fixtures/password-breaches
-test_ca_dir="$(mktemp -d)"
-trap 'rm -rf "$test_ca_dir"' EXIT
-openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
-  -subj '/CN=Inframeld public test CA' \
-  -addext 'basicConstraints=critical,CA:TRUE' \
-  -addext 'keyUsage=critical,keyCertSign,cRLSign' \
-  -keyout "$test_ca_dir/ca.key" -out "$fixture_dir/ca.pem"
-openssl req -new -newkey rsa:2048 -nodes \
-  -subj '/CN=password-breaches' \
-  -keyout "$fixture_dir/server.key" -out "$test_ca_dir/server.csr"
-cat > "$test_ca_dir/extensions.cnf" <<'EOF'
-subjectAltName=DNS:password-breaches
-basicConstraints=critical,CA:FALSE
-keyUsage=critical,digitalSignature,keyEncipherment
-extendedKeyUsage=serverAuth
-EOF
-openssl x509 -req -in "$test_ca_dir/server.csr" \
-  -CA "$fixture_dir/ca.pem" -CAkey "$test_ca_dir/ca.key" \
-  -set_serial 2 -days 3650 -extfile "$test_ca_dir/extensions.cnf" \
-  -out "$fixture_dir/server.pem"
-chmod 644 "$fixture_dir/server.key"
-openssl verify -CAfile "$fixture_dir/ca.pem" "$fixture_dir/server.pem"
-openssl x509 -in "$fixture_dir/server.pem" -noout -dates -ext subjectAltName
-```
+| Volume | Contents | Consumers |
+| --- | --- | --- |
+| `inframeld_test_tls_trust` | Public `ca.pem` and `server-not-after.txt` expiry metadata | Kratos variants and test runner, read-only |
+| `inframeld_test_tls_identity` | `server.pem` and `server.key` | Breach fixture only, read-only |
 
-Update the expiry date above after regeneration. Run:
+Both volumes have `org.inframeld.test-project=inframeld-test` and `org.inframeld.disposable-tls=true` labels. Cleanup requires the exact expected names and matching labels. A label mismatch fails visibly instead of deleting an unowned volume. Named database volumes survive.
+
+Consumers read certificates under `/run/inframeld-test-tls/`. The trust directory has mode `0755`, the identity directory `0700`, public certificates `0644` and the private key `0600`. The initializer rejects non-empty output directories and never falls back to old credentials. Runtime consumers remain non-root.
+
+Repeated `./scripts/dev-compose.sh test-run` commands reuse the running stack's certificates. To renew an expired certificate, stop and restart the stack. There is no rotation while consumers are running. The runner rejects expired or incomplete expiry metadata before waiting for services, with exact restart instructions. Shared paths belong to `tests/support/integration_services.py`, so clients do not depend on the issuer module.
+
+Run one local integration operation at a time. Overlapping commands are unsupported. Manual stacks are explicitly started and stopped, without worktree ownership or reservations. See the [serial integration workflow](../../../../../docs/development/guides/testing.md#serial-integration-workflow) for cancellation, cleanup and CI behavior.
+
+These temporary volumes may contain files on the container host's disk until deletion. Cleanup does not promise secure erasure. Generated material must not enter image layers, caches, logs or CI artifacts.
+
+## Verify or recover
+
+Run native password acceptance, rejection and explicit-trust checks:
 
 ```bash
 pnpm test:integration tests/integration/kratos/test_password_breach_lookup.py
 ```
+
+If cleanup was interrupted, retry it with:
+
+```bash
+./scripts/dev-compose.sh test-services-down
+```
+
+Do not use a broad volume prune or disable TLS verification to repair startup.
