@@ -63,7 +63,7 @@ For new behavior or a bug fix:
 
 1. Establish only the public symbols/signatures/lifecycle needed for test execution, without implementing the tested behavior.
 2. Write the behavioral test.
-3. Run it and require the intended behavioral failure. Import/collection failures mean the scaffold needs only its missing seam.
+3. Run it and require the intended behavioral failure. If an import, compilation or collection failure is caused by a missing scaffold symbol, signature or lifecycle seam, add only that seam and rerun. Correct other setup, syntax, dependency or type errors normally before evaluating test behavior.
 4. Implement the smallest real behavior, then run the focused test and relevant suite.
 5. Refactor with tests green. Do not smuggle behavior into scaffolds or add interfaces for speculative future services.
 

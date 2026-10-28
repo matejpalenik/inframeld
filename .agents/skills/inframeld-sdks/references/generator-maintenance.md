@@ -8,7 +8,7 @@ This reference owns common maintenance policy. The [Rust](../../inframeld-rust-s
 
 Inspect the native OpenAPI operation, backend behavior and generated signature first. A backend contract defect belongs to its owner and needs authorized backend work. Do not alter a correct schema for a generator. Missing generation, a missing test binding and a broken fixture are different from a generator defect.
 
-Qualify newly delivered operations and newly exercised schema/transport capabilities through [shared qualification](shared-qualification.md). Follow Coding Standards' scaffold-first TDD: expose only the missing test seam, observe the intended behavioral failure, then implement the smallest real fix. Import failures require the missing seam, not early implementation. Existing coverage can supply the regression when it already demonstrates the defect.
+Qualify newly delivered operations and newly exercised schema/transport capabilities through [shared qualification](shared-qualification.md). Follow Coding Standards' [scaffold-first TDD](../../inframeld-coding-standards/references/testing-and-documentation.md#behavioral-tdd): expose only the missing test seam, observe the intended behavioral failure, then implement the smallest real fix. Use that sequence to distinguish missing scaffold seams from other errors that prevent test execution. Existing coverage can supply the regression when it already demonstrates the defect.
 
 Use actual HTTP routers and shared FastAPI fixtures with controlled collaborators where applicable. Capability-only schemas remain synthetic. They cannot establish product jobs, receipts or other missing workflows. No real provider credentials or paid endpoints are needed for generator qualification.
 

@@ -12,7 +12,7 @@ For new behavior and bug fixes, follow this sequence:
 
 1. Establish only the public symbols, signatures and lifecycle shape needed to import and execute the test. The scaffold is an API outline and implements none of the behavior under test. Add only a real required seam.
 2. Write the behavioral test against those symbols.
-3. Run it and require failure for the expected behavioral reason. Import, compilation or collection errors mean the seam is incomplete. Add only the missing symbol/signature and rerun.
+3. Run it and require failure for the expected behavioral reason. If an import, compilation or collection failure is caused by a missing scaffold symbol, signature or lifecycle seam, add only that seam and rerun. Correct other setup, syntax, dependency or type errors normally before evaluating test behavior.
 4. Implement the smallest real behavior. Run the focused test, then the relevant suite.
 5. Refactor while tests remain green. Do not smuggle behavior into scaffolding or add interfaces for speculative future services.
 

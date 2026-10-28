@@ -10,7 +10,7 @@ This reference owns Python test-code and docstring conventions. The [shared core
 
 ## Behavioral TDD
 
-Follow the [shared behavioral sequence](../../inframeld-coding-standards/references/testing-and-documentation.md#behavioral-tdd), including an API-only scaffold, the intended behavioral failure and green refactoring. Python import/collection errors are missing seams, not the expected behavior failure. Keep Python fixtures and protocol doubles explicit rather than adding speculative services.
+Follow the [shared behavioral sequence](../../inframeld-coding-standards/references/testing-and-documentation.md#behavioral-tdd), including an API-only scaffold, the intended behavioral failure and green refactoring. Use that sequence to distinguish missing scaffold seams from other errors that prevent test execution. Keep Python fixtures and protocol doubles explicit rather than adding speculative services.
 
 Qualify new workflows through domain, service and persistence behavior. Type-compatible authorization does not prove ordering before disclosure or mutation. Test the actual boundary.
 

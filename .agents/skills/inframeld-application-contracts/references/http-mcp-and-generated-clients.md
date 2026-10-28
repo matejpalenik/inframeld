@@ -196,7 +196,6 @@ These backend checks proceed before Studio and SDK verification. CI also checks 
 
 Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
 
-- [PD-CONTRACTS-03: Matching qualified CLI/runtime releases](decision-cli-server-compatibility.md) is accepted through ADR-0095. Offline metadata does not verify remote compatibility. Runtime enforcement and release-pair qualification remain separate work.
 - [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
 
 <a id="decision-and-reference-map"></a>
@@ -219,3 +218,4 @@ The shared error and pagination foundations are implemented. [Error qualificatio
 | [ADR-0006](../../../../docs/adr/ADR-0006-use-official-generated-clients-for-application-api-access.md) | Use official generated clients for application API access. |
 | [ADR-0007](../../../../docs/adr/ADR-0007-keep-api-documentation-public-and-product-operations-protected.md) | Keep API documentation public and product operations protected. |
 | [ADR-0044](../../../../docs/adr/ADR-0044-provide-mcp-through-a-thin-adapter-in-the-existing-api-process.md) | Provide MCP through a thin adapter in the existing API process. |
+| [ADR-0095](../../../../docs/adr/ADR-0095-support-matching-qualified-cli-and-runtime-releases.md) | Select the accepted [CLI/runtime compatibility policy](decision-cli-server-compatibility.md), distinguishing offline metadata from remote verification and release-pair qualification. |
