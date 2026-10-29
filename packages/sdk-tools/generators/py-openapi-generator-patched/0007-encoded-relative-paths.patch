@@ -41,7 +41,7 @@
 +        import re
 +        from urllib.parse import unquote
 +
-+        if len(value) > 8192 or value.startswith('/') or re.fullmatch(r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})*", value) is None:
++        if len(value) > 3 * 8192 or value.startswith('/') or re.fullmatch(r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})*", value) is None:
 +            raise ValueError("Invalid percent-encoded relative path")
 +        decoded = unquote(value, errors="strict")
 +        if any(ord(c) < 32 or 127 <= ord(c) <= 159 or c == "\\" for c in decoded) or any(part in {".", ".."} for part in decoded.split('/')):

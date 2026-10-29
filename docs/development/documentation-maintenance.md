@@ -18,6 +18,7 @@ Use this guide when adding or rewriting documentation. A new maintainer should b
 | Implemented values, HTTP fields and database constraints | Python/Pydantic definitions, native generated OpenAPI and migrations. Do not copy them into another schema manual. |
 | Architectural choice and supersession | [ADRs](../adr/README.md). |
 | Unresolved alternatives and decision trigger | The existing owning `decision-*.md` reference. |
+| Requested code review process, ratings and readiness report | [Review](../../.agents/skills/inframeld-review/SKILL.md), applying existing language/domain standards rather than redefining them. |
 | Agent discovery and task method | Concise `SKILL.md` metadata/body with direct conditional links. |
 | Shared SDK maintenance and cross-language qualification | [SDKs](../../.agents/skills/inframeld-sdks/SKILL.md), with independently discoverable language skills for specific behavior. Application Contracts retains HTTP semantics and compatibility. |
 | Test layers, dependency isolation and verification evidence | [Testing](../../.agents/skills/inframeld-testing/SKILL.md). The shared Coding Standards retains TDD/documentation, language standards retain test-code conventions, domains retain business expectations, and runbooks retain commands. |

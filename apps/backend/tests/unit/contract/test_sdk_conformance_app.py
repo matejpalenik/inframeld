@@ -422,3 +422,16 @@ def test_path_witness_retains_wire_escaping() -> None:
         )
         observed = client.get("/sdk-control/cases/escaped").json()["observations"]["escaped"]
         assert observed["path"] == "/.well-known/oauth-protected-resource/api%2Fv1"
+
+
+def test_expanded_unicode_discovery_preserves_identity_and_wire_path() -> None:
+    path = "/.well-known/oauth-protected-resource/" + "%C3%A9" * 1500
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post("/sdk-control/cases/unicode", json={"calls": {"unicode": {"kind": "none"}}})
+        response = client.get(path, headers={"X-SDK-Test": "unicode"})
+        evidence = client.get("/sdk-control/cases/unicode").json()
+
+    assert response.status_code == 200
+    assert response.json()["resource"] == "https://api.test/" + "é" * 1500
+    assert evidence["observations"]["unicode"]["path"] == path
+    assert evidence["counts"] == {"unicode": 1}

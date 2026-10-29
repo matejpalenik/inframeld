@@ -315,7 +315,7 @@ fn __encoded_relative_path(s: &str) -> Result<String, HttpError> {
     let invalid = || HttpError::Serialization(
         "Invalid percent-encoded relative path".into(),
     );
-    if s.starts_with('/') || s.len() > 8192 {
+    if s.starts_with('/') || s.len() > 3 * 8192 {
         return Err(invalid());
     }
     let mut decoded = Vec::new();

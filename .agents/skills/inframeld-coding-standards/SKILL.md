@@ -21,6 +21,7 @@ Behaviour-only explanations, request tracing and documentation-only edits do not
 | Generated SDK source or generator behavior | The owning [Rust](../inframeld-rust-sdk/SKILL.md), [Python](../inframeld-python-sdk/SKILL.md) or [TypeScript SDK](../inframeld-typescript-sdk/SKILL.md) skill. Do not hand-edit generated output or impose authored-code rules on it. |
 | Shared TDD, test/code documentation or examples | [Test behavior and explain the contract](references/testing-and-documentation.md). |
 | Choosing test layers or interpreting evidence | [Testing](../inframeld-testing/SKILL.md), only when that strategy question arises. |
+| Requested code/architecture review or commit/merge readiness assessment | [Review](../inframeld-review/SKILL.md) owns the assessment process, ratings and report. This core and the language skills own the rules being assessed. |
 
 For a mixed-language change, load the affected language guides rather than all of them. Read the owning domain workflow when behavior matters. Before domain-specific backend design, generation or structural review, read that domain's architecture and relevant workflow. Shared backend components use [Application Contracts' component view](../inframeld-application-contracts/references/components-and-services.md), adding its transaction/job or gateway reference when applicable.
 

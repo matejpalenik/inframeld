@@ -154,6 +154,7 @@ test("invalid encoded paths fail before fetch", async () => {
     "a%00b",
     "a%FF",
     "a b",
+    "a".repeat(24577),
   ]) {
     const result = await getProtectedResourceMetadataForPath({
       client,
@@ -162,4 +163,38 @@ test("invalid encoded paths fail before fetch", async () => {
     assert.equal(result.error?.kind, "request");
   }
   assert.equal(count, 0);
+});
+
+test("encoded paths accept the maximum length", async () => {
+  const path = "a".repeat(24576);
+  let count = 0;
+  const client = createClient({
+    baseUrl: "https://sdk.test",
+    fetch: async (input) => {
+      count++;
+      assert.ok(input instanceof Request);
+      assert.equal(
+        new URL(input.url).pathname,
+        `/.well-known/oauth-protected-resource/${path}`,
+      );
+      return Response.json({
+        resource: "https://api.test",
+        authorization_servers: ["https://auth.test/"],
+        scopes_supported: ["inframeld:api"],
+        bearer_methods_supported: ["header"],
+        inframeld: {
+          schema_version: 1,
+          client_id: "inframeld-cli",
+          installation_id: "00000000-0000-4000-8000-000000000001",
+        },
+      });
+    },
+  });
+  const result = await getProtectedResourceMetadataForPath({
+    client,
+    path: { resource_path: path },
+  });
+  assert.equal(result.response?.status, 200);
+  assert.equal(result.data?.resource, "https://api.test");
+  assert.equal(count, 1);
 });

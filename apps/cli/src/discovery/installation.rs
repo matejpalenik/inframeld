@@ -122,7 +122,7 @@ pub(super) fn validate_provider_profile(
         if endpoint.origin() != *origin {
             return Err(DiscoveryError::IdentityMismatch);
         }
-        policy.issuer_url(endpoint.as_str())?;
+        policy.provider_url(endpoint.as_str())?;
     }
     let default_grants = [CoreGrantType::AuthorizationCode, CoreGrantType::Implicit];
     let grants = provider

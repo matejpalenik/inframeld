@@ -69,9 +69,10 @@ pub(super) fn transport_error(error: &(dyn Error + 'static)) -> DiscoveryError {
     DiscoveryError::Transport
 }
 
-/// Preserve the existing SDK status/transport categories without retaining its body.
+/// Classify SDK input, status and transport failures without retaining their messages.
 pub(super) fn sdk_error<E: fmt::Debug>(error: ApiOpError<E>) -> DiscoveryError {
     match error {
+        ApiOpError::Transport(HttpError::Serialization(_)) => DiscoveryError::InvalidUrl,
         ApiOpError::Transport(HttpError::ResponseTooLarge { .. }) => {
             DiscoveryError::ResponseTooLarge
         }
@@ -84,5 +85,22 @@ pub(super) fn sdk_error<E: fmt::Debug>(error: ApiOpError<E>) -> DiscoveryError {
         ApiOpError::Api(error) if (300..400).contains(&error.status) => DiscoveryError::Redirect,
         ApiOpError::Api(error) if error.status == 200 => DiscoveryError::InvalidMetadata,
         ApiOpError::Api(_) => DiscoveryError::Unavailable,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ApiOpError, DiscoveryError, HttpError, sdk_error};
+
+    #[test]
+    fn serialization_rejection_is_a_safe_input_error() {
+        let sentinel = "private-discovery-credential";
+        let error = sdk_error::<()>(ApiOpError::Transport(HttpError::Serialization(
+            sentinel.to_owned(),
+        )));
+        assert_eq!(error, DiscoveryError::InvalidUrl);
+        assert!(!error.to_string().contains(sentinel));
+        assert!(!format!("{error:?}").contains(sentinel));
+        assert!(std::error::Error::source(&error).is_none());
     }
 }

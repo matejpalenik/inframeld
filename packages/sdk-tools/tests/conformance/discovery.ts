@@ -5,13 +5,19 @@ import {
   headerValues,
 } from "../../src/conformance/assertions.ts";
 
-for (const [operation, suffix, id] of [
+for (const [operation, suffix, id, resourceSuffix = suffix] of [
   ["getProtectedResourceMetadata", "", "root"],
   ["getProtectedResourceMetadataForPath", "/api/v1", "path"],
   ["getProtectedResourceMetadataForPath", "/api/", "trailing"],
   ["getProtectedResourceMetadataForPath", "/a%20b", "space"],
   ["getProtectedResourceMetadataForPath", "/api%2Fv1", "encoded-slash"],
   ["getProtectedResourceMetadataForPath", "/a%25b", "percent"],
+  [
+    "getProtectedResourceMetadataForPath",
+    `/${"%C3%A9".repeat(1500)}`,
+    "expanded-unicode",
+    `/${"é".repeat(1500)}`,
+  ],
 ] as const) {
   sdkTest(
     {
@@ -27,7 +33,7 @@ for (const [operation, suffix, id] of [
         ...(suffix ? { path: { resource_path: suffix.slice(1) } } : {}),
       });
       assert.deepEqual(assertSuccess(observation, 200), {
-        resource: `https://api.test${suffix}`,
+        resource: `https://api.test${resourceSuffix}`,
         authorization_servers: ["https://auth.test/"],
         scopes_supported: ["inframeld:api"],
         bearer_methods_supported: ["header"],

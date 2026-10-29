@@ -8,7 +8,7 @@ use url::Origin;
 use super::{
     BODY_LIMIT, DiscoveryError, DiscoveryOptions,
     error::transport_error,
-    url_policy::{UrlPolicy, parse_identifier},
+    url_policy::{UrlPolicy, parse_provider_url},
 };
 
 /// Build a fresh transport without ambient proxies, credentials, redirects or retries.
@@ -53,10 +53,10 @@ impl OidcTransport {
         request: openidconnect::HttpRequest,
     ) -> Result<openidconnect::HttpResponse, DiscoveryError> {
         let raw = request.uri().to_string();
-        if parse_identifier(&raw)?.origin() != self.origin {
+        if parse_provider_url(&raw)?.origin() != self.origin {
             return Err(DiscoveryError::IdentityMismatch);
         }
-        let target = self.policy.issuer_url(&raw)?;
+        let target = self.policy.provider_url(&raw)?;
         if target.origin() != self.origin || request.method() != http::Method::GET {
             return Err(DiscoveryError::IdentityMismatch);
         }

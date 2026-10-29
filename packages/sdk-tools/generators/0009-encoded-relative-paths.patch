@@ -6,7 +6,7 @@
          let path_encoder = quote! {
 +            fn __encoded_relative_path(s: &str) -> Result<String, HttpError> {
 +                let invalid = || HttpError::Serialization("Invalid percent-encoded relative path".into());
-+                if s.starts_with('/') || s.len() > 8192 { return Err(invalid()); }
++                if s.starts_with('/') || s.len() > 3 * 8192 { return Err(invalid()); }
 +                let mut decoded = Vec::new();
 +                let mut bytes = s.bytes();
 +                while let Some(b) = bytes.next() {

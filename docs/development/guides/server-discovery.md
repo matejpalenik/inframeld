@@ -64,7 +64,11 @@ New operations also run through all selected SDK profiles using the normal endpo
 
 ## Client path and capability checks
 
-Generated SDK discovery path arguments use the [encoded relative path contract](../../../packages/sdk-tools/docs/generators.md#encoded-relative-path-parameters). The Rust library preserves the URL path directly, so `/api/v1` and `/api%2Fv1` remain distinct on the wire. Malformed authority syntax and user information, including an empty username, fail URL validation before network I/O.
+Generated SDK discovery path arguments use the [encoded relative path contract](../../../packages/sdk-tools/docs/generators.md#encoded-relative-path-parameters). Its 24,576-character ASCII budget accommodates the maximum threefold expansion of the original 8,192-byte UTF-8 input. The original URL limit remains unchanged. The Rust library preserves the URL path directly, so `/api/v1` and `/api%2Fv1` remain distinct on the wire. Malformed authority syntax and user information, including an empty username, fail URL validation before network I/O.
+
+OIDC requests and parsed provider endpoints use a separate 24,609-byte URL budget. This allows threefold encoding expansion plus the 33-byte metadata suffix that the OIDC library can append. Original API and issuer input still passes the 8,192-byte check first. The provider budget applies to metadata and signing-key requests and to advertised authorization, token, user-info and revocation endpoints, retaining the same syntax, HTTPS, exact-origin and managed-local checks.
+
+Local SDK request-serialization rejection is reported as invalid URL input, without retaining the underlying message. Actual connection failures remain connection failures. Deployment proxies and HTTP servers can impose their own request limits, so accepted client input does not establish every installation's capacity for long request paths.
 
 Ordinary HTTPS targets support an explicit proxy and additional trusted CAs. Managed-local discovery rejects explicit proxies and never adopts inherited proxy settings. Provider metadata must support both authorization-code and refresh grants, a code response, public-client authentication and S256. Missing grant metadata has the standard authorization-code/implicit default and therefore fails this profile's refresh requirement. These checks establish discovery compatibility, while complete login remains separately qualified.
 

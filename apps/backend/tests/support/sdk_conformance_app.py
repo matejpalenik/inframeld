@@ -269,6 +269,9 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
             b"/.well-known/oauth-protected-resource/a%20b": "https://api.test/a%20b",
             b"/.well-known/oauth-protected-resource/api%2Fv1": "https://api.test/api%2Fv1",
             b"/.well-known/oauth-protected-resource/a%25b": "https://api.test/a%25b",
+            b"/.well-known/oauth-protected-resource/" + b"%C3%A9" * 1500: (
+                "https://api.test/" + "é" * 1500
+            ),
         }
         resource = resources.get(request.scope["raw_path"])
         token = discovery_snapshot.set(

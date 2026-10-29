@@ -91,6 +91,48 @@ The former domain validation module and its imports were removed. Pydantic remai
 
 The existing Starlette/AnyIO deprecation warning remains. Full provider integration, SDK regeneration/conformance and native packaging were not rerun for this configuration-only fix. Earlier results above remain earlier evidence. Final published-revision Docker, SDK and native CLI CI qualification remains pending below.
 
+## Encoded URL budget and error correction on 2026-10-29
+
+The next review reproduced a boundary that pure URL-validation tests did not cover. An accepted URL with 1,500 `é` path characters expands to a 9,000-character encoded path. The generated SDK's former 8,192-character path cap rejected it before dispatch, and discovery classified that local serialization rejection as a connection failure. New tests observed the intended failures for Unicode discovery, all three SDKs' maximum-length acceptance, error classification and the controlled backend fixture before their fixes.
+
+The existing generator patches now admit encoded relative paths of up to 24,576 ASCII characters, calculated as `3 * 8192` for percent encoding's maximum expansion. The backend and Rust validators retain the original 8,192-byte UTF-8 URL limit and exact identity spelling. Syntax, escape, UTF-8 and traversal checks remain. The three affected patch digests and generator revisions were updated, with upstream versions and the TypeScript shared parser unchanged. Production and fixture SDKs were regenerated through the existing workflow. Generated changes are confined to their encoded-path length guards.
+
+Discovery maps SDK serialization rejection to its existing `InvalidUrl` category and discards the underlying message. A sentinel regression checks display, debug and error-source safety. A real refused-connection scenario retains `Transport`. The existing local HTTPS fixture routes the encoded path while advertising the original identity, with an independent `%C3%A9` wire assertion and exactly three credential-free requests. Native tests admit 24,576 characters and reject 24,577 without dispatch. Python exercises sync and async methods. The existing Rust SDK probe has a bounded 32 KiB header allowance for the maximum valid request. No new runner or production HTTP limit was introduced.
+
+| Check personally run for this correction | Observed result |
+| --- | --- |
+| Focused backend and discovery checks | All 91 Python discovery/witness tests and all 15 Rust discovery tests passed. Native encoded-path regressions passed for Rust, TypeScript and Python, including Python sync and async calls. |
+| All authored Rust tests and strict checks | All 30 tests and three doctests passed. Selected-package rustfmt, strict all-target/all-feature Clippy and all-feature public/private rustdoc passed. |
+| `pnpm check:backend` | Passed formatting, Ruff and strict Pyright. All 1,669 host tests and 13 OpenAPI contract tests passed. The host run skipped the existing 511 integration tests as designed. |
+| `pnpm check` | Passed. Backend, CLI and SDK-tool checks executed. Unchanged tasks could reuse existing Turbo evidence. |
+| Explicit `pnpm sdk:generate` | Passed for production and fixture clients in all three languages. OpenAPI, generated API signatures and dependency selections remained unchanged. |
+| Complete unfiltered `pnpm sdk:verify` | Passed every stage for Rust, TypeScript and Python on local macOS arm64. Each of the five HTTP profiles passed 89 cases, including expanded Unicode discovery with exact original identity and raw-wire assertions. The summary records `partial: false`. Native typing/regressions, regeneration drift, generator checks, package archives and installed consumers passed. |
+| Manual inspection | The guide's offline configuration recipe printed `valid: accepted unchanged=True` and `invalid: rejected`. Executable help still lists the existing offline command surface. Neither check starts services or saves state. |
+| Scope and documentation checks | All 31 local links/anchors and targeted formatting checks passed. Snapshot comparison confirmed that existing review-skill work, backend production source, OpenAPI, SDK signatures and dependency selections were preserved. All 26 generator patch digests matched the manifest. |
+
+The complete SDK run retained OpenAPI SHA-256 `c53819a5e28c83e5223f124ceb4fd60e245d59b9eaa36e23c35617d927fa350a`. The existing Starlette/AnyIO deprecation warning remains. Backend production source, dependency selections and discovery's time, response-size and trust limits are unchanged. Real-provider integration, container qualification and native CLI packaging were not rerun for this correction. Earlier results remain earlier evidence.
+
+Server and proxy request limits remain deployment-specific. SDK acceptance does not establish an arbitrary deployment's capacity for long request paths. There is still no executable discovery command or complete manual registration/login journey. Final published-revision CI remains pending below.
+
+## Original issuer and encoded provider budgets on 2026-10-29
+
+The following review found that the API SDK correction did not cover OIDC transport. A valid 3,025-byte Unicode issuer became a request path exceeding 9,000 characters, and the transport reapplied the original 8,192-byte input limit before contacting the provider. Permanent regressions observed three intended failures, with the existing 15 discovery tests still passing.
+
+The existing URL policy now keeps the original API/issuer budget at 8,192 UTF-8 bytes and selects a private 24,609-byte budget for encoded provider URLs. This is three times the original budget plus the 33-byte metadata suffix that the maintained OIDC library may append. One private syntax parser serves both modes. Both OIDC transport admission checks and validation of authorization, token, signing-key, user-info and revocation endpoints use the provider budget. The library still derives discovery URLs. Validation order, exact-origin checks, HTTPS/managed-local restrictions and safe failure categories remain unchanged.
+
+The existing TLS fixture resolves issuer paths after its ephemeral address is known and keeps a bounded 32 KiB header allowance. The Unicode scenario completes metadata, key-set and profile validation with five expanded endpoint URLs, exact issuer spelling, independently expected encoded wire paths and exactly three credential-free requests. A separate scenario admits an 8,192-byte issuer without a trailing slash, including the appended metadata suffix, and rejects an 8,193-byte original issuer before provider requests. The direct transport boundary admits a 24,609-byte URI and rejects 24,610 bytes without another dispatch. All earlier negative scenarios remain.
+
+| Check personally run for the provider-budget correction | Observed result |
+| --- | --- |
+| Focused discovery tests | All 18 passed after the three observed behavioral failures were corrected. |
+| Both authored crates with all features | All 33 tests and three doctests passed. |
+| Strict Rust checks | Selected-package rustfmt, strict all-target/all-feature Clippy and all-feature public/private rustdoc passed. |
+| Repository checks | `pnpm check` passed. CLI checks executed. Unchanged backend, web and SDK-tool tasks reused existing Turbo evidence. |
+| Manual inspection | Executable help retained its existing offline command surface. The guide still distinguishes lower-level inspection from the future executable registration/login journey. |
+| Scope and documentation | Exactly seven approved source/reference files changed. All 1,288 other recorded files were preserved. Skill metadata, 25 local links/anchors, targeted formatting and whitespace checks passed. |
+
+The correction changes no backend validation, native OpenAPI, dependencies, SDK patches or generated source. Earlier complete SDK, real-provider integration and native packaging results remain earlier evidence. Those suites were not rerun for this Rust-only correction. Skill activation and public APIs are unchanged. Final published-revision CI remains pending below.
+
 ## Dependency audit assessment
 
 `openidconnect` 4.0.1 is the latest published release observed during this check. Its RSA and elliptic-curve dependencies are mandatory even with default features disabled. The initial audit rejected `rsa` 0.9.10 under [RUSTSEC-2023-0071](https://rustsec.org/advisories/RUSTSEC-2023-0071.html) and `crypto-bigint` 0.5.5 under [RUSTSEC-2026-0387](https://rustsec.org/advisories/RUSTSEC-2026-0387.html). RSA has no patched release. The big-integer fix requires 0.7.6 or newer, outside the selected elliptic-curve dependency constraint. A compatible lockfile update cannot resolve either finding.

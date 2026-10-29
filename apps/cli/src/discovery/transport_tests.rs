@@ -36,6 +36,7 @@ enum Fault {
 }
 struct Server {
     base: String,
+    issuer: String,
     ca: reqwest::Certificate,
     requests: Arc<Mutex<Vec<String>>>,
     task: JoinHandle<()>,
@@ -52,7 +53,7 @@ async fn serve(
     path: &str,
     fault: Fault,
     requests: &Mutex<Vec<String>>,
-    advertised_issuer: Option<&str>,
+    issuer: &str,
 ) {
     let mut bytes = vec![];
     while !bytes.ends_with(b"\r\n\r\n") {
@@ -61,7 +62,7 @@ async fn serve(
             return;
         }
         bytes.push(byte[0]);
-        assert!(bytes.len() < 16_384);
+        assert!(bytes.len() < 32 * 1024);
     }
     let request = String::from_utf8(bytes).unwrap();
     let target = request.split_whitespace().nth(1).unwrap();
@@ -71,8 +72,15 @@ async fn serve(
         target.to_owned()
     };
     requests.lock().unwrap().push(request);
-    let issuer = advertised_issuer.map_or_else(|| format!("{base}/issuer/"), str::to_owned);
-    let suffix = if path == "/" { "" } else { path };
+    let routing_url = Url::parse(&format!("{base}{path}")).unwrap();
+    let suffix = if path.is_empty() || path == "/" {
+        ""
+    } else {
+        routing_url.path()
+    };
+    let issuer_url = Url::parse(issuer).unwrap();
+    let provider_path = issuer_url.path().trim_end_matches('/');
+    let endpoint_base = format!("{}/", issuer.trim_end_matches('/'));
     let (status, body) = if target == format!("/.well-known/oauth-protected-resource{suffix}") {
         match fault {
             Fault::Redirect => (302, "{}".into()),
@@ -80,13 +88,31 @@ async fn serve(
             Fault::Slow => { tokio::time::sleep(Duration::from_mins(1)).await; (200, "{}".into()) },
             _ => (200, serde_json::json!({"resource": if matches!(fault, Fault::Resource) {format!("{base}/other")} else {format!("{base}{path}")}, "authorization_servers": [issuer], "scopes_supported": ["inframeld:api"], "bearer_methods_supported": ["header"], "inframeld": {"installation_id": Uuid::from_u128(1), "client_id": "inframeld-cli", "schema_version": if matches!(fault, Fault::Version) {2} else {1}}}).to_string()),
         }
-    } else if target == "/issuer/.well-known/openid-configuration" {
+    } else if target == format!("{provider_path}/.well-known/openid-configuration") {
         if matches!(fault, Fault::ProviderRedirect) {
             (302, "{}".into())
         } else if matches!(fault, Fault::Malformed) {
             (200, "private invalid body".into())
         } else {
-            let mut metadata = serde_json::json!({"issuer": if matches!(fault, Fault::Issuer) {format!("{base}/wrong/")} else {issuer.clone()}, "authorization_endpoint": format!("{issuer}authorize"), "token_endpoint": if matches!(fault, Fault::Token) {"https://foreign.test/token".into()} else {format!("{issuer}token")}, "jwks_uri": if matches!(fault, Fault::Keys) {"https://foreign.test/keys".into()} else {format!("{issuer}keys")}, "grant_types_supported": match fault { Fault::GrantClient => Some(vec!["client_credentials"]), Fault::GrantNoRefresh => Some(vec!["authorization_code"]), Fault::GrantMissing => None, _ => Some(vec!["authorization_code", "refresh_token"]) }, "response_types_supported": ["code"], "token_endpoint_auth_methods_supported": ["none"], "subject_types_supported": ["public"], "id_token_signing_alg_values_supported": ["RS256"], "code_challenge_methods_supported": if matches!(fault, Fault::Pkce) {vec!["plain"]} else {vec!["S256"]}});
+            let mut metadata = serde_json::json!({
+                "issuer": if matches!(fault, Fault::Issuer) {format!("{base}/wrong/")} else {issuer.to_owned()},
+                "authorization_endpoint": format!("{endpoint_base}authorize"),
+                "token_endpoint": if matches!(fault, Fault::Token) {"https://foreign.test/token".into()} else {format!("{endpoint_base}token")},
+                "jwks_uri": if matches!(fault, Fault::Keys) {"https://foreign.test/keys".into()} else {format!("{endpoint_base}keys")},
+                "userinfo_endpoint": format!("{endpoint_base}userinfo"),
+                "revocation_endpoint": format!("{endpoint_base}revoke"),
+                "grant_types_supported": match fault {
+                    Fault::GrantClient => Some(vec!["client_credentials"]),
+                    Fault::GrantNoRefresh => Some(vec!["authorization_code"]),
+                    Fault::GrantMissing => None,
+                    _ => Some(vec!["authorization_code", "refresh_token"]),
+                },
+                "response_types_supported": ["code"],
+                "token_endpoint_auth_methods_supported": ["none"],
+                "subject_types_supported": ["public"],
+                "id_token_signing_alg_values_supported": ["RS256"],
+                "code_challenge_methods_supported": if matches!(fault, Fault::Pkce) {vec!["plain"]} else {vec!["S256"]},
+            });
             if matches!(fault, Fault::GrantMissing) {
                 metadata
                     .as_object_mut()
@@ -95,7 +121,7 @@ async fn serve(
             }
             (200, metadata.to_string())
         }
-    } else if target != "/issuer/keys" {
+    } else if target != format!("{provider_path}/keys") {
         (404, "{}".into())
     } else if matches!(fault, Fault::KeysRedirect) {
         (302, "{}".into())
@@ -114,16 +140,20 @@ async fn serve(
 }
 
 async fn server(tls: bool, path: &str, fault: Fault, wrong_host: bool, expired: bool) -> Server {
-    server_with_issuer(tls, path, fault, wrong_host, expired, None).await
+    server_with_issuer(tls, path, fault, wrong_host, expired, |base| {
+        format!("{base}/issuer/")
+    })
+    .await
 }
 
+/// Resolve issuer spelling after the fixture's ephemeral listening address is known.
 async fn server_with_issuer(
     tls: bool,
     path: &str,
     fault: Fault,
     wrong_host: bool,
     expired: bool,
-    advertised_issuer: Option<String>,
+    issuer: impl FnOnce(&str) -> String,
 ) -> Server {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -132,6 +162,7 @@ async fn server_with_issuer(
         if tls { "https" } else { "http" },
         listener.local_addr().unwrap()
     );
+    let issuer = issuer(&base);
     let mut params = rcgen::CertificateParams::new(vec![if wrong_host {
         "wrong.test".into()
     } else {
@@ -159,16 +190,17 @@ async fn server_with_issuer(
     let acceptor = TlsAcceptor::from(Arc::new(config));
     let requests = Arc::new(Mutex::new(vec![]));
     let (server_base, records, path) = (base.clone(), requests.clone(), path.to_owned());
+    let server_issuer = issuer.clone();
     let task = tokio::spawn(async move {
         let mut children = JoinSet::new();
         loop {
             tokio::select! {
                 connection = listener.accept() => {
                     let (socket, _) = connection.unwrap();
-                    let (base, records, path, acceptor, advertised_issuer) = (server_base.clone(), records.clone(), path.clone(), acceptor.clone(), advertised_issuer.clone());
+                    let (base, records, path, acceptor, issuer) = (server_base.clone(), records.clone(), path.clone(), acceptor.clone(), server_issuer.clone());
                     children.spawn(async move {
-                        if tls { if let Ok(socket) = acceptor.accept(socket).await {serve(socket, &base, &path, fault, &records, advertised_issuer.as_deref()).await;} }
-                        else { serve(socket, &base, &path, fault, &records, advertised_issuer.as_deref()).await; }
+                        if tls { if let Ok(socket) = acceptor.accept(socket).await {serve(socket, &base, &path, fault, &records, &issuer).await;} }
+                        else { serve(socket, &base, &path, fault, &records, &issuer).await; }
                     });
                 },
                 result = children.join_next(), if !children.is_empty() => { result.unwrap().unwrap(); }
@@ -177,6 +209,7 @@ async fn server_with_issuer(
     });
     Server {
         base,
+        issuer,
         ca,
         requests,
         task,
@@ -222,6 +255,158 @@ async fn verified_https_supports_root_and_prefixed_resources_without_credentials
             assert!(!request.to_lowercase().contains("cookie:"));
         }
     }
+}
+
+#[tokio::test]
+async fn unicode_identity_survives_encoded_path_expansion() {
+    let path = format!("/{}", "é".repeat(1500));
+    let server = server(true, &path, Fault::None, false, false).await;
+    let identity = format!("{}{path}", server.base);
+    assert!(identity.len() < 8192);
+    let result = discover(
+        &identity,
+        DiscoveryOptions {
+            certificate_authorities: vec![server.ca.clone()],
+            proxy: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.resource, identity);
+    let requests = server.requests.lock().unwrap();
+    assert_eq!(requests.len(), 3);
+    assert!(requests[0].starts_with(&format!(
+        "GET /.well-known/oauth-protected-resource/{} ",
+        "%C3%A9".repeat(1500)
+    )));
+    for request in requests.iter() {
+        assert!(!request.to_lowercase().contains("authorization:"));
+        assert!(!request.to_lowercase().contains("cookie:"));
+    }
+}
+
+#[tokio::test]
+async fn unicode_issuer_and_endpoints_survive_encoded_path_expansion() {
+    let server = server_with_issuer(true, "", Fault::None, false, false, |base| {
+        format!("{base}/{}/", "é".repeat(1500))
+    })
+    .await;
+    assert!(server.issuer.len() < 8192);
+    let result = discover(
+        &server.base,
+        DiscoveryOptions {
+            certificate_authorities: vec![server.ca.clone()],
+            proxy: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.provider.issuer().as_str(), server.issuer);
+    for endpoint in [
+        result.provider.authorization_endpoint().url(),
+        result.provider.token_endpoint().unwrap().url(),
+        result.provider.jwks_uri().url(),
+        result.provider.userinfo_endpoint().unwrap().url(),
+        result
+            .provider
+            .additional_metadata()
+            .revocation_endpoint
+            .as_ref()
+            .unwrap(),
+    ] {
+        assert!(endpoint.as_str().len() > 8192);
+    }
+    let requests = server.requests.lock().unwrap();
+    assert_eq!(requests.len(), 3);
+    let encoded = "%C3%A9".repeat(1500);
+    assert!(requests[1].starts_with(&format!("GET /{encoded}/.well-known/openid-configuration ")));
+    assert!(requests[2].starts_with(&format!("GET /{encoded}/keys ")));
+    for request in requests.iter() {
+        assert!(!request.to_lowercase().contains("authorization:"));
+        assert!(!request.to_lowercase().contains("cookie:"));
+    }
+}
+
+#[tokio::test]
+async fn original_issuer_budget_is_independent_of_derived_requests() {
+    for size in [8192, 8193] {
+        let server = server_with_issuer(true, "", Fault::None, false, false, |base| {
+            format!("{base}/{}", "a".repeat(size - base.len() - 1))
+        })
+        .await;
+        assert_eq!(server.issuer.len(), size);
+        assert!(!server.issuer.ends_with('/'));
+        let result = discover(
+            &server.base,
+            DiscoveryOptions {
+                certificate_authorities: vec![server.ca.clone()],
+                proxy: None,
+            },
+        )
+        .await;
+        if size == 8192 {
+            assert_eq!(result.unwrap().provider.issuer().as_str(), server.issuer);
+            let requests = server.requests.lock().unwrap();
+            assert_eq!(requests.len(), 3);
+            let path = format!("/{}", "a".repeat(size - server.base.len() - 1));
+            assert!(
+                requests[1].starts_with(&format!("GET {path}/.well-known/openid-configuration "))
+            );
+        } else {
+            assert_eq!(result.unwrap_err(), DiscoveryError::InvalidUrl);
+            assert_eq!(server.requests.lock().unwrap().len(), 1);
+        }
+    }
+}
+
+#[tokio::test]
+async fn encoded_provider_budget_rejects_before_dispatch() {
+    use openidconnect::AsyncHttpClient as _;
+
+    let server = server(true, "", Fault::None, false, false).await;
+    let client = super::oidc_transport::client(
+        DiscoveryOptions {
+            certificate_authorities: vec![server.ca.clone()],
+            proxy: None,
+        },
+        Duration::from_secs(2),
+    )
+    .unwrap();
+    let transport = super::oidc_transport::OidcTransport::new(
+        client,
+        Url::parse(&server.base).unwrap().origin(),
+        UrlPolicy::new(None),
+    );
+    for (size, expected) in [
+        (24609, DiscoveryError::Unavailable),
+        (24610, DiscoveryError::InvalidUrl),
+    ] {
+        let target = format!(
+            "{}/{}",
+            server.base,
+            "a".repeat(size - server.base.len() - 1)
+        );
+        assert_eq!(target.len(), size);
+        let request = http::Request::builder()
+            .uri(target)
+            .body(Vec::new())
+            .unwrap();
+        assert_eq!(transport.call(request).await.unwrap_err(), expected);
+    }
+    assert_eq!(server.requests.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn refused_connection_remains_a_transport_failure() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let identity = format!("https://{}", listener.local_addr().unwrap());
+    drop(listener);
+    assert_eq!(
+        discover(&identity, DiscoveryOptions::default())
+            .await
+            .unwrap_err(),
+        DiscoveryError::Transport
+    );
 }
 
 #[tokio::test]
@@ -370,14 +555,9 @@ async fn cancellation_drops_the_original_discovery_without_retry() {
 async fn separately_hosted_issuer_uses_its_own_verified_origin() {
     for tls in [false, true] {
         let issuer = server(tls, "", Fault::None, false, false).await;
-        let api = server_with_issuer(
-            tls,
-            "",
-            Fault::None,
-            false,
-            false,
-            Some(format!("{}/issuer/", issuer.base)),
-        )
+        let api = server_with_issuer(tls, "", Fault::None, false, false, |_| {
+            format!("{}/issuer/", issuer.base)
+        })
         .await;
         let options = DiscoveryOptions {
             certificate_authorities: vec![api.ca.clone(), issuer.ca.clone()],

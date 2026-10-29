@@ -32,7 +32,7 @@
       },
       {
         "file": "ts-hey-api-patched/0007-encoded-relative-paths.patch",
-        "sha256": "cf26fde4f272755ba742e00cadeacb87cc4964b1a7bd41bce5b230effdb240e7"
+        "sha256": "3d763269a253eebb2e1f9c56a27c1ca91e7c6e626dec8160dbf57442ebd03a97"
       }
     ],
     "sharedParser": {
@@ -57,7 +57,7 @@
       ],
       "revision": "inframeld.1"
     },
-    "revision": "inframeld.1"
+    "revision": "inframeld.2"
   },
   "python": {
     "upstreamVersion": "7.26.0",
@@ -91,14 +91,14 @@
       },
       {
         "file": "py-openapi-generator-patched/0007-encoded-relative-paths.patch",
-        "sha256": "5988f364b304ebf8d6ed87991c1b9fb033b7c5dab2bab5a6e15dbd6cfa0235c8"
+        "sha256": "5cdde5e53da36a64739d6008e12b041083712d7751b8a44561187350d403fa84"
       }
     ],
-    "revision": "inframeld.1"
+    "revision": "inframeld.2"
   },
   "rust": {
     "upstreamVersion": "0.23.0",
-    "revision": "inframeld.5",
+    "revision": "inframeld.6",
     "archiveUrl": "https://static.crates.io/crates/openapi-to-rust/openapi-to-rust-0.23.0.crate",
     "archiveSha256": "3bd6e71bfeb9c084586ad4daa7373a662be1f779432f263fa291460a98803d7d",
     "patches": [
@@ -136,7 +136,7 @@
       },
       {
         "file": "0009-encoded-relative-paths.patch",
-        "sha256": "f1b80c329f1a11ac077cbc6825e6c1ad4fad240b9b8ef73887b318d6ced671ef"
+        "sha256": "80416aa8d00c1106e4b5244fcfa9e9fa8e1e6bed9745c00f94c4a14040cc5a8f"
       }
     ],
     "archiveRoot": "openapi-to-rust-0.23.0"

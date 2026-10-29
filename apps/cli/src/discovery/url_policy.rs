@@ -4,6 +4,13 @@ use url::{Origin, Url};
 
 use super::{DiscoveryError, ManagedLocalContext};
 
+/// Original API and issuer identities retain their supplied UTF-8 byte budget.
+const ORIGINAL_URL_LIMIT: usize = 8192;
+
+/// Allow percent encoding and the suffix appended by the maintained OIDC library.
+const PROVIDER_URL_LIMIT: usize =
+    3 * ORIGINAL_URL_LIMIT + "/.well-known/openid-configuration".len();
+
 /// The existing trusted context used consistently across API and provider checks.
 #[derive(Debug, Clone)]
 pub(super) struct UrlPolicy {
@@ -21,22 +28,35 @@ impl UrlPolicy {
     /// Check the API under HTTPS or the exact managed API-origin restriction.
     pub(super) fn api_url(&self, value: &str) -> Result<Url, DiscoveryError> {
         match &self.managed {
-            Some(context) => managed_url(value, &context.api_origin),
-            None => validate_url(value),
+            Some(context) => managed_url(value, &context.api_origin, ORIGINAL_URL_LIMIT),
+            None => validate_url(value, ORIGINAL_URL_LIMIT),
         }
     }
 
-    /// Check provider destinations under HTTPS or the exact managed issuer origin.
+    /// Admit the original issuer identity before the OIDC library encodes or extends it.
     pub(super) fn issuer_url(&self, value: &str) -> Result<Url, DiscoveryError> {
         match &self.managed {
-            Some(context) => managed_url(value, &context.issuer_origin),
-            None => validate_url(value),
+            Some(context) => managed_url(value, &context.issuer_origin, ORIGINAL_URL_LIMIT),
+            None => validate_url(value, ORIGINAL_URL_LIMIT),
+        }
+    }
+
+    /// Check encoded provider destinations without applying the original-input budget.
+    pub(super) fn provider_url(&self, value: &str) -> Result<Url, DiscoveryError> {
+        match &self.managed {
+            Some(context) => managed_url(value, &context.issuer_origin, PROVIDER_URL_LIMIT),
+            None => validate_url(value, PROVIDER_URL_LIMIT),
         }
     }
 }
 
+/// Parse an encoded provider request before the caller checks its exact issuer origin.
+pub(super) fn parse_provider_url(value: &str) -> Result<Url, DiscoveryError> {
+    parse_url(value, PROVIDER_URL_LIMIT)
+}
+
 /// Reject ambiguous URL syntax while the caller retains the original identity text.
-pub(super) fn parse_identifier(value: &str) -> Result<Url, DiscoveryError> {
+fn parse_url(value: &str, max_bytes: usize) -> Result<Url, DiscoveryError> {
     let authority = value
         .split_once("://")
         .filter(|(scheme, _)| {
@@ -68,7 +88,7 @@ pub(super) fn parse_identifier(value: &str) -> Result<Url, DiscoveryError> {
     let decoded = percent_encoding::percent_decode_str(raw_path)
         .decode_utf8()
         .map_err(|_| DiscoveryError::InvalidUrl)?;
-    if value.len() > 8192
+    if value.len() > max_bytes
         || decoded.chars().any(|c| c.is_control() || c == '\\')
         || url.host_str().is_none()
         || !url.username().is_empty()
@@ -84,16 +104,16 @@ pub(super) fn parse_identifier(value: &str) -> Result<Url, DiscoveryError> {
     Ok(url)
 }
 
-fn validate_url(value: &str) -> Result<Url, DiscoveryError> {
-    let url = parse_identifier(value)?;
+fn validate_url(value: &str, max_bytes: usize) -> Result<Url, DiscoveryError> {
+    let url = parse_url(value, max_bytes)?;
     if url.scheme() != "https" {
         return Err(DiscoveryError::InvalidUrl);
     }
     Ok(url)
 }
 
-fn managed_url(value: &str, expected: &Origin) -> Result<Url, DiscoveryError> {
-    let url = parse_identifier(value)?;
+fn managed_url(value: &str, expected: &Origin, max_bytes: usize) -> Result<Url, DiscoveryError> {
+    let url = parse_url(value, max_bytes)?;
     let literal_host = value
         .strip_prefix("http://")
         .and_then(|rest| rest.split('/').next())
@@ -129,15 +149,18 @@ mod tests {
             "https://api%00.test",
             "https://api%5C.test",
         ] {
-            assert_eq!(validate_url(value).unwrap_err(), DiscoveryError::InvalidUrl);
+            assert_eq!(
+                validate_url(value, ORIGINAL_URL_LIMIT).unwrap_err(),
+                DiscoveryError::InvalidUrl
+            );
         }
     }
 
     #[test]
     fn exact_identifier_spelling_is_retained() {
-        assert!(validate_url("https://api.test/api/").is_ok());
-        assert!(validate_url("https://private.test:8443/api").is_ok());
-        assert!(validate_url("HTTPS://api.test").is_ok());
+        assert!(validate_url("https://api.test/api/", ORIGINAL_URL_LIMIT).is_ok());
+        assert!(validate_url("https://private.test:8443/api", ORIGINAL_URL_LIMIT).is_ok());
+        assert!(validate_url("HTTPS://api.test", ORIGINAL_URL_LIMIT).is_ok());
         for value in [
             "https://api.test",
             "HTTPS://API.test:443/api/",
@@ -150,7 +173,10 @@ mod tests {
             "https://api.test/a%25b",
             "https://api.test:0/api",
         ] {
-            assert!(validate_url(value).is_ok(), "rejected {value}");
+            assert!(
+                validate_url(value, ORIGINAL_URL_LIMIT).is_ok(),
+                "rejected {value}"
+            );
         }
     }
 
@@ -165,10 +191,10 @@ mod tests {
                 let value = format!("{prefix}{path}{remainder}");
                 assert_eq!(value.len(), size);
                 if size == 8192 {
-                    assert!(validate_url(&value).is_ok());
+                    assert!(validate_url(&value, ORIGINAL_URL_LIMIT).is_ok());
                 } else {
                     assert_eq!(
-                        validate_url(&value).unwrap_err(),
+                        validate_url(&value, ORIGINAL_URL_LIMIT).unwrap_err(),
                         DiscoveryError::InvalidUrl
                     );
                 }
@@ -180,7 +206,7 @@ mod tests {
     fn managed_discovery_rejects_normalized_loopback_aliases() {
         let literal = "http://127.0.0.1:8000";
         let origin = Url::parse(literal).unwrap().origin();
-        assert!(managed_url(literal, &origin).is_ok());
+        assert!(managed_url(literal, &origin, ORIGINAL_URL_LIMIT).is_ok());
         for value in [
             "HTTP://127.0.0.1:8000",
             "http://127.1:8000",
@@ -189,7 +215,7 @@ mod tests {
             "http://127.0.0.1.:8000",
         ] {
             assert_eq!(
-                managed_url(value, &origin).unwrap_err(),
+                managed_url(value, &origin, ORIGINAL_URL_LIMIT).unwrap_err(),
                 DiscoveryError::InvalidUrl,
                 "accepted {value}",
             );
