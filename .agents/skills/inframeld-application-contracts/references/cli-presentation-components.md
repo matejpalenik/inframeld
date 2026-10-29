@@ -2,7 +2,7 @@
 
 Alice inspects a failed job, then asks a different command to wait for its success. Both views can display the same failed job state. Their command outcomes differ because the requests differ. Shared presentation makes the facts consistent while [CLI result contracts](cli-result-contracts.md#separate-command-success-from-background-work-success) determine what succeeded.
 
-> **Status:** accepted presentation responsibilities and typed result boundary on 2026-10-28, recorded in [ADR-0097](../../../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md). The linked output/result/change-review references own product semantics. Accepted organization does not establish implemented components, wire fields or a generic tracking schema. Exact schemas, error vocabulary and command mappings remain #156's work. Loading this reference authorizes no application changes.
+> **Status:** accepted presentation responsibilities and typed result boundary on 2026-10-28, recorded in [ADR-0097](../../../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md). The linked output/result/change-review references own product semantics. Accepted organization does not establish implemented components, wire fields or a generic tracking schema. The [common framing](cli-output-and-automation.md) and [invocation mappings](cli-result-contracts.md) are accepted through the joint #124/#156 specification. Command-specific data/vocabularies and runtime integration remain delivery work. Loading this reference authorizes no application changes.
 
 ## One owner for each decision
 
@@ -50,7 +50,7 @@ The existing [machine-channel contract](cli-output-and-automation.md#use-one-pre
 
 The shared output boundary handles controlled failures from parsing and execution, while preserving local-error versus backend-problem meaning. A lost response can remain uncertain. A killed process or broken stdout can leave incomplete output, so absence of a result is not proof of no effects. Follow the approved result and signal mappings rather than deriving exits from resource status or HTTP success alone.
 
-Define raw export, completion scripts, help/version and secret-delivery interactions explicitly before adding stdout conflicts. Secrets and downloadable artifacts retain their dedicated channels. Do not bury them in the ordinary result envelope or serialize raw exception/debug structures to obtain JSON cheaply.
+Use the accepted [text/JSON channel and help exceptions](cli-output-and-automation.md#channels-exceptions-and-input), including `--plain` record formatting. Feature-specific export, completion and secret-delivery contracts still define their dedicated channels before integration. Secrets and downloadable artifacts retain their dedicated channels. Do not bury them in the ordinary result envelope or serialize raw exception/debug structures to obtain JSON cheaply.
 
 Disable interactive prompts when input is noninteractive or the caller explicitly selects no-input behavior. Missing required values fail with an actionable explanation. Generic confirmation never supplies missing values or authority. Color and animations must respect the actual destination's terminal capabilities. Paging must not block an automated invocation. Quiet mode cannot conceal a failed command or corrupt its promised machine result.
 

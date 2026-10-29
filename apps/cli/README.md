@@ -1,6 +1,6 @@
 # Inframeld CLI foundation
 
-The Rust `inframeld` executable currently provides offline help and build/compatibility information. It does not start services. Login, target selection, product commands, JSON automation and descriptive dry-run remain separate delivery work (#156–#160 and their owning issues).
+The Rust `inframeld` executable currently provides offline help and build/compatibility information. It does not start services. Login, target selection, product commands, JSON automation and descriptive dry-run remain separate delivery work (#158–#160 and their owning issues). The [common automation contract](../../.agents/skills/inframeld-application-contracts/references/cli-output-and-automation.md) is accepted design, with runtime delivery still pending.
 
 ```sh
 inframeld --help

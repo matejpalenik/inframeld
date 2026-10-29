@@ -32,7 +32,7 @@ The worker continues the exact deletion that was admitted even when ordinary mem
 | Physical cleanup unfinished | Known removal work remains. Late writes cannot restore use or publication authority. |
 | Physical cleanup complete | The owning cleanup completion requirements were established, subject to separately disclosed provider/backup limits. |
 
-These are required meanings, not an approved new public enum or another job state machine. Exact route, payload and retention remain owning implementation-contract work. An unavailable cleanup dependency never permits reporting success or reopening access to meet a timing goal.
+These are required meanings, not a new public enum or another job state machine. The [logical deletion-status contract](../../inframeld-application-contracts/references/operation-recovery-contracts.md#deletion-status-inspection) specifies the bounded permitted projection. HTTP route/DTO names and the independently pending retention periods remain delivery work. An unavailable cleanup dependency never permits reporting success or reopening access to meet a timing goal.
 
 <a id="unresolved-protected-status-wording"></a> <a id="preserve-a-narrow-way-to-observe-deletion-completion"></a>
 
@@ -58,7 +58,7 @@ Alice may delete Legal Research without being able to read its private HR docume
 
 Deleting one Document in a surviving project remains different: check Delete documents on every current audience group before committing that Document's marker. A caller cannot select the whole-project worker path by supplying a deletion marker or claiming that admission already happened.
 
-Admission, confirmed access blocking and physical completion are separate reported facts. If cleanup stops after membership removal, the project stays blocked and the original operation records the unfinished steps. Protected job status exposes only safe progress to eligible readers, not private contents or general historical job payloads. It does not implicitly authorize cancellation or continuation. The exact contracts and recovery checks remain prerequisite engineering work. This guide does not claim the deletion workflow has been implemented.
+Admission, confirmed access blocking and physical completion are separate reported facts. If cleanup stops after membership removal, the project stays blocked and the original operation records the unfinished steps. Protected job status exposes only safe progress to eligible readers, not private contents or general historical job payloads. It does not implicitly authorize cancellation or continuation. The [logical recovery reference](../../inframeld-application-contracts/references/operation-recovery-contracts.md) defines the accepted observation and recovery boundaries. Native HTTP delivery and runtime recovery checks remain prerequisite engineering work. This guide does not claim the deletion workflow has been implemented.
 
 <a id="example-delete-a-project-while-its-embedding-job-is-running"></a>
 

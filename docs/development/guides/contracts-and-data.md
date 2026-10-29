@@ -11,6 +11,7 @@ Alice wants to know whether a grant request accepts a recipient UUID and which d
 | Which tables, keys and indexes exist? | [Migrations](../../../apps/backend/migrations/versions), in order. ORM rows map the fields their adapter needs and are not a second schema definition. |
 | Which logical relationships are accepted but not all implemented? | The domain record references below. A named concept does not imply one table, aggregate or endpoint. |
 | What error can a caller receive? | [Public catalogue](../error-handling.md), implemented problem definitions and the relevant OpenAPI operation. |
+| Which backend recovery facts and CLI machine fields are accepted but unimplemented? | [Logical recovery contracts](../../../.agents/skills/inframeld-application-contracts/references/operation-recovery-contracts.md), [CLI framing](../../../.agents/skills/inframeld-application-contracts/references/cli-output-and-automation.md) and [invocation outcomes](../../../.agents/skills/inframeld-application-contracts/references/cli-result-contracts.md). These do not publish backend HTTP names or executable commands. |
 | What is still undecided? | The owning skill’s conditional `decision-*.md` routes. A recommendation has no approval status. |
 
 <a id="logical-records-by-owner"></a>
@@ -37,6 +38,8 @@ The [Kratos identity schema](../../../config/kratos/identity.schema.json) retain
 <a id="design-only-envelopes"></a>
 
 ## Design-only envelopes
+
+The accepted [CLI version 1 envelope](../../../.agents/skills/inframeld-application-contracts/references/cli-output-and-automation.md#use-one-predictable-machine-channel) has a precise documented representation, with command-specific typed data still supplied by each feature. The [backend recovery interfaces](../../../.agents/skills/inframeld-application-contracts/references/operation-recovery-contracts.md) are logical contracts only. This specification adds no handwritten schema artifact, HTTP route, OpenAPI change or SDK operation. The current executable remains offline help/version.
 
 [Maintenance](../../../contracts/design/access/maintenance-v1.schema.json) and [version 2 recovery evidence](../../../contracts/design/access/recovery-event-v2.schema.json) formalize accepted input shapes. The [version 1 recovery draft](../../../contracts/design/access/recovery-event-v1.schema.json) is superseded and retained as historical design, without a runtime compatibility path. They are not runtime models, OpenAPI endpoints, trusted provider evidence or production qualification. Their owning Access references describe parsing, byte limits and authority that JSON Schema cannot prove. The private v2 recovery mapper now owns runtime parsing and intentionally remains outside public OpenAPI. The design schema remains an explanatory artifact. Other future implementations must reconcile their handwritten design schemas with runtime-owned definitions.
 
