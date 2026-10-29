@@ -18,11 +18,27 @@ Application Contracts owns these shared interfaces. Each domain supplies its out
 
 ## Original-request lookup
 
-**Inputs.** The caller supplies the original request key, HTTP method, canonical logical route and original organization/Project identifiers where applicable. Authentication supplies the current principal. The trusted installation binding supplies installation identity. User-supplied actor IDs, current aliases, changed defaults and a remembered job ID cannot replace those trusted bindings.
+**Inputs.** The caller supplies the original request key, HTTP method, canonical logical route, original organization/Project identifiers where applicable and an expected original authority guard. The guard contains a closed authority family and the original action. It is an untrusted matching predicate, not permission or proof of admission. Capture it from the submitting operation before dispatch. An expected installation identity is checked against authoritative backend identity. Authentication supplies the current principal. The trusted installation binding supplies installation identity. User-supplied actor IDs, current aliases, changed defaults and a remembered job ID cannot replace those trusted bindings.
 
 Use the same route meaning and scope as original admission. A logical default route stays that route even if its current Deployment target changed. Do not resolve today's default as a new request. A known operation reference can instead use its normal inspection contract.
 
-**Authority.** Authenticate and authorize lookup before disclosing a match. Resolve the retained original scope rather than selecting a convenient accessible Project. Ordinary reads retain current resource/source disclosure checks. Only the separately defined deletion projection has its narrow initiator exception. A key is correlation, never a credential.
+**Authority.** Authenticate and authorize the expected guard before searching retained history. A denied guard fails identically whether history is absent, present, expired, legacy or mismatched. Never learn a hidden record's action and then choose a different public authorization failure. Only an exact immutable identity and authority-binding match may disclose an outcome.
+
+The following minimal metadata rules were accepted on 2026-10-29. They do not establish runtime delivery or add permissions:
+
+| Expected family | Current authority before search | Matching original target |
+| --- | --- | --- |
+| Project action-use | Current eligibility, Project visibility/membership and use permission for that accepted Project action | Original Organization and exact Project |
+| Project grant-read | Eligible human, Project visibility/membership and can-use-and-grant for the exact action | Original Organization and exact Project |
+| Organization action-use | Eligible human in the original Organization with use permission for the exact accepted Organization action | Original Organization, without a Project |
+
+The delivered grant route's meaning is fixed: `POST /v1/projects/{project_id}/grants` uses Project grant-read for `create-access-groups`. A caller cannot downgrade it to ordinary action-use. Invalid method/route/family/action combinations fail before history search. This observes the original operation without reapplying recipient assignment eligibility or expected revision.
+
+Generic action-use permits only content-free original operation/admission metadata. It does not permit current job results, resource inventory or source-derived content. Future resource-specific and deletion-exception families need their own original binding and pre-search authority contracts. They cannot be coerced into Project action-use.
+
+After authorization, absent history, another binding, insufficient legacy metadata or a non-authoritative binding shape all return the same **Unresolved** observation without a match-specific reason, references or expiry. A valid exact binding whose retained outcome cannot be decoded remains a failed observation. Actual dependency failures and timeouts remain failures. This avoids revealing inaccessible history through status, details or recovery headers. Independently generated request correlation may differ. No constant-time database guarantee follows.
+
+Resolve the retained original scope rather than selecting a convenient accessible Project. Ordinary reads retain current resource/source disclosure checks. Only the separately defined deletion projection has its narrow initiator exception. A key is correlation, never a credential.
 
 **Result.** Return exactly one logical alternative:
 
@@ -57,8 +73,9 @@ sequenceDiagram
     CLI->>API: Submit fixed request with original key
     API->>DB: Commit admission, original binding and audit
     API--xCLI: Acknowledgment lost
-    CLI->>API: Look up original scope, route and key
-    API->>DB: Authorize and read retained original binding
+    CLI->>API: Look up original scope, route, key and expected authority
+    API->>DB: Authorize expected authority without reading history
+    API->>DB: Read exact original identity and authority binding
     DB-->>API: Original admission and known reference
     API-->>CLI: Safe admission facts
     CLI->>API: Inspect known job under current authority
@@ -131,6 +148,10 @@ The following are downstream behavioral acceptance cases, not tests executed by 
 
 | Scenario | Required observation |
 | --- | --- |
+| Denied expected guard, history absent or retained under any binding | Same authorization failure before history search |
+| Authorized guard, absent/mismatched/insufficient legacy binding | Same Unresolved observation with no match-specific diagnostics |
+| Fixed grant route supplied with ordinary action-use | Reject invalid guard independently of history |
+| Exact authorized binding with malformed outcome | Safe failed observation, not Unresolved |
 | Admission committed, acknowledgment lost | Lookup identifies the original admission without another job or provider call |
 | Admission retained, permitted job reference unavailable | Lookup returns Accepted asynchronous operation with original identity, any established expiry, job reference explicitly unknown and dispatch not established. No guessed job state, replacement admission or provider call |
 | Later authorized lookup establishes the job reference | Return the same admitted operation with that known reference. Job inspection remains a separate authorized read |

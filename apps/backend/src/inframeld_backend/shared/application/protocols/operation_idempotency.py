@@ -22,6 +22,9 @@ from inframeld_backend.shared.application.dtos.recovery_required_operation_dto i
     RecoveryRequiredOperationDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
+from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+    OperationLookupAuthority,
+)
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
@@ -44,6 +47,7 @@ class OperationIdempotency(Protocol):
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,
         expected_replay_kind: OperationReplayKind,
+        lookup_authority: OperationLookupAuthority | None = None,
     ) -> (
         NewOperationReservationDTO
         | CompletedSynchronousOperationDTO

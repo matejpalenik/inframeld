@@ -59,6 +59,9 @@ from inframeld_backend.shared.application.dtos.operation_admission_context_dto i
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+    OperationLookupAuthorityFamily,
+)
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -75,6 +78,9 @@ from inframeld_backend.shared.application.services.request_fingerprint_service i
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+    OperationLookupAuthority,
+)
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
@@ -174,6 +180,7 @@ class MockOperationIdempotency(OperationIdempotency):
         self.access: AccessContextDTO | None = None
         self.authorization: object | None = None
         self.fingerprint: RequestFingerprint | None = None
+        self.lookup_authority: OperationLookupAuthority | None = None
         self.expected_kind: OperationReplayKind | None = None
 
     @override
@@ -185,6 +192,7 @@ class MockOperationIdempotency(OperationIdempotency):
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,
         expected_replay_kind: OperationReplayKind,
+        lookup_authority: OperationLookupAuthority | None = None,
     ) -> (
         NewOperationReservationDTO
         | CompletedSynchronousOperationDTO
@@ -197,6 +205,7 @@ class MockOperationIdempotency(OperationIdempotency):
         self.access = access
         self.authorization = authorization
         self.fingerprint = fingerprint
+        self.lookup_authority = lookup_authority
         self.expected_kind = expected_replay_kind
         assert expected_replay_kind is OperationReplayKind.SAFE_RESULT
         if self.error is not None:
@@ -552,3 +561,12 @@ async def test_membership_loading_failure_rolls_back_without_completion() -> Non
     assert scenario.memberships.calls == 0
     assert "complete" not in scenario.events
     assert scenario.events[-1] == "rollback"
+
+
+@pytest.mark.asyncio
+async def test_original_grant_lookup_retains_delegation_authority() -> None:
+    scenario = GrantScenario()
+    await scenario.assign()
+    assert scenario.idempotency.lookup_authority == OperationLookupAuthority(
+        OperationLookupAuthorityFamily.PROJECT_GRANT_READ, ACTION_ID
+    )

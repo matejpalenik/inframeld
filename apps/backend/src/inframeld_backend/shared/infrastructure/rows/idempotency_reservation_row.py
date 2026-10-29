@@ -65,6 +65,10 @@ class IdempotencyReservationRow(SharedPersistenceBase):
     expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
+    lookup_authority_family: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, default=None
+    )
+    lookup_action_id: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

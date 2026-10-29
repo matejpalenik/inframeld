@@ -24,9 +24,15 @@ from inframeld_backend.shared.application.dtos.operation_admission_context_dto i
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+    OperationLookupAuthorityFamily,
+)
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.protocols.operation_idempotency import (
     OperationIdempotency,
+)
+from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+    OperationLookupAuthority,
 )
 
 
@@ -70,4 +76,7 @@ class ProjectOperationAdmissionService:
             authorization=authorization,
             fingerprint=request.fingerprint,
             expected_replay_kind=expected_replay_kind,
+            lookup_authority=OperationLookupAuthority(
+                OperationLookupAuthorityFamily.PROJECT_ACTION_USE, action_id
+            ),
         )

@@ -35,6 +35,9 @@ from inframeld_backend.shared.application.dtos.operation_admission_context_dto i
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+    OperationLookupAuthorityFamily,
+)
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
@@ -44,6 +47,9 @@ from inframeld_backend.shared.application.protocols.operation_idempotency import
     OperationIdempotency,
 )
 from inframeld_backend.shared.application.protocols.transaction_manager import TransactionManager
+from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+    OperationLookupAuthority,
+)
 
 
 class ProjectGrantChangeService(ProjectGrantChanger):
@@ -90,6 +96,9 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                 authorization=authorization,
                 fingerprint=fingerprint,
                 expected_replay_kind=OperationReplayKind.SAFE_RESULT,
+                lookup_authority=OperationLookupAuthority(
+                    OperationLookupAuthorityFamily.PROJECT_GRANT_READ, command.action_id
+                ),
             )
 
             if not isinstance(operation, NewOperationReservationDTO):

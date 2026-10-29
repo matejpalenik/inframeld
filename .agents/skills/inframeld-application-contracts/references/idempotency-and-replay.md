@@ -54,7 +54,7 @@ A **principal** is the stable identity of a human or application. Credential IDs
 
 ### Reserve the key alongside admission
 
-Save the key reservation together with the accepted command. It records the request fingerprint, stable operation or job ID, state, expiry, and safe outcome.
+Save the key reservation together with the accepted command. Retain the server-selected original lookup authority family/action atomically with admission. These immutable facts describe the exact current authority a later lookup must check. They are not saved permission. Never replace them on replay or fill missing historical facts from today's request. Only the fixed delivered grant method/route permits deterministic legacy binding backfill. It records the request fingerprint, stable operation or job ID, state, expiry, and safe outcome.
 
 A **canonical request fingerprint** is a consistent summary of the meaningful input. Equivalent requests produce the same fingerprint. Reusing a key with different input produces a conflict.
 
@@ -112,7 +112,7 @@ Alice's Command names the project and the grant she wants to assign. Her verifie
 | `fingerprint: RequestFingerprint` | Immutable 32-byte digest already computed by the owning workflow. |
 | `expected_replay_kind: OperationReplayKind` | Replay category required by the owning operation. |
 
-[`IdempotencyService`](../../../../apps/backend/src/inframeld_backend/shared/application/services/idempotency_service.py) constructs `OperationReservationRequestDTO` at the reservation-writer boundary. It reads the actor from access, both scope IDs from authorization, retry metadata from context and digest bytes from `fingerprint.value`. It copies these values exactly, without normalization, scope inference or fingerprint recomputation. The Command is not an idempotency input.
+[`IdempotencyService`](../../../../apps/backend/src/inframeld_backend/shared/application/services/idempotency_service.py) constructs `OperationReservationRequestDTO` at the reservation-writer boundary. It reads the actor from access, both scope IDs from authorization, retry metadata from context and digest bytes from `fingerprint.value`. It copies these values exactly, without normalization, scope inference or fingerprint recomputation. The Command is not an idempotency input. The owning workflow also supplies its immutable original lookup authority separately. The grant service supplies Project grant-read for its fixed action. The Project admission helper supplies Project action-use for its explicit action. Organization callers supply an accepted Organization action-use binding. Shared idempotency preserves that server-selected binding and rejects incompatible retry metadata without changing original request identity, fingerprints, expiry or outcomes.
 
 `AuthorizedOperationScope` is a field-based Protocol parameterized by the project type. This keeps a project-specific DTO's `project_id: ProjectId` precise while allowing organization scope through the same generic method. Concrete DTOs explicitly implement the interface and declare their own fields. Frozen records remain immutable, but the Protocol itself does not express read-only access. Neither interface conformance nor a typed fingerprint proves permission. Authorize current state first on every attempt, including replay.
 

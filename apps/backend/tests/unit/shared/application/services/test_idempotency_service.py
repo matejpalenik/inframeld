@@ -407,3 +407,29 @@ async def test_completion_failure_propagates_without_retry() -> None:
             replay_kind=OperationReplayKind.SAFE_RESULT,
         )
     assert writer.completed == [(NEW.operation_id, OperationReplayKind.SAFE_RESULT)]
+
+
+@pytest.mark.asyncio
+async def test_original_lookup_authority_is_passed_to_atomic_reservation() -> None:
+    from inframeld_backend.access.domain.value_objects.action_id import ActionId
+    from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+        OperationLookupAuthorityFamily,
+    )
+    from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+        OperationLookupAuthority,
+    )
+
+    authority = OperationLookupAuthority(
+        OperationLookupAuthorityFamily.ORGANIZATION_ACTION_USE, ActionId("create-projects")
+    )
+    writer = MockOperationReservations()
+    await IdempotencyService(writer).find_or_reserve(
+        context=CONTEXT,
+        access=ACCESS,
+        authorization=AUTHORIZATION,
+        fingerprint=RequestFingerprint(REQUEST.fingerprint),
+        expected_replay_kind=OperationReplayKind.SAFE_RESULT,
+        lookup_authority=authority,
+    )
+    assert writer.request is not None
+    assert writer.request.lookup_authority == authority

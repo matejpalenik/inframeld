@@ -5,6 +5,9 @@ from inframeld_backend.access.domain.value_objects.organization_id import Organi
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+    OperationLookupAuthority,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,3 +21,4 @@ class OperationReservationRequestDTO:
     requested_route: str
     key: IdempotencyKey
     fingerprint: bytes
+    lookup_authority: OperationLookupAuthority | None = None

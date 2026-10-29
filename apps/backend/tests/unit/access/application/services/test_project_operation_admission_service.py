@@ -42,6 +42,9 @@ from inframeld_backend.shared.application.dtos.operation_admission_context_dto i
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+    OperationLookupAuthorityFamily,
+)
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -54,6 +57,9 @@ from inframeld_backend.shared.application.protocols.operation_idempotency import
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+    OperationLookupAuthority,
+)
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
@@ -109,6 +115,7 @@ class MockOperationIdempotency(OperationIdempotency):
         self.access: AccessContextDTO | None = None
         self.authorization: object | None = None
         self.fingerprint: RequestFingerprint | None = None
+        self.lookup_authority: OperationLookupAuthority | None = None
         self.expected_kind: OperationReplayKind | None = None
 
     @override
@@ -120,6 +127,7 @@ class MockOperationIdempotency(OperationIdempotency):
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,
         expected_replay_kind: OperationReplayKind,
+        lookup_authority: OperationLookupAuthority | None = None,
     ) -> (
         NewOperationReservationDTO
         | CompletedSynchronousOperationDTO
@@ -132,6 +140,7 @@ class MockOperationIdempotency(OperationIdempotency):
         self.access = access
         self.authorization = authorization
         self.fingerprint = fingerprint
+        self.lookup_authority = lookup_authority
         self.expected_kind = expected_replay_kind
         if self.error is not None:
             raise self.error
@@ -283,3 +292,18 @@ async def test_shared_retry_errors_propagate_without_another_attempt(error: Conf
         )
     assert caught.value is error
     assert idempotency.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_original_project_action_is_retained_for_lookup() -> None:
+    events: list[str] = []
+    idempotency = MockOperationIdempotency(events)
+    await ProjectOperationAdmissionService(MockActionAuthorizer(events), idempotency).reserve(
+        access=ACCESS,
+        action_id=ACTION,
+        request=REQUEST,
+        expected_replay_kind=OperationReplayKind.ASYNC_JOB,
+    )
+    assert idempotency.lookup_authority == OperationLookupAuthority(
+        OperationLookupAuthorityFamily.PROJECT_ACTION_USE, ACTION
+    )
