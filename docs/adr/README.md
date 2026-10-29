@@ -159,3 +159,33 @@ For contributor routes, start with [developer documentation](../development/READ
 - [ADR-0107: Reference exact verified index materializations](ADR-0107-reference-exact-verified-index-materializations.md). Accepted PD-INDEXING-01 on 2026-10-29. Implementation and qualification pending.
 
 - [ADR-0108: Identify passages through canonical source coordinates](ADR-0108-identify-passages-through-canonical-source-coordinates.md). Accepted PD-INDEXING-03 on 2026-10-29. Implementation and qualification pending.
+
+- [ADR-0109: Capture fixed execution inputs and commit required completion](ADR-0109-capture-fixed-execution-inputs-and-commit-required-completion.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0110: Serialize release control with expected revisions](ADR-0110-serialize-release-control-with-expected-revisions.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0111: Authorize minimal precreation status through the selected Pipeline](ADR-0111-authorize-minimal-precreation-status-through-the-selected-pipeline.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0112: Fence trace capture, delivery and history deletion](ADR-0112-fence-trace-capture-delivery-and-history-deletion.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0113: Review exact case revisions and preserve generation shortfalls](ADR-0113-review-exact-case-revisions-and-preserve-generation-shortfalls.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0114: Freeze evaluation runs and report per-metric populations](ADR-0114-freeze-evaluation-runs-and-report-per-metric-populations.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0115: Qualify narrow Ragas paths and claim-level judge evidence](ADR-0115-qualify-narrow-ragas-paths-and-claim-level-judge-evidence.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0116: Apply bounded reviewed import plans through stable child operations](ADR-0116-apply-bounded-reviewed-import-plans-through-stable-child-operations.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0123: Keep model metadata explicit and delete only unreferenced connections](ADR-0123-keep-model-metadata-explicit-and-delete-only-unreferenced-connections.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0117: Bound retention while preserving erasure and safety obligations](ADR-0117-bound-retention-while-preserving-erasure-and-safety-obligations.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0118: Audit index health with explicit freshness and unknown outcomes](ADR-0118-audit-index-health-with-explicit-freshness-and-unknown-outcomes.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0119: Bound frozen storage retries and prove exceptional erasure completion](ADR-0119-bound-frozen-storage-retries-and-prove-exceptional-erasure-completion.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0120: Qualify one conservative offline parser profile](ADR-0120-qualify-one-conservative-offline-parser-profile.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0121: Qualify a small single-host operating envelope](ADR-0121-qualify-a-small-single-host-operating-envelope.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0122: Qualify cold-backup recovery and explicit maintenance objectives](ADR-0122-qualify-cold-backup-recovery-and-explicit-maintenance-objectives.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.

@@ -20,6 +20,10 @@ Future production ingress must keep Hydra administration private and expose only
 
 <a id="1-understand-the-compatibility-boundary"></a>
 
+## Accepted recovery and upgrade profile
+
+Accepted [PD-ARCHITECTURE-02](../../../.agents/skills/inframeld-architecture/references/decision-availability-backup-and-restore.md#approved-resolution) selects the cold-backup, retention, operator-preparation and protected upgrade/restore objectives. Its schedule and timing values are qualification targets, not measured service levels. Keep matching qualified CLI/runtime releases, explicit upgrade authorization, one migration owner, coherent backup and fail-closed restriction reconciliation. Do not roll an image back over an incompatible schema or infer successful recovery from restarted containers.
+
 ## CLI and runtime release pairing
 
 [ADR-0095](../../adr/ADR-0095-support-matching-qualified-cli-and-runtime-releases.md) selects explicitly qualified matching CLI/runtime releases initially. Upgrade them as a coordinated pair. Development CLI builds claim no released runtime support. Offline version output identifies the supported pair when one has been qualified, but remote compatibility remains unverified until a backend version contract is delivered. Health and login success cannot replace that check. A decode failure never authorizes repeating a write.

@@ -2,6 +2,10 @@
 
 Alice deletes Support while its cleanup still has work to do. She might not be allowed to read every HR document inside it. Delete project authorizes this exact scoped destruction, not reading or sharing its contents.
 
+## Apply accepted PD-KNOWLEDGE-02
+
+Accepted [PD-KNOWLEDGE-02](decision-retention-erasure-policy.md#approved-resolution) selects this workflow's detailed contract. Keeping everything forever eventually exhausts the host and makes erasure harder. Finite defaults make normal growth predictable, while safety obligations cannot be discarded just because a timer expired. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Authority and ownership
 
 Delete project is a separate human-only Project permission, initially assigned to the creator through ordinary removable grants. It covers all Project-owned contents. Alice does not need every resource's Delete permission or management of every document group.
@@ -83,5 +87,5 @@ This is accepted design, including the approved status-viewer resolution. It doe
 
 - [Explicit source erasure](deletion-and-retention.md) and [ordinary retention/pins](retention-and-pins.md) own those lifecycle distinctions.
 - [Access transport boundaries](../../inframeld-access-models/references/grant-contracts.md) preserve current authority, operation identity and safe disclosure.
-- [PD-KNOWLEDGE-02](decision-retention-erasure-policy.md) remains pending for retention periods and other open contracts. Its viewer subquestion alone is resolved.
+- [PD-KNOWLEDGE-02](decision-retention-erasure-policy.md#approved-resolution) is accepted for retention, quota and derived-erasure policy. ADR-0080 retains its earlier initiator-only status-viewer rule.
 - [Indexing retirement](../../inframeld-indexing/references/retirement-and-erasure.md), [artifact storage](../../inframeld-application-contracts/references/artifact-storage.md) and [restore](../../../../docs/development/operations/restore.md) retain delayed-write and restoration obligations.

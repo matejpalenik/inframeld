@@ -6,6 +6,10 @@ Alice changes chunking while keeping the same handbook bytes. She needs another 
 
 <a id="the-records-solve-different-problems"></a>
 
+## Apply accepted PD-INDEXING-05
+
+Accepted [PD-INDEXING-05](decision-parser-runtime-profile.md#approved-resolution) selects this workflow's detailed contract. A small uploaded file can expand into huge content or spawn children. File size alone cannot protect the host or isolate the next document. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Choose a focused reading task
 
 - For complete readiness verification, read [Materialization verification](materialization-verification.md).
@@ -63,7 +67,7 @@ Ragas starter generation reuses processed text without extra generation-time emb
 
 ### Apply the accepted coordinate and binding contracts
 
-[PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) selects existing materialization references with complete bounded verified projections and operation-owned pins. [PD-INDEXING-03](decision-source-coordinates.md#approved-resolution) selects canonical conversion identity independent of chunk-only settings and zero-based Unicode code-point half-open ranges. Read those accepted contracts before defining the consuming interfaces. Separate current-health detection, parser runtime limits and physical erasure qualification remain pending.
+[PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) selects existing materialization references with complete bounded verified projections and operation-owned pins. [PD-INDEXING-03](decision-source-coordinates.md#approved-resolution) selects canonical conversion identity independent of chunk-only settings and zero-based Unicode code-point half-open ranges. Read those accepted contracts before defining the consuming interfaces. Accepted PD-INDEXING-02/04/05 select current-health observation, physical-erasure policy and parser runtime limits, with qualification still required.
 
 <a id="understand-what-is-shared"></a>
 
@@ -140,10 +144,10 @@ Do not resize returned vectors or silently choose a generic tokenizer to make th
 
 ## Decision references for dependent implementation
 
-Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
+Apply the accepted entries when their scope matches. Evidence and implementation remain separate:
 
 - [PD-INDEXING-03 (accepted): Keep source passage identity stable when chunking changes](decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
-- [PD-INDEXING-05: Select and prove a bounded parser runtime](decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
+- [PD-INDEXING-05 (accepted): Select and prove a bounded parser runtime](decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
 
 <a id="status-and-sources"></a>
 

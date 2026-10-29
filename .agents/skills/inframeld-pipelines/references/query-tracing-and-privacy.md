@@ -34,6 +34,10 @@ Check the caller's current status, permissions and reviewed state again when sav
 
 <a id="who-may-inspect-or-change-tracing"></a>
 
+## Apply accepted PD-PIPELINES-02
+
+Accepted [PD-PIPELINES-02](decision-trace-policy-fencing.md#approved-resolution) selects this workflow's detailed contract. Tracing should help diagnose a query without becoming a second, uncontrolled copy of private data. A confirmed off action must affect running processes and queued writes, not just a settings screen. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Choose a focused reading task
 
 - For opt-out, deletion and delivery fences, read [Trace capture and deletion](trace-capture-and-deletion.md).
@@ -112,7 +116,7 @@ An execution admitted with capture off does not begin recording halfway through 
 
 Apply this behavior to each independently controlled installation category. Project opt-out suppresses both categories for that project, while unrelated/projectless collection remains governed by its own controls. The RAG switch being off is not permission to copy RAG content into operational spans. Existing project preferences survive installation disable/re-enable and do not override operator restrictions.
 
-The policy operation must establish the effective restriction at Inframeld's capture, persistence and delivery boundaries before reporting a confirmed "off" result. Stale workers, automatic instrumentation, buffered spans and queued retries must respect it. A lost acknowledgment is unconfirmed until original-operation recovery establishes the result. Never claim off merely because the user selected it. Must specify and qualify the exact ordering/fencing and concurrent handoff behavior, without relying solely on a collector filter after sensitive capture.
+The policy operation must establish the effective restriction at Inframeld's capture, persistence and delivery boundaries before reporting a confirmed "off" result. Stale workers, automatic instrumentation, buffered spans and queued retries must respect it. A lost acknowledgment is unconfirmed until original-operation recovery establishes the result. Never claim off merely because the user selected it. Apply accepted PD-PIPELINES-02 for ordering/fencing and concurrent handoff behavior, then qualify the implementation. A collector filter after sensitive capture is insufficient.
 
 Already saved traces are not deleted by opt-out and remain subject to current access, retention and erasure. Data already handed outside Inframeld's control cannot be recalled by this switch. Do not promise withdrawal of an in-flight external delivery. No further handoff may be initiated after the effective restriction. This qualification does not enable v2 content-export connectors: v1 operational OTLP remains limited to allowed operational metadata.
 

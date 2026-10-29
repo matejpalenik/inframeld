@@ -12,6 +12,12 @@ Alice needs to know whether an installation can handle her corpus while serving 
 
 <a id="6-measure-the-supported-workload"></a>
 
+## Selected initial qualification gate
+
+Accepted [PD-ARCHITECTURE-01](decision-supported-operating-envelope.md#approved-resolution) selects the first profile: 200 current documents, 2,000 current chunks, 10,000 physical vectors, one active answer execution, and the specified shared queue/storage/filter/deadline bounds on the 16-vCPU/64-GiB/1-TB host. Apply those bounds and its one-query mixed-load objectives for initial release qualification. They are selected targets, not measured support.
+
+The larger 25,000-document/500,000-vector, five-query and million-document material below is retained as an explicitly separate expansion experiment and cost explanation. It is not the initial go/no-go gate. Passing it does not silently enlarge the accepted profile.
+
 ## Measure the supported workload
 
 These estimates do not establish production capacity. Test the exact single-node Chroma image digest and matching SDK that the release will ship. Do not use floating `latest` versions, apply cloud quotas to the local server, or rely on cloud-only forks or experimental search features.
@@ -51,7 +57,7 @@ Use one Linux server with **16 vCPUs, 64 GiB RAM, and 1 TB usable local SSD/NVMe
 
 <a id="proposed-workload"></a>
 
-### Proposed workload
+### Larger expansion workload
 
 | Dimension | Initial target and stress variants |
 | --- | --- |
@@ -128,11 +134,11 @@ Resource budgets must reject admission visibly **before** out-of-memory failure,
 
 <a id="provisional-gono-go-goals"></a>
 
-### Provisional go/no-go goals
+### Larger expansion go/no-go experiments
 
 | Measurement | Proposed goal |
 | --- | --- |
-| **Database retrieval, including authorization and filter construction** | p95 at most 1 second at five concurrent requests during a small build. |
+| **Database retrieval, including authorization and filter construction** | p95 at most 1 second at five concurrent requests during a small build, as an expansion experiment. |
 | **Retrieval quality** | recall@10 of at least 0.95 on the declared fixture. |
 | **One-document release platform overhead** | At most 2 minutes. |
 | **1% change platform overhead** | At most 15 minutes. |

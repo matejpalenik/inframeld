@@ -4,6 +4,10 @@ Alice turns tracing off while an answer is running, then turns it on again. That
 
 <a id="recording-controls"></a>
 
+## Apply accepted PD-PIPELINES-02
+
+Accepted [PD-PIPELINES-02](decision-trace-policy-fencing.md#approved-resolution) selects this workflow's detailed contract. Tracing should help diagnose a query without becoming a second, uncontrolled copy of private data. A confirmed off action must affect running processes and queued writes, not just a settings screen. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Recording Controls
 
 | Control | Meaning |
@@ -20,7 +24,7 @@ Mandatory security/audit records are not optional diagnostic tracing. Neither sw
 
 When a project opts out, stop its operational traces as well as its RAG traces. This does not turn off tracing for unrelated projects or health checks that belong to no project. Keep the project's saved preference even while an installation policy prevents recording.
 
-[The trace lifecycle](query-tracing-and-privacy.md#trace-lifecycle) explains what happens to queued and running work. The tracing contract still needs the exact coordination, storage and wire mechanisms.
+[The trace lifecycle](query-tracing-and-privacy.md#trace-lifecycle) explains what happens to queued and running work. Accepted PD-PIPELINES-02 selects the epoch, sticky suppression, acknowledgment barrier and deletion fencing. Native storage/wire delivery remains implementation work.
 
 <a id="deletion-blocks-reads-before-physical-cleanup-completes"></a>
 
@@ -69,7 +73,7 @@ For example, Alice reduces retention and some old traces become expired. Warn ab
 
 Expired history and history blocked by deletion must be unreadable before physical cleanup finishes. Retries and late writers must not restore it. Automatic expiry, previously accepted cleanup and source erasure require no fresh human approval per record. This does not change who may perform unrelated source or project deletion.
 
-[Trace authority](query-tracing-and-privacy.md#trace-authority) and the [trace lifecycle](query-tracing-and-privacy.md#trace-lifecycle) own these rules. Their exact enforcement still needs specification and qualification.
+[Trace authority](query-tracing-and-privacy.md#trace-authority) and the [trace lifecycle](query-tracing-and-privacy.md#trace-lifecycle) own these rules. Accepted PD-PIPELINES-02 selects enforcement policy. Its implementation and assembled qualification remain required.
 
 <a id="trace-history-deletion"></a>
 

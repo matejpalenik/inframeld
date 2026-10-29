@@ -10,6 +10,10 @@ Alice edits working revision 18 while an earlier question runs. That question ke
 
 <a id="pipelines-configuration-answers-and-feedback"></a>
 
+## Apply accepted PD-PIPELINES-01
+
+Accepted [PD-PIPELINES-01](decision-execution-build-receipt-contracts.md#approved-resolution) selects this workflow's detailed contract. Alice starts a question using saved configuration 17. Bob saves configuration 18 while it runs. Separately, Production may serve a ready version using configuration 16. The application must keep each execution's chosen meaning and distinguish a ready build from permission to publish it. If an answer response is lost, a retry must not buy another answer. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Pipelines: configuration, answers, and feedback
 
 A **Pipeline** is a stable named configuration with one current saved working revision. Each immutable **PipelineVersion** is a release-build result saving exact collection revisions, one processing profile, one embedding profile, an optional configured reranker, retrieval limits, prompt, generation settings, and the complete configuration fingerprint. `PipelineIndexBindings` point to compatible ready materializations without copying them. Direct Pipeline querying uses the records below without creating a PipelineVersion or Deployment.
@@ -44,7 +48,7 @@ Secrets never belong in these records. History is bounded by retention and curre
 
 ### Consume prepared materializations
 
-Accepted [PD-INDEXING-01](../../inframeld-indexing/references/decision-capability-binding-contracts.md#approved-resolution) gives each captured execution a complete set of exact scoped materialization references and bounded verified projections. Large inventories remain immutable paged manifests. Active execution pins use the shared retention gate and do not freeze authority. Missing/retired required data fails instead of selecting latest data or silently reconstructing historical bindings. PD-PIPELINES-01 still owns capture, preparation continuation and receipt finalization.
+Accepted [PD-INDEXING-01](../../inframeld-indexing/references/decision-capability-binding-contracts.md#approved-resolution) gives each captured execution a complete set of exact scoped materialization references and bounded verified projections. Large inventories remain immutable paged manifests. Active execution pins use the shared retention gate and do not freeze authority. Missing/retired required data fails instead of selecting latest data or silently reconstructing historical bindings. Accepted PD-PIPELINES-01 owns capture, preparation continuation and receipt finalization.
 
 <a id="record-the-actual-serving-selection-before-accepting-feedback"></a>
 

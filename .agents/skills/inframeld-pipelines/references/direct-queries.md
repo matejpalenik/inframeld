@@ -31,3 +31,7 @@ The [trace lifecycle](query-tracing-and-privacy.md#trace-lifecycle) applies to d
 Opting out stops further recording and queued diagnostic writes or delivery. It does not by itself cancel the query. Re-enabling tracing allows new eligible executions to record, but does not restart capture for this query. Explicitly deleting past traces is a separate operation: it blocks the affected reads before physical cleanup and does not change future recording.
 
 None of these actions reruns a model, reconstructs a missing answer, expands receipt replay or grants trace inspection.
+
+## Apply accepted PD-PIPELINES-01
+
+Accepted [PD-PIPELINES-01](decision-execution-build-receipt-contracts.md#approved-resolution) selects this workflow's detailed contract. Alice starts a question using saved configuration 17. Bob saves configuration 18 while it runs. Separately, Production may serve a ready version using configuration 16. The application must keep each execution's chosen meaning and distinguish a ready build from permission to publish it. If an answer response is lost, a retry must not buy another answer. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.

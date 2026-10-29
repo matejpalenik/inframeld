@@ -40,6 +40,10 @@ Feedback never triggers automatic release transitions. [Understanding feedback o
 
 <a id="start-with-an-answer-receipt"></a>
 
+## Apply accepted PD-KNOWLEDGE-02
+
+Accepted [PD-KNOWLEDGE-02](../../inframeld-knowledge/references/decision-retention-erasure-policy.md#approved-resolution) selects this workflow's detailed contract. Keeping everything forever eventually exhausts the host and makes erasure harder. Finite defaults make normal growth predictable, while safety obligations cannot be discarded just because a timer expired. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Start with an answer receipt
 
 An **AnswerReceipt** records that an eligible response was produced, who requested it, the version and release context used, and all supporting sources. It does not store the full answer or prove anyone saw it. Pipelines saves the completed receipt before returning the response.

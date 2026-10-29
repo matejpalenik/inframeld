@@ -8,6 +8,10 @@ Alice signs in, configures models and uploads two Support documents. Setup helps
 
 <a id="private-defaults-are-ordinary-resources"></a>
 
+## Apply accepted PD-ACCESS-06
+
+Accepted [PD-ACCESS-06](../../inframeld-access-models/references/decision-setup-read-authority.md#approved-resolution) selects this workflow's detailed contract. Alice has Query on her starter Pipeline, but the first build failed before any Deployment was created. Query on a nonexistent Deployment cannot authorize useful setup details. Bob guessing the Project ID must not learn the Project's state. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Private defaults are ordinary resources
 
 The server operator controls a one-time claim that establishes the installation and the first verified human's explicit permissions. The first arbitrary public signup never becomes an administrator. This claim gives neither unrestricted UI authority nor host access. Kratos verifies identity, while Access separately controls admission, suspension, restoration, and project creation.

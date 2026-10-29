@@ -4,6 +4,14 @@
 
 The accepted [application queue policy](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md#approved-resolution) uses bounded oldest-eligible application work and preserves the separate recovery process. Full ordinary capacity rejects new job admission before effects. Existing cleanup obligations and access restrictions survive saturation and restart. Application jobs can delay other product work without occupying recovery's execution slot. Numerical limits and measured response-time claims remain separate qualification.
 
+## Apply accepted PD-ARCHITECTURE-02
+
+Accepted [PD-ARCHITECTURE-02](decision-availability-backup-and-restore.md#approved-resolution) selects this workflow's detailed contract. A single host needs planned maintenance and a coherent recovery set. Copying old data back is unsafe if it also restores credentials or sources that were later revoked or erased. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
+## Apply accepted PD-ARCHITECTURE-01
+
+Accepted [PD-ARCHITECTURE-01](decision-supported-operating-envelope.md#approved-resolution) selects this workflow's detailed contract. Several individually bounded jobs can still exhaust one shared host. One conservative whole-installation profile gives every owner the same budget. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Choose a focused reading task
 
 - For durable stores and paths, read [Storage topology](storage-topology.md).

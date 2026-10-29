@@ -35,9 +35,9 @@ Alice can evaluate two fixed configurations before building. Desired changes mus
 
 For backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
-## Pending decisions for affected work
+## Accepted contracts for affected work
 
-Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
+Load the accepted contract matching the trigger. The developer resolved these policies on 2026-10-29. Do not request the same decisions again. Native representations and qualification remain implementation work. A later policy change follows [decision finalization](../../../docs/development/guides/architecture-decisions.md).
 
 - [PD-PIPELINES-01](references/decision-execution-build-receipt-contracts.md): Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
 - [PD-PIPELINES-02](references/decision-trace-policy-fencing.md): Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.

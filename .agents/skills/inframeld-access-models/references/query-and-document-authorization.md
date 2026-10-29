@@ -8,6 +8,10 @@ SupportBot may ask Production a question without being entitled to every Support
 
 <a id="3-follow-a-query"></a>
 
+## Apply accepted PD-ACCESS-06
+
+Accepted [PD-ACCESS-06](decision-setup-read-authority.md#approved-resolution) selects this workflow's detailed contract. Alice has Query on her starter Pipeline, but the first build failed before any Deployment was created. Query on a nonexistent Deployment cannot authorize useful setup details. Bob guessing the Project ID must not learn the Project's state. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Follow a query
 
 SupportBot asks Production, “How do customers request a refund?” Inframeld first checks the bot's identity, project membership, and Query permission. It then needs to keep unauthorized documents out of both the answer and the work that produces it.

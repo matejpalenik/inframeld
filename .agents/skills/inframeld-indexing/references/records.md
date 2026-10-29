@@ -10,6 +10,10 @@ Alice changes B1 while A1 is unchanged. Indexing can reuse compatible A1 data an
 
 <a id="indexing-profiles-generations-and-materializations"></a>
 
+## Apply accepted PD-INDEXING-02
+
+Accepted [PD-INDEXING-02](decision-health-observation.md#approved-resolution) selects this workflow's detailed contract. An index can lose a record without returning an error. Periodic checks can discover that omission, but a ready label or unchanged counter cannot discover it by itself. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Indexing: profiles, generations, and materializations
 
 <a id="distinguish-sources-processing-results-indexes-and-bindings"></a>
@@ -189,7 +193,7 @@ The existing IndexMaterialization is the compact scoped binding reference under 
 
 ### Indexing application boundaries
 
-[ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) separates preparation/readiness, retrieval and numerical retirement capabilities. They exchange exact typed bindings while preserving the singleton vector writer and shared retention gates. Accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) selects the existing scoped materialization identity, complete bounded projections, immutable paged inventories, unavailable outcomes and operation-owned pins. Current-health detection and physical cleanup qualification retain their separately pending contracts.
+[ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) separates preparation/readiness, retrieval and numerical retirement capabilities. They exchange exact typed bindings while preserving the singleton vector writer and shared retention gates. Accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) selects the existing scoped materialization identity, complete bounded projections, immutable paged inventories, unavailable outcomes and operation-owned pins. Accepted PD-INDEXING-02/04 select the health and physical-cleanup policies, with qualification still required.
 
 <a id="authoritative-application-state"></a>
 

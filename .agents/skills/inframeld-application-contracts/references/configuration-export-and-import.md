@@ -2,6 +2,10 @@
 
 Alice exports Support and Bob reviews it in Test. A configuration transfer carries reusable definitions. It does not carry the documents, live release state or credentials that made the original installation work.
 
+## Apply accepted PD-CONTRACTS-04
+
+Accepted [PD-CONTRACTS-04](decision-import-review-and-recovery.md#approved-resolution) selects this workflow's detailed contract. Import should apply exactly the configuration Bob reviewed and tell him which changes actually happened if a later step fails. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Three different operations
 
 1. **Export** captures one coherent permitted definition set. A name is portable text, while a permanent resource ID belongs to its installation. Export is a read and must not probe a provider or change source state.
@@ -19,4 +23,4 @@ A global database transaction cannot cover remote work and all of these independ
 
 ## Status and decision boundary
 
-These are accepted behavior boundaries. Exact portable schemas, equivalence and reviewed application contracts remain unfinished. Load [PD-CONTRACTS-04](decision-import-review-and-recovery.md) before choosing those representations. Examples in the workflow references must not be treated as invented runtime request types.
+These are accepted behavior boundaries. Accepted PD-CONTRACTS-04 selects versioned portable semantics, equivalence and reviewed action policy. Native schemas and integration remain implementation work. Load [PD-CONTRACTS-04](decision-import-review-and-recovery.md) before choosing those representations. Examples in the workflow references must not be treated as invented runtime request types.

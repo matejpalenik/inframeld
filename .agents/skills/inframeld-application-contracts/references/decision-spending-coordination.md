@@ -67,7 +67,7 @@ Shared gateway/accounting, Access budget authority, Evaluation/operation limits,
 Load neighboring decisions only under these conditions:
 
 - [PD-CONTRACTS-01: Enforce model policy on the actual outbound path](decision-gateway-enforcement.md). For actual dispatch/usage mapping.
-- [PD-CONTRACTS-04: Bind import review and partial recovery to exact actions](decision-import-review-and-recovery.md). When import explicitly applies a budget change.
+- [PD-CONTRACTS-04 (accepted): Bind import review and partial recovery to exact actions](decision-import-review-and-recovery.md). When import explicitly applies a budget change.
 
 ## Implementation and required evidence
 

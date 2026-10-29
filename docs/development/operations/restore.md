@@ -18,6 +18,10 @@ Do not promise deduplication or exactly-once external effects for history absent
 
 <a id="5-preserve-restrictions-after-restoration"></a>
 
+## Accepted backup and recovery objectives
+
+[PD-ARCHITECTURE-02](../../../.agents/skills/inframeld-architecture/references/decision-availability-backup-and-restore.md#approved-resolution) selects the daily coherent cut, 20-minute planned-interruption objective, one-hour verified off-host completion, conditional 25-hour recovery point/four-hour prepared-operator restoration, 98.0% availability objective, seven daily/four weekly completed sets and fail-closed security reconciliation. These are chosen targets, not measured results. The initial workload is the smaller accepted [operating profile](../../../.agents/skills/inframeld-architecture/references/decision-supported-operating-envelope.md#approved-resolution), not the old 25k expansion experiment. Preserve the existing procedures below and qualify them on that profile.
+
 ## Preserve restrictions after restoration
 
 The supported restore procedure must account for restrictions imposed **after** the selected backup was taken.

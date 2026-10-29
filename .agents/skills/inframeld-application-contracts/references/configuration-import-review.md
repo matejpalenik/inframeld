@@ -4,6 +4,10 @@ Bob reviews Alice’s definitions against an existing installation. Names resolv
 
 <a id="destination-review"></a>
 
+## Apply accepted PD-CONTRACTS-04
+
+Accepted [PD-CONTRACTS-04](decision-import-review-and-recovery.md#approved-resolution) selects this workflow's detailed contract. Import should apply exactly the configuration Bob reviewed and tell him which changes actually happened if a later step fails. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Destination Review
 
 V1 creation of configurable resources is human-only. An application may review/import eligible changes to existing resources and explicitly reuse compatible definitions. A missing dependency or changed immutable profile requiring creation makes its plan ineligible: reject the known-invalid plan before mutations and report the resource an authorized human must provision. A subsequent import uses a new reviewed plan against those destination IDs. Neither a Create grant record nor a saved human login makes application creation eligible. [The provisioning contract](../../inframeld-access-models/references/actions-and-initial-grants.md#provisioning) owns this boundary. Ordinary operational output such as versions and cases remains supported.

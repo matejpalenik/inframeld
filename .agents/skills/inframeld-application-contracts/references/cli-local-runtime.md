@@ -113,6 +113,10 @@ Neither `--no-input` nor a general confirmation flag can authorize relaxing thes
 
 <a id="persistent-lifecycle-status-and-deliberate-reset"></a>
 
+## Apply accepted PD-ARCHITECTURE-02
+
+Accepted [PD-ARCHITECTURE-02](../../inframeld-architecture/references/decision-availability-backup-and-restore.md#approved-resolution) selects this workflow's detailed contract. A single host needs planned maintenance and a coherent recovery set. Copying old data back is unsafe if it also restores credentials or sources that were later revoked or erased. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Persistent lifecycle, status and deliberate reset
 
 The CLI initially supports macOS and Linux. Platform and architecture claims still require the release’s qualification matrix. It manages one persistent local development installation without requiring a project initialization file. A repository directory or target alias is not proof of ownership.

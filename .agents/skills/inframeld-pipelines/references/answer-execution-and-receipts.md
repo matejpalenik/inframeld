@@ -6,6 +6,10 @@ SupportBot asks Production a question. The answer must use one selected version 
 
 <a id="follow-execution"></a>
 
+## Apply accepted PD-PIPELINES-01
+
+Accepted [PD-PIPELINES-01](decision-execution-build-receipt-contracts.md#approved-resolution) selects this workflow's detailed contract. Alice starts a question using saved configuration 17. Bob saves configuration 18 while it runs. Separately, Production may serve a ready version using configuration 16. The application must keep each execution's chosen meaning and distinguish a ready build from permission to publish it. If an answer response is lost, a retry must not buy another answer. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Follow execution
 
 1. Authenticate and authorize the exact query. Live serving selects one ready version and takes a bounded retention pin. A direct query uses captured working inputs with the same execution protections.
@@ -180,11 +184,11 @@ HTTP and MCP apply this same rule for identifying a route. Explicitly requesting
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Accepted decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted contract whose trigger matches. Qualification remains separate from policy approval:
 
-- [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](decision-execution-build-receipt-contracts.md). Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
+- [PD-PIPELINES-01 (accepted): Capture fixed inputs and complete execution through its receipt](decision-execution-build-receipt-contracts.md). Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
 
 <a id="status-and-sources"></a>
 

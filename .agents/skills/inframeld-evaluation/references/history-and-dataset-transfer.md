@@ -6,6 +6,10 @@ Alice exports reviewed Support questions to another installation. The JSONL cont
 
 <a id="authority-and-audiences"></a>
 
+## Apply accepted PD-EVALUATION-01
+
+Accepted [PD-EVALUATION-01](decision-case-review-contracts.md#approved-resolution) selects this workflow's detailed contract. Generating a question, editing it and approving it are different actions. Approval should apply only to what someone actually reviewed. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Authority and audiences
 
 Evaluation uses six separate exact-Pipeline use permissions. Eligible humans and applications can receive those grants. Grant/audience administration remains human-only. Exact creator assignments and the separate `manage-evaluation-case-audiences` capability are accepted. Public/physical schemas and runtime qualification remain distinct delivery work.

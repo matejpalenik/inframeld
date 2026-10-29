@@ -10,6 +10,14 @@ Alice accepts a proposed question, then edits it. The edit creates a new unrevie
 
 <a id="evaluation-frozen-inputs-and-recorded-observations"></a>
 
+## Apply accepted PD-EVALUATION-02
+
+Accepted [PD-EVALUATION-02](decision-run-and-result-contracts.md#approved-resolution) selects this workflow's detailed contract. A run can answer successfully while a metric cannot be calculated. A comparison can also have missing pairs. Those facts must remain visible instead of collapsing into one success flag or score. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
+## Apply accepted PD-EVALUATION-01
+
+Accepted [PD-EVALUATION-01](decision-case-review-contracts.md#approved-resolution) selects this workflow's detailed contract. Generating a question, editing it and approving it are different actions. Approval should apply only to what someone actually reviewed. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Evaluation: frozen inputs and recorded observations
 
 <a id="preserve-history-with-a-small-application-owned-model"></a>
@@ -62,4 +70,4 @@ Each run keeps bounded final answers, final-context evidence or immutable artifa
 
 ### Evaluation application boundaries
 
-[ADR-0078](../../../../docs/adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md) separates case generation/review operations, run/comparison coordination and scoring adapters. Ordinary question execution stays with Pipelines, controlled progress with shared jobs and remote model calls with ModelGateway. Exact case/run, metric, progress and protected-result contracts remain to specify. The logical records do not imply a table or aggregate per concept.
+[ADR-0078](../../../../docs/adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md) separates case generation/review operations, run/comparison coordination and scoring adapters. Ordinary question execution stays with Pipelines, controlled progress with shared jobs and remote model calls with ModelGateway. Accepted PD-EVALUATION-01/02/03 now select the logical case/run, metric, progress, protected-result and adapter/quality contracts. Native storage/API shapes and qualification remain implementation work. The logical records do not imply a table or aggregate per concept.

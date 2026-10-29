@@ -102,7 +102,7 @@ Read [profiles and preparation](profiles-and-preparation.md), [frozen vector ret
 
 ## Decisions still needed and sources
 
-[ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) accepts focused preparation/readiness, retrieval and numerical retirement capabilities. The [owning guide](#indexing-capability-boundaries) links accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) for exact bindings, complete results, unavailable outcomes and pins. Current-health detection and physical cleanup qualification remain separate pending choices. The selected engine, frozen-byte retries and qualification limits remain in force.
+[ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) accepts focused preparation/readiness, retrieval and numerical retirement capabilities. The [owning guide](#indexing-capability-boundaries) links accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) for exact bindings, complete results, unavailable outcomes and pins. Accepted PD-INDEXING-02/04 select current-health observation and physical-cleanup policy. Qualification remains required. The selected engine, frozen-byte retries and qualification limits remain in force.
 
 [The Indexing guide](profiles-and-preparation.md), [Indexing records](records.md#indexing), [model connections](../../inframeld-application-contracts/references/model-gateway-and-connections.md) and [ingestion security](../../inframeld-knowledge/references/uploads-and-source-sync.md) own the accepted protocols and qualification limits.
 
@@ -126,16 +126,16 @@ Indexing has focused preparation/readiness, retrieval and numerical retirement/c
 
 Explicit typed bindings identify the exact corpus, profiles, generations and layout passed between these parts. Existing readiness verification, frozen-byte retries, current-health checks and shared retention gates remain authoritative. Reuse the existing jobs and transaction support. This split selects no new vector engine, process or generic workflow framework.
 
-**Accepted contracts, implementation and qualification pending.** Apply [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) for scoped materialization identities, complete bounded projections and pin lifetime. Apply [PD-INDEXING-03](decision-source-coordinates.md#approved-resolution) for canonical artifacts and source mappings. Current-health detection, backend completion barriers and parser runtime limits retain their own pending choices. These are logical capabilities, not a class, repository or process per box. Exact backend, security, resource and concurrency qualification remains required. A numerical reuse key cannot authorize redispatch of an uncertain paid request.
+**Accepted contracts, implementation and qualification pending.** Apply [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) for scoped materialization identities, complete bounded projections and pin lifetime. Apply [PD-INDEXING-03](decision-source-coordinates.md#approved-resolution) for canonical artifacts and source mappings. Accepted PD-INDEXING-02/04/05 select health observation, completion-barrier policy and parser limits. Their evidence remains required. These are logical capabilities, not a class, repository or process per box. Exact backend, security, resource and concurrency qualification remains required. A numerical reuse key cannot authorize redispatch of an uncertain paid request.
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
 ## Decision references for dependent implementation
 
-Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
+Apply the accepted entries when their scope matches. Evidence and implementation remain separate:
 
 - [PD-INDEXING-01 (accepted): Exchange complete prepared bindings between Indexing capabilities](decision-capability-binding-contracts.md). Before defining preparation, retrieval or retirement application ports and their complete input/result records.
-- [PD-INDEXING-02: Define what current index health can actually detect](decision-health-observation.md). Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
+- [PD-INDEXING-02 (accepted): Define what current index health can actually detect](decision-health-observation.md). Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
 - [PD-INDEXING-03 (accepted): Keep source passage identity stable when chunking changes](decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
-- [PD-INDEXING-04: Qualify frozen storage retries and final erasure barriers](decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
-- [PD-INDEXING-05: Select and prove a bounded parser runtime](decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
+- [PD-INDEXING-04 (accepted): Qualify frozen storage retries and final erasure barriers](decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
+- [PD-INDEXING-05 (accepted): Select and prove a bounded parser runtime](decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.

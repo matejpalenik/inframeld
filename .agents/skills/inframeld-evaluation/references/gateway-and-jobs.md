@@ -6,6 +6,10 @@ Alice starts generation and cancels while Ragas is still preparing its executor.
 
 <a id="roles-and-adapters"></a>
 
+## Apply accepted PD-EVALUATION-03
+
+Accepted [PD-EVALUATION-03](decision-ragas-integration-and-calibration.md#approved-resolution) selects this workflow's detailed contract. A judging model can produce valid JSON and still miss an unsupported claim. A narrow adapter and explicit human-labelled checks make the limits inspectable. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Roles and adapters
 
 Generator and judge bindings explicitly select authorized saved connections and model settings. They may reuse a key through an existing connection, but do not modify Pipeline generation settings. Ragas supplies algorithms, not case management, authorization, durable scheduling or another workflow engine.
@@ -170,5 +174,5 @@ Optional starter generation and evaluation use embedded Ragas under [ADR-0051](.
 
 Apply the accepted entries below when their scope matches. Discuss only choices still explicitly marked pending:
 
-- [PD-EVALUATION-03: Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.
+- [PD-EVALUATION-03 (accepted): Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.
 - [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.

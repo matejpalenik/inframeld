@@ -2,13 +2,17 @@
 
 <a id="back-up-and-restore-a-complete-installation"></a>
 
-A backup must preserve the database, identity infrastructure, artifacts, vector data and the keys needed to interpret them. The sequence below is a proposed single-host operating procedure with provisional targets. It has not been qualified by this documentation migration.
+A backup must preserve the database, identity infrastructure, artifacts, vector data and the keys needed to interpret them. The sequence below is the selected single-host operating procedure with chosen qualification targets. It has not been qualified by recording the decision.
 
 <a id="back-up-one-complete-matching-set"></a>
 
 <a id="inventory"></a>
 
 <a id="4-back-up-one-complete-matching-set"></a>
+
+## Accepted backup and recovery objectives
+
+[PD-ARCHITECTURE-02](../../../.agents/skills/inframeld-architecture/references/decision-availability-backup-and-restore.md#approved-resolution) selects the daily coherent cut, 20-minute planned-interruption objective, one-hour verified off-host completion, conditional 25-hour recovery point/four-hour prepared-operator restoration, 98.0% availability objective, seven daily/four weekly completed sets and fail-closed security reconciliation. These are chosen targets, not measured results. The initial workload is the smaller accepted [operating profile](../../../.agents/skills/inframeld-architecture/references/decision-supported-operating-envelope.md#approved-resolution), not the old 25k expansion experiment. Preserve the existing procedures below and qualify them on that profile.
 
 ## Back up one complete matching set
 

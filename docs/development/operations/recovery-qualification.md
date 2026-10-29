@@ -1,5 +1,9 @@
 # Recovery Qualification
 
+## Accepted backup and recovery objectives
+
+[PD-ARCHITECTURE-02](../../../.agents/skills/inframeld-architecture/references/decision-availability-backup-and-restore.md#approved-resolution) selects the daily coherent cut, 20-minute planned-interruption objective, one-hour verified off-host completion, conditional 25-hour recovery point/four-hour prepared-operator restoration, 98.0% availability objective, seven daily/four weekly completed sets and fail-closed security reconciliation. These are chosen targets, not measured results. The initial workload is the smaller accepted [operating profile](../../../.agents/skills/inframeld-architecture/references/decision-supported-operating-envelope.md#approved-resolution), not the old 25k expansion experiment. Preserve the existing procedures below and qualify them on that profile.
+
 <a id="provisional-workload-schedule-and-targets"></a>
 
 ### Provisional workload, schedule, and targets
@@ -8,14 +12,14 @@ Every value below is a planning assumption or objective, not tested capacity.
 
 | Planning input or objective | Proposed value and meaning |
 | --- | --- |
-| **Initial workload** | [Preparing and searching reliable indexes](../../../.agents/skills/inframeld-indexing/references/profiles-and-preparation.md)’s unmeasured workload: **25,000 documents**, approximately **500,000 current vectors**, one embedding profile, limited retained revisions, and remote model inference. An embedding profile identifies how numerical search vectors are produced and compared. |
+| **Initial workload** | Accepted PD-ARCHITECTURE-01: **200 current documents**, **2,000 current chunks**, **10,000 physical vectors** including retained/pending work, up to two prepared profiles and one active answer execution. Remote model inference is assumed. These are qualification targets, not measured capacity. |
 | **Protected state** | Assume **100 GiB total** across PostgreSQL, SeaweedFS, Chroma, and configuration. This is an independent storage-budget assumption, not a conversion from vector count. Measure actual sources, histories, index overhead, and pending payloads. |
 | **Backup schedule and outage** | Start a consistent cut every **24 hours**. Budget **20 minutes of planned unavailability** per backup. API queries, releases, and login are unavailable during the cold-copy phase. |
 | **Local staging rate** | Assume **200 MiB/s effective verified copying**, including the work needed to trust the staged copy. Copying 100 GiB takes about **512 seconds / 8.5 minutes**, leaving roughly **11.5 minutes** for draining, stopping, manifest checks, and restart. Shared or slower disks may not achieve this. |
 | **Off-host transfer rate** | Assume **50 MiB/s effective encrypted transfer**, including normal overhead. Transferring 100 GiB takes about **2,048 seconds / 34.1 minutes**. Target completed off-host protection within **one hour of the cut**. Service can run during this transfer. |
 | **Recovery point** | Target a **maximum 25-hour age of the latest completed off-host cut**, while daily backups and the one-hour completion budget succeed. A failed or missed backup increases exposure immediately. This is an operating/alert target, not a guaranteed bound. |
 | **Recovery time** | Target **four hours from the operator beginning restoration to validated service reopening**, with the required replacement host, disk, matching images, keys, off-host access, and complete security evidence already available. |
-| **Retention and rehearsal** | Propose **7 daily and 4 weekly completed sets**, a **monthly isolated restore**, and another rehearsal after material storage/schema changes. A schema is the database’s stored structure. Retention remains subject to [Keeping and deleting data deliberately](../../../.agents/skills/inframeld-knowledge/references/deletion-and-retention.md)’s deletion policy. |
+| **Retention and rehearsal** | Select **7 daily and 4 weekly completed sets**, a **monthly isolated restore**, and another rehearsal after material storage/schema changes. A schema is the database’s stored structure. Retention remains subject to [Keeping and deleting data deliberately](../../../.agents/skills/inframeld-knowledge/references/deletion-and-retention.md)’s deletion policy. |
 
 The copy estimates use `100 × 1024 / 200` and `100 × 1024 / 50`, because one GiB contains 1,024 MiB. They estimate only the stated phases, not the complete recovery duration.
 

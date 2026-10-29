@@ -6,6 +6,14 @@ Alice removes the handbook from a new corpus, changes its audience, or erases it
 
 <a id="change-an-audience-deliberately"></a>
 
+## Apply accepted PD-INDEXING-04
+
+Accepted [PD-INDEXING-04](../../inframeld-indexing/references/decision-storage-retries-and-erasure.md#approved-resolution) selects this workflow's detailed contract. A timed-out storage request may still finish later. Reusing already known bytes is different from buying another embedding, and deleting data is not complete while old writes could recreate it. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
+## Apply accepted PD-KNOWLEDGE-02
+
+Accepted [PD-KNOWLEDGE-02](decision-retention-erasure-policy.md#approved-resolution) selects this workflow's detailed contract. Keeping everything forever eventually exhausts the host and makes erasure harder. Finite defaults make normal growth predictable, while safety obligations cannot be discarded just because a timer expired. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Choose a focused reading task
 
 - For routine expiry and retained dependencies, read [Retention and pins](retention-and-pins.md).
@@ -178,12 +186,12 @@ The checks above express accepted requirements. Backup timing proposals, future 
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Accepted decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted contract whose trigger matches. Qualification remains separate from policy approval:
 
-- [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](decision-retention-erasure-policy.md). Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.
-- [PD-INDEXING-04: Qualify frozen storage retries and final erasure barriers](../../inframeld-indexing/references/decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
+- [PD-KNOWLEDGE-02 (accepted): Choose bounded retention without weakening explicit erasure](decision-retention-erasure-policy.md). Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.
+- [PD-INDEXING-04 (accepted): Qualify frozen storage retries and final erasure barriers](../../inframeld-indexing/references/decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
 
 ## Status, sources and unresolved scope
 
@@ -201,7 +209,7 @@ The erasure and audience rules are accepted design. Exact retention periods and 
 
 <a id="8-decision-and-reference-map"></a>
 
-Exact retention periods, erasure/anonymization policy, and the narrow deletion-status endpoint still need implementation decisions. [Recovery](../../../../docs/development/operations/restore.md#restrictions) owns the provisional off-host restriction register. Explicit erasure can make an old release unavailable. Keeping its history does not require retaining its content forever or guarantee deletion from every provider and backup.
+Accepted [PD-KNOWLEDGE-02](decision-retention-erasure-policy.md#approved-resolution) selects retention, minimal retained attribution and erasure policy. Native endpoint/storage representations and physical-cleanup qualification remain implementation work. [Recovery](../../../../docs/development/operations/restore.md#restrictions) owns the provisional off-host restriction register. Explicit erasure can make an old release unavailable. Keeping its history does not require retaining its content forever or guarantee deletion from every provider and backup.
 
 | Decision | Rationale |
 | --- | --- |

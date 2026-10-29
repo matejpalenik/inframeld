@@ -4,6 +4,10 @@ Alice starts a build, but the acknowledgment disappears. The backend may already
 
 > **Status:** logical application contracts accepted on 2026-10-29 through the approved joint #124/#156 specification plan. Original-request lookup now has a [native HTTP/backend implementation](../../../../docs/development/guides/original-request-lookup.md). The other contracts remain design unless their own implementation evidence says otherwise. Native OpenAPI and code own delivered representations, while tests establish their qualified scope. Existing [typed idempotency outcomes](idempotency-and-replay.md#temporary-operation-outcomes) retain authority for replay behavior.
 
+## Apply accepted PD-PIPELINES-01
+
+Accepted [PD-PIPELINES-01](../../inframeld-pipelines/references/decision-execution-build-receipt-contracts.md#approved-resolution) selects this workflow's detailed contract. Alice starts a question using saved configuration 17. Bob saves configuration 18 while it runs. Separately, Production may serve a ready version using configuration 16. The application must keep each execution's chosen meaning and distinguish a ready build from permission to publish it. If an answer response is lost, a retry must not buy another answer. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Choose the operation
 
 | Question | Contract |
@@ -142,7 +146,7 @@ This projection grants no cancellation, continuation, restoration or replacement
 
 ## Retention, delivery and acceptance
 
-Preserve [at least 24 hours of completed duplicate detection and active-work retention](idempotency-and-replay.md#limit-guarantees-to-retained-authoritative-history). An established expiry is published unchanged. Repeated reads or retries do not extend it. That floor does not select job-history or deletion-status lifetimes. PD-KNOWLEDGE-02's remaining periods are pending. The [accepted queue policy](decision-queue-saturation-and-cleanup.md#approved-resolution) governs saturation, with numerical operating limits still separate.
+Preserve [at least 24 hours of completed duplicate detection and active-work retention](idempotency-and-replay.md#limit-guarantees-to-retained-authoritative-history). An established expiry is published unchanged. Repeated reads or retries do not extend it. That floor does not select job-history or deletion-status lifetimes. Accepted [PD-KNOWLEDGE-02](../../inframeld-knowledge/references/decision-retention-erasure-policy.md#approved-resolution) selects job-history and deletion-status periods. The [accepted queue policy](decision-queue-saturation-and-cleanup.md#approved-resolution) and [PD-ARCHITECTURE-01](../../inframeld-architecture/references/decision-supported-operating-envelope.md#approved-resolution) select saturation and numerical operating limits. Runtime qualification remains required.
 
 The following are downstream behavioral acceptance cases, not tests executed by this specification:
 

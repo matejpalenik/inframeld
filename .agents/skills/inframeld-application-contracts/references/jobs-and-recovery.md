@@ -42,6 +42,10 @@ Resume must not revive a permanently retired generation, change saved payload by
 
 Cancellation records a request to stop. The worker checks it between limited-size units of work. It cannot undo a completed model call or an already-published release.
 
+## Apply accepted PD-ARCHITECTURE-01
+
+Accepted [PD-ARCHITECTURE-01](../../inframeld-architecture/references/decision-supported-operating-envelope.md#approved-resolution) selects this workflow's detailed contract. Several individually bounded jobs can still exhaust one shared host. One conservative whole-installation profile gives every owner the same budget. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Current authority after admission
 
 Alice's token can expire after five of twenty evaluation cases. The accepted job can continue, but the worker must check current account, required action and source authority before each protected step, business save, publication and disclosure. Individual key revocation blocks new incoming requests, not already admitted work. Cancel affected jobs or suspend the application account for containment. A changed human recovery generation prevents further protected work until eligible explicit continuation. Preserve confirmed progress and unknown external outcomes without automatically restarting after permission restoration.

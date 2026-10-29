@@ -6,6 +6,10 @@ Alice changes chunking and gets a different score. Before calling it a regressio
 
 <a id="read-results-responsibly"></a>
 
+## Apply accepted PD-EVALUATION-02
+
+Accepted [PD-EVALUATION-02](decision-run-and-result-contracts.md#approved-resolution) selects this workflow's detailed contract. A run can answer successfully while a metric cannot be calculated. A comparison can also have missing pairs. Those facts must remain visible instead of collapsing into one success flag or score. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Choose a focused reading task
 
 - For coverage calculation and missing mappings, read [Passage coverage](passage-coverage.md).
@@ -87,11 +91,11 @@ Reuse Evaluation's existing logical case/run observations and shared jobs. This 
 
 ## Decision references for dependent implementation
 
-Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
+Apply the accepted entries when their scope matches. Evidence and implementation remain separate:
 
 - [PD-INDEXING-03 (accepted): Keep source passage identity stable when chunking changes](../../inframeld-indexing/references/decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
-- [PD-EVALUATION-02: Coordinate fixed runs and expose honest protected results](decision-run-and-result-contracts.md). Before defining run/comparison inputs, durable progress, scoring outcomes, result inspection or summary/export schemas.
-- [PD-EVALUATION-03: Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.
+- [PD-EVALUATION-02 (accepted): Coordinate fixed runs and expose honest protected results](decision-run-and-result-contracts.md). Before defining run/comparison inputs, durable progress, scoring outcomes, result inspection or summary/export schemas.
+- [PD-EVALUATION-03 (accepted): Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.
 
 <a id="status-and-sources"></a>
 

@@ -12,6 +12,10 @@ Alice sees a high faithfulness score. Before treating the judge as useful eviden
 
 **Calibration** compares the selected judge with human-labelled evidence, not another model's opinion. Label factual claims and whether each is supported by the exact final context. Measure missed/altered claims separately from support-classification errors. Omitting an unsupported claim can inflate a score even when returned verdicts look valid.
 
-Include supported and mixed-support answers, contradictions, numbers, negation, irrelevant-but-supported answers, abstentions, no-evidence/no-claim cases, long contexts, and prompt injection. Keep a held-out subset unused during tuning. Record disputed labels and denominators. Numeric acceptance thresholds must be established and tested for this rubric. The old whole-answer agreement target does not transfer automatically.
+Include supported and mixed-support answers, contradictions, numbers, negation, irrelevant-but-supported answers, abstentions, no-evidence/no-claim cases, long contexts, and prompt injection. Keep a held-out subset unused during tuning. Record disputed labels and denominators. Accepted PD-EVALUATION-03 selects numeric acceptance thresholds for this rubric. They still require held-out testing. The old whole-answer agreement target does not transfer automatically.
 
 Run five fixed borderline/adversarial examples three times each, keeping all results and reporting claim/score variation, failures, calls, cost, and latency. Never select favorable repeats. Temperature zero and deterministic arithmetic do not make a judge deterministic. Recalibrate after material library, prompt, model, language, or corpus changes. Changing judge after failure is an explicit choice, not automatic fallback.
+
+## Apply accepted PD-EVALUATION-03
+
+Accepted [PD-EVALUATION-03](decision-ragas-integration-and-calibration.md#approved-resolution) selects this workflow's detailed contract. A judging model can produce valid JSON and still miss an unsupported claim. A narrow adapter and explicit human-labelled checks make the limits inspectable. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
