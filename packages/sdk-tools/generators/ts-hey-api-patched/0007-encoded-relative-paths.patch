@@ -1,0 +1,109 @@
+--- a/dist/init-D6Y8JFUS.mjs
++++ b/dist/init-D6Y8JFUS.mjs
+@@ -4963,8 +4963,10 @@
+ 		plugin
+ 	});
+ 	if (auth.length) reqOptions.prop("security", $.fromValue(auth));
++	const encodedPathParams = Object.values(operation.parameters?.path ?? {}).filter(p => p.encodedPath).map(p => p.name);
+ 	reqOptions.prop("url", $.literal(operation.path));
+ 	reqOptions.spread("options");
++	if (encodedPathParams.length) reqOptions.prop("encodedPathParams", $.fromValue(encodedPathParams));
+ 	if (client.name === "@hey-api/client-fetch" && responseHandlers.validator) reqOptions.prop("responseValidator", responseHandlers.validator);
+ 	if (client.name === "@hey-api/client-fetch") {
+ 		const contracts = $.object();
+--- a/dist/clients/core/utils.ts
++++ b/dist/clients/core/utils.ts
+@@ -7,13 +7,21 @@
+ } from './pathSerializer';
+ 
+ export interface PathSerializer {
++  encodedPathParams?: readonly string[];
+   path: Record<string, unknown>;
+   url: string;
+ }
+ 
++export const encodedRelativePath = (value: unknown): string => {
++  if (typeof value !== 'string' || value.length > 3 * 8192 || value.startsWith('/') || !/^(?:[A-Za-z0-9._~!$&'()*+,;=:@/\-]|%[0-9A-Fa-f]{2})*$/.test(value)) throw new Error('Invalid percent-encoded relative path');
++  const decoded = decodeURIComponent(value);
++  if (/[\u0000-\u001f\u007f-\u009f\\]/u.test(decoded) || decoded.split('/').some(part => part === '.' || part === '..')) throw new Error('Invalid percent-encoded relative path');
++  return value;
++};
++
+ export const PATH_PARAM_RE: RegExp = /\{[^{}]+\}/g;
+ 
+-export const defaultPathSerializer = ({ path, url: _url }: PathSerializer): string => {
++export const defaultPathSerializer = ({ path, url: _url, encodedPathParams }: PathSerializer): string => {
+   let url = _url;
+   const matches = _url.match(PATH_PARAM_RE);
+   if (matches) {
+@@ -41,6 +49,10 @@
+         continue;
+       }
+ 
++      if (encodedPathParams?.includes(name)) {
++        url = url.replace(match, () => encodedRelativePath(value));
++        continue;
++      }
+       if (Array.isArray(value)) {
+         url = url.replace(match, serializeArrayParam({ explode, name, style, value }));
+         continue;
+@@ -82,12 +94,14 @@
+ 
+ export const getUrl = ({
+   baseUrl,
++  encodedPathParams,
+   path,
+   query,
+   querySerializer,
+   url: _url,
+ }: {
+   baseUrl?: string;
++  encodedPathParams?: readonly string[];
+   path?: Record<string, unknown>;
+   query?: Record<string, unknown>;
+   querySerializer: QuerySerializer;
+@@ -96,7 +110,7 @@
+   const pathUrl = _url.startsWith('/') ? _url : `/${_url}`;
+   let url = (baseUrl ?? '') + pathUrl;
+   if (path) {
+-    url = defaultPathSerializer({ path, url });
++    url = defaultPathSerializer({ path, url, encodedPathParams });
+   }
+   let search = query ? querySerializer(query) : '';
+   if (search.startsWith('?')) {
+--- a/dist/clients/fetch/utils.ts
++++ b/dist/clients/fetch/utils.ts
+@@ -156,6 +156,7 @@
+   getUrl({
+     baseUrl: options.baseUrl as string,
+     path: options.path,
++    encodedPathParams: options.encodedPathParams,
+     query: options.query,
+     querySerializer:
+       typeof options.querySerializer === 'function'
+--- a/dist/clients/fetch/types.ts
++++ b/dist/clients/fetch/types.ts
+@@ -91,6 +91,7 @@
+    * {@link https://developer.mozilla.org/docs/Web/API/fetch#body}
+    */
+   body?: unknown;
++  encodedPathParams?: readonly string[];
+   path?: Record<string, unknown>;
+   query?: Record<string, unknown>;
+   /**
+@@ -185,6 +186,7 @@
+ 
+ type BuildUrlFn = <
+   TData extends {
++    encodedPathParams?: readonly string[];
+     body?: unknown;
+     path?: Record<string, unknown>;
+     query?: Record<string, unknown>;
+@@ -227,6 +229,6 @@
+   TResponseStyle extends ResponseStyle = 'fields',
+ > = OmitKeys<
+   RequestOptions<TResponse, TResponseStyle, ThrowOnError>,
+-  'body' | 'path' | 'query' | 'url' | 'responseContract'
++  'body' | 'path' | 'query' | 'url' | 'responseContract' | 'encodedPathParams'
+ > &
+   ([TData] extends [never] ? unknown : Omit<TData, 'url'>);

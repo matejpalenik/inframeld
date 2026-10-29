@@ -30,3 +30,22 @@ test("a case cannot claim coverage for an unknown operation", () => {
     /Unknown/,
   );
 });
+
+test("unrelated parameter references do not change operation coverage", () => {
+  assert.doesNotThrow(() =>
+    assertCoverage(
+      {
+        paths: {
+          "/session": {
+            get: {
+              operationId: "session",
+              parameters: [{ $ref: "#/components/parameters/header" }],
+            },
+          },
+        },
+      },
+      cases,
+      { rust: ["session"] },
+    ),
+  );
+});

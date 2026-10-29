@@ -42,6 +42,10 @@ from inframeld_sdk.exceptions import (
 
 RequestSerialized = Tuple[str, str, Dict[str, str], Optional[str], List[str]]
 
+class _EncodedRelativePath(str):
+    pass
+
+
 class ApiClient:
     """Generic API client for OpenAPI client library builds.
 
@@ -72,6 +76,18 @@ class ApiClient:
         'object': object,
     }
     _pool = None
+
+    @staticmethod
+    def _encoded_relative_path(value: str) -> str:
+        import re
+        from urllib.parse import unquote
+
+        if len(value) > 3 * 8192 or value.startswith('/') or re.fullmatch(r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})*", value) is None:
+            raise ValueError("Invalid percent-encoded relative path")
+        decoded = unquote(value, errors="strict")
+        if any(ord(c) < 32 or 127 <= ord(c) <= 159 or c == "\\" for c in decoded) or any(part in {".", ".."} for part in decoded.split('/')):
+            raise ValueError("Invalid percent-encoded relative path")
+        return value
 
     def __init__(
         self,
@@ -203,7 +219,7 @@ class ApiClient:
                 # specified safe chars, encode everything
                 resource_path = resource_path.replace(
                     '{%s}' % k,
-                    quote(str(v), safe=config.safe_chars_for_path_param)
+                    str(v) if isinstance(v, _EncodedRelativePath) else quote(str(v), safe=config.safe_chars_for_path_param)
                 )
 
         # post parameters

@@ -8,6 +8,7 @@ from uuid import UUID
 import inframeld_sdk
 import inframeld_sdk_fixtures
 from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.api.discovery_api import DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
 from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest
@@ -52,6 +53,40 @@ def payload_body(call: Call) -> ContractFixturePayload:
     if value is None:
         raise ValueError("Payload requires a body")
     return value
+
+
+def discovery_sync(clients: Clients, call: Call) -> NativeResponse:
+    return DiscoveryApi(clients.production).get_protected_resource_metadata_sync_with_http_info(
+        _headers=call.headers, _request_timeout=call.timeout / 1000
+    )
+
+
+async def discovery_async(clients: Clients, call: Call) -> NativeResponse:
+    return await DiscoveryApi(clients.production).get_protected_resource_metadata_with_http_info(
+        _headers=call.headers, _request_timeout=call.timeout / 1000
+    )
+
+
+def discovery_path_sync(clients: Clients, call: Call) -> NativeResponse:
+    assert call.path is not None
+    return DiscoveryApi(
+        clients.production
+    ).get_protected_resource_metadata_for_path_sync_with_http_info(
+        var_resource_path=call.path["resource_path"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def discovery_path_async(clients: Clients, call: Call) -> NativeResponse:
+    assert call.path is not None
+    return await DiscoveryApi(
+        clients.production
+    ).get_protected_resource_metadata_for_path_with_http_info(
+        var_resource_path=call.path["resource_path"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
 
 
 def health_sync(clients: Clients, call: Call) -> NativeResponse:
@@ -280,6 +315,8 @@ async def fallback_async(clients: Clients, call: Call) -> NativeResponse:
 
 
 BINDINGS: dict[Operation, Binding] = {
+    "getProtectedResourceMetadata": Binding(discovery_sync, discovery_async),
+    "getProtectedResourceMetadataForPath": Binding(discovery_path_sync, discovery_path_async),
     "contractFixtureVariants": Binding(variants_sync, variants_async),
     "contractFixtureFallback": Binding(fallback_sync, fallback_async),
     "contractFixtureMedia": Binding(media_sync, media_async),

@@ -48,6 +48,66 @@ mod tests {
         server.join().unwrap();
     }
 
+    #[tokio::test]
+    async fn encoded_paths_fail_before_opening_a_connection() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let client = inframeld_sdk::HttpClient::new()
+            .with_base_url(format!("http://{}", listener.local_addr().unwrap()));
+        let oversized = "a".repeat(24577);
+        for value in [
+            "/absolute",
+            "a?x=1",
+            "a#fragment",
+            "a\\b",
+            "a%",
+            "a%GG",
+            "../admin",
+            "a/%2e%2e/admin",
+            "a%00b",
+            "a%FF",
+            "a b",
+            oversized.as_str(),
+        ] {
+            let result = client.get_protected_resource_metadata_for_path(value).await;
+            assert!(
+                matches!(
+                    result,
+                    Err(inframeld_sdk::client::ApiOpError::Transport(
+                        inframeld_sdk::client::HttpError::Serialization(_)
+                    ))
+                ),
+                "{value}: {result:?}"
+            );
+        }
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
+
+    #[tokio::test]
+    async fn encoded_path_budget_allows_maximum_length() {
+        fn metadata(stream: &mut std::net::TcpStream, _index: usize) {
+            let body = r#"{"resource":"https://api.test","authorization_servers":["https://auth.test/"],"scopes_supported":["inframeld:api"],"bearer_methods_supported":["header"],"inframeld":{"schema_version":1,"client_id":"inframeld-cli","installation_id":"00000000-0000-4000-8000-000000000001"}}"#;
+            write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+        }
+        let probe = Probe::start(metadata);
+        let transport = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .unwrap();
+        let client = inframeld_sdk::HttpClient::with_client(transport).with_base_url(&probe.url);
+        let response = client
+            .get_protected_resource_metadata_for_path("a".repeat(24576))
+            .await
+            .unwrap();
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body.resource, "https://api.test");
+        assert_eq!(probe.count.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
     fn read_request_headers(stream: &mut impl Read) -> std::io::Result<Vec<u8>> {
         let mut request = Vec::new();
         let mut buffer = [0; 4096];
@@ -60,7 +120,7 @@ mod tests {
                 ));
             }
             request.extend_from_slice(&buffer[..count]);
-            if request.len() > 16384 {
+            if request.len() > 32 * 1024 {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     "Probe request headers exceed the test bound",
@@ -107,6 +167,8 @@ mod tests {
                 while !finished.load(Ordering::SeqCst) {
                     match listener.accept() {
                         Ok((mut stream, _)) => {
+                            // Accept polling is nonblocking, but header reads must wait for bytes.
+                            stream.set_nonblocking(false).unwrap();
                             stream
                                 .set_read_timeout(Some(Duration::from_secs(1)))
                                 .unwrap();

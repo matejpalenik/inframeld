@@ -58,6 +58,16 @@ pub async fn observe(
             result
         }
         "contractFixtureMedia" => observed!(fixture.contract_fixture_media().await),
+        "getProtectedResourceMetadata" => observed!(client.get_protected_resource_metadata().await),
+        "getProtectedResourceMetadataForPath" => observed!(
+            client
+                .get_protected_resource_metadata_for_path(
+                    request.path.as_ref().unwrap()["resource_path"]
+                        .as_str()
+                        .unwrap()
+                )
+                .await
+        ),
         "getHealth" => observed!(client.get_health().await),
         "getCurrentSession" => observed!(client.get_current_session().await),
         "inspectHumanOAuthConsent" => observed!(

@@ -1,3 +1,5 @@
+//! Enter the CLI and preserve its offline output and broken-pipe exit behavior.
+
 use std::io;
 use std::process::ExitCode;
 

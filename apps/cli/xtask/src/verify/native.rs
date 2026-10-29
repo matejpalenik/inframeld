@@ -1,84 +1,20 @@
-use crate::{Error, Result, archive, process};
-use inframeld_cli::metadata::BuildMetadata;
-use serde::{Deserialize, Serialize};
+//! Qualify installation and offline execution in an isolated temporary home.
+
 use std::{
     collections::BTreeMap, fs, io::Write, os::unix::fs::PermissionsExt, path::Path,
     process::Command, time::Duration,
 };
 
-/// Native qualification facts. A successful read never substitutes for these checks.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Evidence {
-    pub archive_sha256: String,
-    pub binary_sha256: String,
-    pub metadata: BuildMetadata,
-    pub permission_denial_checked: bool,
-}
+use inframeld_cli::metadata::BuildMetadata;
 
-fn require(condition: bool, message: &str) -> Result<()> {
-    if condition {
-        Ok(())
-    } else {
-        Err(Error::Invalid(message.into()))
-    }
-}
+use crate::{Error, Result, archive, process};
 
-/// Inspect an artifact before any bundled executable can run.
-///
-/// # Errors
-/// Rejects invalid checksums, paths, metadata and missing required payloads.
-pub fn inspect(path: &Path, target: &str) -> Result<BuildMetadata> {
-    let checksum = fs::read_to_string(archive::checksum_path(path))?;
-    let fields: Vec<_> = checksum.split_whitespace().collect();
-    require(
-        fields.len() == 2
-            && fields[0] == archive::digest(path)?
-            && Some(fields[1]) == path.file_name().and_then(|name| name.to_str()),
-        "archive checksum mismatch",
-    )?;
-    let prefix = format!("inframeld-cli-{target}");
-    let mut files = BTreeMap::new();
-    for entry in archive::read(path)? {
-        if entry.directory {
-            require(
-                entry.path == Path::new(&prefix),
-                "unexpected archive directory",
-            )?;
-            continue;
-        }
-        let relative = entry
-            .path
-            .strip_prefix(&prefix)
-            .map_err(|_| Error::Invalid("archive target mismatch".into()))?;
-        require(
-            relative.components().count() == 1,
-            "unexpected nested archive payload",
-        )?;
-        if relative == Path::new("inframeld") {
-            require(entry.mode & 0o111 != 0, "binary is not executable")?;
-        }
-        files.insert(relative.to_owned(), entry.bytes);
-    }
-    for name in ["inframeld", "LICENSE", "README.md", "compatibility.json"] {
-        require(
-            files
-                .get(Path::new(name))
-                .is_some_and(|bytes| !bytes.is_empty()),
-            "required archive payload is absent or empty",
-        )?;
-    }
-    require(files.len() == 4, "unexpected extra archive payload")?;
-    let metadata =
-        BuildMetadata::parse(&files[Path::new("compatibility.json")]).map_err(Error::Invalid)?;
-    require(
-        metadata.target == target && metadata.cli_version == env!("CARGO_PKG_VERSION"),
-        "archive build identity mismatch",
-    )?;
-    Ok(metadata)
-}
+use super::{Evidence, inspect::inspect, require};
 
 /// Copy into an explicitly selected test destination without replacement.
+///
+/// Parent directories may be created before a later failure. The staged copy is
+/// published without replacing an existing executable.
 ///
 /// # Errors
 /// Returns permission, destination conflict or I/O failures without overwriting a file.
@@ -98,6 +34,7 @@ pub fn install(source: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Observe all ordinary files so installation and execution cannot hide user-state changes.
 fn snapshot(
     root: &Path,
     directory: &Path,
@@ -122,6 +59,7 @@ fn snapshot(
     Ok(())
 }
 
+/// Run an offline invocation with cleared environment and a disposable home.
 fn execute(binary: &Path, home: &Path, args: &[&str]) -> Result<String> {
     let output = process::capture(
         Command::new(binary)
@@ -141,6 +79,9 @@ fn execute(binary: &Path, home: &Path, args: &[&str]) -> Result<String> {
 }
 
 /// Qualify a native archive in an isolated home and installation directory.
+///
+/// Executes the bundled binary only after inspection. The caller must already
+/// trust the artifact's provenance. Checksums do not establish publisher identity.
 ///
 /// # Errors
 /// Every failed gate is an explicit error in debug and optimized builds.
@@ -241,12 +182,4 @@ pub fn artifact(path: &Path, target: &str) -> Result<Evidence> {
         metadata,
         permission_denial_checked: true,
     })
-}
-
-/// Compare successful independent builds using checks that remain active in release mode.
-///
-/// # Errors
-/// Any differing archive, executable or build identity fails reproducibility.
-pub fn compare(first: &Evidence, second: &Evidence) -> Result<()> {
-    require(first == second, "repeated builds differ")
 }

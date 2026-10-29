@@ -5,14 +5,23 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BuildMetadata {
+    /// Version of the embedded metadata representation.
     pub schema_version: u32,
+    /// Approved CLI/runtime pairing policy from the compatibility descriptor.
     pub policy: String,
+    /// CLI package version recorded by the build.
     pub cli_version: String,
+    /// Explicitly qualified runtime release, absent for the development profile.
     pub qualified_runtime: Option<String>,
+    /// Availability of remote compatibility verification, not its successful result.
     pub remote_verification: String,
+    /// Development or release status asserted by the validated metadata.
     pub status: String,
+    /// Source revision, or `unknown` when source identity was unavailable.
     pub revision: String,
+    /// Rust target triple of the executable described by this build.
     pub target: String,
+    /// Whether the build's source inputs were recorded as locally modified.
     pub source_dirty: bool,
 }
 
@@ -44,8 +53,23 @@ impl BuildMetadata {
 
     /// Read the metadata generated from the descriptor and Cargo build identity.
     ///
+    /// This reads embedded bytes without contacting an installation. A supported
+    /// development descriptor still has no qualified runtime release.
+    ///
     /// # Errors
     /// Rejects invalid build metadata before it can become a support claim.
+    ///
+    /// # Examples
+    /// ```
+    /// use inframeld_cli::metadata::BuildMetadata;
+    ///
+    /// # fn main() -> Result<(), String> {
+    /// let metadata = BuildMetadata::embedded()?;
+    /// assert!(metadata.qualified_runtime.is_none());
+    /// assert!(!metadata.cli_version.is_empty());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn embedded() -> Result<Self, String> {
         Self::parse(include_bytes!(concat!(
             env!("OUT_DIR"),

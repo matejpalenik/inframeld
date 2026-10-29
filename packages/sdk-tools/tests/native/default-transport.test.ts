@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
-import { createClient, getHealth } from "@inframeld/sdk";
+import {
+  createClient,
+  getHealth,
+  getProtectedResourceMetadataForPath,
+} from "@inframeld/sdk";
 
 test(
   "the default deadline remains active when the caller supplies cancellation",
@@ -127,4 +131,70 @@ test("JavaScript callers cannot turn invalid timeout values into defaults", asyn
     assert.equal(result.error?.kind, "request");
   }
   assert.equal(count, 0);
+});
+
+test("invalid encoded paths fail before fetch", async () => {
+  let count = 0;
+  const client = createClient({
+    baseUrl: "https://sdk.test",
+    fetch: async () => {
+      count++;
+      return new Response("{}", { status: 500 });
+    },
+  });
+  for (const resource_path of [
+    "/absolute",
+    "a?x=1",
+    "a#fragment",
+    "a\\b",
+    "a%",
+    "a%GG",
+    "../admin",
+    "a/%2e%2e/admin",
+    "a%00b",
+    "a%FF",
+    "a b",
+    "a".repeat(24577),
+  ]) {
+    const result = await getProtectedResourceMetadataForPath({
+      client,
+      path: { resource_path },
+    });
+    assert.equal(result.error?.kind, "request");
+  }
+  assert.equal(count, 0);
+});
+
+test("encoded paths accept the maximum length", async () => {
+  const path = "a".repeat(24576);
+  let count = 0;
+  const client = createClient({
+    baseUrl: "https://sdk.test",
+    fetch: async (input) => {
+      count++;
+      assert.ok(input instanceof Request);
+      assert.equal(
+        new URL(input.url).pathname,
+        `/.well-known/oauth-protected-resource/${path}`,
+      );
+      return Response.json({
+        resource: "https://api.test",
+        authorization_servers: ["https://auth.test/"],
+        scopes_supported: ["inframeld:api"],
+        bearer_methods_supported: ["header"],
+        inframeld: {
+          schema_version: 1,
+          client_id: "inframeld-cli",
+          installation_id: "00000000-0000-4000-8000-000000000001",
+        },
+      });
+    },
+  });
+  const result = await getProtectedResourceMetadataForPath({
+    client,
+    path: { resource_path: path },
+  });
+  assert.equal(result.response?.status, 200);
+  assert.equal(result.data?.resource, "https://api.test");
+  assert.equal(count, 1);
 });

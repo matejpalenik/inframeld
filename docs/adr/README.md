@@ -137,3 +137,7 @@ For contributor routes, start with [developer documentation](../development/READ
 - [ADR-0080: Limit product deletion status to the initiating human](ADR-0080-limit-product-deletion-status-to-the-initiating-human.md). Accepted status-viewer scope. Other retention choices remain pending.
 
 - [ADR-0093: Preserve response integrity and type native SDK boundaries](ADR-0093-preserve-response-integrity-and-type-native-sdk-boundaries.md). Accepted response, metadata and qualification boundaries.
+
+- [ADR-0098: Publish bounded first-party discovery](ADR-0098-publish-bounded-first-party-discovery.md). Accepted profile, qualification pending.
+
+- [ADR-0099: Preserve encoded relative paths in generated clients](ADR-0099-preserve-encoded-relative-paths-in-generated-clients.md). Accepted encoded-path capability for generated SDKs.

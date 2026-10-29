@@ -1,3 +1,9 @@
+//! Capture trusted build-tool subprocess output with bounded waits and buffers.
+//!
+//! Diagnostics retain command and tool error text. Callers must not pass secrets
+//! through command arguments or output. Timeout stops and reaps the immediate child,
+//! without claiming general supervision of its descendants.
+
 use crate::{Error, Result};
 use std::{
     io::Read,
@@ -6,6 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Capture at most 4 MiB per stream, returning the original process status.
 pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Output> {
     let stdout = tempfile::NamedTempFile::new()?;
     let stderr = tempfile::NamedTempFile::new()?;
@@ -46,6 +53,7 @@ pub(crate) fn capture(command: &mut Command, timeout: Duration) -> Result<Output
     })
 }
 
+/// Require a successful tool exit under the existing ten-minute operation budget.
 pub(crate) fn checked(command: &mut Command) -> Result<Output> {
     let result = capture(command, Duration::from_mins(10))?;
     if !result.status.success() {

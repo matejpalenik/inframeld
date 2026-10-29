@@ -1,39 +1,47 @@
 ---
 name: inframeld-rust-standards
-description: Guides authored Rust in Inframeld for planning, suggestions, implementation and review, including CLI and xtask code. Covers Rust types, modules, errors, ownership, testing and presentation boundaries. Generated SDK source and generator maintenance remain with Rust SDK.
+description: Guides authored Rust planning, implementation and review in Inframeld, including CLI and xtask code. Covers component structure, types, ownership, errors, documentation and tests. Generated SDK maintenance belongs to Rust SDK.
 ---
 
 # Inframeld Rust standards
 
-Use this skill with the [shared Coding Standards](../inframeld-coding-standards/SKILL.md) for authored Rust planning, suggestions, implementation and review, including tests and snippets. Follow applicable directory guidance. Loading guidance authorizes neither code edits nor publication.
+Use with [shared Coding Standards](../inframeld-coding-standards/SKILL.md) for repository Rust work, including suggestions, tests and snippets. Follow affected directory guidance. Behaviour tracing or documentation-only work does not require code review merely because Rust source is inspected. Loading this skill grants no edit or external-action authority.
 
-Alice inspects a failed build through the CLI. A command handler requests permitted facts through the generated SDK and returns a typed result. The presenter formats those facts. Neither Rust types nor successful inspection establish that the build succeeded or that Alice may repeat it.
+Alice inspects a failed build. The CLI requests permitted facts through the generated SDK, produces a typed outcome and presents it. Successful inspection does not mean the build succeeded. A maintainer should find that command, understand its dependencies and follow its failures without reconstructing a framework.
 
-## Rust idioms and boundaries
+## Essential standards
 
-- Group cohesive types, errors and functions in modules. Keep visibility private or `pub(crate)` until another crate needs an API. Rust does not inherit Python's one-primary-type-per-module, static utility-class, nominal Command/DTO or explicit Protocol-inheritance conventions.
-- Prefer module functions for stateless operations and ordinary functions for command handlers. Put stateful behavior and invariants on the owning struct or enum. Use traits for real capability boundaries or multiple implementations rather than a trait, registry or command bus for every function.
-- Model closed alternatives with enums and meaningful identity/invariant distinctions with newtypes. Keep passive result records simple. Preserve explicit unknown/absent values and avoid broad string maps or `serde_json::Value` as the default internal representation. Dynamic JSON remains appropriate at a deliberate untyped boundary.
-- Make ownership, mutability and resource lifetime visible. Borrow inputs when ownership transfer is unnecessary. Use owned values when tasks or records need an independent lifetime. Do not add clones, reference counting or concurrency solely to satisfy a speculative architecture.
-- Return `Result` for expected input, I/O, network and validation failures. Keep error classification typed where callers need to decide an outcome. Preserve useful causes without exposing credentials or raw protected values through `Debug`, `Display` or logs. One outer boundary owns final reporting and exit conversion.
-- Production verification and integrity gates use explicit error paths. Ordinary assertions panic, and debug assertions may be omitted in optimized builds. Neither supplies the controlled error outcome required by these gates. Tests may use assertions and focused unwrap/expect allowances to fail on invalid fixtures without weakening production conventions.
-- Keep asynchronous orchestration with the command/workflow owner. Bound external waits and preserve cancellation and resource cleanup. Renderers do not send requests, refresh credentials, authorize work or decide retry eligibility.
-- Follow the [shared TDD and documentation contract](../inframeld-coding-standards/references/testing-and-documentation.md). Use process tests for real streams, exit codes, arguments and interaction behavior. Keep pure conversion/validation tests focused, and distinguish controlled SDK/HTTP evidence from real provider or persistence qualification.
+- Organize by command family or cohesive capability. Give operations, values, policies, adapters and presentation explicit owners. Apply inward dependency rules without reproducing backend domains or requiring identical Onion directories in every feature. One component may include closely related types and helpers. No type-per-file mandate, empty layers, command bus or registry for a closed command enum.
+- Use functions for stateless work. Put owned resources, meaningful state and invariants on structs or enums with methods. Traits express real capability contracts or external-library requirements, not a mandatory interface for each function. Prefer composition to simulated class inheritance and public one-action service objects.
+- Use enums for closed alternatives and newtypes where identity, validity or secrecy matters. Keep passive records simple and unknown values explicit. Avoid untyped string maps or `serde_json::Value` as the default internal representation. Deliberate untyped boundaries remain valid.
+- Borrow when ownership transfer is unnecessary. Own values when their lifetime requires it. Keep mutability and resource cleanup explicit. Do not add clones, `Arc`, locks, tasks or generics for speculative flexibility.
+- Return typed `Result` failures for expected validation, I/O and network outcomes. Preserve useful safe causes. Protect `Debug`, `Display`, serialization and logs from credentials or upstream protected content. The outer reporting boundary owns streams and exit conversion.
+- Integrity and verification gates require explicit error paths. Production assertions can panic, and debug assertions can disappear. Tests may use focused assertion and unwrap/expect allowances without weakening production rules.
+- Bound external waits and retain cancellation and cleanup meaning. Keep async orchestration with the operation owner. Renderers do not send requests, refresh credentials, authorize work or decide retry eligibility.
+- Explain meaningful components in purpose-first rustdoc, including important internal components. Document effects, invariants, result meaning and relevant failures. Avoid blanket comments on obvious helpers and repeated signature descriptions. Preserve the shared [TDD and documentation contract](../inframeld-coding-standards/references/testing-and-documentation.md).
 
-The [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/) explain naming, conversions and API design. [The Rust book](https://doc.rust-lang.org/book/ch09-03-to-panic-or-not-to-panic.html) explains recoverable errors and test assertions. These are background references, not permission to override repository contracts or copy a general manual into this skill.
+## Read the affected reference
 
-## Tooling and existing code
+Read only the rows needed for the task. Detailed references own the complete conventions and exceptions.
 
-Use the pinned repository toolchain, Cargo lockfile and rustfmt. Apply strict compiler/Clippy checks and rustdoc diagnostics to authored code under the package's documented commands. Explain narrow exceptions rather than hiding broad warnings.
+| Task | Read |
+| --- | --- |
+| Choose module boundaries, files, functions or objects, or review architecture | [Component roles and module design](references/module-design.md). |
+| Design values, enums, ownership, traits, conversions or safe errors | [Types, ownership and capability boundaries](references/types-and-boundaries.md). |
+| Write or review rustdoc, examples, test documentation or documentation checks | [Document Rust for its readers](references/documentation.md). |
+| Build or review a complete bounded operation with typed values and I/O | [Worked artifact-verification example](references/worked-verification-example.md), an original teaching example, not application delivery. |
+| Place commands, compose clap declarations, map results or follow an invocation | [CLI structure and lifecycle](references/cli-structure.md), accepted under ADR-0097. |
+| Implement shared presentation, prompts, completions or snapshots | [Selected CLI libraries](references/cli-libraries.md), accepted under ADR-0096, and Application Contracts' [shared presentation rules](../inframeld-application-contracts/references/cli-presentation-components.md) when semantics matter. |
+| Consume or maintain the generated Rust SDK | [Rust SDK](../inframeld-rust-sdk/SKILL.md). Generated operations and source remain generator-owned. |
 
-The existing [CLI manifest](../../../apps/cli/Cargo.toml) and [xtask manifest](../../../apps/cli/xtask/Cargo.toml) select denied compiler warnings, forbidden unsafe code, Clippy all/pedantic, and denied production unwrap, expect, panic, todo, unimplemented and debug macros. Preserve those package rules. Generated SDK code retains generator-owned settings, and another package's existing test/driver allowances are not silently migrated by this documentation.
+For a narrow helper, do not automatically load every CLI workflow. Read the owning domain contract when its behavior matters. Exact command vocabulary, JSON fields and per-command outcomes remain their owning delivery work. Teaching examples establish no missing public contract.
 
-The [Rust SDK skill](../inframeld-rust-sdk/SKILL.md) owns generated operations, transport defaults and regeneration. Use it for SDK consumption or maintenance. Do not add handwritten application HTTP calls, edit generated source or move backend rules into Rust to satisfy a command.
+## Implement and verify
 
-## CLI reading route
+Inspect existing consumers and explain the component's owner before changing its interface. Keep modules private or narrowly visible until an actual consumer needs more. Application requests use the generated SDK, with no competing handwritten endpoint client or client-side copy of backend authorization.
 
-For command placement, clap declarations, typed results or the invocation lifecycle, read [CLI structure and presentation boundaries](references/cli-structure.md), accepted through ADR-0097. Keep command-specific declarations beside their handler, shared options at the root and final reporting under shared output. Small command inputs, execution, results and human views can share a module with distinct responsibilities.
+Use the pinned toolchain, Cargo.lock and rustfmt. Preserve the [CLI](../../../apps/cli/Cargo.toml) and [xtask](../../../apps/cli/xtask/Cargo.toml) rules, including forbidden unsafe code, denied warnings and missing public documentation, Clippy all/pedantic and production unwrap, expect, panic, todo, unimplemented and debug macros. Explain narrow exceptions. Generated SDK and other native-driver allowances are not silently migrated.
 
-For CLI dependency selection, shared output-component implementation, prompts, completions or presentation snapshots, read [Selected CLI libraries](references/cli-libraries.md), accepted through ADR-0096. Read Application Contracts' [shared presentation reference](../inframeld-application-contracts/references/cli-presentation-components.md) when component semantics or output behavior matter. A small Rust-only helper review does not require all CLI workflows.
+Follow behavioral TDD and verify observable behavior. Process tests own arguments, streams, exits and interaction. Controlled HTTP evidence differs from real provider, persistence and platform qualification. Do not add architecture, naming, import-boundary or composition-construction enforcement tests.
 
-Read [CLI directory guidance](../../../apps/cli/AGENTS.md) for local commands and implementation status. Accepted structure is distinct from implemented components. Exact command vocabulary, JSON schemas and mappings remain #156's work. Illustrative names do not select missing contracts or authorize application changes.
+At handoff, follow [CLI directory guidance](../../../apps/cli/AGENTS.md) for manual feature verification and identify library-only delivery honestly. Report actual checks and gaps. Standards describe required practice, while manifests, inspected code and executed evidence establish implementation.

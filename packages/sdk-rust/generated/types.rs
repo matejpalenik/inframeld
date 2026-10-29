@@ -54,6 +54,67 @@ mod tri_state_serde {
         T::deserialize(de).map(Some)
     }
 }
+///Publish the bounded first-party RFC 9728 profile, not private provider configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProtectedResourceMetadataResponse {
+    ///Constraint: minItems=1, maxItems=1
+    pub authorization_servers: (String,),
+    ///Constraint: minItems=1, maxItems=1
+    pub bearer_methods_supported: (
+        ProtectedResourceMetadataResponseBearerMethodsSupportedItem1,
+    ),
+    pub inframeld: InframeldDiscoveryResponse,
+    pub resource: String,
+    ///Constraint: minItems=1, maxItems=1
+    pub scopes_supported: (ProtectedResourceMetadataResponseScopesSupportedItem1,),
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ProtectedResourceMetadataResponseScopesSupportedItem1 {
+    #[default]
+    #[serde(rename = "inframeld:api")]
+    InframeldApi,
+}
+impl ProtectedResourceMetadataResponseScopesSupportedItem1 {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::InframeldApi => "inframeld:api",
+        }
+    }
+}
+impl ::std::fmt::Display for ProtectedResourceMetadataResponseScopesSupportedItem1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ProtectedResourceMetadataResponseScopesSupportedItem1 {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ProtectedResourceMetadataResponseBearerMethodsSupportedItem1 {
+    #[default]
+    #[serde(rename = "header")]
+    Header,
+}
+impl ProtectedResourceMetadataResponseBearerMethodsSupportedItem1 {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Header => "header",
+        }
+    }
+}
+impl ::std::fmt::Display
+for ProtectedResourceMetadataResponseBearerMethodsSupportedItem1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ProtectedResourceMetadataResponseBearerMethodsSupportedItem1 {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
 ///Describe the original change - current grants require a fresh authorized read.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectUseOnlyGrantResponse {
@@ -251,6 +312,36 @@ impl ::std::fmt::Display for ValidationIssueLocation {
     }
 }
 impl AsRef<str> for ValidationIssueLocation {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+///Bind the fixed CLI profile to the persistent public installation identity.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InframeldDiscoveryResponse {
+    pub client_id: InframeldDiscoveryResponseClientId,
+    pub installation_id: uuid::Uuid,
+    pub schema_version: i64,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InframeldDiscoveryResponseClientId {
+    #[default]
+    #[serde(rename = "inframeld-cli")]
+    InframeldCli,
+}
+impl InframeldDiscoveryResponseClientId {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::InframeldCli => "inframeld-cli",
+        }
+    }
+}
+impl ::std::fmt::Display for InframeldDiscoveryResponseClientId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InframeldDiscoveryResponseClientId {
     fn as_ref(&self) -> &str {
         self.as_str()
     }

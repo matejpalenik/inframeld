@@ -9,6 +9,8 @@ use protocol::DriverRequest;
 use serde_json::json;
 use std::{io::Read, time::Duration};
 const BINDINGS: &[&str] = &[
+    "getProtectedResourceMetadata",
+    "getProtectedResourceMetadataForPath",
     "getHealth",
     "getCurrentSession",
     "inspectHumanOAuthConsent",

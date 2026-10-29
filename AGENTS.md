@@ -29,6 +29,7 @@ Read the skill whose invariant or behavior the question concerns. Domain skills 
 | Working configuration, builds, queries, receipts or feedback | [Pipelines](.agents/skills/inframeld-pipelines/SKILL.md) |
 | Cases, benchmarks, judges, comparisons or evaluation history | [Evaluation](.agents/skills/inframeld-evaluation/SKILL.md) |
 | Serving selection, publication modes, canaries or rollback | [Releases](.agents/skills/inframeld-releases/SKILL.md) |
+| Requested code or architectural review and commit/merge readiness | [Review](.agents/skills/inframeld-review/SKILL.md) |
 | Any repository code planning, suggestions, additions, changes, refactoring or review, including tests and code snippets | [Coding Standards](.agents/skills/inframeld-coding-standards/SKILL.md) |
 | Authored Python, including backend components and tests | [Python Standards](.agents/skills/inframeld-python-standards/SKILL.md) |
 | Authored Rust, including CLI and xtask code | [Rust Standards](.agents/skills/inframeld-rust-standards/SKILL.md) |
@@ -40,6 +41,8 @@ Read the skill whose invariant or behavior the question concerns. Domain skills 
 | Choosing test layers, dependency isolation or interpreting verification evidence | [Testing](.agents/skills/inframeld-testing/SKILL.md) |
 
 Use the client's skill invocation mechanism when available. If discovery misses a skill, read its linked SKILL.md directly, for example through `$inframeld-pipelines`. Actually read the relevant body and reference. Briefly identify a skill on first use. Follow specific neighboring guide sections when a dependency matters, adding another skill only when its broader context matters. Do not load all skills or every linked document for a small question. Unrelated styling/general programming needs no domain skill.
+
+Review owns the assessment process, ratings and report format for requested reviews. Coding Standards and its language skills remain the owners of code conventions. Behavior-only explanations and routine implementation do not require a separate rated review merely because source is inspected.
 
 SDK skills are independently discoverable siblings. The shared SDK skill owns common policy, without being a prerequisite for ordinary language-specific consumption. Testing is conditional guidance for test strategy and evidence, not an additional prerequisite for every code change. Coding Standards remains mandatory for repository code work.
 

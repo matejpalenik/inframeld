@@ -29,6 +29,10 @@
       {
         "file": "ts-hey-api-patched/0006-preserve-classified-failure-evidence.patch",
         "sha256": "c1765a24744128d11c17d575c6d6cfa17b3a09f743c2ffaab075fa9789c31474"
+      },
+      {
+        "file": "ts-hey-api-patched/0007-encoded-relative-paths.patch",
+        "sha256": "3d763269a253eebb2e1f9c56a27c1ca91e7c6e626dec8160dbf57442ebd03a97"
       }
     ],
     "sharedParser": {
@@ -45,9 +49,15 @@
         {
           "file": "ts-hey-api-patched/0002-shared-default-response-types.patch",
           "sha256": "5e4149d9fcf30afa7310cddcedb2a349b46ba7a7a4ceca600255d09452e35b40"
+        },
+        {
+          "file": "ts-hey-api-patched/0003-shared-encoded-relative-paths.patch",
+          "sha256": "23c5cd426bad6622a0f72173412ffee2a5fdfb1af0ffc9f607710d51dd71bef1"
         }
-      ]
-    }
+      ],
+      "revision": "inframeld.1"
+    },
+    "revision": "inframeld.2"
   },
   "python": {
     "upstreamVersion": "7.26.0",
@@ -78,12 +88,17 @@
       {
         "file": "py-openapi-generator-patched/0006-strict-container-and-default-responses.patch",
         "sha256": "446bbfcd67b00f88b38bf64ee8620677a97489baaa2ae5e59a93d7797a3e328f"
+      },
+      {
+        "file": "py-openapi-generator-patched/0007-encoded-relative-paths.patch",
+        "sha256": "5cdde5e53da36a64739d6008e12b041083712d7751b8a44561187350d403fa84"
       }
-    ]
+    ],
+    "revision": "inframeld.2"
   },
   "rust": {
     "upstreamVersion": "0.23.0",
-    "revision": "inframeld.4",
+    "revision": "inframeld.6",
     "archiveUrl": "https://static.crates.io/crates/openapi-to-rust/openapi-to-rust-0.23.0.crate",
     "archiveSha256": "3bd6e71bfeb9c084586ad4daa7373a662be1f779432f263fa291460a98803d7d",
     "patches": [
@@ -118,6 +133,10 @@
       {
         "file": "0008-json-error-representations.patch",
         "sha256": "e2d1eeaf18aba0d7be6320848c37ad263c38495938b699ab6d2684ebc4de2662"
+      },
+      {
+        "file": "0009-encoded-relative-paths.patch",
+        "sha256": "80416aa8d00c1106e4b5244fcfa9e9fa8e1e6bed9745c00f94c4a14040cc5a8f"
       }
     ],
     "archiveRoot": "openapi-to-rust-0.23.0"

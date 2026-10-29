@@ -93,6 +93,7 @@ export interface RequestOptions<
    * {@link https://developer.mozilla.org/docs/Web/API/fetch#body}
    */
   body?: unknown;
+  encodedPathParams?: readonly string[];
   path?: Record<string, unknown>;
   query?: Record<string, unknown>;
   /**
@@ -187,6 +188,7 @@ type RequestFn = <
 
 type BuildUrlFn = <
   TData extends {
+    encodedPathParams?: readonly string[];
     body?: unknown;
     path?: Record<string, unknown>;
     query?: Record<string, unknown>;
@@ -229,6 +231,6 @@ export type Options<
   TResponseStyle extends ResponseStyle = 'fields',
 > = OmitKeys<
   RequestOptions<TResponse, TResponseStyle, ThrowOnError>,
-  'body' | 'path' | 'query' | 'url' | 'responseContract'
+  'body' | 'path' | 'query' | 'url' | 'responseContract' | 'encodedPathParams'
 > &
   ([TData] extends [never] ? unknown : Omit<TData, 'url'>);

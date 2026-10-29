@@ -18,11 +18,15 @@ from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler
     register_human_oauth_credential_error_handler,
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
+from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
 from inframeld_backend.access.http.routes.project_grant_routes import (
     create_project_grant_router,
+)
+from inframeld_backend.access.infrastructure.resources.installation_discovery_resource import (
+    InstallationDiscoveryResource,
 )
 from inframeld_backend.bootstrap.access_composition import create_access_components
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
@@ -83,7 +87,13 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             )
         )
 
+        discovery = (
+            InstallationDiscoveryResource(resolved_settings.discovery, resolved_settings.hydra)
+            if resolved_settings.discovery is not None and resolved_settings.hydra is not None
+            else None
+        )
         resources = ApplicationResources(
+            discovery=discovery,
             database=database,
             kratos_client=access.kratos_client,
             kratos_admin_client=access.kratos_admin_client,
@@ -105,6 +115,9 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         register_human_oauth_credential_error_handler(application)
         configure_problem_openapi(application)
         application.include_router(health_router)
+        application.include_router(
+            create_discovery_router(discovery.read if discovery else lambda: None)
+        )
 
         human_session = HumanSessionDependency(
             access.authenticator,

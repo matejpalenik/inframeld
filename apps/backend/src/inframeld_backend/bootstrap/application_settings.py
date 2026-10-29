@@ -9,11 +9,15 @@ from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
+from inframeld_backend.access.infrastructure.settings.discovery_settings import DiscoverySettings
 from inframeld_backend.access.infrastructure.settings.human_authentication_settings import (
     HumanAuthenticationSettings,
 )
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.access.infrastructure.verifiers.pydantic_discovery_url_verifier import (
+    PydanticDiscoveryURLVerifier,
+)
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 from inframeld_backend.shared.infrastructure.settings.request_fingerprint_settings import (
     RequestFingerprintSettings,
@@ -43,6 +47,7 @@ class ApplicationSettings(BaseSettings):
     human_authentication: HumanAuthenticationSettings = Field(
         default_factory=HumanAuthenticationSettings
     )
+    discovery: DiscoverySettings | None = None
     csrf: CSRFSettings = Field(default_factory=CSRFSettings)
 
     model_config = SettingsConfigDict(
@@ -56,6 +61,22 @@ class ApplicationSettings(BaseSettings):
     @model_validator(mode="after")
     def _require_human_bearer_configuration(self) -> Self:
         """Require both identity providers when Hydra authentication is configured."""
+
+        if self.discovery is not None:
+            if self.hydra is None:
+                raise ValueError("Discovery requires Hydra configuration.")
+            if self.discovery.public_api_url != self.hydra.api_audience.value:
+                raise ValueError("Discovery API identity must equal the Hydra API audience.")
+            private_urls = [str(self.hydra.admin_url)]
+            if self.kratos is not None and self.kratos.admin_url is not None:
+                private_urls.append(str(self.kratos.admin_url))
+            for public in (self.discovery.public_api_url, self.hydra.issuer.value):
+                for private in private_urls:
+                    PydanticDiscoveryURLVerifier.require_not_admin(public, private)
+            PydanticDiscoveryURLVerifier.require_public(
+                self.hydra.issuer.value,
+                managed_local=self.discovery.transport_profile == "managed-local",
+            )
 
         if self.hydra is None:
             return self

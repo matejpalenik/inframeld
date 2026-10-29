@@ -1,3 +1,5 @@
+//! Verify deterministic normalization and preservation of archives rejected before rewrite.
+
 // Assertions and fixture construction deliberately fail immediately.
 #![allow(clippy::unwrap_used)]
 use inframeld_cli_xtask::archive;

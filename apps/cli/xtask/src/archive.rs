@@ -1,3 +1,8 @@
+//! Read and normalize bounded distribution archives without executing their payloads.
+//!
+//! Rewrites are staged before replacement. The archive is replaced before its
+//! checksum file is written, so a checksum-write failure may leave updated bytes.
+
 use crate::{Error, Result};
 use sha2::{Digest, Sha256};
 use std::{
@@ -10,6 +15,7 @@ use xz2::{read::XzDecoder, write::XzEncoder};
 
 const MAX_BYTES: u64 = 128 * 1024 * 1024;
 
+/// One validated archive member retained for normalization or inspection.
 #[derive(Debug)]
 pub(crate) struct Entry {
     pub path: PathBuf,
@@ -18,6 +24,7 @@ pub(crate) struct Entry {
     pub directory: bool,
 }
 
+/// Reject unsafe members and excessive expanded data before returning sorted entries.
 pub(crate) fn read(path: &Path) -> Result<Vec<Entry>> {
     let mut archive = tar::Archive::new(XzDecoder::new(fs::File::open(path)?));
     let mut entries = Vec::new();
