@@ -28,6 +28,8 @@ An SDK test can additionally show that the generated client sent the right reque
 | Choose a unit, HTTP, database or provider test | [Test strategy](references/test-strategy.md) |
 | Investigate fixtures, integration setup, cleanup or evidence claims | [Isolation and evidence](references/isolation-and-evidence.md) |
 | Run a focused check or integration stack | [Testing runbook](../../../docs/development/guides/testing.md) |
+| Explain CI relevance, not-applicable results or manual full verification | [CI selection and proof boundaries](../../../docs/development/guides/testing.md#ci-selection) |
+| Explain dependency caches, invalidation or cold/warm CI evidence | [CI cache policy](../../../docs/development/guides/testing.md#ci-dependency-caches) |
 | Shared TDD and documentation | [Core testing contract](../inframeld-coding-standards/references/testing-and-documentation.md) |
 | Python test conventions and doubles | [Python test/code examples](../inframeld-python-standards/references/testing-and-documentation.md), for authored Python tests |
 | Rust test and process conventions | [Rust Standards](../inframeld-rust-standards/SKILL.md), for authored Rust tests |

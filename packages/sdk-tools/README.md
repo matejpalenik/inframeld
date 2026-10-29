@@ -27,7 +27,7 @@ Run `pnpm sdk:setup` once to prepare all selected generators and development too
 
 The default tool cache is `node_modules/.cache/inframeld-sdk-tools`. `INFRAMELD_SDK_TOOLS_DIR` selects another cache. `PLAYWRIGHT_BROWSERS_PATH` selects provisioned Chromium. Preparation verifies source and patch digests even when tools are cached. Downloads and installation are separate from SDK compilation.
 
-Use the default cache for complete qualification. Python's native Pyright configuration still resolves its environment at that default location, so a custom cache can fail native typing despite successful preparation. The [CI-bootstrap follow-up](../../docs/development/reports/sdk-response-fixes-verification.md#ci-bootstrap-follow-up-2026-10-27) records this separate limitation.
+Complete qualification supports either cache location. Native Python typing passes the selected cache to Pyright so it checks against the prepared `python` environment. The [CI-bootstrap follow-up](../../docs/development/reports/sdk-response-fixes-verification.md#ci-bootstrap-follow-up-2026-10-27) records the earlier default-path limitation, now superseded by this explicit selection.
 
 ## Commands
 
@@ -78,9 +78,15 @@ Rust's metadata-disabled consumer and synthetic binary/streaming/SSE/builder tes
 
 ## CI and proof boundaries
 
+CI selects the existing `INFRAMELD_SDK_TOOLS_DIR` override under the job's temporary directory. setup-uv restores that same cache's `uv` directory, with the pinned Python version and explicit backend/SDK dependency inputs. Language-specific uv keys avoid competing matrix jobs saving incomplete subsets under one key. Every job still installs its dependencies and creates fresh consumer environments.
+
+The [CI cache policy](../../docs/development/guides/testing.md#ci-dependency-caches) owns the cache inventory, key boundaries and cold/warm qualification procedure. SDK jobs restore the pnpm store and original generator archives. Rust jobs also restore compiled workspace dependencies and the content-addressed generator installation. Their platform/compiler key includes the manifest, actual patches and preparation code. Workspace crates, the generator's separate compilation directory and temporary consumer compilation directories are excluded. Source and patch hashes and the generator version are still checked on every preparation.
+
+Each selected run performs regeneration/drift comparison, native checks, generator-library tests where applicable, archive construction and installed-consumer qualification. These operations produce fresh reports and evidence. Generator archives are reusable tool inputs, distinct from SDK package archives that must be built during verification. Do not cache generated SDK source, package outputs, virtual environments, Chromium installations, evidence or test results. Remote cold/warm performance remains unqualified until published runs are observed.
+
 The workflow runs independent Ubuntu 26.04 language jobs for SDK/API-affecting changes, using the explicit `ubuntu-26.04` runner label. The existing pinned uv installs the pinned Python interpreter before key provisioning, without relying on GitHub's OS-specific Python builds. Generator, patch, configuration and platform-sensitive process/browser/lifecycle changes also select macOS. Changes to the SDK workflow or workspace dependency approvals select macOS too, so bootstrap changes qualify on both platforms. Manual qualification remains available. Its stable **SDK conformance** aggregate rejects failed jobs, partial runs and missing or incomplete evidence. Configure the external branch ruleset to require that aggregate separately.
 
-The long verification jobs are selected by the path groups in the [workflow's change-detection step](../../.github/workflows/sdk-conformance.yml). Unrelated changes run only lightweight change detection and the aggregate, with no SDK dependency installation, generator setup or runtime verification. Job-level selection keeps the required aggregate reporting, following [GitHub's skipped-check guidance](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks).
+The long verification jobs use the SDK input groups in the [shared CI selector](../../.github/scripts/ci_changes.py), through the [reusable change-detection workflow](../../.github/workflows/changes.yml). The [CI selection runbook](../../docs/development/guides/testing.md#ci-selection) owns shared comparison, fallback and full-run procedures. Unrelated changes run only lightweight change detection and the aggregate, with no SDK dependency installation, generator setup or runtime verification. Job-level selection keeps the required aggregate reporting, following [GitHub's skipped-check guidance](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks).
 
 | Changed files | Long SDK verification |
 | --- | --- |
@@ -89,9 +95,9 @@ The long verification jobs are selected by the path groups in the [workflow's ch
 | Shared workspace manifests, locks, toolchain/build settings, dependency trust policy or SDK workflows | Run |
 | Authored Markdown/MDX documentation, web-only code, database migrations or unrelated backend unit/provider-integration tests | Skip, unless the same change also contains a relevant file |
 
-Backend runtime changes remain conservatively relevant because they can change HTTP behavior before OpenAPI is regenerated. Generated Markdown and Markdown fixture payloads remain artifacts, so they still select verification. When adding backend fixture dependencies, update the workflow's explicit input paths with the fixture imports.
+Backend runtime changes remain conservatively relevant because they can change HTTP behavior before OpenAPI is regenerated. Generated Markdown and Markdown fixture payloads remain artifacts, so they still select verification. When adding backend fixture dependencies, update the shared selector's explicit SDK input paths with the fixture imports. Shared selection changes and unclassified non-documentation inputs use the runbook's conservative full-verification policy.
 
-PR selection uses the complete merge-base-to-head diff, including earlier commits in that PR. A later documentation-only commit in a PR that already changes SDK inputs still requires verification at the new head. Changes made only on the base branch do not select that PR's jobs. Main-branch pushes compare before/after commits. Manual execution always qualifies the selected platform set, and a missing initial baseline selects verification conservatively. A failed Git comparison fails change detection and cannot produce a successful skip.
+The shared comparison retains earlier SDK changes in the same PR even after a later documentation-only commit. Manual execution qualifies the selected platform set, retaining the existing macOS choice. A successful not-applicable aggregate establishes only that SDK verification was not selected. It is not fresh SDK runtime evidence.
 
 Tests use real production HTTP routers with controlled authentication/application collaborators. They do not call a database, real identity provider or paid endpoint. They establish SDK and HTTP-adapter behavior, not database atomicity, real Kratos/Hydra login, production CORS or a complete CLI/account-UI journey. Local macOS execution does not establish Linux or remote macOS execution.
 

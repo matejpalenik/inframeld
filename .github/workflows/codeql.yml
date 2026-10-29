@@ -7,13 +7,19 @@ on:
       - main
   schedule:
     - cron: "23 3 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   analyze:
     name: Analyze (${{ matrix.language }})
+    needs: changes
+    if: always()
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
@@ -24,22 +30,37 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language:
-          - javascript-typescript
-          - python
+        include:
+          - language: javascript-typescript
+            required: ${{ needs.changes.outputs.codeql_javascript }}
+          - language: python
+            required: ${{ needs.changes.outputs.codeql_python }}
 
     steps:
+      - name: Require valid selection
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          REQUIRED: ${{ matrix.required }}
+        run: |
+          test "$CHANGES" = success
+          case "$REQUIRED" in true|false) ;; *) exit 1 ;; esac
+          if [ "$REQUIRED" = false ]; then
+            echo 'No relevant language inputs. Analysis is not applicable.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Check out repository
+        if: matrix.required == 'true'
         uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Initialize CodeQL
+        if: matrix.required == 'true'
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
 
       - name: Analyze
+        if: matrix.required == 'true'
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"

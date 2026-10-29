@@ -2,33 +2,11 @@ name: CLI foundation
 
 on:
   pull_request:
-    paths:
-      - "apps/cli/**"
-      - "packages/sdk-rust/**"
-      - ".cargo/**"
-      - "Cargo.*"
-      - "rust-toolchain.toml"
-      - "dist-workspace.toml"
-      - "deny.toml"
-      - ".github/workflows/cli.yml"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "turbo.json"
   push:
     branches: [main]
-    paths:
-      - "apps/cli/**"
-      - "packages/sdk-rust/**"
-      - ".cargo/**"
-      - "Cargo.*"
-      - "rust-toolchain.toml"
-      - "dist-workspace.toml"
-      - "deny.toml"
-      - ".github/workflows/cli.yml"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "turbo.json"
   workflow_dispatch:
+  schedule:
+    - cron: "41 3 * * 1"
 
 permissions:
   contents: read
@@ -38,7 +16,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   native:
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
     name: CLI ${{ matrix.target }}
     strategy:
       fail-fast: false
@@ -64,6 +47,14 @@ jobs:
       - name: Set up pinned Rust
         shell: bash
         run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+      - name: Restore native Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: inframeld-rust-v1
+          key: cli-${{ matrix.runner }}-${{ matrix.target }}-${{ hashFiles('Cargo.toml', 'dist-workspace.toml', '.github/workflows/cli.yml', 'apps/cli/xtask/src/package.rs') }}
+          env-vars: MACOSX_DEPLOYMENT_TARGET
+          cache-bin: false
+          cache-workspace-crates: false
       - name: Strict checks and behavior
         shell: bash
         run: |
@@ -104,6 +95,8 @@ jobs:
 
   dependencies:
     name: CLI dependencies
+    needs: changes
+    if: needs.changes.outputs.cli_dependencies == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
@@ -111,6 +104,19 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install 1.95.0 --profile minimal
-      - run: cargo install --locked --version 0.20.2 cargo-deny
+      - name: Restore pinned dependency-audit tool
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-deny
+          key: cargo-deny-v1-ubuntu-26.04-${{ runner.arch }}-rust-1.95.0-deny-0.20.2
+      - name: Ensure pinned dependency-audit tool
+        shell: bash
+        run: |
+          tool="$HOME/.cargo/bin/cargo-deny"
+          if ! tool_version="$("$tool" --version 2>/dev/null)" || [ "$tool_version" != 'cargo-deny 0.20.2' ]; then
+            cargo install --locked --version 0.20.2 --force cargo-deny
+          fi
+          tool_version="$("$tool" --version)"
+          test "$tool_version" = 'cargo-deny 0.20.2'
       - run: cargo deny --manifest-path apps/cli/Cargo.toml --locked check
       - run: cargo deny --manifest-path apps/cli/xtask/Cargo.toml --locked check

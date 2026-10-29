@@ -23,115 +23,27 @@ concurrency:
 
 jobs:
   changes:
-    runs-on: ubuntu-26.04
-    outputs:
-      relevant: ${{ steps.changes.outputs.relevant }}
-      macos: ${{ steps.changes.outputs.macos }}
-      matrix: ${{ steps.changes.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - id: changes
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-          MACOS: ${{ inputs.macos }}
-        run: |
-          python3 - <<'PY'
-          import os
-          import json
-          import subprocess
+    uses: ./.github/workflows/changes.yml
+    with:
+      macos: ${{ github.event_name != 'workflow_dispatch' || inputs.macos }}
 
-          sdk_prefixes = (
-              'packages/sdk-',
-              'contracts/openapi/',
-              'apps/backend/src/',
-              'apps/backend/tests/unit/contract/',
-              '.cargo/',
-              '.github/workflows/sdk-',
-          )
-          sdk_inputs = {
-              'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc',
-              'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'mise.toml',
-              'apps/backend/package.json', 'apps/backend/pyproject.toml',
-              'apps/backend/uv.lock', 'apps/backend/.python-version',
-              'apps/backend/.env.test.example', 'apps/backend/scripts/export_openapi.py',
-              'apps/backend/tests/__init__.py', 'apps/backend/tests/conftest.py',
-              'apps/backend/tests/unit/__init__.py', 'apps/backend/tests/unit/conftest.py',
-              'apps/backend/tests/support/__init__.py',
-              'apps/backend/tests/support/authentication_evidence.py',
-              'apps/backend/tests/support/openapi_schema_fixture.py',
-              'apps/backend/tests/support/sdk_conformance_app.py',
-              'apps/backend/tests/support/sdk_server.py',
-          }
-          macos_prefixes = (
-              'packages/sdk-tools/generators/', 'packages/sdk-tools/src/generation/',
-              'packages/sdk-tools/src/system/', 'packages/sdk-tools/src/conformance/',
-              'packages/sdk-tools/drivers/', 'packages/sdk-tools/consumers/',
-              'packages/sdk-tools/tests/native/',
-          )
-          macos_inputs = {
-              '.github/workflows/sdk-conformance.yml', 'pnpm-workspace.yaml', '.npmrc',
-              'packages/sdk-tools/src/workflows/generate.ts',
-              'packages/sdk-tools/requirements.in', 'packages/sdk-tools/requirements.lock',
-              'packages/sdk-tools/package.json', 'packages/sdk-rust/Cargo.toml',
-              'packages/sdk-python/pyproject.toml', 'packages/sdk-typescript/package.json',
-              'packages/sdk-tools/tests/unit/process.test.ts',
-              'packages/sdk-tools/tests/unit/backend.test.ts',
-              'packages/sdk-tools/tests/conformance/transport.ts',
-              'rust-toolchain.toml', 'mise.toml',
-          }
-
-          def affects_sdk(path: str) -> bool:
-              if path in sdk_inputs or path.startswith('packages/sdk-tools/fixtures/'):
-                  return True
-              if path.startswith('packages/sdk-') and '/generated/' in path:
-                  return True
-              if path.endswith(('.md', '.mdx')):
-                  return False
-              return path.startswith(sdk_prefixes)
-
-          event = os.environ['EVENT']
-          base = os.environ.get('BASE', '')
-          if event == 'workflow_dispatch' or not base or set(base) == {'0'}:
-              relevant = True
-              macos = event != 'workflow_dispatch' or os.environ.get('MACOS') == 'true'
-              print('SDK verification requested manually or no comparison baseline is available.')
-          else:
-              head = os.environ['HEAD']
-              revisions = [f'{base}...{head}'] if event == 'pull_request' else [base, head]
-              paths = subprocess.check_output(
-                  ['git', 'diff', '--name-only', '--no-renames', '-z', *revisions, '--'],
-                  text=True,
-              ).split('\0')
-              sdk_paths = [path for path in paths if affects_sdk(path)]
-              relevant = bool(sdk_paths)
-              macos = any(path.startswith(macos_prefixes) or path in macos_inputs for path in sdk_paths)
-              print(f'SDK verification required: {relevant}. Relevant changed files: {len(sdk_paths)}.')
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f'relevant={str(relevant).lower()}\nmacos={str(macos).lower()}\n')
-              matrix = {'include': [{'language': language, 'os': platform} for language in ('rust', 'typescript', 'python') for platform in ('ubuntu-26.04', 'macos-15') if platform == 'ubuntu-26.04' or macos]}
-              output.write('matrix=' + json.dumps(matrix) + '\n')
-          PY
   verify:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: needs.changes.outputs.sdk == 'true'
     name: ${{ matrix.language }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.changes.outputs.sdk_matrix) }}
     env:
       INFRAMELD_ENVIRONMENT: test
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Select job-local SDK tool cache
+        run: printf 'INFRAMELD_SDK_TOOLS_DIR=%s/inframeld-sdk-tools\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: "12.4.0"
@@ -139,10 +51,25 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "26.6.0"
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            packages/sdk-tools/package.json
       - name: Set up uv
         uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa
         with:
           version: "0.12.15"
+          python-version: "3.13.12"
+          enable-cache: true
+          cache-local-path: ${{ env.INFRAMELD_SDK_TOOLS_DIR }}/uv
+          cache-suffix: sdk-${{ matrix.language }}
+          cache-dependency-glob: |
+            apps/backend/pyproject.toml
+            apps/backend/uv.lock
+            packages/sdk-tools/pyproject.toml
+            packages/sdk-tools/requirements.lock
+            packages/sdk-python/pyproject.toml
+            packages/sdk-tools/fixtures/python/pyproject.toml
       - name: Install pinned Python
         run: |
           uv python install 3.13.12
@@ -170,10 +97,29 @@ jobs:
           pnpm install --frozen-lockfile
           cp apps/backend/.env.test.example apps/backend/.env.test
           uv sync --project apps/backend --locked
-          if [ '${{ matrix.language }}' = rust ]; then
-            rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
-          fi
-          pnpm sdk:setup ${{ matrix.language }}
+      - name: Set up pinned Rust
+        if: matrix.language == 'rust'
+        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+      - name: Restore Rust dependencies and pinned generator
+        if: matrix.language == 'rust'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: inframeld-rust-v1
+          key: sdk-${{ matrix.os }}-${{ hashFiles('Cargo.toml', '.github/workflows/sdk-conformance.yml', 'packages/sdk-tools/generators/**', 'packages/sdk-tools/src/generation/**', 'packages/sdk-tools/src/system/**', 'packages/sdk-tools/src/config.ts') }}
+          cache-bin: false
+          cache-all-crates: true
+          cache-workspace-crates: false
+          cache-directories: ${{ env.INFRAMELD_SDK_TOOLS_DIR }}/selected/rust
+      - name: Restore original generator archives
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ env.INFRAMELD_SDK_TOOLS_DIR }}/*.crate
+            ${{ env.INFRAMELD_SDK_TOOLS_DIR }}/*.tgz
+            ${{ env.INFRAMELD_SDK_TOOLS_DIR }}/*.jar
+          key: sdk-sources-v1-${{ matrix.os }}-${{ runner.arch }}-${{ matrix.language }}-${{ hashFiles('packages/sdk-tools/generators/**') }}
+      - name: Prepare selected SDK tools
+        run: pnpm sdk:setup ${{ matrix.language }}
       - name: Install Linux browser dependencies
         if: matrix.language == 'typescript' && runner.os == 'Linux'
         run: pnpm --filter @inframeld/sdk-tools exec playwright install-deps chromium
@@ -196,38 +142,45 @@ jobs:
     runs-on: ubuntu-26.04
     env:
       CHANGES: ${{ needs.changes.result }}
-      RELEVANT: ${{ needs.changes.outputs.relevant }}
+      RELEVANT: ${{ needs.changes.outputs.sdk }}
       VERIFICATION: ${{ needs.verify.result }}
     steps:
       - uses: actions/checkout@v7
-        if: needs.changes.outputs.relevant == 'true'
+        if: needs.changes.outputs.sdk == 'true'
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
-        if: needs.changes.outputs.relevant == 'true'
-        with:
-          node-version: "26.6.0"
       - uses: pnpm/action-setup@v6
-        if: needs.changes.outputs.relevant == 'true'
+        if: needs.changes.outputs.sdk == 'true'
         with:
           version: "12.4.0"
           run_install: false
+      - uses: actions/setup-node@v7
+        if: needs.changes.outputs.sdk == 'true'
+        with:
+          node-version: "26.6.0"
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            packages/sdk-tools/package.json
       - name: Install evidence reader dependencies
-        if: needs.changes.outputs.relevant == 'true'
+        if: needs.changes.outputs.sdk == 'true'
         run: pnpm install --frozen-lockfile --filter '@inframeld/sdk-tools...'
       - uses: actions/download-artifact@v8
-        if: needs.changes.outputs.relevant == 'true'
+        if: needs.changes.outputs.sdk == 'true'
         with:
           pattern: sdk-*
           path: sdk-evidence
       - name: Inspect complete evidence
-        if: needs.changes.outputs.relevant == 'true'
+        if: needs.changes.outputs.sdk == 'true'
         env:
-          REQUIRE_MACOS: ${{ needs.changes.outputs.macos }}
-        run: node --import ./packages/sdk-tools/node_modules/tsx/dist/loader.mjs packages/sdk-tools/src/ci/evidence.ts sdk-evidence "$REQUIRE_MACOS"
+          REQUIRE_MACOS: ${{ needs.changes.outputs.sdk_macos }}
+        run: |
+          case "$REQUIRE_MACOS" in true|false) ;; *) exit 1 ;; esac
+          node --import ./packages/sdk-tools/node_modules/tsx/dist/loader.mjs packages/sdk-tools/src/ci/evidence.ts sdk-evidence "$REQUIRE_MACOS"
       - name: Require every applicable SDK check
         run: |
           test "$CHANGES" = success
+          case "$RELEVANT" in true|false) ;; *) exit 1 ;; esac
           if [ "$RELEVANT" = true ]; then
             test "$VERIFICATION" = success
           else
