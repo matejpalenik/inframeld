@@ -1,0 +1,67 @@
+name: Select CI checks
+
+on:
+  workflow_call:
+    inputs:
+      macos:
+        description: Include macOS in manual SDK qualification
+        type: boolean
+        default: true
+    outputs:
+      backend:
+        value: ${{ jobs.detect.outputs.backend }}
+      integration:
+        value: ${{ jobs.detect.outputs.integration }}
+      web:
+        value: ${{ jobs.detect.outputs.web }}
+      web_format:
+        value: ${{ jobs.detect.outputs.web_format }}
+      cli:
+        value: ${{ jobs.detect.outputs.cli }}
+      cli_dependencies:
+        value: ${{ jobs.detect.outputs.cli_dependencies }}
+      sdk:
+        value: ${{ jobs.detect.outputs.sdk }}
+      sdk_macos:
+        value: ${{ jobs.detect.outputs.sdk_macos }}
+      codeql_python:
+        value: ${{ jobs.detect.outputs.codeql_python }}
+      codeql_javascript:
+        value: ${{ jobs.detect.outputs.codeql_javascript }}
+      sdk_matrix:
+        value: ${{ jobs.detect.outputs.sdk_matrix }}
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 3
+    outputs:
+      backend: ${{ steps.select.outputs.backend }}
+      integration: ${{ steps.select.outputs.integration }}
+      web: ${{ steps.select.outputs.web }}
+      web_format: ${{ steps.select.outputs.web_format }}
+      cli: ${{ steps.select.outputs.cli }}
+      cli_dependencies: ${{ steps.select.outputs.cli_dependencies }}
+      sdk: ${{ steps.select.outputs.sdk }}
+      sdk_macos: ${{ steps.select.outputs.sdk_macos }}
+      codeql_python: ${{ steps.select.outputs.codeql_python }}
+      codeql_javascript: ${{ steps.select.outputs.codeql_javascript }}
+      sdk_matrix: ${{ steps.select.outputs.sdk_matrix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test selection behavior
+        run: python3 -m unittest discover -s .github/scripts -p test_ci_changes.py
+      - name: Select complete check families
+        id: select
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          MACOS: ${{ inputs.macos }}
+        run: python3 .github/scripts/ci_changes.py

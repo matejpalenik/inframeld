@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -25,36 +26,59 @@ env:
   INFRAMELD_LOG_FORMAT: console
 
 jobs:
-  backend:
-    name: Backend foundation
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
+  changes:
+    uses: ./.github/workflows/changes.yml
 
+  quality:
+    name: Quality
+    needs: changes
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    env:
+      CHANGES: ${{ needs.changes.result }}
+      BACKEND: ${{ needs.changes.outputs.backend }}
+      WEB: ${{ needs.changes.outputs.web }}
+      WEB_FORMAT: ${{ needs.changes.outputs.web_format }}
+      CLI: ${{ needs.changes.outputs.cli }}
+      SDK: ${{ needs.changes.outputs.sdk }}
+      UV_LOCKED: "1"
     steps:
+      - name: Require valid selection
+        run: |
+          test "$CHANGES" = success
+          for selected in "$BACKEND" "$WEB" "$WEB_FORMAT" "$CLI" "$SDK"; do
+            case "$selected" in true|false) ;; *) exit 1 ;; esac
+          done
       - name: Check out repository
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Prepare backend test configuration
-        run: cp apps/backend/.env.test.example apps/backend/.env.test
-
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
-
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install backend check dependencies
-        run: pnpm install --filter inframeld --filter @inframeld/backend --frozen-lockfile
-
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies for selected packages
+        run: |
+          filters=(--filter inframeld)
+          if [ "$BACKEND" = true ]; then filters+=(--filter @inframeld/backend); fi
+          if [ "$WEB" = true ] || [ "$WEB_FORMAT" = true ]; then filters+=(--filter @inframeld/web); fi
+          if [ "$CLI" = true ]; then filters+=(--filter @inframeld/cli); fi
+          if [ "$SDK" = true ]; then filters+=(--filter '@inframeld/sdk-tools...'); fi
+          pnpm install --frozen-lockfile "${filters[@]}"
+      - name: Prepare backend test configuration
+        if: needs.changes.outputs.backend == 'true'
+        run: cp apps/backend/.env.test.example apps/backend/.env.test
       - name: Set up uv
+        if: needs.changes.outputs.backend == 'true'
         uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa
         with:
           version: ${{ env.UV_VERSION }}
@@ -63,39 +87,149 @@ jobs:
           cache-dependency-glob: |
             apps/backend/pyproject.toml
             apps/backend/uv.lock
-
       - name: Install pinned Python
+        if: needs.changes.outputs.backend == 'true'
         run: |
           uv python install "$PYTHON_VERSION"
           python_executable="$(uv python find --managed-python "$PYTHON_VERSION")"
           dirname "$python_executable" >> "$GITHUB_PATH"
-
       - name: Provision test fingerprint key
+        if: needs.changes.outputs.backend == 'true'
         run: |
           umask 077
           key_file="$RUNNER_TEMP/idempotency-fingerprint-hmac.key"
-          python - "$key_file" <<'PY'
+          python - "$key_file" <<'PYKEY'
           import secrets
           import sys
           from pathlib import Path
 
           Path(sys.argv[1]).write_bytes(secrets.token_bytes(32))
-          PY
+          PYKEY
           printf 'INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE=%s\n' "$key_file" >> "$GITHUB_ENV"
+      - name: Check uv lockfile and install Python dependencies
+        if: needs.changes.outputs.backend == 'true'
+        run: |
+          uv lock --check --project apps/backend
+          uv sync --project apps/backend --locked
+      - name: Set up pinned Rust for CLI checks
+        if: needs.changes.outputs.cli == 'true'
+        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+      - name: Restore Rust dependencies for CLI checks
+        if: needs.changes.outputs.cli == 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: inframeld-rust-v1
+          key: quality-ubuntu-26.04-${{ hashFiles('Cargo.toml', '.github/workflows/ci.yml') }}
+          cache-bin: false
+          cache-workspace-crates: false
+      - name: Validate commit messages
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+          elif [ "$EVENT_NAME" = workflow_dispatch ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            git log -1 --format=%B | pnpm exec commitlint
+          else
+            pnpm exec commitlint --from "$BEFORE_SHA" --to "$AFTER_SHA" --verbose
+          fi
 
-      - name: Check uv lockfile
-        run: uv lock --check --project apps/backend
+      - name: Check repository formatting
+        run: |
+          if [ "$WEB" = true ] || [ "$WEB_FORMAT" = true ]; then
+            pnpm exec prettier --check --ignore-unknown .
+          else
+            pnpm exec prettier --check --ignore-unknown . '!apps/web/**'
+          fi
+      - name: Run backend fast checks and build
+        if: needs.changes.outputs.backend == 'true'
+        run: |
+          pnpm check:backend
+          pnpm --filter @inframeld/backend build
+      - name: Check CI helper quality
+        if: needs.changes.outputs.backend == 'true'
+        run: |
+          uv run --project apps/backend ruff format --check --config apps/backend/pyproject.toml .github/scripts
+          uv run --project apps/backend ruff check --config apps/backend/pyproject.toml .github/scripts
+          uv run --project apps/backend pyright --project .github/scripts/pyrightconfig.json
+      - name: Run web checks and build
+        if: needs.changes.outputs.web == 'true'
+        run: |
+          pnpm --filter @inframeld/web lint
+          pnpm --filter @inframeld/web typecheck
+          pnpm --filter @inframeld/web build
+      - name: Run CLI fast checks and build
+        if: needs.changes.outputs.cli == 'true'
+        run: |
+          pnpm --filter @inframeld/cli format:check
+          pnpm --filter @inframeld/cli lint
+          pnpm --filter @inframeld/cli typecheck
+          pnpm --filter @inframeld/cli test
+          pnpm --filter @inframeld/cli build
+      - name: Run SDK tooling checks and TypeScript build
+        if: needs.changes.outputs.sdk == 'true'
+        run: |
+          pnpm --filter @inframeld/sdk-tools typecheck
+          pnpm --filter @inframeld/sdk-tools test
+          pnpm --filter @inframeld/sdk typecheck
+          pnpm --filter @inframeld/sdk build
+      - name: Report documentation-only quality scope
+        if: needs.changes.outputs.backend == 'false' && needs.changes.outputs.web == 'false' && needs.changes.outputs.cli == 'false' && needs.changes.outputs.sdk == 'false'
+        run: echo 'Only formatting and commit checks applied. Application checks were not required.' >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Install Python dependencies
-        run: uv sync --project apps/backend --locked
-
-      - name: Run backend-only checks
-        run: pnpm check:backend
-
+  backend:
+    name: Backend foundation
+    needs: [changes, quality]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    env:
+      CHANGES: ${{ needs.changes.result }}
+      INTEGRATION: ${{ needs.changes.outputs.integration }}
+      QUALITY: ${{ needs.quality.result }}
+    steps:
+      - name: Require valid selection and prerequisite checks
+        run: |
+          test "$CHANGES" = success
+          case "$INTEGRATION" in true|false) ;; *) exit 1 ;; esac
+          if [ "$INTEGRATION" = true ]; then
+            test "$QUALITY" = success
+          else
+            echo 'No integration inputs changed. Backend integration is not applicable.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Check out repository
+        if: needs.changes.outputs.integration == 'true'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        if: needs.changes.outputs.integration == 'true'
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+      - name: Set up Node.js
+        if: needs.changes.outputs.integration == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            apps/backend/package.json
+      - name: Install integration command dependencies
+        if: needs.changes.outputs.integration == 'true'
+        run: pnpm install --filter inframeld --filter @inframeld/backend --frozen-lockfile
       - name: Set up Docker Buildx
+        if: needs.changes.outputs.integration == 'true'
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build and cache integration image
+        if: needs.changes.outputs.integration == 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -110,6 +244,7 @@ jobs:
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,version=2,scope=inframeld-integration-linux-amd64,mode=min,ignore-error=true,timeout=2m' || '' }}
 
       - name: Run backend integration tests with PostgreSQL, Kratos and Hydra
+        if: needs.changes.outputs.integration == 'true'
         id: integration
         env:
           INFRAMELD_CONTAINER_RUNTIME: docker
@@ -117,7 +252,7 @@ jobs:
         run: pnpm test:integration
 
       - name: Verify integration teardown
-        if: ${{ !cancelled() && steps.integration.outcome != 'skipped' }}
+        if: ${{ !cancelled() && needs.changes.outputs.integration == 'true' && steps.integration.outcome != 'skipped' && steps.integration.outcome != '' }}
         run: |
           set -euo pipefail
           containers="$(docker ps -aq --filter label=com.docker.compose.project=inframeld-test)"
@@ -136,113 +271,3 @@ jobs:
             esac
           done
           docker volume inspect inframeld_test_postgres_data inframeld_test_kratos_postgres_data >/dev/null
-
-  quality:
-    name: Quality
-    runs-on: ubuntu-26.04
-    timeout-minutes: 15
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Prepare backend test configuration
-        run: cp apps/backend/.env.test.example apps/backend/.env.test
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa
-        with:
-          version: ${{ env.UV_VERSION }}
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-          cache-dependency-glob: |
-            apps/backend/pyproject.toml
-            apps/backend/uv.lock
-
-      - name: Install pinned Python
-        run: |
-          uv python install "$PYTHON_VERSION"
-          python_executable="$(uv python find --managed-python "$PYTHON_VERSION")"
-          dirname "$python_executable" >> "$GITHUB_PATH"
-
-      - name: Provision test fingerprint key
-        run: |
-          umask 077
-          key_file="$RUNNER_TEMP/idempotency-fingerprint-hmac.key"
-          python - "$key_file" <<'PY'
-          import secrets
-          import sys
-          from pathlib import Path
-
-          Path(sys.argv[1]).write_bytes(secrets.token_bytes(32))
-          PY
-          printf 'INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE=%s\n' "$key_file" >> "$GITHUB_ENV"
-
-      - name: Set up pinned Rust for CLI checks
-        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
-
-      - name: Verify toolchain versions
-        run: |
-          node --version
-          pnpm --version
-          python --version
-          uv --version
-
-      - name: Install JavaScript dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check uv lockfile
-        run: uv lock --check --project apps/backend
-
-      - name: Install Python dependencies
-        run: uv sync --project apps/backend --locked
-
-      - name: Validate commit messages
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
-          elif [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            git log -1 --format=%B | pnpm exec commitlint
-          else
-            pnpm exec commitlint --from "$BEFORE_SHA" --to "$AFTER_SHA" --verbose
-          fi
-
-      - name: Check formatting
-        run: pnpm format:check
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Check types
-        run: pnpm typecheck
-
-      - name: Run tests
-        run: pnpm test
-
-      - name: Check OpenAPI drift
-        run: pnpm openapi:check
-
-      - name: Build
-        run: pnpm build

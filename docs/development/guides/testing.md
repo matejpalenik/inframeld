@@ -19,6 +19,94 @@ pnpm test:integration
 
 `pnpm check:backend` runs backend formatting, linting, type checking, fast tests, and OpenAPI contract validation without PostgreSQL. It uses only the backend's locked Python environment and does not generate or install a Studio SDK.
 
+<a id="ci-selection"></a>
+
+### CI selection and full verification
+
+Alice changes the CLI README. CI still checks formatting and commit messages, but does not compile Rust or start identity providers. If her PR also contains an earlier Rust change, the complete PR diff still selects CLI checks at its latest head.
+
+The [shared selector](../../../.github/scripts/ci_changes.py) owns dependency groups. The [reusable workflow](../../../.github/workflows/changes.yml) tests that selector, reads the complete Git comparison and publishes fixed check-family flags. All four caller workflows report selection even when their expensive work is not applicable. A selection summary records the original paths and selected families. It does not establish that application tests ran.
+
+| Inputs | Selected checks |
+| --- | --- |
+| Authored Markdown/MDX, skills, README and AGENTS files | Repository formatting and commit messages |
+| Backend runtime, dependencies, migrations and shared test fixtures | Backend fast checks and integration. HTTP-affecting inputs also select SDK verification |
+| Backend unit tests | Backend fast checks. Contract tests and designated SDK fixtures also select SDK verification |
+| Integration Compose, provider configuration, runner scripts and image inputs | Backend fast checks and integration |
+| Web implementation, assets and configuration | Web lint, types and build. Language inputs also select JavaScript/TypeScript CodeQL |
+| CLI implementation, xtask, build inputs, tests and Rust SDK | CLI fast checks and all four native targets. SDK inputs also select conformance |
+| Cargo manifests, lockfile and Rust toolchain | Rust consumers and dependency audits. Audit-policy-only changes select the audit |
+| SDK code, generators, tools, schemas, generated output and fixtures | Existing SDK conformance, including macOS for its platform-sensitive inputs |
+| Shared pnpm manifests, lockfile and trust policy | Workspace consumers and SDK verification, without Cargo-only native packaging |
+| Python or JavaScript/TypeScript source and dependency/analysis inputs | That CodeQL language across its complete existing analysis scope |
+| A caller workflow | That workflow's checks |
+| Shared selection code or an unclassified non-documentation input | Conservative full verification, with the reason in the summary |
+
+Consumed fixture data, generated documentation and source-tree resources are evaluated before the prose exclusion. Do not make a global Markdown exclusion that hides those inputs. Keep dependency groups explicit instead of selecting individual tests or building a dependency graph.
+
+Web prose and shared formatter configuration select web formatting dependencies without selecting web lint, types or build. Tailwind formatting resolves the web stylesheet's package imports. When neither web code nor its formatting inputs change, repository Prettier checking excludes the unchanged web tree and needs only root tooling.
+
+**Quality** owns repository formatting, commit validation and selected package fast checks/builds. It installs only those workspace packages and the Python/Rust toolchains they need. Backend fast checks include OpenAPI validation. **Backend foundation** waits for successful Quality when integration is selected, then builds the existing integration image, runs the complete private suite and verifies teardown. It does not repeat backend fast checks. Native CLI jobs retain strict checks, installation and repeated-build qualification on all four existing targets when selected. Their dependency audit is selected separately.
+
+PRs compare merge-base to head, including every commit in the PR. Changes only on the base branch do not select that PR's work. Main pushes compare the event's before/after revisions. Git reports additions, deletions and both sides of a rename, without an API file-list cutoff. An absent initial baseline selects full verification. Failed comparisons and invalid outputs fail detection. Quality, Backend foundation and the SDK aggregate reject failed selection rather than treating it as a valid skip.
+
+Scheduled CodeQL runs still scan both languages. The weekly CLI security run audits dependencies without starting native packaging, because advisories can change independently of source. Manual runs select complete verification for their workflow. The SDK's existing `macos` input remains available and defaults to `true`.
+
+From the repository root, check the selector without application dependencies:
+
+```bash
+python3 -m unittest discover -s .github/scripts -p test_ci_changes.py
+```
+
+To inspect the selection for committed changes on your branch:
+
+```bash
+ci_selection_dir="$(mktemp -d)"
+EVENT=pull_request BASE="$(git rev-parse main)" HEAD="$(git rev-parse HEAD)" \
+  GITHUB_OUTPUT="$ci_selection_dir/outputs" \
+  GITHUB_STEP_SUMMARY="$ci_selection_dir/summary.md" \
+  python3 .github/scripts/ci_changes.py
+cat "$ci_selection_dir/outputs"
+```
+
+Uncommitted edits do not participate in that Git comparison. The script writes only the two selected temporary report files. A manual full run of the published branch uses the existing workflows separately:
+
+```bash
+ci_branch=main
+gh workflow run ci.yml --ref "$ci_branch"
+gh workflow run cli.yml --ref "$ci_branch"
+gh workflow run sdk-conformance.yml --ref "$ci_branch" -f macos=true
+gh workflow run codeql.yml --ref "$ci_branch"
+```
+
+When adding a consumed configuration file, fixture or workspace member, update the selector and its behavioral examples together. Keep the source paths and reasons in one owner. Local developer commands such as `pnpm check` remain complete and unchanged.
+
+**Merge and evidence boundaries.** Preserve the current required Quality, Backend foundation and CodeRabbit checks and the separate native CodeQL alert rule. Job-level selection avoids [missing required workflow checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks). Native [CodeQL merge protection](https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection) must also accept documentation-only and single-language skips in published PRs. That remote compatibility remains pending until observed. If GitHub requires analysis in those cases, retain PR analysis as the compatibility exception. Do not replace native protection with a successful shell job, change alert thresholds or upload fabricated results. External activation of additional required checks remains a separate decision.
+
+<a id="ci-dependency-caches"></a>
+
+### CI dependency caches
+
+Alice reruns a selected CLI check after changing a command. CI restores compatible third-party dependencies, compiles the current workspace crates and executes the tests again. A cache hit never substitutes for a check result.
+
+| Owner | Reused inputs | Work that still runs |
+| --- | --- | --- |
+| Quality and native CLI jobs | Cargo downloads and compiled third-party dependencies | Selected formatting, lint, types, tests and builds. Native jobs also run rustdoc and both packaging/installation passes |
+| CLI dependency audit | The exact pinned `cargo-deny` executable | Tool-version validation and both audits against current advisories, including weekly runs |
+| SDK Rust jobs | Cargo dependencies and the content-addressed patched generator executable | Source/patch digest and tool-version checks, regeneration, fresh generator-library compilation/tests, native qualification and package consumers |
+| Quality, Backend foundation and SDK jobs | The pnpm package store | Frozen installation and every selected command |
+| SDK jobs | Original generator archives and uv dependency downloads/wheels | Archive verification, TypeScript/Python resource patching, Python SDK builds and fresh consumer environments |
+
+The caller workflows own these caches. Rust caching uses the pinned [Rust cache action](https://github.com/Swatinem/rust-cache/tree/v2.9.3) with workspace-crate and Cargo-bin caching disabled. Its dependency pruning removes authored workspace artifacts and non-build outputs before saving. Job family, runner image, architecture, compiler, target, Cargo inputs and relevant workflow/build settings separate compatible caches. The root Cargo profile configuration and native packaging flags participate explicitly. The SDK generator cache also includes its manifest, actual patches and preparation code. Generator-library and temporary consumer compilation directories are not restored.
+
+The audit executable has an exact version/platform/compiler key without fallback keys. A missing, unusable or incorrect version triggers locked installation. Advisory databases and audit verdicts are not cached. Original SDK archives are checked against their committed hashes on every use. Cache misses follow normal installation and build paths. Integrity failures still fail the check.
+
+SDK jobs select their existing tool-cache override under `RUNNER_TEMP`. The uv action and SDK subprocesses use the same `uv` directory. Native Python typing uses the selected environment. The [SDK runbook](../../../packages/sdk-tools/README.md#ci-and-proof-boundaries) owns the qualification details.
+
+Keep caches limited to these inputs. Do not cache test verdicts, generated SDK output, release/package archives, evidence, installed consumer environments, database volumes, provider state, certificates or credentials. CLI reproducibility still explicitly cleans the CLI package between its two builds. This permits dependency reuse and does not claim a clean rebuild of every third-party crate. Existing Docker layer caching below retains its separate main-only write policy.
+
+To qualify a cache change, inspect its first published run and rerun the same revision. Confirm cache keys/hits, selected command execution and newly produced evidence on both runs. Compare restoration, saving, compilation and total durations. For a controlled cold run, remove only the relevant GitHub Actions cache entries before rerunning, with the repository owner's authorization. Cache misses are supported and need no workflow flag. If cache overhead exceeds its benefit, remove that cache. Local checks do not establish remote cache hits or speedups.
+
 <a id="unit-and-contract-tests"></a>
 
 ### Unit and contract tests
@@ -29,7 +117,7 @@ pnpm test:integration
 
 ### Integration tests
 
-CI runs the same `pnpm test:integration` command. There is no separate database-only CI suite.
+CI runs the same `pnpm test:integration` command when integration inputs change, after Quality succeeds. There is no separate database-only CI suite.
 
 CI first builds the integration image with Docker Buildx and restores its layers from GitHub Actions cache. Pushes to `main` update the shared cache, while pull requests only read it. A missing cache triggers a normal build. Cache imports and uploads each have a two-minute timeout. Upload failures do not fail the image build. Both Docker actions are pinned to verified release commit SHAs. This follows [Docker's GitHub Actions cache guidance](https://docs.docker.com/build/cache/backends/gha/) and [GitHub's action-pinning guidance](https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions).
 

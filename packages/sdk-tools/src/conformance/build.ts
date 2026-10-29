@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { build } from "esbuild";
 import { z } from "zod";
-import { root, home, packageRoot, type Language } from "../config.ts";
+import { root, home, cache, packageRoot, type Language } from "../config.ts";
 import { run } from "../system/run.ts";
 import { buildTypescript } from "../system/typescript.ts";
 import { wheel, python, pythonVersions } from "../system/python.ts";
@@ -191,7 +191,14 @@ export async function typecheckNative(language: Language): Promise<void> {
   if (language === "python") {
     await run(
       python,
-      ["-m", "pyright", "-p", join(home, "pyrightconfig.json")],
+      [
+        "-m",
+        "pyright",
+        "-p",
+        join(home, "pyrightconfig.json"),
+        "--venvpath",
+        cache,
+      ],
       "python-driver-types",
     );
     await run(

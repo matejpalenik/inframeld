@@ -35,6 +35,10 @@ Follow the existing [runbook](../../../../docs/development/guides/testing.md) an
 
 Report commands, artifacts/configuration and executed outcomes. Distinguish personally run results from inspected source, historical reports and pending checks. Formatting/type checks, a skipped integration collection and an accepted test design are not runtime qualification. [Isolation and evidence](isolation-and-evidence.md) explains the operational limits.
 
+CI selects complete check families through the [shared relevance policy](../../../../docs/development/guides/testing.md#ci-selection). A successful not-applicable check records a selection decision, not an executed application test. Inspect selected jobs and their actual results before claiming qualification. Local complete commands and the SDK evidence requirements retain their existing meaning.
+
+The [CI cache policy](../../../../docs/development/guides/testing.md#ci-dependency-caches) permits dependency reuse and exactly pinned tools while keeping selected checks and evidence fresh. Cache hits do not establish a passing test, audit or packaging result. Keep workspace artifacts, qualification outputs and integration state outside caches. Report observed cold/warm behavior separately from local validation.
+
 Backend implementation and HTTP foundations can be qualified before deferred Studio. The existing web package has no test script establishing a frontend suite. Provider browser-flow HTTP tests and SDK Chromium tests do not establish an implemented Inframeld account UI or complete browser-to-CLI login. A future product journey needs its actual components and scenarios.
 
 Evaluation's benchmark/case-quality workflows remain under the [Evaluation skill](../../inframeld-evaluation/SKILL.md). Tests of Evaluation code still use ordinary repository testing conventions, but passing those tests is not calibration or model-quality evidence.
