@@ -29,11 +29,13 @@ The [shared selector](../../../.github/scripts/ci_changes.py) owns dependency gr
 
 | Inputs | Selected checks |
 | --- | --- |
-| Authored Markdown/MDX, skills, README and AGENTS files | Repository formatting and commit messages |
+| Authored Markdown/MDX, skills, README and AGENTS files outside consumed application content | Repository formatting and commit messages |
 | Backend runtime, dependencies, migrations and shared test fixtures | Backend fast checks and integration. HTTP-affecting inputs also select SDK verification |
 | Backend unit tests | Backend fast checks. Contract tests and designated SDK fixtures also select SDK verification |
 | Integration Compose, provider configuration, runner scripts and image inputs | Backend fast checks and integration |
 | Web implementation, assets and configuration | Web lint, types and build. Language inputs also select JavaScript/TypeScript CodeQL |
+| Documentation app pages, navigation, assets and configuration | Documentation formatting, lint, types, content and link checks, tests and production build |
+| Delivery helper implementation and configuration | Helper formatting, lint, strict types and behavioral tests, without product services |
 | CLI implementation, xtask, build inputs, tests and Rust SDK | CLI fast checks and all four native targets. SDK inputs also select conformance |
 | Cargo manifests, lockfile and Rust toolchain | Rust consumers and dependency audits. Audit-policy-only changes select the audit |
 | SDK code, generators, tools, schemas, generated output and fixtures | Existing SDK conformance, including macOS for its platform-sensitive inputs |
@@ -44,7 +46,7 @@ The [shared selector](../../../.github/scripts/ci_changes.py) owns dependency gr
 
 Consumed fixture data, generated documentation and source-tree resources are evaluated before the prose exclusion. Do not make a global Markdown exclusion that hides those inputs. Keep dependency groups explicit instead of selecting individual tests or building a dependency graph.
 
-Web prose and shared formatter configuration select web formatting dependencies without selecting web lint, types or build. Tailwind formatting resolves the web stylesheet's package imports. When neither web code nor its formatting inputs change, repository Prettier checking excludes the unchanged web tree and needs only root tooling.
+Contributor prose in the web and documentation apps selects that app's formatting dependencies without selecting its application checks. Shared formatter configuration selects both apps' formatting dependencies. Repository Prettier checking excludes each unchanged app tree when its stylesheet dependencies are unnecessary. Quality always runs the small delivery helper behavioral suite. Delivery helper changes also select Ruff and strict type checks.
 
 **Quality** owns repository formatting, commit validation and selected package fast checks/builds. It installs only those workspace packages and the Python/Rust toolchains they need. Backend fast checks include OpenAPI validation. **Backend foundation** waits for successful Quality when integration is selected, then builds the existing integration image, runs the complete private suite and verifies teardown. It does not repeat backend fast checks. Native CLI jobs retain strict checks, installation and repeated-build qualification on all four existing targets when selected. Their dependency audit is selected separately.
 

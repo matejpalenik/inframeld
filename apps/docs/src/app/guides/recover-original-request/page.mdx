@@ -1,0 +1,273 @@
+export const pageMetadata = {
+  title: "Check whether your original request was accepted",
+  description:
+    "Look up an original request after losing its response, without submitting the operation again.",
+}
+
+# Check whether your original request was accepted
+
+If you submit a request and lose its response, use `POST /v1/operations/lookup` to check what Inframeld retained about that request. Lookup reads the original operation's record. It does not perform the operation again.
+
+This guide uses a Project grant: Alice submitted a request to grant Bob access, but did not receive the response. The same lookup endpoint supports retained Project and Organization operations with the appropriate authority guard.
+
+<Note>
+  An `unresolved` result or a timeout does not mean the original request failed.
+  Keep the original request details. Do not submit another operation just
+  because lookup cannot confirm the result.
+</Note>
+
+## Before you begin
+
+You need:
+
+- The backend URL for your Inframeld installation.
+- A current human bearer credential for that installation.
+- The original installation, Organization, Project, HTTP method, canonical route, request key, and authority guard. Retain these before sending the original request.
+- Current permission to inspect the original scope. For a grant, you must still have Project membership and visibility, with can-use-and-grant authority for `create-access-groups`.
+
+The authority guard describes the permission associated with the original operation. Supplying it does not grant permission. Authentication identifies the caller, so the request body has no actor field.
+
+For these examples, set the following variables in your shell. Replace both values with the backend URL and credential supplied for your installation. Use a URL without a trailing slash.
+
+```shell
+export INFRAMELD_URL='https://YOUR_INFRAMELD_BACKEND'
+export INFRAMELD_TOKEN='YOUR_HUMAN_BEARER_TOKEN'
+```
+
+SDK examples require a local build of the [Python](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-python#build-and-use-locally), [TypeScript](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-typescript#build-and-use-locally), or [Rust](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-rust#build-and-use-locally) SDK. Follow the linked package instructions to build and install it in a separate example project. The SDKs are not published to package registries. There is no CLI lookup command yet.
+
+## Prepare the lookup
+
+Save the following as `original-request.json` in your example project's working directory. Replace the illustrative UUIDs and key with the original values. Do not generate a new key for lookup.
+
+```json
+{
+  "installationId": "00000000-0000-4000-8000-000000000001",
+  "organizationId": "00000000-0000-4000-8000-000000000002",
+  "projectId": "00000000-0000-4000-8000-000000000003",
+  "method": "POST",
+  "requestedRoute": "/v1/projects/{project_id}/grants",
+  "key": "grant-bob-1",
+  "expectedAuthority": {
+    "family": "project_grant_read",
+    "actionId": "create-access-groups"
+  }
+}
+```
+
+Use the original method and canonical route template exactly. For this grant, `requestedRoute` contains `{project_id}`, not the Project's UUID. The original idempotency key belongs in the JSON body.
+
+Do not reconstruct the original scope from your current Project selection or an alias. Lookup takes no grant payload or request fingerprint. The JSON body is limited to 32 KiB. Unknown fields and duplicate JSON keys are rejected.
+
+For other supported operations, preserve the original authority meaning:
+
+| Original operation        | `expectedAuthority.family` | `expectedAuthority.actionId` | `projectId`           |
+| ------------------------- | -------------------------- | ---------------------------- | --------------------- |
+| Project grant             | `project_grant_read`       | `create-access-groups`       | Original Project UUID |
+| Generic Project operation | `project_action_use`       | Original Project action      | Original Project UUID |
+| Organization operation    | `organization_action_use`  | Original Organization action | Explicit `null`       |
+
+A grant lookup requires `project_grant_read`. The weaker `project_action_use` guard cannot replace it. Lookup checks your current authority before searching retained history. It does not repeat the recipient's eligibility check from the original assignment.
+
+## Send the lookup
+
+Choose one example below. Each reads `original-request.json`, authenticates the lookup, and observes the result without resubmitting the original operation.
+
+<CodeGroup>
+
+```shell
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request POST \
+  --url "$INFRAMELD_URL/v1/operations/lookup" \
+  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @original-request.json
+```
+
+```python
+# Save as lookup.py. Run with: python lookup.py
+import asyncio
+import json
+import os
+from pathlib import Path
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.operations_api import OperationsApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.original_operation_lookup_request import (
+    OriginalOperationLookupRequest,
+)
+
+
+async def main() -> None:
+    body = OriginalOperationLookupRequest.model_validate(
+        json.loads(Path("original-request.json").read_text())
+    )
+    configuration = Configuration(host=os.environ["INFRAMELD_URL"])
+    async with ApiClient(configuration) as client:
+        try:
+            response = await OperationsApi(client).lookup_original_operation_with_http_info(
+                original_operation_lookup_request=body,
+                _headers={
+                    "Authorization": f"Bearer {os.environ['INFRAMELD_TOKEN']}"
+                },
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            print(f"Lookup could not be read: HTTP {error.status}")
+            print(error.body)
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("Lookup did not produce a usable response. Keep the original request.")
+            raise SystemExit(1) from error
+
+        result = response.data.actual_instance
+        if result is None:
+            raise RuntimeError("Lookup returned no outcome")
+        print(result.outcome)
+        print(result.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+// Save as lookup.ts in an ESM project with the locally built SDK installed.
+// With Node 26, run with: node lookup.ts
+import { readFileSync } from "node:fs"
+import {
+  createClient,
+  lookupOriginalOperation,
+  type OriginalOperationLookupRequest,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+if (!baseUrl || !token) {
+  throw new Error("Set INFRAMELD_URL and INFRAMELD_TOKEN")
+}
+
+const body: OriginalOperationLookupRequest = JSON.parse(
+  readFileSync("original-request.json", "utf8")
+)
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const result = await lookupOriginalOperation({
+  client,
+  body,
+  headers: { Authorization: `Bearer ${token}` },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error) {
+  console.error("Lookup could not be read:", result.error.kind)
+  console.error("HTTP status:", result.response?.status)
+  if (result.error.kind === "api") {
+    console.error(result.error.body)
+  } else {
+    console.error(result.error.message)
+  }
+  process.exitCode = 1
+} else if (result.data) {
+  console.log(result.data.outcome)
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+// Save as src/main.rs in a separate Cargo project.
+// Add the locally built inframeld-sdk as a path dependency, plus:
+// serde_json = "1"
+// tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+// Run from the directory containing original-request.json: cargo run
+use inframeld_sdk::{HttpClient, OriginalOperationLookupRequest};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let body: OriginalOperationLookupRequest =
+        serde_json::from_str(&std::fs::read_to_string("original-request.json")?)?;
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    match client.lookup_original_operation(body).await {
+        Ok(response) => {
+            println!("HTTP {}", response.status);
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+        }
+        Err(error) => {
+            if let Some(context) = error.api() {
+                eprintln!("Lookup could not be read: HTTP {}", context.status);
+                eprintln!("{}", context.body);
+            } else {
+                eprintln!("Lookup did not produce a usable response: {error}");
+            }
+            return Err(error.into());
+        }
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+The HTTP example uses a five second deadline. The Python and TypeScript examples set the same deadline. The Rust client's default is five seconds. These SDK defaults do not retry the operation automatically.
+
+If your application uses browser cookies instead of a bearer token, send its trusted `Origin` and `X-Inframeld-CSRF: 1`. Browser SDK requests also need the existing installation's cookie and CORS configuration. Do not copy a browser session cookie into a shared example.
+
+## Interpret the result
+
+A successful lookup returns HTTP `200`. Check `outcome` to decide what the response establishes.
+
+| `outcome`               | What it means                                                                                                       | What to do next                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `completed_synchronous` | The original operation completed. The record includes its operation ID, result classification, and original expiry. | Use the operation ID to investigate the original result. Lookup does not replay its contents. |
+| `accepted_asynchronous` | The original request was accepted. Its job reference is unknown and dispatch is not established by this record.     | Keep the operation ID. Do not treat this as evidence that a job started or finished.          |
+| `in_progress`           | The original synchronous operation has not finished.                                                                | Keep its operation ID. A later lookup can observe the same original request.                  |
+| `recovery_required`     | The original operation requires recovery. The record does not establish asynchronous acceptance.                    | Keep the operation ID and ask the installation's operator to investigate.                     |
+| `unresolved`            | Lookup cannot establish an authoritative retained match.                                                            | Keep the original details and investigate. Do not assume the operation never happened.        |
+
+For example, a completed response has this shape. The operation ID and expiry below are illustrative:
+
+```json
+{
+  "outcome": "completed_synchronous",
+  "operationId": "example-original-operation",
+  "classification": "safe_result",
+  "idempotencyExpiresAt": "2030-01-01T00:00:00Z"
+}
+```
+
+`classification` describes the kind of completed result: `safe_result`, `issued_secret`, or `answer_receipt`. Lookup does not return the original secret, answer, or response body.
+
+An unresolved response contains only:
+
+```json
+{
+  "outcome": "unresolved"
+}
+```
+
+It does not say whether history was absent, expired, or did not match the full original identity. Repeating a successful lookup does not extend the original record's expiry. An accepted asynchronous result remains a statement about original acceptance, even if the job later changes state. Lookup does not provide a job URL or current job progress.
+
+## Handle an error or lost response
+
+Error responses use `application/problem+json`. Read the HTTP status and problem details before deciding how to proceed. An SDK decoding error can also occur with HTTP `200`, so check the SDK error even when the status looks successful.
+
+| Status or failure                        | Next step                                                                                                                            |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `400` or `422`                           | Check the original identifiers, method, route, key, and authority guard. Remove unknown fields and duplicate JSON keys.              |
+| `401`                                    | Use a valid current human credential for this installation.                                                                          |
+| `403` or `404`                           | Check your current access to the original Organization and Project. A hidden scope is not evidence that the original request failed. |
+| `413`                                    | Reduce the JSON body to the supported lookup fields, within 32 KiB.                                                                  |
+| `415`                                    | Send `Content-Type: application/json`.                                                                                               |
+| `503`                                    | The lookup's dependencies are unavailable. Check installation health and try the same lookup later.                                  |
+| Timeout, disconnect, or decoding failure | Treat the result as unknown. Preserve the original details and investigate or repeat the lookup.                                     |
+
+Repeating **lookup** with the same original identity is a read. Submitting the original business operation again is a separate decision that these observations do not authorize.

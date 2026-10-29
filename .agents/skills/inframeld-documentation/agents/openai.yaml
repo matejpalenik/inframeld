@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inframeld Documentation"
+  short_description: "Write clear, source-backed Inframeld user docs"
+  default_prompt: "Use $inframeld-documentation to document this delivered feature."

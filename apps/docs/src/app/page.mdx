@@ -1,0 +1,35 @@
+export const pageMetadata = {
+  title: "Inframeld documentation",
+  description: "Practical guides for using Inframeld and its API.",
+}
+
+# Inframeld documentation
+
+Inframeld provides governed retrieval and release workflows. Use these guides to understand a feature, make a request, and decide what to do with the result.
+
+The documentation is growing alongside the application. Each guide describes behavior implemented in the repository. Links to source code help you check the details for your version.
+
+## Start with a task
+
+If you submitted a request but lost its response, you can check the original request without submitting it again.
+
+<Button href="/guides/recover-original-request" arrow="right">
+  Check whether your original request was accepted
+</Button>
+
+The guide covers the HTTP endpoint and the Python, TypeScript, and Rust SDKs. It explains which details you need to retain and how to handle a result that cannot be resolved.
+
+## Use the API and SDKs
+
+Use the backend URL and credentials provided for your Inframeld installation. The SDKs are currently available from this repository and are not published packages.
+
+- [Python SDK source and setup](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-python)
+- [TypeScript SDK source and setup](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-typescript)
+- [Rust SDK source and setup](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-rust)
+- [API schema](https://github.com/matejpalenik/inframeld/blob/main/contracts/openapi/v1/inframeld-v1.json)
+
+A CLI command for looking up an original request is not available yet. Use HTTP or an SDK for this task.
+
+## Get help
+
+[Open an issue](https://github.com/matejpalenik/inframeld/issues) to report a problem or suggest an improvement. Include the feature, your application version, and a minimal example. Remove credentials and private request data before sharing it.

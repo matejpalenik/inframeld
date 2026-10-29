@@ -27,6 +27,9 @@ Start the backend, learn one workflow and follow its owner when you need details
 | Understand a public HTTP problem | [Problem catalogue](error-handling.md) |
 | Review code or decide commit/merge readiness | [Review skill](../../.agents/skills/inframeld-review/SKILL.md) and its [standard report](../../.agents/skills/inframeld-review/references/scoring-and-report.md) |
 | Finish or document a change | [Definition of Done](definition-of-done.md) and [documentation maintenance](documentation-maintenance.md) |
+| Write or preview end-user documentation | [Docs app authoring guide](../../apps/docs/README.md) and [Documentation skill](../../.agents/skills/inframeld-documentation/SKILL.md) |
+| Assess CLI or SDK usability | [Developer Experience skill](../../.agents/skills/inframeld-developer-experience/SKILL.md) |
+| Rehearse or explicitly launch native-subagent backlog delivery | [Backlog delivery](guides/backlog-delivery.md) |
 
 <a id="find-the-detailed-owner"></a>
 

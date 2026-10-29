@@ -14,6 +14,58 @@ from ci_changes import FLAGS, Selection, detect, select
 class SelectionTests(unittest.TestCase):
     """Keep unrelated prose cheap while retaining real component dependencies."""
 
+    def test_docs_runtime_content_selects_docs_without_product_services(self) -> None:
+        for path in [
+            "apps/docs/src/app/guides/recovery/page.mdx",
+            "apps/docs/src/components/Code.tsx",
+            "apps/docs/src/styles/tailwind.css",
+            "apps/docs/src/mdx/search.mjs",
+            "apps/docs/package.json",
+            "apps/docs/next.config.mjs",
+            "apps/docs/tsconfig.json",
+            "apps/docs/public/icon.svg",
+        ]:
+            with self.subTest(path=path):
+                actual = select([path])
+                self.assertTrue(actual.docs)
+                self.assertFalse(actual.backend or actual.integration or actual.web or actual.sdk)
+        self.assertTrue(select(["apps/docs/src/components/Code.tsx"]).codeql_javascript)
+
+    def test_docs_contributor_prose_only_needs_formatter_dependencies(self) -> None:
+        for path in [
+            "apps/docs/README.md",
+            "apps/docs/AGENTS.md",
+            "apps/docs/LICENSE.md",
+            "apps/docs/prettier.config.mjs",
+            "apps/docs/.prettierignore",
+        ]:
+            with self.subTest(path=path):
+                actual = select([path])
+                self.assertTrue(actual.docs_format)
+                self.assertFalse(actual.docs or actual.backend or actual.integration or actual.sdk)
+
+    def test_shared_workspace_and_formatter_changes_include_docs(self) -> None:
+        for path in ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "turbo.json"]:
+            with self.subTest(path=path):
+                self.assertTrue(select([path]).docs)
+        self.assertTrue(select(["prettier.config.mjs"]).docs_format)
+
+    def test_web_contributor_prose_does_not_install_docs_dependencies(self) -> None:
+        for path in ["apps/web/README.md", "apps/web/.prettierrc", "apps/web/.prettierignore"]:
+            with self.subTest(path=path):
+                actual = select([path])
+                self.assertTrue(actual.web_format)
+                self.assertFalse(actual.docs or actual.docs_format)
+
+    def test_delivery_helpers_select_their_checks_without_product_services(self) -> None:
+        for path in ["scripts/delivery/cli.py", "scripts/delivery/pyrightconfig.json"]:
+            with self.subTest(path=path):
+                actual = select([path])
+                self.assertTrue(actual.delivery)
+                self.assertFalse(actual.backend or actual.integration or actual.web or actual.docs)
+        self.assertFalse(select(["scripts/delivery/README.md"]).delivery)
+        self.assertTrue(select(["apps/backend/pyproject.toml"]).delivery)
+
     def test_specification_pr_270_needs_no_application_checks(self) -> None:
         paths = [
             ".agents/skills/inframeld-access-models/references/grant-contracts.md",
@@ -137,7 +189,7 @@ class SelectionTests(unittest.TestCase):
         cases = [
             (
                 ".github/workflows/ci.yml",
-                {"backend", "integration", "web", "cli", "sdk"},
+                {"backend", "integration", "web", "docs", "delivery", "cli", "sdk"},
             ),
             (".github/workflows/cli.yml", {"cli", "cli_dependencies"}),
             (".github/workflows/sdk-conformance.yml", {"sdk", "sdk_macos"}),

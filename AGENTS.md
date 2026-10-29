@@ -30,6 +30,9 @@ Read the skill whose invariant or behavior the question concerns. Domain skills 
 | Cases, benchmarks, judges, comparisons or evaluation history | [Evaluation](.agents/skills/inframeld-evaluation/SKILL.md) |
 | Serving selection, publication modes, canaries or rollback | [Releases](.agents/skills/inframeld-releases/SKILL.md) |
 | Requested code or architectural review and commit/merge readiness | [Review](.agents/skills/inframeld-review/SKILL.md) |
+| End-user documentation, Protocol MDX pages and public usage examples | [Documentation](.agents/skills/inframeld-documentation/SKILL.md) |
+| Requested CLI or SDK developer-experience assessment | [Developer Experience](.agents/skills/inframeld-developer-experience/SKILL.md) |
+| Explicitly authorized v1 backlog delivery through native subagents, or its read-only rehearsal | [Backlog Delivery](.agents/skills/inframeld-backlog-delivery/SKILL.md) |
 | Any repository code planning, suggestions, additions, changes, refactoring or review, including tests and code snippets | [Coding Standards](.agents/skills/inframeld-coding-standards/SKILL.md) |
 | Authored Python, including backend components and tests | [Python Standards](.agents/skills/inframeld-python-standards/SKILL.md) |
 | Authored Rust, including CLI and xtask code | [Rust Standards](.agents/skills/inframeld-rust-standards/SKILL.md) |

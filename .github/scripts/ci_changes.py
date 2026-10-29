@@ -12,6 +12,9 @@ FLAGS = (
     "integration",
     "web",
     "web_format",
+    "docs",
+    "docs_format",
+    "delivery",
     "cli",
     "cli_dependencies",
     "sdk",
@@ -82,7 +85,7 @@ MACOS_INPUTS = {
 }
 WORKSPACE_INPUTS = {"package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".npmrc"}
 WORKFLOWS = {
-    ".github/workflows/ci.yml": {"backend", "integration", "web", "cli", "sdk"},
+    ".github/workflows/ci.yml": {"backend", "integration", "web", "docs", "delivery", "cli", "sdk"},
     ".github/workflows/cli.yml": {"cli", "cli_dependencies"},
     ".github/workflows/sdk-conformance.yml": {"sdk", "sdk_macos"},
     ".github/workflows/codeql.yml": {"codeql_python", "codeql_javascript"},
@@ -97,6 +100,9 @@ class Selection:
     integration: bool = False
     web: bool = False
     web_format: bool = False
+    docs: bool = False
+    docs_format: bool = False
+    delivery: bool = False
     cli: bool = False
     cli_dependencies: bool = False
     sdk: bool = False
@@ -112,6 +118,9 @@ def _selection(enabled: set[str], reasons: tuple[str, ...]) -> Selection:
         integration="integration" in enabled,
         web="web" in enabled,
         web_format="web_format" in enabled,
+        docs="docs" in enabled,
+        docs_format="docs_format" in enabled,
+        delivery="delivery" in enabled,
         cli="cli" in enabled,
         cli_dependencies="cli_dependencies" in enabled,
         sdk="sdk" in enabled,
@@ -139,6 +148,12 @@ def _families(path: str) -> set[str]:
         return WORKFLOWS[path]
 
     enabled: set[str] = set()
+    if path in {
+        "apps/backend/pyproject.toml",
+        "apps/backend/uv.lock",
+        "apps/backend/.python-version",
+    }:
+        enabled.add("delivery")
     if _affects_sdk(path):
         enabled.add("sdk")
         if path in MACOS_INPUTS or path.startswith(MACOS_PREFIXES):
@@ -162,14 +177,26 @@ def _families(path: str) -> set[str]:
         enabled.add("codeql_javascript")
 
     web_resource = path.startswith(("apps/web/app/", "apps/web/src/", "apps/web/components/"))
+    docs_resource = path.startswith(("apps/docs/src/", "apps/docs/public/"))
     if path in {
         "prettier.config.mjs",
         ".prettierignore",
         ".editorconfig",
+    }:
+        return enabled | {"web_format", "docs_format"}
+
+    if path in {
         "apps/web/.prettierrc",
         "apps/web/.prettierignore",
     } or (path.startswith("apps/web/") and path.endswith((".md", ".mdx")) and not web_resource):
         return enabled | {"web_format"}
+
+    if path in {
+        "apps/docs/prettier.config.mjs",
+        "apps/docs/.prettierrc",
+        "apps/docs/.prettierignore",
+    } or (path.startswith("apps/docs/") and path.endswith((".md", ".mdx")) and not docs_resource):
+        return enabled | {"docs_format"}
 
     consumed = (
         path.startswith(
@@ -186,12 +213,16 @@ def _families(path: str) -> set[str]:
         )
         or (path.startswith("packages/sdk-") and "/generated/" in path)
         or web_resource
+        or docs_resource
     )
     if path.endswith((".md", ".mdx")) and not consumed:
         return enabled
 
+    if path.startswith("scripts/delivery/"):
+        return enabled | {"delivery"}
+
     if path in WORKSPACE_INPUTS:
-        return enabled | {"backend", "integration", "web", "sdk"}
+        return enabled | {"backend", "integration", "web", "docs", "sdk"}
     if path == "mise.toml":
         return set(FLAGS)
     if path in {"Cargo.toml", "Cargo.lock", "rust-toolchain.toml"} or path.startswith(".cargo/"):
@@ -203,11 +234,13 @@ def _families(path: str) -> set[str]:
     if path == "dist-workspace.toml":
         return {"cli"}
     if path == "turbo.json":
-        return {"backend", "web", "cli", "sdk"}
+        return {"backend", "web", "docs", "cli", "sdk"}
     if path.startswith(("apps/cli/", "packages/sdk-rust/")):
         return enabled | {"cli"}
     if path.startswith("apps/web/"):
         return enabled | {"web"}
+    if path.startswith("apps/docs/"):
+        return enabled | {"docs"}
     if path.startswith("apps/backend/"):
         enabled.add("backend")
         if path.startswith(

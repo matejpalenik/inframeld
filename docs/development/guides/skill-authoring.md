@@ -79,6 +79,9 @@ Keep one active `SKILL.md` for each capability listed below under `.agents/skill
 | [Python SDK](../../../.agents/skills/inframeld-python-sdk/SKILL.md) | [HTTPX/Pydantic usage and maintenance](../../../.agents/skills/inframeld-python-sdk/references/usage-and-maintenance.md). |
 | [Testing](../../../.agents/skills/inframeld-testing/SKILL.md) | [Test strategy](../../../.agents/skills/inframeld-testing/references/test-strategy.md) and [isolation/evidence](../../../.agents/skills/inframeld-testing/references/isolation-and-evidence.md). |
 | [Review](../../../.agents/skills/inframeld-review/SKILL.md) | Human maintainability, proportionate V1 engineering and evidence-backed review, with [scoring and report format](../../../.agents/skills/inframeld-review/references/scoring-and-report.md). |
+| [Documentation](../../../.agents/skills/inframeld-documentation/SKILL.md) | Plain-language user pages, tested public examples and the Protocol MDX authoring workflow. |
+| [Developer Experience](../../../.agents/skills/inframeld-developer-experience/SKILL.md) | Task-oriented CLI and SDK review, using Review's severity and report conventions. |
+| [Backlog Delivery](../../../.agents/skills/inframeld-backlog-delivery/SKILL.md) | Explicitly authorized main-chat coordination with native subagents, plus read-only planning and rehearsal. |
 | [Coding Standards](../../../.agents/skills/inframeld-coding-standards/SKILL.md) | Shared engineering and [TDD/documentation](../../../.agents/skills/inframeld-coding-standards/references/testing-and-documentation.md), with language routing. |
 | [Python Standards](../../../.agents/skills/inframeld-python-standards/SKILL.md) | Seven focused backend component/test references and package-specific exclusions. |
 | [Rust Standards](../../../.agents/skills/inframeld-rust-standards/SKILL.md) | Rust idioms and the [accepted CLI structure and lifecycle](../../../.agents/skills/inframeld-rust-standards/references/cli-structure.md). |

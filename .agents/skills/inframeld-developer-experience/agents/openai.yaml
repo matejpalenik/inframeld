@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inframeld Developer Experience"
+  short_description: "Review CLI and SDK journeys against real behavior"
+  default_prompt: "Use $inframeld-developer-experience to review this developer journey."
