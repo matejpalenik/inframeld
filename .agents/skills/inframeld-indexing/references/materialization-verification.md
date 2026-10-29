@@ -2,6 +2,12 @@
 
 Alice changes B1 while A1 remains unchanged. Reusing A1 saves numerical work, but Indexing must still verify the complete expected data for the selected revision. A total vector count cannot establish that every required record is correct.
 
+## Return exact verified bindings
+
+Accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) returns the existing scoped IndexMaterialization identity and the complete typed projection needed by each consumer. It fixes exact corpus membership, profiles, index/layout, generation manifests, expected/verified hashes and counts, per-shard completion and observed health generation. Large inventories remain immutable paged manifests. Pending or failed preparation is not a ready binding.
+
+Resolve selected usable dependencies and acquire the operation pin in the same short retention-gate transaction. A missing, retired, incompatible or unconfirmed required dependency fails without selecting newer data, hidden re-preparation or partial retrieval. Readiness is separate from current authority and health. The complete contract owns pin lifetime and safe unavailable outcomes.
+
 <a id="prepare-and-verify-a-materialization"></a>
 
 <a id="build"></a>
@@ -123,7 +129,7 @@ V1 offers supported processing profiles. Arbitrary parser or chunker plugins are
 
 ### Preserve source coordinates for evaluation
 
-An expected passage can remain the same when a new chunking profile divides it differently. Expose the DocumentVersion, immutable parsed-artifact identity, and source spans for processed passages and returned chunks. Define the coordinate units explicitly. Generation-scoped chunk IDs alone cannot establish equivalent evidence. Truncated generation context needs mappings for the retained text, not the original full chunk.
+An expected passage can remain the same when a new chunking profile divides it differently. Expose the DocumentVersion, immutable canonical conversion-artifact identity, and source spans for processed passages and returned chunks under accepted [PD-INDEXING-03](decision-source-coordinates.md#approved-resolution). Coordinates are zero-based Unicode code-point half-open ranges in the exact stored canonical text. Normalize LF before coordinates and preserve other Unicode, case and whitespace. Conversion identity excludes chunk-only settings, allowing different chunking generations to share genuinely identical canonical parsed content. Generation-scoped chunk IDs alone cannot establish equivalent evidence. Truncated generation context needs mappings for the retained text, not the original full chunk.
 
 [Evaluation](../../inframeld-evaluation/references/passage-coverage.md#passages) owns the full-coverage calculation and freezes expectations from already processed text. It needs no additional parsing, embeddings, or relationship graph for its starter preset. If parser outputs lack a verified shared coordinate mapping, report that limitation: Evaluation marks the case unscorable rather than guessing from text similarity. These mappings and conversions still require implementation qualification. This is not a guarantee of arbitrary cross-parser compatibility.
 

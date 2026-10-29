@@ -19,6 +19,10 @@ Indexing separates preparation/readiness, permission-filtered retrieval and nume
 
 The capabilities exchange explicit identities and typed bindings for the exact corpus, profiles, generations and layout. Existing PostgreSQL authority, private artifact storage, Chroma selection, complete verification, frozen-byte retries, current health and retention gates remain authoritative. All remote embedding work uses ModelGateway. Shared jobs and transactions support these operations without a generic workflow engine.
 
+## Later contract resolution
+
+Accepted [PD-INDEXING-01](../../.agents/skills/inframeld-indexing/references/decision-capability-binding-contracts.md#approved-resolution) on 2026-10-29 fills the corresponding consistency/binding contract below. Earlier design-work statements retain their historical context. Implementation and qualification remain unfinished.
+
 ## Consequences
 
 Specify trusted inputs, complete binding/result contracts, readiness versus current-health obligations, unavailable outcomes and cleanup/retention coordination before coding the ports. These are logical capabilities, not a class, repository or process per box. Exact backend, security, resource and concurrency qualification remains required. A numerical reuse key cannot authorize redispatch of an uncertain paid request.

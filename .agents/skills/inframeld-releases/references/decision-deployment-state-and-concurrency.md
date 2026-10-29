@@ -52,7 +52,7 @@ Releases state/repository/services, shared operation completion/audit, Pipeline 
 
 Load neighboring decisions only under these conditions:
 
-- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). For complete live-input selection/handoff.
+- [PD-KNOWLEDGE-01 (accepted): Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). For complete live-input selection/handoff.
 - [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). For protected precreation status.
 - [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](../../inframeld-pipelines/references/decision-execution-build-receipt-contracts.md). For captured ready-build results.
 

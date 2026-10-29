@@ -127,6 +127,10 @@ The starter creator receives explicit permissions for the starter project and re
 
 When several automatic Deployments use one collection, the operation names each target it may update. Each has its own request and outcome. There is no all-Deployment transaction or use of another person's release permissions.
 
+### Consume a durable complete-batch handoff
+
+Accepted [PD-KNOWLEDGE-01](../../inframeld-knowledge/references/decision-complete-batch-handoff.md#approved-resolution) preserves the original complete selection and durable continuation after child admission. Recover the same handoff after a crash. It names explicit targets and fixed input/configuration meaning, but does not grant Build or Manage releases. Each target has its own ordinary admission and outcome. A completed collection selection is not proof that every target accepted publication. PD-RELEASES-01 still owns atomic Deployment control and newest-request coordination.
+
 <a id="take-an-imported-pipeline-live-explicitly"></a>
 
 ### Take an imported Pipeline live explicitly
@@ -155,12 +159,12 @@ Changing publication mode requires Manage releases. Enabling automatic updates a
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
 
 - [PD-RELEASES-01: Persist Deployment transitions with one shared control check](decision-deployment-state-and-concurrency.md). Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding.
-- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-KNOWLEDGE-01 (accepted): Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
 - [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
 
 <a id="status-and-sources"></a>

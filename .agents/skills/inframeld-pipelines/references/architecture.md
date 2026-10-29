@@ -107,6 +107,8 @@ Read [configuration, queries and builds](configuration-queries-and-builds.md), [
 
 ## Decisions still needed and sources
 
+Accepted [PD-INDEXING-01](../../inframeld-indexing/references/decision-capability-binding-contracts.md#approved-resolution) already supplies the exact prepared materialization/projection and pin-lifetime contract. The Pipeline capture, continuation and execution-result/receipt handoffs below remain with PD-PIPELINES-01.
+
 [ADR-0077](../../../../docs/adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md) accepts focused settings/capture, readiness-build and answer-execution capabilities, retaining one ordinary execution path. The [owning guide](#pipeline-operation-boundaries) retains complete binding/result, capture, receipt and transaction/external-work contracts still to specify. This selects no new framework or public API.
 
 [The Pipeline guide](configuration-queries-and-builds.md), [Pipeline records](records.md#pipelines), [jobs](../../inframeld-application-contracts/references/jobs-and-recovery.md) and [feedback](answer-feedback.md) own the contracts. [Releases architecture](../../inframeld-releases/references/architecture.md) explains separate traffic authority.

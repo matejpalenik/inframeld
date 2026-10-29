@@ -61,12 +61,12 @@ sequenceDiagram
         K->>DB: Reuse equal authoritative content or record B2
         Note over DB: Persist admission with its required metadata and audit
         opt Explicitly authorised corpus selection or complete-batch workflow
-            K->>DB: Preserve R1 and freeze selected R2 under current checks
+            K->>DB: Conditionally commit R2, complete marker and durable handoff
             opt Explicit preparation or authorised automatic workflow
-                K->>I: Supply exact corpus through ordinary admission
+                K->>I: Recover ordinary admission from durable handoff
             end
         end
-        Note over K,I: Transaction grouping needs an explicit contract, publication stays separate
+        Note over K,I: External waits are outside SQL, publication stays separate
     end
 ```
 
@@ -96,7 +96,7 @@ Read [documents and collections](documents-and-collections.md), [uploads and sou
 
 ## Decisions still needed and sources
 
-[ADR-0075](../../../../docs/adr/ADR-0075-separate-document-lifecycle-from-collection-selection.md) accepts focused document/version and collection-selection operations coordinated by an application workflow for complete batches. The [owning guide](#knowledge-operation-boundaries) retains transaction/consistency, durable handoff and committed batch-membership contracts still to specify. This accepted split adds no schema or API and does not make replacement select a new corpus implicitly.
+[ADR-0075](../../../../docs/adr/ADR-0075-separate-document-lifecycle-from-collection-selection.md) accepts focused document/version and collection-selection operations coordinated by an application workflow for complete batches. The [owning guide](#knowledge-operation-boundaries) links the accepted [PD-KNOWLEDGE-01](decision-complete-batch-handoff.md#approved-resolution) transaction, completeness and durable-handoff contract, with implementation and qualification unfinished. This accepted split adds no schema or API and does not make replacement select a new corpus implicitly.
 
 [Knowledge lifecycle](documents-and-collections.md), [ingestion security](uploads-and-source-sync.md), [Knowledge records](records.md#knowledge) and [retention](deletion-and-retention.md) remain authoritative. The proposed component split must preserve their accepted behaviour.
 
@@ -106,7 +106,7 @@ Read [documents and collections](documents-and-collections.md), [uploads and sou
 
 ## Internal architecture decisions
 
-The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The precise contracts listed with each decision remain design work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
+The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. Accepted detailed contracts are linked below. Separately pending decisions retain their own triggers. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
 
 <a id="knowledge-operation-boundaries"></a> <a id="proposal-knowledge-boundaries"></a>
 
@@ -118,15 +118,15 @@ The component boundaries below are accepted. They explain how to divide responsi
 
 Document/version lifecycle and exact collection selection have separate application operations. When Alice replaces B1 with B2, the document operation admits the new immutable version. An authorized selection or complete-batch workflow freezes a new collection revision, while earlier R1 membership stays fixed.
 
-A coordinating application workflow handles complete batches spanning both responsibilities. This needs an explicit consistency/handoff contract and preserves the existing atomic admission, audience, durable-content and retry requirements. A manifest remains an inventory, not a mandatory aggregate. Separate operations do not require separate transactions.
+A coordinating application workflow handles complete batches spanning both responsibilities. The accepted [PD-KNOWLEDGE-01](decision-complete-batch-handoff.md#approved-resolution) supplies its consistency/handoff contract and preserves the existing atomic admission, audience, durable-content and retry requirements. A manifest remains an inventory, not a mandatory aggregate. Separate operations do not require separate transactions.
 
-**Remaining design and qualification.** Specify the transaction/consistency boundaries, durable artifact handoff, committed batch-membership outcome and retry/recovery behavior before implementing the corresponding ports. Separate operations do not imply separate commits or permission to expose a partial batch as complete. Indexing preparation and Releases publication keep their own authority and lifetimes.
+**Accepted contract, implementation and qualification pending.** Preserve original child admissions. Conditionally finalize the complete fixed membership and durable continuation under the expected selection revision. Recover the same committed result, or report a concurrent-selection conflict without retargeting. Separate operations do not imply separate commits or permission to expose a partial batch as complete. Indexing preparation and Releases publication keep their own authority and lifetimes.
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
 
-- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-KNOWLEDGE-01 (accepted): Finalize a complete collection selection without losing admitted input](decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
 - [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](decision-retention-erasure-policy.md). Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.

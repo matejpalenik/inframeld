@@ -19,6 +19,10 @@ Knowledge exposes focused application operations for document/version lifecycle 
 
 Choose aggregates around real consistency rules and bounded state, rather than making every DocumentVersion or manifest an aggregate. This decision does not select aggregate/repository signatures, create a table per concept or require loading an entire version history.
 
+## Later contract resolution
+
+Accepted [PD-KNOWLEDGE-01](../../.agents/skills/inframeld-knowledge/references/decision-complete-batch-handoff.md#approved-resolution) on 2026-10-29 fills the corresponding consistency/binding contract below. Earlier design-work statements retain their historical context. Implementation and qualification remain unfinished.
+
 ## Consequences
 
 Specify the transaction/consistency boundaries, durable artifact handoff, committed batch-membership outcome and retry/recovery behavior before implementing the corresponding ports. Separate operations do not imply separate commits or permission to expose a partial batch as complete. Indexing preparation and Releases publication keep their own authority and lifetimes.

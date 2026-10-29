@@ -42,6 +42,10 @@ Keep configuration identity, effective input fingerprints and actual physical bi
 
 Secrets never belong in these records. History is bounded by retention and current access. Restoring configuration creates a new current revision and does not resurrect erased content, expired artifacts or credentials. Snapshot retention does not pin every historical index forever. Active operations use ordinary bounded pins. Explicit evaluation evidence and diagnostic traces keep their separate capture, inspection and erasure rules. Pipeline Query/inspection identifiers and creator grants are settled in the [Access contract](../../inframeld-access-models/references/actions-and-initial-grants.md). Exact physical storage, API schemas, resource bounds and runtime enforcement remain delivery work under their owning guides.
 
+### Consume prepared materializations
+
+Accepted [PD-INDEXING-01](../../inframeld-indexing/references/decision-capability-binding-contracts.md#approved-resolution) gives each captured execution a complete set of exact scoped materialization references and bounded verified projections. Large inventories remain immutable paged manifests. Active execution pins use the shared retention gate and do not freeze authority. Missing/retired required data fails instead of selecting latest data or silently reconstructing historical bindings. PD-PIPELINES-01 still owns capture, preparation continuation and receipt finalization.
+
 <a id="record-the-actual-serving-selection-before-accepting-feedback"></a>
 
 ### Record the actual serving selection before accepting feedback

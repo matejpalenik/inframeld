@@ -112,6 +112,12 @@ Docling supplies the built-in PDF, Markdown, and text adapter. Translate its obj
 
 This keeps the processing result understandable to the application independently of the library that produced it.
 
+### Canonical conversion identity and coordinates
+
+Accepted [PD-INDEXING-03](decision-source-coordinates.md#approved-resolution) separates canonical conversion identity from downstream chunking. Bind the exact DocumentVersion, scoped format/version, converter implementation/assets/settings and canonical content/structure digest. Exclude chunk-only settings and execution timestamps. Separate ProcessingGenerations can share the same genuinely identical canonical artifact without sharing chunk identities.
+
+Preserve structured block/table provenance and a deterministic reading-order text stream, with LF block/row separators and TAB cell separators. Normalize line endings before coordinates, otherwise preserve Unicode code points, case and whitespace. The full contract covers embedded delimiters and cell identity. Source spans bind exact version/artifact and zero-based Unicode code-point [start,end) ranges. Returned text carries explicit ordered segment mappings. Discontiguous spans stay separate, repeated mapped headers count once and synthetic text has no invented source coordinates. Different conversion output requires proven correspondence or an explicit unscorable comparison.
+
 <a id="record-processing-choices-in-an-immutable-profile"></a>
 
 ### Record processing choices in an immutable profile
@@ -147,12 +153,13 @@ Start the user experience with a tested preset. The profile editor can expose mo
 
 ```mermaid
 ---
-title: "Accepted logical Indexing relationships, exact contracts pending"
+title: "Accepted source, conversion and numerical relationships"
 ---
 flowchart LR
-    DV[DocumentVersion] --> PG[ProcessingGeneration]
+    DV[DocumentVersion] --> Artifact[Canonical conversion artifact]
+    Artifact --> PG[ProcessingGeneration]
     PP[Immutable ProcessingProfile] --> PG
-    PG --> Chunks[Generation-scoped chunks and manifest]
+    PG --> Chunks[Generation-scoped chunks and mapped source spans]
     PG --> VG[VectorGeneration]
     EP[Immutable EmbeddingProfile] --> VG
     VG --> IM[IndexMaterialization]
@@ -174,11 +181,15 @@ A health generation changes on loss, corruption, and recovery, but not unrelated
 
 The [Indexing guide](profiles-and-preparation.md) explains verification, saved-write retries, search filters, pins, and cleanup. PostgreSQL's current state determines the allowed search filter. Clients do not supply that authority, and vectors do not store changing collection membership, permission groups, or serving flags.
 
+### Prepared-binding projection
+
+The existing IndexMaterialization is the compact scoped binding reference under accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution). Its trusted projection references exact collection membership, processing/embedding profiles, index/layout, processing/vector generations, expected/verified manifest hashes/counts and per-shard verification completion. Observed lifecycle/health facts remain distinct from immutable verification evidence. Large inventories are immutable paged manifests. Consumer binding sets must include every required materialization. These logical records prescribe no new public DTO, physical table or duplicate binding aggregate.
+
 <a id="indexing-application-boundaries"></a>
 
 ### Indexing application boundaries
 
-[ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) separates preparation/readiness, retrieval and numerical retirement capabilities. They exchange exact typed bindings while preserving the singleton vector writer and shared retention gates. Concrete input/result and current-health/cleanup contracts remain design work.
+[ADR-0076](../../../../docs/adr/ADR-0076-separate-index-preparation-retrieval-and-retirement.md) separates preparation/readiness, retrieval and numerical retirement capabilities. They exchange exact typed bindings while preserving the singleton vector writer and shared retention gates. Accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) selects the existing scoped materialization identity, complete bounded projections, immutable paged inventories, unavailable outcomes and operation-owned pins. Current-health detection and physical cleanup qualification retain their separately pending contracts.
 
 <a id="authoritative-application-state"></a>
 

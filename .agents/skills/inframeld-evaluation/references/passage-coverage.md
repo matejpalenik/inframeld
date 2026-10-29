@@ -20,7 +20,7 @@ Report missing mappings as unscorable counts separately alongside the scored den
 
 ## Preserve and measure passage identity
 
-Suppose an expected passage occupies positions 100 through 180 in one parsed artifact. A returned chunk covering 80 through 200 satisfies it. Two adjacent chunks covering 100 through 140 and 140 through 180 also satisfy it. A chunk covering only 100 through 150 does not. These positions illustrate a common coordinate system, not a selected physical offset encoding. Indexing must define its units and interpretation.
+Suppose an expected passage occupies positions 100 through 180 in one parsed artifact. A returned chunk covering 80 through 200 satisfies it. Two adjacent chunks covering 100 through 140 and 140 through 180 also satisfy it. A chunk covering only 100 through 150 does not. Under accepted [PD-INDEXING-03](../../inframeld-indexing/references/decision-source-coordinates.md#approved-resolution), positions are zero-based Unicode code-point half-open ranges in the exact canonical artifact. Thus these examples mean [100,180), [80,200), [100,140), [140,180) and [100,150).
 
 Retain each expectation's DocumentVersion, immutable parsed-artifact identity, source spans, and protected excerpt or artifact reference sufficient to reconstruct it. Preserve the link from the sampled Inframeld passage to the Ragas scenario and returned case. Returned context text alone is not that link. Do not reconstruct identity by searching strings after generation: repeated sentences and parser changes make this ambiguous.
 
@@ -49,6 +49,10 @@ For each stage, report found cases divided by successfully scored eligible cases
 
 For example, at the **final-context stage**, 20 admitted cases can yield 16 found, three not found and one unscorable because its source mapping is unavailable. Report **16/19 scored cases**, plus the one unscorable case and its permitted reason. Do not report 16/20 as if the mapping problem were a retrieval miss, or silently present this as a complete 19-case benchmark. These counts assume the reader may inspect all 20 cases. If access has changed, protect the population as well as its details. This passage denominator does not determine the faithfulness or citation denominator.
 
+## Compare changed chunking honestly
+
+Different chunking generations may share the same canonical conversion artifact when only chunk settings change. Keep exact DocumentVersion/artifact identity and use the union of actual mapped spans. Discontiguous excerpts cannot claim their missing middle, overlapping/repeated header spans count once and synthetic summaries have no source coordinates. Comparable partial coverage is Not found. Changed parser/OCR output without a qualified mapping is Unscorable, with its population and reason explicit under current disclosure rules. Never reconstruct identity with fuzzy string matching.
+
 ## Follow one measurement
 
 1. Resolve the expected passage in the frozen source version and its verified coordinates.
@@ -56,4 +60,4 @@ For example, at the **final-context stage**, 20 admitted cases can yield 16 foun
 3. Map returned passages to the same source and establish whether their union covers the whole expected span.
 4. Record found, not found or unscorable with the reason. Missing mapping is not evidence of a miss.
 
-This is accepted metric behavior. The canonical coordinate contract remains pending in [PD-INDEXING-03](../../inframeld-indexing/references/decision-source-coordinates.md). [Metrics and evidence](metrics-and-evidence.md) owns protected result populations and denominators. A teaching example does not establish a passage-coordinate schema.
+This is accepted metric behavior. The canonical coordinate contract is accepted in [PD-INDEXING-03](../../inframeld-indexing/references/decision-source-coordinates.md). [Metrics and evidence](metrics-and-evidence.md) owns protected result populations and denominators. The accepted logical coordinate contract does not claim delivered public schemas or qualified mappings.

@@ -153,3 +153,9 @@ For contributor routes, start with [developer documentation](../development/READ
 - [ADR-0104: Enforce one qualified outbound model path](ADR-0104-enforce-one-qualified-outbound-model-path.md). Accepted PD-CONTRACTS-01 on 2026-10-29. Implementation and qualification pending.
 
 - [ADR-0105: Coordinate exact spending reservations and uncertain settlement](ADR-0105-coordinate-exact-spending-reservations-and-uncertain-settlement.md). Accepted PD-CONTRACTS-02 on 2026-10-29. Implementation and qualification pending.
+
+- [ADR-0106: Finalize complete batches with durable conditional handoff](ADR-0106-finalize-complete-batches-with-durable-conditional-handoff.md). Accepted PD-KNOWLEDGE-01 on 2026-10-29. Implementation and qualification pending.
+
+- [ADR-0107: Reference exact verified index materializations](ADR-0107-reference-exact-verified-index-materializations.md). Accepted PD-INDEXING-01 on 2026-10-29. Implementation and qualification pending.
+
+- [ADR-0108: Identify passages through canonical source coordinates](ADR-0108-identify-passages-through-canonical-source-coordinates.md). Accepted PD-INDEXING-03 on 2026-10-29. Implementation and qualification pending.

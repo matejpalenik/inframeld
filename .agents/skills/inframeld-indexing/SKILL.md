@@ -41,11 +41,16 @@ For backend component design, code generation or structural review, read [module
 
 Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
-- [PD-INDEXING-01](references/decision-capability-binding-contracts.md): Before defining preparation, retrieval or retirement application ports and their complete input/result records.
 - [PD-INDEXING-02](references/decision-health-observation.md): Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
-- [PD-INDEXING-03](references/decision-source-coordinates.md): Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
 - [PD-INDEXING-04](references/decision-storage-retries-and-erasure.md): When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
 - [PD-INDEXING-05](references/decision-parser-runtime-profile.md): Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
+
+## Accepted decision references
+
+Apply these approved contracts without reopening them. Implementation and qualification remain separate.
+
+- [PD-INDEXING-01](references/decision-capability-binding-contracts.md): Before defining preparation, retrieval or retirement application ports and their complete input/result records.
+- [PD-INDEXING-03](references/decision-source-coordinates.md): Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
 
 ## Read as needed
 
