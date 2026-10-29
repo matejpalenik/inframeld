@@ -78,3 +78,21 @@ const forbiddenPathEncoding: SessionOptions<GetCurrentSessionData> = {
   encodedPathParams: [],
 };
 void forbiddenPathEncoding;
+
+import type {
+  OriginalOperationLookupRequest,
+  AcceptedOperationLookupResponse,
+} from "@inframeld/sdk";
+// @ts-expect-error An original authority guard is required even when other context is retained.
+const missingLookupGuard: Pick<
+  OriginalOperationLookupRequest,
+  "expectedAuthority"
+> = {};
+const unknownLookupJob: Pick<AcceptedOperationLookupResponse, "jobReference"> =
+  { jobReference: "unknown" };
+const guessedLookupJob: Pick<AcceptedOperationLookupResponse, "jobReference"> =
+  {
+    // @ts-expect-error The original job reference remains unknown.
+    jobReference: "known",
+  };
+void [missingLookupGuard, unknownLookupJob, guessedLookupJob];

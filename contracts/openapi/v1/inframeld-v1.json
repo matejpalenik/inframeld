@@ -7,13 +7,11 @@
         "properties": {
           "admission": {
             "const": "confirmed",
-            "default": "confirmed",
             "title": "Admission",
             "type": "string"
           },
           "dispatch": {
             "const": "not_established",
-            "default": "not_established",
             "title": "Dispatch",
             "type": "string"
           },
@@ -29,13 +27,8 @@
             ],
             "title": "Idempotencyexpiresat"
           },
-          "jobId": {
-            "title": "Jobid",
-            "type": "null"
-          },
           "jobReference": {
             "const": "unknown",
-            "default": "unknown",
             "title": "Jobreference",
             "type": "string"
           },
@@ -45,14 +38,16 @@
           },
           "outcome": {
             "const": "accepted_asynchronous",
-            "default": "accepted_asynchronous",
             "title": "Outcome",
             "type": "string"
           }
         },
         "required": [
+          "outcome",
           "operationId",
-          "jobId",
+          "admission",
+          "jobReference",
+          "dispatch",
           "idempotencyExpiresAt"
         ],
         "title": "AcceptedOperationLookupResponse",
@@ -82,12 +77,12 @@
           },
           "outcome": {
             "const": "completed_synchronous",
-            "default": "completed_synchronous",
             "title": "Outcome",
             "type": "string"
           }
         },
         "required": [
+          "outcome",
           "operationId",
           "classification",
           "idempotencyExpiresAt"
@@ -217,12 +212,12 @@
           },
           "outcome": {
             "const": "in_progress",
-            "default": "in_progress",
             "title": "Outcome",
             "type": "string"
           }
         },
         "required": [
+          "outcome",
           "operationId"
         ],
         "title": "InProgressOperationLookupResponse",
@@ -614,19 +609,19 @@
           },
           "outcome": {
             "const": "recovery_required",
-            "default": "recovery_required",
             "title": "Outcome",
             "type": "string"
           },
           "reason": {
             "const": "original_outcome_requires_recovery",
-            "default": "original_outcome_requires_recovery",
             "title": "Reason",
             "type": "string"
           }
         },
         "required": [
-          "operationId"
+          "outcome",
+          "operationId",
+          "reason"
         ],
         "title": "RecoveryRequiredOperationLookupResponse",
         "type": "object"
@@ -636,11 +631,13 @@
         "properties": {
           "outcome": {
             "const": "unresolved",
-            "default": "unresolved",
             "title": "Outcome",
             "type": "string"
           }
         },
+        "required": [
+          "outcome"
+        ],
         "title": "UnresolvedOperationLookupResponse",
         "type": "object"
       },

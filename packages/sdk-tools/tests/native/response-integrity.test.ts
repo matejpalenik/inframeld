@@ -1,6 +1,66 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createClient, getCurrentSession } from "@inframeld/sdk";
+import {
+  zOriginalOperationLookupRequest,
+  zOperationLookupResponse,
+} from "../../../sdk-typescript/generated/zod.gen.js";
+
+test("original lookup requires an authority guard and retains explicit unknown job fields", () => {
+  const input = {
+    installationId: "00000000-0000-4000-8000-000000000001",
+    organizationId: "00000000-0000-4000-8000-000000000002",
+    projectId: null,
+    method: "POST",
+    requestedRoute: "/v1/original-organization-operation",
+    key: "original +/&é",
+    expectedAuthority: {
+      family: "organization_action_use",
+      actionId: "create-projects",
+    },
+  };
+  assert.deepEqual(zOriginalOperationLookupRequest.parse(input), input);
+  const { expectedAuthority: _guard, ...missing } = input;
+  assert.equal(
+    zOriginalOperationLookupRequest.safeParse(missing).success,
+    false,
+  );
+  assert.equal(
+    zOriginalOperationLookupRequest.safeParse({
+      ...input,
+      expectedAuthority: null,
+    }).success,
+    false,
+  );
+  const accepted: Record<string, unknown> = {
+    outcome: "accepted_asynchronous",
+    operationId: "original",
+    admission: "confirmed",
+    jobReference: "unknown",
+    dispatch: "not_established",
+    idempotencyExpiresAt: null,
+  };
+  assert.deepEqual(zOperationLookupResponse.parse(accepted), accepted);
+  for (const field of [
+    "outcome",
+    "jobReference",
+    "dispatch",
+    "idempotencyExpiresAt",
+  ]) {
+    const absent = { ...accepted };
+    delete absent[field];
+    assert.equal(
+      zOperationLookupResponse.safeParse(absent).success,
+      false,
+      `accepted missing ${field}`,
+    );
+  }
+  assert.equal(
+    zOperationLookupResponse.safeParse({ ...accepted, jobReference: "known" })
+      .success,
+    false,
+  );
+});
 
 for (const [name, status, body, headers] of [
   [

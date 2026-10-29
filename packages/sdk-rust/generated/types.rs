@@ -316,6 +316,937 @@ impl AsRef<str> for ValidationIssueLocation {
         self.as_str()
     }
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OriginalOperationLookupRequest {
+    #[serde(rename = "expectedAuthority")]
+    pub expected_authority: OperationLookupAuthorityRequest,
+    #[serde(rename = "installationId")]
+    pub installation_id: uuid::Uuid,
+    ///Constraint: minLength=1, maxLength=128
+    pub key: String,
+    pub method: OriginalOperationLookupRequestMethod,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(
+        rename = "projectId",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub project_id: Option<uuid::Uuid>,
+    ///Constraint: minLength=1
+    #[serde(rename = "requestedRoute")]
+    pub requested_route: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum OriginalOperationLookupRequestMethod {
+    #[default]
+    #[serde(rename = "POST")]
+    Post,
+    #[serde(rename = "PUT")]
+    Put,
+    #[serde(rename = "PATCH")]
+    Patch,
+    #[serde(rename = "DELETE")]
+    Delete,
+}
+impl OriginalOperationLookupRequestMethod {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Post => "POST",
+            Self::Put => "PUT",
+            Self::Patch => "PATCH",
+            Self::Delete => "DELETE",
+        }
+    }
+}
+impl ::std::fmt::Display for OriginalOperationLookupRequestMethod {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for OriginalOperationLookupRequestMethod {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone)]
+pub enum OperationLookupResponse {
+    CompletedOperationLookupResponse(CompletedOperationLookupResponse),
+    AcceptedOperationLookupResponse(AcceptedOperationLookupResponse),
+    InProgressOperationLookupResponse(InProgressOperationLookupResponse),
+    RecoveryRequiredOperationLookupResponse(RecoveryRequiredOperationLookupResponse),
+    UnresolvedOperationLookupResponse(UnresolvedOperationLookupResponse),
+}
+impl serde::Serialize for OperationLookupResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::CompletedOperationLookupResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(CompletedOperationLookupResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("outcome") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "completed_synchronous") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "outcome", stringify!(CompletedOperationLookupResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "outcome",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "outcome".to_string(),
+                                serde_json::Value::String(
+                                    "completed_synchronous".to_string(),
+                                ),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::AcceptedOperationLookupResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(AcceptedOperationLookupResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("outcome") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "accepted_asynchronous") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "outcome", stringify!(AcceptedOperationLookupResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "outcome",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "outcome".to_string(),
+                                serde_json::Value::String(
+                                    "accepted_asynchronous".to_string(),
+                                ),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InProgressOperationLookupResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InProgressOperationLookupResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("outcome") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "in_progress") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "outcome", stringify!(InProgressOperationLookupResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "outcome",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "outcome".to_string(),
+                                serde_json::Value::String("in_progress".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::RecoveryRequiredOperationLookupResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(RecoveryRequiredOperationLookupResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("outcome") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "recovery_required") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "outcome",
+                                    stringify!(RecoveryRequiredOperationLookupResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "outcome",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "outcome".to_string(),
+                                serde_json::Value::String("recovery_required".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::UnresolvedOperationLookupResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(UnresolvedOperationLookupResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("outcome") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "unresolved") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "outcome", stringify!(UnresolvedOperationLookupResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "outcome",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "outcome".to_string(),
+                                serde_json::Value::String("unresolved".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+        }
+    }
+}
+impl<'de> serde::Deserialize<'de> for OperationLookupResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = match value.get("outcome") {
+            Some(serde_json::Value::String(discriminator)) => {
+                Some(discriminator.as_str())
+            }
+            Some(_) => {
+                return Err(
+                    serde::de::Error::custom(
+                        concat!("non-string discriminator `", "outcome", "`",),
+                    ),
+                );
+            }
+            None => None,
+        };
+        match discriminator {
+            Some(discriminator) => {
+                match discriminator {
+                    "completed_synchronous" => {
+                        let primary_error = match serde_json::from_value::<
+                            CompletedOperationLookupResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::CompletedOperationLookupResponse(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            AcceptedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "completed_synchronous", first_name,
+                                            stringify!(AcceptedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::AcceptedOperationLookupResponse(payload),
+                                stringify!(AcceptedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InProgressOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "completed_synchronous", first_name,
+                                            stringify!(InProgressOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InProgressOperationLookupResponse(payload),
+                                stringify!(InProgressOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            RecoveryRequiredOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "completed_synchronous", first_name,
+                                            stringify!(RecoveryRequiredOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RecoveryRequiredOperationLookupResponse(payload),
+                                stringify!(RecoveryRequiredOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            UnresolvedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "completed_synchronous", first_name,
+                                            stringify!(UnresolvedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::UnresolvedOperationLookupResponse(payload),
+                                stringify!(UnresolvedOperationLookupResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "accepted_asynchronous" => {
+                        let primary_error = match serde_json::from_value::<
+                            AcceptedOperationLookupResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::AcceptedOperationLookupResponse(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            CompletedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "accepted_asynchronous", first_name,
+                                            stringify!(CompletedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::CompletedOperationLookupResponse(payload),
+                                stringify!(CompletedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InProgressOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "accepted_asynchronous", first_name,
+                                            stringify!(InProgressOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InProgressOperationLookupResponse(payload),
+                                stringify!(InProgressOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            RecoveryRequiredOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "accepted_asynchronous", first_name,
+                                            stringify!(RecoveryRequiredOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RecoveryRequiredOperationLookupResponse(payload),
+                                stringify!(RecoveryRequiredOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            UnresolvedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "accepted_asynchronous", first_name,
+                                            stringify!(UnresolvedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::UnresolvedOperationLookupResponse(payload),
+                                stringify!(UnresolvedOperationLookupResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "in_progress" => {
+                        let primary_error = match serde_json::from_value::<
+                            InProgressOperationLookupResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InProgressOperationLookupResponse(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            CompletedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "in_progress", first_name,
+                                            stringify!(CompletedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::CompletedOperationLookupResponse(payload),
+                                stringify!(CompletedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            AcceptedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "in_progress", first_name,
+                                            stringify!(AcceptedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::AcceptedOperationLookupResponse(payload),
+                                stringify!(AcceptedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            RecoveryRequiredOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "in_progress", first_name,
+                                            stringify!(RecoveryRequiredOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RecoveryRequiredOperationLookupResponse(payload),
+                                stringify!(RecoveryRequiredOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            UnresolvedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "in_progress", first_name,
+                                            stringify!(UnresolvedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::UnresolvedOperationLookupResponse(payload),
+                                stringify!(UnresolvedOperationLookupResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "recovery_required" => {
+                        let primary_error = match serde_json::from_value::<
+                            RecoveryRequiredOperationLookupResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(
+                                    Self::RecoveryRequiredOperationLookupResponse(payload),
+                                );
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            CompletedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "recovery_required", first_name,
+                                            stringify!(CompletedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::CompletedOperationLookupResponse(payload),
+                                stringify!(CompletedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            AcceptedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "recovery_required", first_name,
+                                            stringify!(AcceptedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::AcceptedOperationLookupResponse(payload),
+                                stringify!(AcceptedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InProgressOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "recovery_required", first_name,
+                                            stringify!(InProgressOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InProgressOperationLookupResponse(payload),
+                                stringify!(InProgressOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            UnresolvedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "recovery_required", first_name,
+                                            stringify!(UnresolvedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::UnresolvedOperationLookupResponse(payload),
+                                stringify!(UnresolvedOperationLookupResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "unresolved" => {
+                        let primary_error = match serde_json::from_value::<
+                            UnresolvedOperationLookupResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::UnresolvedOperationLookupResponse(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            CompletedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "unresolved", first_name,
+                                            stringify!(CompletedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::CompletedOperationLookupResponse(payload),
+                                stringify!(CompletedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            AcceptedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "unresolved", first_name,
+                                            stringify!(AcceptedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::AcceptedOperationLookupResponse(payload),
+                                stringify!(AcceptedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InProgressOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "unresolved", first_name,
+                                            stringify!(InProgressOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InProgressOperationLookupResponse(payload),
+                                stringify!(InProgressOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            RecoveryRequiredOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "unresolved", first_name,
+                                            stringify!(RecoveryRequiredOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RecoveryRequiredOperationLookupResponse(payload),
+                                stringify!(RecoveryRequiredOperationLookupResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    other => {
+                        Err(
+                            serde::de::Error::custom(
+                                format!(
+                                    "unknown discriminator value `{other}` for `{}`", "outcome",
+                                ),
+                            ),
+                        )
+                    }
+                }
+            }
+            None => {
+                Err(
+                    serde::de::Error::custom(
+                        concat!("missing string discriminator `", "outcome", "`",),
+                    ),
+                )
+            }
+        }
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UnresolvedOperationLookupResponse {
+    pub outcome: UnresolvedOperationLookupResponseOutcome,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum UnresolvedOperationLookupResponseOutcome {
+    #[default]
+    #[serde(rename = "unresolved")]
+    Unresolved,
+}
+impl UnresolvedOperationLookupResponseOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unresolved => "unresolved",
+        }
+    }
+}
+impl ::std::fmt::Display for UnresolvedOperationLookupResponseOutcome {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for UnresolvedOperationLookupResponseOutcome {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RecoveryRequiredOperationLookupResponse {
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub outcome: RecoveryRequiredOperationLookupResponseOutcome,
+    pub reason: RecoveryRequiredOperationLookupResponseReason,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum RecoveryRequiredOperationLookupResponseReason {
+    #[default]
+    #[serde(rename = "original_outcome_requires_recovery")]
+    OriginalOutcomeRequiresRecovery,
+}
+impl RecoveryRequiredOperationLookupResponseReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::OriginalOutcomeRequiresRecovery => "original_outcome_requires_recovery",
+        }
+    }
+}
+impl ::std::fmt::Display for RecoveryRequiredOperationLookupResponseReason {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for RecoveryRequiredOperationLookupResponseReason {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum RecoveryRequiredOperationLookupResponseOutcome {
+    #[default]
+    #[serde(rename = "recovery_required")]
+    RecoveryRequired,
+}
+impl RecoveryRequiredOperationLookupResponseOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::RecoveryRequired => "recovery_required",
+        }
+    }
+}
+impl ::std::fmt::Display for RecoveryRequiredOperationLookupResponseOutcome {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for RecoveryRequiredOperationLookupResponseOutcome {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OperationLookupAuthorityRequest {
+    ///Constraint: minLength=1, maxLength=100
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    pub family: OperationLookupAuthorityFamily,
+}
+///Select a fixed current-authority check without granting permission.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum OperationLookupAuthorityFamily {
+    #[default]
+    #[serde(rename = "project_action_use")]
+    ProjectActionUse,
+    #[serde(rename = "project_grant_read")]
+    ProjectGrantRead,
+    #[serde(rename = "organization_action_use")]
+    OrganizationActionUse,
+}
+impl OperationLookupAuthorityFamily {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ProjectActionUse => "project_action_use",
+            Self::ProjectGrantRead => "project_grant_read",
+            Self::OrganizationActionUse => "organization_action_use",
+        }
+    }
+}
+impl ::std::fmt::Display for OperationLookupAuthorityFamily {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for OperationLookupAuthorityFamily {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
 ///Bind the fixed CLI profile to the persistent public installation identity.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InframeldDiscoveryResponse {
@@ -342,6 +1273,35 @@ impl ::std::fmt::Display for InframeldDiscoveryResponseClientId {
     }
 }
 impl AsRef<str> for InframeldDiscoveryResponseClientId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InProgressOperationLookupResponse {
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub outcome: InProgressOperationLookupResponseOutcome,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InProgressOperationLookupResponseOutcome {
+    #[default]
+    #[serde(rename = "in_progress")]
+    InProgress,
+}
+impl InProgressOperationLookupResponseOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::InProgress => "in_progress",
+        }
+    }
+}
+impl ::std::fmt::Display for InProgressOperationLookupResponseOutcome {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InProgressOperationLookupResponseOutcome {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
@@ -469,6 +1429,176 @@ impl ::std::fmt::Display for HumanOAuthScope {
     }
 }
 impl AsRef<str> for HumanOAuthScope {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+///Expose safe synchronous outcome metadata without replaying content.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CompletedOperationLookupResponse {
+    pub classification: CompletedOperationLookupResponseClassification,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub outcome: CompletedOperationLookupResponseOutcome,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum CompletedOperationLookupResponseOutcome {
+    #[default]
+    #[serde(rename = "completed_synchronous")]
+    CompletedSynchronous,
+}
+impl CompletedOperationLookupResponseOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CompletedSynchronous => "completed_synchronous",
+        }
+    }
+}
+impl ::std::fmt::Display for CompletedOperationLookupResponseOutcome {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for CompletedOperationLookupResponseOutcome {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum CompletedOperationLookupResponseClassification {
+    #[default]
+    #[serde(rename = "safe_result")]
+    SafeResult,
+    #[serde(rename = "issued_secret")]
+    IssuedSecret,
+    #[serde(rename = "answer_receipt")]
+    AnswerReceipt,
+}
+impl CompletedOperationLookupResponseClassification {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::SafeResult => "safe_result",
+            Self::IssuedSecret => "issued_secret",
+            Self::AnswerReceipt => "answer_receipt",
+        }
+    }
+}
+impl ::std::fmt::Display for CompletedOperationLookupResponseClassification {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for CompletedOperationLookupResponseClassification {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+///Confirm retained admission while making unknown dispatch and references explicit.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AcceptedOperationLookupResponse {
+    pub admission: AcceptedOperationLookupResponseAdmission,
+    pub dispatch: AcceptedOperationLookupResponseDispatch,
+    #[serde(
+        rename = "idempotencyExpiresAt",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub idempotency_expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(rename = "jobReference")]
+    pub job_reference: AcceptedOperationLookupResponseJobReference,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub outcome: AcceptedOperationLookupResponseOutcome,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum AcceptedOperationLookupResponseOutcome {
+    #[default]
+    #[serde(rename = "accepted_asynchronous")]
+    AcceptedAsynchronous,
+}
+impl AcceptedOperationLookupResponseOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::AcceptedAsynchronous => "accepted_asynchronous",
+        }
+    }
+}
+impl ::std::fmt::Display for AcceptedOperationLookupResponseOutcome {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for AcceptedOperationLookupResponseOutcome {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum AcceptedOperationLookupResponseJobReference {
+    #[default]
+    #[serde(rename = "unknown")]
+    Unknown,
+}
+impl AcceptedOperationLookupResponseJobReference {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+        }
+    }
+}
+impl ::std::fmt::Display for AcceptedOperationLookupResponseJobReference {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for AcceptedOperationLookupResponseJobReference {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum AcceptedOperationLookupResponseDispatch {
+    #[default]
+    #[serde(rename = "not_established")]
+    NotEstablished,
+}
+impl AcceptedOperationLookupResponseDispatch {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::NotEstablished => "not_established",
+        }
+    }
+}
+impl ::std::fmt::Display for AcceptedOperationLookupResponseDispatch {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for AcceptedOperationLookupResponseDispatch {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum AcceptedOperationLookupResponseAdmission {
+    #[default]
+    #[serde(rename = "confirmed")]
+    Confirmed,
+}
+impl AcceptedOperationLookupResponseAdmission {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Confirmed => "confirmed",
+        }
+    }
+}
+impl ::std::fmt::Display for AcceptedOperationLookupResponseAdmission {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for AcceptedOperationLookupResponseAdmission {
     fn as_ref(&self) -> &str {
         self.as_str()
     }

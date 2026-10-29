@@ -73,21 +73,29 @@ class OriginalOperationLookupMapper:
         match result:
             case CompletedSynchronousOperationDTO():
                 return CompletedOperationLookupResponse(
+                    outcome="completed_synchronous",
                     operationId=result.operation_id.value,
                     classification=result.replay_kind.value,
                     idempotencyExpiresAt=result.expires_at,
                 )
             case AcceptedAsyncOperationDTO():
                 return AcceptedOperationLookupResponse(
+                    outcome="accepted_asynchronous",
+                    admission="confirmed",
+                    jobReference="unknown",
+                    dispatch="not_established",
                     operationId=result.operation_id.value,
-                    jobId=None,
                     idempotencyExpiresAt=result.expires_at,
                 )
             case InProgressOperationDTO():
-                return InProgressOperationLookupResponse(operationId=result.operation_id.value)
+                return InProgressOperationLookupResponse(
+                    outcome="in_progress", operationId=result.operation_id.value
+                )
             case RecoveryRequiredOperationDTO():
                 return RecoveryRequiredOperationLookupResponse(
-                    operationId=result.operation_id.value
+                    outcome="recovery_required",
+                    reason="original_outcome_requires_recovery",
+                    operationId=result.operation_id.value,
                 )
             case UnresolvedOperationDTO():
-                return UnresolvedOperationLookupResponse()
+                return UnresolvedOperationLookupResponse(outcome="unresolved")

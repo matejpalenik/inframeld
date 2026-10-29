@@ -21,6 +21,7 @@ __all__ = [
     "AccessApi",
     "DiscoveryApi",
     "HealthApi",
+    "OperationsApi",
     "ApiResponse",
     "ApiClient",
     "Configuration",
@@ -30,18 +31,27 @@ __all__ = [
     "ApiKeyError",
     "ApiAttributeError",
     "ApiException",
+    "AcceptedOperationLookupResponse",
+    "CompletedOperationLookupResponse",
     "CurrentSessionResponse",
     "HumanOAuthConsentDecisionResponse",
     "HumanOAuthConsentDetailsResponse",
     "HumanOAuthConsentRequest",
     "HumanOAuthScope",
+    "InProgressOperationLookupResponse",
     "InframeldDiscoveryResponse",
     "OAuthConsentDecision",
+    "OperationLookupAuthorityFamily",
+    "OperationLookupAuthorityRequest",
+    "OperationLookupResponse",
+    "OriginalOperationLookupRequest",
     "PathInner",
     "ProblemDetails",
     "ProjectUseOnlyGrantRequest",
     "ProjectUseOnlyGrantResponse",
     "ProtectedResourceMetadataResponse",
+    "RecoveryRequiredOperationLookupResponse",
+    "UnresolvedOperationLookupResponse",
     "ValidationIssue",
 ]
 
@@ -49,6 +59,7 @@ __all__ = [
 from inframeld_sdk.api.access_api import AccessApi as AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi as DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi as HealthApi
+from inframeld_sdk.api.operations_api import OperationsApi as OperationsApi
 
 # import ApiClient
 from inframeld_sdk.api_response import ApiResponse as ApiResponse
@@ -62,17 +73,26 @@ from inframeld_sdk.exceptions import ApiAttributeError as ApiAttributeError
 from inframeld_sdk.exceptions import ApiException as ApiException
 
 # import models into sdk package
+from inframeld_sdk.models.accepted_operation_lookup_response import AcceptedOperationLookupResponse as AcceptedOperationLookupResponse
+from inframeld_sdk.models.completed_operation_lookup_response import CompletedOperationLookupResponse as CompletedOperationLookupResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse as CurrentSessionResponse
 from inframeld_sdk.models.human_o_auth_consent_decision_response import HumanOAuthConsentDecisionResponse as HumanOAuthConsentDecisionResponse
 from inframeld_sdk.models.human_o_auth_consent_details_response import HumanOAuthConsentDetailsResponse as HumanOAuthConsentDetailsResponse
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest as HumanOAuthConsentRequest
 from inframeld_sdk.models.human_o_auth_scope import HumanOAuthScope as HumanOAuthScope
+from inframeld_sdk.models.in_progress_operation_lookup_response import InProgressOperationLookupResponse as InProgressOperationLookupResponse
 from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
 from inframeld_sdk.models.o_auth_consent_decision import OAuthConsentDecision as OAuthConsentDecision
+from inframeld_sdk.models.operation_lookup_authority_family import OperationLookupAuthorityFamily as OperationLookupAuthorityFamily
+from inframeld_sdk.models.operation_lookup_authority_request import OperationLookupAuthorityRequest as OperationLookupAuthorityRequest
+from inframeld_sdk.models.operation_lookup_response import OperationLookupResponse as OperationLookupResponse
+from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest as OriginalOperationLookupRequest
 from inframeld_sdk.models.path_inner import PathInner as PathInner
 from inframeld_sdk.models.problem_details import ProblemDetails as ProblemDetails
 from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest as ProjectUseOnlyGrantRequest
 from inframeld_sdk.models.project_use_only_grant_response import ProjectUseOnlyGrantResponse as ProjectUseOnlyGrantResponse
 from inframeld_sdk.models.protected_resource_metadata_response import ProtectedResourceMetadataResponse as ProtectedResourceMetadataResponse
+from inframeld_sdk.models.recovery_required_operation_lookup_response import RecoveryRequiredOperationLookupResponse as RecoveryRequiredOperationLookupResponse
+from inframeld_sdk.models.unresolved_operation_lookup_response import UnresolvedOperationLookupResponse as UnresolvedOperationLookupResponse
 from inframeld_sdk.models.validation_issue import ValidationIssue as ValidationIssue
 

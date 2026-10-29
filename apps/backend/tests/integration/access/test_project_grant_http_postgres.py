@@ -10,7 +10,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, update
 from tests.support.access_scenarios import (
     MockAccessScenarios,
     ProjectAuthorizationSeedDTO,
@@ -53,6 +53,9 @@ from inframeld_backend.access.infrastructure.rows.project_membership_row import 
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
+from inframeld_backend.bootstrap.original_operation_lookup_composition import (
+    open_original_operation_lookup,
+)
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
@@ -68,6 +71,12 @@ from inframeld_backend.shared.http.middleware.request_context_middleware import 
     RequestContextMiddleware,
 )
 from inframeld_backend.shared.http.openapi.problem_openapi import configure_problem_openapi
+from inframeld_backend.shared.http.routes.original_operation_lookup_routes import (
+    create_original_operation_lookup_router,
+)
+from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
+    PostgresInstallationIdentityReader,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
@@ -114,6 +123,11 @@ def _test_app(database: Database, actor_id: PrincipalId) -> FastAPI:
     application.include_router(
         create_project_grant_router(
             authenticate, partial(open_project_grant_change, database, fingerprints)
+        )
+    )
+    application.include_router(
+        create_original_operation_lookup_router(
+            authenticate, partial(open_original_operation_lookup, database)
         )
     )
     application.add_middleware(RequestContextMiddleware)
@@ -573,3 +587,146 @@ async def test_grant_http_retry_after_session_rotation_reuses_original_operation
 
     assert reservation_ids == [first.json()["operationId"]]
     assert revision == 1
+
+
+@pytest.mark.asyncio
+async def test_lost_grant_acknowledgment_is_observed_without_reassigning_or_auditing(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+) -> None:
+    """Keep the admitted identity after recipient eligibility and revision change."""
+    scenario, bob_id, action_id = await _seed_grantable_project_with_bob(database)
+    installed = await PostgresInstallationIdentityReader(database).read()
+    headers = {"Origin": "http://studio.test", "X-Inframeld-CSRF": "1"}
+    lookup = {
+        "installationId": str(installed.value),
+        "organizationId": str(scenario.organization_id.value),
+        "projectId": str(scenario.project_id.value),
+        "method": "POST",
+        "requestedRoute": "/v1/projects/{project_id}/grants",
+        "key": "lost-grant-ack",
+        "expectedAuthority": {"family": "project_grant_read", "actionId": action_id.value},
+    }
+    api_database = Database(temporary_postgres_settings)
+    with TestClient(_test_app(api_database, scenario.principal_id)) as client:
+        client.cookies.set("ory_kratos_session", "test-session")
+        admitted = client.post(
+            f"/v1/projects/{scenario.project_id.value}/grants",
+            headers=headers | {"Idempotency-Key": "lost-grant-ack"},
+            json={
+                "recipientPrincipalId": str(bob_id.value),
+                "actionId": action_id.value,
+                "expectedAccessRevision": 0,
+            },
+        )
+        assert admitted.status_code == 201, admitted.text
+
+        # Lookup must not reapply assignment-time recipient or revision checks.
+        async with database.session() as session, session.begin():
+            await session.execute(
+                update(PrincipalRow)
+                .where(PrincipalRow.id == bob_id.value)
+                .values(status=PrincipalStatus.SUSPENDED)
+            )
+            await session.execute(
+                update(ProjectRow)
+                .where(ProjectRow.id == scenario.project_id.value)
+                .values(access_revision=2)
+            )
+        observed = [
+            client.post("/v1/operations/lookup", json=lookup, headers=headers) for _ in range(3)
+        ]
+
+    expected = {
+        "outcome": "completed_synchronous",
+        "operationId": admitted.json()["operationId"],
+        "classification": "safe_result",
+        "idempotencyExpiresAt": admitted.json()["idempotencyExpiresAt"],
+    }
+    for response in observed:
+        assert response.status_code == 200, response.text
+        assert response.json() == expected
+        assert response.headers["cache-control"] == "no-store"
+        assert "location" not in response.headers
+
+    async with database.session() as session:
+        assert (
+            await session.scalar(select(func.count()).select_from(IdempotencyReservationRow)) == 1
+        )
+        assert await session.scalar(select(func.count()).select_from(AccessAuditEventRow)) == 1
+        assert await session.scalar(select(func.count()).select_from(ProjectActionGrantRow)) == 2
+        assert (
+            await session.scalar(
+                select(ProjectRow.access_revision).where(ProjectRow.id == scenario.project_id.value)
+            )
+            == 2
+        )
+        original = await session.get(IdempotencyReservationRow, admitted.json()["operationId"])
+        assert original is not None
+        assert original.lookup_authority_family == "project_grant_read"
+        assert original.lookup_action_id == action_id.value
+        assert original.expires_at is not None
+        assert original.expires_at == datetime.fromisoformat(str(expected["idempotencyExpiresAt"]))
+
+
+@pytest.mark.asyncio
+async def test_grant_lookup_cannot_downgrade_revoked_delegation_or_probe_history(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+) -> None:
+    """Use permission cannot expose retained grant history after delegation is lost."""
+    scenario, bob_id, action_id = await _seed_grantable_project_with_bob(database)
+    installed = await PostgresInstallationIdentityReader(database).read()
+    headers = {"Origin": "http://studio.test", "X-Inframeld-CSRF": "1"}
+    lookup = {
+        "installationId": str(installed.value),
+        "organizationId": str(scenario.organization_id.value),
+        "projectId": str(scenario.project_id.value),
+        "method": "POST",
+        "requestedRoute": "/v1/projects/{project_id}/grants",
+        "key": "revoked-grant-ack",
+        "expectedAuthority": {"family": "project_grant_read", "actionId": action_id.value},
+    }
+    api_database = Database(temporary_postgres_settings)
+    with TestClient(_test_app(api_database, scenario.principal_id)) as client:
+        client.cookies.set("ory_kratos_session", "test-session")
+        admitted = client.post(
+            f"/v1/projects/{scenario.project_id.value}/grants",
+            headers=headers | {"Idempotency-Key": "revoked-grant-ack"},
+            json={
+                "recipientPrincipalId": str(bob_id.value),
+                "actionId": action_id.value,
+                "expectedAccessRevision": 0,
+            },
+        )
+        assert admitted.status_code == 201, admitted.text
+        async with database.session() as session, session.begin():
+            await session.execute(
+                update(ProjectActionGrantRow)
+                .where(
+                    ProjectActionGrantRow.project_id == scenario.project_id.value,
+                    ProjectActionGrantRow.recipient_principal_id == scenario.principal_id.value,
+                    ProjectActionGrantRow.action == action_id.value,
+                )
+                .values(can_grant=False)
+            )
+        for key in ["revoked-grant-ack", "absent-grant-ack"]:
+            denied = client.post(
+                "/v1/operations/lookup", json=lookup | {"key": key}, headers=headers
+            )
+            assert denied.status_code == 403, denied.text
+            assert denied.json()["code"] == "access_denied"
+            assert "operationId" not in denied.json()
+        downgraded = client.post(
+            "/v1/operations/lookup",
+            json=lookup
+            | {"expectedAuthority": {"family": "project_action_use", "actionId": action_id.value}},
+            headers=headers,
+        )
+        assert downgraded.status_code == 422, downgraded.text
+
+    async with database.session() as session:
+        assert (
+            await session.scalar(select(func.count()).select_from(IdempotencyReservationRow)) == 1
+        )
+        assert await session.scalar(select(func.count()).select_from(AccessAuditEventRow)) == 1

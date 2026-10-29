@@ -41,13 +41,13 @@ class PostgresOperationLookupReader(OperationLookupReader):
     async def read(
         self, *, principal_id: PrincipalId, query: LookupOriginalOperationQuery
     ) -> OperationReservationResultDTO | None:
-        if query.project_id is None:
-            return None
         row = IdempotencyReservationRow
         binding = and_(
             row.principal_id == principal_id.value,
             row.organization_id == query.organization_id.value,
-            row.project_id == query.project_id.value,
+            row.project_id.is_not_distinct_from(
+                query.project_id.value if query.project_id is not None else None
+            ),
             row.method == query.method,
             row.requested_route == query.requested_route,
             row.request_key == query.key.value,

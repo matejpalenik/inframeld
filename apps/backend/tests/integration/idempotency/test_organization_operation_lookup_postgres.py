@@ -15,11 +15,17 @@ from tests.support.access_scenarios import MockAccessScenarios
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
 from inframeld_backend.access.application.dtos.operation_lookup_authorization_dto import (
     OperationLookupAuthorizationDTO,
 )
 from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
     IdentityRecoveryEventKind,
+)
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
 )
 from inframeld_backend.access.application.services.operation_lookup_authorization_service import (
     OperationLookupAuthorizationService,
@@ -27,10 +33,17 @@ from inframeld_backend.access.application.services.operation_lookup_authorizatio
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.postgres_operation_lookup_facts_reader import (
     PostgresOperationLookupFactsReader,
+)
+from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
+    HumanCredentialVersionRow,
 )
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
@@ -80,6 +93,7 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
     PostgresInstallationIdentityReader,
 )
@@ -332,3 +346,48 @@ async def test_organization_authorized_nonmatches_share_unresolved(
                 .values(expires_at=func.clock_timestamp() - timedelta(seconds=1))
             )
     assert await observe(database, access, query) == UnresolvedOperationDTO()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "credential", ["current", "stale", "missing_version", "other_identity", "other_installation"]
+)
+async def test_organization_lookup_uses_current_original_human_credential_binding(
+    database: Database, credential: str
+) -> None:
+    access, query, operation, _project = await organization_admitted(database)
+    identity = MockAuthenticationEvidence.browser().identity
+    async with database.session() as session, session.begin():
+        session.add(
+            HumanIdentityLinkRow(
+                authority=identity.authority.value,
+                subject=identity.subject.value,
+                organization_id=query.organization_id.value,
+                principal_id=access.actor_principal_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+        if credential != "missing_version":
+            session.add(
+                HumanCredentialVersionRow(
+                    installation_id=query.installation_id.value,
+                    authority=identity.authority.value,
+                    subject=identity.subject.value,
+                    version=2 if credential == "stale" else 1,
+                )
+            )
+    binding = HumanOAuthCredentialBindingDTO(
+        replace(identity, subject=IdentitySubject("another-human"))
+        if credential == "other_identity"
+        else identity,
+        InstallationId(uuid4()) if credential == "other_installation" else query.installation_id,
+        HumanCredentialVersion(1),
+    )
+    access = replace(access, authentication_evidence=binding)
+    if credential == "current":
+        result = await observe(database, access, query)
+        assert isinstance(result, CompletedSynchronousOperationDTO)
+        assert result.operation_id.value == operation
+    else:
+        with pytest.raises(HumanOAuthCredentialRejectedError):
+            await observe(database, access, query)

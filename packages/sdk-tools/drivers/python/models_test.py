@@ -94,6 +94,51 @@ def _rejects_native_null() -> bool:
 
 
 class GeneratedModelTests(unittest.TestCase):
+    def test_original_lookup_preserves_null_scope_and_requires_the_guard(self) -> None:
+        source: dict[str, JsonValue] = {
+            "installationId": "00000000-0000-4000-8000-000000000001",
+            "organizationId": "00000000-0000-4000-8000-000000000002",
+            "projectId": None,
+            "method": "POST",
+            "requestedRoute": "/v1/original-organization-operation",
+            "key": "original +/&é",
+            "expectedAuthority": {
+                "family": "organization_action_use",
+                "actionId": "create-projects",
+            },
+        }
+        model = inframeld_sdk.OriginalOperationLookupRequest.model_validate(source)
+        self.assertEqual(body_value(model), source)
+        for guard in [None, "absent"]:
+            invalid = dict(source)
+            if guard is None:
+                invalid["expectedAuthority"] = None
+            else:
+                invalid.pop("expectedAuthority")
+            with self.assertRaises(ValueError):
+                inframeld_sdk.OriginalOperationLookupRequest.model_validate(invalid)
+
+    def test_accepted_lookup_requires_its_discriminator_and_uncertainty(self) -> None:
+        source: dict[str, JsonValue] = {
+            "outcome": "accepted_asynchronous",
+            "operationId": "original",
+            "admission": "confirmed",
+            "jobReference": "unknown",
+            "dispatch": "not_established",
+            "idempotencyExpiresAt": None,
+        }
+        model = inframeld_sdk.AcceptedOperationLookupResponse.model_validate(source)
+        self.assertEqual(body_value(model), source)
+        for field in ["outcome", "admission", "jobReference", "dispatch", "idempotencyExpiresAt"]:
+            invalid = dict(source)
+            invalid.pop(field)
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                inframeld_sdk.AcceptedOperationLookupResponse.model_validate(invalid)
+        with self.assertRaises(ValueError):
+            inframeld_sdk.AcceptedOperationLookupResponse.model_validate(
+                source | {"jobReference": "known"}
+            )
+
     def test_malformed_problem_array_is_not_repaired(self) -> None:
         with self.assertRaises((ValueError, TypeError)):
             inframeld_sdk.ProblemDetails.from_dict(

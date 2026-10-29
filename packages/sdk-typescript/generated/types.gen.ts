@@ -5,6 +5,62 @@ export type ClientOptions = {
 };
 
 /**
+ * AcceptedOperationLookupResponse
+ *
+ * Confirm retained admission while making unknown dispatch and references explicit.
+ */
+export type AcceptedOperationLookupResponse = {
+    /**
+     * Admission
+     */
+    admission: 'confirmed';
+    /**
+     * Dispatch
+     */
+    dispatch: 'not_established';
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string | null;
+    /**
+     * Jobreference
+     */
+    jobReference: 'unknown';
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Outcome
+     */
+    outcome: 'accepted_asynchronous';
+};
+
+/**
+ * CompletedOperationLookupResponse
+ *
+ * Expose safe synchronous outcome metadata without replaying content.
+ */
+export type CompletedOperationLookupResponse = {
+    /**
+     * Classification
+     */
+    classification: 'safe_result' | 'issued_secret' | 'answer_receipt';
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Outcome
+     */
+    outcome: 'completed_synchronous';
+};
+
+/**
  * CurrentSessionResponse
  */
 export type CurrentSessionResponse = {
@@ -79,6 +135,20 @@ export type HumanOAuthConsentRequest = {
 export type HumanOAuthScope = 'openid' | 'offline_access' | 'inframeld:api';
 
 /**
+ * InProgressOperationLookupResponse
+ */
+export type InProgressOperationLookupResponse = {
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Outcome
+     */
+    outcome: 'in_progress';
+};
+
+/**
  * InframeldDiscoveryResponse
  *
  * Bind the fixed CLI profile to the persistent public installation identity.
@@ -102,6 +172,67 @@ export type InframeldDiscoveryResponse = {
  * OAuthConsentDecision
  */
 export type OAuthConsentDecision = 'allow' | 'deny';
+
+/**
+ * OperationLookupAuthorityFamily
+ *
+ * Select a fixed current-authority check without granting permission.
+ */
+export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use';
+
+/**
+ * OperationLookupAuthorityRequest
+ */
+export type OperationLookupAuthorityRequest = {
+    /**
+     * Actionid
+     */
+    actionId: string;
+    family: OperationLookupAuthorityFamily;
+};
+
+export type OperationLookupResponse = ({
+    outcome: 'completed_synchronous';
+} & CompletedOperationLookupResponse) | ({
+    outcome: 'accepted_asynchronous';
+} & AcceptedOperationLookupResponse) | ({
+    outcome: 'in_progress';
+} & InProgressOperationLookupResponse) | ({
+    outcome: 'recovery_required';
+} & RecoveryRequiredOperationLookupResponse) | ({
+    outcome: 'unresolved';
+} & UnresolvedOperationLookupResponse);
+
+/**
+ * OriginalOperationLookupRequest
+ */
+export type OriginalOperationLookupRequest = {
+    expectedAuthority: OperationLookupAuthorityRequest;
+    /**
+     * Installationid
+     */
+    installationId: string;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Method
+     */
+    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string | null;
+    /**
+     * Requestedroute
+     */
+    requestedRoute: string;
+};
 
 /**
  * ProblemDetails
@@ -257,6 +388,34 @@ export type ProtectedResourceMetadataResponse = {
     scopes_supported: [
         'inframeld:api'
     ];
+};
+
+/**
+ * RecoveryRequiredOperationLookupResponse
+ */
+export type RecoveryRequiredOperationLookupResponse = {
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Outcome
+     */
+    outcome: 'recovery_required';
+    /**
+     * Reason
+     */
+    reason: 'original_outcome_requires_recovery';
+};
+
+/**
+ * UnresolvedOperationLookupResponse
+ */
+export type UnresolvedOperationLookupResponse = {
+    /**
+     * Outcome
+     */
+    outcome: 'unresolved';
 };
 
 /**
@@ -514,6 +673,59 @@ export type DecideHumanOAuthConsentResponses = {
 };
 
 export type DecideHumanOAuthConsentResponse = DecideHumanOAuthConsentResponses[keyof DecideHumanOAuthConsentResponses];
+
+export type LookupOriginalOperationData = {
+    body: OriginalOperationLookupRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/operations/lookup';
+};
+
+export type LookupOriginalOperationErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Invalid input
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type LookupOriginalOperationError = LookupOriginalOperationErrors[keyof LookupOriginalOperationErrors];
+
+export type LookupOriginalOperationResponses = {
+    /**
+     * Successful Response
+     */
+    200: OperationLookupResponse;
+};
+
+export type LookupOriginalOperationResponse = LookupOriginalOperationResponses[keyof LookupOriginalOperationResponses];
 
 export type AssignProjectUseOnlyGrantData = {
     body: ProjectUseOnlyGrantRequest;

@@ -67,6 +67,11 @@ const calls = {
       ...options(client, call),
       body: call.body as sdk.DecideHumanOAuthConsentData["body"],
     }),
+  lookupOriginalOperation: (client: Client, call: SdkCall) =>
+    sdk.lookupOriginalOperation({
+      ...options(client, call),
+      body: call.body as sdk.LookupOriginalOperationData["body"],
+    }),
   assignProjectUseOnlyGrant: (client: Client, call: SdkCall) =>
     sdk.assignProjectUseOnlyGrant({
       ...options(client, call),

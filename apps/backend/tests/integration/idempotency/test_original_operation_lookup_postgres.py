@@ -7,6 +7,8 @@ an upload, build or Organization business endpoint.
 import os
 from dataclasses import replace
 from datetime import timedelta
+from typing import Literal
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import func, select, update
@@ -28,6 +30,9 @@ from inframeld_backend.access.application.services.project_operation_admission_s
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.postgres_operation_lookup_facts_reader import (
     PostgresOperationLookupFactsReader,
 )
@@ -74,6 +79,7 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
     PostgresInstallationIdentityReader,
 )
@@ -322,3 +328,40 @@ async def test_in_progress_and_recovery_remain_distinct(database: Database) -> N
         )
         assert result is not None and result.state is OperationReservationState.RECOVERY_REQUIRED
         assert result.operation_id.value == operation
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "changed", ["installation", "principal", "organization", "project", "method", "route", "key"]
+)
+async def test_retained_history_never_substitutes_another_original_identity(
+    database: Database,
+    changed: Literal[
+        "installation", "principal", "organization", "project", "method", "route", "key"
+    ],
+) -> None:
+    """Every original identity component must match before any outcome is projected."""
+    access, query, _operation = await admitted(database)
+    principal_id = access.actor_principal_id
+    match changed:
+        case "installation":
+            query = replace(query, installation_id=InstallationId(uuid4()))
+        case "principal":
+            principal_id = PrincipalId(uuid4())
+        case "organization":
+            query = replace(query, organization_id=OrganizationId(uuid4()))
+        case "project":
+            query = replace(query, project_id=ProjectId(uuid4()))
+        case "method":
+            query = replace(query, method="PATCH")
+        case "route":
+            query = replace(query, requested_route="/v1/another-original-operation")
+        case "key":
+            query = replace(query, key=IdempotencyKey("another-original-key"))
+    async with database.session() as session:
+        assert (
+            await PostgresOperationLookupReader(session).read(
+                principal_id=principal_id, query=query
+            )
+            is None
+        )

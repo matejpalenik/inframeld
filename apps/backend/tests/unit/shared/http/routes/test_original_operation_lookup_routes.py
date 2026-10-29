@@ -173,7 +173,7 @@ def test_permitted_alternatives_preserve_original_identity(
     assert service.queries[0].key.value == BODY["key"]
     if outcome == "accepted_asynchronous":
         assert response.json()["jobReference"] == "unknown"
-        assert response.json()["jobId"] is None
+        assert "jobId" not in response.json()
         assert response.json()["dispatch"] == "not_established"
     elif outcome == "unresolved":
         assert response.json() == {"outcome": "unresolved"}
@@ -267,6 +267,15 @@ def test_whitespace_only_identity_fields_are_controlled_validation_failures(fiel
         client_for(service) as existing,
         TestClient(existing.app, raise_server_exceptions=False) as client,
     ):
+        response = client.post("/v1/operations/lookup", json=body, headers=HEADERS)
+    assert response.status_code == 422
+    assert service.queries == []
+
+
+def test_original_guard_is_required_before_application_lookup() -> None:
+    service = MockOriginalLookup()
+    body = {key: value for key, value in BODY.items() if key != "expectedAuthority"}
+    with client_for(service) as client:
         response = client.post("/v1/operations/lookup", json=body, headers=HEADERS)
     assert response.status_code == 422
     assert service.queries == []

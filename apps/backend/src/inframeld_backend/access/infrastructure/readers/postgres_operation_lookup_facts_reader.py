@@ -34,6 +34,9 @@ from inframeld_backend.access.infrastructure.rows.human_identity_link_row import
 from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
     IdentityRecoveryAdmissionRow,
 )
+from inframeld_backend.access.infrastructure.rows.organization_action_grant_row import (
+    OrganizationActionGrantRow,
+)
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
@@ -62,19 +65,27 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
     async def read(
         self, *, access: AccessContextDTO, query: LookupOriginalOperationQuery
     ) -> OperationLookupFactsDTO | None:
+        project_id = query.project_id.value if query.project_id is not None else None
         if query.project_id is None:
-            return None
-        member = exists().where(
-            ProjectMembershipRow.project_id == ProjectRow.id,
-            ProjectMembershipRow.principal_id == PrincipalRow.id,
-        )
-        grant_scope = (
-            ProjectActionGrantRow.project_id == ProjectRow.id,
-            ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
-            ProjectActionGrantRow.action == query.expected_authority.action_id.value,
-        )
-        granted = exists().where(*grant_scope)
-        can_grant = exists().where(*grant_scope, ProjectActionGrantRow.can_grant.is_(True))
+            member = literal(False)
+            granted = exists().where(
+                OrganizationActionGrantRow.organization_id == PrincipalRow.organization_id,
+                OrganizationActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                OrganizationActionGrantRow.action == query.expected_authority.action_id.value,
+            )
+            can_grant = literal(False)
+        else:
+            member = exists().where(
+                ProjectMembershipRow.project_id == ProjectRow.id,
+                ProjectMembershipRow.principal_id == PrincipalRow.id,
+            )
+            grant_scope = (
+                ProjectActionGrantRow.project_id == ProjectRow.id,
+                ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                ProjectActionGrantRow.action == query.expected_authority.action_id.value,
+            )
+            granted = exists().where(*grant_scope)
+            can_grant = exists().where(*grant_scope, ProjectActionGrantRow.can_grant.is_(True))
         pending = (
             select(IdentityRecoveryAdmissionRow.operation_id)
             .join(
@@ -107,7 +118,7 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
         statement = (
             select(
                 PrincipalRow,
-                ProjectRow.status,
+                Nullable(ProjectRow.status),
                 Nullable(InstallationIdentityRow.installation_id),
                 member,
                 granted,
@@ -117,10 +128,10 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
                 version,
             )
             .select_from(PrincipalRow)
-            .join(
+            .outerjoin(
                 ProjectRow,
                 and_(
-                    ProjectRow.id == query.project_id.value,
+                    ProjectRow.id == project_id,
                     ProjectRow.organization_id == PrincipalRow.organization_id,
                 ),
             )
@@ -131,6 +142,9 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
             )
             .execution_options(populate_existing=True)
         )
+        if query.project_id is not None:
+            statement = statement.where(ProjectRow.id.is_not(None))
+
         try:
             async with asyncio.timeout(5.0):
                 observed = (await self._session.execute(statement)).tuples().one_or_none()

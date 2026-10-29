@@ -2,7 +2,7 @@
 
 Alice starts a build, but the acknowledgment disappears. The backend may already have committed the work. She needs to identify that original request, then inspect its saved state without starting another build.
 
-> **Status:** logical application contracts accepted on 2026-10-29 through the approved joint #124/#156 specification plan. These representations are design, not implemented endpoints or runtime qualification. HTTP paths, operation IDs, backend DTO names and native OpenAPI delivery remain with the implementation issues. Existing [typed idempotency outcomes](idempotency-and-replay.md#temporary-operation-outcomes) and their inspected code retain authority for delivered behavior.
+> **Status:** logical application contracts accepted on 2026-10-29 through the approved joint #124/#156 specification plan. Original-request lookup now has a [native HTTP/backend implementation](../../../../docs/development/guides/original-request-lookup.md). The other contracts remain design unless their own implementation evidence says otherwise. Native OpenAPI and code own delivered representations, while tests establish their qualified scope. Existing [typed idempotency outcomes](idempotency-and-replay.md#temporary-operation-outcomes) retain authority for replay behavior.
 
 ## Choose the operation
 

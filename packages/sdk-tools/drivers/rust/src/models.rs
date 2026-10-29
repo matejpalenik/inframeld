@@ -1,6 +1,65 @@
 #[cfg(test)]
 mod tests {
     #[test]
+    fn original_lookup_requires_the_guard_and_preserves_null_organization_scope() {
+        let input = serde_json::json!({
+            "installationId":"00000000-0000-4000-8000-000000000001",
+            "organizationId":"00000000-0000-4000-8000-000000000002",
+            "projectId":null,"method":"POST","requestedRoute":"/v1/original-organization-operation",
+            "key":"original +/&é","expectedAuthority":{"family":"organization_action_use","actionId":"create-projects"}
+        });
+        let model: inframeld_sdk::types::OriginalOperationLookupRequest =
+            serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(serde_json::to_value(model).unwrap(), input);
+        let mut missing = input.clone();
+        missing.as_object_mut().unwrap().remove("expectedAuthority");
+        assert!(
+            serde_json::from_value::<inframeld_sdk::types::OriginalOperationLookupRequest>(missing)
+                .is_err()
+        );
+        let mut null = input;
+        null["expectedAuthority"] = serde_json::Value::Null;
+        assert!(
+            serde_json::from_value::<inframeld_sdk::types::OriginalOperationLookupRequest>(null)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn accepted_lookup_requires_explicit_unknown_job_and_dispatch() {
+        let accepted = serde_json::json!({
+            "outcome":"accepted_asynchronous","operationId":"original","admission":"confirmed",
+            "jobReference":"unknown","dispatch":"not_established","idempotencyExpiresAt":null
+        });
+        assert!(
+            serde_json::from_value::<inframeld_sdk::types::OperationLookupResponse>(
+                accepted.clone()
+            )
+            .is_ok()
+        );
+        for field in [
+            "outcome",
+            "jobReference",
+            "dispatch",
+            "idempotencyExpiresAt",
+        ] {
+            let mut missing = accepted.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            assert!(
+                serde_json::from_value::<inframeld_sdk::types::OperationLookupResponse>(missing)
+                    .is_err(),
+                "accepted missing {field}"
+            );
+        }
+        let mut invented = accepted;
+        invented["jobReference"] = serde_json::json!("known");
+        assert!(
+            serde_json::from_value::<inframeld_sdk::types::OperationLookupResponse>(invented)
+                .is_err()
+        );
+    }
+
+    #[test]
     fn required_nullable_fields_cannot_be_absent() {
         let missing = serde_json::json!({"required_name":"valid", "score":0.5, "choice":7});
         assert!(

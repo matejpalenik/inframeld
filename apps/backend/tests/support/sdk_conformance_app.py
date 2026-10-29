@@ -76,11 +76,26 @@ from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
 from inframeld_backend.access.http.routes.project_grant_routes import create_project_grant_router
+from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
+    AcceptedAsyncOperationDTO,
+)
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.in_progress_operation_dto import (
+    InProgressOperationDTO,
+)
 from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
     OperationAdmissionContextDTO,
+)
+from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
+    RecoveryRequiredOperationDTO,
+)
+from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
+    UnresolvedOperationDTO,
+)
+from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+    OperationLookupAuthorityFamily,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -88,9 +103,18 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.application.protocols.original_operation_lookup import (
+    OriginalOperationLookup,
+)
+from inframeld_backend.shared.application.queries.lookup_original_operation_query import (
+    LookupOriginalOperationQuery,
+)
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.http.routes.health_routes import router as health_router
+from inframeld_backend.shared.http.routes.original_operation_lookup_routes import (
+    create_original_operation_lookup_router,
+)
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
@@ -188,6 +212,69 @@ class MockSDKGrantChanger(ProjectGrantChanger):
 @asynccontextmanager
 async def _open_grant_change() -> AsyncGenerator[ProjectGrantChanger]:
     yield MockSDKGrantChanger()
+
+
+class MockSDKOriginalOperationLookup(OriginalOperationLookup):
+    """Supply explicit retained outcomes without a database or business dispatch."""
+
+    @override
+    async def lookup(
+        self, *, access: AccessContextDTO, query: LookupOriginalOperationQuery
+    ) -> (
+        CompletedSynchronousOperationDTO
+        | AcceptedAsyncOperationDTO
+        | InProgressOperationDTO
+        | RecoveryRequiredOperationDTO
+        | UnresolvedOperationDTO
+    ):
+        query.expected_authority.require_supported_scope(
+            project_id=query.project_id, method=query.method, requested_route=query.requested_route
+        )
+        original_action = "create-projects" if query.project_id is None else "create-access-groups"
+        if (
+            query.installation_id.value != UUID("00000000-0000-4000-8000-000000000001")
+            or query.organization_id.value != UUID("00000000-0000-4000-8000-000000000002")
+            or (
+                query.project_id is not None
+                and query.project_id.value != UUID("00000000-0000-4000-8000-000000000003")
+            )
+            or query.expected_authority.action_id.value != original_action
+            or (
+                query.requested_route == "/v1/projects/{project_id}/grants"
+                and query.expected_authority.family
+                is not OperationLookupAuthorityFamily.PROJECT_GRANT_READ
+            )
+        ):
+            return UnresolvedOperationDTO()
+
+        operation = OperationId("sdk-original-operation")
+        match query.key.value:
+            case "completed +/&é" | "issued-secret" | "answer-receipt":
+                kind: Literal[
+                    OperationReplayKind.SAFE_RESULT,
+                    OperationReplayKind.ISSUED_SECRET,
+                    OperationReplayKind.ANSWER_RECEIPT,
+                ] = OperationReplayKind.SAFE_RESULT
+                if query.key.value == "issued-secret":
+                    kind = OperationReplayKind.ISSUED_SECRET
+                elif query.key.value == "answer-receipt":
+                    kind = OperationReplayKind.ANSWER_RECEIPT
+                return CompletedSynchronousOperationDTO(
+                    operation, False, kind, datetime(2030, 1, 1, tzinfo=UTC)
+                )
+            case "accepted":
+                return AcceptedAsyncOperationDTO(operation, False, None)
+            case "in-progress":
+                return InProgressOperationDTO(operation)
+            case "recovery-required":
+                return RecoveryRequiredOperationDTO(operation)
+            case _:
+                return UnresolvedOperationDTO()
+
+
+@asynccontextmanager
+async def _open_original_lookup() -> AsyncGenerator[OriginalOperationLookup]:
+    yield MockSDKOriginalOperationLookup()
 
 
 async def _fault_response(fault: SDKFaultRequestDTO | None) -> Response | None:
@@ -292,6 +379,9 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(health_router)
     application.include_router(create_session_router(authenticate))
     application.include_router(create_project_grant_router(authenticate, _open_grant_change))
+    application.include_router(
+        create_original_operation_lookup_router(authenticate, _open_original_lookup)
+    )
     application.include_router(create_human_oauth_consent_router(MockSDKConsentHandler(), csrf))
     counts: dict[str, int] = {}
     observations: dict[str, dict[str, JsonValue]] = {}
