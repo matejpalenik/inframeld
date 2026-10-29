@@ -66,7 +66,7 @@ Access owns one original cleanup job and its fixed two-step progress. It uses th
 
 Check ownership and the active run before each dispatch and checkpoint. Ending or satisfying a run prevents fresh admission of provider work. It cannot recall a call already admitted or dispatched. Cancellation propagates, and remote cancellation is never inferred. Keep explicit finite provider deadlines and bound each by remaining run time. Required state unavailable means no release.
 
-This contract does not choose scheduler fairness, queue saturation policy or authority for already-admitted product jobs. Load the neighboring pending decisions only if implementing those separate concerns.
+This contract does not choose scheduler fairness, queue saturation policy or authority for already-admitted product jobs. Apply the accepted [job authority](decision-admitted-work-authority.md#approved-resolution) and [queue policy](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md#approved-resolution) when implementing those separate concerns. Numerical operating limits and qualification remain separate.
 
 <a id="hydra-cleanup-retry-budget"></a>
 

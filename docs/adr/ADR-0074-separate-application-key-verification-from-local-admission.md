@@ -58,3 +58,7 @@ Application-key authentication and production qualification remain unfinished. T
 - [Verification outcomes](../../.agents/skills/inframeld-access-models/references/application-key-contracts.md#verification-results-and-unresolved-currentness) and [accepted public authentication errors](../development/error-handling.md#authentication-contract).
 - [Inspected browser verifier contract](../../apps/backend/src/inframeld_backend/access/application/protocols/browser_session_verifier.py). Its rejection/availability pattern is reused, while application-key implementation remains unfinished.
 - [Component conventions](../../.agents/skills/inframeld-python-standards/references/component-roles-and-imports.md#component-conventions) and [inspected browser authentication service](../../apps/backend/src/inframeld_backend/access/application/services/human_session_authentication_service.py). The browser implementation is an ownership example, not application-key implementation evidence.
+
+## Later resolution
+
+[ADR-0100](ADR-0100-order-key-revocation-at-protected-boundaries.md) resolves key-boundary ordering, and [ADR-0101](ADR-0101-authorize-admitted-jobs-by-current-principal.md) resolves admitted-job authority, both approved on 2026-10-29. The earlier verification/authentication component choice remains accepted.

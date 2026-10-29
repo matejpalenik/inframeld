@@ -34,4 +34,8 @@ This refines the earlier single-worker convention. It adds no queue broker, gene
 - [Durable attempts](ADR-0026-persist-background-work-through-controlled-durable-attempts.md)
 - [Recovery completion](../../.agents/skills/inframeld-access-models/references/recovery-completion.md)
 - [Runtime topology](../../.agents/skills/inframeld-architecture/references/runtime-deployment-and-storage.md)
-- [Pending saturation policy](../../.agents/skills/inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md)
+- [Saturation policy, subsequently accepted under ADR-0102](../../.agents/skills/inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md)
+
+## Later resolution
+
+[ADR-0102](ADR-0102-use-bounded-fifo-with-separate-recovery-execution.md) records the developer-approved 2026-10-29 policy for the temporal or queue question left open here. The earlier component/recovery-isolation choice remains accepted.

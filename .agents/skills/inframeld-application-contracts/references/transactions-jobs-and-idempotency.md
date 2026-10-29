@@ -141,13 +141,13 @@ Workers call the same commands as the API, including when a source sync discover
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted entries below when their scope matches. Discuss only choices still explicitly marked pending:
 
-- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
 - [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
-- [PD-CONTRACTS-05: Qualify cleanup and recovery under a full bounded queue](decision-queue-saturation-and-cleanup.md). When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation.
+- [PD-CONTRACTS-05 (accepted): Qualify cleanup and recovery under a full bounded queue](decision-queue-saturation-and-cleanup.md). When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation.
 
 <a id="status-and-sources"></a>
 

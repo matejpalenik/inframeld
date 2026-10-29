@@ -36,6 +36,12 @@ Code suggestions/reviews require Coding Standards and the affected language guid
 
 The [matching qualified CLI/runtime release policy](references/decision-cli-server-compatibility.md) is accepted through ADR-0095. Offline metadata does not verify a remote server. Release-pair qualification and remote enforcement remain delivery work.
 
+## Accepted decision references
+
+These contracts were approved on 2026-10-29. Apply them without reopening their policy. Implementation and qualification remain separate.
+
+- [PD-CONTRACTS-05](references/decision-queue-saturation-and-cleanup.md): When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation.
+
 ## Pending decisions for affected work
 
 Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
@@ -43,7 +49,6 @@ Load only matching triggers. Discuss and obtain approval before code depends on 
 - [PD-CONTRACTS-01](references/decision-gateway-enforcement.md): Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
 - [PD-CONTRACTS-02](references/decision-spending-coordination.md): Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery.
 - [PD-CONTRACTS-04](references/decision-import-review-and-recovery.md): Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery.
-- [PD-CONTRACTS-05](references/decision-queue-saturation-and-cleanup.md): When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation.
 
 ## Read as needed
 

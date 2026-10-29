@@ -2,6 +2,10 @@
 
 Alice authenticated before password recovery began. A later grant attempt must read current account and recovery facts before reserving or replaying work. An authenticated context is evidence for the attempt, not a permission certificate.
 
+## Incoming credentials and admitted jobs
+
+Fresh incoming requests and replays follow the [accepted key-boundary contract](decision-key-currentness.md#approved-resolution). Already admitted product jobs instead follow [current-principal authority](decision-admitted-work-authority.md#approved-resolution), using server-owned original scope/input and current worker ownership. Original credential expiry/replacement/revocation alone does not cancel them. Current account restrictions, required permissions and applicable human recovery generation still prevent later protected steps. This separate logical authority contract is not a new incoming credential family or an implemented bypass.
+
 <a id="shared-principal-eligibility"></a>
 
 <a id="one-shared-account-eligibility-decision"></a>

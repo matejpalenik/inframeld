@@ -42,6 +42,12 @@ Resume must not revive a permanently retired generation, change saved payload by
 
 Cancellation records a request to stop. The worker checks it between limited-size units of work. It cannot undo a completed model call or an already-published release.
 
+## Current authority after admission
+
+Alice's token can expire after five of twenty evaluation cases. The accepted job can continue, but the worker must check current account, required action and source authority before each protected step, business save, publication and disclosure. Individual key revocation blocks new incoming requests, not already admitted work. Cancel affected jobs or suspend the application account for containment. A changed human recovery generation prevents further protected work until eligible explicit continuation. Preserve confirmed progress and unknown external outcomes without automatically restarting after permission restoration.
+
+Workers use server-owned durable admission and current ownership facts, never a forged incoming authentication context or a retained raw token. Trusted system recovery and erasure continue only their original narrow obligations. [PD-ACCESS-02](../../inframeld-access-models/references/decision-admitted-work-authority.md#approved-resolution) owns the complete accepted contract, alternatives and required evidence.
+
 <a id="admit-work-and-claim-an-attempt"></a>
 
 ## Admit work and claim an attempt
@@ -72,6 +78,14 @@ PostgreSQL is also the queue for the single-server deployment. Index the status 
 
 V1 needs no SQS, Kafka, Redis, dead-letter queue, or workflow engine. Webhooks are deferred. A future delivery queue or **outbox**, a record of notifications waiting to be sent, can be added when delivery requires it. Having a `WebhookDispatcher` interface is not a reason to add unused infrastructure.
 
+### Accepted queue order and full-queue behavior
+
+The application worker takes the oldest admitted eligible due job, with a stable job-ID tie-break. One active application attempt retains its slot until completion, failure, cancellation or its bounded deadline. Checkpoints preserve progress and observe cancellation/authority, without implying round-robin yielding. The dedicated recovery worker keeps ADR-0087's separate execution.
+
+Count queued and running work against finite configured capacity and reserve the final slot atomically with admission. Reject new business work before effects when capacity is unavailable. A new deletion requiring a cleanup job must admit that job atomically or fail before its business effects. Already accepted cleanup stays durable. Revocation, suspension and cancellation require no new ordinary queue slot. Product cleanup may wait behind a bounded product job, while access blocks remain effective.
+
+Preserve order, budgets, ownership and known effects after restart. Observe queue depth, oldest eligible age, worker health and cleanup delay. [PD-CONTRACTS-05](decision-queue-saturation-and-cleanup.md#approved-resolution) owns the complete policy. Numerical capacities/deadlines and demonstrated operating guarantees remain with the operating-profile decision.
+
 ```mermaid
 ---
 title: "Accepted background admission and fenced checkpoints"
@@ -83,6 +97,7 @@ sequenceDiagram
     participant Remote as External dependency
     API->>DB: Commit job, request reservation, and audit
     Worker->>DB: Claim bounded attempt and fence
+    Note over Worker,DB: Check current principal authority before protected steps
     Worker->>Remote: Perform work outside SQL transaction
     Worker->>DB: Save progress only if fence still matches
 ```

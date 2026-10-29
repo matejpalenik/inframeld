@@ -67,8 +67,6 @@ These entries retain unresolved review findings, not accepted specifications or 
 
 | Identifier | Owner | Discuss when |
 | --- | --- | --- |
-| [PD-ACCESS-01](../../inframeld-access-models/references/decision-key-currentness.md) | access-models | Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay. |
-| [PD-ACCESS-02](../../inframeld-access-models/references/decision-admitted-work-authority.md) | access-models | Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement. |
 | [PD-ACCESS-05](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md) | access-models | When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified. |
 | [PD-ACCESS-06](../../inframeld-access-models/references/decision-setup-read-authority.md) | access-models | Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution. |
 | [PD-KNOWLEDGE-01](../../inframeld-knowledge/references/decision-complete-batch-handoff.md) | knowledge | Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff. |
@@ -87,11 +85,18 @@ These entries retain unresolved review findings, not accepted specifications or 
 | [PD-CONTRACTS-01](../../inframeld-application-contracts/references/decision-gateway-enforcement.md) | application-contracts | Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism. |
 | [PD-CONTRACTS-02](../../inframeld-application-contracts/references/decision-spending-coordination.md) | application-contracts | Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery. |
 | [PD-CONTRACTS-04](../../inframeld-application-contracts/references/decision-import-review-and-recovery.md) | application-contracts | Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery. |
-| [PD-CONTRACTS-05](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md) | application-contracts | When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation. |
 | [PD-ARCHITECTURE-01](decision-supported-operating-envelope.md) | architecture | Before fixing production resource/admission limits or advertising supported corpus size, throughput, latency or concurrency. |
 | [PD-ARCHITECTURE-02](decision-availability-backup-and-restore.md) | architecture | When setting availability/recovery objectives, assembling the production topology or qualifying backup, upgrade, security clearance and restore claims. |
 
 ### Resolved decision references
+
+Approved on 2026-10-29, with implementation and qualification pending:
+
+| Decision | Owner | Apply when |
+| --- | --- | --- |
+| [PD-ACCESS-01](../../inframeld-access-models/references/decision-key-currentness.md) | access-models | Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay. |
+| [PD-ACCESS-02](../../inframeld-access-models/references/decision-admitted-work-authority.md) | access-models | Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement. |
+| [PD-CONTRACTS-05](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md) | application-contracts | When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation. |
 
 - [PD-CONTRACTS-03](../../inframeld-application-contracts/references/decision-cli-server-compatibility.md) is accepted under [ADR-0095](../../../../docs/adr/ADR-0095-support-matching-qualified-cli-and-runtime-releases.md). Follow its CLI/runtime compatibility policy. Remote enforcement and release-pair qualification remain separate delivery work.
 - [PD-ACCESS-04](../../inframeld-access-models/references/decision-recovery-first-admission.md) is accepted under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). Follow [identity coordination](../../inframeld-access-models/references/identity-admission-coordination.md) before implementing first admission, recovery admission/completion or credential-state initialization. The shared coordinator and recovery/initialization participants are implemented with PostgreSQL concurrency coverage. Complete first-admission integration remains unfinished.

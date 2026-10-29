@@ -56,9 +56,9 @@ All commands remain scriptable with descriptive dry-run behavior. [Common machin
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted entries below when their scope matches. Discuss only choices still explicitly marked pending:
 
 - [PD-CONTRACTS-04: Bind import review and partial recovery to exact actions](decision-import-review-and-recovery.md). Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery.
-- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.

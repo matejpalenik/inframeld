@@ -95,7 +95,7 @@ First delivery contains the newly created secret. The same original issuance rep
 
 Credential rejection returns `None` before account loading. Recognized required-verification dependency failures raise `DependencyUnavailableError`. Unexpected errors and cancellation propagate. Preserve safe 401 for invalid credentials, 503 for unconfirmed verification dependencies and separate 403 for verified but locally ineligible accounts.
 
-Existing authorizers own later fresh key-state checks through key-ID evidence. The consuming service uses its ordinary Access authorization capability. No extra mandatory credential-guard call is introduced. Exact verifier inputs, expiry clock/checkpoints, concurrency and protected replay need [PD-ACCESS-01](decision-key-currentness.md). Admitted-work credential lifetime needs [PD-ACCESS-02](decision-admitted-work-authority.md). Neither is selected by these declarations.
+Existing authorizers own later fresh key-state checks through key-ID evidence. The consuming service uses its ordinary Access authorization capability. No extra mandatory credential-guard call is introduced. The accepted [PD-ACCESS-01](decision-key-currentness.md#approved-resolution) selects complete credential plus trusted installation/audience/adapter input, current database expiry checks after coordination waits, and protected-boundary ordering. [PD-ACCESS-02](decision-admitted-work-authority.md#approved-resolution) selects current-principal authority for admitted jobs. These logical contracts do not claim an implemented verifier or worker.
 
 ## Sources and limits
 

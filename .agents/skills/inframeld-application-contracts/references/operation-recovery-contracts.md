@@ -128,7 +128,7 @@ Recheck current caller authority, retained scope, ownership, dependency state an
 
 An eligible observation from inspection is informational. It does not reserve authority, guarantee later admission or permit repeating uncertain paid work. Missing retained inputs, retired resources, changed scope and unproven replay prevent ordinary continuation. Explicit new work after reviewing uncertainty remains a separate owning decision.
 
-[PD-ACCESS-02](../../inframeld-access-models/references/decision-admitted-work-authority.md) still owns originating-credential expiry, rotation, revocation and replacement during admitted work. This interface does not choose those rules or assert eligibility before they are resolved. Access's host-authorized recovery continuation keeps its separate original-obligation and budget contract.
+The accepted [PD-ACCESS-02](../../inframeld-access-models/references/decision-admitted-work-authority.md#approved-resolution) allows admitted product work to survive originating-credential expiry, rotation and individual key revocation while current principal/resource authority remains valid. A fresh valid credential may request eligible explicit continuation without changing the original inputs. Suspension, recovery-generation changes or lost required authority stop later protected steps. Restoring permission does not silently resume the job. Access's host-authorized recovery continuation keeps its separate original-obligation and budget contract.
 
 ## Deletion-status inspection
 
@@ -142,7 +142,7 @@ This projection grants no cancellation, continuation, restoration or replacement
 
 ## Retention, delivery and acceptance
 
-Preserve [at least 24 hours of completed duplicate detection and active-work retention](idempotency-and-replay.md#limit-guarantees-to-retained-authoritative-history). An established expiry is published unchanged. Repeated reads or retries do not extend it. That floor does not select job-history or deletion-status lifetimes. PD-KNOWLEDGE-02's remaining periods and PD-CONTRACTS-05's queue/saturation policy remain pending.
+Preserve [at least 24 hours of completed duplicate detection and active-work retention](idempotency-and-replay.md#limit-guarantees-to-retained-authoritative-history). An established expiry is published unchanged. Repeated reads or retries do not extend it. That floor does not select job-history or deletion-status lifetimes. PD-KNOWLEDGE-02's remaining periods are pending. The [accepted queue policy](decision-queue-saturation-and-cleanup.md#approved-resolution) governs saturation, with numerical operating limits still separate.
 
 The following are downstream behavioral acceptance cases, not tests executed by this specification:
 
@@ -165,7 +165,7 @@ The following are downstream behavioral acceptance cases, not tests executed by 
 | 20 admitted cases, 19 answers, fewer scores | Distinct owner populations remain visible without guessed completion |
 | Cancellation races with completion | Preserve actual terminal state and request acknowledgment separately |
 | Caller loses permission or source is erased | Deny or omit protected information under the owning disclosure contract |
-| Old credential expires or is revoked | Explain the pending authority decision rather than assuming continuation is allowed |
+| Old credential expires or is revoked | Reject incoming requests through an invalid key. Already admitted jobs use current principal authority under PD-ACCESS-02, and explicit continuation still needs a fresh valid credential |
 | Deletion removed membership | Eligible original initiator sees only the narrow projection, other administrators and ineligible initiators do not |
 
 The native HTTP/backend lookup portion of #125 is delivered. Backend delivery remains #234-#237. CLI delivery remains #158, #159 and the operation-recovery family. Native models/OpenAPI will own delivered names and validation. No new route, DTO, schema artifact, persistence mechanism or workflow engine is specified here.

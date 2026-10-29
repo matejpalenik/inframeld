@@ -21,7 +21,7 @@ Deleting one resource in a live Project follows that resource's narrower rules. 
 5. Delete known-owned data in bounded resumable steps, respecting source-derived evidence, shared storage relationships, late writes and explicit erasure rules. Data outside the Project stays untouched.
 6. Record the actual outcome. Losing a response is not proof of rollback. Inspect the original operation before retrying.
 
-The worker continues the exact deletion that was admitted even when ordinary membership changes. It does not depend on a cached initiating-user permission snapshot, restore the Project or gain authority over another one. This accepted cleanup boundary does not select the unresolved authority model for ordinary paid background work.
+The worker continues the exact deletion that was admitted even when ordinary membership changes. It does not depend on a cached initiating-user permission snapshot, restore the Project or gain authority over another one. This accepted cleanup boundary does not select the accepted [current-principal authority for ordinary paid background work](../../inframeld-access-models/references/decision-admitted-work-authority.md#approved-resolution).
 
 ## Distinguish progress from completion
 

@@ -141,3 +141,9 @@ For contributor routes, start with [developer documentation](../development/READ
 - [ADR-0098: Publish bounded first-party discovery](ADR-0098-publish-bounded-first-party-discovery.md). Accepted profile, qualification pending.
 
 - [ADR-0099: Preserve encoded relative paths in generated clients](ADR-0099-preserve-encoded-relative-paths-in-generated-clients.md). Accepted encoded-path capability for generated SDKs.
+
+- [ADR-0100: Order key revocation at protected boundaries](ADR-0100-order-key-revocation-at-protected-boundaries.md). Accepted PD-ACCESS-01 on 2026-10-29. Implementation and qualification pending.
+
+- [ADR-0101: Authorize admitted jobs by current principal](ADR-0101-authorize-admitted-jobs-by-current-principal.md). Accepted PD-ACCESS-02 on 2026-10-29. Implementation and qualification pending.
+
+- [ADR-0102: Use bounded FIFO with separate recovery execution](ADR-0102-use-bounded-fifo-with-separate-recovery-execution.md). Accepted PD-CONTRACTS-05 on 2026-10-29. Implementation and qualification pending.
