@@ -41,8 +41,13 @@ For backend component design, code generation or structural review, read [module
 
 Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
-- [PD-KNOWLEDGE-01](references/decision-complete-batch-handoff.md): Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
 - [PD-KNOWLEDGE-02](references/decision-retention-erasure-policy.md): Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.
+
+## Accepted decision references
+
+Apply these approved contracts without reopening them. Implementation and qualification remain separate.
+
+- [PD-KNOWLEDGE-01](references/decision-complete-batch-handoff.md): Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
 
 ## Read as needed
 

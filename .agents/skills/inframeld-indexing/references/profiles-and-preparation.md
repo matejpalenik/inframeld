@@ -61,6 +61,10 @@ Indexing supplies source-version/artifact spans and mappings for text actually r
 
 Ragas starter generation reuses processed text without extra generation-time embeddings, reparsing or relationship graphs.
 
+### Apply the accepted coordinate and binding contracts
+
+[PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) selects existing materialization references with complete bounded verified projections and operation-owned pins. [PD-INDEXING-03](decision-source-coordinates.md#approved-resolution) selects canonical conversion identity independent of chunk-only settings and zero-based Unicode code-point half-open ranges. Read those accepted contracts before defining the consuming interfaces. Separate current-health detection, parser runtime limits and physical erasure qualification remain pending.
+
 <a id="understand-what-is-shared"></a>
 
 <a id="model"></a>
@@ -134,11 +138,11 @@ Do not resize returned vectors or silently choose a generic tokenizer to make th
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
 
-- [PD-INDEXING-03: Keep source passage identity stable when chunking changes](decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
+- [PD-INDEXING-03 (accepted): Keep source passage identity stable when chunking changes](decision-source-coordinates.md). Before defining parsed artifact identities, source-span fields, chunk transformation mappings or passage-coverage implementation.
 - [PD-INDEXING-05: Select and prove a bounded parser runtime](decision-parser-runtime-profile.md). Before fixing parser numerical limits or shipping the assembled parser image/sandbox/host profile.
 
 <a id="status-and-sources"></a>

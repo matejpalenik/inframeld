@@ -73,6 +73,10 @@ sequenceDiagram
 
 The current authority and attempt checks are workflow-specific, not a new generic execution framework. Client disconnection does not imply cancellation, failure or authority for replacement work. Storage retries from captured vector bytes retain their separate protocol. Complete synchronous writes such as the grant command finish inside their service-owned transaction instead of being forced through this job shape.
 
+## Complete-batch transaction composition
+
+For Knowledge batches, accepted [PD-KNOWLEDGE-01](../../inframeld-knowledge/references/decision-complete-batch-handoff.md#approved-resolution) keeps durable child admissions and a conditional finalization. The owning application transaction commits exact selection, completion, safe replay outcome, required audit and durable continuation together after bounded inventory preparation. Use lower-level capabilities inside that transaction. Do not wrap independently transaction-owning complete services in an outer begin. New child jobs use the existing atomic capacity/admission contract. Network/storage waits remain outside SQL.
+
 <a id="recovery-boundaries"></a>
 
 ## Recovery boundaries
@@ -146,7 +150,7 @@ Workers call the same commands as the API, including when a source sync discover
 Apply the accepted entries below when their scope matches. Discuss only choices still explicitly marked pending:
 
 - [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
-- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-KNOWLEDGE-01 (accepted): Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
 - [PD-CONTRACTS-05 (accepted): Qualify cleanup and recovery under a full bounded queue](decision-queue-saturation-and-cleanup.md). When selecting worker claim/scheduling behavior or making claims about recovery/cleanup progress under saturation.
 
 <a id="status-and-sources"></a>

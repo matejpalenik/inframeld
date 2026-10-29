@@ -2,6 +2,16 @@
 
 Alice replaces B1 with B2. Admitting B2 makes a new version available. A separately authorized complete selection chooses whether a new CollectionRevision contains it and whether ordinary automatic-update work may follow.
 
+## Finalize the original complete selection
+
+The accepted [PD-KNOWLEDGE-01](decision-complete-batch-handoff.md#approved-resolution) fixes the parent manifest, child identities, effective audience and intended complete selection before finalization. Recover each confirmed admission instead of uploading it again. A failed sibling leaves successful versions saved but the original batch incomplete. Admission completeness does not claim parsing or search readiness.
+
+Prepare large membership inventories in bounded pages. Under current authority and the expected base-selection revision, commit the exact new CollectionRevision, completion marker, safe outcome, audit and durable continuation together in one short application-owned SQL transaction. New child-job admission includes its finite capacity reservation. Storage/provider waits stay outside it. Do not nest independently transaction-owning complete services.
+
+If Bob selects another revision before Alice finalizes, report a conflict and preserve her admitted versions. Replaying Alice's operation cannot silently merge Bob's changes or change its base. A new reviewed selection can combine both. A lost committed response recovers the original selection/handoff.
+
+Downstream preparation and each explicitly named Deployment retain their ordinary admission, captured-input and release-authority checks. Selection completion is distinct from each target's accepted, denied or unfinished handoff. PD-PIPELINES-01 and PD-RELEASES-01 still own their separate receipt/control choices.
+
 <a id="capture-inputs-before-preparation"></a>
 
 ## Capture inputs before preparation

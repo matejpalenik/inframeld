@@ -4,6 +4,12 @@
 
 Alice erases B1 while a delayed worker still has its old vector payload. Deleting visible records once is not enough. A late write may recreate bytes, so application authority must permanently reject the retired physical identity before cleanup.
 
+## Prepared-binding lifetime
+
+Accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) uses the existing scoped materialization identity. An admitted operation owns its pin, attempt, deadline and fence. Exact selected usable dependencies and the pin are resolved together through the shared SQL retention gate. Active/retained references block ordinary retirement. A retained snapshot's metadata alone does not retain all historical vectors. Missing dependencies do not authorize automatic reconstruction.
+
+Release an operation pin when use finishes. Lease expiry alone cannot prove that reads or outbound content stopped. Retain the pin or stop and drain the old runtime unless the enforced deadline stops further use and rejects late results. Explicit erasure/revocation retains precedence. Current-health observation and physical completion mechanics remain separately pending.
+
 <a id="pins-retirement-and-tombstones"></a>
 
 ## Pins, retirement and tombstones

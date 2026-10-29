@@ -20,6 +20,10 @@ Retries use the original admitted operation and durable artifacts. They must not
 
 A complete batch still needs separate Build and target-specific publication authority before an automatic update can move traffic.
 
+## Recover a fixed batch
+
+The accepted [complete-batch contract](decision-complete-batch-handoff.md#approved-resolution) retains the original manifest, effective audiences, input meanings and stable child identities. Changed upload defaults or later files cannot change a retry. Reconcile an uncertain child before admitting another. Keep successful original versions after a partial failure, but finalize only all confirmed original members and the exact reviewed selection. A competing collection selection conflicts without discarding those files or automatically combining changes.
+
 <a id="follow-a-source-sync"></a>
 
 ## Follow a source sync
@@ -125,11 +129,11 @@ Starter uploads use the private group saved in the project's defaults. Future so
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
 
-- [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
+- [PD-KNOWLEDGE-01 (accepted): Finalize a complete collection selection without losing admitted input](decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
 
 <a id="status-and-sources"></a>
 

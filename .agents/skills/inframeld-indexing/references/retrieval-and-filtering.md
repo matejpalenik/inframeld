@@ -16,6 +16,10 @@ SupportBot may query Production but can read only SupportKnowledge. Retrieving g
 
 Logical collections and physical shards are not one-to-one. A ready label alone cannot prove current health. Missing or failed required shards fail visibly instead of silently reducing the corpus, searching another engine or widening filters.
 
+## Resolve and retain the exact binding
+
+Accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) resolves a scoped IndexMaterialization and claims its operation pin atomically through the retention gate. Use its saved exact identities and current server-owned authorization to construct filters. The binding is not a permission certificate. Required missing or unusable dependencies fail visibly. Resolving an old binding cannot follow a mutable latest pointer, substitute a new generation or start hidden preparation. Recheck health/access at the accepted boundaries and release the pin only under the proven lifetime rules.
+
 <a id="changed-state-and-failure-behavior"></a>
 
 ## Changed state and failure behavior

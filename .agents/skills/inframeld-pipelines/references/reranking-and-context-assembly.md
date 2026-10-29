@@ -62,6 +62,8 @@ Hosted reranking is accepted for v1 and needs an approved endpoint and an explic
 
 ### Fit final context without silently changing evidence
 
+Keep each retained passage's exact source-version/canonical-artifact identity and ordered segment mappings under accepted [PD-INDEXING-03](../../inframeld-indexing/references/decision-source-coordinates.md#approved-resolution). Reranking preserves those mappings while reordering candidates. Attribute final-context coverage only to actual retained text. Discontiguous excerpts cannot claim their missing middle, and generated labels have no invented source spans. This does not change the whole-passage fitting rule below.
+
 The Pipeline has two separate limits: retrieve up to **20 candidate passages** initially, then include **at most 5 passages** in generation context. Both are configurable positive integers. The context limit cannot exceed the candidate limit. Apply both limits with or without reranking. Actual returned counts may be smaller.
 
 Reserve the model's fixed input and saved effective `max_output_tokens`, using qualified model/token metadata. Append whole passages in ranked order until the next passage would exceed the remaining input allowance, then stop. Do not truncate, summarize, skip ahead, switch models or silently reduce output to make it fit. Distinguish oversized fixed inputs/first passage from ordinary no-evidence outcomes. Generation has a small supported configuration, including optional model-aware temperature, not arbitrary provider parameters. Exact ranges, presets and billing/reasoning semantics remain contract/adapter qualification.
