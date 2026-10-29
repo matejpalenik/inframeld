@@ -54,6 +54,7 @@ def test_openapi_contract_matches_application() -> None:
     [
         ("/v1/session", "get"),
         ("/v1/projects/{project_id}/grants", "post"),
+        ("/v1/operations/lookup", "post"),
     ],
 )
 def test_human_routes_declare_cookie_or_bearer_and_authentication_errors(

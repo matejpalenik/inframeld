@@ -191,6 +191,7 @@ def test_authentication_and_csrf_precede_application_lookup(
     with client_for(service) as client:
         response = client.post("/v1/operations/lookup", json=BODY, headers=headers)
     assert response.status_code == status
+    assert response.headers["cache-control"] == "no-store"
     assert service.queries == []
 
 
@@ -203,6 +204,7 @@ def test_application_failure_does_not_become_unresolved(failure: Exception, stat
     with client_for(service) as client:
         response = client.post("/v1/operations/lookup", json=BODY, headers=HEADERS)
     assert response.status_code == status
+    assert response.headers["cache-control"] == "no-store"
     assert "operationId" not in response.json()
 
 
@@ -228,6 +230,7 @@ def test_bounded_strict_json_fails_before_application(raw: bytes, status: int) -
             headers=HEADERS | {"Content-Type": "application/json"},
         )
     assert response.status_code == status
+    assert response.headers["cache-control"] == "no-store"
     assert service.queries == []
 
 
@@ -244,5 +247,26 @@ def test_duplicate_valid_key_is_rejected_instead_of_overwritten() -> None:
             content=raw,
             headers=HEADERS | {"Content-Type": "application/json"},
         )
+    assert response.status_code == 422
+    assert service.queries == []
+
+
+@pytest.mark.parametrize("field", ["key", "actionId", "requestedRoute"])
+def test_whitespace_only_identity_fields_are_controlled_validation_failures(field: str) -> None:
+    from copy import deepcopy
+
+    service = MockOriginalLookup()
+    body = deepcopy(BODY)
+    if field == "actionId":
+        guard = body["expectedAuthority"]
+        assert isinstance(guard, dict)
+        guard["actionId"] = "   "
+    else:
+        body[field] = "   "
+    with (
+        client_for(service) as existing,
+        TestClient(existing.app, raise_server_exceptions=False) as client,
+    ):
+        response = client.post("/v1/operations/lookup", json=body, headers=HEADERS)
     assert response.status_code == 422
     assert service.queries == []

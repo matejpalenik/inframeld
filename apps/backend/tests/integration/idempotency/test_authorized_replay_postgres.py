@@ -6,7 +6,7 @@ from typing import override
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios
 from tests.support.authentication_evidence import MockAuthenticationEvidence
@@ -189,13 +189,22 @@ async def _authorized_request(
             is_project_member=True,
             has_action_grant=True,
         )
+        await session.execute(
+            update(ProjectActionGrantRow)
+            .where(
+                ProjectActionGrantRow.project_id == scenario.project_id.value,
+                ProjectActionGrantRow.recipient_principal_id == scenario.principal_id.value,
+                ProjectActionGrantRow.action == scenario.action.value,
+            )
+            .values(action="create-access-groups")
+        )
 
     return (
         AccessContextDTO(
             actor_principal_id=scenario.principal_id,
             authentication_evidence=MockAuthenticationEvidence.browser(),
         ),
-        scenario.action,
+        ActionId("create-access-groups"),
         ProjectOperationAdmissionRequestDTO(
             project_id=scenario.project_id,
             method="POST",

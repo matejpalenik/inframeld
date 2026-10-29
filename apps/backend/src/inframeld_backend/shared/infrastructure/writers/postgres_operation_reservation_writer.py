@@ -136,6 +136,12 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
                 request_key=request.key.value,
                 request_fingerprint=request.fingerprint,
                 expires_at=None,
+                lookup_authority_family=request.lookup_authority.family.value
+                if request.lookup_authority is not None
+                else None,
+                lookup_action_id=request.lookup_authority.action_id.value
+                if request.lookup_authority is not None
+                else None,
             )
             .on_conflict_do_nothing(constraint="uq_idempotency_reservations_scope")
             .returning(
@@ -165,6 +171,8 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
                 IdempotencyReservationRow.state,
                 IdempotencyReservationRow.replay_kind,
                 IdempotencyReservationRow.expires_at,
+                IdempotencyReservationRow.lookup_authority_family,
+                IdempotencyReservationRow.lookup_action_id,
             ).where(
                 IdempotencyReservationRow.principal_id == request.principal_id.value,
                 IdempotencyReservationRow.organization_id == request.organization_id.value,
@@ -179,11 +187,31 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
         if existing is None:
             raise RuntimeError("Conflicting operation reservation was not found after insert.")
 
-        operation_id, saved_fingerprint, state, replay_kind, expires_at = existing
+        (
+            operation_id,
+            saved_fingerprint,
+            state,
+            replay_kind,
+            expires_at,
+            authority_family,
+            action_id,
+        ) = existing
         # The key alone is insufficient: changed input must not inherit the
         # first request's operation, even when its scope and route match.
         if not compare_digest(saved_fingerprint, request.fingerprint):
             raise IdempotencyKeyReusedError()
+
+        if (authority_family is None) != (action_id is None):
+            raise ConflictError()
+        if (
+            request.lookup_authority is not None
+            and authority_family is not None
+            and (
+                authority_family != request.lookup_authority.family.value
+                or action_id != request.lookup_authority.action_id.value
+            )
+        ):
+            raise ConflictError()
 
         # An equivalent retry keeps the original identity and recorded state.
         return OperationReservationResultDTO(
