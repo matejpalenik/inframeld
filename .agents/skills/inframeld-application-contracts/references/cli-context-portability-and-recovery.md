@@ -10,7 +10,7 @@ Alice has a local installation and a remote Support project. A retry or imported
 
 Use the selected one-server-URL discovery and target/account/project contract. Project Name and ID form one precedence choice, not independently merged inputs. Explicit selection overrides both environment forms. Display names are labels, never resource selectors. Stored bindings use permanent IDs.
 
-Admitted work retains original installation/account/project identity. Resolve original retry context before current aliases or changed settings. A missing/inaccessible original target does not authorize substitution.
+Admitted work retains original installation/account/project identity and its expected lookup authority family/action. Capture the guard before dispatch and retain it with the original context. Do not reconstruct it from current grants, aliases or defaults. Resolve original retry context before current aliases or changed settings. A missing/inaccessible original target does not authorize substitution.
 
 For example, Alice admits a query against Support, then rebinds her default alias to Sales. A retry finds the original logical-route idempotency record before resolving a new target. It must not create another paid query against Sales. Exact selector internals remain implementation recommendations rather than a delivered API.
 
@@ -46,7 +46,7 @@ A colored proposal does not prove commit. A saved-revision delta does not alter 
 
 ## Recovery is scoped to original work
 
-Retry job status and safe resume through existing bounded outcomes. Project deletion resumes only the admitted scope and exposes content-free status under its contract. Identity cleanup preserves original obligations, trusted evidence and independent blocks. Neither adds another job state machine or an authorization bypass.
+Original-request lookup independently authorizes the expected authority guard before searching history, then requires exact retained binding equality. It grants no continuation authority. Retry job status and safe resume through existing bounded outcomes. Project deletion resumes only the admitted scope and exposes content-free status under its contract. Identity cleanup preserves original obligations, trusted evidence and independent blocks. Neither adds another job state machine or an authorization bypass.
 
 All commands remain scriptable with descriptive dry-run behavior. [Common machine framing](cli-output-and-automation.md), [invocation outcomes and bounded hints](cli-result-contracts.md) and [logical recovery results](operation-recovery-contracts.md) are accepted design. Backend HTTP names, command-specific payloads and runtime delivery remain implementation work. Do not present an accepted user journey as a delivered provisioning API.
 

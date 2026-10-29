@@ -42,6 +42,9 @@ from inframeld_backend.shared.application.protocols.operation_reservation_writer
     OperationReservationWriter,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+    OperationLookupAuthority,
+)
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
@@ -60,12 +63,20 @@ class IdempotencyService(OperationIdempotency):
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,
         expected_replay_kind: OperationReplayKind,
+        lookup_authority: OperationLookupAuthority | None = None,
     ) -> (
         NewOperationReservationDTO
         | CompletedSynchronousOperationDTO
         | AcceptedAsyncOperationDTO
         | RecoveryRequiredOperationDTO
     ):
+        if lookup_authority is not None:
+            lookup_authority.require_supported_scope(
+                project_id=authorization.project_id,
+                method=context.method,
+                requested_route=context.requested_route,
+            )
+
         stored = await self._reservations.reserve(
             OperationReservationRequestDTO(
                 principal_id=access.actor_principal_id,
@@ -75,6 +86,7 @@ class IdempotencyService(OperationIdempotency):
                 requested_route=context.requested_route,
                 key=context.key,
                 fingerprint=fingerprint.value,
+                lookup_authority=lookup_authority,
             )
         )
         if stored.created:

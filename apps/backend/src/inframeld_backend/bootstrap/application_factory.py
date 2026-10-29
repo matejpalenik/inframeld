@@ -32,6 +32,9 @@ from inframeld_backend.bootstrap.access_composition import create_access_compone
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
+from inframeld_backend.bootstrap.original_operation_lookup_composition import (
+    open_original_operation_lookup,
+)
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
@@ -42,6 +45,9 @@ from inframeld_backend.shared.http.middleware.request_context_middleware import 
 )
 from inframeld_backend.shared.http.openapi.problem_openapi import configure_problem_openapi
 from inframeld_backend.shared.http.routes.health_routes import router as health_router
+from inframeld_backend.shared.http.routes.original_operation_lookup_routes import (
+    create_original_operation_lookup_router,
+)
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
 from inframeld_backend.shared.infrastructure.readers.file_request_fingerprint_key_reader import (
     FileRequestFingerprintKeyReader,
@@ -135,6 +141,12 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_project_grant_router(
                 human_session, partial(open_project_grant_change, database, fingerprints)
+            )
+        )
+
+        application.include_router(
+            create_original_operation_lookup_router(
+                human_session, partial(open_original_operation_lookup, database)
             )
         )
 

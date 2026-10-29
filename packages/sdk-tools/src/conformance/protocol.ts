@@ -15,6 +15,7 @@ export const operations = [
   "inspectHumanOAuthConsent",
   "decideHumanOAuthConsent",
   "assignProjectUseOnlyGrant",
+  "lookupOriginalOperation",
   "contractFixturePayload",
   "contractFixturePage",
   "contractFixtureUpload",

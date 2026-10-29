@@ -16,6 +16,7 @@ const BINDINGS: &[&str] = &[
     "inspectHumanOAuthConsent",
     "decideHumanOAuthConsent",
     "assignProjectUseOnlyGrant",
+    "lookupOriginalOperation",
     "contractFixturePayload",
     "contractFixturePage",
     "contractFixtureUpload",
@@ -65,7 +66,7 @@ async fn main() {
         let mut additional_headers = call.headers.clone();
         if matches!(
             call.operation.as_str(),
-            "getCurrentSession" | "assignProjectUseOnlyGrant"
+            "getCurrentSession" | "assignProjectUseOnlyGrant" | "lookupOriginalOperation"
         ) {
             if let Some(token) = call
                 .headers

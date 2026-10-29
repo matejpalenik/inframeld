@@ -54,6 +54,7 @@ def test_openapi_contract_matches_application() -> None:
     [
         ("/v1/session", "get"),
         ("/v1/projects/{project_id}/grants", "post"),
+        ("/v1/operations/lookup", "post"),
     ],
 )
 def test_human_routes_declare_cookie_or_bearer_and_authentication_errors(
@@ -303,3 +304,24 @@ def test_consent_declares_cookie_only_security_and_problem_responses(
         request = schema["components"]["schemas"]["HumanOAuthConsentRequest"]
         assert request["additionalProperties"] is False
         assert set(request["properties"]) == {"consentChallenge", "decision", "remember"}
+
+
+@pytest.mark.parametrize(
+    "model,required",
+    [
+        ("CompletedOperationLookupResponse", {"outcome"}),
+        (
+            "AcceptedOperationLookupResponse",
+            {"outcome", "admission", "jobReference", "dispatch", "idempotencyExpiresAt"},
+        ),
+        ("InProgressOperationLookupResponse", {"outcome"}),
+        ("RecoveryRequiredOperationLookupResponse", {"outcome", "reason"}),
+        ("UnresolvedOperationLookupResponse", {"outcome"}),
+    ],
+)
+def test_lookup_wire_alternatives_require_their_discriminator_and_uncertainty(
+    model: str, required: set[str]
+) -> None:
+    """Clients must reject absent outcome tags and absent explicit uncertainty fields."""
+    schema = create_app().openapi()["components"]["schemas"][model]
+    assert required <= set(schema.get("required", []))

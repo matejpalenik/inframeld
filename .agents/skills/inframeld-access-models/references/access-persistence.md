@@ -98,6 +98,8 @@ All these tables use the same permission rules and two grant levels. Separate ta
 
 ## Current action-grant tables
 
+Original-request lookup reads these current grants to authorize its expected guard independently of reservation existence. Organization lookup uses the existing exact Organization grant and current eligible human in that Organization, without inventing a Project. Retained authority family/action on a reservation is historical matching metadata, never a grant or permission snapshot. The [lookup contract](../../inframeld-application-contracts/references/operation-recovery-contracts.md#original-request-lookup) owns supported families and legacy failure handling.
+
 Every grant row contains `recipient_principal_id`, `recipient_kind`, `action`, `can_grant`, and assignment attribution. `action` is a stable identifier defined in code. Row checks restrict actions and recipient kinds to the supported catalogue as it is implemented.
 
 An application's `can_grant` must be `false`. The recipient-kind foreign key prevents treating it as human. Application policy also denies unknown or unsupported actions, even if an unexpected value appears in storage.

@@ -78,6 +78,8 @@ The action reader still executes one statement. The grant reader retains its thr
 
 ### Typed authorization capabilities
 
+Original-request lookup has a separate read capability. It validates the expected family/action and exact scope, checks current eligibility and the selected family's current authority before any reservation-history read, then allows only an exact retained authority-binding match. The expected guard does not certify original meaning. The retained binding does not certify current permission. The [lookup contract](../../inframeld-application-contracts/references/operation-recovery-contracts.md#original-request-lookup) owns the public non-disclosure matrix and supported families. This read does not execute an action or recheck a grant recipient as a new assignment.
+
 Alice performing a project action and assigning Bob permission to perform it are different decisions. Both need current eligibility, but assignment also checks delegation authority and the recipient. [ADR-0067](../../../../docs/adr/ADR-0067-standardize-authorization-capabilities-with-typed-requests.md) gives both a common calling convention without combining their rules.
 
 [`Authorizer[RequestType, ResultType]`](../../../../apps/backend/src/inframeld_backend/access/application/protocols/authorizer.py) declares the abstract keyword-only method `require_authorization(access, request)`. The family Protocol specializes request and result types. Concrete services and test doubles explicitly inherit their family and mark the method with `@override`. Inheriting this required behavior does not create an empty marker interface.

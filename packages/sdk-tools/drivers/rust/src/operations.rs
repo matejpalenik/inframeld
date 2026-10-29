@@ -84,6 +84,11 @@ pub async fn observe(
                 .decide_human_o_auth_consent(serde_json::from_value(body).unwrap())
                 .await
         ),
+        "lookupOriginalOperation" => observed!(
+            client
+                .lookup_original_operation(serde_json::from_value(body).unwrap())
+                .await
+        ),
         "assignProjectUseOnlyGrant" => observed!(
             client
                 .assign_project_use_only_grant(

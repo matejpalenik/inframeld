@@ -12,7 +12,7 @@ For code suggestions or reviews, read [Coding Standards](../../inframeld-coding-
 
 Knowledge owns sources, Indexing verified search data, Pipelines builds/query/receipts/feedback, Evaluation offline evidence, Releases serving selection and Access identity/authorization. Application workflows call stable Access operations rather than assembling permission checks independently. Read projections may join owners without becoming additional writers.
 
-Jobs and audit are supporting records, not a seventh domain or event-sourcing framework.
+Jobs and audit are supporting records, not a seventh domain or event-sourcing framework. Shared original-request lookup coordinates an Access-owned pre-search check of the expected authority guard with a read-only reservation projection. Exact retained identity and authority must match before disclosure. It never invokes reservation, command execution, jobs or ModelGateway. [Original-request lookup](operation-recovery-contracts.md#original-request-lookup) owns its contract.
 
 ```mermaid
 flowchart TB

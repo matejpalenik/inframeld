@@ -35,6 +35,7 @@ Start the backend, learn one workflow and follow its owner when you need details
 The skill references are written for people as well as coding agents. They own detailed accepted behavior and architecture. Read a focused workflow directly. You do not need to load every skill or the full glossary first.
 
 - [Access](../../.agents/skills/inframeld-access-models/SKILL.md): identity, authentication, grants, recovery and credential protection.
+- [Original-request lookup](guides/original-request-lookup.md): recover retained admission under current authority without repeating work.
 - [Knowledge](../../.agents/skills/inframeld-knowledge/SKILL.md): documents, immutable versions, collections and source synchronization.
 - [Indexing](../../.agents/skills/inframeld-indexing/SKILL.md): parsing, embeddings, verified search data and cleanup.
 - [Pipelines](../../.agents/skills/inframeld-pipelines/SKILL.md): configuration, ordinary execution, receipts, feedback and tracing.

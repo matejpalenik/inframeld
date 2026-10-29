@@ -3,6 +3,36 @@
 import * as z from 'zod';
 
 /**
+ * AcceptedOperationLookupResponse
+ *
+ * Confirm retained admission while making unknown dispatch and references explicit.
+ */
+export const zAcceptedOperationLookupResponse = z.object({
+    admission: z.literal('confirmed'),
+    dispatch: z.literal('not_established'),
+    idempotencyExpiresAt: z.iso.datetime().nullable(),
+    jobReference: z.literal('unknown'),
+    operationId: z.string(),
+    outcome: z.literal('accepted_asynchronous')
+});
+
+/**
+ * CompletedOperationLookupResponse
+ *
+ * Expose safe synchronous outcome metadata without replaying content.
+ */
+export const zCompletedOperationLookupResponse = z.object({
+    classification: z.enum([
+        'safe_result',
+        'issued_secret',
+        'answer_receipt'
+    ]),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string(),
+    outcome: z.literal('completed_synchronous')
+});
+
+/**
  * CurrentSessionResponse
  */
 export const zCurrentSessionResponse = z.object({
@@ -41,6 +71,14 @@ export const zHumanOAuthConsentDetailsResponse = z.object({
 });
 
 /**
+ * InProgressOperationLookupResponse
+ */
+export const zInProgressOperationLookupResponse = z.object({
+    operationId: z.string(),
+    outcome: z.literal('in_progress')
+});
+
+/**
  * InframeldDiscoveryResponse
  *
  * Bind the fixed CLI profile to the persistent public installation identity.
@@ -64,6 +102,43 @@ export const zOAuthConsentDecision = z.enum(['allow', 'deny']);
 export const zHumanOAuthConsentRequest = z.object({
     decision: zOAuthConsentDecision,
     remember: z.boolean().optional().default(false)
+});
+
+/**
+ * OperationLookupAuthorityFamily
+ *
+ * Select a fixed current-authority check without granting permission.
+ */
+export const zOperationLookupAuthorityFamily = z.enum([
+    'project_action_use',
+    'project_grant_read',
+    'organization_action_use'
+]);
+
+/**
+ * OperationLookupAuthorityRequest
+ */
+export const zOperationLookupAuthorityRequest = z.object({
+    actionId: z.string().min(1).max(100),
+    family: zOperationLookupAuthorityFamily
+});
+
+/**
+ * OriginalOperationLookupRequest
+ */
+export const zOriginalOperationLookupRequest = z.object({
+    expectedAuthority: zOperationLookupAuthorityRequest,
+    installationId: z.uuid(),
+    key: z.string().min(1).max(128),
+    method: z.enum([
+        'POST',
+        'PUT',
+        'PATCH',
+        'DELETE'
+    ]),
+    organizationId: z.uuid(),
+    projectId: z.uuid().nullable(),
+    requestedRoute: z.string().min(1)
 });
 
 /**
@@ -102,6 +177,30 @@ export const zProtectedResourceMetadataResponse = z.object({
     resource: z.string(),
     scopes_supported: z.tuple([z.literal('inframeld:api')])
 });
+
+/**
+ * RecoveryRequiredOperationLookupResponse
+ */
+export const zRecoveryRequiredOperationLookupResponse = z.object({
+    operationId: z.string(),
+    outcome: z.literal('recovery_required'),
+    reason: z.literal('original_outcome_requires_recovery')
+});
+
+/**
+ * UnresolvedOperationLookupResponse
+ */
+export const zUnresolvedOperationLookupResponse = z.object({
+    outcome: z.literal('unresolved')
+});
+
+export const zOperationLookupResponse = z.discriminatedUnion('outcome', [
+    zCompletedOperationLookupResponse,
+    zAcceptedOperationLookupResponse,
+    zInProgressOperationLookupResponse,
+    zRecoveryRequiredOperationLookupResponse,
+    zUnresolvedOperationLookupResponse
+]);
 
 /**
  * ValidationIssue
@@ -332,6 +431,58 @@ export const zDecideHumanOAuthConsent503Representation0Response = zProblemDetail
  * Successful Response
  */
 export const zDecideHumanOAuthConsentResponse = zHumanOAuthConsentDecisionResponse;
+
+export const zLookupOriginalOperationBody = zOriginalOperationLookupRequest;
+
+/**
+ * Successful Response
+ */
+export const zLookupOriginalOperation200Representation0Response = zOperationLookupResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zLookupOriginalOperation400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zLookupOriginalOperation401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zLookupOriginalOperation403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zLookupOriginalOperation404Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zLookupOriginalOperation413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zLookupOriginalOperation415Representation0Response = zProblemDetails;
+
+/**
+ * Invalid input
+ */
+export const zLookupOriginalOperation422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zLookupOriginalOperation503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zLookupOriginalOperationResponse = zOperationLookupResponse;
 
 export const zAssignProjectUseOnlyGrantBody = zProjectUseOnlyGrantRequest;
 

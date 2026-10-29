@@ -120,7 +120,7 @@ Local lifecycle commands retain confirmed started/stopped/unknown effects under 
 
 A request key must survive the interval before acknowledgment if the CLI generated it. Before dispatching a remote product mutation or chargeable request with a CLI-generated key, durably save a current-user recovery hint. If saving fails, fail before dispatch. Ordinary product reads, dry-run and local lifecycle observations create no hint. Provider login/refresh keeps its separate credential-lifecycle contract.
 
-Callers supplying `--idempotency-key` may use a stateless path with no hint. They must retain the original immutable context and key themselves. This allows CI with read-only local state. An explicit key neither proves that a request is a retry nor permits a different target or payload to replace its original meaning.
+Callers supplying `--idempotency-key` may use a stateless path with no hint. They must retain the original immutable context, expected authority guard and key themselves. This allows CI with read-only local state. An explicit key neither proves that a request is a retry nor permits a different target or payload to replace its original meaning.
 
 | Hint component | Meaning and restriction |
 | --- | --- |
@@ -129,6 +129,7 @@ Callers supplying `--idempotency-key` may use a stateless path with no hint. The
 | Scope | Original organization ID and Project ID where applicable |
 | Method and route | Original canonical logical method/route, preserving its original meaning rather than today's default resolution |
 | Request key | Original opaque non-secret idempotency identity, subject to the existing 128-character limit |
+| Expected original authority | Family and action captured from the submitting operation before dispatch. An untrusted lookup mismatch guard, never a permission snapshot |
 | Creation time | UTC time of local creation, not proof of server admission or server retention |
 | Known references | Operation/job identities only when actually received. No guessed IDs |
 
@@ -138,7 +139,7 @@ Fixed private bounds are 1,000 pending hints per current OS user, each at most 3
 
 Remove a hint after confirmed admission/result has been handed back successfully, or after explicit user discard. A known job reference handed back after admission is sufficient handoff, not a claim of completed work. Keep the hint when server acknowledgment or output delivery is uncertain. Local expiry guesses, cache cleanup and an absent file cannot establish that the request did nothing.
 
-Recovery is explicit. Load original binding and current credentials through normal target/account rules, then request [authoritative lookup](operation-recovery-contracts.md#original-request-lookup). No current alias or environment override can retarget it. Deleted/missing target bindings, changed installation/principal identities, invalid credentials and unavailable history produce safe failures without replacement discovery or automatic replay. A hint cannot construct managed-local trust or authorize continuation. A later replay still needs the original inputs and server fingerprint checks, which the hint deliberately does not retain.
+Recovery is explicit. Load original binding and current credentials through normal target/account rules, then request [authoritative lookup](operation-recovery-contracts.md#original-request-lookup). No current alias or environment override can retarget it. Deleted/missing target bindings, changed installation/principal identities, invalid credentials and unavailable history produce safe failures without replacement discovery or automatic replay. A hint cannot construct managed-local trust or authorize continuation. Missing or invalid expected authority is a recovery-input failure. Do not reconstruct it from current grants or defaults. A changed guard cannot recover another retained binding or downgrade a fixed route. Future unknown resource targets need an owner-specific pre-search contract. The guard remains within the same hint size/count bounds. A later replay still needs the original inputs and server fingerprint checks, which the hint deliberately does not retain.
 
 ## Qualification scenarios
 

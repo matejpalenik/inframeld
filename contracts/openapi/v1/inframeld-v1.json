@@ -1,6 +1,95 @@
 {
   "components": {
     "schemas": {
+      "AcceptedOperationLookupResponse": {
+        "additionalProperties": false,
+        "description": "Confirm retained admission while making unknown dispatch and references explicit.",
+        "properties": {
+          "admission": {
+            "const": "confirmed",
+            "title": "Admission",
+            "type": "string"
+          },
+          "dispatch": {
+            "const": "not_established",
+            "title": "Dispatch",
+            "type": "string"
+          },
+          "idempotencyExpiresAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotencyexpiresat"
+          },
+          "jobReference": {
+            "const": "unknown",
+            "title": "Jobreference",
+            "type": "string"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "outcome": {
+            "const": "accepted_asynchronous",
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "operationId",
+          "admission",
+          "jobReference",
+          "dispatch",
+          "idempotencyExpiresAt"
+        ],
+        "title": "AcceptedOperationLookupResponse",
+        "type": "object"
+      },
+      "CompletedOperationLookupResponse": {
+        "additionalProperties": false,
+        "description": "Expose safe synchronous outcome metadata without replaying content.",
+        "properties": {
+          "classification": {
+            "enum": [
+              "safe_result",
+              "issued_secret",
+              "answer_receipt"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "outcome": {
+            "const": "completed_synchronous",
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "operationId",
+          "classification",
+          "idempotencyExpiresAt"
+        ],
+        "title": "CompletedOperationLookupResponse",
+        "type": "object"
+      },
       "CurrentSessionResponse": {
         "properties": {
           "principalId": {
@@ -114,6 +203,26 @@
         "title": "HumanOAuthScope",
         "type": "string"
       },
+      "InProgressOperationLookupResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "outcome": {
+            "const": "in_progress",
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "operationId"
+        ],
+        "title": "InProgressOperationLookupResponse",
+        "type": "object"
+      },
       "InframeldDiscoveryResponse": {
         "additionalProperties": false,
         "description": "Bind the fixed CLI profile to the persistent public installation identity.",
@@ -149,6 +258,127 @@
         ],
         "title": "OAuthConsentDecision",
         "type": "string"
+      },
+      "OperationLookupAuthorityFamily": {
+        "description": "Select a fixed current-authority check without granting permission.",
+        "enum": [
+          "project_action_use",
+          "project_grant_read",
+          "organization_action_use"
+        ],
+        "title": "OperationLookupAuthorityFamily",
+        "type": "string"
+      },
+      "OperationLookupAuthorityRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "actionId": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Actionid",
+            "type": "string"
+          },
+          "family": {
+            "$ref": "#/components/schemas/OperationLookupAuthorityFamily"
+          }
+        },
+        "required": [
+          "family",
+          "actionId"
+        ],
+        "title": "OperationLookupAuthorityRequest",
+        "type": "object"
+      },
+      "OperationLookupResponse": {
+        "discriminator": {
+          "mapping": {
+            "accepted_asynchronous": "#/components/schemas/AcceptedOperationLookupResponse",
+            "completed_synchronous": "#/components/schemas/CompletedOperationLookupResponse",
+            "in_progress": "#/components/schemas/InProgressOperationLookupResponse",
+            "recovery_required": "#/components/schemas/RecoveryRequiredOperationLookupResponse",
+            "unresolved": "#/components/schemas/UnresolvedOperationLookupResponse"
+          },
+          "propertyName": "outcome"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/CompletedOperationLookupResponse"
+          },
+          {
+            "$ref": "#/components/schemas/AcceptedOperationLookupResponse"
+          },
+          {
+            "$ref": "#/components/schemas/InProgressOperationLookupResponse"
+          },
+          {
+            "$ref": "#/components/schemas/RecoveryRequiredOperationLookupResponse"
+          },
+          {
+            "$ref": "#/components/schemas/UnresolvedOperationLookupResponse"
+          }
+        ]
+      },
+      "OriginalOperationLookupRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedAuthority": {
+            "$ref": "#/components/schemas/OperationLookupAuthorityRequest"
+          },
+          "installationId": {
+            "format": "uuid",
+            "title": "Installationid",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
+          },
+          "requestedRoute": {
+            "minLength": 1,
+            "title": "Requestedroute",
+            "type": "string"
+          }
+        },
+        "required": [
+          "installationId",
+          "organizationId",
+          "projectId",
+          "method",
+          "requestedRoute",
+          "key",
+          "expectedAuthority"
+        ],
+        "title": "OriginalOperationLookupRequest",
+        "type": "object"
       },
       "ProblemDetails": {
         "additionalProperties": false,
@@ -368,6 +598,47 @@
           "inframeld"
         ],
         "title": "ProtectedResourceMetadataResponse",
+        "type": "object"
+      },
+      "RecoveryRequiredOperationLookupResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "outcome": {
+            "const": "recovery_required",
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "const": "original_outcome_requires_recovery",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "operationId",
+          "reason"
+        ],
+        "title": "RecoveryRequiredOperationLookupResponse",
+        "type": "object"
+      },
+      "UnresolvedOperationLookupResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "outcome": {
+            "const": "unresolved",
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "UnresolvedOperationLookupResponse",
         "type": "object"
       },
       "ValidationIssue": {
@@ -797,6 +1068,141 @@
         "summary": "Decide Consent",
         "tags": [
           "access"
+        ]
+      }
+    },
+    "/v1/operations/lookup": {
+      "post": {
+        "operationId": "lookupOriginalOperation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OriginalOperationLookupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationLookupResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "HumanBearer": []
+          }
+        ],
+        "summary": "Lookup",
+        "tags": [
+          "operations"
         ]
       }
     },

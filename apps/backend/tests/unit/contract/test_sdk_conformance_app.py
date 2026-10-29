@@ -435,3 +435,36 @@ def test_expanded_unicode_discovery_preserves_identity_and_wire_path() -> None:
     assert response.json()["resource"] == "https://api.test/" + "é" * 1500
     assert evidence["observations"]["unicode"]["path"] == path
     assert evidence["counts"] == {"unicode": 1}
+
+
+def test_original_lookup_fixture_preserves_null_scope_guard_and_unknown_reference() -> None:
+    body = {
+        "installationId": "00000000-0000-4000-8000-000000000001",
+        "organizationId": "00000000-0000-4000-8000-000000000002",
+        "projectId": None,
+        "method": "POST",
+        "requestedRoute": "/v1/original-organization-operation",
+        "key": "accepted",
+        "expectedAuthority": {"family": "organization_action_use", "actionId": "create-projects"},
+    }
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/lookup-wire", json={"calls": {"lookup-wire": {"kind": "none"}}}
+        )
+        response = client.post(
+            "/v1/operations/lookup",
+            json=body,
+            headers={"Authorization": "Bearer sdk-human", "X-SDK-Test": "lookup-wire"},
+        )
+        witness = client.get("/sdk-control/cases/lookup-wire").json()["observations"]["lookup-wire"]
+    assert response.status_code == 200
+    assert response.json() == {
+        "outcome": "accepted_asynchronous",
+        "operationId": "sdk-original-operation",
+        "admission": "confirmed",
+        "jobReference": "unknown",
+        "dispatch": "not_established",
+        "idempotencyExpiresAt": None,
+    }
+    assert witness["jsonBody"] == body
+    assert response.headers["cache-control"] == "no-store"

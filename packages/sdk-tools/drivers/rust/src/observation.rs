@@ -135,3 +135,15 @@ problems!(
     GetProtectedResourceMetadataForPathApiError::Status404,
     GetProtectedResourceMetadataForPathApiError::Status503
 );
+
+problems!(
+    LookupOriginalOperationApiError,
+    LookupOriginalOperationApiError::Status400,
+    LookupOriginalOperationApiError::Status401,
+    LookupOriginalOperationApiError::Status403,
+    LookupOriginalOperationApiError::Status404,
+    LookupOriginalOperationApiError::Status413,
+    LookupOriginalOperationApiError::Status415,
+    LookupOriginalOperationApiError::Status422,
+    LookupOriginalOperationApiError::Status503
+);

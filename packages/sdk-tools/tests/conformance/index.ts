@@ -2,6 +2,7 @@
 import "./consent.ts";
 import "./sessions.ts";
 import "./grants.ts";
+import "./operation-lookup.ts";
 import "./schema.ts";
 import "./transport.ts";
 import "./responses.ts";

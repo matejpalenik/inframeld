@@ -10,7 +10,9 @@ import inframeld_sdk_fixtures
 from inframeld_sdk.api.access_api import AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi
+from inframeld_sdk.api.operations_api import OperationsApi
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
+from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
 from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest
 from inframeld_sdk_fixtures.api.default_api import DefaultApi
 from inframeld_sdk_fixtures.models.contract_fixture_payload import ContractFixturePayload
@@ -166,6 +168,22 @@ async def assign_grant_async(clients: Clients, call: Call) -> NativeResponse:
         project_use_only_grant_request=grant_body(call),
         _request_timeout=call.timeout / 1000,
         _headers=call.headers,
+    )
+
+
+def lookup_sync(clients: Clients, call: Call) -> NativeResponse:
+    return OperationsApi(clients.production).lookup_original_operation_sync_with_http_info(
+        original_operation_lookup_request=OriginalOperationLookupRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def lookup_async(clients: Clients, call: Call) -> NativeResponse:
+    return await OperationsApi(clients.production).lookup_original_operation_with_http_info(
+        original_operation_lookup_request=OriginalOperationLookupRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
     )
 
 
@@ -325,6 +343,7 @@ BINDINGS: dict[Operation, Binding] = {
     "inspectHumanOAuthConsent": Binding(inspect_consent_sync, inspect_consent_async),
     "decideHumanOAuthConsent": Binding(decide_consent_sync, decide_consent_async),
     "assignProjectUseOnlyGrant": Binding(assign_grant_sync, assign_grant_async),
+    "lookupOriginalOperation": Binding(lookup_sync, lookup_async),
     "contractFixturePayload": Binding(payload_sync, payload_async),
     "contractFixturePage": Binding(page_sync, page_async),
     "contractFixtureUpload": Binding(upload_sync, upload_async),
