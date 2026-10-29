@@ -158,6 +158,7 @@ export const buildUrl: Client['buildUrl'] = (options) =>
   getUrl({
     baseUrl: options.baseUrl as string,
     path: options.path,
+    encodedPathParams: options.encodedPathParams,
     query: options.query,
     querySerializer:
       typeof options.querySerializer === 'function'

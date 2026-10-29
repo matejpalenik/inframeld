@@ -19,6 +19,7 @@ __version__ = "0.0.0"
 # Define package exports
 __all__ = [
     "AccessApi",
+    "DiscoveryApi",
     "HealthApi",
     "ApiResponse",
     "ApiClient",
@@ -34,16 +35,19 @@ __all__ = [
     "HumanOAuthConsentDetailsResponse",
     "HumanOAuthConsentRequest",
     "HumanOAuthScope",
+    "InframeldDiscoveryResponse",
     "OAuthConsentDecision",
     "PathInner",
     "ProblemDetails",
     "ProjectUseOnlyGrantRequest",
     "ProjectUseOnlyGrantResponse",
+    "ProtectedResourceMetadataResponse",
     "ValidationIssue",
 ]
 
 # import apis into sdk package
 from inframeld_sdk.api.access_api import AccessApi as AccessApi
+from inframeld_sdk.api.discovery_api import DiscoveryApi as DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi as HealthApi
 
 # import ApiClient
@@ -63,10 +67,12 @@ from inframeld_sdk.models.human_o_auth_consent_decision_response import HumanOAu
 from inframeld_sdk.models.human_o_auth_consent_details_response import HumanOAuthConsentDetailsResponse as HumanOAuthConsentDetailsResponse
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest as HumanOAuthConsentRequest
 from inframeld_sdk.models.human_o_auth_scope import HumanOAuthScope as HumanOAuthScope
+from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
 from inframeld_sdk.models.o_auth_consent_decision import OAuthConsentDecision as OAuthConsentDecision
 from inframeld_sdk.models.path_inner import PathInner as PathInner
 from inframeld_sdk.models.problem_details import ProblemDetails as ProblemDetails
 from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest as ProjectUseOnlyGrantRequest
 from inframeld_sdk.models.project_use_only_grant_response import ProjectUseOnlyGrantResponse as ProjectUseOnlyGrantResponse
+from inframeld_sdk.models.protected_resource_metadata_response import ProtectedResourceMetadataResponse as ProtectedResourceMetadataResponse
 from inframeld_sdk.models.validation_issue import ValidationIssue as ValidationIssue
 

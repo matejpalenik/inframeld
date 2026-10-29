@@ -34,6 +34,13 @@ const options = (client: Client, call: SdkCall, signal?: AbortSignal) => ({
 // Cast only the validated test-protocol input at the generated API boundary.
 // Request validation remains the generator's qualified policy, not a driver repair.
 const calls = {
+  getProtectedResourceMetadata: (client: Client, call: SdkCall) =>
+    sdk.getProtectedResourceMetadata(options(client, call)),
+  getProtectedResourceMetadataForPath: (client: Client, call: SdkCall) =>
+    sdk.getProtectedResourceMetadataForPath({
+      ...options(client, call),
+      path: call.path as { resource_path: string },
+    }),
   contractFixtureVariants: (client: Client, call: SdkCall) =>
     fixtures.contractFixtureVariants({
       ...options(client, call),

@@ -24,7 +24,7 @@ from inframeld_sdk_fixtures.models.page_response_int import PageResponseInt
 import inframeld_sdk_fixtures.models as response_models
 
 
-from inframeld_sdk_fixtures.api_client import ApiClient, RequestSerialized
+from inframeld_sdk_fixtures.api_client import ApiClient, _EncodedRelativePath, RequestSerialized
 from inframeld_sdk_fixtures.api_response import ApiResponse
 from inframeld_sdk_fixtures.rest import RESTResponseType
 from inframeld_sdk_fixtures.sync_helper import run_sync

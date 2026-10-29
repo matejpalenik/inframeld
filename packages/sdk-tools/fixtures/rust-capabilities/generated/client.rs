@@ -311,6 +311,40 @@ impl Default for HttpClient {
         Self::new()
     }
 }
+fn __encoded_relative_path(s: &str) -> Result<String, HttpError> {
+    let invalid = || HttpError::Serialization(
+        "Invalid percent-encoded relative path".into(),
+    );
+    if s.starts_with('/') || s.len() > 8192 {
+        return Err(invalid());
+    }
+    let mut decoded = Vec::new();
+    let mut bytes = s.bytes();
+    while let Some(b) = bytes.next() {
+        if b == b'%' {
+            let hi = bytes
+                .next()
+                .and_then(|c| (c as char).to_digit(16))
+                .ok_or_else(&invalid)?;
+            let lo = bytes
+                .next()
+                .and_then(|c| (c as char).to_digit(16))
+                .ok_or_else(&invalid)?;
+            decoded.push((hi * 16 + lo) as u8);
+        } else if b.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:@/".contains(&b) {
+            decoded.push(b);
+        } else {
+            return Err(invalid());
+        }
+    }
+    let decoded = String::from_utf8(decoded).map_err(|_| invalid())?;
+    if decoded.chars().any(|c| c.is_control() || c == '\\')
+        || decoded.split('/').any(|s| matches!(s, "." | ".."))
+    {
+        return Err(invalid());
+    }
+    Ok(s.to_owned())
+}
 fn __pct_encode_path_segment(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for &b in s.as_bytes() {

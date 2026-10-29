@@ -4,6 +4,12 @@ all-features = true
 
 [advisories]
 unmaintained = "workspace"
+# Approved for public metadata discovery only. Reassess on dependency or crypto-use changes.
+# Assessment: docs/development/reports/server-discovery-verification.md#dependency-audit-assessment
+ignore = [
+    { id = "RUSTSEC-2023-0071", reason = "openidconnect discovery only parses public metadata and keys. No private RSA keys, decryption or signing are used. Reassess before introducing private-key operations." },
+    { id = "RUSTSEC-2026-0387", reason = "openidconnect discovery only parses public metadata and keys. No secret-integer arithmetic is used. Reassess before introducing operations on cryptographic secrets." },
+]
 
 [licenses]
 allow = ["Apache-2.0", "MIT", "BSD-3-Clause", "ISC", "Unicode-3.0"]

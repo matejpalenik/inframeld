@@ -1,6 +1,7 @@
 inframeld_sdk/__init__.py
 inframeld_sdk/api/__init__.py
 inframeld_sdk/api/access_api.py
+inframeld_sdk/api/discovery_api.py
 inframeld_sdk/api/health_api.py
 inframeld_sdk/api_client.py
 inframeld_sdk/api_response.py
@@ -12,11 +13,13 @@ inframeld_sdk/models/human_o_auth_consent_decision_response.py
 inframeld_sdk/models/human_o_auth_consent_details_response.py
 inframeld_sdk/models/human_o_auth_consent_request.py
 inframeld_sdk/models/human_o_auth_scope.py
+inframeld_sdk/models/inframeld_discovery_response.py
 inframeld_sdk/models/o_auth_consent_decision.py
 inframeld_sdk/models/path_inner.py
 inframeld_sdk/models/problem_details.py
 inframeld_sdk/models/project_use_only_grant_request.py
 inframeld_sdk/models/project_use_only_grant_response.py
+inframeld_sdk/models/protected_resource_metadata_response.py
 inframeld_sdk/models/validation_issue.py
 inframeld_sdk/py.typed
 inframeld_sdk/rest.py

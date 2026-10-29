@@ -77,3 +77,5 @@ For SDK response integrity, native typing and package-consumption evidence, see 
 The subsequent [response-fix verification and architectural review](reports/sdk-response-fixes-verification.md) covers typed failures, status/media variants and safe transport defaults under [ADR-0094](../adr/ADR-0094-select-sdk-response-variants-and-safe-transport-defaults.md).
 
 - [Rust CLI foundation](../../apps/cli/README.md): commands, strict Rust checks, native archives and explicit installation/removal.
+
+For public metadata configuration and stateless client validation, read [server discovery](guides/server-discovery.md).

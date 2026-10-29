@@ -58,7 +58,9 @@ cargo install --locked --version 0.20.2 cargo-deny
 cargo deny --manifest-path apps/cli/Cargo.toml --locked check
 ```
 
-The private pnpm wrapper integrates `@inframeld/cli` with repository lint, typecheck, test and build. CLI Turbo tasks disable caching so shared Cargo/SDK changes cannot reuse stale results. Formatting checks also include Rust. End users of archives need none of Rust, Node, pnpm or Python.
+The private pnpm wrapper integrates `@inframeld/cli` with repository lint, typecheck, test and build. CLI Turbo tasks disable caching so shared Cargo/SDK changes cannot reuse stale results. Formatting checks also include Rust. Both authored crates deny missing public documentation. Strict documentation checks include every feature, while generated SDK settings remain separate. To inspect internal component documentation, add `--document-private-items` to the `cargo doc` command above. End users of archives need none of Rust, Node, pnpm or Python.
+
+The [discovery dependency assessment](../../docs/development/reports/server-discovery-verification.md#dependency-audit-assessment) documents the two approved advisory exceptions in `deny.toml` and when their applicability must be reassessed.
 
 ## Package without publishing
 
@@ -79,9 +81,13 @@ Use a clean checkout and locked inputs for qualification. Linux packaging runs o
 
 [ADR-0095](../../docs/adr/ADR-0095-support-matching-qualified-cli-and-runtime-releases.md) selects matching explicitly qualified releases. The checked-in compatibility descriptor owns policy fields. Cargo supplies the package version and the build script generates one metadata document with revision, dirty-source status and target. CLI output, archived metadata and qualification evidence consume that document. A development archive does not imply a clean or released revision. Current version `0.0.0` is a development build, with no qualified released runtime. `inframeld version` reports source revision, target and **Remote compatibility: unverified**. Health and login cannot prove release compatibility. Automatic remote checks await the owning backend contract.
 
-The command/parser and output layers handle local presentation only. Explicit connection inputs do not discover targets, enforce remote trust policy, read environment selections or establish permissions. Product application calls use `inframeld-sdk`, preserving typed errors, response metadata, bounded timeouts and disabled automatic retries/redirects. A decode or acknowledgment failure never authorizes another dispatch. Credentials, discovery and saved selections remain with #159/#160.
+The command/parser and output layers handle local presentation only. Explicit connection inputs do not discover targets, enforce remote trust policy, read environment selections or establish permissions. Product application calls use `inframeld-sdk`, preserving typed errors, response metadata, bounded timeouts and disabled automatic retries/redirects. A decode or acknowledgment failure never authorizes another dispatch. Credential storage and saved selections remain with #159/#160. The stateless discovery library is described below.
 
 ## Rust tooling layout
+
+The runtime starts in `src/main.rs`, with parsing and dispatch in private `src/app.rs`. The library preserves `inframeld_cli::run` through a re-export. `src/commands/version.rs` handles the offline version command using `BuildMetadata::render`, which also supplies the text checked by packaging qualification. It has no separate empty argument record or general reporting framework.
+
+The private xtask follows the same entry-point split: `src/main.rs` reports the result, `src/arguments.rs` declares clap inputs and `src/app.rs` dispatches them. `src/package.rs` coordinates packaging through `PackagingContext`, which owns resolved build inputs and configured commands. `src/verify/mod.rs` retains the verification API and evidence record, `src/verify/inspect.rs` checks archives before execution and `src/verify/native.rs` owns native installation and execution qualification. Archive and bounded-process mechanics remain in `src/archive.rs` and `src/process.rs`.
 
 `cargo xtask package` owns the complete build, metadata stamping, normalization, checksum, installation/removal and native execution path. `--reproducible` forces a second CLI compilation and compares typed evidence. `cargo xtask verify <archive> --target <target>` checks an already normalized native archive. `cargo xtask normalize <archive> --epoch <seconds>` is the low-level normalization command. Commands are build-only and do not publish.
 
@@ -98,3 +104,11 @@ The [Rust Standards library reference](../../.agents/skills/inframeld-rust-stand
 ## Command and presentation organization
 
 [ADR-0097](../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md) accepts command-family modules within one CLI package, command-local clap declarations and typed results before shared reporting. The [Rust Standards structure reference](../../.agents/skills/inframeld-rust-standards/references/cli-structure.md) explains placement through a worked declaration and the end-to-end lifecycle flowchart. [Application Contracts' presentation reference](../../.agents/skills/inframeld-application-contracts/references/cli-presentation-components.md) owns reusable components consuming the accepted output/result contracts. These are accepted targets. General JSON, progress and product-command implementation and qualification remain separate work.
+
+## Stateless server discovery
+
+The library's `discovery::discover` validates one exact HTTPS API identity without accessing credentials, saving targets or starting browser login. It uses the generated application SDK for RFC 9728 metadata and the maintained OpenID Connect library for the advertised Hydra provider. `DiscoveryOptions` supports additional trusted CA certificates and an explicit proxy. Proxy environment variables are not read implicitly. Public errors retain safe categories rather than raw upstream text.
+
+Start reading at [`src/discovery/mod.rs`](src/discovery/mod.rs), which preserves the public interface and keeps managed-local context fields private. The operation lives in `discover.rs`, installation records and provider validation in `installation.rs`, URL decisions in `url_policy.rs`, provider HTTP adaptation in `oidc_transport.rs` and safe failures in `error.rs`. Transport scenarios remain together in `transport_tests.rs`, while pure URL tests live beside their policy. This split follows responsibilities rather than requiring identical layer folders for every capability.
+
+Discovery allows ten seconds overall, five per request and 64 KiB per response, with redirects and retries disabled. The internal managed-local context has no public constructor or deserialization path. Its origin/installation checks are tested with controlled trusted context. Actual managed-runtime ownership remains #162. Target persistence and login remain #159/#160. The [server discovery guide](../../docs/development/guides/server-discovery.md) describes the wire profile and operator setup, with [manual inspection steps and their limits](../../docs/development/guides/server-discovery.md#manually-check-the-current-delivery).

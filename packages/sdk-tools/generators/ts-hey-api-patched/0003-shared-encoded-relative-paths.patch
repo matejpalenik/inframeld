@@ -1,0 +1,26 @@
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -5316,6 +5316,7 @@
+ 	});
+ 	const style = defaultStyle$2(parameter.in);
+ 	const irParameter = {
++        encodedPath: parameter.schema?.["x-inframeld-encoded-path"] === true,
+ 		allowReserved: false,
+ 		explode: defaultExplode$2(parameter.collectionFormat),
+ 		location: parameter.in,
+@@ -6618,6 +6619,7 @@
+ 	const style = parameter.style || defaultStyle$1(parameter.in);
+ 	const explode = parameter.explode !== void 0 ? parameter.explode : defaultExplode$1(style);
+ 	const irParameter = {
++        encodedPath: parameter.schema?.["x-inframeld-encoded-path"] === true,
+ 		allowReserved: parameter.allowReserved !== void 0 ? parameter.allowReserved : defaultAllowReserved$1(parameter.in),
+ 		explode,
+ 		location: parameter.in,
+@@ -8048,6 +8050,7 @@
+ 	const style = parameter.style || defaultStyle(parameter.in);
+ 	const explode = parameter.explode !== void 0 ? parameter.explode : defaultExplode(style);
+ 	const irParameter = {
++        encodedPath: parameter.schema?.["x-inframeld-encoded-path"] === true,
+ 		allowReserved: parameter.allowReserved !== void 0 ? parameter.allowReserved : defaultAllowReserved(parameter.in),
+ 		explode,
+ 		location: parameter.in,

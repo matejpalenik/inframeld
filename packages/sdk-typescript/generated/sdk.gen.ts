@@ -2,8 +2,8 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { AssignProjectUseOnlyGrantData, AssignProjectUseOnlyGrantErrors, AssignProjectUseOnlyGrantResponses, DecideHumanOAuthConsentData, DecideHumanOAuthConsentErrors, DecideHumanOAuthConsentResponses, GetCurrentSessionData, GetCurrentSessionErrors, GetCurrentSessionResponses, GetHealthData, GetHealthErrors, GetHealthResponses, InspectHumanOAuthConsentData, InspectHumanOAuthConsentErrors, InspectHumanOAuthConsentResponses } from './types.gen.js';
-import { zAssignProjectUseOnlyGrant201Representation0Response, zAssignProjectUseOnlyGrant400Representation0Response, zAssignProjectUseOnlyGrant401Representation0Response, zAssignProjectUseOnlyGrant403Representation0Response, zAssignProjectUseOnlyGrant404Representation0Response, zAssignProjectUseOnlyGrant409Representation0Response, zAssignProjectUseOnlyGrant422Representation0Response, zAssignProjectUseOnlyGrant503Representation0Response, zAssignProjectUseOnlyGrantResponse, zDecideHumanOAuthConsent200Representation0Response, zDecideHumanOAuthConsent400Representation0Response, zDecideHumanOAuthConsent401Representation0Response, zDecideHumanOAuthConsent403Representation0Response, zDecideHumanOAuthConsent404Representation0Response, zDecideHumanOAuthConsent422Representation0Response, zDecideHumanOAuthConsent503Representation0Response, zDecideHumanOAuthConsentResponse, zGetCurrentSession200Representation0Response, zGetCurrentSession400Representation0Response, zGetCurrentSession401Representation0Response, zGetCurrentSession403Representation0Response, zGetCurrentSession503Representation0Response, zGetCurrentSessionResponse, zGetHealth200Representation0Response, zGetHealth500Representation0Response, zGetHealthResponse, zInspectHumanOAuthConsent200Representation0Response, zInspectHumanOAuthConsent400Representation0Response, zInspectHumanOAuthConsent401Representation0Response, zInspectHumanOAuthConsent403Representation0Response, zInspectHumanOAuthConsent404Representation0Response, zInspectHumanOAuthConsent422Representation0Response, zInspectHumanOAuthConsent503Representation0Response, zInspectHumanOAuthConsentResponse } from './zod.gen.js';
+import type { AssignProjectUseOnlyGrantData, AssignProjectUseOnlyGrantErrors, AssignProjectUseOnlyGrantResponses, DecideHumanOAuthConsentData, DecideHumanOAuthConsentErrors, DecideHumanOAuthConsentResponses, GetCurrentSessionData, GetCurrentSessionErrors, GetCurrentSessionResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetProtectedResourceMetadataData, GetProtectedResourceMetadataErrors, GetProtectedResourceMetadataForPathData, GetProtectedResourceMetadataForPathErrors, GetProtectedResourceMetadataForPathResponses, GetProtectedResourceMetadataResponses, InspectHumanOAuthConsentData, InspectHumanOAuthConsentErrors, InspectHumanOAuthConsentResponses } from './types.gen.js';
+import { zAssignProjectUseOnlyGrant201Representation0Response, zAssignProjectUseOnlyGrant400Representation0Response, zAssignProjectUseOnlyGrant401Representation0Response, zAssignProjectUseOnlyGrant403Representation0Response, zAssignProjectUseOnlyGrant404Representation0Response, zAssignProjectUseOnlyGrant409Representation0Response, zAssignProjectUseOnlyGrant422Representation0Response, zAssignProjectUseOnlyGrant503Representation0Response, zAssignProjectUseOnlyGrantResponse, zDecideHumanOAuthConsent200Representation0Response, zDecideHumanOAuthConsent400Representation0Response, zDecideHumanOAuthConsent401Representation0Response, zDecideHumanOAuthConsent403Representation0Response, zDecideHumanOAuthConsent404Representation0Response, zDecideHumanOAuthConsent422Representation0Response, zDecideHumanOAuthConsent503Representation0Response, zDecideHumanOAuthConsentResponse, zGetCurrentSession200Representation0Response, zGetCurrentSession400Representation0Response, zGetCurrentSession401Representation0Response, zGetCurrentSession403Representation0Response, zGetCurrentSession503Representation0Response, zGetCurrentSessionResponse, zGetHealth200Representation0Response, zGetHealth500Representation0Response, zGetHealthResponse, zGetProtectedResourceMetadata200Representation0Response, zGetProtectedResourceMetadata404Representation0Response, zGetProtectedResourceMetadata422Representation0Response, zGetProtectedResourceMetadata503Representation0Response, zGetProtectedResourceMetadataForPath200Representation0Response, zGetProtectedResourceMetadataForPath404Representation0Response, zGetProtectedResourceMetadataForPath422Representation0Response, zGetProtectedResourceMetadataForPath503Representation0Response, zGetProtectedResourceMetadataForPathResponse, zGetProtectedResourceMetadataResponse, zInspectHumanOAuthConsent200Representation0Response, zInspectHumanOAuthConsent400Representation0Response, zInspectHumanOAuthConsent401Representation0Response, zInspectHumanOAuthConsent403Representation0Response, zInspectHumanOAuthConsent404Representation0Response, zInspectHumanOAuthConsent422Representation0Response, zInspectHumanOAuthConsent503Representation0Response, zInspectHumanOAuthConsentResponse } from './zod.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -18,6 +18,41 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Root Metadata
+ *
+ * Read anonymous public metadata for a root API identity.
+ */
+export const getProtectedResourceMetadata = <ThrowOnError extends boolean = false>(options?: Options<GetProtectedResourceMetadataData, ThrowOnError>): RequestResult<GetProtectedResourceMetadataResponses, GetProtectedResourceMetadataErrors, ThrowOnError> => (options?.client ?? client).get<GetProtectedResourceMetadataResponses, GetProtectedResourceMetadataErrors, ThrowOnError>({
+    url: '/.well-known/oauth-protected-resource',
+    ...options,
+    responseValidator: async (data) => await zGetProtectedResourceMetadataResponse.parseAsync(data),
+    responseContract: {
+        200: { hasBody: true, representations: [{ mediaType: 'application/json', validator: async (data) => await zGetProtectedResourceMetadata200Representation0Response.parseAsync(data) }] },
+        404: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProtectedResourceMetadata404Representation0Response.parseAsync(data) }] },
+        422: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProtectedResourceMetadata422Representation0Response.parseAsync(data) }] },
+        503: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProtectedResourceMetadata503Representation0Response.parseAsync(data) }] }
+    }
+});
+
+/**
+ * Path Metadata
+ *
+ * Read anonymous public metadata for the exact configured API path.
+ */
+export const getProtectedResourceMetadataForPath = <ThrowOnError extends boolean = false>(options: Options<GetProtectedResourceMetadataForPathData, ThrowOnError>): RequestResult<GetProtectedResourceMetadataForPathResponses, GetProtectedResourceMetadataForPathErrors, ThrowOnError> => (options.client ?? client).get<GetProtectedResourceMetadataForPathResponses, GetProtectedResourceMetadataForPathErrors, ThrowOnError>({
+    url: '/.well-known/oauth-protected-resource/{resource_path}',
+    ...options,
+    encodedPathParams: ['resource_path'],
+    responseValidator: async (data) => await zGetProtectedResourceMetadataForPathResponse.parseAsync(data),
+    responseContract: {
+        200: { hasBody: true, representations: [{ mediaType: 'application/json', validator: async (data) => await zGetProtectedResourceMetadataForPath200Representation0Response.parseAsync(data) }] },
+        404: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProtectedResourceMetadataForPath404Representation0Response.parseAsync(data) }] },
+        422: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProtectedResourceMetadataForPath422Representation0Response.parseAsync(data) }] },
+        503: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProtectedResourceMetadataForPath503Representation0Response.parseAsync(data) }] }
+    }
+});
 
 /**
  * Health

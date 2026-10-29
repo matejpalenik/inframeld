@@ -1,0 +1,61 @@
+--- a/python/api.mustache
++++ b/python/api.mustache
+@@ -16,7 +16,7 @@
+ from {{modelPackage}}.{{#lambda.snakecase}}{{{.}}}{{/lambda.snakecase}} import {{{.}}}
+ {{/value.schema.complexType}}{{/value.schema.isModel}}{{/entrySet}}{{/content}}{{/responses}}{{/operation}}{{/operations}}
+ 
+-from {{packageName}}.api_client import ApiClient, RequestSerialized
++from {{packageName}}.api_client import ApiClient, _EncodedRelativePath, RequestSerialized
+ from {{packageName}}.api_response import ApiResponse
+ from {{packageName}}.rest import RESTResponseType
+ {{#supportHttpxSync}}
+@@ -322,7 +322,7 @@
+         # process the path parameters
+ {{#pathParams}}
+         if {{paramName}} is not None:
+-            _path_params['{{baseName}}'] = {{paramName}}{{#isEnumRef}}.value{{/isEnumRef}}
++            _path_params['{{baseName}}'] = {{#vendorExtensions.x-inframeld-encoded-path}}_EncodedRelativePath(ApiClient._encoded_relative_path({{paramName}})){{/vendorExtensions.x-inframeld-encoded-path}}{{^vendorExtensions.x-inframeld-encoded-path}}{{paramName}}{{#isEnumRef}}.value{{/isEnumRef}}{{/vendorExtensions.x-inframeld-encoded-path}}
+ {{/pathParams}}
+         # process the query parameters
+ {{#queryParams}}
+--- a/python/api_client.mustache
++++ b/python/api_client.mustache
+@@ -45,6 +45,10 @@
+ {{/compatibleWithPythonLegacy}}
+ RequestSerialized = Tuple[str, str, Dict[str, str], Optional[str], List[str]]
+ 
++class _EncodedRelativePath(str):
++    pass
++
++
+ class ApiClient:
+     """Generic API client for OpenAPI client library builds.
+ 
+@@ -80,6 +84,18 @@
+         'object': object,
+     }
+     _pool = None
++
++    @staticmethod
++    def _encoded_relative_path(value: str) -> str:
++        import re
++        from urllib.parse import unquote
++
++        if len(value) > 8192 or value.startswith('/') or re.fullmatch(r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})*", value) is None:
++            raise ValueError("Invalid percent-encoded relative path")
++        decoded = unquote(value, errors="strict")
++        if any(ord(c) < 32 or 127 <= ord(c) <= 159 or c == "\\" for c in decoded) or any(part in {".", ".."} for part in decoded.split('/')):
++            raise ValueError("Invalid percent-encoded relative path")
++        return value
+ 
+     def __init__(
+         self,
+@@ -342,7 +358,7 @@
+                 # specified safe chars, encode everything
+                 resource_path = resource_path.replace(
+                     '{%s}' % k,
+-                    quote(str(v), safe=config.safe_chars_for_path_param)
++                    str(v) if isinstance(v, _EncodedRelativePath) else quote(str(v), safe=config.safe_chars_for_path_param)
+                 )
+ 
+         # post parameters

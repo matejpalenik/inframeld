@@ -1,3 +1,5 @@
+//! Exercise generated-client requests, response metadata and explicit connection failures.
+
 // Disposable server setup and assertions fail immediately rather than hiding a failed fixture.
 #![allow(clippy::unwrap_used)]
 use inframeld_cli::{client, context::Connection};

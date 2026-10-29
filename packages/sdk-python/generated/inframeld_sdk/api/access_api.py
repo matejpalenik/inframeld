@@ -27,7 +27,7 @@ from inframeld_sdk.models.project_use_only_grant_response import ProjectUseOnlyG
 import inframeld_sdk.models as response_models
 
 
-from inframeld_sdk.api_client import ApiClient, RequestSerialized
+from inframeld_sdk.api_client import ApiClient, _EncodedRelativePath, RequestSerialized
 from inframeld_sdk.api_response import ApiResponse
 from inframeld_sdk.rest import RESTResponseType
 from inframeld_sdk.sync_helper import run_sync

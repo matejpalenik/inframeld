@@ -72,3 +72,9 @@ const fallbackRepresentation: ContractFixtureVariantsResponses["default"] = {
   jobId: "job-123",
 };
 void fallbackRepresentation;
+
+const forbiddenPathEncoding: SessionOptions<GetCurrentSessionData> = {
+  // @ts-expect-error Path encoding is fixed by generated operation metadata.
+  encodedPathParams: [],
+};
+void forbiddenPathEncoding;

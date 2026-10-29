@@ -1,3 +1,5 @@
+//! Embed compatibility policy and source/target identity without generating SDK code.
+
 use std::{env, fs, path::PathBuf, process::Command};
 
 fn git(arguments: &[&str]) -> Option<String> {

@@ -412,3 +412,13 @@ def test_case_evidence_is_scoped_and_deleted_without_resetting_total_dispatches(
     assert removed.status_code == 404
     assert set(second.json()["observations"]) == {"two"}
     assert counts == {"_total": 2}
+
+
+def test_path_witness_retains_wire_escaping() -> None:
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post("/sdk-control/cases/escaped", json={"calls": {"escaped": {"kind": "none"}}})
+        client.get(
+            "/.well-known/oauth-protected-resource/api%2Fv1", headers={"X-SDK-Test": "escaped"}
+        )
+        observed = client.get("/sdk-control/cases/escaped").json()["observations"]["escaped"]
+        assert observed["path"] == "/.well-known/oauth-protected-resource/api%2Fv1"

@@ -9,8 +9,19 @@ pub struct Connection {
 impl Connection {
     /// Parse an API base URL. Target discovery and HTTPS policy belong to target registration.
     ///
+    /// This validates connection syntax without requesting the server. Success
+    /// establishes neither installation identity nor permission to send credentials.
+    ///
     /// # Errors
     /// Rejects invalid URLs, credentials, query strings, fragments and non-HTTP schemes.
+    ///
+    /// # Examples
+    /// ```
+    /// use inframeld_cli::context::Connection;
+    ///
+    /// assert!(Connection::new("https://api.example.test").is_ok());
+    /// assert!(Connection::new("ftp://api.example.test").is_err());
+    /// ```
     pub fn new(base_url: &str) -> Result<Self, InvalidConnection> {
         let parsed = url::Url::parse(base_url).map_err(|_| InvalidConnection)?;
         if !matches!(parsed.scheme(), "http" | "https")

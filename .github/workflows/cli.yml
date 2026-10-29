@@ -71,7 +71,7 @@ jobs:
           cargo clippy --locked -p inframeld-cli -p inframeld-cli-xtask --all-targets --all-features --no-deps -- -D warnings
           cargo test --locked -p inframeld-cli -p inframeld-cli-xtask --all-features
           cargo test --locked -p inframeld-cli-xtask --release --test qualification
-          RUSTDOCFLAGS='-D warnings' cargo doc --locked -p inframeld-cli -p inframeld-cli-xtask --no-deps
+          RUSTDOCFLAGS='-D warnings' cargo doc --locked -p inframeld-cli -p inframeld-cli-xtask --all-features --no-deps
       - name: Install checksum-verified packaging tool
         shell: bash
         env:

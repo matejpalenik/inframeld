@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
-import { createClient, getHealth } from "@inframeld/sdk";
+import {
+  createClient,
+  getHealth,
+  getProtectedResourceMetadataForPath,
+} from "@inframeld/sdk";
 
 test(
   "the default deadline remains active when the caller supplies cancellation",
@@ -124,6 +128,37 @@ test("JavaScript callers cannot turn invalid timeout values into defaults", asyn
   for (const timeoutMs of [null, "5000", {}]) {
     const dynamic: Record<string, unknown> = { timeoutMs };
     const result = await getHealth(Object.assign({ client }, dynamic));
+    assert.equal(result.error?.kind, "request");
+  }
+  assert.equal(count, 0);
+});
+
+test("invalid encoded paths fail before fetch", async () => {
+  let count = 0;
+  const client = createClient({
+    baseUrl: "https://sdk.test",
+    fetch: async () => {
+      count++;
+      return new Response("{}", { status: 500 });
+    },
+  });
+  for (const resource_path of [
+    "/absolute",
+    "a?x=1",
+    "a#fragment",
+    "a\\b",
+    "a%",
+    "a%GG",
+    "../admin",
+    "a/%2e%2e/admin",
+    "a%00b",
+    "a%FF",
+    "a b",
+  ]) {
+    const result = await getProtectedResourceMetadataForPath({
+      client,
+      path: { resource_path },
+    });
     assert.equal(result.error?.kind, "request");
   }
   assert.equal(count, 0);

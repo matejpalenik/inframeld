@@ -1,3 +1,5 @@
+//! Keep missing packaging prerequisites actionable without creating user files.
+
 // Process assertions deliberately fail immediately.
 #![allow(clippy::unwrap_used)]
 use assert_cmd::cargo::cargo_bin_cmd;

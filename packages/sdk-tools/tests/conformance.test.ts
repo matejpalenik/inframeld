@@ -24,7 +24,10 @@ import {
   type SdkCall,
 } from "../src/conformance/protocol.ts";
 import { controlJson } from "../src/conformance/backend.ts";
-import { assertCoverage } from "../src/conformance/coverage.ts";
+import {
+  assertCoverage,
+  type OperationMetadata,
+} from "../src/conformance/coverage.ts";
 import {
   assertCompleteReports,
   assertCaseOutcome,
@@ -52,7 +55,7 @@ const report: ProfileReport = {
   results: [],
 };
 let fixture: ProfileFixture;
-let operations: Map<string, { method: string; path: string }>;
+let operations: Map<string, OperationMetadata>;
 const removeInterruptHandlers = installInterruptHandlers();
 
 before(
@@ -209,7 +212,9 @@ for (const definition of selected)
                 witness,
                 operation.method,
                 operation.path.replace(/\{([^}]+)\}/g, (_, name: string) =>
-                  encodeURIComponent(call.path?.[name] ?? ""),
+                  operation.encodedPathParams?.includes(name)
+                    ? (call.path?.[name] ?? "")
+                    : encodeURIComponent(call.path?.[name] ?? ""),
                 ),
               );
             }

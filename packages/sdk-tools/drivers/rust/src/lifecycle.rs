@@ -48,6 +48,42 @@ mod tests {
         server.join().unwrap();
     }
 
+    #[tokio::test]
+    async fn encoded_paths_fail_before_opening_a_connection() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let client = inframeld_sdk::HttpClient::new()
+            .with_base_url(format!("http://{}", listener.local_addr().unwrap()));
+        for value in [
+            "/absolute",
+            "a?x=1",
+            "a#fragment",
+            "a\\b",
+            "a%",
+            "a%GG",
+            "../admin",
+            "a/%2e%2e/admin",
+            "a%00b",
+            "a%FF",
+            "a b",
+        ] {
+            let result = client.get_protected_resource_metadata_for_path(value).await;
+            assert!(
+                matches!(
+                    result,
+                    Err(inframeld_sdk::client::ApiOpError::Transport(
+                        inframeld_sdk::client::HttpError::Serialization(_)
+                    ))
+                ),
+                "{value}: {result:?}"
+            );
+        }
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
+
     fn read_request_headers(stream: &mut impl Read) -> std::io::Result<Vec<u8>> {
         let mut request = Vec::new();
         let mut buffer = [0; 4096];
@@ -107,6 +143,8 @@ mod tests {
                 while !finished.load(Ordering::SeqCst) {
                     match listener.accept() {
                         Ok((mut stream, _)) => {
+                            // Accept polling is nonblocking, but header reads must wait for bytes.
+                            stream.set_nonblocking(false).unwrap();
                             stream
                                 .set_read_timeout(Some(Duration::from_secs(1)))
                                 .unwrap();

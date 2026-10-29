@@ -41,6 +41,17 @@ export const zHumanOAuthConsentDetailsResponse = z.object({
 });
 
 /**
+ * InframeldDiscoveryResponse
+ *
+ * Bind the fixed CLI profile to the persistent public installation identity.
+ */
+export const zInframeldDiscoveryResponse = z.object({
+    client_id: z.literal('inframeld-cli'),
+    installation_id: z.uuid(),
+    schema_version: z.literal(1)
+});
+
+/**
  * OAuthConsentDecision
  */
 export const zOAuthConsentDecision = z.enum(['allow', 'deny']);
@@ -77,6 +88,19 @@ export const zProjectUseOnlyGrantResponse = z.object({
     operationId: z.string(),
     projectId: z.uuid(),
     recipientPrincipalId: z.uuid()
+});
+
+/**
+ * ProtectedResourceMetadataResponse
+ *
+ * Publish the bounded first-party RFC 9728 profile, not private provider configuration.
+ */
+export const zProtectedResourceMetadataResponse = z.object({
+    authorization_servers: z.tuple([z.string()]),
+    bearer_methods_supported: z.tuple([z.literal('header')]),
+    inframeld: zInframeldDiscoveryResponse,
+    resource: z.string(),
+    scopes_supported: z.tuple([z.literal('inframeld:api')])
 });
 
 /**
@@ -149,6 +173,60 @@ export const zHumanOAuthConsentRequestWritable = z.object({
     decision: zOAuthConsentDecision,
     remember: z.boolean().optional().default(false)
 });
+
+/**
+ * Successful Response
+ */
+export const zGetProtectedResourceMetadata200Representation0Response = zProtectedResourceMetadataResponse;
+
+/**
+ * Resource not found
+ */
+export const zGetProtectedResourceMetadata404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zGetProtectedResourceMetadata422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetProtectedResourceMetadata503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetProtectedResourceMetadataResponse = zProtectedResourceMetadataResponse;
+
+export const zGetProtectedResourceMetadataForPathPath = z.object({
+    resource_path: z.string()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetProtectedResourceMetadataForPath200Representation0Response = zProtectedResourceMetadataResponse;
+
+/**
+ * Resource not found
+ */
+export const zGetProtectedResourceMetadataForPath404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zGetProtectedResourceMetadataForPath422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetProtectedResourceMetadataForPath503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetProtectedResourceMetadataForPathResponse = zProtectedResourceMetadataResponse;
 
 /**
  * Response Gethealth

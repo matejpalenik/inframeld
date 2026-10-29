@@ -311,6 +311,40 @@ impl Default for HttpClient {
         Self::new()
     }
 }
+fn __encoded_relative_path(s: &str) -> Result<String, HttpError> {
+    let invalid = || HttpError::Serialization(
+        "Invalid percent-encoded relative path".into(),
+    );
+    if s.starts_with('/') || s.len() > 8192 {
+        return Err(invalid());
+    }
+    let mut decoded = Vec::new();
+    let mut bytes = s.bytes();
+    while let Some(b) = bytes.next() {
+        if b == b'%' {
+            let hi = bytes
+                .next()
+                .and_then(|c| (c as char).to_digit(16))
+                .ok_or_else(&invalid)?;
+            let lo = bytes
+                .next()
+                .and_then(|c| (c as char).to_digit(16))
+                .ok_or_else(&invalid)?;
+            decoded.push((hi * 16 + lo) as u8);
+        } else if b.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:@/".contains(&b) {
+            decoded.push(b);
+        } else {
+            return Err(invalid());
+        }
+    }
+    let decoded = String::from_utf8(decoded).map_err(|_| invalid())?;
+    if decoded.chars().any(|c| c.is_control() || c == '\\')
+        || decoded.split('/').any(|s| matches!(s, "." | ".."))
+    {
+        return Err(invalid());
+    }
+    Ok(s.to_owned())
+}
 fn __pct_encode_path_segment(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for &b in s.as_bytes() {
@@ -359,6 +393,20 @@ pub enum GetCurrentSessionApiError {
 #[derive(Debug, Clone)]
 pub enum GetHealthApiError {
     Status500(ProblemDetails),
+}
+///Typed error responses for `getProtectedResourceMetadata`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum GetProtectedResourceMetadataApiError {
+    Status404(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
+///Typed error responses for `getProtectedResourceMetadataForPath`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum GetProtectedResourceMetadataForPathApiError {
+    Status404(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
 }
 ///Typed error responses for `inspectHumanOAuthConsent`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
@@ -1193,6 +1241,362 @@ impl HttpClient {
                         {
                             Ok(v) => {
                                 typed = Some(GetHealthApiError::Status500(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Root Metadata
+    ///
+    /// Read anonymous public metadata for a root API identity.
+    ///
+    /// `GET /.well-known/oauth-protected-resource`
+    pub async fn get_protected_resource_metadata(
+        &self,
+    ) -> Result<
+        self::response::ApiResponse<ProtectedResourceMetadataResponse>,
+        ApiOpError<GetProtectedResourceMetadataApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, "/.well-known/oauth-protected-resource"
+        );
+        let mut req = self.http_client.get(request_url);
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<GetProtectedResourceMetadataApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    GetProtectedResourceMetadataApiError::Status404(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    GetProtectedResourceMetadataApiError::Status422(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    GetProtectedResourceMetadataApiError::Status503(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Path Metadata
+    ///
+    /// Read anonymous public metadata for the exact configured API path.
+    ///
+    /// `GET /.well-known/oauth-protected-resource/{resource_path}`
+    pub async fn get_protected_resource_metadata_for_path(
+        &self,
+        resource_path: impl AsRef<str>,
+    ) -> Result<
+        self::response::ApiResponse<ProtectedResourceMetadataResponse>,
+        ApiOpError<GetProtectedResourceMetadataForPathApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/.well-known/oauth-protected-resource/{}",
+            __encoded_relative_path(resource_path.as_ref()) ?)
+        );
+        let mut req = self.http_client.get(request_url);
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<GetProtectedResourceMetadataForPathApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    GetProtectedResourceMetadataForPathApiError::Status404(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    GetProtectedResourceMetadataForPathApiError::Status422(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    GetProtectedResourceMetadataForPathApiError::Status503(v),
+                                );
                                 parse_error = None;
                             }
                             Err(e) => {

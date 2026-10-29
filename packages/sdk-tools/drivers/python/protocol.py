@@ -5,6 +5,8 @@ from typing import Literal, TypeAlias
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, JsonValue
 
 Operation: TypeAlias = Literal[
+    "getProtectedResourceMetadata",
+    "getProtectedResourceMetadataForPath",
     "getHealth",
     "getCurrentSession",
     "inspectHumanOAuthConsent",

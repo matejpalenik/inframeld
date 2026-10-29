@@ -122,3 +122,16 @@ macro_rules! observed {
 }
 
 pub(crate) use observed;
+
+problems!(
+    GetProtectedResourceMetadataApiError,
+    GetProtectedResourceMetadataApiError::Status422,
+    GetProtectedResourceMetadataApiError::Status404,
+    GetProtectedResourceMetadataApiError::Status503
+);
+problems!(
+    GetProtectedResourceMetadataForPathApiError,
+    GetProtectedResourceMetadataForPathApiError::Status422,
+    GetProtectedResourceMetadataForPathApiError::Status404,
+    GetProtectedResourceMetadataForPathApiError::Status503
+);

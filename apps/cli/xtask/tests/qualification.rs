@@ -1,3 +1,5 @@
+//! Exercise native artifact gates, safe installation and unchanged user-state evidence.
+
 // Assertions and fixture setup fail immediately on unmet expectations.
 #![allow(clippy::unwrap_used)]
 use inframeld_cli::metadata::BuildMetadata;

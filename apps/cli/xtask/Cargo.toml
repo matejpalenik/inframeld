@@ -25,6 +25,7 @@ predicates = "3"
 
 [lints.rust]
 warnings = "deny"
+missing_docs = "deny"
 unsafe_code = "forbid"
 missing_debug_implementations = "warn"
 unreachable_pub = "warn"

@@ -1,3 +1,5 @@
+//! Reject false compatibility claims in embedded build metadata.
+
 // Fixtures and assertions deliberately fail immediately on invalid expectations.
 #![allow(clippy::unwrap_used)]
 use inframeld_cli::metadata::BuildMetadata;

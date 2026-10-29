@@ -49,3 +49,5 @@ Stages run independently where their inputs permit it. Compilation failure block
 The [runbook](../README.md) owns commands and caches. [Shared qualification](../../../.agents/skills/inframeld-sdks/references/shared-qualification.md) owns conformance policy. HTTP compatibility and business behavior remain with their existing application/domain owners.
 
 The external patterns behind this design are [Node’s standard test runner](https://nodejs.org/api/test.html), [Playwright browser contexts](https://playwright.dev/docs/browser-contexts) and [Smithy’s explicit HTTP compliance expectations](https://smithy.io/2.0/additional-specs/http-protocol-compliance-tests.html). We use these patterns while retaining OpenAPI and the selected generators.
+
+Path witnesses retain the raw percent-encoded request path separately from ASGI routing interpretation. This preserves evidence for slash and percent escaping instead of comparing a decoded path to an encoded expectation.

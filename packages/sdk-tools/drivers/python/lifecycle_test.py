@@ -129,3 +129,46 @@ class SyncDeadlineTests(unittest.TestCase):
         finally:
             run_sync(client.close())
         self.assertTrue(client.rest_client.pool_manager.is_closed)
+
+
+class EncodedPathTests(unittest.IsolatedAsyncioTestCase):
+    async def test_invalid_paths_never_dispatch(self) -> None:
+        from inframeld_sdk.api.discovery_api import DiscoveryApi
+
+        count = 0
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal count
+            count += 1
+            return httpx.Response(500)
+
+        client = inframeld_sdk.ApiClient(inframeld_sdk.Configuration(host="http://sdk.test"))
+        client.rest_client.pool_manager = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        try:
+            for value in [
+                "/absolute",
+                "a?x=1",
+                "a#fragment",
+                "a\\b",
+                "a%",
+                "a%GG",
+                "../admin",
+                "a/%2e%2e/admin",
+                "a%00b",
+                "a%FF",
+                "a b",
+            ]:
+                with self.assertRaises(ValueError):
+                    await DiscoveryApi(
+                        client
+                    ).get_protected_resource_metadata_for_path_with_http_info(value)
+                with self.assertRaises(ValueError):
+                    await asyncio.to_thread(
+                        DiscoveryApi(
+                            client
+                        ).get_protected_resource_metadata_for_path_sync_with_http_info,
+                        value,
+                    )
+            self.assertEqual(count, 0)
+        finally:
+            await client.close()

@@ -79,6 +79,26 @@ export type HumanOAuthConsentRequest = {
 export type HumanOAuthScope = 'openid' | 'offline_access' | 'inframeld:api';
 
 /**
+ * InframeldDiscoveryResponse
+ *
+ * Bind the fixed CLI profile to the persistent public installation identity.
+ */
+export type InframeldDiscoveryResponse = {
+    /**
+     * Client Id
+     */
+    client_id: 'inframeld-cli';
+    /**
+     * Installation Id
+     */
+    installation_id: string;
+    /**
+     * Schema Version
+     */
+    schema_version: 1;
+};
+
+/**
  * OAuthConsentDecision
  */
 export type OAuthConsentDecision = 'allow' | 'deny';
@@ -209,6 +229,37 @@ export type ProjectUseOnlyGrantResponse = {
 };
 
 /**
+ * ProtectedResourceMetadataResponse
+ *
+ * Publish the bounded first-party RFC 9728 profile, not private provider configuration.
+ */
+export type ProtectedResourceMetadataResponse = {
+    /**
+     * Authorization Servers
+     */
+    authorization_servers: [
+        string
+    ];
+    /**
+     * Bearer Methods Supported
+     */
+    bearer_methods_supported: [
+        'header'
+    ];
+    inframeld: InframeldDiscoveryResponse;
+    /**
+     * Resource
+     */
+    resource: string;
+    /**
+     * Scopes Supported
+     */
+    scopes_supported: [
+        'inframeld:api'
+    ];
+};
+
+/**
  * ValidationIssue
  *
  * Describe one sanitized issue in an incoming request.
@@ -266,6 +317,79 @@ export type HumanOAuthConsentRequestWritable = {
      */
     remember?: boolean;
 };
+
+export type GetProtectedResourceMetadataData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/.well-known/oauth-protected-resource';
+};
+
+export type GetProtectedResourceMetadataErrors = {
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetProtectedResourceMetadataError = GetProtectedResourceMetadataErrors[keyof GetProtectedResourceMetadataErrors];
+
+export type GetProtectedResourceMetadataResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProtectedResourceMetadataResponse;
+};
+
+export type GetProtectedResourceMetadataResponse = GetProtectedResourceMetadataResponses[keyof GetProtectedResourceMetadataResponses];
+
+export type GetProtectedResourceMetadataForPathData = {
+    body?: never;
+    path: {
+        /**
+         * Resource Path
+         *
+         * Percent-encoded relative resource path. Preserve slash separators and existing percent escapes.
+         */
+        resource_path: string;
+    };
+    query?: never;
+    url: '/.well-known/oauth-protected-resource/{resource_path}';
+};
+
+export type GetProtectedResourceMetadataForPathErrors = {
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetProtectedResourceMetadataForPathError = GetProtectedResourceMetadataForPathErrors[keyof GetProtectedResourceMetadataForPathErrors];
+
+export type GetProtectedResourceMetadataForPathResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProtectedResourceMetadataResponse;
+};
+
+export type GetProtectedResourceMetadataForPathResponse = GetProtectedResourceMetadataForPathResponses[keyof GetProtectedResourceMetadataForPathResponses];
 
 export type GetHealthData = {
     body?: never;

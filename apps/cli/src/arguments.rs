@@ -1,3 +1,5 @@
+//! Declare root selection and the implemented zero-argument version command.
+
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]

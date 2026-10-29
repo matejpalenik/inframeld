@@ -9,13 +9,21 @@ import {
 } from './pathSerializer.gen.js';
 
 export interface PathSerializer {
+  encodedPathParams?: readonly string[];
   path: Record<string, unknown>;
   url: string;
 }
 
+export const encodedRelativePath = (value: unknown): string => {
+  if (typeof value !== 'string' || value.length > 8192 || value.startsWith('/') || !/^(?:[A-Za-z0-9._~!$&'()*+,;=:@/\-]|%[0-9A-Fa-f]{2})*$/.test(value)) throw new Error('Invalid percent-encoded relative path');
+  const decoded = decodeURIComponent(value);
+  if (/[\u0000-\u001f\u007f-\u009f\\]/u.test(decoded) || decoded.split('/').some(part => part === '.' || part === '..')) throw new Error('Invalid percent-encoded relative path');
+  return value;
+};
+
 export const PATH_PARAM_RE: RegExp = /\{[^{}]+\}/g;
 
-export const defaultPathSerializer = ({ path, url: _url }: PathSerializer): string => {
+export const defaultPathSerializer = ({ path, url: _url, encodedPathParams }: PathSerializer): string => {
   let url = _url;
   const matches = _url.match(PATH_PARAM_RE);
   if (matches) {
@@ -43,6 +51,10 @@ export const defaultPathSerializer = ({ path, url: _url }: PathSerializer): stri
         continue;
       }
 
+      if (encodedPathParams?.includes(name)) {
+        url = url.replace(match, () => encodedRelativePath(value));
+        continue;
+      }
       if (Array.isArray(value)) {
         url = url.replace(match, serializeArrayParam({ explode, name, style, value }));
         continue;
@@ -84,12 +96,14 @@ export const defaultPathSerializer = ({ path, url: _url }: PathSerializer): stri
 
 export const getUrl = ({
   baseUrl,
+  encodedPathParams,
   path,
   query,
   querySerializer,
   url: _url,
 }: {
   baseUrl?: string;
+  encodedPathParams?: readonly string[];
   path?: Record<string, unknown>;
   query?: Record<string, unknown>;
   querySerializer: QuerySerializer;
@@ -98,7 +112,7 @@ export const getUrl = ({
   const pathUrl = _url.startsWith('/') ? _url : `/${_url}`;
   let url = (baseUrl ?? '') + pathUrl;
   if (path) {
-    url = defaultPathSerializer({ path, url });
+    url = defaultPathSerializer({ path, url, encodedPathParams });
   }
   let search = query ? querySerializer(query) : '';
   if (search.startsWith('?')) {

@@ -2,7 +2,7 @@
 
 Alice inspects a failed build. The CLI obtains the currently permitted facts through the generated SDK, then presents them as concise human output or structured JSON. Inspection succeeds even though the build failed. Waiting for that build to succeed asks for a different outcome. [CLI result contracts](../../inframeld-application-contracts/references/cli-result-contracts.md) owns that distinction.
 
-> **Status:** accepted target structure and presentation boundaries on 2026-10-28, recorded in [ADR-0097](../../../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md). The current CLI implements offline help/version, explicit SDK construction and private packaging tooling. Accepted design does not establish general JSON, progress, prompts or product-command implementation. Exact command vocabulary, JSON fields and per-command mappings remain #156's work, with shared implementation in #158 and the owning command issues.
+> **Status:** accepted target structure and presentation boundaries on 2026-10-28, recorded in [ADR-0097](../../../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md). The executable implements offline help/version. The library additionally implements explicit SDK construction and stateless discovery, alongside private packaging tooling. Accepted design does not establish general JSON, progress, prompts or product-command implementation. Exact command vocabulary, JSON fields and per-command mappings remain #156's work, with shared implementation in #158 and the owning command issues.
 
 | Reader question | Read |
 | --- | --- |
@@ -15,6 +15,10 @@ Alice inspects a failed build. The CLI obtains the currently permitted facts thr
 ## Responsibilities and placement
 
 Keep one CLI Cargo package with a small executable and library. A crate is a compilation/API boundary, while modules organize code within it. Use command-family modules inside the package. Keep the generated SDK and private xtask in their existing packages. Extract another crate when actual reuse or a demonstrated compilation-boundary benefit justifies its public API and maintenance.
+
+The [component-role reference](module-design.md) owns the two supported patterns: a small command adapter and a substantial reusable capability. It defines operation, value, policy and adapter placement without imposing an identical Onion tree on every feature. Use it for internal decomposition, while this reference owns the root command structure and presentation lifecycle. [Rust documentation guidance](documentation.md) owns component rustdoc and examples.
+
+The implemented foundation already places runtime orchestration in private `app.rs`, preserving the public `run` re-export. `commands/version.rs` directly writes the offline result from `BuildMetadata::render`, also used by packaging qualification. The zero-argument command has no empty argument record. Stateless discovery is a separate cohesive capability, as mapped in [module design](module-design.md#capability-pattern). The xtask has private argument and application modules, a packaging context, and separate archive-preflight and native-qualification modules behind its verification facade. These concrete components do not establish the general reporting framework below.
 
 The following is the target organization under `apps/cli/`. The build family illustrates placement, without selecting public command names. Create files with real uses rather than empty scaffolding.
 
@@ -181,6 +185,8 @@ Follow the [shared behavioral TDD contract](../../inframeld-coding-standards/ref
 - Keep controlled SDK/HTTP evidence distinct from provider, database and release qualification.
 
 Use local unit tests for pure conversion/presentation and process or integration tests for observable boundaries. Do not add code-layout, naming, import-boundary or composition-root construction tests.
+
+Include the short manual feature recipe required by [CLI directory guidance](../../../../apps/cli/AGENTS.md#manual-feature-verification), linking the existing developer guide in the handoff. State when a library-only feature has no executable entry point. The [documentation reference](documentation.md#examples-that-teach-and-remain-valid) distinguishes component examples, automated checks and a manual user journey.
 
 ## Reading the implementation and sources
 

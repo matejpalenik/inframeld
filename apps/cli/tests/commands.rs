@@ -1,3 +1,5 @@
+//! Check offline arguments, streams, exit codes and absence of user-state changes.
+
 // Test assertions deliberately panic on unmet behavioral expectations.
 #![allow(clippy::unwrap_used)]
 use assert_cmd::{Command, cargo::cargo_bin_cmd};

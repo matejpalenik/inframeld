@@ -8,6 +8,7 @@ import asyncio
 import base64
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from json import JSONDecodeError
 from typing import Literal, override
@@ -34,6 +35,7 @@ from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto i
 from inframeld_backend.access.application.dtos.oauth_consent_continuation_dto import (
     OAuthConsentContinuationDTO,
 )
+from inframeld_backend.access.application.dtos.public_discovery_dto import PublicDiscoveryDTO
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
@@ -69,6 +71,7 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
     HumanSessionDependency,
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
+from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
@@ -86,6 +89,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.http.routes.health_routes import router as health_router
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
@@ -254,6 +258,34 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     authenticate = HumanSessionDependency(
         MockSDKBrowserAuthenticator(), csrf, access_token_authenticator=MockSDKTokenAuthenticator()
     )
+    discovery_snapshot: ContextVar[PublicDiscoveryDTO | None] = ContextVar("discovery_snapshot")
+
+    @application.middleware("http")
+    async def discovery_context(request: Request, call_next: RequestResponseEndpoint) -> Response:
+        resources = {
+            b"/.well-known/oauth-protected-resource": "https://api.test",
+            b"/.well-known/oauth-protected-resource/api/v1": "https://api.test/api/v1",
+            b"/.well-known/oauth-protected-resource/api/": "https://api.test/api/",
+            b"/.well-known/oauth-protected-resource/a%20b": "https://api.test/a%20b",
+            b"/.well-known/oauth-protected-resource/api%2Fv1": "https://api.test/api%2Fv1",
+            b"/.well-known/oauth-protected-resource/a%25b": "https://api.test/a%25b",
+        }
+        resource = resources.get(request.scope["raw_path"])
+        token = discovery_snapshot.set(
+            PublicDiscoveryDTO(
+                resource,
+                "https://auth.test/",
+                InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            )
+            if resource is not None
+            else None
+        )
+        try:
+            return await call_next(request)
+        finally:
+            discovery_snapshot.reset(token)
+
+    application.include_router(create_discovery_router(discovery_snapshot.get))
     application.include_router(health_router)
     application.include_router(create_session_router(authenticate))
     application.include_router(create_project_grant_router(authenticate, _open_grant_change))
@@ -308,7 +340,7 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
             counts[key] = counts.get(key, 0) + 1
             observations[key] = {
                 "method": request.method,
-                "path": request.url.path,
+                "path": request.scope["raw_path"].split(b"?", 1)[0].decode("ascii"),
                 "query": request.url.query,
                 "cursor": request.query_params.get("cursor", ""),
                 "authorization": request.headers.get("authorization", ""),

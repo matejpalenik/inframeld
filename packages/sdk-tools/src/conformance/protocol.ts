@@ -8,6 +8,8 @@ export const profileSchema = z.enum([
   "python-async",
 ]);
 export const operations = [
+  "getProtectedResourceMetadata",
+  "getProtectedResourceMetadataForPath",
   "getHealth",
   "getCurrentSession",
   "inspectHumanOAuthConsent",

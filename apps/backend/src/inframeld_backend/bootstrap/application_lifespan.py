@@ -25,6 +25,8 @@ async def application_lifespan(
 
         try:
             await resources.database.startup()
+            if resources.discovery is not None:
+                await resources.discovery.startup(resources.database)
             yield
         finally:
             await resources.database.shutdown()

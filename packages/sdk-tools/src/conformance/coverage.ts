@@ -7,13 +7,19 @@ export interface CaseMetadata {
 const schemaShape = z.object({
   paths: z.record(z.string(), z.record(z.string(), z.unknown())),
 });
+export interface OperationMetadata {
+  method: string;
+  path: string;
+  encodedPathParams?: string[];
+}
+
 export function assertCoverage(
   input: unknown,
   cases: readonly CaseMetadata[],
   bindings: Record<string, readonly string[]>,
-): Map<string, { method: string; path: string }> {
+): Map<string, OperationMetadata> {
   const schema = schemaShape.parse(input);
-  const operations = new Map<string, { method: string; path: string }>();
+  const operations = new Map<string, OperationMetadata>();
   for (const [path, item] of Object.entries(schema.paths)) {
     for (const [method, operation] of Object.entries(item)) {
       if (
@@ -34,7 +40,35 @@ export function assertCoverage(
         .parse(operation).operationId;
       if (!id || operations.has(id))
         throw new Error(`Missing or duplicate operationId: ${id}`);
-      operations.set(id, { method: method.toUpperCase(), path });
+      const { parameters } = z
+        .object({
+          parameters: z
+            .array(
+              z.object({
+                name: z.string().optional(),
+                in: z.string().optional(),
+                schema: z
+                  .object({
+                    "x-inframeld-encoded-path": z.boolean().optional(),
+                  })
+                  .passthrough()
+                  .optional(),
+              }),
+            )
+            .optional(),
+        })
+        .parse(operation);
+      const encodedPathParams =
+        parameters?.flatMap((p) =>
+          p.name && p.in === "path" && p.schema?.["x-inframeld-encoded-path"]
+            ? [p.name]
+            : [],
+        ) ?? [];
+      operations.set(id, {
+        method: method.toUpperCase(),
+        path,
+        ...(encodedPathParams.length ? { encodedPathParams } : {}),
+      });
     }
   }
   if (new Set(cases.map((entry) => entry.id)).size !== cases.length)
