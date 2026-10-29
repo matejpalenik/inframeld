@@ -2,13 +2,17 @@
 
 <a id="deployment-state-and-release-transitions"></a>
 
-Production serves A, retains Z for one-step rollback and may try candidate B. A Deployment groups these related choices. The state model below is accepted design, while its exact persistence and concurrency mechanism remain pending.
+Production serves A, retains Z for one-step rollback and may try candidate B. A Deployment groups these related choices. The state model below is accepted design, while accepted PD-RELEASES-01 now selects its complete control/revision transaction policy. Native persistence remains implementation work.
 
 > **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
 
 <a id="releases"></a>
 
 <a id="releases-endpoints-pointers-and-publication-control"></a>
+
+## Apply accepted PD-RELEASES-01
+
+Accepted [PD-RELEASES-01](decision-deployment-state-and-concurrency.md#approved-resolution) selects this workflow's detailed contract. An automatic update is building while Alice switches Production to Manual and back to Automatic. Bob might promote, roll back or change the default route at the same time. Checking only the current mode could revive an old update's authority and overwrite a newer decision. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
 
 ## Releases: endpoints, pointers, and publication control
 
@@ -52,7 +56,7 @@ Keep three kinds of change separate. A new complete authorized live-input batch 
 
 ### Deployment transition owner
 
-[ADR-0079](../../../../docs/adr/ADR-0079-protect-deployment-transitions-with-a-focused-aggregate.md) selects a focused Deployment aggregate for related serving/mode/control state and valid transitions. Application services obtain current authorization/readiness facts and own the load, business action, save transaction. The exact aggregate/repository contract and concurrent-control mechanism remain design work. The logical state above does not prescribe physical tables.
+[ADR-0079](../../../../docs/adr/ADR-0079-protect-deployment-transitions-with-a-focused-aggregate.md) selects a focused Deployment aggregate for related serving/mode/control state and valid transitions. Application services obtain current authorization/readiness facts and own the load, business action, save transaction. Accepted PD-RELEASES-01 selects the logical aggregate/repository control and concurrent-save contract. Native interfaces and persistence remain implementation work. The logical state above does not prescribe physical tables.
 
 <a id="release-changes-move-pointers-not-history"></a>
 

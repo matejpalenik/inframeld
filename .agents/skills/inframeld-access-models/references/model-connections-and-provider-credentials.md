@@ -6,6 +6,10 @@ Alice connects a provider so SupportBot can answer questions. The bot's incoming
 
 <a id="concepts-and-owners"></a>
 
+## Apply accepted ADR-0123
+
+Accepted [ADR-0123](../../inframeld-application-contracts/references/model-metadata-and-validation.md#accepted-metadata-and-reference-contract) selects this workflow's detailed contract. A model catalogue can suggest settings without proving that a private server supports them. Separately, deleting a shared connection is safe only when no retained executable configuration still needs it. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Concepts and owners
 
 A connection has one current access configuration. Consumers select stable connection IDs and model-role settings. They cannot execute an old access revision. A separately replaceable provider credential has its own revision and secret lifecycle.

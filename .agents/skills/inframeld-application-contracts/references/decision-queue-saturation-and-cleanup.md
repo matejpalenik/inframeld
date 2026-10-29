@@ -64,7 +64,7 @@ Shared job claims/checkpoints/admission, identity cleanup, source/project erasur
 
 Load neighboring decisions only under these conditions:
 
-- [PD-ARCHITECTURE-01: Select a measured supported workload and resource envelope](../../inframeld-architecture/references/decision-supported-operating-envelope.md). For measured limits and any supported latency objective.
+- [PD-ARCHITECTURE-01 (accepted): Select a measured supported workload and resource envelope](../../inframeld-architecture/references/decision-supported-operating-envelope.md). For measured limits and any supported latency objective.
 - [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). When checkpoint timing implements authority restrictions.
 
 ## Implementation and required evidence

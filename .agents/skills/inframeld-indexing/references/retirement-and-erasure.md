@@ -4,11 +4,19 @@
 
 Alice erases B1 while a delayed worker still has its old vector payload. Deleting visible records once is not enough. A late write may recreate bytes, so application authority must permanently reject the retired physical identity before cleanup.
 
+## Apply accepted PD-INDEXING-04
+
+Accepted [PD-INDEXING-04](decision-storage-retries-and-erasure.md#approved-resolution) selects this workflow's detailed contract. A timed-out storage request may still finish later. Reusing already known bytes is different from buying another embedding, and deleting data is not complete while old writes could recreate it. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
+## Apply accepted PD-INDEXING-02
+
+Accepted [PD-INDEXING-02](decision-health-observation.md#approved-resolution) selects this workflow's detailed contract. An index can lose a record without returning an error. Periodic checks can discover that omission, but a ready label or unchanged counter cannot discover it by itself. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Prepared-binding lifetime
 
 Accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) uses the existing scoped materialization identity. An admitted operation owns its pin, attempt, deadline and fence. Exact selected usable dependencies and the pin are resolved together through the shared SQL retention gate. Active/retained references block ordinary retirement. A retained snapshot's metadata alone does not retain all historical vectors. Missing dependencies do not authorize automatic reconstruction.
 
-Release an operation pin when use finishes. Lease expiry alone cannot prove that reads or outbound content stopped. Retain the pin or stop and drain the old runtime unless the enforced deadline stops further use and rejects late results. Explicit erasure/revocation retains precedence. Current-health observation and physical completion mechanics remain separately pending.
+Release an operation pin when use finishes. Lease expiry alone cannot prove that reads or outbound content stopped. Retain the pin or stop and drain the old runtime unless the enforced deadline stops further use and rejects late results. Explicit erasure/revocation retains precedence. Accepted PD-INDEXING-02/04 select current-health observation and physical-completion policy. Passing backend evidence remains required.
 
 <a id="pins-retirement-and-tombstones"></a>
 

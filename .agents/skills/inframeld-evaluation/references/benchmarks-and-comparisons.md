@@ -6,6 +6,10 @@ Alice starts a comparison, then edits a case reference and the Pipeline's workin
 
 <a id="what-is-frozen"></a>
 
+## Apply accepted PD-EVALUATION-02
+
+Accepted [PD-EVALUATION-02](decision-run-and-result-contracts.md#approved-resolution) selects this workflow's detailed contract. A run can answer successfully while a metric cannot be calculated. A comparison can also have missing pairs. Those facts must remain visible instead of collapsing into one success flag or score. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## What is frozen
 
 A benchmark fixes exact case revisions and membership. An evaluator revision fixes scoring configuration. Execution inputs capture effective working settings/overrides, exact corpus, selected baseline and complete verified bindings.
@@ -90,7 +94,7 @@ For the question "How long is the cancellation period?", the case may store the 
 
 Never silently remove a requested case because its evidence is unavailable. Preserve the admitted selection and unavailable outcomes under current access and retention, not an always-public count of that selection. A deliberate smaller selection is a new explicit admission, not a repair to the meaning of the old run. A fresh comparison executes both sides against the same frozen benchmark/evaluator and reports missing pairs rather than reusing earlier scores.
 
-These rules use the existing execution framework. The Evaluation contract still needs exact inputs, proof of source coordinates, failure representations and rules for which saved results a caller may see.
+These rules use the existing execution framework. Accepted PD-EVALUATION-01/02 and PD-INDEXING-03 select exact logical inputs, source-coordinate proof, failure outcomes and protected saved-result disclosure. Native implementation and evidence remain required.
 
 Implementation is divided into execution, scoring, comparison, protected history and CLI results. Evaluation qualification and the CLI qualification tickets must test the resulting behavior. This example defines no endpoint, permission identifier or physical table. [Evaluation records](records.md#evaluation) describes the logical relationships.
 

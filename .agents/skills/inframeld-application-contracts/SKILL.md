@@ -45,9 +45,9 @@ These contracts were approved on 2026-10-29. Apply them without reopening their 
 - [PD-CONTRACTS-01](references/decision-gateway-enforcement.md): Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
 - [PD-CONTRACTS-02](references/decision-spending-coordination.md): Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery.
 
-## Pending decisions for affected work
+## Accepted contracts for affected work
 
-Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
+Load the accepted contract matching the trigger. The developer resolved these policies on 2026-10-29. Do not request the same decisions again. Native representations and qualification remain implementation work. A later policy change follows [decision finalization](../../../docs/development/guides/architecture-decisions.md).
 
 - [PD-CONTRACTS-04](references/decision-import-review-and-recovery.md): Before implementing import planning/equivalence, admission ordering, child operations or interrupted-import recovery.
 

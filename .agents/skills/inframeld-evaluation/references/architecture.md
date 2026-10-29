@@ -6,6 +6,10 @@ Alice changes a reranker and wants to know whether answers improve. She needs th
 
 <a id="what-evaluation-owns"></a>
 
+## Accepted detailed contracts
+
+The developer resolved this module's detailed policy choices on 2026-10-29. Apply [PD-EVALUATION-02](decision-run-and-result-contracts.md#approved-resolution) and its directly linked accepted neighbors. Earlier descriptions of remaining input/result or concurrency design now refer to native implementation and qualification, not another policy-approval gate. Preserve the focused component split and one ordinary execution path where selected.
+
 ## What Evaluation owns
 
 Evaluation owns generated cases, review, immutable case revisions, benchmarks, evaluator revisions, runs, comparisons and protected history. A benchmark fixes case membership and revisions. An evaluator revision fixes how observations are scored. A comparison executes two selected configurations against the same frozen benchmark and evaluator.
@@ -105,7 +109,7 @@ Read [generation and review](generation-and-review.md), [benchmarks and comparis
 
 ## Decisions still needed and sources
 
-[ADR-0078](../../../../docs/adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md) accepts focused case generation/review operations, run/comparison coordination and scoring adapters. The [owning guide](#evaluation-operation-boundaries) retains exact case/run, per-metric, protected-result and bounded-progress contracts still to specify. Ragas remains embedded, with runtime integration and calibration still unqualified.
+[ADR-0078](../../../../docs/adr/ADR-0078-separate-evaluation-case-work-run-coordination-and-scoring.md) accepts focused case generation/review operations, run/comparison coordination and scoring adapters. The [owning guide](#evaluation-operation-boundaries) retains exact case/run, per-metric, protected-result and bounded-progress contracts selected by the accepted decision above. Ragas remains embedded, with runtime integration and calibration still unqualified.
 
 [Evaluation](generation-and-review.md), [Evaluation records](records.md#evaluation), [jobs](../../inframeld-application-contracts/references/jobs-and-recovery.md) and [model connections](../../inframeld-application-contracts/references/model-gateway-and-connections.md) own accepted behaviour and qualification.
 
@@ -115,7 +119,7 @@ Read [generation and review](generation-and-review.md), [benchmarks and comparis
 
 ## Internal architecture decisions
 
-The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The precise contracts listed with each decision remain design work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
+The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The detailed logical contracts are now accepted in the linked decision records. Native representations and qualification remain implementation work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
 
 <a id="evaluation-operation-boundaries"></a> <a id="proposal-evaluation-boundaries"></a>
 
@@ -129,14 +133,14 @@ Evaluation separates case generation/review operations, run/comparison coordinat
 
 Ordinary question execution stays with Pipelines. Durable continuation uses existing jobs, and every remote synthesis/judge/repair uses ModelGateway. Ragas remains an embedded library. Separate execution success from metric eligibility, retain fixed benchmark membership and current inspection protection, and keep publication with Releases.
 
-**Remaining design and qualification.** Specify exact case/run inputs, per-metric outcomes, protected result representations, bounded progress and preparation/execution/scoring coordination before implementing the ports or persistence. No generic Dataset/Experiment platform, new runner or table per concept follows from this split. Runtime integration, library compatibility and human judge calibration remain qualification work.
+**Accepted contracts, implementation and qualification pending.** Apply PD-EVALUATION-02 and its accepted neighbors for exact logical state, input/result, revision and coordination rules. Native DTOs, physical schema and assembled behavior still need implementation and scoped evidence. Do not reopen the selected policy or infer a table, process or repository per logical record.
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Accepted decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted contract whose trigger matches. Qualification remains separate from policy approval:
 
-- [PD-EVALUATION-01: Define exact case generation and review operations](decision-case-review-contracts.md). Before implementing case generation/review commands, revision preconditions, local acceptance or their public result contracts.
-- [PD-EVALUATION-02: Coordinate fixed runs and expose honest protected results](decision-run-and-result-contracts.md). Before defining run/comparison inputs, durable progress, scoring outcomes, result inspection or summary/export schemas.
-- [PD-EVALUATION-03: Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.
+- [PD-EVALUATION-01 (accepted): Define exact case generation and review operations](decision-case-review-contracts.md). Before implementing case generation/review commands, revision preconditions, local acceptance or their public result contracts.
+- [PD-EVALUATION-02 (accepted): Coordinate fixed runs and expose honest protected results](decision-run-and-result-contracts.md). Before defining run/comparison inputs, durable progress, scoring outcomes, result inspection or summary/export schemas.
+- [PD-EVALUATION-03 (accepted): Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.

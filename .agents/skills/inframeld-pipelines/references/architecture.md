@@ -6,6 +6,10 @@ Alice tries a question with saved revision 17 and a temporary reranker override.
 
 <a id="what-pipelines-owns"></a>
 
+## Accepted detailed contracts
+
+The developer resolved this module's detailed policy choices on 2026-10-29. Apply [PD-PIPELINES-01](decision-execution-build-receipt-contracts.md#approved-resolution) and its directly linked accepted neighbors. Earlier descriptions of remaining input/result or concurrency design now refer to native implementation and qualification, not another policy-approval gate. Preserve the focused component split and one ordinary execution path where selected.
+
 ## What Pipelines owns
 
 Pipelines owns working configuration/history, captured execution inputs, builds, ordinary answer execution, receipts and feedback. Knowledge supplies exact corpus membership. Indexing supplies verified preparation and filtered retrieval. Releases supplies serving selection. Evaluation calls the ordinary execution path with its own frozen cases.
@@ -107,9 +111,9 @@ Read [configuration, queries and builds](configuration-queries-and-builds.md), [
 
 ## Decisions still needed and sources
 
-Accepted [PD-INDEXING-01](../../inframeld-indexing/references/decision-capability-binding-contracts.md#approved-resolution) already supplies the exact prepared materialization/projection and pin-lifetime contract. The Pipeline capture, continuation and execution-result/receipt handoffs below remain with PD-PIPELINES-01.
+Accepted [PD-INDEXING-01](../../inframeld-indexing/references/decision-capability-binding-contracts.md#approved-resolution) already supplies the exact prepared materialization/projection and pin-lifetime contract. The Pipeline capture, continuation and execution-result/receipt handoffs below are now selected by accepted PD-PIPELINES-01.
 
-[ADR-0077](../../../../docs/adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md) accepts focused settings/capture, readiness-build and answer-execution capabilities, retaining one ordinary execution path. The [owning guide](#pipeline-operation-boundaries) retains complete binding/result, capture, receipt and transaction/external-work contracts still to specify. This selects no new framework or public API.
+[ADR-0077](../../../../docs/adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md) accepts focused settings/capture, readiness-build and answer-execution capabilities, retaining one ordinary execution path. The [owning guide](#pipeline-operation-boundaries) retains complete binding/result, capture, receipt and transaction/external-work contracts selected by the accepted decision above. This selects no new framework or public API.
 
 [The Pipeline guide](configuration-queries-and-builds.md), [Pipeline records](records.md#pipelines), [jobs](../../inframeld-application-contracts/references/jobs-and-recovery.md) and [feedback](answer-feedback.md) own the contracts. [Releases architecture](../../inframeld-releases/references/architecture.md) explains separate traffic authority.
 
@@ -117,7 +121,7 @@ Accepted [PD-INDEXING-01](../../inframeld-indexing/references/decision-capabilit
 
 ### Pipeline application boundaries
 
-[ADR-0077](../../../../docs/adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md) separates settings/capture, readiness-build and answer-execution capabilities. Direct questions, Evaluation and serving share ordinary execution with complete fixed inputs. Capture, binding/result, receipt and transaction handoffs remain to specify. No extra Experiment resource or executor is implied.
+[ADR-0077](../../../../docs/adr/ADR-0077-separate-pipeline-settings-builds-and-answer-execution.md) separates settings/capture, readiness-build and answer-execution capabilities. Direct questions, Evaluation and serving share ordinary execution with complete fixed inputs. Accepted PD-PIPELINES-01 now selects capture, prepared-binding, result/receipt and transaction handoffs. No extra Experiment resource or executor is implied.
 
 <a id="proposed-internal-architecture---awaiting-decisions"></a>
 
@@ -125,7 +129,7 @@ Accepted [PD-INDEXING-01](../../inframeld-indexing/references/decision-capabilit
 
 ## Internal architecture decisions
 
-The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The precise contracts listed with each decision remain design work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
+The component boundaries below are accepted. They explain how to divide responsibilities inside the existing backend. The detailed logical contracts are now accepted in the linked decision records. Native representations and qualification remain implementation work. Accepted behavior elsewhere in this guide continues to own permissions, lifecycle and failure rules.
 
 <a id="pipeline-operation-boundaries"></a> <a id="proposal-pipeline-boundaries"></a>
 
@@ -139,16 +143,16 @@ Pipelines separates settings management/input capture, readiness builds and ordi
 
 Readiness builds use the exact authorized saved configuration and corpus supplied by their owning caller, including the Deployment-selected inputs of automatic workflows. They do not follow later edits or use a run ID/unsaved override as release configuration. Publication stays with Releases. The split makes effects clear at the cost of explicit input/result and handoff contracts, without adding an Experiment resource, generic executor or command bus.
 
-**Remaining design and qualification.** Specify capture ownership at each operation boundary, complete binding/result contracts, receipt admission/finalization and transaction/external-work handoffs before defining the concrete ports. Existing current-access, connection-change, health/pin, paid-uncertainty and receipt-only recovery rules remain authoritative. The split does not implement or qualify query/build behavior.
+**Accepted contracts, implementation and qualification pending.** Apply PD-PIPELINES-01 and its accepted neighbors for exact logical state, input/result, revision and coordination rules. Native DTOs, physical schema and assembled behavior still need implementation and scoped evidence. Do not reopen the selected policy or infer a table, process or repository per logical record.
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Accepted decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted contract whose trigger matches. Qualification remains separate from policy approval:
 
-- [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](decision-execution-build-receipt-contracts.md). Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
-- [PD-PIPELINES-02: Make a confirmed trace opt-out stop later capture and delivery](decision-trace-policy-fencing.md). Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.
+- [PD-PIPELINES-01 (accepted): Capture fixed inputs and complete execution through its receipt](decision-execution-build-receipt-contracts.md). Before defining captured input/build/execution interfaces, preparation continuation or receipt admission/finalization.
+- [PD-PIPELINES-02 (accepted): Make a confirmed trace opt-out stop later capture and delivery](decision-trace-policy-fencing.md). Before implementing trace capture/buffering/export delivery, opt-out acknowledgment or history-deletion fencing.
 
 <a id="decision-and-reference-map"></a>
 

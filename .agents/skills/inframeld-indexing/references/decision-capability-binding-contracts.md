@@ -70,8 +70,8 @@ Indexing application ports/readers, Pipeline captured inputs, build completion, 
 
 Load neighboring decisions only under these conditions:
 
-- [PD-INDEXING-02: Define what current index health can actually detect](decision-health-observation.md). For current-health meaning.
-- [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](../../inframeld-pipelines/references/decision-execution-build-receipt-contracts.md). For the consuming execution/build input contract.
+- [PD-INDEXING-02 (accepted): Define what current index health can actually detect](decision-health-observation.md). For current-health meaning.
+- [PD-PIPELINES-01 (accepted): Capture fixed inputs and complete execution through its receipt](../../inframeld-pipelines/references/decision-execution-build-receipt-contracts.md). For the consuming execution/build input contract.
 
 <a id="open-questions-and-required-evidence"></a>
 

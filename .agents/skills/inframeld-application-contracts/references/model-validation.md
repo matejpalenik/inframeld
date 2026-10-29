@@ -43,6 +43,10 @@ The owning command saves its accepted change and required audit in the same tran
 
 <a id="3-validate-the-selected-capabilities"></a>
 
+## Apply accepted ADR-0123
+
+Accepted [ADR-0123](model-metadata-and-validation.md#accepted-metadata-and-reference-contract) selects this workflow's detailed contract. A model catalogue can suggest settings without proving that a private server supports them. Separately, deleting a shared connection is safe only when no retained executable configuration still needs it. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Validate the selected capabilities
 
 Choose embedding and generation models separately. They may share one project connection and key when origin and authentication match. Otherwise use separate connections. A separate synthetic test, called a **preflight**, is recommended but optional under [ADR-0050](../../../../docs/adr/ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md).
@@ -111,7 +115,7 @@ All supported values remain configurable through the qualified CLI/TOML contract
 
 Actual usage, returned vector shape, provider failures and validation history are observations, not editable configuration. Real responses still undergo mandatory checks. Unknown pricing is not zero. A user-supplied rate does not establish free execution or bypass [spending admission](spending-and-accounting.md#spending). The versioned prefill snapshot does not freeze billing forever: estimates and reservations retain the qualified pricing source/rates at their own admission, and completed accounting is not repriced by a catalog update.
 
-[LiteLLM documents](https://docs.litellm.ai/docs/completion/token_usage) its community-maintained cost map, local-map option, custom-tokenizer helpers and generic tokenizer fallback. These are inspected external capabilities, not evidence that Inframeld's adapter behaves correctly. Model metadata contracts still need exact field ownership, supported mappings, conflicting-source resolution, bounds and failures. Portability needs a corresponding reviewed representation. Qualify routing, overrides, round trips and first use. No new service, registry, permission identifier or wire schema is introduced here.
+[LiteLLM documents](https://docs.litellm.ai/docs/completion/token_usage) its community-maintained cost map, local-map option, custom-tokenizer helpers and generic tokenizer fallback. These are inspected external capabilities, not evidence that Inframeld's adapter behaves correctly. Accepted ADR-0123 selects model-metadata ownership, supported property meanings, conflicting-source resolution, required Unknown handling and reference-safe connection changes. Portability needs a corresponding reviewed representation. Qualify routing, overrides, round trips and first use. No new service, registry, permission identifier or wire schema is introduced here.
 
 <a id="keep-provider-validation-outside-the-credential-save-outcome"></a>
 

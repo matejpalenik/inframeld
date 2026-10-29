@@ -37,9 +37,9 @@ Uploaded, admitted, parsed and searchable are different milestones. Admission me
 
 For backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
-## Pending decisions for affected work
+## Accepted contracts for affected work
 
-Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
+Load the accepted contract matching the trigger. The developer resolved these policies on 2026-10-29. Do not request the same decisions again. Native representations and qualification remain implementation work. A later policy change follows [decision finalization](../../../docs/development/guides/architecture-decisions.md).
 
 - [PD-KNOWLEDGE-02](references/decision-retention-erasure-policy.md): Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.
 
@@ -57,7 +57,7 @@ Choose the row matching the task. Workflow, contract and architecture views are 
 | --- | --- |
 | Module/component design or structural review | [Knowledge architecture: preserve which source version was accepted](references/architecture.md) |
 | Collection selection and batches | [Select a complete corpus after admission](references/collection-selection-and-batches.md) |
-| Decision retention erasure policy | [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](references/decision-retention-erasure-policy.md) |
+| Decision retention erasure policy | [PD-KNOWLEDGE-02 (accepted): Choose bounded retention without weakening explicit erasure](references/decision-retention-erasure-policy.md) |
 | Deletion and retention | [Sharing, deletion and retained evidence](references/deletion-and-retention.md) |
 | Documents and collections | [Documents, collections and frozen inputs](references/documents-and-collections.md) |
 | Project deletion | [Block a Project and finish its original deletion](references/project-deletion.md) |

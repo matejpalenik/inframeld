@@ -52,6 +52,10 @@ An explicitly created Deployment instead selects an already-ready initial versio
 
 <a id="4-resolve-the-default-through-normal-serving"></a>
 
+## Apply accepted PD-RELEASES-01
+
+Accepted [PD-RELEASES-01](decision-deployment-state-and-concurrency.md#approved-resolution) selects this workflow's detailed contract. An automatic update is building while Alice switches Production to Manual and back to Automatic. Bob might promote, roll back or change the default route at the same time. Checking only the current mode could revive an old update's authority and overwrite a newer decision. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Resolve the default through normal serving
 
 The recommended HTTP route is:

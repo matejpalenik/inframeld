@@ -65,7 +65,7 @@ Access credential-management authority, credential-store adapter, ModelGateway r
 Load neighboring decisions only under these conditions:
 
 - [PD-CONTRACTS-01: Enforce model policy on the actual outbound path](../../inframeld-application-contracts/references/decision-gateway-enforcement.md). When decrypted secrets reach the outbound transport.
-- [PD-ARCHITECTURE-02: Match availability and recovery claims to the supported deployment](../../inframeld-architecture/references/decision-availability-backup-and-restore.md). When qualifying backup/restore of keys and encrypted records.
+- [PD-ARCHITECTURE-02 (accepted): Match availability and recovery claims to the supported deployment](../../inframeld-architecture/references/decision-availability-backup-and-restore.md). When qualifying backup/restore of keys and encrypted records.
 
 ## Implementation and required evidence
 

@@ -8,6 +8,10 @@ Alice uploads a PDF. Even an ordinary-looking document can exploit its parser or
 
 <a id="separate-coordination-from-conversion"></a>
 
+## Apply accepted PD-INDEXING-05
+
+Accepted [PD-INDEXING-05](decision-parser-runtime-profile.md#approved-resolution) selects this workflow's detailed contract. A small uploaded file can expand into huge content or spawn children. File size alone cannot protect the host or isolate the next document. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Separate coordination from conversion
 
 These components have different responsibilities:
@@ -157,7 +161,7 @@ The source observed upstream bubblewrap **0.12.0** on its research date. That ob
 
 A timeout or exhausted limit returns a defined failure the application can recognize. No chunks from that failed attempt become available for serving.
 
-Only the 25 MiB upload cap is fixed here. The supported deployment must choose and test explicit values for the other limits.
+Accepted PD-INDEXING-05 selects the parser limits, host/profile and startup/teardown contract. Test those chosen values with the whole-host limits; do not treat them as measured support.
 
 <a id="prepare-assets-before-processing-begins"></a>
 
@@ -269,7 +273,7 @@ Also verify source locations and stable identities for fixed inputs, missing ass
 
 ## Decision and reference map
 
-The image, Docling, models, tokenizer, bubblewrap, policies, and host must be tested together. Numeric time, page, text, chunk, token, and scratch limits remain open. Only the 25 MiB upload bound is fixed. Host-kernel compromise remains outside what container isolation can guarantee, and the internal interfaces do not establish a public plugin system.
+The image, Docling, models, tokenizer, bubblewrap, policies, and host must be tested together. Accepted PD-INDEXING-05 now selects time, page, text, chunk, token and scratch limits while preserving the 25 MiB upload bound. Host-kernel compromise remains outside what container isolation can guarantee, and the internal interfaces do not establish a public plugin system.
 
 | Decision | Rationale |
 | --- | --- |

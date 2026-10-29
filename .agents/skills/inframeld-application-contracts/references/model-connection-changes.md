@@ -124,3 +124,7 @@ For isolation, create `company-gateway-next`, supply its credential explicitly a
 Restoring an earlier connection revision creates a new current access revision through the same reviewed update. It does not make old revisions selectable, restore historical secrets or waive current destination/embedding rules. Pipeline rollback restores Pipeline settings and selected connection identities, **not** connection access settings. An old version that selects `company-gateway` still uses its current configuration.
 
 Project configuration export captures one current non-secret definition per included connection. Import can explicitly reuse an equivalent destination connection or create a new one. A same-name mismatch is not overwrite authority. Explicit updates reuse this guarded operation. Exporting a historical Pipeline's settings does not recreate its historical connectivity. The shared-connection administration ticket distinguishes portable settings, destination credentials and execution history.
+
+## Apply accepted ADR-0123
+
+Accepted [ADR-0123](model-metadata-and-validation.md#accepted-metadata-and-reference-contract) selects this workflow's detailed contract. A model catalogue can suggest settings without proving that a private server supports them. Separately, deleting a shared connection is safe only when no retained executable configuration still needs it. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.

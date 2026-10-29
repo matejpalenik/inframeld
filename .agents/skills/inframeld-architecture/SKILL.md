@@ -41,9 +41,9 @@ For example, changing R1={A1,B1} to R2={A1,B2} does not rewrite B1. Indexing can
 4. For existing behavior, inspect the relevant implementation. Separate accepted design, inspected code, recorded verification and remaining qualification.
 5. Cite the exact current rule. Report unresolved disagreements rather than inventing a missing decision. Loading this skill grants no write or external-action authority.
 
-## Pending decisions for affected work
+## Accepted contracts for affected work
 
-Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
+Load the accepted contract matching the trigger. The developer resolved these policies on 2026-10-29. Do not request the same decisions again. Native representations and qualification remain implementation work. A later policy change follows [decision finalization](../../../docs/development/guides/architecture-decisions.md).
 
 - [PD-ARCHITECTURE-01](references/decision-supported-operating-envelope.md): Before fixing production resource/admission limits or advertising supported corpus size, throughput, latency or concurrency.
 - [PD-ARCHITECTURE-02](references/decision-availability-backup-and-restore.md): When setting availability/recovery objectives, assembling the production topology or qualifying backup, upgrade, security clearance and restore claims.

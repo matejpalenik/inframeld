@@ -68,7 +68,7 @@ Knowledge provenance, Indexing conversion/chunking, generation payloads, Pipelin
 
 Load neighboring decisions only under these conditions:
 
-- [PD-EVALUATION-02: Coordinate fixed runs and expose honest protected results](../../inframeld-evaluation/references/decision-run-and-result-contracts.md). When designing metric/protected result representations.
+- [PD-EVALUATION-02 (accepted): Coordinate fixed runs and expose honest protected results](../../inframeld-evaluation/references/decision-run-and-result-contracts.md). When designing metric/protected result representations.
 
 <a id="open-questions-and-required-evidence"></a>
 

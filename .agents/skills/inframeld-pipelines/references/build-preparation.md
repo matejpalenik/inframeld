@@ -4,6 +4,10 @@ Alice explicitly builds her saved configuration. Pipelines captures those inputs
 
 <a id="build-and-target-selection"></a>
 
+## Apply accepted PD-PIPELINES-01
+
+Accepted [PD-PIPELINES-01](decision-execution-build-receipt-contracts.md#approved-resolution) selects this workflow's detailed contract. Alice starts a question using saved configuration 17. Bob saves configuration 18 while it runs. Separately, Production may serve a ready version using configuration 16. The application must keep each execution's chosen meaning and distinguish a ready build from permission to publish it. If an answer response is lost, a retry must not buy another answer. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Build and target selection
 
 The CLI coordinator selects the sole live Deployment or requires a choice when there are several. Never fan out. With none, ordinary Build leaves an unpublished version. Existing first-publication onboarding retains its separate creation authority. No separate CLI apply command is required.

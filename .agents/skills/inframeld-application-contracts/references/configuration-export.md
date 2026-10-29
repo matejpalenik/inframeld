@@ -4,6 +4,10 @@ Alice exports Support to recreate it elsewhere. The export captures a consistent
 
 <a id="export-scope"></a>
 
+## Apply accepted PD-CONTRACTS-04
+
+Accepted [PD-CONTRACTS-04](decision-import-review-and-recovery.md#approved-resolution) selects this workflow's detailed contract. Import should apply exactly the configuration Bob reviewed and tell him which changes actually happened if a later step fails. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Export Scope
 
 Each resource uses one TOML file with `schema_version`, `kind`, `metadata.name`, `metadata.display_name` and the supported resource-specific `spec`. A minimal collection can omit unnecessary `spec`. Names resolve references within their resource type and project. Stored relationships use permanent destination IDs. Display names never resolve identity.
@@ -23,11 +27,11 @@ Working Pipeline settings are the default export source. The user may instead ex
 
 The earlier proposal to transfer broader live-configuration state was superseded by this configuration-only scope. Optional evaluation dataset transfer was added separately. It does not restore Deployment export.
 
-Complete exports expand effective settings, including explicit disabled reranking and selected supported defaults. Preserve prompt text exactly. Unsupported settings cannot be silently omitted. Concise authored definitions may omit only fields with specified versioned defaults. Exact omission rules remain schema work.
+Complete exports expand effective settings, including explicit disabled reranking and selected supported defaults. Preserve prompt text exactly. Unsupported settings cannot be silently omitted. Concise authored definitions may omit only fields with specified versioned defaults. Accepted PD-CONTRACTS-04 selects initial omission rules. Native schema delivery remains implementation work.
 
 For example, export Alice's reviewed 32,768-token context, not a catalogue's newer suggestion of 131,072. Bob's newer catalogue must not replace that explicit value on import. The [metadata rules](model-validation.md#model-metadata) also preserve supported tokenizer, model and profile meaning, including settings explicitly left unset.
 
-Recording where a setting came from explains it. It does not transfer validation status, approve a destination or guarantee model behavior. The model and portability contracts must define its portable representation and how equivalent settings are compared. This adds neither a model registry nor an unrestricted bag of provider options.
+Recording where a setting came from explains it. It does not transfer validation status, approve a destination or guarantee model behavior. Accepted PD-CONTRACTS-04 and ADR-0123 select portable semantics and equivalent-setting comparison; native serialization remains implementation work. This adds neither a model registry nor an unrestricted bag of provider options.
 
 Offline validation checks definitions without fetching catalogues, tokenizers or provider metadata. If the destination cannot honor a setting, report the incompatibility. Do not substitute a default or run a hidden probe.
 

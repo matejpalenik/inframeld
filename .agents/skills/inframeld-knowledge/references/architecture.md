@@ -126,7 +126,7 @@ A coordinating application workflow handles complete batches spanning both respo
 
 ## Decision references for dependent implementation
 
-Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
+Apply the accepted entries when their scope matches. Evidence and implementation remain separate:
 
 - [PD-KNOWLEDGE-01 (accepted): Finalize a complete collection selection without losing admitted input](decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
-- [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](decision-retention-erasure-policy.md). Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.
+- [PD-KNOWLEDGE-02 (accepted): Choose bounded retention without weakening explicit erasure](decision-retention-erasure-policy.md). Before implementing retention configuration, bounded history storage, expiry or cross-domain source-erasure cleanup.

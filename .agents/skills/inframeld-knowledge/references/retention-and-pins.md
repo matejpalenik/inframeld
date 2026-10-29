@@ -8,6 +8,10 @@ Alice retains P1 for rollback while newer knowledge is prepared. A pin records t
 
 <a id="1-distinguish-ownership-removal-and-expiry"></a>
 
+## Apply accepted PD-KNOWLEDGE-02
+
+Accepted [PD-KNOWLEDGE-02](decision-retention-erasure-policy.md#approved-resolution) selects this workflow's detailed contract. Keeping everything forever eventually exhausts the host and makes erasure harder. Finite defaults make normal growth predictable, while safety obligations cannot be discarded just because a timer expired. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Distinguish ownership, removal, and expiry
 
 Start by establishing exactly which person's or project's data is affected. Keep these three categories separate:
@@ -56,7 +60,7 @@ Evaluation evidence and diagnostic traces are distinct stores. A project trace o
 
 Working configuration revisions and execution-input snapshots also have their own bounded lifecycle. Restoring configuration creates a new current revision. It does not restore erased source bytes, expired materializations or revoked credentials. A retained snapshot records what ran but does not keep every historical index alive forever. Active direct-query/preparation/evaluation operations use bounded pins, while routine cleanup preserves artifacts still referenced by a live release. Deleting a query-history reference must not delete shared vectors needed elsewhere.
 
-Direct-query answers and context may be captured only through the separately authorized, policy-controlled result/diagnostic behavior. Do not use snapshot provenance or idempotency storage as an undeclared full-answer archive when tracing is disabled. Explicit evaluation evidence remains governed by the paragraph above. Current access applies to configuration history, snapshot metadata, excerpts, list previews and exports. Missing historical dependencies produce an unavailable result, not silent re-embedding or reconstruction from a different corpus. Exact snapshot/history retention periods and storage bounds must be selected before implementation. This decision introduces no unlimited retention default.
+Direct-query answers and context may be captured only through the separately authorized, policy-controlled result/diagnostic behavior. Do not use snapshot provenance or idempotency storage as an undeclared full-answer archive when tracing is disabled. Explicit evaluation evidence remains governed by the paragraph above. Current access applies to configuration history, snapshot metadata, excerpts, list previews and exports. Missing historical dependencies produce an unavailable result, not silent re-embedding or reconstruction from a different corpus. Accepted PD-KNOWLEDGE-02 selects snapshot/history retention and storage bounds. This decision introduces no unlimited retention default.
 
 An **artifact** is stored content such as a source file, processing output, or manifest. A **materialization** is the prepared searchable index bound to exact source versions and processing settings. A **Deployment** selects which pipeline version serves requests.
 
@@ -80,7 +84,7 @@ An existing connection's prepared or in-progress embedding dependencies include 
 
 Normal audit operations add new events instead of rewriting earlier ones. This is **append-only** history. It does not mean personal data must be retained forever.
 
-Keep only the actor, action, resource, time, and outcome needed as evidence, subject to the defined erasure or anonymization policy. The actor is the verified human or application that acted. Anonymization removes identifying information. The precise policy remains to be defined.
+Keep only the actor, action, resource, time, and outcome needed as evidence, subject to the defined erasure or anonymization policy. The actor is the verified human or application that acted. Anonymization removes identifying information. Accepted [PD-KNOWLEDGE-02](decision-retention-erasure-policy.md#approved-resolution) selects finite ordinary audit retention and minimal non-content/non-reusable attribution while removing unnecessary direct personal attributes. Safety obligations and backup restriction evidence retain their required exception. Native storage representations and erasure qualification remain implementation work.
 
 Full source text, prompts, credentials, and model responses must not enter operational logs.
 

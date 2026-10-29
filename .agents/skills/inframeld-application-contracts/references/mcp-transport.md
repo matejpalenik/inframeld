@@ -8,6 +8,10 @@ SupportBot’s trusted client queries Production through MCP. The adapter transl
 
 <a id="keep-the-adapter-thin"></a>
 
+## Apply accepted PD-ACCESS-06
+
+Accepted [PD-ACCESS-06](../../inframeld-access-models/references/decision-setup-read-authority.md#approved-resolution) selects this workflow's detailed contract. Alice has Query on her starter Pipeline, but the first build failed before any Deployment was created. Query on a nonexistent Deployment cannot authorize useful setup details. Bob guessing the Project ID must not learn the Project's state. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Keep the adapter thin
 
 The MCP adapter translates a tool call into an existing application operation and translates the result back. It does not take over pipeline configuration, permissions, retrieval, answer generation, or releases.

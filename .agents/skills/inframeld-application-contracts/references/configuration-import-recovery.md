@@ -4,6 +4,10 @@ Bob’s import completes several child operations before a later revision confli
 
 <a id="captured-import-inputs-and-durable-outcomes"></a>
 
+## Apply accepted PD-CONTRACTS-04
+
+Accepted [PD-CONTRACTS-04](decision-import-review-and-recovery.md#approved-resolution) selects this workflow's detailed contract. Import should apply exactly the configuration Bob reviewed and tell him which changes actually happened if a later step fails. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Captured import inputs and durable outcomes
 
 These records support the existing domains. Their presence does not add services or a generic workflow engine.
@@ -14,7 +18,7 @@ These records support the existing domains. Their presence does not add services
 
 ### Records used across workflows
 
-The records below explain coherent export and reviewed import. Neighboring owners retain spending, tracing, source credentials and evaluation datasets. They describe information the application must retain, not new migrations or a separate table for every concept. Exact representations and qualification remain with their focused owners and linked pending decisions.
+The records below explain coherent export and reviewed import. Neighboring owners retain spending, tracing, source credentials and evaluation datasets. They describe information the application must retain, not new migrations or a separate table for every concept. Exact representations and qualification remain with their focused owners and linked accepted contracts.
 
 | Logical information | Owner and constraint |
 | --- | --- |
@@ -40,7 +44,7 @@ Bob's import creates two resources and reuses three existing ones. Before its fi
 
 Reusing a resource does not write it. Any remaining step that needs it must still check its current state and permissions. The [worked import example](#import-recovery) explains the resource workflow and terminal output.
 
-Recovery first finds the original admission/job under its original context. An unchanged, retained review can support explicit continuation of eligible unfinished work through ordinary current checks. Changed definitions, mappings or relevant state instead require fresh review/admission. They cannot replace the old job's inputs. A new reviewed import may reuse completed resources after current comparison, while the old partial history remains intact. Exact relationship/projection contracts remain work, not a new generic workflow engine.
+Recovery first finds the original admission/job under its original context. An unchanged, retained review can support explicit continuation of eligible unfinished work through ordinary current checks. Changed definitions, mappings or relevant state instead require fresh review/admission. They cannot replace the old job's inputs. A new reviewed import may reuse completed resources after current comparison, while the old partial history remains intact. Accepted PD-CONTRACTS-04 selects logical relationships and safe projections. Native representations remain implementation work, without a new generic workflow engine.
 
 An uncertain child write is neither a confirmed success nor a confirmed failure. Reconcile its original command/result before repeating it. Replaying an earlier successful response must not restore old configuration over a later edit. Lost local connectivity does not prove failure, and missing authoritative history does not prove absence of effects. Report those limits without silently creating another import. Cancellation prevents only work the ordinary cancellation boundary can stop. It cannot undo committed resources or eliminate the need to reconcile a late write. No import recovery implicitly calls models, syncs documents, builds or publishes.
 
@@ -106,8 +110,8 @@ Keep confirmed completed effects. There is no automatic rollback, deletion of ne
 | A child write's acknowledgment was lost | Reconcile the original child identity/result before repetition. A later edit must not be overwritten by replay of an earlier success. Unknown remains unknown until authoritative evidence resolves it. |
 | Required retained input/history is unavailable | Explain the recovery limit. Do not infer that no effects occurred or reconstruct permission from local names/counts. Any new work needs explicit review. |
 
-Current permissions govern both effects and disclosure, including resource names, counts and stored definitions. Dry-run describes the plan and unavailable checks without mutation/admission or becoming later approval. Scripts provide required choices, return structured conflicts/partial outcomes without prompts, and never switch to a saved human identity. Human progress uses stderr when stdout carries JSON. Ctrl-C requests cancellation without undoing committed resources. `c` detaches the watcher only. [Jobs](#import-recovery) owns these shared retry/cancellation boundaries. The import contract must define exact reviewed inputs, equivalence and revisions before implementing destination review and guarded durable application. Qualification must verify stale-before-mutation, post-partial races, missing credentials, lost acknowledgments, changed files, duplicate resume, current access and zero hidden execution. Retain shared recovery/output contracts. These are accepted requirements and future qualification scenarios, not implemented APIs or test results.
+Current permissions govern both effects and disclosure, including resource names, counts and stored definitions. Dry-run describes the plan and unavailable checks without mutation/admission or becoming later approval. Scripts provide required choices, return structured conflicts/partial outcomes without prompts, and never switch to a saved human identity. Human progress uses stderr when stdout carries JSON. Ctrl-C requests cancellation without undoing committed resources. `c` detaches the watcher only. [Jobs](#import-recovery) owns these shared retry/cancellation boundaries. Apply accepted PD-CONTRACTS-04 for exact reviewed inputs, equivalence and revisions during destination review and guarded durable application. Qualification must verify stale-before-mutation, post-partial races, missing credentials, lost acknowledgments, changed files, duplicate resume, current access and zero hidden execution. Retain shared recovery/output contracts. These are accepted requirements and future qualification scenarios, not implemented APIs or test results.
 
 ## Qualification still required
 
-Before declaring portability supported, settle exact schemas/defaults, semantic equivalence, source-coordinate proof, capability/target mapping, revision review and recovery output through the relevant pending contracts. Qualification must cover complete round trips, local overwrite races, concurrent destination edits, expired authority, uncertain writes, interrupted imports, retained local edits, hidden sources, erasure and every supported resource. Exported copies already downloaded cannot be recalled across installations.
+Before declaring portability supported, implement and qualify the accepted versioned defaults, semantic equivalence, source-coordinate proof, capability/target mapping, revision review and recovery outcomes through their owning contracts. Qualification must cover complete round trips, local overwrite races, concurrent destination edits, expired authority, uncertain writes, interrupted imports, retained local edits, hidden sources, erasure and every supported resource. Exported copies already downloaded cannot be recalled across installations.

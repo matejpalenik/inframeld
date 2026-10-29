@@ -37,9 +37,9 @@ PostgreSQL records exact revision membership and authority. Chroma stores immuta
 
 For backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
-## Pending decisions for affected work
+## Accepted contracts for affected work
 
-Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
+Load the accepted contract matching the trigger. The developer resolved these policies on 2026-10-29. Do not request the same decisions again. Native representations and qualification remain implementation work. A later policy change follows [decision finalization](../../../docs/development/guides/architecture-decisions.md).
 
 - [PD-INDEXING-02](references/decision-health-observation.md): Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
 - [PD-INDEXING-04](references/decision-storage-retries-and-erasure.md): When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.

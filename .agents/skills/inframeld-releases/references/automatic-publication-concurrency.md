@@ -4,6 +4,10 @@ Alice switches Automatic to Manual and back while B is preparing. B may become r
 
 <a id="mode-changes-and-races"></a>
 
+## Apply accepted PD-RELEASES-01
+
+Accepted [PD-RELEASES-01](decision-deployment-state-and-concurrency.md#approved-resolution) selects this workflow's detailed contract. An automatic update is building while Alice switches Production to Manual and back to Automatic. Bob might promote, roll back or change the default route at the same time. Checking only the current mode could revive an old update's authority and overwrite a newer decision. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Mode changes and races
 
 The default onboarding path starts Automatic updates. Explicit new Deployments default Manual releases with an explicit automatic option. Mode belongs to each Deployment, not every Deployment of a Pipeline.

@@ -106,7 +106,7 @@ A separate, restricted parser converts uploaded files. Because documents can be 
 
 **Docker Compose is the only supported deployment method.**
 
-For a human-readable map of each owner's main parts and selected workflows, read [the module map](../../inframeld-architecture/references/module-map.md). Shared application support is explained in [Application Contracts](./components-and-services.md). These logical views are distinct from process topology and source import direction. Proposed internal choices remain pending and must not be used as accepted component contracts.
+For a human-readable map of each owner's main parts and selected workflows, read [the module map](../../inframeld-architecture/references/module-map.md). Shared application support is explained in [Application Contracts](./components-and-services.md). These logical views are distinct from process topology and source import direction. The accepted detailed decision records now select the formerly pending internal contracts. Future new proposals still require decision review, and selected policy is not delivered implementation.
 
 <a id="architecture-principles-and-dependency-rules"></a>
 

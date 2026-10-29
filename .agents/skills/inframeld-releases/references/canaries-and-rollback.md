@@ -6,6 +6,10 @@ Production serves A, retains Z as previous and has ready candidate B. Alice want
 
 <a id="cohorts-are-routing-not-identity"></a>
 
+## Apply accepted PD-RELEASES-01
+
+Accepted [PD-RELEASES-01](decision-deployment-state-and-concurrency.md#approved-resolution) selects this workflow's detailed contract. An automatic update is building while Alice switches Production to Manual and back to Automatic. Bob might promote, roll back or change the default route at the same time. Checking only the current mode could revive an old update's authority and overwrite a newer decision. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Cohorts are routing, not identity
 
 Authenticate and authorize first. Stable principal and rollout identities participate in the canary bucket. The affinity key is routing input, not permission or verified end-user delegation.

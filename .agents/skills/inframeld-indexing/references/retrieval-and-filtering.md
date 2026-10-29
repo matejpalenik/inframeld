@@ -158,11 +158,11 @@ Default onboarding uses this same build process. Creating default records does n
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Accepted decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted contract whose trigger matches. Qualification remains separate from policy approval:
 
-- [PD-INDEXING-02: Define what current index health can actually detect](decision-health-observation.md). Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
+- [PD-INDEXING-02 (accepted): Define what current index health can actually detect](decision-health-observation.md). Before implementing reconciliation, ongoing serving-health checks or claims about how quickly storage loss is detected.
 
 <a id="status-and-sources"></a>
 

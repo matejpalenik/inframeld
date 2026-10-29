@@ -6,6 +6,10 @@ Alice starts an automatic handbook update, then switches Production to Manual. P
 
 <a id="follow-automatic-publication"></a>
 
+## Apply accepted PD-RELEASES-01
+
+Accepted [PD-RELEASES-01](decision-deployment-state-and-concurrency.md#approved-resolution) selects this workflow's detailed contract. An automatic update is building while Alice switches Production to Manual and back to Automatic. Bob might promote, roll back or change the default route at the same time. Checking only the current mode could revive an old update's authority and overwrite a newer decision. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Choose a focused reading task
 
 - For initial ready Deployment and defaults, read [Deployment creation and defaults](deployment-creation-and-defaults.md).
@@ -129,7 +133,7 @@ When several automatic Deployments use one collection, the operation names each 
 
 ### Consume a durable complete-batch handoff
 
-Accepted [PD-KNOWLEDGE-01](../../inframeld-knowledge/references/decision-complete-batch-handoff.md#approved-resolution) preserves the original complete selection and durable continuation after child admission. Recover the same handoff after a crash. It names explicit targets and fixed input/configuration meaning, but does not grant Build or Manage releases. Each target has its own ordinary admission and outcome. A completed collection selection is not proof that every target accepted publication. PD-RELEASES-01 still owns atomic Deployment control and newest-request coordination.
+Accepted [PD-KNOWLEDGE-01](../../inframeld-knowledge/references/decision-complete-batch-handoff.md#approved-resolution) preserves the original complete selection and durable continuation after child admission. Recover the same handoff after a crash. It names explicit targets and fixed input/configuration meaning, but does not grant Build or Manage releases. Each target has its own ordinary admission and outcome. A completed collection selection is not proof that every target accepted publication. Accepted PD-RELEASES-01 owns atomic Deployment control and newest-request coordination.
 
 <a id="take-an-imported-pipeline-live-explicitly"></a>
 
@@ -161,11 +165,11 @@ Changing publication mode requires Manage releases. Enabling automatic updates a
 
 ## Decision references for dependent implementation
 
-Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
+Apply the accepted entries when their scope matches. Evidence and implementation remain separate:
 
-- [PD-RELEASES-01: Persist Deployment transitions with one shared control check](decision-deployment-state-and-concurrency.md). Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding.
+- [PD-RELEASES-01 (accepted): Persist Deployment transitions with one shared control check](decision-deployment-state-and-concurrency.md). Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding.
 - [PD-KNOWLEDGE-01 (accepted): Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
-- [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
+- [PD-ACCESS-06 (accepted): Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
 
 <a id="status-and-sources"></a>
 

@@ -6,6 +6,10 @@ One shard accepts Alice's new vectors while another times out. The materializati
 
 <a id="capture-before-dispatch"></a>
 
+## Apply accepted PD-INDEXING-04
+
+Accepted [PD-INDEXING-04](decision-storage-retries-and-erasure.md#approved-resolution) selects this workflow's detailed contract. A timed-out storage request may still finish later. Reusing already known bytes is different from buying another embedding, and deleting data is not complete while old writes could recreate it. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Capture before dispatch
 
 The singleton vector writer stays in the existing worker and holds a process-lifetime local lock. API handlers never mutate Chroma.
@@ -141,8 +145,8 @@ Creating or deleting a physical Chroma collection needs its own recovery handlin
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Accepted decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted contract whose trigger matches. Qualification remains separate from policy approval:
 
-- [PD-INDEXING-04: Qualify frozen storage retries and final erasure barriers](decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.
+- [PD-INDEXING-04 (accepted): Qualify frozen storage retries and final erasure barriers](decision-storage-retries-and-erasure.md). When implementing frozen-write retry/retirement adapters, selecting artifact completion mechanics or qualifying final-erasure claims.

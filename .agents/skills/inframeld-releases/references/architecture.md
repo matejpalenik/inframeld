@@ -6,6 +6,10 @@ Production serves version A. Alice starts an automatic update for B, switches to
 
 <a id="what-releases-owns"></a>
 
+## Accepted detailed contracts
+
+The developer resolved this module's detailed policy choices on 2026-10-29. Apply [PD-RELEASES-01](decision-deployment-state-and-concurrency.md#approved-resolution) and its directly linked accepted neighbors. Earlier descriptions of remaining input/result or concurrency design now refer to native implementation and qualification, not another policy-approval gate. Preserve the focused component split and one ordinary execution path where selected.
+
 ## What Releases owns
 
 Releases owns Deployment serving selection, current/candidate/designated-previous pointers, publication modes, stable canary assignment and guarded transitions. A Deployment is the stable destination callers query. It selects a complete ready PipelineVersion rather than mutable working settings.
@@ -93,7 +97,7 @@ Read [publication and automatic updates](publication-and-automatic-updates.md) a
 
 ## Decisions still needed and sources
 
-[ADR-0079](../../../../docs/adr/ADR-0079-protect-deployment-transitions-with-a-focused-aggregate.md) accepts a focused Deployment aggregate, with current authority/readiness facts and transaction orchestration supplied by application services. The [owning guide](#deployment-transition-boundary) retains exact state/load/save and concurrent-control contracts still to specify. This selects no physical schema or locking algorithm and changes no accepted publication, canary or rollback rule.
+[ADR-0079](../../../../docs/adr/ADR-0079-protect-deployment-transitions-with-a-focused-aggregate.md) accepts a focused Deployment aggregate, with current authority/readiness facts and transaction orchestration supplied by application services. The [owning guide](#deployment-transition-boundary) retains exact state/load/save and concurrent-control contracts selected by the accepted decision above. The earlier component split selected no physical schema; accepted PD-RELEASES-01 now selects the short-lock/revision control contract and changes no accepted publication, canary or rollback rule.
 
 [The Pipeline/Release guide](../../inframeld-pipelines/references/configuration-queries-and-builds.md), [Release records](records-and-transitions.md#releases), [onboarding](../../inframeld-architecture/references/first-use-and-private-defaults.md) and [Access](../../inframeld-access-models/references/authorization.md) own the contracts.
 
@@ -109,14 +113,14 @@ A focused Deployment aggregate owns related serving/mode/control state and prote
 
 Pure policies remain useful for explicit cross-object facts. Authorization, dependency checks and job admission stay in application workflows. The aggregate does not contain every Pipeline, document or job. Creation constructs new state under the existing first-ready-version and default-binding rules. This gives cohesive transitions a domain owner and requires a precise load/save/concurrency contract.
 
-**Remaining design and qualification.** Specify the aggregate's exact state/loading/save contract and how concurrent publication, mode changes and operator commands share the control check. Preserve atomic pointer/history/completion changes, expected revisions, newest-request/attempt fences and current health/authority checks. This decision selects no table layout, locking algorithm or endpoint and changes no existing mode, canary or rollback behavior. Runtime implementation and concurrency qualification remain unfinished.
+**Accepted contracts, implementation and qualification pending.** Apply PD-RELEASES-01 and its accepted neighbors for exact logical state, input/result, revision and coordination rules. Native DTOs, physical schema and assembled behavior still need implementation and scoped evidence. Do not reopen the selected policy or infer a table, process or repository per logical record.
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
 ## Decision references for dependent implementation
 
-Apply accepted entries when their scope matches. Discuss only choices still explicitly pending:
+Apply the accepted entries when their scope matches. Evidence and implementation remain separate:
 
-- [PD-RELEASES-01: Persist Deployment transitions with one shared control check](decision-deployment-state-and-concurrency.md). Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding.
+- [PD-RELEASES-01 (accepted): Persist Deployment transitions with one shared control check](decision-deployment-state-and-concurrency.md). Before defining Deployment aggregate/repository state or implementing publication, mode changes, promotion, rollback or first binding.
 - [PD-KNOWLEDGE-01 (accepted): Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). Before implementing batch completion, collection selection, parent/child recovery or the ingestion-to-automatic-update handoff.
-- [PD-ACCESS-06: Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
+- [PD-ACCESS-06 (accepted): Authorize setup details before a Deployment exists](../../inframeld-access-models/references/decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.

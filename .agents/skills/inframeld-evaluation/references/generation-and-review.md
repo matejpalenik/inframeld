@@ -6,6 +6,10 @@ Alice has working Support knowledge but no useful regression tests. Generation p
 
 <a id="follow-bounded-generation"></a>
 
+## Apply accepted PD-EVALUATION-01
+
+Accepted [PD-EVALUATION-01](decision-case-review-contracts.md#approved-resolution) selects this workflow's detailed contract. Generating a question, editing it and approving it are different actions. Approval should apply only to what someone actually reviewed. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Follow bounded generation
 
 1. Freeze a permitted corpus sample across documents and sections. Sampling only successful retrieval hits would hide passages retrieval already misses.

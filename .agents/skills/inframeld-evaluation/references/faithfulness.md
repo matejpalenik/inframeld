@@ -4,6 +4,10 @@ Alice’s generated answer contains four claims. The judge checks whether the co
 
 <a id="faithfulness-uses-the-final-context"></a>
 
+## Apply accepted PD-EVALUATION-03
+
+Accepted [PD-EVALUATION-03](decision-ragas-integration-and-calibration.md#approved-resolution) selects this workflow's detailed contract. A judging model can produce valid JSON and still miss an unsupported claim. A narrow adapter and explicit human-labelled checks make the limits inspectable. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Faithfulness uses the final context
 
 Questions go through the ordinary Pipeline without reference answers or expected passages. The judge receives the final context actually sent to generation as support evidence. Expected/reference evidence must not add missing support to the judge's input.

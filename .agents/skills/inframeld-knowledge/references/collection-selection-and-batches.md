@@ -10,7 +10,7 @@ Prepare large membership inventories in bounded pages. Under current authority a
 
 If Bob selects another revision before Alice finalizes, report a conflict and preserve her admitted versions. Replaying Alice's operation cannot silently merge Bob's changes or change its base. A new reviewed selection can combine both. A lost committed response recovers the original selection/handoff.
 
-Downstream preparation and each explicitly named Deployment retain their ordinary admission, captured-input and release-authority checks. Selection completion is distinct from each target's accepted, denied or unfinished handoff. PD-PIPELINES-01 and PD-RELEASES-01 still own their separate receipt/control choices.
+Downstream preparation and each explicitly named Deployment retain their ordinary admission, captured-input and release-authority checks. Selection completion is distinct from each target's accepted, denied or unfinished handoff. Accepted PD-PIPELINES-01 and PD-RELEASES-01 own their separate receipt/control contracts.
 
 <a id="capture-inputs-before-preparation"></a>
 

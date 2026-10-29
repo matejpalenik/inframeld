@@ -2,6 +2,10 @@
 
 Alice changes B1 while A1 remains unchanged. Reusing A1 saves numerical work, but Indexing must still verify the complete expected data for the selected revision. A total vector count cannot establish that every required record is correct.
 
+## Apply accepted PD-INDEXING-02
+
+Accepted [PD-INDEXING-02](decision-health-observation.md#approved-resolution) selects this workflow's detailed contract. An index can lose a record without returning an error. Periodic checks can discover that omission, but a ready label or unchanged counter cannot discover it by itself. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
 ## Return exact verified bindings
 
 Accepted [PD-INDEXING-01](decision-capability-binding-contracts.md#approved-resolution) returns the existing scoped IndexMaterialization identity and the complete typed projection needed by each consumer. It fixes exact corpus membership, profiles, index/layout, generation manifests, expected/verified hashes and counts, per-shard completion and observed health generation. Large inventories remain immutable paged manifests. Pending or failed preparation is not a ready binding.
