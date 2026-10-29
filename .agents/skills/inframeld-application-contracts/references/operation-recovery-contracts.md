@@ -168,4 +168,4 @@ The following are downstream behavioral acceptance cases, not tests executed by 
 | Old credential expires or is revoked | Explain the pending authority decision rather than assuming continuation is allowed |
 | Deletion removed membership | Eligible original initiator sees only the narrow projection, other administrators and ineligible initiators do not |
 
-Backend delivery remains #125 and #234-#237. CLI delivery remains #158, #159 and the operation-recovery family. Native models/OpenAPI will own delivered names and validation. No new route, DTO, schema artifact, persistence mechanism or workflow engine is specified here.
+The native HTTP/backend lookup portion of #125 is delivered. Backend delivery remains #234-#237. CLI delivery remains #158, #159 and the operation-recovery family. Native models/OpenAPI will own delivered names and validation. No new route, DTO, schema artifact, persistence mechanism or workflow engine is specified here.
