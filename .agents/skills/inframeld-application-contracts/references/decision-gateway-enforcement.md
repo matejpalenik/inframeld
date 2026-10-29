@@ -1,22 +1,22 @@
 # PD-CONTRACTS-01: Enforce model policy on the actual outbound path
 
-**Status:** PENDING
+**Status:** ACCEPTED on 2026-10-29 in [ADR-0104](../../../../docs/adr/ADR-0104-enforce-one-qualified-outbound-model-path.md). Implementation and qualification remain pending.
 
 **Owner:** `inframeld-application-contracts`
 
 **Issue kind:** Shared adapter contract and security qualification.
 
-This reference supports a future discussion. Its recommendation is not accepted behavior. Current guides and ADRs retain authority.
+The developer explicitly approved all three model-calls, provider-secrets and spending proposals on 2026-10-29 and requested their repository and GitHub documentation. Acceptance selects the contract, not implemented adapters or passing qualification.
 
 ## Contents
 
 - [Problem and example](#problem-and-example)
 - [Accepted context and evidence](#accepted-context-and-evidence)
 - [Alternatives and trade-offs](#alternatives-and-trade-offs)
-- [Non-binding recommendation](#non-binding-recommendation)
+- [Approved resolution](#approved-resolution)
 - [Decision trigger and stopping boundary](#decision-trigger-and-stopping-boundary)
 - [Architectural impact and dependencies](#architectural-impact-and-dependencies)
-- [Open questions and required evidence](#open-questions-and-required-evidence)
+- [Implementation and required evidence](#implementation-and-required-evidence)
 - [Sources and finalization](#sources-and-finalization)
 
 ## Problem and example
@@ -33,18 +33,30 @@ Provider waits stay outside SQL transactions. A timeout with uncertain dispatch 
 
 ## Alternatives and trade-offs
 
+These preserve the options considered before approval. The approved resolution below owns the selected contract.
+
 1. **Use a narrowly controlled embedded transport path.** Qualify supported adapter hooks and route every allowed request through one enforceable connection path. This keeps deployment simple, but unsupported bypasses must be rejected and hooks must genuinely control DNS/socket behavior.
 2. **Combine adapter checks with supported host egress enforcement.** Constrain the actual process/network boundary as well as request mapping. This adds defense against library bypass, but requires deployment-specific configuration and tests. It is not permission for a separate gateway service.
 
-## Non-binding recommendation
+## Approved resolution
 
-**Proposal only.** Prefer explicit supported adapter mapping plus real network-boundary enforcement where required by the accepted threat model. Qualify the assembled path using a private hostile test endpoint. Do not assume a library name or hostname allowlist proves enforcement.
+Every model operation, role, optional probe, metadata read, reranker and nested Evaluation/Ragas call must use the approved gateway path. Support only explicitly mapped and qualified pinned adapter features. Unsupported provider/settings or a transport bypass fails before dispatch, without silently dropping settings.
+
+Use a controlled embedded transport together with the supported host/network egress policy. Validate scheme, normalized host/port/base path and resolved IPv4/ IPv6 destinations at connection time. Connect through the validated route and retain correct hostname/certificate verification. A hostname check followed by an independent uncontrolled resolution is insufficient. Connection reuse remains bound to the approved origin and route.
+
+Disable automatic redirects for the supported initial profile. Require the configured connection to name the final endpoint. Do not inherit ambient proxy configuration, credentials, router fallbacks or independent library/provider-SDK retries. Explicitly qualified deployment egress configuration is distinct from an arbitrary caller-supplied proxy. Reject adapters that cannot enforce the path.
+
+Preserve verified HTTPS and customer-CA support. Private networks require explicit deployment allowlisting. Always reject link-local/cloud-metadata destinations. Preserve only the already approved credential-free local Ollama HTTP exception, with no saved provider key or authentication secret attached. Do not add another gateway service or a new public network proxy.
+
+Before each bounded call, check current principal authority, connection access revision and model compatibility, the current credential, spending reservation and cancellation/ownership. Access-revision changes stop remaining dispatches in the admitted operation rather than changing its inputs. Credential-only rotation resolves the current secret without silently changing endpoint/model selection. Provider waits stay outside SQL transactions.
+
+Map the observed call into a known not-sent outcome, a known response/result or failure, or dispatch uncertainty. A malformed result is not success. Absence of trustworthy usage is not zero billing. A timeout/cancellation after a possible send never triggers automatic redispatch. Late observations retain operation and call attribution, cannot bypass lost worker ownership or current disclosure, and cannot create a second settlement. Accepted safe-repeat protocols remain separate from uncertain paid model requests.
+
+Metadata reads are bounded, typed and tied to the selected connection/model. Keep provenance and supported known/unknown observations, not arbitrary provider dictionaries. Optional validation is not an implicit synthetic paid call. Existing metadata/connection specification work in #121 must still cover its full scope, so this transport decision alone does not automatically resolve every #121 choice.
 
 ## Decision trigger and stopping boundary
 
-Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
-
-Pause unresolved enforcement interfaces. Production/security claims wait for assembled qualification, while authorized private tests of accepted requirements may proceed.
+Apply this accepted contract when the implementation reaches its original trigger. Concrete method names and physical representations remain ordinary implementation choices. Qualification limits support and release claims, not authorized evidence gathering. Discuss a new policy choice only if it would change this approved contract.
 
 ## Architectural impact and dependencies
 
@@ -55,13 +67,11 @@ Load neighboring decisions only under these conditions:
 - [PD-ACCESS-05: Implement and qualify the selected provider-secret lifecycle](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md). For secret lifecycle and deployment-key integration.
 - [PD-CONTRACTS-02: Coordinate budget policy, reservations and uncertain settlement](decision-spending-coordination.md). For reservation/settlement at dispatch.
 
-## Open questions and required evidence
+## Implementation and required evidence
 
-- What actually controls DNS resolution, socket destination, redirects and proxies?
-- Which adapters/settings are supported and which fail closed?
-- How are usage, malformed outputs and unknown dispatch mapped?
-- How do cancellation and late SDK results avoid success or hidden retry?
-- What tests cover metadata, reranking, repair and private/local models?
+These are required cases and evidence, not recorded passing tests.
+
+Hostile private endpoints must test DNS changes, forbidden IPv4/IPv6 routes, redirects, invalid/custom-CA TLS, inherited proxy/credential settings, nested calls, SDK retries/fallbacks, malformed results, timeouts, cancellation and late results. Demonstrate current-credential rotation/removal and connection revision changes. Unqualified combinations cannot be advertised as supported.
 
 ## Sources and finalization
 
@@ -69,4 +79,4 @@ Load neighboring decisions only under these conditions:
 - [Dispatch and freshness](model-dispatch-and-destinations.md#dispatch).
 - [Gateway decision](../../../../docs/adr/ADR-0023-route-every-model-request-through-modelgateway.md).
 
-When the trigger applies, follow [the decision finalization workflow](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions). Obtain explicit approval of the concrete design and named documentation edits, reconcile affected sources and diagrams, and complete the repository-wide consistency pass before dependent implementation. Acceptance does not establish runtime qualification or authorize application writes.
+[ADR-0104](../../../../docs/adr/ADR-0104-enforce-one-qualified-outbound-model-path.md) records the approval and rationale. Follow [decision finalization](../../../../docs/development/guides/architecture-decisions.md#just-in-time-architecture-decisions) for a later policy change. This documentation approval does not authorize application implementation or claim successful qualification.

@@ -15,7 +15,7 @@ A bounded single-host queue needs a documented claim order and honest behavior w
 
 ## Decision Outcome
 
-Use oldest-admitted eligible due application jobs with a stable job-ID tie-break, one application attempt and the existing separate recovery attempt. Count queued/running jobs against atomically reserved finite capacity. Reject new work before effects when admission cannot succeed. Existing cleanup stays durable. Revocation, suspension and cancellation require no new ordinary queue slot.
+Use oldest-admitted eligible due application jobs with a stable job-ID tie-break, one active application-worker attempt and the existing separate recovery attempt. Count queued/running jobs against atomically reserved finite capacity. Reject new work before effects when admission cannot succeed. Existing cleanup stays durable. Revocation, suspension and cancellation require no new ordinary queue slot.
 
 The [approved PD-CONTRACTS-05 contract](../../.agents/skills/inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md#approved-resolution) owns the complete behavior and examples.
 

@@ -6,6 +6,16 @@ Alice sets a monthly project limit while SupportBot runs several questions. Conc
 
 > **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
 
+## Approved accounting coordination
+
+Alice and Bob each try to reserve USD 0.70 from the last USD 1. One short transactional boundary reserves against all applicable Project and operation limits, including unsettled holds. Only one request fits. Policy mutation and settlement share the same documented coordination order. Each call has one idempotent settlement and a captured policy/rate basis.
+
+Use exact decimal accounting with an initial USD 0.000000000001 quantum. Round conservative reservations and normalized accounting debits upward at that quantum, retaining trustworthy usage and captured-rate evidence. Display rounding never drives allowance. Fail visibly rather than truncate or overflow. An estimate or caller-supplied zero rate does not establish a valid cap bound.
+
+Final dispatch authorization rechecks current policy and qualified pricing/bounds. A reserved but not-yet-authorized call that no longer fits cannot send and may release its proven unused hold. Once dispatch authorization commits, a later policy edit cannot recall that call. Timeout, restart, cancellation, missing usage and a new month do not release unknown holds. Correction requires authorized, audited, call-bound evidence, not an arbitrary mark-free action.
+
+Capture each call's UTC month at reservation. Its late settlement stays in that month, while calls reserved in a later month use the later Project period and the operation's cumulative limit still spans both. Raising a limit or starting a month never automatically resumes work. The accepted [PD-CONTRACTS-02](decision-spending-coordination.md#approved-resolution) owns exact outcomes, permitted projections and evidence requirements. This is a logical target, not implemented accounting or invoice accuracy.
+
 <a id="expose-policy-administration-and-feedback-through-their-owners"></a>
 
 ### Expose policy administration and feedback through their owners
@@ -58,7 +68,7 @@ After a call, record its cost once using trustworthy usage and the captured rate
 
 Release a hold when the call is known not to have been sent. Keep it unresolved when dispatch may have happened but the outcome is unknown, including timeouts, cancellation, missing usage or a lost acknowledgment. Restarting a worker or letting its lease expire does not prove the provider charged nothing.
 
-Record any overage honestly and stop further affected spending until it is resolved. A late settlement belongs to the project's original admission period. The operation's cumulative limit still applies.
+Record any overage honestly and stop further affected spending until it is resolved. A late settlement belongs to the UTC Project month captured when that call reserved its budget. A later call reserved in a new month uses the new month. The operation's cumulative limit still applies across both months.
 
 With a monetary limit enabled, do not dispatch if prices are unavailable or a conservative bound cannot cover the billable work. An authorized policy or pricing change must make the call admissible first. If accounting itself is unavailable, capped work cannot start.
 
@@ -66,7 +76,7 @@ Without a cap, unknown pricing need not block otherwise supported and authorized
 
 When the budget is exhausted, stop new calls and keep completed work. Do not shrink the corpus or switch models to continue. Use ordinary job failure and recovery outcomes, not a new paused-job system. A new month does not automatically restart failed work.
 
-Changing a shared limit requires its own current permission and audit record. [PD-CONTRACTS-02](decision-spending-coordination.md) owns the unresolved coordination choices. Qualification must cover concurrency, rounding and providers. This design is not an invoice-level spending guarantee or evidence that those tests ran.
+Changing a shared limit requires its own current permission and audit record. The accepted [PD-CONTRACTS-02](decision-spending-coordination.md#approved-resolution) owns coordination, rounding, captured periods and evidence-backed reconciliation. Qualification must cover concurrency, rounding and providers. This design is not an invoice-level spending guarantee or evidence that those tests ran.
 
 <a id="budget-policy-authority"></a>
 
@@ -92,7 +102,7 @@ Current authority and expected state are rechecked when a permitted mutation com
 
 Alice changes the project's monthly limit from USD 20 to USD 10 after USD 12 has already been settled and USD 1 remains reserved. The update changes the policy, not the ledger: it does not erase spending, release the hold or make the available allowance positive. Further calls that cannot fit are refused. Already-dispatched calls retain normal settlement and uncertainty handling.
 
-One application-layer capability exposes authorized inspection and human-only setting, replacement and explicit removal of the project limit. Here, application-layer means backend business orchestration, not permission for an application account to mutate policy. CLI setup/management and TOML import use this capability. None writes a separate copy of policy. Recheck current human eligibility/change authority and the reviewed policy revision, coordinate mutation with concurrent reservations, and commit policy/audit together. The exact coordination protocol and request schemas must be reviewed before implementation. A lost acknowledgment recovers the original mutation rather than applying it over a newer policy.
+One application-layer capability exposes authorized inspection and human-only setting, replacement and explicit removal of the project limit. Here, application-layer means backend business orchestration, not permission for an application account to mutate policy. CLI setup/management and TOML import use this capability. None writes a separate copy of policy. Recheck current human eligibility/change authority and the reviewed policy revision, coordinate mutation with concurrent reservations, and commit policy/audit together. Apply the accepted [accounting contract](decision-spending-coordination.md#approved-resolution). Concrete native request schemas remain implementation work within that contract. A lost acknowledgment recovers the original mutation rather than applying it over a newer policy.
 
 Increasing or removing a limit also preserves consumed amounts and unresolved obligations. It neither changes existing operation limits nor resumes stopped work. Setup retains the current policy by default. Import preserves destination policy unless its explicit apply choice is separately authorized. A model-use grant, generic import approval or `--yes` is not budget-administration authority. No monetary default is prefilled, and no provider test or model call follows saving a policy. V1 has only project and operation limits. Account, user, connection and organization budget hierarchies remain deferred.
 
@@ -105,3 +115,5 @@ Connection TOML exports only current supported non-secret access settings and au
 | Information | Owner and constraint |
 | --- | --- |
 | Spending policy, accounting period, call reservation and settlement | Gateway/application accounting in PostgreSQL. Optional UTC-calendar-month project limit and cumulative operation limit. A reviewed policy mutation records its revision and audit without replacing accounting history. Uniquely attributed call/period, captured price basis, fixed-precision amounts and unresolved holds survive policy changes, retries and restart. No account-level ceiling, credentials or full prompts are needed for accounting. |
+
+The accepted accounting projection includes optional policy/revision, UTC period, settled total, unresolved holds, remaining allowance including negative values, pricing provenance and permitted partial/uncertain operation state. Keep call and reservation identity, captured rate/policy basis and correction evidence without raw prompts or secrets. These are logical facts, not selected physical tables or public field names.

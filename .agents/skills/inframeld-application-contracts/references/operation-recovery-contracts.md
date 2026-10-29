@@ -128,7 +128,7 @@ Recheck current caller authority, retained scope, ownership, dependency state an
 
 An eligible observation from inspection is informational. It does not reserve authority, guarantee later admission or permit repeating uncertain paid work. Missing retained inputs, retired resources, changed scope and unproven replay prevent ordinary continuation. Explicit new work after reviewing uncertainty remains a separate owning decision.
 
-The accepted [PD-ACCESS-02](../../inframeld-access-models/references/decision-admitted-work-authority.md#approved-resolution) allows admitted product work to survive originating-credential expiry, rotation and individual key revocation while current principal/resource authority remains valid. A fresh valid credential may request eligible explicit continuation without changing the original inputs. Suspension, recovery-generation changes or lost required authority stop later protected steps. Restoring permission does not silently resume the job. Access's host-authorized recovery continuation keeps its separate original-obligation and budget contract.
+The accepted [PD-ACCESS-02](../../inframeld-access-models/references/decision-admitted-work-authority.md#approved-resolution) allows admitted product work to survive originating-credential expiry, rotation and individual key revocation while current principal/resource authority remains valid. A fresh valid credential for the original principal may request eligible explicit continuation without changing the original inputs or transferring ownership. Suspension, recovery-generation changes or lost required authority stop later protected steps. Restoring permission does not silently resume the job. Access's host-authorized recovery continuation keeps its separate original-obligation and budget contract.
 
 ## Deletion-status inspection
 
@@ -165,7 +165,7 @@ The following are downstream behavioral acceptance cases, not tests executed by 
 | 20 admitted cases, 19 answers, fewer scores | Distinct owner populations remain visible without guessed completion |
 | Cancellation races with completion | Preserve actual terminal state and request acknowledgment separately |
 | Caller loses permission or source is erased | Deny or omit protected information under the owning disclosure contract |
-| Old credential expires or is revoked | Reject incoming requests through an invalid key. Already admitted jobs use current principal authority under PD-ACCESS-02, and explicit continuation still needs a fresh valid credential |
+| Old credential expires or is revoked | Reject incoming requests through an invalid credential. Already admitted jobs use current principal authority under PD-ACCESS-02, and explicit continuation still needs a fresh valid credential for the original principal without ownership transfer |
 | Deletion removed membership | Eligible original initiator sees only the narrow projection, other administrators and ineligible initiators do not |
 
 The native HTTP/backend lookup portion of #125 is delivered. Backend delivery remains #234-#237. CLI delivery remains #158, #159 and the operation-recovery family. Native models/OpenAPI will own delivered names and validation. No new route, DTO, schema artifact, persistence mechanism or workflow engine is specified here.

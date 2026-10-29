@@ -6,6 +6,12 @@ Alice saves a model provider key so the backend can call that provider later. Un
 
 > **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
 
+## Approved management and qualification contract
+
+Alice's revision-7 replacement cannot overwrite Bob's committed revision 8. Check the reviewed revision and current authority, then save the ciphertext/removal, resulting credential revision, required audit and safe original retry outcome together. A lost response recovers safe metadata without another mutation or secret echo. Missing/wrong deployment keys or damaged/swapped ciphertext stop affected calls explicitly, without a replacement key or old-secret fallback.
+
+[PD-ACCESS-05](decision-provider-secret-lifecycle.md#approved-resolution), accepted in ADR-0103 on 2026-10-29, owns the complete logical input/result, failure and qualification contract. Implement in stages and require assembled management, dispatch and restore evidence before claiming the whole secret boundary is qualified. Existing Aead, associated-data binding and offline root-key lifecycle remain selected.
+
 <a id="keep-current-access-and-credentials-separate"></a>
 
 ### Keep current access and credentials separate

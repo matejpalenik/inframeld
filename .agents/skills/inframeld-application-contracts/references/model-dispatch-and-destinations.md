@@ -10,6 +10,12 @@ Record the resolved model revision when the provider exposes it, and pin model r
 
 An external gateway can change what an alias points to. The saved alias proves what Inframeld requested, not that the external model stayed unchanged. Keep that limit on reproducibility visible.
 
+## Approved outbound enforcement
+
+The accepted [PD-CONTRACTS-01](decision-gateway-enforcement.md#approved-resolution) combines a controlled embedded transport and supported host/network egress enforcement. Every model, metadata, probe, reranker and nested call uses an explicitly mapped and qualified adapter path. Actual resolved routes must match permitted destinations. Connection reuse remains bound to the approved origin and route. Reject unsupported bypasses before dispatch.
+
+The initial profile disables automatic redirects, ambient proxies/credentials, router fallbacks and independent SDK/library retries. Preserve verified HTTPS/custom CAs, explicitly allowlisted private routes and the existing credential-free local Ollama HTTP exception. Known not-sent, known response/failure and uncertain dispatch remain distinct. A timeout or cancellation after a possible send never authorizes redispatch. Implementation and hostile-endpoint qualification remain pending.
+
 <a id="approve-and-validate-a-destination"></a>
 
 <a id="destinations"></a>
@@ -43,7 +49,7 @@ This permits approved private customer gateways without giving ordinary users un
 | **Remote transport** | Require TLS certificate verification. TLS protects the connection and verifies the endpoint's certificate. Mount a customer certificate authority (CA) when its private service requires custom trust. Do not disable verification. |
 | **Local HTTP exception** | Explicitly operator-approved local Ollama over HTTP is allowed only without a provider credential or other authentication secret. Never attach a saved key or authorization header to this cleartext connection. If authentication is needed, create an approved HTTPS connection with certificate verification. This exception does not permit unverified remote endpoints. |
 | **Credentials in URLs** | Reject URL user-info, such as an embedded username/password, and credential-bearing query strings. |
-| **Redirects** | Reject redirects to a different origin. |
+| **Redirects** | Disable automatic redirects in the initial supported profile. Configure the final endpoint explicitly. |
 | **Forbidden destinations** | Reject link-local and cloud-metadata addresses. These are not made acceptable merely by supporting private endpoints. |
 | **Private networks** | Permit private address ranges only through explicit deployment allowlisting. A blanket ban on private addresses would prevent the approved customer-gateway use case. |
 | **Caller-controlled proxies** | Do not accept arbitrary proxy settings from API callers. |

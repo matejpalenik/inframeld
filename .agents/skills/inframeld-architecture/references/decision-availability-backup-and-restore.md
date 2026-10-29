@@ -53,7 +53,7 @@ Deployment/runtime profile, operator runbooks, identity recovery, secret files, 
 Load neighboring decisions only under these conditions:
 
 - [PD-ACCESS-03: Prove recovery cleanup before releasing product access](../../inframeld-access-models/references/decision-recovery-production-completion.md). For unfinished production identity-recovery integration.
-- [PD-ACCESS-05: Implement and qualify the selected provider-secret lifecycle](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md). For root-key/credential-store recovery.
+- [PD-ACCESS-05 (accepted): Implement and qualify the selected provider-secret lifecycle](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md). For root-key/credential-store recovery.
 - [PD-INDEXING-04: Qualify frozen storage retries and final erasure barriers](../../inframeld-indexing/references/decision-storage-retries-and-erasure.md). For storage late-write and erasure completion evidence.
 - [PD-ARCHITECTURE-01: Select a measured supported workload and resource envelope](decision-supported-operating-envelope.md). For the workload and disk budget being qualified.
 

@@ -6,6 +6,8 @@ Alice runs a direct query, generates Evaluation cases and later changes a provid
 
 <a id="roles-and-responsibilities"></a>
 
+The approved [outbound enforcement](decision-gateway-enforcement.md#approved-resolution), [provider-secret lifecycle](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md#approved-resolution) and [transactional accounting](decision-spending-coordination.md#approved-resolution) contracts govern this target architecture. They select actual-path control, safe current-secret management and exact reservation/settlement behavior. Their implementation and assembled qualification remain pending.
+
 ## Choose a focused reading task
 
 - For destination and per-call enforcement, read [Model dispatch and destinations](model-dispatch-and-destinations.md).
@@ -159,13 +161,13 @@ These are acceptance requirements, not claims that implementation qualification 
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted entries below when their scope matches. Discuss only choices still explicitly marked pending:
 
-- [PD-CONTRACTS-01: Enforce model policy on the actual outbound path](decision-gateway-enforcement.md). Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
-- [PD-CONTRACTS-02: Coordinate budget policy, reservations and uncertain settlement](decision-spending-coordination.md). Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery.
-- [PD-ACCESS-05: Implement and qualify the selected provider-secret lifecycle](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md). When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
+- [PD-CONTRACTS-01 (accepted): Enforce model policy on the actual outbound path](decision-gateway-enforcement.md). Before implementing model adapters/metadata/probe dispatch or selecting the actual transport/egress mechanism.
+- [PD-CONTRACTS-02 (accepted): Coordinate budget policy, reservations and uncertain settlement](decision-spending-coordination.md). Before implementing budget mutation, reservation, settlement, usage normalization or unknown-charge recovery.
+- [PD-ACCESS-05 (accepted): Implement and qualify the selected provider-secret lifecycle](../../inframeld-access-models/references/decision-provider-secret-lifecycle.md). When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
 
 ## Status, sources and unresolved scope
 
