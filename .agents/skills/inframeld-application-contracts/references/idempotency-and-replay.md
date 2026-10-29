@@ -2,7 +2,7 @@
 
 <a id="recognize-a-request-and-recover-its-original-outcome"></a>
 
-Alice grants Bob permission but loses the response. Repeating the same request key must find the original operation under current authority. It must not apply the grant again or mistake a different request for a retry.
+Alice grants Bob permission but loses the response. Repeating the same request key must find the original operation under current authority. It must not apply the grant again or mistake a different request for a retry. [Original-request lookup](operation-recovery-contracts.md#original-request-lookup) separately defines read-only correlation before replay, without a reservation, replacement payload or business execution.
 
 > **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
 

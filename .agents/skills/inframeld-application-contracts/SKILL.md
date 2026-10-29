@@ -24,7 +24,7 @@ The domain owns business decisions. Application services coordinate them. Adapte
 - Complete write services own transactions through direct injected capabilities. Authenticate first, authorize before reservation/replay, check returned scope and commit required audit with the change.
 - Keep provider waits outside SQL transactions. Lower-level admission helpers retain caller-owned transaction contracts unless deliberately migrated.
 - Preserve original operation meaning, identity and target on retry. Completed outcomes do not grant authority. A lost paid response does not authorize another dispatch.
-- Native FastAPI/Pydantic OpenAPI drives generated clients. V1 delivers Rust CLI and the small Ory UI. MCP retains its two accepted tools in the API process.
+- Native FastAPI/Pydantic OpenAPI drives generated clients. V1 delivers Rust CLI and the small Ory UI. CLI UX follows [clig.dev alignment and owned exceptions](references/cli-output-and-automation.md#follow-cligdev-and-record-product-exceptions). MCP retains its two accepted tools in the API process.
 - All remote model calls use ModelGateway. Keep current connection access, credential rotation, spending and diagnostics under their owners.
 - Do not introduce a generic executor, workflow engine, marker framework or architecture-enforcement tests.
 
@@ -73,6 +73,7 @@ Choose the row matching the task. Workflow, contract and architecture views are 
 | Http problem contract | [Read the delivered HTTP problem contract](references/http-problem-contract.md) |
 | Idempotency and replay | [Recognize a request and recover its original outcome](references/idempotency-and-replay.md) |
 | Jobs and recovery | [Continue background work without repeating uncertain effects](references/jobs-and-recovery.md) |
+| Original-request lookup and logical job/deletion outcomes | [Find original work and read its permitted outcome](references/operation-recovery-contracts.md), before designing or explaining lookup, inspection, cancellation or continuation interfaces. |
 | Mcp transport | [Expose ordinary queries through the MCP adapter](references/mcp-transport.md) |
 | Model connection changes | [Change shared current model connectivity](references/model-connection-changes.md) |
 | Model dispatch and destinations | [Dispatch through the enforced model boundary](references/model-dispatch-and-destinations.md) |

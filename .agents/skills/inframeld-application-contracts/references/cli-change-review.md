@@ -45,4 +45,30 @@ The column labels and field identity carry the meaning without styling. For exam
 - Respect `NO_COLOR`, `--no-color`, `TERM=dumb` and non-terminal output. Omit unsupported styling and use a plain `->` with explicit labels when needed. Never depend on color or strikethrough alone. JSON has no presentation ANSI codes or decorative arrows. Preserve the same permitted values and proposed/observed meaning under the reviewed machine contract.
 - Show the affected resource and change scope. Keep version identity, configuration revision and release mode distinct. Display only actually known values. Unavailable old state is not an empty value, zero or evidence that nothing changed.
 - Wrap or stack long rows in narrow terminals while keeping labels attached to their values. For long text or many changes, use bounded detail/ordinary inspection rather than silently hiding a material difference. This does not add another editor or a new storage system.
-- Exclude secret values from both sides and from JSON, logs and artifacts. Retain current authorization and erasure for other protected content. Render untrusted text safely. Input control characters cannot insert styling or impersonate a confirmation. Showing a difference is neither authorization nor consent to apply it. The shared CLI output contract still needs exact mappings, terminal fallbacks and machine representation. Feature commands must consume that presentation and qualify its behavior. No field names, new API endpoints, physical records, automatic polling subsystem or additional permission is selected here. This pass documents accepted design, not tested terminal compatibility. [clig.dev](https://clig.dev/#output) supplies the output/color guidance. The specific red-strikethrough/green convention is Inframeld's accepted choice.
+- Exclude secret values from both sides and from JSON, logs and artifacts. Retain current authorization and erasure for other protected content. Render untrusted text safely. Input control characters cannot insert styling or impersonate a confirmation. Showing a difference is neither authorization nor consent to apply it. The [machine change view](#machine-change-views) and [common framing](cli-output-and-automation.md) are accepted. Command-specific typed values and terminal behavior still require implementation and qualification. Feature commands must consume that presentation and qualify its behavior. The following client-owned representation adds no backend endpoint, physical record, automatic polling subsystem or permission. This pass documents accepted design, not tested terminal compatibility. [clig.dev](https://clig.dev/#output) supplies the output/color guidance. The specific red-strikethrough/green convention is Inframeld's accepted choice.
+
+## Machine change views
+
+The client-owned change-view representation was accepted on 2026-10-29 through the approved joint #124/#156 specification plan. It is design, not an implemented field model or a backend history API.
+
+A command-specific typed `data` object may contain `changes`, a bounded array of views. Each view has `kind` (`proposed`, `confirmed` or `stale`), `resource` (the permitted typed resource reference) and `fields` (typed field changes). Kind maps respectively to Current/Proposed, Before/Now and Reviewed/Now. Keep admitted build inputs or other unchanged identities separate from a changing live/configuration value.
+
+Each field has a stable `field` identifier and `before`/`after` observations. Each observation is one of `{"known": false}` or `{"known": true, "value": ...}`, where the command defines the permitted value type. A known `null`, empty string, zero or false is not an unknown observation. Omit forbidden fields entirely. Never replace a secret with either a real value or a distinguishable hint.
+
+The following example belongs to this reference's `machine-change-views` section. Its leaf resource/field identifiers illustrate command data, not published backend wire names. It describes a proposal, not an applied revision:
+
+```json
+{
+  "kind": "proposed",
+  "resource": { "configurationId": "configuration-example" },
+  "fields": [
+    {
+      "field": "retrievalLimit",
+      "before": { "known": true, "value": 20 },
+      "after": { "known": true, "value": 30 }
+    }
+  ]
+}
+```
+
+Confirmed views require authoritative evidence of the named effects. Stale views compare reviewed state with a permitted current observation and require fresh review before a new mutation. Unknown old state cannot become a confirmed change from zero. The command's typed field catalogue defines semantics, bounds and allowed values. This is not an arbitrary JSON-map renderer or a requirement to record additional backend state.

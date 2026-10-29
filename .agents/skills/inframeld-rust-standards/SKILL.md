@@ -34,7 +34,7 @@ Read only the rows needed for the task. Detailed references own the complete con
 | Implement shared presentation, prompts, completions or snapshots | [Selected CLI libraries](references/cli-libraries.md), accepted under ADR-0096, and Application Contracts' [shared presentation rules](../inframeld-application-contracts/references/cli-presentation-components.md) when semantics matter. |
 | Consume or maintain the generated Rust SDK | [Rust SDK](../inframeld-rust-sdk/SKILL.md). Generated operations and source remain generator-owned. |
 
-For a narrow helper, do not automatically load every CLI workflow. Read the owning domain contract when its behavior matters. Exact command vocabulary, JSON fields and per-command outcomes remain their owning delivery work. Teaching examples establish no missing public contract.
+For a narrow helper, do not automatically load every CLI workflow. Read the owning domain contract when its behavior matters. Application Contracts owns the accepted [common machine framing](../inframeld-application-contracts/references/cli-output-and-automation.md) and invocation rules. Feature-command vocabulary, typed leaf payloads and runtime integration remain their owning delivery work. Teaching examples establish no missing public contract.
 
 ## Implement and verify
 

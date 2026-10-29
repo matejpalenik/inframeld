@@ -2,7 +2,7 @@
 
 <a id="continue-background-work-without-repeating-uncertain-effects"></a>
 
-Alice starts a build and closes the progress view. Durable work records what was admitted and completed. A replacement worker must distinguish safe remaining work from a model call that may already have executed and charged.
+Alice starts a build and closes the progress view. Durable work records what was admitted and completed. A replacement worker must distinguish safe remaining work from a model call that may already have executed and charged. The [logical recovery reference](operation-recovery-contracts.md) owns the accepted lookup, inspection, cancellation, continuation and narrow deletion-status interfaces. This workflow owns execution mechanics.
 
 > **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
 
@@ -163,7 +163,7 @@ When a known job is read successfully, a failed job state can accompany a succes
 
 If the original review and inputs remain applicable, only backend-confirmed eligible unfinished work may resume through the existing contract. Changed input or relevant state requires fresh reviewed work, not rewriting the original operation. Unknown paid outcomes remain unsafe to repeat even after the job's identity is recovered. Expired/restored/missing history limits duplicate-detection guarantees. Do not promise guaranteed recovery or silently resubmit as new work. Local hints and saved credentials supply neither authoritative server history nor missing permissions.
 
-Keep Ctrl-C's cancellation request, its acknowledgment and actual termination distinct. `c` detaches the view. It cannot cancel or close the user's terminal. Cancellation or an output failure cannot roll back completed effects. Bounded retry, receipt-only answers, show-once secrets and current-authority checks remain unchanged. Specify concrete mappings and must prove the CLI behavior. This section is accepted design, not implementation evidence.
+Keep Ctrl-C's cancellation request, its acknowledgment and actual termination distinct. `c` detaches the view. It cannot cancel or close the user's terminal. Cancellation or an output failure cannot roll back completed effects. Bounded retry, receipt-only answers, show-once secrets and current-authority checks remain unchanged. Use the accepted [CLI exit/signal mappings](cli-result-contracts.md#interruption-and-detachment) and [machine framing](cli-output-and-automation.md). Runtime behavior still needs qualification. This section is accepted design, not implementation evidence.
 
 <a id="postgresql-delivers-background-jobs"></a>
 
@@ -211,4 +211,4 @@ External work is not guaranteed to happen exactly once. [Recovery](../../../../d
 | [ADR-0028](../../../../docs/adr/ADR-0028-recover-answer-requests-through-receipts-without-a-full-answer-replay-cache.md) | Recover answer requests through receipts without a full-answer replay cache. |
 | [ADR-0029](../../../../docs/adr/ADR-0029-use-expected-revisions-to-protect-competing-changes.md) | Use expected revisions to protect competing changes. |
 
-Access commits the original cleanup handoff/run with trusted evidence. Its dedicated worker now implements claims, fenced checkpoints and proof-backed local completion. Additional host-authorized runs remain separate work. See [the owning records](../../inframeld-access-models/references/credential-and-recovery-records.md#recovery-delivery-records).
+Access commits the original cleanup handoff/run with trusted evidence. Its dedicated worker now implements claims, fenced checkpoints and proof-backed local completion. Additional host-authorized runs use the separate [protected maintenance contract](../../inframeld-access-models/references/host-maintenance.md#recovery-cleanup-continuation). See [the owning records](../../inframeld-access-models/references/credential-and-recovery-records.md#recovery-delivery-records).

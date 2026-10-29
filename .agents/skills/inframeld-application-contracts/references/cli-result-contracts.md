@@ -1,12 +1,12 @@
 # Distinguish CLI command and background outcomes
 
-CI admits a build and exits successfully, but the build can still fail later. The CLI must separate submission, inspection, waiting and uncertain outcomes. Exact missing framing fields remain pending rather than being guessed here.
+CI admits a build and exits successfully, but the build can still fail later. The CLI must separate submission, inspection, waiting and uncertain outcomes. The [machine-output contract](cli-output-and-automation.md) defines common framing. The [logical recovery contract](operation-recovery-contracts.md) defines the backend facts it may present.
 
 <a id="cli-outcomes-automation-and-change-presentation"></a>
 
 CI submits an import and receives its durable acceptance. That command succeeded even though the job may fail later. Human and machine output must distinguish submission, inspection and completed work without repeating uncertain operations.
 
-> **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
+> **Status:** invocation outcomes, signals and bounded recovery hints accepted on 2026-10-29 through the approved joint #124/#156 specification plan. Runtime delivery remains pending. Existing Python types, generated OpenAPI and migrations own implemented backend shapes. Independent pending decisions are not accepted by this reference.
 
 <a id="keep-cli-and-portability-contracts-explicit"></a>
 
@@ -29,7 +29,7 @@ Keep these distinctions visible:
 - Successfully reading a job does not mean the job succeeded.
 - Losing contact with the backend is different from not knowing whether a provider completed a paid call.
 
-Do not reconstruct missing results or repeat model calls to populate a screen. No generic tracking schema is needed. The job, Evaluation and automation contracts must define typed outcomes and bounded reads before generated clients consume them. Mock counts and commands do not publish fields or endpoints.
+Do not reconstruct missing results or repeat model calls to populate a screen. No generic tracking schema is needed. The [logical job projection](operation-recovery-contracts.md#job-inspection) and Evaluation own typed facts and bounded reads. The CLI framing is accepted, while command-specific payloads and native backend delivery remain separate work. Mock counts and commands do not publish endpoints.
 
 Configuration portability adds offline TOML validation, coherent authorized exports, destination-aware read-only review and durable application-owned imports. [Its guide](configuration-export-and-import.md) defines scope and effects. Exact schemas/defaults/equivalence and resource permissions are explicit prerequisites. Evaluation owns optional protected JSONL dataset transfer. No generated client or Rust command may invent missing wire fields, permission identifiers or a client-side bypass of domain guards.
 
@@ -51,13 +51,14 @@ For each invocation, distinguish **what the caller requested**, **the command's 
 | --- | --- | --- |
 | Admit work with `--no-wait`. Durable admission and required local transfer are confirmed | `0` | Return known original job/operation identity. Admission is not completion, current progress or publication. Read/watch separately if needed. |
 | Inspect an existing failed job successfully | `0` | Return its actual failed state and permitted saved/unfinished results. Inspection neither retries nor rewrites that state. |
+| Inspect original-request lookup successfully, with an unresolved retained match | `0` | Report the unresolved observation. This confirms neither admission nor absence of original effects and permits no resubmission. |
 | Wait for the requested workflow. It fails or only partly completes | `1` | Preserve completed effects, unfinished/failed/uncertain work and owner-supplied reasons. Inspect original work. Resume only when the backend establishes eligibility. |
 | Submission may have reached the server, but admission cannot be confirmed | `1` | Report uncertainty and only actually known recovery information. Find the original admission before repetition. Do not fabricate a job ID or a no-effect claim. |
 | Required invocation inputs are missing or incompatible | `2` | Return a safe usage explanation without starting the requested work or prompting under `--no-input`. Generic confirmation cannot supply missing values or authority. |
 | A wait expires before completion is known | `1` | Report last confirmed state and original identity. Wait expiry does not request cancellation or prove the backend stopped. |
 | A descriptive dry-run completes | `0` | Success of the explanation only. Report checks performed, intended effects and unknowns. No execution, readiness, future permission or consent is established. |
 
-These are the ordinary `0`/`1`/`2` meanings. They do not assign signal codes or provide every domain-specific mapping. A valid answer that abstains can succeed. A tracing-only warning does not fail an otherwise successful query, but a separate trace-read command must report when its own request is denied or unavailable. Likewise, a ready build and a failed publication are separate facts. The automation contract must map every command variant before implementation.
+These are the ordinary `0`/`1`/`2` meanings. [Interruption and detachment](#interruption-and-detachment) adds `130` for INT and `143` for TERM. JSON uses `succeeded` for `0`, `failed` for usage or known failure, `uncertain` for unestablished requested effects/completion and `interrupted` for signals. Known failure and uncertainty both ordinarily exit `1`. A valid answer that abstains can succeed. A tracing-only warning does not fail an otherwise successful query, but a separate trace-read command must report when its own request is denied or unavailable. Likewise, a ready build and a failed publication are separate facts. The automation contract must map every command variant before implementation.
 
 <a id="cli-recovery-contract"></a>
 
@@ -65,15 +66,15 @@ These are the ordinary `0`/`1`/`2` meanings. They do not assign signal codes or 
 
 The terminal and CI use the same saved backend operation. For a new command that changes state or can incur a charge, the CLI generates a request key unless automation supplies `--idempotency-key`.
 
-A retry keeps the original target, account, project, command meaning and accepted inputs. If the acceptance response was lost, first look up the original operation. Changing the selected target or editing the Pipeline does not change what that retry means. Local recovery hints can help locate an operation, but cannot prove what the server did or grant permission to continue.
+A retry keeps the original target, account, project, command meaning and accepted inputs. If the acceptance response was lost, first look up the original operation. Changing the selected target or editing the Pipeline does not change what that retry means. [Local recovery hints](#minimal-local-recovery-hints) retain only enough original identity to request an authoritative lookup. They cannot prove what the server did or grant permission to continue.
 
-`Ctrl-C` requests cancellation. Pressing `c` stops watching and returns to the shell without canceling backend work. Report whether cancellation was merely requested or actually completed.
+[Interruption and detachment](#interruption-and-detachment) distinguishes Ctrl-C cancellation requests, `c` detachment and TERM. Preserve request, acknowledgment and confirmed job outcome as separate facts.
 
-Human commands wait by default. The caller can explicitly choose to return after the backend accepts work, and a wait timeout does not cancel that work. Scripts must not encounter unexpected prompts. They receive separate command and job outcomes. Exact transport, output and signal contracts still need specification. A terminal mockup does not define them.
+Commands requesting completion of durable work wait by default in interactive terminals and automation alike. `--json`, `--jsonl`, `--plain`, `--no-input`, piping and terminal detection do not change that default. `--no-wait` explicitly selects return after confirmed admission for commands that support durable admission. Inspection reads only the requested observation and never waits for the observed job to succeed unless waiting was explicitly requested. A wait timeout does not cancel work. Scripts must not encounter unexpected prompts. They receive separate command and job outcomes. Use the accepted machine framing and signal rules below. Exact HTTP transport delivery remains backend work. A terminal mockup does not publish an endpoint.
 
 Configuration imports use these same durable jobs. They retain the approved definitions, destination mappings and completed resources. Continue only unfinished steps that the backend confirms are still safe and permitted. Changed inputs need a new review. An uncertain write must be resolved before it is repeated.
 
-Query retries still return receipts rather than answer text, and one-time secrets retain their special recovery restrictions. If the backend's original history has expired, the CLI must not automatically create new paid work. The shared job contract owns lookup, progress and continuation. Output schemas and qualification remain explicit work. It does not replace the implemented grant-idempotency behavior.
+Query retries still return receipts rather than answer text, and one-time secrets retain their special recovery restrictions. If the backend's original history has expired, the CLI must not automatically create new paid work. The [logical recovery reference](operation-recovery-contracts.md) owns lookup, progress and continuation. Common output framing is accepted. Command-specific data and runtime qualification remain delivery work. It does not replace the implemented grant-idempotency behavior.
 
 <a id="progress-presentation"></a>
 
@@ -88,7 +89,7 @@ CLI progress and result presentation selects concise outcome/reason/next-action 
 - Show actual progress when known, with a named unit and denominator. Do not invent a percentage, time estimate, zero or successful result when information is unavailable. Preparation can show its current activity without a case count.
 - Separate an answer being saved from its scoring being complete. Partial, failed, canceled, unattempted and uncertain work must remain distinguishable. A total or saved-result statement must come from authoritative retained observations, not elapsed time or local guesses.
 - Use a short default summary and a bounded list of items needing attention. Link to ordinary inspection for the rest. Summaries, identifiers, questions and counts all remain subject to current access and erasure. Do not fetch every protected item merely to render progress.
-- `c` stops watching without sending cancellation and returns to the shell. It does not close the user's terminal. Ctrl-C requests cancellation. Acknowledge locally that cancellation is being requested, but report "Cancellation requested" only after server acknowledgment and "Job canceled" only after confirmation. If acknowledgment is lost, report it as unconfirmed and offer status lookup.
+- [Interruption and detachment](#interruption-and-detachment) owns `c`, INT, TERM and bounded cancellation acknowledgment. Progress may say "Requesting cancellation" locally, "Cancellation requested" only after acknowledgment and "Job canceled" only after confirmation.
 - A lost CLI connection means the job **may** still be running, not that it certainly is. Look up the original operation before starting again. A model request with an unknown paid outcome instead requires review. Say that it may have been charged and was not retried when those facts are established. Ordinary resume cannot repeat that call.
 - Human and JSON views expose the same authorized facts and recovery limits. Human progress goes to stderr when stdout carries JSON. No animations or interactive key handling in noninteractive output. Reading or watching results does not rerun work.
 
@@ -96,4 +97,72 @@ These are accepted presentation requirements, not implemented guarantees or a wi
 
 ## Output framing and dry-run
 
-[CLI automation](cli-output-and-automation.md) owns stdout/stderr, JSON framing and descriptive dry-run. These outcomes do not define missing exact machine fields.
+[CLI automation](cli-output-and-automation.md) owns the accepted stdout/stderr, JSON/JSONL framing and descriptive dry-run contract. Command-specific fields remain with each feature. [Shared change views](cli-change-review.md#machine-change-views) preserve proposed, confirmed and stale meanings.
+
+## Interruption and detachment
+
+| Input or observation | Exit and effect |
+| --- | --- |
+| Interactive `c` while watching | Exit `0` for successful detachment. Report last permitted facts and that no cancellation was sent. Do not claim the backend certainly continues |
+| First INT during an active durable-work wait | Return `130`. Stop normal polling, request cancellation under current authority and allow at most five seconds from receipt of INT for acknowledgment |
+| First INT elsewhere | Return `130` without inventing a job or cancellation. A submission already dispatched can remain uncertain |
+| Second INT | Return `130` immediately without further network work or waiting for the first cancellation request |
+| TERM | Return `143`, stop local observation and send no implicit backend cancellation |
+| Wait deadline expires | Return `1` without requesting cancellation. Preserve last permitted state and original references |
+
+On first INT, immediately explain on stderr that interruption has started and that a second INT exits without waiting. Do this before credential access or network cleanup, with wording that distinguishes requesting cancellation from a recorded request. The five seconds includes credential access and cancellation dispatch, not five seconds per phase. Do not start interactive login or automatically retry an uncertain cancellation. A distinct cancellation mutation uses its own request identity against the original job. [Its backend contract](operation-recovery-contracts.md#cancellation) owns reconciliation and current authority. A canceled/succeeded/failed job discovered during interruption keeps that actual state while the invocation still reports interruption.
+
+No interactive `c` handler runs under noninteractive input or `--no-input`. Acknowledgment confirms only the recorded request. Report unconfirmed delivery if it is denied, times out or loses contact. Signals cannot undo completed effects or recall an external call. Best-effort machine output uses `interrupted` with a safe local error and any permitted observation. Second INT, forced termination and broken stdout may prevent a final record.
+
+Local lifecycle commands retain confirmed started/stopped/unknown effects under the same invocation meanings. INT does not imply a successful rollback of partial startup. TERM does not cancel durable jobs, and stopping the runtime preserves their saved work under [local lifecycle](cli-local-runtime.md#persistent-lifecycle-status-and-deliberate-reset).
+
+## Minimal local recovery hints
+
+A request key must survive the interval before acknowledgment if the CLI generated it. Before dispatching a remote product mutation or chargeable request with a CLI-generated key, durably save a current-user recovery hint. If saving fails, fail before dispatch. Ordinary product reads, dry-run and local lifecycle observations create no hint. Provider login/refresh keeps its separate credential-lifecycle contract.
+
+Callers supplying `--idempotency-key` may use a stateless path with no hint. They must retain the original immutable context and key themselves. This allows CI with read-only local state. An explicit key neither proves that a request is a retry nor permits a different target or payload to replace its original meaning.
+
+| Hint component | Meaning and restriction |
+| --- | --- |
+| Target-binding reference | Immutable locally registered binding reference, not an alias or authority to rediscover a replacement |
+| Installation and principal | Original permanent identities, checked against trusted target/account bindings during recovery |
+| Scope | Original organization ID and Project ID where applicable |
+| Method and route | Original canonical logical method/route, preserving its original meaning rather than today's default resolution |
+| Request key | Original opaque non-secret idempotency identity, subject to the existing 128-character limit |
+| Creation time | UTC time of local creation, not proof of server admission or server retention |
+| Known references | Operation/job identities only when actually received. No guessed IDs |
+
+The current-user location of a hint can identify it without another public resource ID. A hint contains no payload, credential, fingerprint, answer, cached result or permission snapshot. Use restricted current-user storage, owner-only files/directories, and treat loaded contents as untrusted input. A corrupted or modified hint cannot redirect credentials or select a new binding.
+
+Fixed private bounds are 1,000 pending hints per current OS user, each at most 32 KiB of UTF-8 stored representation. The representation's implementation/versioning stays private. Do not silently evict unresolved hints. Saving an oversized hint or reaching the count bound fails new submissions requiring a hint before dispatch. Report how to recover or explicitly discard existing hints. These bounds add no user setting, database, daemon or global coordinator. Separate invocations must not overwrite one another's hints or exceed the count limit through a race, without serializing their backend jobs.
+
+Remove a hint after confirmed admission/result has been handed back successfully, or after explicit user discard. A known job reference handed back after admission is sufficient handoff, not a claim of completed work. Keep the hint when server acknowledgment or output delivery is uncertain. Local expiry guesses, cache cleanup and an absent file cannot establish that the request did nothing.
+
+Recovery is explicit. Load original binding and current credentials through normal target/account rules, then request [authoritative lookup](operation-recovery-contracts.md#original-request-lookup). No current alias or environment override can retarget it. Deleted/missing target bindings, changed installation/principal identities, invalid credentials and unavailable history produce safe failures without replacement discovery or automatic replay. A hint cannot construct managed-local trust or authorize continuation. A later replay still needs the original inputs and server fingerprint checks, which the hint deliberately does not retain.
+
+## Qualification scenarios
+
+The matrix defines future behavioral evidence for the owning implementation issues. These are not application tests executed by the specification PR.
+
+| Scenario | Expected invocation and observation |
+| --- | --- |
+| Completion command in a terminal, a pipe or `--no-input --json`, with no waiting override | All wait for the requested workflow. Actual failure returns `1`, independently of input/output mode |
+| Confirmed admission with explicit no-wait | `0` / `succeeded`, original references, no claim of completion |
+| Lost admission acknowledgment | `1` / `uncertain`, original recovery information, no new paid request |
+| Expired history or failed lookup | Completed read-only lookup can succeed with unresolved data. Denial/unavailability fails the read. Neither establishes no original effects |
+| Target alias, account, Project or payload changes | Preserve original identity, deny mismatches, require ordinary fingerprint/current-authority checks |
+| Inspect a failed job | `0` / `succeeded` with actual failed state and permitted saved results |
+| Wait for failed/partial work or wait timeout | `1`, confirmed partial facts retained, timeout sends no cancellation |
+| Answers saved but scoring incomplete | Distinct owner counts and unknowns match human and JSON views |
+| Cancellation races with completion or acknowledgment loss | Preserve actual terminal state and acknowledged versus unconfirmed request |
+| `c`, INT, second INT and TERM | Detach `0`, interrupt `130`, immediate second INT, TERM `143`, only first INT during active wait requests cancellation |
+| Noninteractive missing input or incompatible stdout modes | `2`, controlled failure, no operation, browser/editor or prompt |
+| Malformed invocation with diagnostic dry-run intent | `2` / `failed`, `mode: dryRun` when an exact `--dry-run` precedes `--`, otherwise `execute`, no effects |
+| Help with otherwise invalid arguments or conflicting output flags | Plain-text help, exit `0`, no requested operation |
+| Successful dry-run of read, mutation or lifecycle action | `0`, `mode: dryRun`, only permitted metadata checks, no requested operation or hint |
+| Hint storage denied, oversized or full | No generated-key submission. Explicit-key stateless path remains available |
+| Hint modified, binding deleted or account changed | No credential forwarding or replacement-target recovery |
+| Output fails after admission | No false success/no-effect claim, hint retained when handoff is uncertain |
+| JSON/JSONL, terminal/plain, warning and change views | Same permitted effects/counts/unknowns, one result, correct channels and labels |
+
+Runtime delivery belongs to #158 and the relevant CLI command/recovery issues. This contract supplies no new command registration, application implementation or permanent qualification harness.

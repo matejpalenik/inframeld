@@ -2,7 +2,7 @@
 
 Alice inspects a failed build. The CLI obtains the currently permitted facts through the generated SDK, then presents them as concise human output or structured JSON. Inspection succeeds even though the build failed. Waiting for that build to succeed asks for a different outcome. [CLI result contracts](../../inframeld-application-contracts/references/cli-result-contracts.md) owns that distinction.
 
-> **Status:** accepted target structure and presentation boundaries on 2026-10-28, recorded in [ADR-0097](../../../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md). The executable implements offline help/version. The library additionally implements explicit SDK construction and stateless discovery, alongside private packaging tooling. Accepted design does not establish general JSON, progress, prompts or product-command implementation. Exact command vocabulary, JSON fields and per-command mappings remain #156's work, with shared implementation in #158 and the owning command issues.
+> **Status:** accepted target structure and presentation boundaries on 2026-10-28, recorded in [ADR-0097](../../../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md). The executable implements offline help/version. The library additionally implements explicit SDK construction and stateless discovery, alongside private packaging tooling. Accepted design does not establish general JSON, progress, prompts or product-command implementation. The [common JSON framing](../../inframeld-application-contracts/references/cli-output-and-automation.md) and [invocation/signal mappings](../../inframeld-application-contracts/references/cli-result-contracts.md) are accepted through the joint #124/#156 specification. Exact feature-command vocabulary, typed leaf payloads and runtime implementation remain #158 and the owning command issues' work.
 
 | Reader question | Read |
 | --- | --- |
@@ -97,7 +97,7 @@ The family enum's `Inspect` variant carries `inspect::Arguments`, and the root e
 
 Use shared global flags with clap's global propagation where their meaning is shared. Qualify their use before and after subcommands and their presence in subcommand help. Reuse argument groups for genuinely shared inputs. Create a separate resolved-options record when configuration precedence or validation changes meaning, rather than copying every argument struct into another identical type.
 
-Use a non-exiting parse boundary such as `try_parse_from` so controlled argument failures reach shared reporting. The owning specification still needs to define how machine-output intent is recognized when full parsing fails, and how help/version/completion interact with output channels.
+Use a non-exiting parse boundary such as `try_parse_from` so controlled argument failures reach shared reporting. The [machine-channel contract](../../inframeld-application-contracts/references/cli-output-and-automation.md#use-one-predictable-machine-channel) defines diagnostic output intent on parsing failure and the help/version/completion channel exceptions. Keep that narrow intent selection separate from command parsing and execution.
 
 ## Command lifecycle
 
