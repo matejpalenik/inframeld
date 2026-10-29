@@ -191,13 +191,13 @@ Existing Access authorizers own the fresh key-state check for incoming protected
 
 For writes, these checks participate in the operation's transaction and applicable coordination rules before protected work or replay. The verifier still establishes ownership of the submitted secret during authentication. Later key-state checks use the non-secret evidence and do not retain or forward that secret. Keep fact loading in infrastructure and interpretation/decisions in Access's application/domain components, following the [credential query and policy boundary](eligibility-and-current-authority.md#credential-query-and-policy-boundaries).
 
-This is accepted ownership for the future application-key path. The current human OAuth generation flag does not prove key validity, and the inspected authorizers' synthetic application-key fixtures do not implement this fresh key-state check. Exact lifecycle checkpoints and concurrency mechanisms remain to specify.
+This is accepted ownership for the future application-key path. The current human OAuth generation flag does not prove key validity, and the inspected authorizers' synthetic application-key fixtures do not implement this fresh key-state check. [PD-ACCESS-01](decision-key-currentness.md#approved-resolution) now selects lifecycle checkpoints and database ordering. Their implementation and qualification remain delivery work.
 
 <a id="contracts-still-needed-before-implementation"></a>
 
-### Contracts still needed before implementation
+### Approved contracts to apply in implementation
 
-Agree exact verification inputs, expiry/revocation checkpoint and concurrency mechanics, and the credential lifecycle of already-admitted background work before implementing the affected paths. The component split, minimal two-ID result, rejection/availability contract and existing-authorizer ownership are settled, while those details remain open. Existing [public authentication outcomes](../../../../docs/development/error-handling.md#authentication-contract) remain authoritative. The accepted [key format, verifier algorithm and lifetime](application-key-contracts.md#application-key-contract), current-account authority, two-usable-key limit and show-once delivery remain unchanged.
+Apply the accepted [key checkpoint contract](decision-key-currentness.md#approved-resolution) and [durable-job authority contract](decision-admitted-work-authority.md#approved-resolution) when implementing these paths. Individual key revocation blocks new requests, not already admitted jobs. Cancellation or account suspension stops their later protected work. The component split, minimal two-ID result, rejection/availability contract and existing-authorizer ownership are settled, while concrete backend representations and qualification remain implementation work. Existing [public authentication outcomes](../../../../docs/development/error-handling.md#authentication-contract) remain authoritative. The accepted [key format, verifier algorithm and lifetime](application-key-contracts.md#application-key-contract), current-account authority, two-usable-key limit and show-once delivery remain unchanged.
 
 <a id="recover-secret-operations-safely"></a>
 
@@ -243,12 +243,12 @@ Invitation issuance likewise generates a 32-random-byte protected token, stores 
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted entries below when their scope matches. Discuss only choices still explicitly marked pending:
 
-- [PD-ACCESS-01: Check application-key currentness at the right boundary](decision-key-currentness.md). Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
-- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-ACCESS-01 (accepted): Check application-key currentness at the right boundary](decision-key-currentness.md). Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
+- [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
 
 <a id="status-and-sources"></a>
 

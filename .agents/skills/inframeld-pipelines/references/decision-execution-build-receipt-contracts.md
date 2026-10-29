@@ -53,7 +53,7 @@ Pipelines configuration/capture/build/execution, shared operations/receipts, Ind
 Load neighboring decisions only under these conditions:
 
 - [PD-INDEXING-01: Exchange complete prepared bindings between Indexing capabilities](../../inframeld-indexing/references/decision-capability-binding-contracts.md). For complete prepared bindings.
-- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). For durable-work credential authority.
+- [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). For durable-work credential authority.
 - [PD-KNOWLEDGE-01: Finalize a complete collection selection without losing admitted input](../../inframeld-knowledge/references/decision-complete-batch-handoff.md). When consuming a complete live-input batch.
 
 ## Open questions and required evidence

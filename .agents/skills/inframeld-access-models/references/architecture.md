@@ -133,7 +133,7 @@ Application-key lifecycle, the account UI, complete CLI delivery and safe produc
 
 The [logical result](credential-and-recovery-records.md#application-key-verification-result) carries no secret, account state or grants. Operation authorization remains separate. Existing Access authorizers obtain fresh key-state facts by key ID and check the current actor binding, expiry and revocation before protected work or replay, with the owning transaction/coordination for writes. This accepted responsibility is not an implemented application-key check.
 
-Rejected credentials return no verified result. Recognized verification-dependency availability failures raise `DependencyUnavailableError`, while unexpected failures and cancellation propagate. The [owning guide](application-key-contracts.md#verification-results-and-unresolved-currentness) defines their service/HTTP translation and retains exact input, temporal lifecycle/coordination and already-admitted job credential details still to resolve. The [current-key authorization section](application-keys.md#application-key-current-authorization) records the settled existing-authorizer ownership. This accepted boundary does not establish an implemented authenticator or change the key/evidence contract.
+Rejected credentials return no verified result. Recognized verification-dependency availability failures raise `DependencyUnavailableError`, while unexpected failures and cancellation propagate. The [owning guide](application-key-contracts.md#verification-results-and-unresolved-currentness) defines their service/HTTP translation. The accepted [key ordering](decision-key-currentness.md#approved-resolution) and [durable-job authority](decision-admitted-work-authority.md#approved-resolution) contracts resolve the temporal details, with implementation still pending. The [current-key authorization section](application-keys.md#application-key-current-authorization) records the settled existing-authorizer ownership. This accepted boundary does not establish an implemented authenticator or change the key/evidence contract.
 
 [Access control](authorization.md), [Access contracts](actions-and-initial-grants.md), [Access records](identity-and-grant-records.md#access) and [the service guide](../../inframeld-python-standards/references/services-and-use-cases.md#service-writing-guide) own the rules. The [architecture decision index](../../../../docs/adr/README.md) owns accepted choices and supersession.
 
@@ -226,14 +226,14 @@ Authentication establishes the caller. A later `ActionAuthorizationService.requi
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-[PD-ACCESS-03 is resolved](decision-recovery-production-completion.md). Use the accepted [private handoff](private-recovery-handoff.md), [completion workflow](recovery-completion.md) and [host continuation](host-maintenance.md#recovery-cleanup-continuation) for their inspected implementations and qualification limits. Bootstrap, stranded-authority repair and account restoration remain separate work. Other choices below remain pending.
+[PD-ACCESS-03 is resolved](decision-recovery-production-completion.md). Use the accepted [private handoff](private-recovery-handoff.md), [completion workflow](recovery-completion.md) and [host continuation](host-maintenance.md#recovery-cleanup-continuation) for their inspected implementations and qualification limits. Bootstrap, stranded-authority repair and account restoration remain separate work. The entries below distinguish accepted policies from choices still pending.
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted entries below when their scope matches. Discuss only choices still explicitly marked pending:
 
-- [PD-ACCESS-01: Check application-key currentness at the right boundary](decision-key-currentness.md). Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
-- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-ACCESS-01 (accepted): Check application-key currentness at the right boundary](decision-key-currentness.md). Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
+- [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
 - [PD-ACCESS-05: Implement and qualify the selected provider-secret lifecycle](decision-provider-secret-lifecycle.md). When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
 - [PD-ACCESS-06: Authorize setup details before a Deployment exists](decision-setup-read-authority.md). Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
 

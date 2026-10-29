@@ -2,6 +2,8 @@
 
 <a id="understand-the-runtime-services"></a>
 
+The accepted [application queue policy](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md#approved-resolution) uses bounded oldest-eligible application work and preserves the separate recovery process. Full ordinary capacity rejects new job admission before effects. Existing cleanup obligations and access restrictions survive saturation and restart. Application jobs can delay other product work without occupying recovery's execution slot. Numerical limits and measured response-time claims remain separate qualification.
+
 ## Choose a focused reading task
 
 - For durable stores and paths, read [Storage topology](storage-topology.md).

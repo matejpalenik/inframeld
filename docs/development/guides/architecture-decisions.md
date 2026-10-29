@@ -17,7 +17,7 @@ Keep assigned ADR IDs stable. Use the next unused ID in the index for a new choi
 
 ## Just-in-time architecture decisions
 
-Alice is ready to implement application-key authorization. Its verifier split is accepted, but the exact revocation/checkpoint contract is still pending. This is the time to discuss that contract. An unrelated change to a human grant error message should not require settling background-job credential lifetime.
+Alice reaches an unresolved contract needed by her next implementation. Discuss that concrete choice then, while allowing unrelated work to continue. The application-key checkpoint and admitted-job lifetime examples were resolved on 2026-10-29 through ADR-0100 and ADR-0101. Their still-pending implementation evidence does not reopen those policies.
 
 <a id="find-the-relevant-pending-question"></a>
 

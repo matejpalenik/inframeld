@@ -36,12 +36,17 @@ Trace the chosen credential, local identity, current eligibility, exact action/t
 
 Before backend component design, code generation or structural review, read [module architecture](references/architecture.md), the affected workflow and Coding Standards. Behavior-only questions go directly to their workflow. Pending proposals do not authorize dependent code.
 
+## Accepted decision references
+
+These contracts were approved on 2026-10-29. Apply them without reopening their policy. Implementation and qualification remain separate.
+
+- [PD-ACCESS-01](references/decision-key-currentness.md): Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
+- [PD-ACCESS-02](references/decision-admitted-work-authority.md): Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+
 ## Pending decisions for affected work
 
 Load only matching triggers. Discuss and obtain approval before code depends on an unresolved choice, following [decision finalization](../../../docs/development/guides/architecture-decisions.md). Unrelated decisions do not block work. Qualification gaps gate claims, not evidence-gathering tests.
 
-- [PD-ACCESS-01](references/decision-key-currentness.md): Before defining the application-key verifier/authenticator contracts or implementing key-aware authorizers and protected replay.
-- [PD-ACCESS-02](references/decision-admitted-work-authority.md): Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
 - [PD-ACCESS-05](references/decision-provider-secret-lifecycle.md): When implementing protected provider-credential management, storage or deployment-key integration, and before claiming the complete secret boundary is qualified.
 - [PD-ACCESS-06](references/decision-setup-read-authority.md): Before defining defaults/setup read contracts or implementing HTTP/MCP/CLI prepublication status resolution.
 

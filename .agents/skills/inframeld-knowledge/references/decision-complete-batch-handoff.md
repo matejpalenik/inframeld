@@ -54,7 +54,7 @@ Load neighboring decisions only under these conditions:
 
 - [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](../../inframeld-pipelines/references/decision-execution-build-receipt-contracts.md). For exact captured build inputs and preparation handoff.
 - [PD-RELEASES-01: Persist Deployment transitions with one shared control check](../../inframeld-releases/references/decision-deployment-state-and-concurrency.md). For atomic newest-request/control state.
-- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). If a queued continuation must interpret the initiating credential’s lifetime.
+- [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). If a queued continuation must interpret the initiating credential’s lifetime.
 
 ## Open questions and required evidence
 

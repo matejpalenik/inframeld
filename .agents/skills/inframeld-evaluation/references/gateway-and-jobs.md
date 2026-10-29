@@ -166,9 +166,9 @@ Optional starter generation and evaluation use embedded Ragas under [ADR-0051](.
 
 <a id="pending-decisions-for-dependent-implementation"></a>
 
-## Pending decisions for dependent implementation
+## Decision references for dependent implementation
 
-Before choosing an unresolved implementation contract, load only the entry whose trigger applies:
+Apply the accepted entries below when their scope matches. Discuss only choices still explicitly marked pending:
 
 - [PD-EVALUATION-03: Qualify embedded Ragas without hidden calls or false confidence](decision-ragas-integration-and-calibration.md). Before implementing embedded generator/judge adapters or claiming supported model-quality/calibration results.
-- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.
+- [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Before admitting, executing or resuming durable work that must interpret credential expiry, rotation, revocation or replacement.

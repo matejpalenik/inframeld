@@ -53,7 +53,7 @@ Indexing writer/reconciliation, Knowledge artifact cleanup, shared job attempts,
 Load neighboring decisions only under these conditions:
 
 - [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](../../inframeld-knowledge/references/decision-retention-erasure-policy.md). For shared reference/erasure policy.
-- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Only when a recovery continuation must interpret credential lifetime.
+- [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). Only when a recovery continuation must interpret credential lifetime.
 
 ## Open questions and required evidence
 

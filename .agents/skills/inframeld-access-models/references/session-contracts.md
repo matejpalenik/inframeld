@@ -30,7 +30,7 @@ class CurrentApplicationSessionResponse(TypedDict):
     projectId: UUID
 ```
 
-A response with permissions, account status or another selected Project would violate this shape. Full key verification, expiry/revocation, installation/audience/adapter and current account/Project checks remain mandatory. A public prefix or key-ID lookup is not authentication. [PD-ACCESS-01](decision-key-currentness.md) still gates unresolved verifier inputs and currentness coordination.
+A response with permissions, account status or another selected Project would violate this shape. Full key verification, expiry/revocation, installation/audience/adapter and current account/Project checks remain mandatory. A public prefix or key-ID lookup is not authentication. The accepted [PD-ACCESS-01](decision-key-currentness.md#approved-resolution) governs verifier inputs and currentness coordination. Implementation remains pending.
 
 <a id="session-checks"></a><a id="session-responses-and-authentication-budgets"></a>
 

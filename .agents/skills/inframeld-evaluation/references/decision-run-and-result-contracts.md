@@ -54,7 +54,7 @@ Load neighboring decisions only under these conditions:
 
 - [PD-PIPELINES-01: Capture fixed inputs and complete execution through its receipt](../../inframeld-pipelines/references/decision-execution-build-receipt-contracts.md). For ordinary execution/capture results.
 - [PD-INDEXING-03: Keep source passage identity stable when chunking changes](../../inframeld-indexing/references/decision-source-coordinates.md). For canonical passage identity.
-- [PD-ACCESS-02: Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). For admitted background-work authority.
+- [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). For admitted background-work authority.
 
 ## Open questions and required evidence
 

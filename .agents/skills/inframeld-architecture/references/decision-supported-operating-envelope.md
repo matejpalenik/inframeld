@@ -53,7 +53,7 @@ Deployment profile, every domain’s admission/batching, worker/gateway limits, 
 Load neighboring decisions only under these conditions:
 
 - [PD-INDEXING-05: Select and prove a bounded parser runtime](../../inframeld-indexing/references/decision-parser-runtime-profile.md). For parser resource limits.
-- [PD-CONTRACTS-05: Qualify cleanup and recovery under a full bounded queue](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md). For mixed-load queue behavior.
+- [PD-CONTRACTS-05 (accepted): Qualify cleanup and recovery under a full bounded queue](../../inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md). For mixed-load queue behavior.
 - [PD-KNOWLEDGE-02: Choose bounded retention without weakening explicit erasure](../../inframeld-knowledge/references/decision-retention-erasure-policy.md). For bounded retained history.
 - [PD-ARCHITECTURE-02: Match availability and recovery claims to the supported deployment](decision-availability-backup-and-restore.md). For backup resource and availability costs.
 
