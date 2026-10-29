@@ -89,7 +89,9 @@ Metadata list/get needs exact Issue or Revoke keys, without the extra issuance d
 
 First delivery contains the newly created secret. The same original issuance replay omits it and reports `secretAvailable: false`. Never save plaintext in idempotency, audit, trace or logs, and never generate another key because a response was lost. The retained metadata describes the original created credential. A fresh authorized read determines its current expiry/revocation state. A human may explicitly revoke the unusable lost key and admit a separate new issuance.
 
-## Verification results and unresolved currentness
+<a id="verification-results-and-unresolved-currentness"></a>
+
+## Verification results and currentness
 
 [ADR-0074](../../../../docs/adr/ADR-0074-separate-application-key-verification-from-local-admission.md) selects a focused verifier returning only verified key identity and associated principal identity. Do not invent a concrete result schema or new account snapshot here. The authentication service separately loads the account, checks local eligibility and builds complete non-secret evidence.
 

@@ -52,7 +52,7 @@ Shared CLI/import orchestration, all imported resource owners, budget/trace poli
 
 Load neighboring decisions only under these conditions:
 
-- [PD-CONTRACTS-02: Coordinate budget policy, reservations and uncertain settlement](decision-spending-coordination.md). Only for explicit budget apply.
+- [PD-CONTRACTS-02 (accepted): Coordinate budget policy, reservations and uncertain settlement](decision-spending-coordination.md). Only for explicit budget apply.
 - [PD-PIPELINES-02: Make a confirmed trace opt-out stop later capture and delivery](../../inframeld-pipelines/references/decision-trace-policy-fencing.md). Only for trace-policy apply.
 - [PD-ACCESS-02 (accepted): Keep durable work and credential lifetime explicit](../../inframeld-access-models/references/decision-admitted-work-authority.md). When queued import continuation needs credential-lifetime semantics.
 

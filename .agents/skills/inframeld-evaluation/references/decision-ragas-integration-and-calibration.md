@@ -52,8 +52,8 @@ Evaluation library adapters, ModelGateway role/accounting paths, case generation
 
 Load neighboring decisions only under these conditions:
 
-- [PD-CONTRACTS-01: Enforce model policy on the actual outbound path](../../inframeld-application-contracts/references/decision-gateway-enforcement.md). For supported dispatch/adapter contracts.
-- [PD-CONTRACTS-02: Coordinate budget policy, reservations and uncertain settlement](../../inframeld-application-contracts/references/decision-spending-coordination.md). For bounded paid calls and uncertain holds.
+- [PD-CONTRACTS-01 (accepted): Enforce model policy on the actual outbound path](../../inframeld-application-contracts/references/decision-gateway-enforcement.md). For supported dispatch/adapter contracts.
+- [PD-CONTRACTS-02 (accepted): Coordinate budget policy, reservations and uncertain settlement](../../inframeld-application-contracts/references/decision-spending-coordination.md). For bounded paid calls and uncertain holds.
 
 ## Open questions and required evidence
 
