@@ -29,12 +29,16 @@ Use the same route meaning and scope as original admission. A logical default ro
 | Alternative | Permitted facts |
 | --- | --- |
 | Completed synchronous operation | Original operation identity, safe result classification and retained outcome metadata, including expiry when established |
-| Accepted asynchronous operation | Retained asynchronous admission, its original operation identity and known job reference, plus original admission facts and established expiry, regardless of current job state |
+| Accepted asynchronous operation | Retained asynchronous admission, original operation identity, original admission facts and any established expiry. A permitted job reference is known or explicitly unknown, regardless of current job state |
 | In progress | Original identity and the fact that synchronous processing is still in progress, rather than requiring recovery |
 | Recovery required | Original identity and the safe uncertainty/recovery reason supplied by its owner, with no established asynchronous admission |
 | Unresolved | No authoritative retained match can be established. This says nothing about whether work previously happened |
 
 Admission and inspection are separate. Retained asynchronous admission selects **Accepted asynchronous operation** regardless of the job's current state. An admitted job's later `recovery_required` state does not select the lookup's **Recovery required** alternative. Finding an admission does not report today's job state. Read that state through [authorized job inspection](#job-inspection). Likewise, [retrying that accepted command](idempotency-and-replay.md#return-the-documented-outcome-instead-of-starting-duplicate-work) retains its original `202` meaning even after the job finishes.
+
+**Admission without a known job reference.** The [shared accepted-operation record](idempotency-and-replay.md#temporary-operation-outcomes) carries operation metadata without a job reference. If admission is confirmed but a permitted job reference cannot be established, lookup still returns **Accepted asynchronous operation**. Its bounded observation contains the original operation identity, confirmed admission facts, any established expiry, an explicitly unknown job reference and dispatch not established. Missing a reference proves neither that work was not dispatched nor that it is queued, running, failed or recovery-required. It does not select **In progress**, **Recovery required** or **Unresolved** solely because that reference is unavailable. Unauthorized job facts remain omitted under the disclosure rules above.
+
+An unknown reference describes limited lookup knowledge, not permission to commit a jobless admission. Preserve [atomic job admission](jobs-and-recovery.md#admit-work-and-claim-an-attempt). Further read-only lookup uses the original binding, or the owner's existing operation-inspection contract where available. Job inspection, cancellation and continuation still require a known original job reference and current authority. Do not guess a job ID, fabricate a replay `Location`, create replacement work or dispatch a provider request to fill the gap.
 
 Lookup correlates the supplied original identity. It does not accept a replacement payload or certify that newly edited inputs equal the original inputs. A later replay retains server-owned fingerprint comparison. Continuation loads fixed retained inputs. Reusing a key with a changed payload cannot use lookup as approval to execute that change.
 
@@ -61,7 +65,7 @@ sequenceDiagram
     API-->>CLI: Permitted current progress and outcome
 ```
 
-Arrows show requests and observations, not source dependencies or a replay. Worker execution can progress independently between the two reads. A missing match or denied read follows the failure rules above instead of the illustrated successful recovery.
+Arrows show requests and observations, not source dependencies or a replay. Worker execution can progress independently between the two reads. The illustrated lookup has a known job reference. A missing match or denied read follows the failure rules above instead of the illustrated successful recovery.
 
 ## Job inspection
 
@@ -128,6 +132,8 @@ The following are downstream behavioral acceptance cases, not tests executed by 
 | Scenario | Required observation |
 | --- | --- |
 | Admission committed, acknowledgment lost | Lookup identifies the original admission without another job or provider call |
+| Admission retained, permitted job reference unavailable | Lookup returns Accepted asynchronous operation with original identity, any established expiry, job reference explicitly unknown and dispatch not established. No guessed job state, replacement admission or provider call |
+| Later authorized lookup establishes the job reference | Return the same admitted operation with that known reference. Job inspection remains a separate authorized read |
 | Synchronous request is still processing | Lookup returns In progress, without implying an asynchronous job |
 | Original operation requires recovery with no established asynchronous admission | Lookup returns Recovery required with its safe owner reason |
 | Accepted asynchronous job is queued or running | Lookup returns Accepted asynchronous operation. Authorized inspection supplies current job state |
