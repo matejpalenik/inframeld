@@ -133,9 +133,9 @@ These messages and the illustrative `missing_input` code explain the shape. Comm
 
 ### Versioning and explicit streaming
 
-Consumers ignore additive fields and tolerate unfamiliar diagnostic codes and backend problem extensions. Breaking changes to required fields, types or outcome meaning require a new `schemaVersion`. Reject an unsupported schema version or malformed required shape instead of interpreting it as success. These rules do not promise that unimplemented command data schemas already exist.
+Consumers ignore additive fields and tolerate unfamiliar diagnostic codes and backend problem extensions. These compatibility rules apply to ordinary result objects, both JSONL record types and the ordinary result nested in a final record. Breaking changes to required fields, types or outcome meaning require a new `schemaVersion`. Ignoring additive fields never permits missing or malformed required fields or an unsupported schema version. Reject such records or results instead of interpreting them as success. These rules do not promise that unimplemented command data schemas already exist.
 
-Explicit `--jsonl` emits newline-delimited UTF-8 objects in observed order. A progress record contains exactly `schemaVersion: 1`, `type: "progress"` and `data`, a typed permitted observation. The final record contains `schemaVersion: 1`, `type: "result"` and `result`, the same six-field ordinary result object. There is at most one final record and no later progress. Normal controlled completion emits that final record even when there were no progress records.
+Explicit `--jsonl` emits newline-delimited UTF-8 objects in observed order. A progress record requires `schemaVersion: 1`, `type: "progress"` and `data`, a typed permitted observation. The final record requires `schemaVersion: 1`, `type: "result"` and `result`, the ordinary result object with its six required fields. There is at most one final record and no later progress. Normal controlled completion emits that final record even when there were no progress records.
 
 This reference's JSONL example has one observation and a final successful inspection result. Its progress/data fields remain illustrative command payloads:
 
@@ -184,7 +184,7 @@ A successful explanation exits `0` without establishing execution, readiness, fu
 
 Backend logical facts are accepted separately from delivered models/OpenAPI. Common framing is accepted separately from each command's typed data. Native FastAPI/OpenAPI and generated clients remain the delivered HTTP authority. Add no handwritten application client or competing schema artifact for this specification.
 
-Downstream checks must cover one final JSON object, valid JSONL ordering, local/backend error source, partial data on failure, warnings, missing input, output conflicts, interrupted output, dry-run effects and human/JSON parity. [The combined scenario matrix](cli-result-contracts.md#qualification-scenarios) owns cross-boundary cases. These are requirements, not application tests run by this documentation change.
+Downstream checks must cover one final JSON object, valid JSONL ordering, local/backend error source, partial data on failure, warnings, missing input, output conflicts, interrupted output, dry-run effects and human/JSON parity. Check additive fields in ordinary results, progress records, final records and nested results. Missing or malformed required fields and unsupported schema versions must still be rejected. [The combined scenario matrix](cli-result-contracts.md#qualification-scenarios) owns cross-boundary cases. These are requirements, not application tests run by this documentation change.
 
 ## Follow clig.dev and record product exceptions
 

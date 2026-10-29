@@ -29,12 +29,12 @@ Use the same route meaning and scope as original admission. A logical default ro
 | Alternative | Permitted facts |
 | --- | --- |
 | Completed synchronous operation | Original operation identity, safe result classification and retained outcome metadata, including expiry when established |
-| Accepted asynchronous operation | Original operation identity and known job reference, plus original admission facts and established expiry |
-| In progress | Original identity and the fact that retained processing is unfinished |
-| Recovery required | Original identity and the safe uncertainty/recovery reason supplied by its owner |
+| Accepted asynchronous operation | Retained asynchronous admission, its original operation identity and known job reference, plus original admission facts and established expiry, regardless of current job state |
+| In progress | Original identity and the fact that synchronous processing is still in progress, rather than requiring recovery |
+| Recovery required | Original identity and the safe uncertainty/recovery reason supplied by its owner, with no established asynchronous admission |
 | Unresolved | No authoritative retained match can be established. This says nothing about whether work previously happened |
 
-Admission and inspection are separate. Finding an asynchronous admission does not report today's job state. Likewise, [retrying that accepted command](idempotency-and-replay.md#return-the-documented-outcome-instead-of-starting-duplicate-work) retains its original `202` meaning even after the job finishes.
+Admission and inspection are separate. Retained asynchronous admission selects **Accepted asynchronous operation** regardless of the job's current state. An admitted job's later `recovery_required` state does not select the lookup's **Recovery required** alternative. Finding an admission does not report today's job state. Read that state through [authorized job inspection](#job-inspection). Likewise, [retrying that accepted command](idempotency-and-replay.md#return-the-documented-outcome-instead-of-starting-duplicate-work) retains its original `202` meaning even after the job finishes.
 
 Lookup correlates the supplied original identity. It does not accept a replacement payload or certify that newly edited inputs equal the original inputs. A later replay retains server-owned fingerprint comparison. Continuation loads fixed retained inputs. Reusing a key with a changed payload cannot use lookup as approval to execute that change.
 
@@ -128,6 +128,10 @@ The following are downstream behavioral acceptance cases, not tests executed by 
 | Scenario | Required observation |
 | --- | --- |
 | Admission committed, acknowledgment lost | Lookup identifies the original admission without another job or provider call |
+| Synchronous request is still processing | Lookup returns In progress, without implying an asynchronous job |
+| Original operation requires recovery with no established asynchronous admission | Lookup returns Recovery required with its safe owner reason |
+| Accepted asynchronous job is queued or running | Lookup returns Accepted asynchronous operation. Authorized inspection supplies current job state |
+| Accepted asynchronous job is succeeded, failed, canceled or `recovery_required` | Lookup still returns Accepted asynchronous operation. Inspection supplies the saved outcome or recovery facts |
 | History expired or lookup timed out | Expiry is reported only if established, timeout remains failed observation, neither permits new work |
 | Alias, Project or payload changed | Original binding is preserved, changed scope is not substituted, payload equivalence still needs normal fingerprint checks |
 | Job failed after saving partial results | Inspection succeeds with actual failed state and permitted results, waiting for success fails |
