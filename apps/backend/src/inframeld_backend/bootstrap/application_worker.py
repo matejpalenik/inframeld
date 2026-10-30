@@ -160,7 +160,6 @@ async def run_application_worker(
         last_report = 0.0
         while not stopped.is_set():
             try:
-                context = await _claim(database, settings, worker_id, supported)
                 now = asyncio.get_running_loop().time()
                 if now - last_report >= 30:
                     async with (
@@ -175,6 +174,7 @@ async def run_application_worker(
                         active=status.active,
                     )
                     last_report = now
+                context = await _claim(database, settings, worker_id, supported)
                 if context is None:
                     await _wait(stopped, settings.jobs.poll_seconds)
                 else:

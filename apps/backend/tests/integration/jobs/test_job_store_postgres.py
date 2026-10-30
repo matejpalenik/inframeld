@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.application_job_handler import BoundedJobHandler
 from tests.support.application_worker_process import (
     application_worker_command,
     application_worker_process,
@@ -63,8 +64,13 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.access.infrastructure.writers.postgres_job_admission_audit_writer import (
     PostgresJobAdmissionAuditWriter,
 )
+from inframeld_backend.bootstrap import application_worker
+from inframeld_backend.bootstrap.application_worker_application_settings import (
+    ApplicationWorkerApplicationSettings,
+)
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
+from inframeld_backend.shared.application.dtos.job_queue_status_dto import JobQueueStatusDTO
 from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
     OperationAdmissionContextDTO,
 )
@@ -74,6 +80,7 @@ from inframeld_backend.shared.application.dtos.operation_reservation_request_dto
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    DependencyUnavailableError,
     InvalidInputError,
 )
 from inframeld_backend.shared.application.errors.job_errors import (
@@ -96,6 +103,9 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.infrastructure.readers.postgres_job_queue_status_reader import (
+    PostgresJobQueueStatusReader,
+)
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
@@ -110,6 +120,7 @@ from inframeld_backend.shared.infrastructure.rows.installation_identity_row impo
     InstallationIdentityRow,
 )
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.settings.job_settings import JobSettings
 from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservation_writer import (
     PostgresOperationReservationWriter,
 )
@@ -1078,3 +1089,60 @@ async def test_aged_unresolved_effect_replay_preserves_original_job_and_operatio
         assert await session.scalar(select(func.count()).select_from(DurableJobRow)) == 1
         assert await session.scalar(select(func.count()).select_from(AccessAuditEventRow)) == 1
     assert await _claim(database) is None
+
+
+@pytest.mark.asyncio
+async def test_queue_reporting_failure_does_not_waste_first_executable_attempt(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    admission = await _admit(database, data=b"1")
+    report_failed = asyncio.Event()
+
+    class MockTransientQueueStatusReader(PostgresJobQueueStatusReader):
+        @override
+        async def read(self) -> JobQueueStatusDTO:
+            if not report_failed.is_set():
+                report_failed.set()
+                raise DependencyUnavailableError("The queue report is temporarily unavailable.")
+            return await super().read()
+
+    monkeypatch.setattr(
+        application_worker, "PostgresJobQueueStatusReader", MockTransientQueueStatusReader
+    )
+    settings = ApplicationWorkerApplicationSettings(
+        database=temporary_postgres_settings,
+        jobs=JobSettings(
+            lease_seconds=3,
+            poll_seconds=0.02,
+            database_timeout_seconds=1,
+            shutdown_seconds=1,
+            work_seconds=20,
+        ),
+    )
+    stopped = asyncio.Event()
+    worker = asyncio.create_task(
+        application_worker.run_application_worker(settings, stopped, (BoundedJobHandler(),))
+    )
+    try:
+        await _wait_job(database, admission)
+    finally:
+        stopped.set()
+        try:
+            await asyncio.wait_for(asyncio.shield(worker), timeout=3)
+        finally:
+            if not worker.done():
+                worker.cancel()
+            await asyncio.gather(worker, return_exceptions=True)
+
+    assert report_failed.is_set()
+    async with database.session() as session:
+        saved = await PostgresJobStore(session).find(admission.operation_id)
+    assert (
+        saved is not None
+        and saved.job_id == admission.job_id
+        and saved.status is JobStatus.SUCCEEDED
+        and saved.checkpoint == b"1"
+    )
+    assert saved.attempt == 1, "Queue-report failure must not discard a committed attempt."
