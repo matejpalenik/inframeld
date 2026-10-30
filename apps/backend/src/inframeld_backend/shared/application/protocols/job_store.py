@@ -9,14 +9,15 @@ from inframeld_backend.access.application.dtos.admitted_work_authority_dto impor
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_snapshot_dto import JobSnapshotDTO
-from inframeld_backend.shared.application.enums.job_status import JobStatus
+from inframeld_backend.shared.application.protocols.job_ownership import JobOwnership
 from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
+from inframeld_backend.shared.domain.enums.job_status import JobStatus
 
 
-class JobStore(Protocol):
+class JobStore(JobOwnership, Protocol):
     """Persist ordinary job mechanics in the caller-owned short transaction.
 
     Admission shares the authorization, business effects, required audit and
@@ -47,9 +48,6 @@ class JobStore(Protocol):
     ) -> JobAttemptContextDTO: ...
 
     @abstractmethod
-    async def require_current(self, context: JobAttemptContextDTO) -> JobSnapshotDTO: ...
-
-    @abstractmethod
     async def checkpoint(
         self, context: JobAttemptContextDTO, data: bytes, *, lease_seconds: float
     ) -> None: ...
@@ -70,7 +68,13 @@ class JobStore(Protocol):
     @abstractmethod
     async def retire_attempt(
         self, job: JobSnapshotDTO, *, status: JobStatus, reason: str, due_at: datetime
-    ) -> None: ...
+    ) -> None:
+        """Apply the current queued or expired-attempt decision under the queue turn.
+
+        Match the observed state, attempt count and fence. Terminal jobs and
+        obsolete queued snapshots cannot restart or replace later work.
+        """
+        ...
 
     @abstractmethod
     async def request_cancel(self, job_id: JobId) -> None: ...

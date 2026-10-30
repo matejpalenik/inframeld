@@ -34,7 +34,7 @@ Bootstrap owns aggregate settings, concrete dependency assembly, application con
 
 Alice's grant operation needs a transaction and safe replay. A later document job also needs durable background progress. These are supporting capabilities supplied to the owning domain operation, not additional product domains or compulsory dependencies for every service.
 
-**Logical application view.** Transaction/idempotency foundations are implemented for the grant chain. Complete worker and gateway workflows retain their accepted target/qualification status.
+**Logical application view.** Transaction/idempotency foundations are implemented for the grant chain and the shared ordinary-job runtime. [Implemented ordinary execution](jobs-and-recovery.md#implemented-ordinary-job-foundation) identifies its code, admission boundary and qualification limits. Real product handlers and complete gateway workflows retain their separate delivery and qualification work.
 
 ```mermaid
 ---
@@ -213,7 +213,7 @@ Transactions, jobs, spending, traces and imports support the six domains. They d
 
 These are mandatory application boundaries for generated, suggested and implemented backend components. The shared Coding Standards owns cross-language principles, TDD and documentation. Python Standards owns backend declaration, organization, typed values, protocols, persistence, Python test conventions and docstrings.
 
-The current component map and supported grant/authentication flows have implementation references. Later upload and worker journeys remain accepted design where identified. Loading guidance authorizes no edits.
+The current component map, supported grant/authentication flows and shared ordinary-job foundation have implementation references. Upload, build, evaluation and other real product-worker journeys remain accepted design where identified. The default application-worker registry is empty. Loading guidance authorizes no edits.
 
 - [Component conventions](../../inframeld-python-standards/references/component-roles-and-imports.md#component-conventions), [service-writing guide](../../inframeld-python-standards/references/services-and-use-cases.md#service-writing-guide), [grant chain](../../inframeld-python-standards/references/services-and-use-cases.md#grant-command-flow), [authentication flow](../../inframeld-access-models/references/architecture.md#authentication-flow) and [stable domain-error mapping](http-errors.md#stable-domain-error-mapping).
 - [ADR-0001](../../../../docs/adr/ADR-0001-use-one-modular-backend-with-clear-domain-boundaries.md), [ADR-0002](../../../../docs/adr/ADR-0002-separate-commands-and-queries-without-a-command-bus-framework.md) and [ADR-0065](../../../../docs/adr/ADR-0065-application-services-own-write-transactions.md).

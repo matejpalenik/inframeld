@@ -2,7 +2,7 @@
 
 <a id="run-the-backend-locally"></a>
 
-Start here to develop today’s FastAPI backend. The delivered development stack includes PostgreSQL, Kratos, Hydra and Mailpit. The accepted worker, vector and artifact topology is broader than this local stack. These instructions do not claim that the full CLI product is delivered.
+Start here to develop today’s FastAPI backend. The delivered development stack includes PostgreSQL, Kratos, Hydra and Mailpit, plus opt-in application and identity-recovery workers. The accepted vector and artifact topology is broader than this local stack. These instructions do not claim that the full CLI product is delivered.
 
 <a id="quick-start"></a>
 
@@ -82,6 +82,20 @@ pnpm dev:db:down
 ```
 
 Application, Kratos and Hydra databases use three separate named volumes, preserved when containers stop. Kratos's public endpoint is at http://127.0.0.1:14434, Hydra's at http://127.0.0.1:14444 and Mailpit's inbox at http://127.0.0.1:18024. Provider administration stays private. The host API workflow supports browser authentication without publishing administration ports.
+
+<a id="ordinary-application-worker"></a>
+
+## Run the ordinary application worker
+
+After applying schema `0010_durable_jobs`, start the worker from the same checkout as the API, with the development database still running:
+
+```bash
+mise exec -- uv run --project apps/backend --locked --env-file apps/backend/.env python -m inframeld_backend.application_worker
+```
+
+This explicitly loads the ignored API environment file for database settings. Worker startup checks the schema and existing installation identity without migrating. Look for `application_worker_ready`, then use Ctrl-C to stop the foreground process when finished. The worker has no HTTP listener and does not require the API's fingerprint key or provider credentials.
+
+The production handler registry is currently empty, so startup does not enable document processing, builds or evaluations. [The operator guide](../operations/application-jobs.md) covers the opt-in `jobs` Compose service, effective settings, queue events and restart or shutdown uncertainty. There is no generic job submission or inspection interface.
 
 ---
 
@@ -381,7 +395,7 @@ Read [testing](../guides/testing.md) next. For accepted production boundaries, s
 
 ## Private recovery callbacks
 
-The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the supported head, including migration `0008_host_maintenance_receipts`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
+The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the supported head, currently `0010_durable_jobs`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
 
 Supply a dedicated 32 to 256 byte printable ASCII key through `INFRAMELD_RECOVERY_KEY_HOST_FILE`. The mounted regular file must be readable by the container's runtime UID 10001, with mode 0400 or 0600 as seen inside the container. Compose file-backed secrets do not reliably remap host ownership. Provision the correct runtime ownership rather than making the file group/world-readable. Do not reuse an API, database or fingerprint secret.
 
@@ -397,7 +411,7 @@ For rotation, configure a current file plus optional retiring file and `INFRAMEL
 
 Alice remains blocked after Hydra rejects cleanup or a run exhausts its budget. Fix the provider/configuration problem first. A trusted deployment operator can then authorize one additional twelve-attempt, one-hour run of the original recovery. This is a local container command with no network endpoint. Keep container-exec and database credentials restricted to operators.
 
-Apply migration `0008_host_maintenance_receipts` deliberately before starting the updated backend, callbacks or worker. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
+Apply the supported schema `0010_durable_jobs` deliberately before starting the updated backend, callbacks or worker. Migration `0008_host_maintenance_receipts` introduced the maintenance receipt. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
 
 Obtain the expected installation UUID from your protected installation record and the original recovery operation ID from protected recovery records. Replace the placeholders below. Choose a unique operator request ID and retain the exact request privately until its outcome is known. Supply attribution and the repair reason, without passwords, cookies or tokens.
 

@@ -7,12 +7,12 @@ from inframeld_backend.shared.infrastructure.settings.job_settings import JobSet
 @pytest.mark.parametrize(
     "values",
     [
-        {"capacity": 9},
-        {"capacity": 0},
+        {"lease_seconds": 121},
+        {"poll_seconds": 0},
         {"lease_seconds": float("inf")},
         {"poll_seconds": float("nan")},
         {"work_seconds": 7201},
-        {"queue_wait_seconds": 86401},
+        {"database_timeout_seconds": 0},
         {"shutdown_seconds": 0},
         {"lease_seconds": 1, "database_timeout_seconds": 5},
     ],

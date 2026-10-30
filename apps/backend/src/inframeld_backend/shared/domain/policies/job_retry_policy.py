@@ -1,4 +1,4 @@
-from inframeld_backend.shared.application.enums.job_status import JobStatus
+from inframeld_backend.shared.domain.enums.job_status import JobStatus
 
 
 class JobRetryPolicy:

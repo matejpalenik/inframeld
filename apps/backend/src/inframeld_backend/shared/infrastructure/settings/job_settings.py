@@ -7,13 +7,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class JobSettings(BaseSettings):
     """Bound ordinary work independently of the dedicated recovery attempt."""
 
-    capacity: int = Field(default=8, ge=1, le=8)
     lease_seconds: float = Field(default=30, gt=0, le=120)
     poll_seconds: float = Field(default=1, gt=0, le=30)
     database_timeout_seconds: float = Field(default=5, gt=0, le=5)
     shutdown_seconds: float = Field(default=15, gt=0, le=30)
     work_seconds: float = Field(default=7200, gt=0, le=7200)
-    queue_wait_seconds: float = Field(default=86400, gt=0, le=86400)
 
     model_config = SettingsConfigDict(
         env_prefix="INFRAMELD_JOBS__",

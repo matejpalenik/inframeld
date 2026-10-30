@@ -4,6 +4,8 @@
 
 The supported design is a single-server Docker Compose installation. The current development Compose stack is smaller than the full target. Use executable configuration for actual ports and service pins. Do not infer production delivery from an architecture diagram.
 
+The opt-in `jobs` Compose profile runs the [ordinary application worker](application-jobs.md), with PostgreSQL-backed claims, checkpoints and bounded shutdown. Its production handler registry is currently empty. Identity-recovery cleanup retains its separate worker and `recovery` profile. These processes do not establish delivery of the full product workload.
+
 <a id="operate-within-visible-limits"></a>
 
 <a id="operations"></a>

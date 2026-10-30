@@ -1,7 +1,7 @@
 import pytest
 
-from inframeld_backend.shared.application.enums.job_status import JobStatus
-from inframeld_backend.shared.application.services.job_retry_policy import JobRetryPolicy
+from inframeld_backend.shared.domain.enums.job_status import JobStatus
+from inframeld_backend.shared.domain.policies.job_retry_policy import JobRetryPolicy
 
 
 @pytest.mark.parametrize(

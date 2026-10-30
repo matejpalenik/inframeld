@@ -19,3 +19,7 @@ class JobStoppedError(Exception):
 
 class SafeJobRetryError(Exception):
     """The handler established that its unfinished work is safe to repeat."""
+
+
+class JobWorkerStoppingError(Exception):
+    """Stop taking new units without canceling accepted work or discarding progress."""
