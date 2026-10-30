@@ -16,6 +16,12 @@ on:
         value: ${{ jobs.detect.outputs.web }}
       web_format:
         value: ${{ jobs.detect.outputs.web_format }}
+      docs:
+        value: ${{ jobs.detect.outputs.docs }}
+      docs_format:
+        value: ${{ jobs.detect.outputs.docs_format }}
+      delivery:
+        value: ${{ jobs.detect.outputs.delivery }}
       cli:
         value: ${{ jobs.detect.outputs.cli }}
       cli_dependencies:
@@ -43,6 +49,9 @@ jobs:
       integration: ${{ steps.select.outputs.integration }}
       web: ${{ steps.select.outputs.web }}
       web_format: ${{ steps.select.outputs.web_format }}
+      docs: ${{ steps.select.outputs.docs }}
+      docs_format: ${{ steps.select.outputs.docs_format }}
+      delivery: ${{ steps.select.outputs.delivery }}
       cli: ${{ steps.select.outputs.cli }}
       cli_dependencies: ${{ steps.select.outputs.cli_dependencies }}
       sdk: ${{ steps.select.outputs.sdk }}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inframeld Backlog Delivery"
+  short_description: "Coordinate v1 delivery with native subagents"
+  default_prompt: "Use $inframeld-backlog-delivery to rehearse the current v1 backlog."

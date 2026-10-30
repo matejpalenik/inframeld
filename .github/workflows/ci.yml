@@ -40,6 +40,9 @@ jobs:
       BACKEND: ${{ needs.changes.outputs.backend }}
       WEB: ${{ needs.changes.outputs.web }}
       WEB_FORMAT: ${{ needs.changes.outputs.web_format }}
+      DOCS: ${{ needs.changes.outputs.docs }}
+      DOCS_FORMAT: ${{ needs.changes.outputs.docs_format }}
+      DELIVERY: ${{ needs.changes.outputs.delivery }}
       CLI: ${{ needs.changes.outputs.cli }}
       SDK: ${{ needs.changes.outputs.sdk }}
       UV_LOCKED: "1"
@@ -47,7 +50,7 @@ jobs:
       - name: Require valid selection
         run: |
           test "$CHANGES" = success
-          for selected in "$BACKEND" "$WEB" "$WEB_FORMAT" "$CLI" "$SDK"; do
+          for selected in "$BACKEND" "$WEB" "$WEB_FORMAT" "$DOCS" "$DOCS_FORMAT" "$DELIVERY" "$CLI" "$SDK"; do
             case "$selected" in true|false) ;; *) exit 1 ;; esac
           done
       - name: Check out repository
@@ -71,6 +74,7 @@ jobs:
           filters=(--filter inframeld)
           if [ "$BACKEND" = true ]; then filters+=(--filter @inframeld/backend); fi
           if [ "$WEB" = true ] || [ "$WEB_FORMAT" = true ]; then filters+=(--filter @inframeld/web); fi
+          if [ "$DOCS" = true ] || [ "$DOCS_FORMAT" = true ]; then filters+=(--filter @inframeld/docs); fi
           if [ "$CLI" = true ]; then filters+=(--filter @inframeld/cli); fi
           if [ "$SDK" = true ]; then filters+=(--filter '@inframeld/sdk-tools...'); fi
           pnpm install --frozen-lockfile "${filters[@]}"
@@ -78,7 +82,7 @@ jobs:
         if: needs.changes.outputs.backend == 'true'
         run: cp apps/backend/.env.test.example apps/backend/.env.test
       - name: Set up uv
-        if: needs.changes.outputs.backend == 'true'
+        if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.delivery == 'true'
         uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa
         with:
           version: ${{ env.UV_VERSION }}
@@ -88,7 +92,7 @@ jobs:
             apps/backend/pyproject.toml
             apps/backend/uv.lock
       - name: Install pinned Python
-        if: needs.changes.outputs.backend == 'true'
+        if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.delivery == 'true'
         run: |
           uv python install "$PYTHON_VERSION"
           python_executable="$(uv python find --managed-python "$PYTHON_VERSION")"
@@ -107,7 +111,7 @@ jobs:
           PYKEY
           printf 'INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE=%s\n' "$key_file" >> "$GITHUB_ENV"
       - name: Check uv lockfile and install Python dependencies
-        if: needs.changes.outputs.backend == 'true'
+        if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.delivery == 'true'
         run: |
           uv lock --check --project apps/backend
           uv sync --project apps/backend --locked
@@ -140,11 +144,10 @@ jobs:
 
       - name: Check repository formatting
         run: |
-          if [ "$WEB" = true ] || [ "$WEB_FORMAT" = true ]; then
-            pnpm exec prettier --check --ignore-unknown .
-          else
-            pnpm exec prettier --check --ignore-unknown . '!apps/web/**'
-          fi
+          arguments=(--check --ignore-unknown .)
+          if [ "$WEB" != true ] && [ "$WEB_FORMAT" != true ]; then arguments+=('!apps/web/**'); fi
+          if [ "$DOCS" != true ] && [ "$DOCS_FORMAT" != true ]; then arguments+=('!apps/docs/**'); fi
+          pnpm exec prettier "${arguments[@]}"
       - name: Run backend fast checks and build
         if: needs.changes.outputs.backend == 'true'
         run: |
@@ -156,6 +159,14 @@ jobs:
           uv run --project apps/backend ruff format --check --config apps/backend/pyproject.toml .github/scripts
           uv run --project apps/backend ruff check --config apps/backend/pyproject.toml .github/scripts
           uv run --project apps/backend pyright --project .github/scripts/pyrightconfig.json
+      - name: Check delivery helper quality
+        if: needs.changes.outputs.delivery == 'true'
+        run: |
+          uv run --project apps/backend ruff format --check --config apps/backend/pyproject.toml scripts/delivery
+          uv run --project apps/backend ruff check --config apps/backend/pyproject.toml scripts/delivery
+          uv run --project apps/backend pyright --project scripts/delivery/pyrightconfig.json
+      - name: Test delivery coordination helpers
+        run: pnpm delivery:test
       - name: Run web checks and build
         if: needs.changes.outputs.web == 'true'
         run: |
@@ -170,6 +181,9 @@ jobs:
           pnpm --filter @inframeld/cli typecheck
           pnpm --filter @inframeld/cli test
           pnpm --filter @inframeld/cli build
+      - name: Run documentation checks and build
+        if: needs.changes.outputs.docs == 'true'
+        run: pnpm check:docs
       - name: Run SDK tooling checks and TypeScript build
         if: needs.changes.outputs.sdk == 'true'
         run: |
@@ -178,8 +192,8 @@ jobs:
           pnpm --filter @inframeld/sdk typecheck
           pnpm --filter @inframeld/sdk build
       - name: Report documentation-only quality scope
-        if: needs.changes.outputs.backend == 'false' && needs.changes.outputs.web == 'false' && needs.changes.outputs.cli == 'false' && needs.changes.outputs.sdk == 'false'
-        run: echo 'Only formatting and commit checks applied. Application checks were not required.' >> "$GITHUB_STEP_SUMMARY"
+        if: needs.changes.outputs.backend == 'false' && needs.changes.outputs.web == 'false' && needs.changes.outputs.docs == 'false' && needs.changes.outputs.cli == 'false' && needs.changes.outputs.sdk == 'false'
+        run: echo 'Application checks were not required. Formatting, commit and delivery helper tests applied.' >> "$GITHUB_STEP_SUMMARY"
 
   backend:
     name: Backend foundation

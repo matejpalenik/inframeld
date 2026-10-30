@@ -49,6 +49,7 @@ pnpm dev
 The applications are now available at:
 
 - Web: http://localhost:3000
+- User documentation: http://localhost:3001
 - API: http://127.0.0.1:8000
 - API documentation: http://127.0.0.1:8000/docs
 
@@ -63,12 +64,13 @@ Inframeld is intentionally structured as a small monorepo so the API, web client
 | `apps/backend`      | Typed FastAPI application and OpenAPI export      |
 | `apps/cli`          | Rust CLI foundation using the generated SDK       |
 | `apps/web`          | Next.js App Router web client                     |
+| `apps/docs`         | Protocol-based Inframeld user documentation       |
 | `contracts/openapi` | Committed API contract generated from FastAPI     |
 | `docs`              | Architecture, development documentation, and ADRs |
 
 ## Development
 
-Run both applications from the repository root:
+Run the applications from the repository root:
 
 ```bash
 pnpm dev
@@ -79,7 +81,12 @@ To run individual applications:
 ```bash
 pnpm --filter @inframeld/web dev
 pnpm --filter @inframeld/backend dev
+pnpm dev:docs
 ```
+
+The documentation app runs independently of PostgreSQL and the backend. Run `pnpm check:docs` to validate its content, links, types and production build. Use `pnpm build:docs` followed by `pnpm start:docs` to serve a production build locally. The [authoring guide](apps/docs/README.md) explains MDX and supported examples. Protocol-derived source retains its [Tailwind Plus license](apps/docs/LICENSE.md).
+
+For the native-subagent delivery setup, start with [backlog delivery](docs/development/guides/backlog-delivery.md). `pnpm delivery:plan` inspects the v1 milestone without changing GitHub or starting workers, and `pnpm delivery:rehearse` exercises synthetic coordination failures. Starting live delivery requires an explicit main-chat launch instruction.
 
 To regenerate the OpenAPI contract:
 

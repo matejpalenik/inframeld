@@ -23,8 +23,12 @@ Use this guide when adding or rewriting documentation. A new maintainer should b
 | Shared SDK maintenance and cross-language qualification | [SDKs](../../.agents/skills/inframeld-sdks/SKILL.md), with independently discoverable language skills for specific behavior. Application Contracts retains HTTP semantics and compatibility. |
 | Test layers, dependency isolation and verification evidence | [Testing](../../.agents/skills/inframeld-testing/SKILL.md). The shared Coding Standards retains TDD/documentation, language standards retain test-code conventions, domains retain business expectations, and runbooks retain commands. |
 | Development and operator procedures | Human guides and runbooks, with current implementation limits explicit. |
+| End-user task guides and public examples | The Protocol documentation app, following [Documentation](../../.agents/skills/inframeld-documentation/SKILL.md). Pages explain delivered behavior rather than introducing another specification. |
+| CLI and SDK usability assessment | [Developer Experience](../../.agents/skills/inframeld-developer-experience/SKILL.md), using Review's existing severity and report conventions. |
 
 Give each rule one detailed owner. A human guide may explain its purpose briefly, then link to that owner. Avoid parallel specifications, large required reading stacks and copies of exact code declarations. Existing code may intentionally lag accepted design. Label that gap rather than changing the target during editing.
+
+For user-visible changes, record documentation impact and update the user-facing task instructions with the implementation. Keep public examples aligned with the delivered API, CLI or SDK and distinguish illustrative responses from observed execution. Contributor setup, internal component teaching and pending decisions remain in their existing homes. The [docs app authoring guide](../../apps/docs/README.md) owns its commands and MDX mechanics.
 
 For authorized issue work, follow [Author delivery issues](#author-delivery-issues), the [implementation template](../../.github/ISSUE_TEMPLATE/implementation.md) and [Definition of Done](definition-of-done.md). Issues own task tracking. Do not add delivery inventories, progress logs or reconciliation reports to developer guides or skills. Historical issue bodies are not rewritten merely because a documentation path moved.
 

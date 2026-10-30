@@ -1,0 +1,15 @@
+[
+  {
+    "title": "Get started",
+    "links": [{ "title": "Introduction", "href": "/" }]
+  },
+  {
+    "title": "Guides",
+    "links": [
+      {
+        "title": "Check whether your original request was accepted",
+        "href": "/guides/recover-original-request"
+      }
+    ]
+  }
+]
