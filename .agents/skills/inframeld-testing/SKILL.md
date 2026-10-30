@@ -17,6 +17,7 @@ An SDK test can additionally show that the generated client sent the right reque
 
 - Choose tests for the behavior and failure boundary. A mock can establish interactions and decisions, not an unexecuted database or provider guarantee.
 - Keep service-dependent tests isolated from development databases, credentials and volumes. Use the existing private test procedures rather than an improvised stack or broad cleanup.
+- Complete qualification uses maintained test entry points. Classify bounded diagnostic probes separately from product or harness failures. Coordinated delivery stops at its host-repair boundary, as explained in [isolation and evidence](references/isolation-and-evidence.md#maintained-commands-and-diagnostic-probes).
 - Distinguish passed, failed, skipped and unavailable checks. Inspect enabled integration flags and the actual collected/executed scenarios before claiming a whole suite or product journey passed.
 - Follow Coding Standards' behavioral TDD and meaningful-test rules when writing code. Do not add architecture, naming, import-boundary or composition enforcement tests.
 - Loading this skill grants no authority to run migrations, provision databases or contact providers merely to answer a question. Authorized test execution uses the existing disposable test boundaries.

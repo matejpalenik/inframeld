@@ -13,6 +13,7 @@ from model import (
     MILESTONE,
     REPOSITORY,
     assess_merge,
+    assess_prerequisite,
     integer_value,
     issue_numbers,
     list_value,
@@ -54,6 +55,12 @@ def _parser() -> argparse.ArgumentParser:
     assess.add_argument("--state", type=Path, required=True)
     assess.add_argument("--issue", type=int, required=True)
     assess.add_argument("--observation", type=Path, required=True)
+    supporting = subcommands.add_parser(
+        "assess-prerequisite", help="Assess a supporting PR without completing its issue"
+    )
+    supporting.add_argument("--state", type=Path, required=True)
+    supporting.add_argument("--issue", type=int, required=True)
+    supporting.add_argument("--packet", type=Path, required=True)
     subcommands.add_parser(
         "rehearse", help="Run deterministic disposable scenarios without GitHub calls"
     )
@@ -156,11 +163,18 @@ def _execute(arguments: argparse.Namespace) -> dict[str, object]:
             expected_revision=cast("int", arguments.expected_revision),
             operation=read_json(cast("Path", arguments.input)),
         )
-    if command == "assess-merge":
+    if command in ("assess-merge", "assess-prerequisite"):
         state = store.read()
         assignments = object_value(state["assignments"], "assignments")
         key = str(integer_value(cast("int", arguments.issue), "issue", 1))
         assignment = object_value(assignments.get(key), "assigned issue")
+        if command == "assess-prerequisite":
+            assessment = assess_prerequisite(assignment, read_json(cast("Path", arguments.packet)))
+            return {
+                **asdict(assessment),
+                "issue_complete": False,
+                "merge_authorized_by_helper": False,
+            }
         observation = read_json(cast("Path", arguments.observation))
         assessment = assess_merge(assignment, observation)
         if assignment["merge_state"] in ("uncertain", "merged"):
