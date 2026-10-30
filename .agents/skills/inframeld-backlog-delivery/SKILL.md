@@ -25,6 +25,10 @@ Target a shared pool of up to ten workers, two code reviewers, one DX reviewer a
 
 The coordinator alone owns the external run record and resource grants. Use [the helper contract](../../../scripts/delivery/README.md) for atomic state updates and revision checks. Store runtime state outside every checkout. Helpers plan, validate and assess. They do not dispatch agents, create Goals, authorize actions or merge PRs.
 
+Before an issue absorbs another feature, map the missing evidence to its accepted behavior and independently review the proposed boundary. Preserve blocked checkpoints and reuse stopped workers for verified independent assignments. A reviewed supporting PR may merge while its larger issue stays open. [Coordination](references/coordinator.md) owns these decisions, and [merge gates](references/gates-and-recovery.md) distinguish supporting PRs from complete issues.
+
+Delivery does not authorize host or Podman-machine repair. The coordinator may start an existing stopped machine or attempt one coordinated restart of a confirmed stuck machine. Further host changes, failed or unconfirmed recovery, or recurrence of the same fault stop affected runtime work immediately. Follow the [host boundary](references/gates-and-recovery.md#keep-delivery-out-of-host-repair), including preservation of unrelated work. An extra issue-repair cycle does not extend that exception.
+
 ## Deliver to the checked revision
 
 Acceptance, code review, documentation, DX applicability, local checks, final CI and the CodeRabbit observation must identify the current issue revision and exact base/head. A push, rebase, changed issue acceptance or new main revision invalidates the affected evidence. CodeRabbit is advisory. Wait for its existing run to finish, review any substantive comments through the independent local reviewers, and skip it if it provides none for any reason. Never trigger or restart it manually. Keep mandatory local reviews and actual GitHub-required statuses enforced under the [gate policy](references/gates-and-recovery.md).

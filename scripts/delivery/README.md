@@ -58,7 +58,7 @@ python3 scripts/delivery/cli.py init --state /absolute/outside-checkouts/run/sta
 pnpm --silent delivery:status --state /absolute/outside-checkouts/run/state.json
 ```
 
-Initialization never overwrites an existing run. `status` validates the complete record and does not write it. The state schema contains `schema_version: 1`, repository and milestone identity, run and coordinator identity, finite `allowed_issues`, a monotonic `revision`, `assignments`, `resources`, and `merge_observations`. Each new assignment has `claim_state: "active"` and a `history` array. Verified retirement changes its claim state to `retired` and stores its `retirement_receipt`. Records stay available for audit.
+Initialization never overwrites an existing run. `status` validates the complete record and does not write it. Fresh records use `schema_version: 1`, with repository and milestone identity, run and coordinator identity, finite `allowed_issues`, a monotonic `revision`, `assignments`, `resources`, and `merge_observations`. Supporting merge observations upgrade the state to version 2 as described below. Each new assignment has `claim_state: "active"` and a `history` array. Verified retirement changes its claim state to `retired` and stores its `retirement_receipt`. Records stay available for audit.
 
 Apply a local update with the current revision:
 
@@ -84,6 +84,7 @@ The `apply` operation is a JSON object with one of these `op` values:
 | `reserve` | `issue`, `resource`, `token`, `head_sha`, `operation`, `reference` | Reserve a named resource such as `integration`, `code-review:1`, or `dx-review:1`. |
 | `release` | `resource`, `token`, `head_sha`, `cleanup`, `reference` | Release only the matching reservation with `cleanup: "verified_clean"` and its frozen head. Dirty or unknown cleanup leaves the resource occupied. |
 | `observe_merge` | `issue`, `status`, `source`, `pr`, `head_sha`, `reference`, `observed_at`, and `merge_sha` when merged | Record observed GitHub state to reconcile an uncertain or completed merge. |
+| `observe_prerequisite_merge` | The `observe_merge` fields plus `base_sha`, `issue_updated_at`, `scope`, `assessment_reference` | Record a supporting PR without completing the feature or clearing its native blockers. |
 
 `paths` is a nonempty list of normalized repository-relative path prefixes. Use concrete prefixes without globs. Claiming `apps/backend` excludes another claim beneath that path. `contracts` lists shared interfaces such as a public SDK session contract that different files can affect. The helper checks declared paths and contracts. The coordinator must discover undeclared overlap by reading the code and acceptance scope before assigning work.
 
@@ -113,6 +114,34 @@ The coordinator must obtain the old writer's stop acknowledgement and verify cle
 For `observe_merge`, `source` must be `"github"`, and `reference` must be the matching repository PR URL. `status` is `uncertain`, `not_merged`, or `merged`. The caller must actually inspect GitHub. An uncertain merge blocks changes to the assignment until reconciliation. A merged receipt needs a full `merge_sha` and cannot be reverted. There is no merge command or automatic retry action. A receipt does not release resources: cleanup still needs its own verified release. The coordinator broadcasts confirmed merge SHAs and refreshes affected workers' bases before collecting replacement evidence.
 
 ## Assess evidence
+
+### Assess a supporting PR
+
+Complete-issue assessment and supporting-PR assessment are separate operations. A supporting PR delivers a reviewed useful capability while identified acceptance remains unfinished. It cannot close an issue. The coordinator must inspect its actual scope, native dependencies, required checks and closing references. A reviewer or JSON assertion cannot supply authorization.
+
+```sh
+python3 scripts/delivery/cli.py assess-prerequisite \
+  --state /absolute/outside-checkouts/run/state.json \
+  --issue 125 --packet supporting-pr.json
+```
+
+The packet has these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `pr`, `scope` | Actual PR number and the exact useful capability proposed for this merge. |
+| `remaining_acceptance` | Nonempty list of the feature behavior still unfinished after this PR. |
+| `scope_review` | Independent ready review with the current base/head/issue binding, `reviewer_id`, `reference`, `findings`, the exact `scope` and `remaining_acceptance`, `deferred_blockers` matching the full assignment's blockers, and a nonempty `dependency_rationale` explaining why they are unnecessary here. |
+| `evidence` | The ordinary current acceptance, documentation, code/DX, CI and CodeRabbit bundle, specifically assessed for this PR. Each of the four review receipts also identifies its exact `pr` and `scope`. |
+| `observation` | Ordinary current GitHub observations plus matching `pr` and `closing_issues: []`, verified against the PR and included commits. |
+
+The helper reuses ordinary merge checks and P0/P1/P2 rules after validating independent scope review. It assesses the supporting capability with its reviewed deferred dependencies, without mutating the feature assignment or its evidence. A required dependency for that capability cannot be deferred merely to obtain readiness. The coordinator must verify that substantive claim against the real acceptance and sources. Results include `issue_complete: false` and `merge_authorized_by_helper: false`. This capability is not a waiver for missing qualification or an unresolved finding.
+
+After actual GitHub observation, `observe_prerequisite_merge` records a PR-keyed receipt in that assignment's optional `prerequisite_merges` object. It upgrades that record to state schema version 2. The current helper reads versions 1 and 2, while older helpers reject version 2 instead of overlooking uncertain supporting merges. Upgrade the coordinator's helper revision before using this operation and never downgrade a live record. It retains the full issue's `merge_state`, blockers, ownership and completion status. `assessment_reference` points to the actual reviewed packet. As with other receipts, the helper stores evidence and cannot authenticate it or perform a merge.
+
+An uncertain supporting merge prevents further assessment, ownership/scope changes and other merge observations until that exact PR is reconciled. Preserve its base/head, issue revision, scope and assessment reference during reconciliation. A merged supporting receipt is immutable and survives later assignment revisions and retirement/adoption. It does not release resources. Confirm on GitHub that the feature issue stayed open, then refresh dependent work against the observed main revision. Use full-issue `observe_merge` only after full acceptance and an actual completing merge.
+
+### Assess complete issue acceptance
 
 Full commit SHAs are 40 lowercase hex characters. `issue_updated_at` identifies the current GitHub source revision. Store the launch source snapshot separately and inspect each later scope change. Every changed base, head, or issue revision invalidates earlier review evidence.
 

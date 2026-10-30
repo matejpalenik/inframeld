@@ -82,6 +82,28 @@ Only the coordinator merges, serially, using a supported guard for the checked h
 
 Complete the Goal only after the finite authorized snapshot is actually delivered and reconciled. A pushed branch, a helper's `ready` result or low remaining usage is not completion.
 
+## Keep blocked issues from stopping independent delivery
+
+When a new dependency appears, identify which accepted behavior needs it before expanding another feature's assignment. Independently review the smallest honest boundary: a documented prerequisite, an existing supported procedure, a useful supporting PR or an integrated delivery. Keep required findings open until properly resolved. See [dependency review](../../../.agents/skills/inframeld-backlog-delivery/references/coordinator.md#review-a-newly-discovered-dependency).
+
+Preserve blocked work at a recoverable checkpoint, record its exact blocker and next action, obtain the writer's stop acknowledgment and verify resource cleanup. Retire the unfinished assignment before reusing that worker on a verified independent issue. Resume it later with `adopt`. The shared integration slot serializes integration execution, not unrelated implementation or private checks.
+
+A supporting PR may merge a useful qualified capability while the larger issue stays open. Its scope, deferred dependencies and remaining acceptance need independent review. Use `assess-prerequisite` and `observe_prerequisite_merge`, retain all ordinary checks and merge guards, and use no closing references. Full-issue acceptance and completion counts remain unchanged. [Supporting-PR gates](../../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md#merge-useful-prerequisites-without-closing-the-feature) own the details.
+
+## Stop at the host boundary
+
+Delivery may fix repository code, Dockerfiles and Compose/test configuration. It must not repair or reconfigure the host or Podman machine. The only machine-recovery exception is one coordinator-controlled start of an existing stopped machine, or one coordinated restart of a confirmed stuck machine, after reconciling other users. Stop runtime-dependent work if recovery fails, cannot be confirmed or the same fault recurs. Changing VM networking/storage/settings, host trust/DNS/permissions, global tools, resetting/recreating machines and broad pruning are outside delivery authority. An extra issue-remediation cycle does not expand this boundary. See [host recovery and immediate stop conditions](../../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md#keep-delivery-out-of-host-repair).
+
+Future launch requests can add:
+
+> Review newly discovered dependencies against accepted behavior before expanding an issue. Preserve blocked checkpoints and reuse stopped workers for verified independent tasks. Permit reviewed supporting PRs without declaring their larger issues complete. Use maintained acceptance commands and bounded diagnostic probes. Do not repair or reconfigure the host or Podman machine. Permit only the coordinated existing-machine start/restart exception in the delivery skill, then stop runtime-dependent work if recovery fails, cannot be confirmed or the same fault recurs.
+
+This example does not modify an existing Goal or expand an active run's authorization. Its coordinator must reconcile new guidance with the actual checked revision before adopting it.
+
+## Rehearse the changed decisions
+
+Use synthetic requests in isolated fresh contexts when permitted. Keep expected outcomes in the evaluator's private record rather than giving the answering agent an answer key. Include a newly discovered login prerequisite, a parked writer with an independent task available, a qualified supporting PR, an underqualified helper, a stopped machine, a hung machine shared with unrelated work, failed restart recovery and a proposed VM-network repair. Add ordinary explanation and standalone-review controls. Inspect loaded references and actual proposed actions. No real machine or live run mutation is needed to rehearse these decisions. Static walkthroughs and helper tests are not independent agent evaluations. Report unavailable evaluations explicitly.
+
 ## Configuration sources
 
 The project uses current native standalone agent files and project-scoped configuration described in [OpenAI's subagent documentation](https://learn.chatgpt.com/docs/agent-configuration/subagents) and [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference). Role instructions do not create a separate security sandbox. Each agent inherits the parent session's permissions, and managed restrictions still apply.

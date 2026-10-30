@@ -12,6 +12,16 @@ Application scenarios receive fresh temporary databases through the existing fix
 
 The integration graph publishes no host ports and exposes no container socket to the runner. Follow its private service addresses rather than recreating provider services on public host ports. Controlled provider collaborators in database tests and real provider services in native scenarios establish different boundaries.
 
+### Maintained commands and diagnostic probes
+
+Complete acceptance runs use the maintained repository wrapper and its selected pinned configuration. A workspace `pnpm` alias may invoke that wrapper. Calling its documented shell entry point directly does not create a different test. Existing focused/manual procedures remain available within their stated boundaries.
+
+When a wrapper fails, a small direct engine probe can isolate the failing boundary. Bind the exact source, images, runtime and owned resources, state any different startup order or omitted service, and use a bounded lifetime and exact cleanup. Classify the result before changing production code: product behavior, maintained harness/configuration, probe setup or unavailable runtime. A probe importing the wrong package establishes a probe error. Correcting it does not demonstrate a product fix. A web-first address collision does not establish that the full database-first journey was executed.
+
+New or substantially changed harnesses should establish the affected real build/startup/cleanup behavior with small probes before another expensive whole journey. Controlled substitutes can test orchestration decisions but do not establish actual engine compatibility. A passing probe remains partial evidence. Return to the maintained wrapper to qualify the complete supported journey.
+
+During coordinated delivery, follow the owning [host-repair boundary](../../inframeld-backlog-delivery/references/gates-and-recovery.md#keep-delivery-out-of-host-repair). Broad debugging guidance cannot authorize host or Podman-machine reconfiguration. At that boundary, stop affected runtime-dependent operations and report the blocker to the coordinator. At the issue's retry limit, stop that issue's dependent work. Independent authorized work may continue. Ordinary explanation requests do not authorize starting or restarting a machine.
+
 ## Cleanup and resource lifetime
 
 Run one local integration operation at a time because the harness uses a fixed private test project. Overlapping commands are unsupported, without runtime locking, reservations or worktree ownership. The Bash wrapper owns startup, testing and cleanup for an automatic run. Manual start, test and stop commands remain available. CI steps execute sequentially on their job's isolated runner. The [runbook](../../../../docs/development/guides/testing.md#serial-integration-workflow) owns supported commands, bounded process-group shutdown and post-run checks.

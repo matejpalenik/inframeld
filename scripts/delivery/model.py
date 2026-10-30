@@ -203,6 +203,54 @@ def _strings_required(value: object) -> list[str]:
     ]
 
 
+def assess_prerequisite(
+    assignment: dict[str, object], packet: dict[str, object]
+) -> MergeAssessment:
+    """Assess a reviewed supporting PR without declaring its owning issue complete."""
+    try:
+        pr = integer_value(packet.get("pr"), "pr", 1)
+        scope = string_value(packet.get("scope"), "scope")
+        remaining = list_value(packet.get("remaining_acceptance"), "remaining_acceptance")
+        if not remaining:
+            raise ValueError("supporting PR must identify remaining issue acceptance")
+        for item in remaining:
+            string_value(item, "remaining acceptance item")
+        review = object_value(packet.get("scope_review"), "scope_review")
+        if not _current(review, assignment):
+            raise ValueError("supporting scope review is stale")
+        if (
+            review.get("scope") != scope
+            or review.get("remaining_acceptance") != remaining
+            or review.get("deferred_blockers") != assignment.get("blockers")
+        ):
+            raise ValueError(
+                "scope review must cover the exact boundary and every deferred blocker"
+            )
+        string_value(review.get("reference"), "scope review reference")
+        string_value(review.get("dependency_rationale"), "dependency rationale")
+        if review.get("verdict") != "ready" or string_value(
+            review.get("reviewer_id"), "scope reviewer"
+        ) == assignment.get("worker_id"):
+            raise ValueError("supporting scope needs independent ready review")
+        evidence = object_value(packet.get("evidence"), "supporting evidence")
+        for role in ("acceptance", "documentation", "code_review", "dx_review"):
+            receipt = object_value(evidence.get(role), role)
+            if receipt.get("pr") != pr or receipt.get("scope") != scope:
+                raise ValueError("every review must identify this supporting PR and scope")
+        observed = object_value(packet.get("observation"), "observation")
+        if observed.get("pr") != pr or observed.get("closing_issues") != []:
+            raise ValueError(
+                "supporting PR observation must match and contain no closing references"
+            )
+        if assignment.get("merge_state") in ("uncertain", "merged"):
+            raise ValueError("reconcile uncertain or completed issue merge first")
+        if _finding_blocks("scope_review", review, assignment, observed):
+            raise ValueError("supporting scope has unresolved material findings")
+        return assess_merge({**assignment, "blockers": [], "evidence": evidence}, observed)
+    except ValueError as error:
+        return MergeAssessment("blocked", (f"Invalid supporting PR evidence: {error}.",))
+
+
 def assess_merge(assignment: dict[str, object], observation: dict[str, object]) -> MergeAssessment:
     """Fail closed on absent, stale, malformed, or incomplete review evidence.
 
@@ -221,6 +269,12 @@ def assess_merge(assignment: dict[str, object], observation: dict[str, object]) 
             pending.append("Observed base, head, or issue scope changed. Refresh all evidence.")
         if assignment.get("claim_state") == "retired":
             blocked.append("The assignment is retired.")
+        supporting = object_value(assignment.get("prerequisite_merges", {}), "prerequisite_merges")
+        if any(
+            object_value(item, "supporting merge").get("status") == "uncertain"
+            for item in supporting.values()
+        ):
+            blocked.append("A supporting PR merge is uncertain. Reconcile GitHub first.")
         blockers = list_value(assignment.get("blockers"), "blockers")
         if blockers:
             blocked.append("The assignment has unresolved blockers.")

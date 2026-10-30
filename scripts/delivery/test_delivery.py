@@ -15,9 +15,9 @@ from unittest.mock import patch
 
 from cli import run
 from github import GitHubClient
-from model import assess_merge, list_value, object_value
+from model import assess_merge, assess_prerequisite, list_value, object_value
 from planner import create_plan
-from state import StateStore
+from state import StateStore, validate_state
 
 BASE = "a" * 40
 HEAD = "b" * 40
@@ -81,6 +81,101 @@ def observation() -> dict[str, object]:
         "mergeable": True,
         "unresolved_review_threads": 0,
     }
+
+
+def prerequisite_packet() -> dict[str, object]:
+    scope = "Provide transient recipient proof without saved login management."
+    remaining = ["Credential storage, refresh and logout remain undelivered."]
+    evidence = deepcopy(object_value(passing_assignment()["evidence"], "evidence"))
+    for role in ("acceptance", "documentation", "code_review", "dx_review"):
+        object_value(evidence[role], role).update({"pr": 273, "scope": scope})
+    return {
+        "pr": 273,
+        "scope": scope,
+        "remaining_acceptance": remaining,
+        "scope_review": {
+            **receipt(),
+            "scope": scope,
+            "remaining_acceptance": remaining,
+            "deferred_blockers": [82, 159],
+            "dependency_rationale": "Reviewed explicit host context needs neither saved selection nor admission creation.",
+        },
+        "evidence": evidence,
+        "observation": {**observation(), "pr": 273, "closing_issues": []},
+    }
+
+
+class PrerequisiteAssessmentTests(unittest.TestCase):
+    def test_reviewed_support_can_be_ready_while_feature_stays_blocked(self) -> None:
+        assignment = {**passing_assignment(), "blockers": [82, 159]}
+        before = deepcopy(assignment)
+        self.assertEqual(assess_prerequisite(assignment, prerequisite_packet()).verdict, "ready")
+        self.assertEqual(assignment, before)
+        self.assertEqual(assess_merge(assignment, observation()).verdict, "blocked")
+
+    def test_missing_stale_or_worker_scope_review_cannot_approve_support(self) -> None:
+        changes: list[dict[str, object]] = [
+            {"verdict": "changes_needed"},
+            {"head_sha": "c" * 40},
+            {"reviewer_id": "worker-125"},
+            {"deferred_blockers": [82]},
+            {"remaining_acceptance": []},
+            {"scope": "Different change"},
+        ]
+        for change in changes:
+            with self.subTest(change=change):
+                packet = prerequisite_packet()
+                object_value(packet["scope_review"], "scope review").update(change)
+                self.assertNotEqual(
+                    assess_prerequisite(
+                        {**passing_assignment(), "blockers": [82, 159]}, packet
+                    ).verdict,
+                    "ready",
+                )
+
+    def test_support_cannot_close_issues_or_reuse_unscoped_reviews(self) -> None:
+        for kind in ("closing", "unscoped", "failed_ci", "material_finding"):
+            with self.subTest(kind=kind):
+                packet = prerequisite_packet()
+                evidence = object_value(packet["evidence"], "evidence")
+                if kind == "closing":
+                    object_value(packet["observation"], "observation")["closing_issues"] = [125]
+                elif kind == "unscoped":
+                    object_value(evidence["acceptance"], "acceptance").pop("scope")
+                elif kind == "failed_ci":
+                    object_value(list_value(evidence["checks"], "checks")[0], "check")[
+                        "conclusion"
+                    ] = "failure"
+                else:
+                    object_value(packet["scope_review"], "scope review")["findings"] = [
+                        {"id": "unsupported-boundary", "priority": 2, "resolved": False}
+                    ]
+                self.assertNotEqual(
+                    assess_prerequisite(
+                        {**passing_assignment(), "blockers": [82, 159]}, packet
+                    ).verdict,
+                    "ready",
+                )
+
+    def test_support_retains_current_checks_reviews_and_merge_uncertainty(self) -> None:
+        for kind in ("stale", "checks", "worker", "retired", "uncertain"):
+            with self.subTest(kind=kind):
+                assignment = {**passing_assignment(), "blockers": [82, 159]}
+                packet = prerequisite_packet()
+                evidence = object_value(packet["evidence"], "evidence")
+                if kind == "stale":
+                    object_value(packet["observation"], "observation")["head_sha"] = "c" * 40
+                elif kind == "checks":
+                    object_value(packet["observation"], "observation")["required_checks"] = [
+                        "New gate"
+                    ]
+                elif kind == "worker":
+                    object_value(evidence["code_review"], "review")["reviewer_id"] = "worker-125"
+                elif kind == "retired":
+                    assignment["claim_state"] = "retired"
+                else:
+                    assignment["prerequisite_merges"] = {"272": {"status": "uncertain"}}
+                self.assertNotEqual(assess_prerequisite(assignment, packet).verdict, "ready")
 
 
 class MergeAssessmentTests(unittest.TestCase):
@@ -691,6 +786,124 @@ class StateTests(unittest.TestCase):
                     },
                 )
 
+    def test_supporting_merge_keeps_feature_open_and_preserves_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            self.apply(store, 0, self.claim(blockers=[82, 159]))
+            operation: dict[str, object] = {
+                "op": "observe_prerequisite_merge",
+                "issue": 125,
+                "pr": 273,
+                "status": "uncertain",
+                "source": "github",
+                "head_sha": HEAD,
+                "base_sha": BASE,
+                "issue_updated_at": UPDATED,
+                "reference": "https://github.com/matejpalenik/inframeld/pull/273",
+                "observed_at": UPDATED,
+                "scope": "Transient recipient proof",
+                "assessment_reference": "synthetic:reviewed-support-packet",
+            }
+            self.apply(store, 1, operation)
+            with self.assertRaisesRegex(ValueError, "uncertain"):
+                self.apply(
+                    store,
+                    2,
+                    {
+                        "op": "revise",
+                        "issue": 125,
+                        "base_sha": BASE,
+                        "head_sha": "c" * 40,
+                        "issue_updated_at": UPDATED,
+                    },
+                )
+            current = store.read()
+            self.assertEqual(current["schema_version"], 2)
+            with self.assertRaisesRegex(ValueError, "schema_version 2"):
+                validate_state({**current, "schema_version": 1})
+            assignment = object_value(
+                object_value(current["assignments"], "assignments")["125"], "assignment"
+            )
+            self.assertEqual(
+                assess_merge({**passing_assignment(), **assignment}, observation()).verdict,
+                "blocked",
+            )
+            current = self.apply(store, 2, {**operation, "status": "merged", "merge_sha": "e" * 40})
+            assignment = object_value(
+                object_value(current["assignments"], "assignments")["125"], "assignment"
+            )
+            self.assertEqual(assignment["merge_state"], "unmerged")
+            self.assertEqual(assignment["blockers"], [82, 159])
+            self.assertEqual(current["merge_observations"], {})
+            with self.assertRaisesRegex(ValueError, "merged"):
+                self.apply(store, 3, {**operation, "status": "not_merged"})
+            current = self.apply(
+                store,
+                3,
+                {
+                    "op": "revise",
+                    "issue": 125,
+                    "base_sha": BASE,
+                    "head_sha": "c" * 40,
+                    "issue_updated_at": UPDATED,
+                },
+            )
+            assignment = object_value(
+                object_value(current["assignments"], "assignments")["125"], "assignment"
+            )
+            self.assertIn(
+                "273", object_value(assignment["prerequisite_merges"], "supporting merges")
+            )
+
+    def test_unmerged_support_can_be_rebased_and_later_recorded_as_merged(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            self.apply(store, 0, self.claim())
+            operation: dict[str, object] = {
+                "op": "observe_prerequisite_merge",
+                "issue": 125,
+                "pr": 273,
+                "status": "uncertain",
+                "source": "github",
+                "head_sha": HEAD,
+                "base_sha": BASE,
+                "issue_updated_at": UPDATED,
+                "reference": "https://github.com/matejpalenik/inframeld/pull/273",
+                "observed_at": UPDATED,
+                "scope": "Transient recipient proof",
+                "assessment_reference": "synthetic:original-scope-review",
+            }
+            self.apply(store, 1, operation)
+            with self.assertRaisesRegex(ValueError, "preserve"):
+                self.apply(
+                    store, 2, {**operation, "status": "not_merged", "scope": "Changed scope"}
+                )
+            self.apply(store, 2, {**operation, "status": "not_merged"})
+            revised = {"base_sha": "c" * 40, "head_sha": "d" * 40, "issue_updated_at": "later"}
+            self.apply(store, 3, {"op": "revise", "issue": 125, **revised})
+            state = self.apply(
+                store,
+                4,
+                {
+                    **operation,
+                    **revised,
+                    "status": "merged",
+                    "merge_sha": "e" * 40,
+                    "assessment_reference": "synthetic:refreshed-scope-review",
+                },
+            )
+            assignment = object_value(
+                object_value(state["assignments"], "assignments")["125"], "assignment"
+            )
+            self.assertEqual(assignment["merge_state"], "unmerged")
+            merged = object_value(
+                object_value(assignment["prerequisite_merges"], "supporting merges")["273"],
+                "merged",
+            )
+            self.assertEqual(merged["status"], "merged")
+            self.assertEqual(merged["head_sha"], revised["head_sha"])
+            self.assertEqual(len(list_value(assignment["history"], "history")), 4)
+
     def test_uncertain_merge_requires_observed_github_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = self.make_store(directory)
@@ -1251,6 +1464,34 @@ class GitHubSnapshotTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    def test_supporting_assessment_is_read_only_and_never_completes_the_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = StateTests().make_store(directory)
+            StateTests().apply(store, 0, StateTests().claim(blockers=[82, 159]))
+            packet = Path(directory) / "packet.json"
+            packet.write_text(json.dumps(prerequisite_packet()))
+            state_path = Path(directory) / "state.json"
+            before = state_path.read_bytes()
+            output = io.StringIO()
+            with redirect_stdout(output):
+                code = run(
+                    [
+                        "assess-prerequisite",
+                        "--state",
+                        str(state_path),
+                        "--issue",
+                        "125",
+                        "--packet",
+                        str(packet),
+                    ]
+                )
+            result = json.loads(output.getvalue())
+            self.assertEqual(code, 0)
+            self.assertEqual(result["verdict"], "ready")
+            self.assertFalse(result["issue_complete"])
+            self.assertFalse(result["merge_authorized_by_helper"])
+            self.assertEqual(state_path.read_bytes(), before)
+
     def invoke(self, arguments: list[str]) -> tuple[int, dict[str, object]]:
         output = io.StringIO()
         with redirect_stdout(output):

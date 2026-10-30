@@ -20,6 +20,16 @@ Bind each accepted risk to its originating review role, exact review reference a
 
 Revalidate current issue acceptance before merge. A changed issue body, updated blocker or material acceptance change invalidates the affected readiness claim. A foundation can close its own scoped issue when acceptance is met. It cannot close a complete feature issue merely because another issue might later connect it to an executable journey.
 
+## Merge useful prerequisites without closing the feature
+
+A supporting PR may deliver a coherent, useful capability from an unfinished issue. It must belong to the authorized snapshot and have explicit acceptance examples, accurate limits and no speculative unused framework. Independently review the scope against the full issue, identifying remaining acceptance and explaining why each deferred native blocker is unnecessary for this particular capability. Preserve those blockers on the issue and full assignment. A missing prerequisite needed by the supporting capability still blocks its merge.
+
+For example, a maintained transient login helper may be useful before saved credentials, refresh and logout exist. Its own supported journey, failures, cleanup and documentation must be qualified. Merely compiling a helper or promising a future consumer is insufficient. Existing required findings cannot be waived by moving them into the remaining-work list.
+
+Bind acceptance, code, documentation and DX receipts explicitly to the supporting PR number, scope and actual base/head. All actual required checks, current authorization, independent reviews, P0/P1/P2 rules, CodeRabbit handling and expected-head merge guard still apply. Inspect PR and included commit closing references. Supporting PRs use no closing keywords and leave the larger issue open.
+
+Use `assess-prerequisite` with the independently reviewed packet described in [the helper contract](../../../../scripts/delivery/README.md#assess-a-supporting-pr). It assesses only the supporting boundary and never reports issue completion. Observe its actual merge with `observe_prerequisite_merge`. Do not use full-issue `observe_merge` or invent a ready full-issue acceptance receipt for that event. Unknown merge outcomes block further execution and ownership changes until reconciled. Confirm the feature issue stayed open, retain the remaining acceptance and refresh affected dependent work against actual main.
+
 ## Shared resources are observed ownership
 
 Workers request resources from the coordinator before starting shared integration activity. A claim names its owner, worktree/run and resource identity. Use one integration owner when the suite depends on shared Compose projects, fixed ports, database state or cleanup. Keep independent unit and fixture checks parallel when they do not use the same resources.
@@ -28,11 +38,34 @@ Release only after observing teardown and the actual resource state. A timeout, 
 
 The run record lives outside every checkout, so rebases cannot overwrite it. The coordinator is its sole writer. Use run/coordinator identity and expected-revision updates, and inspect conflicts instead of overwriting newer records. Atomic state persistence prevents partial files. It does not make two independently acting coordinators safe.
 
+## Keep delivery out of host repair
+
+Delivery implements repository capabilities. It is not a host-administration or container-runtime repair task. This boundary also applies when a Debug or Docker skill suggests broader investigation. A retry grant, a new probe or an extra remediation cycle does not authorize host changes.
+
+Use maintained repository commands for complete checks. Allow only bounded diagnostics needed to distinguish a repository defect, probe setup error and unavailable environment. Record what actually ran. A probe failure is not proof that the maintained journey failed, and a successful probe does not establish complete qualification. Use existing phase budgets and stop on an unchanged repeated failure rather than running variants without new evidence.
+
+The coordinator may inspect machine/runtime status and make one bounded recovery attempt for the same incident: start the existing stopped or crashed machine, or stop/start an existing machine confirmed stuck. First reconcile active integration commands and machine users. Preserve unrelated containers, volumes and services. If unrelated use is unknown or restarting would disrupt work outside the authorization, stop runtime-dependent delivery and report that blocker. Workers and specialists request recovery from the coordinator and never restart the machine themselves.
+
+After that attempt, perform a bounded health check and reconcile owned resources before another test. If recovery fails, cannot be confirmed or the same fault recurs, stop affected runtime work. Do not reset the recovery allowance by changing the incident name, stage, worker or test. Unknown cleanup stays occupied. Independent work that does not use the unavailable runtime may continue.
+
+| Situation | Delivery response |
+| --- | --- |
+| A repository Compose file allocates the gateway address dynamically | Diagnose the source-controlled setting and repair it within the authorized issue scope and retry limit. |
+| The existing machine is stopped or confirmed hung | The coordinator may make the single coordinated recovery attempt above. |
+| The machine still fails after that attempt | Stop dependent operations and report the environment blocker. |
+| A proposed fix changes VM networking, DNS, storage, CPU/memory, mounts, backend/provider, guest services or packages | Stop. Do not reconfigure the machine, SSH into it for repairs or pursue extended guest/host forensics. |
+| A proposed fix changes host DNS, routes, firewall, trust stores, broad permissions or global tool versions/settings | Stop. Repository delivery does not authorize these host changes. |
+| A proposed fix resets/recreates/deletes the machine, migrates its storage or broadly prunes resources | Stop. Preserve the machine and unrelated data. |
+
+Locked dependencies inside an assigned worktree or disposable test image, repository Dockerfile/Compose changes and cleanup of positively owned fixtures remain ordinary scoped delivery operations. They do not permit host-wide installation, reconfiguration or cleanup. An explicitly requested infrastructure task is separate work with its own authorization.
+
+The existing three-unsuccessful-cycle ceiling still applies to issue remediation. Record repository, harness and diagnostic setup failures honestly. Moving to another stage or private probe does not erase unsuccessful cycles or permit unbounded setup corrections. A need for prohibited host repair stops delivery immediately, even before the first cycle is exhausted. Report the failed command/phase, bounded observations, recovery attempted, resource state and what the user must resolve. Do not supply a script that performs the prohibited repair as the next delivery action.
+
 ## Merge the reviewed head serially
 
 The helper's `assess-merge` reports whether supplied evidence is consistent and sufficient. It does not prove that uninspected GitHub evidence is authentic, authorize a merge or execute it. Before acting, the coordinator fetches current PR, issue, review, check and base state through supported tools and reconciles it with the record.
 
-Require the branch to be frozen, the PR open and eligible, current base/head matching the checked revisions, accepted issue scope met, no unresolved material findings and all actual required gates satisfied. Recheck branch protections and use a supported expected-head merge guard. If the available merge tool cannot bind the operation to the checked head, do not perform an unguarded automatic merge. Obtain a supported path or escalate that capability gap.
+Require the branch to be frozen, the PR open and eligible, current base/head matching the checked revisions, the accepted delivery boundary met, no unresolved material findings and all actual required gates satisfied. A completing PR needs full issue acceptance. A supporting PR needs the explicit scoped assessment above and leaves the feature open. Recheck branch protections and use a supported expected-head merge guard. If the available merge tool cannot bind the operation to the checked head, do not perform an unguarded automatic merge. Obtain a supported path or escalate that capability gap.
 
 Serialize merges so each subsequent PR is assessed against observed current main. Do not disable protections, bypass failed requirements, rewrite protected history or treat a local predicted merge as an observed GitHub merge. A merge call with an unknown outcome must be reconciled by reading actual PR/main state before retrying.
 

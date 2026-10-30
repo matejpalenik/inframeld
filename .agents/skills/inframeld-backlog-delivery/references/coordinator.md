@@ -12,6 +12,14 @@ Run `pnpm delivery:plan` to inspect the current GitHub snapshot. A helper candid
 
 Before assigning, resolve current acceptance, known pending decisions, verification needs, branch base, ownership and whether the task truly fits the milestone. Missing decisions block dependent work. Continue unrelated tasks. Do not silently relax acceptance, close a partial foundation as a complete feature or expand an issue to future Studio work.
 
+### Review a newly discovered dependency
+
+Suppose Alice's Project metadata repair consumes human identity proof, but the login client producing that proof is unfinished. Before adding browser login to the metadata assignment, identify the accepted repair behavior, the missing evidence and its owning issue. Compare a clearly documented prerequisite, a maintained procedure over existing capabilities, a separately reviewed supporting PR and an explicitly integrated delivery. Check for dependency cycles. Independent scope review must explain which option satisfies the accepted behavior and why deferred dependencies are unnecessary for that particular change.
+
+A finding about a complete operator walkthrough does not automatically make the entire login feature a prerequisite for a server capability. Conversely, conditional documentation cannot replace an accepted requirement for a usable operator journey. Retain the finding until its reviewer resolves the scope or the human explicitly accepts the bounded P2 risk. Do not downgrade it to improve throughput.
+
+Record the chosen boundary, acceptance examples, remaining work, owner and exact unblock condition in the assignment brief and outside-checkout evidence. Revise ownership before dependent writes. Routine scope decisions within existing authorization need coordinator alignment and applicable independent review, not repeated human permission. A changed accepted contract or expanded authorization still follows its owning decision process.
+
 ## Verify actual capacity
 
 Project config requests fourteen concurrently open subagents, excluding the main chat. The active client can expose fewer slots or a different tool surface. Verify available roles, effective concurrency and lifecycle operations in the current session. A configured file and successful TOML validation do not prove that custom profiles loaded. Report a missing capability and use a supported smaller rehearsal. Do not pretend a generic agent was spawned under a native custom profile.
@@ -31,6 +39,14 @@ The coordinator is the sole state writer and resource allocator. Atomic replacem
 Declare path and contract ownership before writing. Shared roots such as lockfiles, migrations, OpenAPI, generated SDKs and navigation need one writer or a serial integration handoff. A lockfile change is not made safe simply by being in a different worktree. Expand or revise ownership atomically before a worker crosses its boundary.
 
 Use `amend` for ownership or gate changes and `adopt` for a verified replacement owner. These operations invalidate prior evidence. Use `retire` only after verifying that the old writer has stopped and cleanup is complete. A recorded merge alone does not release its worker or paths. Preserve the history and any uncertain resource claims. The helper contract defines the required observations and revision checks.
+
+### Park blocked work and reuse its worker
+
+When an issue cannot progress, preserve its worktree and a recoverable checkpoint, with the exact revision, missing capability, next action and unblock condition. Obtain a positive writer stop acknowledgment and reconcile every held resource. Retire the unfinished assignment only after verified cleanup. Retirement releases ownership, not feature completion. Never delete the branch or discard dirty work to free a slot.
+
+Recheck the finite snapshot for a genuinely independent assignment, then reuse the stopped worker with a fresh worktree, brief and acknowledgment. Resume the parked issue through `adopt` when its blocker is resolved, checking intervening main and contract changes. If no independent assignment is verified, report that reason rather than inventing work to fill the pool.
+
+For example, metadata can wait for login qualification while its stopped writer delivers an unrelated backend capability. The shared integration slot serializes integration execution. It does not serialize independent source work, reviews or checks with private outputs. A whole run waits only when no useful authorized independent work remains, or when the human explicitly required a staged launch.
 
 ## Communicate useful events
 

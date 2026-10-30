@@ -10,11 +10,15 @@ Confirm the assigned worktree and base. Read the current issue, acceptance and b
 
 Report overlap before editing unassigned paths or contracts. Different worktrees do not give permission to race on the lockfile, migration order, OpenAPI, generated SDKs or shared navigation. Ask the coordinator for a revised assignment or a serial handoff. Do not silently create another abstraction to avoid communication.
 
+If a missing prerequisite would absorb another feature, identify the accepted behavior it blocks and ask for the coordinator's independently reviewed delivery boundary. Do not treat a broader end-to-end example as automatic authority to implement every producer it uses. Preserve required findings until resolved under the existing review policy.
+
 ## Implement and verify proportionately
 
 Follow the repository's behavioral test-first procedure. Establish only necessary public scaffolds, require the intended behavioral failure, implement the smallest behavior and refactor with focused tests green. Preserve mandatory conventions and valid exceptions. Do not add architecture-enforcement tests or speculative infrastructure.
 
 Use local unit and fixture checks that fit the change. Request an exclusive resource grant before starting shared integration services, reserving ports or using a shared database or Compose project. Only the coordinator grants and records ownership. Do not infer a free resource from a quiet terminal, elapsed time or stale status.
+
+Use maintained repository entry points for acceptance runs. Diagnostic probes are bounded supporting evidence, with their differences and failure classification recorded under [Testing](../../inframeld-testing/references/isolation-and-evidence.md). Never repair the host or Podman machine to make a check pass. Report the environment blocker to the coordinator under the [host boundary](gates-and-recovery.md#keep-delivery-out-of-host-repair).
 
 For user-visible work, request the shared documentation writer with exact disjoint paths and the implementation revision. The writer uses the approved brief and page patterns without a repeated outline-approval loop. Shared navigation has one named owner. Review the returned page manifest and example evidence against the implementation. An internal-only change can explain why no user page changes are needed.
 
@@ -27,6 +31,10 @@ Send the coordinator the issue revision, actual base/head, implementation summar
 Reviewers inspect the actual change and return findings with evidence. Address P0/P1 and required P2 findings. The human can explicitly accept a bounded P2 risk and follow-up. P3 suggestions are optional. Do not add a change merely to raise a score. After three unsuccessful remediation cycles on the issue, report the remaining root cause and stop dependent work for coordinator escalation.
 
 Read the PR template before preparing the title and description. Describe the complete delivered behavior and actual evidence. Distinguish local execution, cached results, reported CI and pending checks. Do not mark unverified acceptance complete or close the issue for a partial foundation outside its accepted scope.
+
+A separately approved supporting PR describes its useful delivered capability, the remaining issue acceptance and actual dependencies. Reference the issue without a closing keyword. Obtain independent scope and implementation reviews plus applicable documentation, DX and final-head checks. The coordinator uses the [supporting-PR gates](gates-and-recovery.md#merge-useful-prerequisites-without-closing-the-feature), not a false full-issue acceptance receipt.
+
+When blocked, return a recoverable checkpoint, exact blocker, next action and resource status. Stop writes before acknowledgment. The coordinator may retire the unfinished assignment after cleanup and give you an independent issue. Keep the previous branch intact and discard its assumptions when reading the new brief.
 
 ## Freeze the checked revision
 

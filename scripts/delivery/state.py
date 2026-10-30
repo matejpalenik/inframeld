@@ -46,6 +46,9 @@ OPERATION_FIELDS: dict[str, set[str]] = {
         "observed_at",
     },
 }
+OPERATION_FIELDS["observe_prerequisite_merge"] = (
+    OPERATION_FIELDS["observe_merge"] | BINDING_FIELDS | {"scope", "assessment_reference"}
+)
 
 
 def _known_fields(record: dict[str, object], allowed: set[str], name: str) -> None:
@@ -59,7 +62,10 @@ def _operation_fields(record: dict[str, object], kind: str) -> None:
         raise ValueError(f"unsupported operation: {kind}")
     required = OPERATION_FIELDS[kind]
     optional: set[str] = (
-        {"merge_sha"} if kind == "observe_merge" and record.get("status") == "merged" else set()
+        {"merge_sha"}
+        if kind in ("observe_merge", "observe_prerequisite_merge")
+        and record.get("status") == "merged"
+        else set()
     )
     _known_fields(record, required | optional, kind)
     missing = required - set(record)
@@ -187,6 +193,15 @@ def _assignment(record: dict[str, object]) -> None:
     list_value(record.get("blockers"), "blockers")
     object_value(record.get("evidence"), "evidence")
     _binding(record)
+    supporting = object_value(record.get("prerequisite_merges", {}), "prerequisite_merges")
+    for key, item in supporting.items():
+        observation = object_value(item, "supporting merge")
+        _validate_merge_observation(observation)
+        _binding(observation)
+        string_value(observation.get("scope"), "supporting scope")
+        string_value(observation.get("assessment_reference"), "assessment_reference")
+        if key != str(observation["pr"]) or observation.get("issue") != record["issue"]:
+            raise ValueError("supporting merge must identify its issue and PR")
     if record.get("merge_state") not in ("unmerged", "uncertain", "merged", "not_merged"):
         raise ValueError("invalid merge_state")
     if record.get("claim_state", "active") not in ("active", "retired"):
@@ -197,7 +212,10 @@ def _assignment(record: dict[str, object]) -> None:
         object_value(event.get("previous"), "previous assignment")
         object_value(event.get("operation"), "history operation")
     if record.get("claim_state") == "retired":
-        if record["merge_state"] == "uncertain":
+        if record["merge_state"] == "uncertain" or any(
+            object_value(item, "supporting merge")["status"] == "uncertain"
+            for item in supporting.values()
+        ):
             raise ValueError("uncertain merge cannot be retired")
         _stop_cleanup(object_value(record.get("retirement_receipt"), "retirement_receipt"), record)
 
@@ -229,7 +247,7 @@ def _exclusive(records: dict[str, object]) -> None:
 
 
 def validate_state(state: dict[str, object]) -> None:
-    if state.get("schema_version") != 1 or isinstance(state.get("schema_version"), bool):
+    if state.get("schema_version") not in (1, 2) or isinstance(state.get("schema_version"), bool):
         raise ValueError("unsupported state schema_version")
     if (
         state.get("repository") != REPOSITORY
@@ -249,6 +267,8 @@ def validate_state(state: dict[str, object]) -> None:
     for key, item in assignments.items():
         assignment = object_value(item, "assignment")
         _assignment(assignment)
+        if state["schema_version"] == 1 and assignment.get("prerequisite_merges"):
+            raise ValueError("supporting merge records require state schema_version 2")
         if key != str(assignment["issue"]) or assignment["issue"] not in allowed:
             raise ValueError("assignment is outside authorized scope")
     _exclusive(assignments)
@@ -445,6 +465,53 @@ class StateStore:
             _exclusive(assignments)
             return
         assignment = object_value(assignments.get(key), "assigned issue")
+        supporting = object_value(assignment.get("prerequisite_merges", {}), "prerequisite_merges")
+        uncertain_support = any(
+            object_value(item, "supporting merge")["status"] == "uncertain"
+            for item in supporting.values()
+        )
+        if kind == "observe_prerequisite_merge":
+            _validate_merge_observation(operation)
+            if _binding(operation) != _binding(assignment):
+                raise ValueError("supporting merge binding is stale")
+            if assignment.get("claim_state") == "retired" or assignment["merge_state"] in (
+                "uncertain",
+                "merged",
+            ):
+                raise ValueError("supporting merge requires an active unmerged issue")
+            string_value(operation.get("scope"), "supporting scope")
+            string_value(operation.get("assessment_reference"), "assessment_reference")
+            pr_key = str(operation["pr"])
+            previous = (
+                object_value(supporting[pr_key], "supporting merge")
+                if pr_key in supporting
+                else None
+            )
+            if previous is not None:
+                if previous["status"] == "merged":
+                    raise ValueError("a merged supporting receipt cannot be changed")
+                if previous["status"] == "uncertain" and any(
+                    previous.get(field) != operation.get(field)
+                    for field in (
+                        "base_sha",
+                        "head_sha",
+                        "issue_updated_at",
+                        "scope",
+                        "assessment_reference",
+                    )
+                ):
+                    raise ValueError("reconciliation must preserve the supporting PR binding")
+            if uncertain_support and (previous is None or previous["status"] != "uncertain"):
+                raise ValueError("reconcile uncertain supporting merge first")
+            _archive(assignment, state, operation)
+            supporting[pr_key] = {
+                field: value for field, value in operation.items() if field != "op"
+            }
+            assignment["prerequisite_merges"] = supporting
+            state["schema_version"] = 2
+            return
+        if uncertain_support:
+            raise ValueError("supporting merge is uncertain, reconcile GitHub state first")
         if kind == "observe_merge":
             _validate_merge_observation(operation)
             if operation["head_sha"] != assignment["head_sha"]:
