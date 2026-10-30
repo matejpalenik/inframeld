@@ -225,6 +225,23 @@ services:
       hydra:
         condition: service_started
 
+  application-worker:
+    <<: *backend-image
+    profiles: [jobs]
+    command: ["python", "-m", "inframeld_backend.application_worker"]
+    stop_grace_period: 20s
+    environment:
+      INFRAMELD_DATABASE__HOST: postgres
+      INFRAMELD_DATABASE__PORT: "5432"
+      INFRAMELD_DATABASE__NAME: inframeld
+      INFRAMELD_DATABASE__USER: inframeld
+      INFRAMELD_DATABASE__PASSWORD: inframeld-dev-only
+      INFRAMELD_DATABASE__POOL_SIZE: "2"
+      INFRAMELD_DATABASE__MAX_OVERFLOW: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     <<: *backend-image
     environment:

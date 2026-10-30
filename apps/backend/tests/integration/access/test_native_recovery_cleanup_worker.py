@@ -12,6 +12,7 @@ import pytest
 from pydantic import HttpUrl, SecretStr
 from sqlalchemy import select
 from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.busy_application_job import busy_application_job
 from tests.support.hydra_provider import API_AUDIENCE, HYDRA_ISSUER, hydra_test_provider
 from tests.support.integration_services import HYDRA_ADMIN_URL, HYDRA_PUBLIC_URL
 from tests.support.kratos_browser import create_browser, register_human
@@ -54,6 +55,8 @@ from inframeld_backend.access.infrastructure.writers.postgres_human_credential_s
 )
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import get_settings
+from inframeld_backend.shared.domain.enums.job_status import JobStatus
+from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
 
 pytestmark = pytest.mark.skipif(
@@ -183,8 +186,11 @@ async def test_native_evidence_real_cleanup_and_late_old_version_credentials_aft
         )
         assert saved.status_code == 200
 
-        async with recovery_worker_process():
+        async with busy_application_job(database) as ordinary, recovery_worker_process():
             finished = await _wait_for_release(database, alice.subject)
+            async with database.session() as session, session.begin():
+                still_owned = await PostgresJobStore(session).require_current(ordinary)
+            assert still_owned.status is JobStatus.RUNNING
         assert finished.operation_id == original.operation_id
         assert finished.kratos_cleanup_state is finished.hydra_cleanup_state is State.CONFIRMED
         assert not await provider.token_is_active(old_tokens.access_token)

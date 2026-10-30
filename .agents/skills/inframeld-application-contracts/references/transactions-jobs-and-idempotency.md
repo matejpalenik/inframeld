@@ -35,6 +35,8 @@ The Access-owned `ProjectOperationAdmissionService` and its request DTO also coo
 
 Durable jobs save accepted work and progress across client disconnects or worker restart. Admit work and its reservation atomically in a short transaction, then perform external work outside it. Only the current fenced attempt may publish. A fence is an attempt/revision check preventing stale publication, not a way to cancel remote work.
 
+The shared ordinary-job admission, queue and fenced worker foundation is now implemented. Its lower-level admission service retains the caller-owned transaction so required business admission, job, audit and replay metadata commit together. It has no generic product endpoint or production product-handler registration. [Implemented ordinary execution](jobs-and-recovery.md#implemented-ordinary-job-foundation) identifies the code, current OAuth/application admission boundary, browser refusal and remaining domain/operating qualification.
+
 A paid model timeout may mean the request ran and was billed. Missing output, a nonzero exit or unconfirmed cancellation cannot authorize a new dispatch. Frozen vector storage retries have a separate bounded protocol using already captured bytes. Identity-recovery cleanup has its own trusted original-obligation and bulk-provider boundaries, not another generic state machine.
 
 <a id="a-durable-operation-across-transaction-and-provider-boundaries"></a>
