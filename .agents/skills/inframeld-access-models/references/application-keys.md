@@ -33,6 +33,7 @@ sequenceDiagram
     participant Bot as SupportBot
     participant Auth as Application authentication
     participant Operation as Protected operation
+    participant Authorizer as Existing Access authorizer
     Alice->>Access: Explicitly request key issuance
     Access->>DB: Check current management, delegation and key-lifecycle limits
     Note over Access,DB: Commit verifier, required audit and secret-safe operation outcome
@@ -42,9 +43,16 @@ sequenceDiagram
     Auth->>DB: Verify stored credential, expiry, revocation and current account
     Note over Auth: Public prefix alone is never verification
     Auth->>Operation: Actor identity and complete non-secret key evidence
-    Operation->>DB: Check current exact action and document authority
+    Operation->>Authorizer: Authorize the protected step using key evidence
+    Authorizer->>DB: Load fresh key/account and exact action/source facts
+    Note over Authorizer: Check key binding, expiry, revocation and current authority
+    Authorizer-->>Operation: Permit the exact step or reject
     Operation-->>Bot: Permitted result or owning failure
 ```
+
+Follow the [accepted protected-boundary ordering](decision-key-currentness.md#approved-resolution). For local writes and admission, coordinate the fresh key check against revocation in the same short transaction and hold the relevant locks through commit. Use current database UTC time after acquiring those locks. The key is expired when `check_time >= expires_at`, including equality. Revocation winning the ordering denies the effect. Later revocation does not undo an already committed write.
+
+Freshly authorize each bounded protected disclosure, saved-result replay, next stream delivery unit or external dispatch immediately before that step. Do not hold database locks while waiting for the provider or network. Revocation cannot recall bytes or requests already in flight. Later protected steps require new authorization.
 
 The successful arrows require their preceding checks to pass. A rejection has no credential-family fallback. The account remains SupportBot during key rotation, with its current grants and memberships. The optional CLI connection journey reviews the existing account, document groups and exact grants, then uses ordinary authorized creation/assignment and explicit show-once issuance. Setup issues no key automatically. Any paid live test needs separate approval and acts as the application. It cannot export the human's Hydra credential or widen scope.
 
