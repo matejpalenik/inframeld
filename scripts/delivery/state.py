@@ -490,7 +490,7 @@ class StateStore:
             if previous is not None:
                 if previous["status"] == "merged":
                     raise ValueError("a merged supporting receipt cannot be changed")
-                if any(
+                if previous["status"] == "uncertain" and any(
                     previous.get(field) != operation.get(field)
                     for field in (
                         "base_sha",

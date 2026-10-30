@@ -855,6 +855,55 @@ class StateTests(unittest.TestCase):
                 "273", object_value(assignment["prerequisite_merges"], "supporting merges")
             )
 
+    def test_unmerged_support_can_be_rebased_and_later_recorded_as_merged(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = self.make_store(directory)
+            self.apply(store, 0, self.claim())
+            operation: dict[str, object] = {
+                "op": "observe_prerequisite_merge",
+                "issue": 125,
+                "pr": 273,
+                "status": "uncertain",
+                "source": "github",
+                "head_sha": HEAD,
+                "base_sha": BASE,
+                "issue_updated_at": UPDATED,
+                "reference": "https://github.com/matejpalenik/inframeld/pull/273",
+                "observed_at": UPDATED,
+                "scope": "Transient recipient proof",
+                "assessment_reference": "synthetic:original-scope-review",
+            }
+            self.apply(store, 1, operation)
+            with self.assertRaisesRegex(ValueError, "preserve"):
+                self.apply(
+                    store, 2, {**operation, "status": "not_merged", "scope": "Changed scope"}
+                )
+            self.apply(store, 2, {**operation, "status": "not_merged"})
+            revised = {"base_sha": "c" * 40, "head_sha": "d" * 40, "issue_updated_at": "later"}
+            self.apply(store, 3, {"op": "revise", "issue": 125, **revised})
+            state = self.apply(
+                store,
+                4,
+                {
+                    **operation,
+                    **revised,
+                    "status": "merged",
+                    "merge_sha": "e" * 40,
+                    "assessment_reference": "synthetic:refreshed-scope-review",
+                },
+            )
+            assignment = object_value(
+                object_value(state["assignments"], "assignments")["125"], "assignment"
+            )
+            self.assertEqual(assignment["merge_state"], "unmerged")
+            merged = object_value(
+                object_value(assignment["prerequisite_merges"], "supporting merges")["273"],
+                "merged",
+            )
+            self.assertEqual(merged["status"], "merged")
+            self.assertEqual(merged["head_sha"], revised["head_sha"])
+            self.assertEqual(len(list_value(assignment["history"], "history")), 4)
+
     def test_uncertain_merge_requires_observed_github_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = self.make_store(directory)

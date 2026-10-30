@@ -20,7 +20,7 @@ When a wrapper fails, a small direct engine probe can isolate the failing bounda
 
 New or substantially changed harnesses should establish the affected real build/startup/cleanup behavior with small probes before another expensive whole journey. Controlled substitutes can test orchestration decisions but do not establish actual engine compatibility. A passing probe remains partial evidence. Return to the maintained wrapper to qualify the complete supported journey.
 
-During coordinated delivery, follow the owning [host-repair boundary](../../inframeld-backlog-delivery/references/gates-and-recovery.md#keep-delivery-out-of-host-repair). Broad debugging guidance cannot authorize host or Podman-machine reconfiguration. Stop when that boundary or the delivery retry limit is reached. Ordinary explanation requests do not authorize starting or restarting a machine.
+During coordinated delivery, follow the owning [host-repair boundary](../../inframeld-backlog-delivery/references/gates-and-recovery.md#keep-delivery-out-of-host-repair). Broad debugging guidance cannot authorize host or Podman-machine reconfiguration. At that boundary, stop affected runtime-dependent operations and report the blocker to the coordinator. At the issue's retry limit, stop that issue's dependent work. Independent authorized work may continue. Ordinary explanation requests do not authorize starting or restarting a machine.
 
 ## Cleanup and resource lifetime
 
