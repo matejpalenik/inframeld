@@ -174,6 +174,8 @@ async def run_application_worker(
                         active=status.active,
                     )
                     last_report = now
+                if stopped.is_set():
+                    break
                 context = await _claim(database, settings, worker_id, supported)
                 if context is None:
                     await _wait(stopped, settings.jobs.poll_seconds)

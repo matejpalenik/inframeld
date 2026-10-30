@@ -1146,3 +1146,58 @@ async def test_queue_reporting_failure_does_not_waste_first_executable_attempt(
         and saved.checkpoint == b"1"
     )
     assert saved.attempt == 1, "Queue-report failure must not discard a committed attempt."
+
+
+@pytest.mark.asyncio
+async def test_stop_during_queue_report_leaves_admitted_job_unclaimed(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    admission = await _admit(database, data=b"1")
+    stopped = asyncio.Event()
+
+    class MockStoppingQueueStatusReader(PostgresJobQueueStatusReader):
+        @override
+        async def read(self) -> JobQueueStatusDTO:
+            status = await super().read()
+            # Shutdown is observed before any subsequent claim can be dispatched.
+            stopped.set()
+            return status
+
+    monkeypatch.setattr(
+        application_worker, "PostgresJobQueueStatusReader", MockStoppingQueueStatusReader
+    )
+    settings = ApplicationWorkerApplicationSettings(
+        database=temporary_postgres_settings,
+        jobs=JobSettings(
+            lease_seconds=3,
+            poll_seconds=0.02,
+            database_timeout_seconds=1,
+            shutdown_seconds=3,
+            work_seconds=20,
+        ),
+    )
+    worker = asyncio.create_task(
+        application_worker.run_application_worker(settings, stopped, (BoundedJobHandler(),))
+    )
+    try:
+        await asyncio.wait_for(asyncio.shield(worker), timeout=5)
+    finally:
+        stopped.set()
+        if not worker.done():
+            worker.cancel()
+        await asyncio.gather(worker, return_exceptions=True)
+
+    async with database.session() as session:
+        saved = await PostgresJobStore(session).find(admission.operation_id)
+    assert saved is not None and saved.job_id == admission.job_id
+    assert saved.status is JobStatus.QUEUED and saved.attempt == 0, (
+        "A stop observed during reporting must not start a new durable attempt."
+    )
+    assert (
+        saved.checkpoint == b""
+        and saved.fence is None
+        and saved.lease_expires_at is None
+        and saved.work_deadline is None
+    )
