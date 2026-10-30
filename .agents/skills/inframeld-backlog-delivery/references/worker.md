@@ -6,7 +6,7 @@ Alice's worker owns a feature branch while other workers change independent area
 
 Read repository and directory instructions, Coding Standards, affected language/package guidance and the owning domain workflow. Read mandatory component references before proposing affected architecture or code. Load Application Contracts for transport or execution boundaries and the relevant SDK skill for generated-client work. Testing guides strategy and evidence when those decisions arise. Do not load every skill for a small task.
 
-Confirm the assigned worktree and base. Read the current issue, acceptance and blockers. Identify the user outcome, smallest coherent implementation, expected failure behavior, tests, user documentation and affected public contracts. Return this bounded plan to the coordinator. Resolve a material pending decision before dependent implementation. Routine choices within accepted scope do not require repeated approval.
+Confirm the assigned worktree and base. Read the current issue, acceptance and blockers. Identify the user outcome, smallest coherent implementation, expected failure behavior, tests, user documentation and affected public contracts. Return this bounded plan for the coordinator to confirm ownership before implementation. If the assignment already supplies an accepted plan, use it without repeating planning. Resolve a material pending decision before dependent implementation. Routine choices within accepted scope do not require repeated human approval.
 
 Report overlap before editing unassigned paths or contracts. Different worktrees do not give permission to race on the lockfile, migration order, OpenAPI, generated SDKs or shared navigation. Ask the coordinator for a revised assignment or a serial handoff. Do not silently create another abstraction to avoid communication.
 
@@ -32,7 +32,7 @@ Read the PR template before preparing the title and description. Describe the co
 
 Before final review and CI, stop all branch writes, including documentation edits and generation. Record the exact head, base and current issue revision. Any push, rebase or acceptance change makes affected receipts stale. Inform the coordinator immediately when the implementation changes.
 
-In a future authorized live run, the worker can push and prepare/update the PR within the launch policy. Required GitHub checks and CodeRabbit must apply to the final head. Read their actual conclusions and comments, then request or perform authorized remediation. Neutral, queued, rate-limited, missing and unknown states remain pending when a required review is not completed. Do not manufacture a pass or trigger unrelated paid services.
+In a future authorized live run, the worker can push and prepare/update the PR within the launch policy. Required GitHub checks and the CodeRabbit observation must apply to the final head. Wait for the existing bot run to finish and report its actual result to the coordinator. Route any substantive comments to independent local review under the [advisory policy](gates-and-recovery.md#evidence-for-readiness). Skip analysis when no comments are provided, and never trigger or restart CodeRabbit manually. Mandatory local reviews and actual required CI results remain enforced. Do not manufacture a pass or trigger unrelated paid services.
 
 The worker does not merge. Return a revision-bound ready-for-assessment report to the coordinator. The coordinator independently checks merge eligibility and acts only under the explicit live authorization.
 

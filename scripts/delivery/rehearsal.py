@@ -5,7 +5,7 @@ from contextlib import suppress
 from copy import deepcopy
 from pathlib import Path
 
-from model import assess_merge, object_value
+from model import assess_merge, list_value, object_value
 from state import StateStore
 
 BASE = "a" * 40
@@ -46,7 +46,12 @@ def _assignment() -> dict[str, object]:
             "code_review": deepcopy(receipt),
             "dx_review": deepcopy(receipt),
             "checks": [deepcopy(check)],
-            "coderabbit": {**check, "analysis_completed": True, "findings": []},
+            "coderabbit": {
+                **check,
+                "issue_updated_at": UPDATED,
+                "status": "completed",
+                "comments": [],
+            },
         },
     }
 
@@ -84,10 +89,59 @@ def rehearse() -> dict[str, object]:
             "pending",
             assess_merge(_assignment(), {**observation, field: changed}).verdict,
         )
+    for conclusion in ("rate_limited", "failure", "skipped", None):
+        assignment = _assignment()
+        evidence = object_value(assignment["evidence"], "evidence")
+        object_value(evidence["coderabbit"], "coderabbit")["conclusion"] = conclusion
+        record(
+            f"advisory-coderabbit-{conclusion}",
+            "ready",
+            assess_merge(assignment, observation).verdict,
+        )
+    for status in ("queued", "in_progress", "unknown", "not_reported"):
+        assignment = _assignment()
+        rabbit = object_value(
+            object_value(assignment["evidence"], "evidence")["coderabbit"], "rabbit"
+        )
+        rabbit.update({"status": status, "conclusion": None})
+        record(
+            f"observed-coderabbit-{status}",
+            "ready" if status == "not_reported" else "pending",
+            assess_merge(assignment, observation).verdict,
+        )
     assignment = _assignment()
     evidence = object_value(assignment["evidence"], "evidence")
-    object_value(evidence["coderabbit"], "coderabbit")["conclusion"] = "rate_limited"
-    record("coderabbit-rate-limit", "pending", assess_merge(assignment, observation).verdict)
+    rabbit = object_value(evidence["coderabbit"], "rabbit")
+    rabbit.update({"comments": ["bot-1"], "local_review_reference": "rehearsal:review"})
+    record("unreviewed-bot-comment", "pending", assess_merge(assignment, observation).verdict)
+    review = object_value(evidence["code_review"], "code review")
+    review["reviewed_comments"] = [{"id": "bot-1", "review_reference": "rehearsal:check"}]
+    record(
+        "independently-assessed-bot-comment", "ready", assess_merge(assignment, observation).verdict
+    )
+    review["findings"] = [{"id": "actual-local-concern", "priority": 1, "resolved": False}]
+    record("material-local-concern", "blocked", assess_merge(assignment, observation).verdict)
+    for conclusion, expected in (("skipped", "ready"), ("failure", "blocked")):
+        assignment = _assignment()
+        assignment["required_checks"] = ["Quality", "CodeRabbit"]
+        checks = list_value(object_value(assignment["evidence"], "evidence")["checks"], "checks")
+        checks.append(
+            {
+                "name": "CodeRabbit",
+                "base_sha": BASE,
+                "head_sha": HEAD,
+                "status": "completed",
+                "conclusion": conclusion,
+                "reference": "rehearsal:actual-required-status",
+            }
+        )
+        record(
+            f"actual-required-coderabbit-{conclusion}",
+            expected,
+            assess_merge(
+                assignment, {**observation, "required_checks": ["Quality", "CodeRabbit"]}
+            ).verdict,
+        )
     assignment = _assignment()
     assignment["blockers"] = ["Unresolved native dependency"]
     record("native-dependency", "blocked", assess_merge(assignment, observation).verdict)

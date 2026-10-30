@@ -120,7 +120,7 @@ An assignment's `evidence` object contains:
 
 - `acceptance`, `documentation`, `code_review`, and `dx_review` receipts. Each needs `base_sha`, `head_sha`, `issue_updated_at`, `reference`, `verdict`, and `findings`. A ready receipt uses `verdict: "ready"` and an explicit findings array. `changes_needed` and `blocked` prevent a merge. Code and DX receipts also need an independently verified `reviewer_id` distinct from `worker_id`.
 - `checks`: named CI receipts with `name`, `base_sha`, `head_sha`, `reference`, `conclusion`, `applicable`, and `explanation`. The assignment's nonempty `required_checks` must include all applicable required gates, and must match the coordinator's fresh observed list. Each required name needs one receipt.
-- `coderabbit`: a separate receipt with current `base_sha`, `head_sha`, `reference`, `conclusion`, `analysis_completed`, and `findings`.
+- `coderabbit`: an advisory observation with current `base_sha`, `head_sha`, `issue_updated_at`, raw `reference`, `status`, `conclusion`, and `comments`. `comments` lists the stable IDs of substantive bot comments. When comments exist, `local_review_reference` identifies their current independent local assessment.
 
 The coordinator supplies an observation JSON object with current `base_sha`, `head_sha`, `issue_updated_at`, `draft`, `mergeable`, `unresolved_review_threads`, and `required_checks`. These are observations to verify against GitHub, not values to invent to obtain a passing result.
 
@@ -132,7 +132,44 @@ python3 scripts/delivery/cli.py assess-merge \
 
 The result is `ready`, `pending`, or `blocked`, with reasons and `merge_authorized_by_helper: false`. The helper performs no merge. The main coordinator must still enforce its authorized merge policy and refresh GitHub state immediately before any external action.
 
-Unknown mergeability, missing evidence, changed revisions, cancelled or neutral checks, rate limits, and unexplained skips never pass. A CI skip passes only with `applicable: false` and a specific explanation. CodeRabbit must have completed a successful analysis. A skipped or rate-limited CodeRabbit check never substitutes for that analysis.
+Unknown mergeability, missing evidence, changed revisions, and unfinished required CI never pass. An ordinary CI skip passes only with `applicable: false` and a specific explanation. A neutral ordinary CI result remains pending.
+
+### Observe CodeRabbit without restarting it
+
+CodeRabbit analysis is optional. Wait for any observed queued or in-progress run to finish. Known waiting, pending, and requested statuses also remain pending. Once its status is `completed`, preserve the raw conclusion and skip the advisory bot gate regardless of failure, cancellation, skips, limits, or missing comments. A terminal CI run does not establish that a successful analysis occurred. Never trigger, restart, retry, or request another CodeRabbit run because it failed or produced no comments.
+
+Record the exact current base, head, and issue source with the original report reference. Keep raw status and conclusion unchanged. The helper compares recognized status values case-insensitively. If no bot run was reported, inspect and reconcile the current PR and CI observations, then record `status: "not_reported"`, `conclusion: null`, and `comments: []`, with a reference to the inspected evidence. An absent receipt or unknown status stays pending until reconciled. Reconciliation is a read-only check, never a request for a new bot run.
+
+For example, this synthetic receipt records a terminal bot failure with no substantive comments:
+
+```json
+{
+  "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "issue_updated_at": "2026-10-29T12:00:00Z",
+  "reference": "synthetic:observed-coderabbit-report",
+  "status": "completed",
+  "conclusion": "failure",
+  "comments": []
+}
+```
+
+If substantive comments exist, the coordinator must route them through a current independent local code or DX review before readiness. Include all known substantive comments from the PR, rather than only the latest bot run. Set `local_review_reference` to that local receipt's `reference`. Its `reviewed_comments` array explicitly covers each bot comment ID and originating bot receipt reference:
+
+```json
+{
+  "reviewed_comments": [
+    {
+      "id": "synthetic:bot-comment-id",
+      "review_reference": "synthetic:observed-coderabbit-report"
+    }
+  ]
+}
+```
+
+That coverage records independent assessment. A reviewer may reject a false positive or suggestion without inventing a local finding. Actual material concerns belong in the local review's ordinary `findings` and follow its existing priority and risk-acceptance rules. Missing, stale, worker-authored, unrelated, or incomplete review coverage cannot establish readiness. The coordinator verifies the source observations and review claims. JSON cannot authenticate them. Acceptance, documentation, independent code and DX reviews, unresolved threads, and every required CI check remain mandatory.
+
+Keep CodeRabbit in `required_checks` when GitHub actually requires that status. Its separate receipt in `checks` needs the actual run `status: "completed"` and conclusion `success`, `neutral`, or `skipped`, compared case-insensitively. A missing, unfinished, failed, or unknown required result remains pending or blocked regardless of the advisory bot outcome. All other required CI rules stay unchanged. The helper cannot change or bypass branch protections, and a blocking required bot status does not authorize a retry.
 
 A finding needs `id`, integer `priority` from 0 through 3, and boolean `resolved`. Unresolved P0, P1, and P2 findings block. P3 suggestions are optional. A P2 can be accepted only with separately verified, bounded human risk evidence in the observation's `human_risk_acceptances` array. Each such receipt needs:
 
@@ -162,7 +199,7 @@ pnpm delivery:test
 pnpm --silent delivery:rehearse
 ```
 
-The rehearsal uses temporary, explicitly synthetic records outside checkouts and removes them before returning. It exercises ready evidence, missing docs and DX, changed revisions and source, CodeRabbit rate limits, native dependencies, duplicate claims, stale updates, uncertain cleanup, uncertain merges, bounded risk isolation, atomic scope amendment, verified adoption, and explicit retirement that releases claims. It makes no GitHub calls, starts no workers, and creates no live Goal.
+The rehearsal uses temporary, explicitly synthetic records outside checkouts and removes them before returning. It exercises ready evidence, missing docs and DX, changed revisions and source, advisory CodeRabbit terminal outcomes, active runs, explicit absence, local assessment of bot comments, actual required bot statuses, native dependencies, duplicate claims, stale updates, uncertain cleanup, uncertain merges, bounded risk isolation, atomic scope amendment, verified adoption, and explicit retirement that releases claims. It makes no GitHub calls, starts no workers, and creates no live Goal.
 
 The unittest suite also checks two competing OS processes, interrupted atomic replacement, malformed records, unsafe paths, resource exclusivity, scope validation, and pagination. No network or product service is needed.
 

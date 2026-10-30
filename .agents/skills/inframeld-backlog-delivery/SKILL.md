@@ -11,9 +11,11 @@ This skill does not start a live run merely by being loaded. Setup and rehearsal
 
 ## Select the mode and role
 
-For the main-chat coordinator, read [coordination and scheduling](references/coordinator.md). For an assigned implementation worker, read [worker delivery](references/worker.md). For final evidence, shared resources, merge/rebase and recovery, read [gates and recovery](references/gates-and-recovery.md). The [launch guide](../../../docs/development/guides/backlog-delivery.md) explains concrete commands and the separate setup, rehearsal and live-launch phases.
+Every coordinator-assigned role follows the [assignment protocol](references/assignment-protocol.md) for checkout binding, trusted instructions, resource ownership and evidence handoffs. For the main-chat coordinator, read [coordination and scheduling](references/coordinator.md). For an assigned implementation worker, read [worker delivery](references/worker.md). For final evidence, shared resources, merge/rebase and recovery, read [gates and recovery](references/gates-and-recovery.md). The [launch guide](../../../docs/development/guides/backlog-delivery.md) explains concrete commands and the separate setup, rehearsal and live-launch phases.
 
-Use the four project profiles: `inframeld_worker`, `inframeld_code_reviewer`, `inframeld_documentation_writer` and `inframeld_dx_reviewer`. There is no coordinator profile. Leave model and reasoning settings inherited from the main chat unless the human chooses otherwise. Verify that the active client exposes these actual native roles before relying on them. A TOML parse or a role name inside a prompt does not prove native loading.
+Use the four project profiles: `inframeld_worker`, `inframeld_code_reviewer`, `inframeld_documentation_writer` and `inframeld_dx_reviewer`. There is no coordinator profile. Project defaults and every profile explicitly select `gpt-6.1-sol` with `xhigh` reasoning, following the human's choice. Preserve that selection unless the human changes it. Verify that the active client exposes these actual native roles before relying on them. A TOML parse or a role name inside a prompt does not prove native loading.
+
+This skill owns the native project workflow. The older personal `inframeld-delivery` skill describes a separate-chat pilot. Do not combine its worker cap or merge restrictions with this run's accepted native-agent policy.
 
 ## Keep the run bounded and accountable
 
@@ -25,7 +27,7 @@ The coordinator alone owns the external run record and resource grants. Use [the
 
 ## Deliver to the checked revision
 
-Acceptance, code review, documentation, DX applicability, local checks, final CI and CodeRabbit evidence must identify the current issue revision and exact base/head. A push, rebase, changed issue acceptance or new main revision invalidates the affected evidence. Keep required gates pending when evidence is missing. A neutral or rate-limited CodeRabbit result is not approval.
+Acceptance, code review, documentation, DX applicability, local checks, final CI and the CodeRabbit observation must identify the current issue revision and exact base/head. A push, rebase, changed issue acceptance or new main revision invalidates the affected evidence. CodeRabbit is advisory. Wait for its existing run to finish, review any substantive comments through the independent local reviewers, and skip it if it provides none for any reason. Never trigger or restart it manually. Keep mandatory local reviews and actual GitHub-required statuses enforced under the [gate policy](references/gates-and-recovery.md).
 
 P0 and P1 findings must be resolved. Address P2 findings unless the human explicitly accepts the bounded risk and follow-up. P3 ideas remain optional. Stop after three unsuccessful remediation cycles and escalate the concrete remaining concern. Do not use a numerical score as a merge gate.
 

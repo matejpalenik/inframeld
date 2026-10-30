@@ -118,19 +118,19 @@ def _finding_blocks(
     return blocked
 
 
-def _check_result(check: dict[str, object], *, coderabbit: bool = False) -> str:
+def _check_result(check: dict[str, object], *, coderabbit_required: bool = False) -> str:
     string_value(check.get("reference"), "check reference")
     conclusion = check.get("conclusion")
+    if coderabbit_required:
+        status = check.get("status")
+        if not isinstance(status, str) or status.casefold() != "completed":
+            return "pending"
+        if isinstance(conclusion, str):
+            conclusion = conclusion.casefold()
     if conclusion in ("failure", "timed_out", "action_required", "startup_failure"):
         return "blocked"
-    if coderabbit:
-        return (
-            "ready"
-            if conclusion == "success"
-            and check.get("analysis_completed") is True
-            and check.get("rate_limited", False) is False
-            else "pending"
-        )
+    if coderabbit_required:
+        return "ready" if conclusion in ("success", "neutral", "skipped") else "pending"
     if conclusion == "success" and check.get("applicable") is True:
         return "ready"
     if (
@@ -140,6 +140,57 @@ def _check_result(check: dict[str, object], *, coderabbit: bool = False) -> str:
         and cast("str", check["explanation"]).strip()
     ):
         return "ready"
+    return "pending"
+
+
+def _coderabbit_result(
+    rabbit: dict[str, object], evidence: dict[str, object], assignment: dict[str, object]
+) -> str:
+    """Wait for the observed run, then use independent local assessment of its comments."""
+    reference = string_value(rabbit.get("reference"), "CodeRabbit reference")
+    status = rabbit.get("status")
+    if not isinstance(status, str) or status.casefold() not in ("completed", "not_reported"):
+        return "pending"
+    if "conclusion" not in rabbit or "comments" not in rabbit:
+        return "pending"
+    conclusion = rabbit["conclusion"]
+    if conclusion is not None:
+        string_value(conclusion, "raw CodeRabbit conclusion")
+    comments = [
+        string_value(item, "CodeRabbit comment id")
+        for item in list_value(rabbit["comments"], "CodeRabbit comments")
+    ]
+    if len(set(comments)) != len(comments):
+        raise ValueError("duplicate CodeRabbit comment IDs")
+    if status.casefold() == "not_reported" and (conclusion is not None or comments):
+        return "pending"
+    if not comments:
+        return "ready"
+    local_reference = rabbit.get("local_review_reference")
+    if not isinstance(local_reference, str) or not local_reference.strip():
+        return "pending"
+    for role in ("code_review", "dx_review"):
+        if role not in evidence:
+            continue
+        review = object_value(evidence[role], role)
+        if (
+            review.get("reference") != local_reference
+            or not _current(review, assignment)
+            or review.get("verdict") != "ready"
+            or string_value(review.get("reviewer_id"), "reviewer_id") == assignment["worker_id"]
+        ):
+            continue
+        covered: set[tuple[str, str]] = set()
+        for item in list_value(review.get("reviewed_comments", []), "reviewed_comments"):
+            comment = object_value(item, "reviewed comment")
+            covered.add(
+                (
+                    string_value(comment.get("id"), "reviewed comment id"),
+                    string_value(comment.get("review_reference"), "bot comment origin"),
+                )
+            )
+        if all((identifier, reference) in covered for identifier in comments):
+            return "ready"
     return "pending"
 
 
@@ -232,28 +283,21 @@ def assess_merge(assignment: dict[str, object], observation: dict[str, object]) 
             ):
                 pending.append(f"Check {name} is stale.")
                 continue
-            result = _check_result(check)
+            result = _check_result(check, coderabbit_required=name.casefold() == "coderabbit")
             if result == "blocked":
                 blocked.append(f"Check {name} failed.")
             elif result != "ready":
                 pending.append(f"Check {name} has no passing result.")
         if "coderabbit" not in evidence:
-            pending.append("Missing CodeRabbit analysis.")
+            pending.append(
+                "Record the observed CodeRabbit run or reconcile that none was reported."
+            )
         else:
             rabbit = object_value(evidence["coderabbit"], "coderabbit")
-            if (
-                rabbit.get("head_sha") != assignment["head_sha"]
-                or rabbit.get("base_sha") != assignment["base_sha"]
-            ):
+            if not _current(rabbit, assignment):
                 pending.append("CodeRabbit evidence is stale.")
-            else:
-                if _finding_blocks("coderabbit", rabbit, assignment, observation):
-                    blocked.append("CodeRabbit has unresolved material findings.")
-                result = _check_result(rabbit, coderabbit=True)
-                if result == "blocked":
-                    blocked.append("CodeRabbit failed.")
-                elif result != "ready":
-                    pending.append("CodeRabbit has not completed a passing analysis.")
+            elif _coderabbit_result(rabbit, evidence, assignment) != "ready":
+                pending.append("Wait for or reconcile CodeRabbit and assess its comments locally.")
     except ValueError as error:
         blocked.append(f"Malformed evidence: {error}.")
     reasons = tuple(blocked + pending)

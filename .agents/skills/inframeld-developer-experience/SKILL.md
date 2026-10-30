@@ -26,7 +26,7 @@ For CLI changes, read [CLI review](references/cli-review.md). For generated clie
 
 ## Coordinate delivery
 
-For an assigned delivery review, return the issue, exact base/head, scope, findings, checks and readiness to the coordinator and worker through the authorized native internal messaging channel. Review remains read-only unless an explicit separate fix assignment provides file ownership. Do not stage, commit, rebase, push, post GitHub comments or change issue scope.
+For an assigned delivery review, follow the [assignment protocol](../inframeld-backlog-delivery/references/assignment-protocol.md) for checkout binding, trusted instructions and check/resource ownership. Return the issue, exact base/head, scope, findings, checks and readiness to the coordinator and worker through the authorized native internal messaging channel. Review remains read-only unless an explicit separate fix assignment provides file ownership. Do not stage, commit, rebase, push, post GitHub comments or change issue scope.
 
 P0 and P1 findings require a stop or fix under Review's rules. Address P2 findings unless the human explicitly accepts the bounded risk and follow-up. Keep P3 suggestions optional. In a backlog run, three unsuccessful remediation cycles escalate to the coordinator rather than creating an endless polishing loop. High scores cannot override a failed gate, and no material findings means stop inventing work.
 

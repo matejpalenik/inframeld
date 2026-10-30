@@ -28,6 +28,6 @@ Use [documentation maintenance](../../../docs/development/documentation-maintena
 
 ## Coordinate edits
 
-In a delivery run, the worker owns Git operations. The documentation writer edits only the explicitly allocated user documentation paths and returns a manifest, implementation revision, source evidence and checks to that worker. Shared navigation has one named owner. Do not stage, commit, rebase or push from a writer assignment.
+In a delivery run, follow the [assignment protocol](../inframeld-backlog-delivery/references/assignment-protocol.md) for checkout binding, trusted instructions and check/resource ownership. The worker owns Git operations. The documentation writer edits only the explicitly allocated user documentation paths and returns a manifest, implementation revision, source evidence and checks to that worker. Shared navigation has one named owner. Do not stage, commit, rebase or push from a writer assignment.
 
 A user-visible change needs the relevant new or updated explanation and example. An internal-only change can record why no user page changes are needed. Preserve stable routes and anchors, use original Inframeld examples and remove template product claims. Apply the common prose rule of no semicolons or em dashes.

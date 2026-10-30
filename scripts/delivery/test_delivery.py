@@ -63,8 +63,9 @@ def passing_assignment() -> dict[str, object]:
             "coderabbit": {
                 **check,
                 "name": "CodeRabbit",
-                "analysis_completed": True,
-                "findings": [],
+                "issue_updated_at": UPDATED,
+                "status": "completed",
+                "comments": [],
             },
         },
     }
@@ -166,19 +167,198 @@ class MergeAssessmentTests(unittest.TestCase):
         }
         self.assertEqual(assess_merge(assignment, observation()).verdict, "blocked")
 
-    def test_coderabbit_must_have_completed_analysis_on_the_current_revision(self) -> None:
-        for conclusion in ["neutral", "cancelled", "skipped", "unknown", "rate_limited"]:
+    def test_terminal_coderabbit_outcomes_are_advisory_and_preserve_raw_evidence(self) -> None:
+        for conclusion in (
+            "success",
+            "failure",
+            "timed_out",
+            "startup_failure",
+            "action_required",
+            "neutral",
+            "cancelled",
+            "skipped",
+            "rate_limited",
+            "too_many_files",
+            "unknown",
+            None,
+        ):
             assignment = passing_assignment()
             evidence = object_value(assignment["evidence"], "evidence")
-            review = object_value(evidence["coderabbit"], "coderabbit")
-            review["conclusion"] = conclusion
+            rabbit = object_value(evidence["coderabbit"], "coderabbit")
+            rabbit["conclusion"] = conclusion
+            rabbit["analysis_completed"] = False
+            before = deepcopy(assignment)
             with self.subTest(conclusion=conclusion):
+                self.assertEqual(assess_merge(assignment, observation()).verdict, "ready")
+                self.assertEqual(assignment, before)
+
+    def test_coderabbit_active_unknown_or_missing_observation_remains_pending(self) -> None:
+        for status in (
+            "queued",
+            "in_progress",
+            "QUEUED",
+            "IN_PROGRESS",
+            "waiting",
+            "pending",
+            "requested",
+            "unknown",
+            None,
+        ):
+            assignment = passing_assignment()
+            rabbit = object_value(
+                object_value(assignment["evidence"], "evidence")["coderabbit"], "rabbit"
+            )
+            rabbit["status"] = status
+            with self.subTest(status=status):
                 self.assertEqual(assess_merge(assignment, observation()).verdict, "pending")
         assignment = passing_assignment()
-        evidence = object_value(assignment["evidence"], "evidence")
-        review = object_value(evidence["coderabbit"], "coderabbit")
-        review["analysis_completed"] = False
+        del object_value(assignment["evidence"], "evidence")["coderabbit"]
         self.assertEqual(assess_merge(assignment, observation()).verdict, "pending")
+
+    def test_explicitly_reconciled_unreported_coderabbit_is_skipped_without_a_new_run(self) -> None:
+        assignment = passing_assignment()
+        rabbit = object_value(
+            object_value(assignment["evidence"], "evidence")["coderabbit"], "rabbit"
+        )
+        rabbit.update({"status": "not_reported", "conclusion": None, "comments": []})
+        with patch("github.subprocess.run", side_effect=AssertionError("Never trigger CodeRabbit")):
+            self.assertEqual(assess_merge(assignment, observation()).verdict, "ready")
+        rabbit["conclusion"] = "success"
+        self.assertEqual(assess_merge(assignment, observation()).verdict, "pending")
+
+    def test_coderabbit_observation_needs_current_binding_and_explicit_raw_fields(self) -> None:
+        for changes in (
+            {"base_sha": "c" * 40},
+            {"head_sha": "c" * 40},
+            {"issue_updated_at": "changed"},
+            {"issue_updated_at": None},
+            {"reference": ""},
+        ):
+            assignment = passing_assignment()
+            rabbit = object_value(
+                object_value(assignment["evidence"], "evidence")["coderabbit"], "rabbit"
+            )
+            rabbit.update(changes)
+            with self.subTest(changes=changes):
+                self.assertNotEqual(assess_merge(assignment, observation()).verdict, "ready")
+        for missing in ("conclusion", "comments"):
+            assignment = passing_assignment()
+            del object_value(
+                object_value(assignment["evidence"], "evidence")["coderabbit"], "rabbit"
+            )[missing]
+            with self.subTest(missing=missing):
+                self.assertNotEqual(assess_merge(assignment, observation()).verdict, "ready")
+
+    def test_substantive_bot_comments_need_explicit_current_independent_review_coverage(
+        self,
+    ) -> None:
+        cases: tuple[tuple[dict[str, object], str], ...] = (
+            ({}, "ready"),
+            ({"head_sha": "c" * 40}, "pending"),
+            ({"issue_updated_at": "changed"}, "pending"),
+            ({"reviewer_id": "worker-125"}, "blocked"),
+            ({"verdict": "blocked"}, "blocked"),
+            ({"reviewed_comments": []}, "pending"),
+            (
+                {"reviewed_comments": [{"id": "other", "review_reference": "synthetic:check"}]},
+                "pending",
+            ),
+            (
+                {"reviewed_comments": [{"id": "bot-1", "review_reference": "wrong-origin"}]},
+                "pending",
+            ),
+        )
+        for changes, expected in cases:
+            assignment = passing_assignment()
+            evidence = object_value(assignment["evidence"], "evidence")
+            rabbit = object_value(evidence["coderabbit"], "rabbit")
+            rabbit.update(
+                {
+                    "conclusion": "failure",
+                    "comments": ["bot-1"],
+                    "local_review_reference": "synthetic:review",
+                }
+            )
+            review = object_value(evidence["code_review"], "review")
+            review["reviewed_comments"] = [{"id": "bot-1", "review_reference": "synthetic:check"}]
+            review.update(changes)
+            with self.subTest(changes=changes):
+                self.assertEqual(assess_merge(assignment, observation()).verdict, expected)
+
+    def test_bot_comment_coverage_can_dismiss_suggestions_without_inventing_findings(self) -> None:
+        assignment = passing_assignment()
+        evidence = object_value(assignment["evidence"], "evidence")
+        rabbit = object_value(evidence["coderabbit"], "rabbit")
+        rabbit.update({"comments": ["bot-1"], "local_review_reference": "synthetic:review"})
+        self.assertEqual(assess_merge(assignment, observation()).verdict, "pending")
+        review = object_value(evidence["dx_review"], "review")
+        review["reviewed_comments"] = [{"id": "bot-1", "review_reference": "synthetic:check"}]
+        self.assertEqual(assess_merge(assignment, observation()).verdict, "ready")
+        review["findings"] = [{"id": "accepted-material-concern", "priority": 1, "resolved": False}]
+        self.assertEqual(assess_merge(assignment, observation()).verdict, "blocked")
+
+    def test_every_substantive_comment_must_be_covered_by_the_referenced_local_review(self) -> None:
+        assignment = passing_assignment()
+        evidence = object_value(assignment["evidence"], "evidence")
+        rabbit = object_value(evidence["coderabbit"], "rabbit")
+        rabbit.update(
+            {"comments": ["bot-1", "bot-2"], "local_review_reference": "synthetic:review"}
+        )
+        review = object_value(evidence["code_review"], "review")
+        review["reviewed_comments"] = [{"id": "bot-1", "review_reference": "synthetic:check"}]
+        self.assertEqual(assess_merge(assignment, observation()).verdict, "pending")
+        review["reviewed_comments"].append({"id": "bot-2", "review_reference": "synthetic:check"})
+        rabbit["local_review_reference"] = "unrelated-review"
+        self.assertEqual(assess_merge(assignment, observation()).verdict, "pending")
+        rabbit["local_review_reference"] = "synthetic:review"
+        self.assertEqual(assess_merge(assignment, observation()).verdict, "ready")
+
+    def test_advisory_bot_never_relaxes_other_required_ci_or_local_gates(self) -> None:
+        for role in ("acceptance", "documentation", "code_review", "dx_review"):
+            assignment = passing_assignment()
+            del object_value(assignment["evidence"], "evidence")[role]
+            with self.subTest(role=role):
+                self.assertEqual(assess_merge(assignment, observation()).verdict, "pending")
+        for conclusion, expected in (("failure", "blocked"), ("neutral", "pending")):
+            assignment = passing_assignment()
+            checks = list_value(
+                object_value(assignment["evidence"], "evidence")["checks"], "checks"
+            )
+            object_value(checks[0], "check")["conclusion"] = conclusion
+            with self.subTest(conclusion=conclusion):
+                self.assertEqual(assess_merge(assignment, observation()).verdict, expected)
+
+    def test_actually_required_coderabbit_status_is_separate_from_advisory_analysis(self) -> None:
+        for status, conclusion, expected in (
+            ("completed", "success", "ready"),
+            ("completed", "neutral", "ready"),
+            ("completed", "skipped", "ready"),
+            ("COMPLETED", "SKIPPED", "ready"),
+            ("completed", "failure", "blocked"),
+            ("completed", "rate_limited", "pending"),
+            ("completed", None, "pending"),
+            ("queued", "success", "pending"),
+            ("in_progress", "skipped", "pending"),
+            (None, "success", "pending"),
+        ):
+            assignment = passing_assignment()
+            assignment["required_checks"] = ["Quality", "CodeRabbit"]
+            evidence = object_value(assignment["evidence"], "evidence")
+            object_value(evidence["coderabbit"], "rabbit")["conclusion"] = "failure"
+            list_value(evidence["checks"], "checks").append(
+                {
+                    "name": "CodeRabbit",
+                    "base_sha": BASE,
+                    "head_sha": HEAD,
+                    "reference": "synthetic:actual-required-status",
+                    "status": status,
+                    "conclusion": conclusion,
+                    "applicable": True,
+                }
+            )
+            current = {**observation(), "required_checks": ["Quality", "CodeRabbit"]}
+            with self.subTest(status=status, conclusion=conclusion):
+                self.assertEqual(assess_merge(assignment, current).verdict, expected)
 
     def test_skipped_check_needs_explicit_non_applicability(self) -> None:
         assignment = passing_assignment()
@@ -229,15 +409,15 @@ class MergeAssessmentTests(unittest.TestCase):
         object_value(evidence["code_review"], "review")["reviewer_id"] = "worker-125"
         self.assertEqual(assess_merge(assignment, observation()).verdict, "blocked")
 
-    def test_required_check_scope_and_coderabbit_findings_fail_closed(self) -> None:
+    def test_required_check_scope_and_unreviewed_coderabbit_comments_fail_closed(self) -> None:
         current = observation()
         current["required_checks"] = ["Quality", "Security"]
         self.assertEqual(assess_merge(passing_assignment(), current).verdict, "pending")
         assignment = passing_assignment()
         evidence = object_value(assignment["evidence"], "evidence")
         rabbit = object_value(evidence["coderabbit"], "coderabbit")
-        rabbit["findings"] = [{"id": "rabbit-p1", "priority": 1, "resolved": False}]
-        self.assertEqual(assess_merge(assignment, observation()).verdict, "blocked")
+        rabbit["comments"] = ["rabbit-p1"]
+        self.assertEqual(assess_merge(assignment, observation()).verdict, "pending")
 
     def test_risk_acceptance_cannot_waive_another_role_or_review_with_same_finding_id(self) -> None:
         assignment = passing_assignment()
