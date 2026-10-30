@@ -1,6 +1,6 @@
 ## Summary
 
-<!-- What changed, and why? Link the issue or decision when one exists. -->
+<!-- Describe the concrete problem and resulting behavior. Link the issue or decision when one exists. Keep CI/CodeRabbit progress updates and future launch instructions out of the description. -->
 
 ## Change type
 
@@ -20,7 +20,7 @@
 
 ## Validation
 
-<!-- List the commands you ran and any relevant manual verification. -->
+<!-- List commands actually run and relevant manual verification. GitHub checks show CI and CodeRabbit status. -->
 
 ```text
 pnpm check
