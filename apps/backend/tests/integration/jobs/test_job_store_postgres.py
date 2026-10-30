@@ -136,7 +136,7 @@ async def _request(
                 ProjectActionGrantRow.project_id == scenario.project_id.value,
                 ProjectActionGrantRow.recipient_principal_id == scenario.principal_id.value,
             )
-            .values(action="create-sources")
+            .values(action="inspect-feedback")
         )
         organization = await session.scalar(
             select(ProjectRow.organization_id).where(ProjectRow.id == scenario.project_id.value)
@@ -149,7 +149,7 @@ async def _request(
         InstallationId(installation),
         OrganizationId(organization),
         scenario.project_id,
-        ActionId("create-sources"),
+        ActionId("inspect-feedback"),
         None,
     )
     request = OperationReservationRequestDTO(
@@ -157,7 +157,7 @@ async def _request(
         organization_id=authority.organization_id,
         project_id=scenario.project_id,
         method="POST",
-        requested_route="/v1/projects/{project_id}/sources",
+        requested_route="/test/projects/{project_id}/feedback-reports",
         key=IdempotencyKey("job-1"),
         fingerprint=b"F" * 32,
     )
@@ -929,3 +929,152 @@ async def test_queued_snapshot_cannot_retire_a_later_retry(database: Database) -
     async with database.session() as session:
         saved = await PostgresJobStore(session).find(admission.operation_id)
     assert saved is not None and saved.status is JobStatus.QUEUED and saved.attempt == 1
+
+
+@pytest.mark.asyncio
+async def test_application_human_only_action_is_denied_before_admission_effects(
+    database: Database,
+) -> None:
+    request, authority = await _request(database)
+    authority = replace(authority, action_id=ActionId("create-sources"))
+    async with database.session() as session, session.begin():
+        await session.execute(
+            update(ProjectActionGrantRow)
+            .where(
+                ProjectActionGrantRow.project_id == authority.project_id.value,
+                ProjectActionGrantRow.recipient_principal_id == authority.principal_id.value,
+            )
+            .values(action="create-sources")
+        )
+        # Catch inside the owning transaction. A denial must leave nothing to commit.
+        with pytest.raises(AccessDeniedError):
+            await _admission_service(session).admit(
+                access=AccessContextDTO(
+                    authority.principal_id, MockAuthenticationEvidence.application_key()
+                ),
+                authority=authority,
+                context=OperationAdmissionContextDTO(
+                    request.method, request.requested_route, request.key
+                ),
+                fingerprint=RequestFingerprint(request.fingerprint),
+                request_id=RequestId(uuid4()),
+                payload=JobPayload("test.progress", 1, b"fixed"),
+            )
+
+    async with database.session() as session:
+        assert await session.scalar(select(func.count()).select_from(DurableJobRow)) == 0
+        assert (
+            await session.scalar(select(func.count()).select_from(IdempotencyReservationRow)) == 0
+        )
+        assert await session.scalar(select(func.count()).select_from(AccessAuditEventRow)) == 0
+
+
+@pytest.mark.asyncio
+async def test_legacy_ineligible_application_job_cannot_publish_a_checkpoint(
+    database: Database,
+) -> None:
+    request, authority = await _request(database)
+    authority = replace(authority, action_id=ActionId("create-sources"))
+    async with database.session() as session, session.begin():
+        await session.execute(
+            update(ProjectActionGrantRow)
+            .where(
+                ProjectActionGrantRow.project_id == authority.project_id.value,
+                ProjectActionGrantRow.recipient_principal_id == authority.principal_id.value,
+            )
+            .values(action="create-sources")
+        )
+        # Reproduce already persisted incompatible authority without the admission guard.
+        writer = PostgresOperationReservationWriter(session)
+        operation = await writer.reserve(request)
+        admitted = await PostgresJobStore(session).admit(
+            operation_id=operation.operation_id,
+            request_id=RequestId(uuid4()),
+            authority=authority,
+            payload=JobPayload("test.progress", 1, b"fixed"),
+            capacity=8,
+        )
+        await writer.mark_replayable(operation.operation_id, OperationReplayKind.ASYNC_JOB)
+
+    context = await _claim(database)
+    assert context is not None and context.job_id == admitted.job_id
+    with pytest.raises(JobStoppedError):
+        await _checkpoints(database, context, b"forbidden-protected-result")
+
+    async with database.session() as session:
+        saved = await PostgresJobStore(session).find(admitted.operation_id)
+    assert (
+        saved is not None
+        and saved.status is JobStatus.FAILED
+        and saved.reason == "authority_changed"
+        and saved.checkpoint == b""
+    )
+    assert await _claim(database) is None
+
+
+@pytest.mark.asyncio
+async def test_aged_unresolved_effect_replay_preserves_original_job_and_operation(
+    database: Database,
+) -> None:
+    request, authority = await _request(database)
+
+    async def admit() -> JobAdmissionDTO:
+        async with database.session() as session, session.begin():
+            return await _admission_service(session).admit(
+                access=AccessContextDTO(
+                    authority.principal_id, MockAuthenticationEvidence.application_key()
+                ),
+                authority=authority,
+                context=OperationAdmissionContextDTO(
+                    request.method, request.requested_route, request.key
+                ),
+                fingerprint=RequestFingerprint(request.fingerprint),
+                request_id=RequestId(uuid4()),
+                payload=JobPayload("test.progress", 1, b"fixed"),
+            )
+
+    first = await admit()
+    context = await _claim(database)
+    assert context is not None and context.job_id == first.job_id
+    async with database.session() as session, session.begin():
+        await PostgresJobStore(session).begin_effect(context, "unresolved-paid-unit")
+        await session.execute(
+            update(DurableJobRow)
+            .where(DurableJobRow.id == first.job_id.value)
+            .values(lease_expires_at=func.clock_timestamp() - timedelta(seconds=1))
+        )
+    assert await _claim(database) is None
+
+    async with database.session() as session, session.begin():
+        saved = await PostgresJobStore(session).find(first.operation_id)
+        assert saved is not None and saved.status is JobStatus.RECOVERY_REQUIRED
+        # Advance beyond an advertised expiry without inventing one for a pinned binding.
+        await session.execute(
+            update(IdempotencyReservationRow)
+            .where(
+                IdempotencyReservationRow.operation_id == first.operation_id.value,
+                IdempotencyReservationRow.expires_at.is_not(None),
+            )
+            .values(expires_at=func.clock_timestamp() - timedelta(seconds=1))
+        )
+
+    replay = await admit()
+    assert replay.job_id == first.job_id and replay.operation_id == first.operation_id
+    assert not replay.created
+    async with database.session() as session:
+        saved = await PostgresJobStore(session).find(first.operation_id)
+        reservation = await session.scalar(
+            select(IdempotencyReservationRow).where(
+                IdempotencyReservationRow.operation_id == first.operation_id.value
+            )
+        )
+        assert (
+            saved is not None
+            and saved.status is JobStatus.RECOVERY_REQUIRED
+            and saved.pending_effect == "unresolved-paid-unit"
+            and saved.attempt == 1
+        )
+        assert reservation is not None and reservation.expires_at is None
+        assert await session.scalar(select(func.count()).select_from(DurableJobRow)) == 1
+        assert await session.scalar(select(func.count()).select_from(AccessAuditEventRow)) == 1
+    assert await _claim(database) is None

@@ -44,7 +44,7 @@ AUTHORITY = AdmittedWorkAuthorityDTO(
     InstallationId(UUID(int=3)),
     ACTOR.organization_id,
     ProjectId(UUID(int=4)),
-    ActionId("query"),
+    ActionId("inspect-feedback"),
     None,
 )
 FACTS = AdmittedWorkFactsDTO(
@@ -105,6 +105,42 @@ async def test_changed_human_recovery_generation_stops_original_work() -> None:
         human_generation=HumanOAuthCredentialFactsDTO(
             True, HumanCredentialVersion(binding.version.value + 1)
         ),
+    )
+
+    with pytest.raises(AccessDeniedError):
+        await AdmittedWorkAuthorizationService(MockAdmittedWorkFactsReader(facts)).require_current(
+            authority
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["create-sources", "manage-budget", "query", "unknown-action"])
+async def test_exact_grant_cannot_make_unsupported_application_action_eligible(action: str) -> None:
+    authority = replace(AUTHORITY, action_id=ActionId(action))
+
+    with pytest.raises(AccessDeniedError):
+        await AdmittedWorkAuthorizationService(MockAdmittedWorkFactsReader(FACTS)).require_current(
+            authority
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["query", "unknown-action"])
+async def test_human_generation_and_grant_cannot_make_non_project_action_eligible(
+    action: str,
+) -> None:
+    binding = MockAuthenticationEvidence.human_oauth()
+    human = Principal(ACTOR.id, ACTOR.organization_id, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE)
+    authority = replace(
+        AUTHORITY,
+        principal_kind=PrincipalKind.HUMAN,
+        human_binding=binding,
+        action_id=ActionId(action),
+    )
+    facts = replace(
+        FACTS,
+        principal=human,
+        human_generation=HumanOAuthCredentialFactsDTO(True, binding.version),
     )
 
     with pytest.raises(AccessDeniedError):

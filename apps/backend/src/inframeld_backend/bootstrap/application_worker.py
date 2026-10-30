@@ -144,10 +144,18 @@ async def run_application_worker(
     operations = ApplicationWorkerOperations(database, settings.jobs, stopped)
     worker_id = uuid4()
     log = structlog.get_logger()
+    startup: asyncio.Task[None] | None = None
     work: asyncio.Task[None] | None = None
     stop_wait: asyncio.Task[bool] | None = None
 
+    async def initialize() -> None:
+        await database.startup()
+        async with asyncio.timeout(settings.jobs.database_timeout_seconds):
+            await PostgresInstallationIdentityReader(database).read()
+
     async def loop() -> None:
+        if stopped.is_set():
+            return
         log.info("application_worker_ready", worker_id=str(worker_id))
         last_report = 0.0
         while not stopped.is_set():
@@ -188,10 +196,16 @@ async def run_application_worker(
                 await _wait(stopped, settings.jobs.poll_seconds)
 
     try:
-        await database.startup()
-        await PostgresInstallationIdentityReader(database).read()
-        work = asyncio.create_task(loop())
+        if stopped.is_set():
+            return
         stop_wait = asyncio.create_task(stopped.wait())
+        startup = asyncio.create_task(initialize())
+        await asyncio.wait((startup, stop_wait), return_when=asyncio.FIRST_COMPLETED)
+        if stopped.is_set():
+            return
+        await startup
+
+        work = asyncio.create_task(loop())
         await asyncio.wait((work, stop_wait), return_when=asyncio.FIRST_COMPLETED)
         if work.done():
             await work
@@ -203,11 +217,13 @@ async def run_application_worker(
                 work.cancel()
                 await asyncio.gather(work, return_exceptions=True)
     finally:
-        for task in (work, stop_wait):
-            if task is not None and not task.done():
+        tasks = tuple(task for task in (startup, work, stop_wait) if task is not None)
+        for task in tasks:
+            if not task.done():
                 task.cancel()
-        if work is not None:
-            await asyncio.gather(work, return_exceptions=True)
+        await asyncio.gather(
+            *(task for task in (startup, work) if task is not None), return_exceptions=True
+        )
         if stop_wait is not None:
             await asyncio.gather(stop_wait, return_exceptions=True)
         await database.shutdown()

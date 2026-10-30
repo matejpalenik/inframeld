@@ -73,7 +73,7 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
         await session.execute(
             update(ProjectActionGrantRow)
             .where(ProjectActionGrantRow.project_id == seed.project_id.value)
-            .values(action="create-sources")
+            .values(action="inspect-feedback")
         )
         installation = await session.scalar(select(InstallationIdentityRow.installation_id))
         assert installation is not None
@@ -83,7 +83,7 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
             InstallationId(installation),
             seed.organization_id,
             seed.project_id,
-            ActionId("create-sources"),
+            ActionId("inspect-feedback"),
             None,
         )
         service = JobAdmissionService(
@@ -100,7 +100,7 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
             ),
             authority=authority,
             context=OperationAdmissionContextDTO(
-                "POST", "/v1/projects/{project_id}/sources", IdempotencyKey(str(uuid4()))
+                "POST", "/test/projects/{project_id}/feedback-reports", IdempotencyKey(str(uuid4()))
             ),
             fingerprint=RequestFingerprint(b"B" * 32),
             request_id=RequestId(uuid4()),

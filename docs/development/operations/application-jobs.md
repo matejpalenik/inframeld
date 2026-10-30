@@ -14,7 +14,7 @@ The existing operator-controlled migration command is:
 mise exec -- pnpm --filter @inframeld/backend migrate
 ```
 
-For an existing installation, follow the [upgrade procedure](upgrades.md#upgrades) before migrating. Worker startup checks the exact supported schema and reads the existing installation identity. It never migrates the database or generates a replacement identity. Missing or incompatible state prevents readiness.
+For an existing installation, follow the [upgrade procedure](upgrades.md#upgrades) before migrating. Worker startup checks the exact supported schema and reads the existing installation identity. It never migrates the database or generates a replacement identity. Missing or incompatible state prevents readiness. Installation-identity access uses `INFRAMELD_JOBS__DATABASE_TIMEOUT_SECONDS`. SIGINT or SIGTERM during startup cancels initialization and closes the pool without reporting readiness.
 
 The worker requires database configuration, with `INFRAMELD_DATABASE__NAME`, `INFRAMELD_DATABASE__USER` and `INFRAMELD_DATABASE__PASSWORD` set. `HOST` defaults to `localhost` and `PORT` to `5432`. Use the host connection values from `apps/backend/.env` for the development database. The worker has no HTTP listener and requires no fingerprint key, incoming product credential or model-provider secret.
 
@@ -54,7 +54,7 @@ podman compose -f compose.dev.yaml --profile jobs stop application-worker
 
 ## Configure bounded execution
 
-These optional settings affect the worker loop. Values are seconds unless stated otherwise.
+These optional settings bound worker startup and execution. Values are seconds unless stated otherwise.
 
 | Environment variable | Default | Allowed value |
 | --- | --: | --- |
@@ -90,9 +90,9 @@ Stopping the process with SIGINT or SIGTERM stops new claims and gives active wo
 
 After an interrupted lease, safe remaining work can retry with retained checkpoints, bounded backoff and at most three attempts within the original work deadline. Restarting does not reset those budgets. Exhausted budgets or deadlines produce a recorded failure. An unsupported stored payload produces `failed` with reason `unsupported_payload` without running its handler. Do not edit stored payload bytes or queue rows to make a different release accept them.
 
-If an external effect was started but its outcome is unknown, the job retains `recovery_required` and the engine does not automatically repeat that effect. Keep the original operation identity and evidence. A restart, missing response or failed process is not permission to issue replacement paid work.
+If an external effect was started but its outcome is unknown, the job retains `recovery_required` and the engine does not automatically repeat that effect. Its original admission replay binding remains nonexpiring while the effect is unresolved. Keep the original operation identity and evidence. A restart, missing response or failed process is not permission to issue replacement paid work.
 
-Admitted work keeps its original principal and inputs. Ordinary credential expiry, replacement or individual key revocation does not cancel it. Protected boundaries recheck current account, exact permission and the saved human security generation. Lost authority stops further protected work, and restoring permission does not restart it. This foundation accepts application-key evidence and generation-bound human OAuth evidence. Browser-derived durable admission is rejected until an owning caller implements qualified generation capture.
+Admitted work keeps its original principal and inputs. Ordinary credential expiry, replacement or individual key revocation does not cancel it. Protected boundaries recheck current account, exact permission and the saved human security generation. Lost authority stops further protected work, and restoring permission does not restart it. The shared admission contract accepts application evidence and generation-bound human OAuth evidence. Application-key authentication itself remains separate delivery work. Browser-derived durable admission is rejected until an owning caller implements qualified generation capture.
 
 Identity-recovery cleanup runs through the separate [recovery worker](../getting-started/local-setup.md#private-recovery-callbacks), outside the ordinary attempt slot. It still shares the host and dependencies, so this separation does not promise a response time. Follow its own protected continuation procedure rather than applying ordinary-job retry rules to recovery.
 

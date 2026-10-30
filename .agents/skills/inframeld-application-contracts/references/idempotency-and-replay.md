@@ -143,7 +143,7 @@ Only a `NewOperationReservationDTO` can be passed to `record_completed_result()`
 
 Access owns [`ProjectOperationAdmissionService`](../../../../apps/backend/src/inframeld_backend/access/application/services/project_operation_admission_service.py) and its request DTO. The helper first authorizes the action and matches the returned project, then delegates with the caller's expected replay kind. The principal comes from authentication and both scope IDs from authorization. Its caller continues owning the transaction. Generic idempotency, outcomes and reservation persistence remain shared. [PostgreSQL admission tests](../../../../apps/backend/tests/integration/idempotency/test_authorized_replay_postgres.py) exercise replay metadata and rollback through the real reservation adapter. This verifies shared retry decisions, not another complete product command or job lifecycle.
 
-The shared [ordinary-job admission service](jobs-and-recovery.md#implemented-ordinary-job-foundation) now binds an asynchronous acceptance to its original internal job. Queued, running and terminal execution states retain that admission identity. Active work has no replay expiry. Terminal transition records a fixed 24-hour deadline without extending it on replay. The public original-operation lookup still has its existing unknown-job-reference response and does not become job inspection merely because the internal binding exists.
+The shared [ordinary-job admission service](jobs-and-recovery.md#implemented-ordinary-job-foundation) now binds an asynchronous acceptance to its original internal job. Queued, running and terminal execution states retain that admission identity. Active work and unresolved effects have no replay expiry. A known-safe terminal transition records a fixed 24-hour deadline without extending it on replay. A `recovery_required` job keeps its original nonexpiring asynchronous admission binding until explicit resolution, so an aged retry cannot admit replacement work around the uncertainty marker. The public original-operation lookup still has its existing unknown-job-reference response and does not become job inspection merely because the internal binding exists.
 
 The grant route exercises the safe-result path. The in-progress, asynchronous `202`, uncertain, issued-secret, and answer-receipt outcomes above retain their separate contracts. Their owning workflows still need implementation where noted.
 
@@ -170,7 +170,7 @@ Each protection answers a different question: the idempotency key identifies a r
 
 ### Limit guarantees to retained, authoritative history
 
-Keep completed duplicate-detection records for **at least 24 hours** and for as long as their work remains active. Publish their expiry time. After expiry, the server no longer promises to recognize that old request.
+Keep completed duplicate-detection records for **at least 24 hours**, for as long as their work remains active and while external effects remain unresolved. Publish their expiry time. After expiry, the server no longer promises to recognize that old request.
 
 The implemented project-grant response publishes the stored deadline as `idempotencyExpiresAt`. An authorized replay returns that same timestamp. Retrying does not extend the retention window. The deadline limits duplicate detection. It does not delete the grant.
 

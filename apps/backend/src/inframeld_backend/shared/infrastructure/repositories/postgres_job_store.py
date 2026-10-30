@@ -407,16 +407,20 @@ class PostgresJobStore(JobStore):
         await self._end_attempt(row, now, reason)
         row.status, row.reason, row.terminal_at = status.value, reason, now
         row.fence = row.worker_id = row.lease_expires_at = None
-        await self._session.execute(
-            update(IdempotencyReservationRow)
-            .where(
-                IdempotencyReservationRow.operation_id == row.operation_id,
-                IdempotencyReservationRow.state == OperationReservationState.REPLAYABLE,
-                IdempotencyReservationRow.replay_kind == OperationReplayKind.ASYNC_JOB,
-                IdempotencyReservationRow.expires_at.is_(None),
-            )
-            .values(expires_at=now + timedelta(hours=24))
+        retention = update(IdempotencyReservationRow).where(
+            IdempotencyReservationRow.operation_id == row.operation_id,
+            IdempotencyReservationRow.state == OperationReservationState.REPLAYABLE,
+            IdempotencyReservationRow.replay_kind == OperationReplayKind.ASYNC_JOB,
         )
+        if status is JobStatus.RECOVERY_REQUIRED or row.pending_effect is not None:
+            # Expiry must not turn an unresolved effect into newly admitted work.
+            await self._session.execute(retention.values(expires_at=None))
+        else:
+            await self._session.execute(
+                retention.where(IdempotencyReservationRow.expires_at.is_(None)).values(
+                    expires_at=now + timedelta(hours=24)
+                )
+            )
         await self._session.flush()
 
     @staticmethod

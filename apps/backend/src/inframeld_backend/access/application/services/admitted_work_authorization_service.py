@@ -13,6 +13,9 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.policies.human_credential_policy import HumanCredentialPolicy
 from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
+from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
+    ProjectActionEligibilityPolicy,
+)
 from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
     PrincipalAccessPolicyInput,
 )
@@ -25,6 +28,11 @@ class AdmittedWorkAuthorizationService(AdmittedWorkAuthorizer):
 
     @override
     async def require_current(self, authority: AdmittedWorkAuthorityDTO) -> None:
+        if not ProjectActionEligibilityPolicy.may_use(
+            action_id=authority.action_id, principal_kind=authority.principal_kind
+        ):
+            raise AccessDeniedError("The admitted Project action is not eligible for this caller.")
+
         facts = await self._facts.read(authority)
         if facts is None or (
             facts.principal.id != authority.principal_id
