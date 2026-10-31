@@ -37,6 +37,16 @@ Ten does not mean perfect under every hypothetical future requirement. Nine does
 
 Give one overall quality score as a reasoned judgment, prioritizing human maintainability, correctness and proportionality. Explain the limiting concern. Do not calculate an average, average the inverse risk score with quality scores, or hide a severe defect behind stronger categories. If evidence is too incomplete for a credible overall rating, say so instead of choosing an arbitrary middle score.
 
+## Apply the maintainability bar
+
+Ready requires overengineering risk at most **2/10, where lower is better**, and no unresolved material human-maintainability finding. This is an explicit acceptance ceiling, not a requested answer or an average of the other categories. Preserve all nine categories and their existing directions. A 9 in correctness or tests cannot compensate for a material maintenance problem.
+
+Explain the present need, smallest safe alternative and maintenance cost of the reviewed capability, including its fixtures and execution helpers. Scores 1–2 mean the mechanism is proportionate and understandable within scope. Scores 3–4 still identify avoidable complexity and require a smaller design or implementation before Ready. Higher scores strengthen that concern. Size, language or a new helper alone does not establish overengineering. Necessary safety can require substantial code, but its implementation must remain understandable.
+
+Support a score above 2 with concrete findings and their actual severity. A P3 preference alone cannot justify calling the whole solution materially overengineered. Conversely, do not lower a score merely because the worker explains the design, a narrow correction passed or the review was repeated. Inspect the changed source or revised plan. Unknown relevant evidence means Pending evidence, not an assumed 2. Do not infer an exception from earlier risk acceptance, general delivery authority or green CI.
+
+When the bar is unmet, preserve the checkpoint and propose simplification, a smaller useful boundary or a separately scoped repair. If no safe maintainable option is established, explain the exact obstacle for human direction. Ordinary corrections within an accepted approach need no new ceremony. A work-in-progress checkpoint may still be saved under existing authority, but is not Ready for delivery. Required security, correctness, coverage and cleanup guarantees remain enforced.
+
 ## Findings and priorities
 
 Findings are actionable defects or material maintenance problems supported by inspected code and a concrete scenario. Identify whether evidence is an observed result or a well-supported inference. A missing required test can be a finding without a known implementation failure when the unprotected invariant and appropriate test boundary are clear. Generic requests for more tests or best practices are not findings.

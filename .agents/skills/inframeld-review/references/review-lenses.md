@@ -20,6 +20,8 @@ Follow the user journey into the public entry point, operation, decision and ext
 
 Review the cost of a likely modification, such as adding one argument, changing a trust rule or diagnosing a rejected operation. Look for concrete reasons a change spreads across unrelated files. A large cohesive file can be easier to maintain than many forwarding modules. Conversely, unrelated policies and I/O in one file can conceal different reasons to change. Size is a signal to investigate, not a finding by itself.
 
+Can a maintainer follow the normal operation and one relevant failure without reverse-engineering a private framework? Check explicit state transitions, resource ownership, readable control flow, native types and preserved errors. Hidden global coupling, duplicated business rules, unexplained fallbacks and substantial programs embedded in shell or string literals need a concrete reason. Prefer ordinary maintained source for nontrivial fixture programs. A small subprocess snippet, documented shell wrapper or necessary adapter is not inherently a defect.
+
 Apply the affected language skill's mandatory declarations, imports, typing and documentation rules. Rust functions, modules and resource-owning structs need not resemble Python services. Generated code remains generator-owned. Documented exceptions count as valid practice rather than violations to remove.
 
 Read meaningful rustdoc, docstrings and examples as contracts. They should explain purpose, effects, ownership, relevant failures and what a result establishes. Flag misleading guarantees, stale source links and unqualified examples when they can misdirect a maintainer. Do not ask for boilerplate on obvious helpers or a second architecture manual in every file.
@@ -36,11 +38,17 @@ A finding about unnecessary complexity must name the component, the absent or di
 
 When a repair expands or its replacement needs substantial corrections, assess the accumulated change against main, including its test fixtures, supervision and new failure modes. A good score for the latest small patch or a process-only slice does not rate the whole solution. Identify the reviewed boundary and remaining qualification explicitly. For coordinated delivery, [defect triage](../../inframeld-backlog-delivery/references/discovered-defects.md) owns the decision to separate, defer or park the newly discovered work. Do not restart unrelated audits after routine corrections.
 
+Apply the [maintainability bar](scoring-and-report.md#apply-the-maintainability-bar) before endorsing further expansion. A new executor, supervisor, IPC protocol, store or alternative verification path needs a demonstrated present limitation and comparison with the existing maintained mechanism. If the explanation remains hypothetical or the added machinery is disproportionate, return Changes needed and stop dependent expansion. A remaining retry allowance does not authorize complexity. Keep the failure, evidence, smallest alternative and unblock condition in the existing review or assignment record.
+
+For example, a feature test failure does not justify a private Bash controller that recreates services and bypasses the workspace command. A focused regression in the responsible package is usually the useful next step. An actual process-ownership defect can justify a narrowly reviewed lifecycle helper, with its own real failure test. Review the complete resulting repair rather than assuming either all shell is bad or all safety-related machinery is necessary.
+
 ## Correctness, data integrity and architecture
 
 Trace supplied input to the actual effect, including representation changes, validation, checked scope and returned facts. Check empty/absent/unknown distinctions, boundary values and supported malformed input. Use contracts rather than guessing meaning from a name. For externally observable changes, verify callers, native OpenAPI, generated consumers and applicable compatibility obligations agree.
 
 Locate the authoritative state and each writer. Inspect the affected transaction, audit, idempotency and retry boundaries. Consider failed validation, rejected authority, stale observations, duplicate requests, lost acknowledgments and partial cleanup where they can occur. A timeout does not establish that a remote write did not happen. Keep actual concurrency safeguards even when local development is sequential.
+
+Use [state and failure boundaries](state-and-failure-boundaries.md) only for affected state, concurrency, external-effect or recovery paths. Its questions locate evidence for existing contracts. They do not create new feature dependencies or production guarantees.
 
 Check whether commands, HTTP routes and jobs invoke the same owning behavior rather than independently reproducing permissions or persistence. Review dependency direction and lifecycle ownership manually. Do not invent an aggregate, repository or service for a simple projection merely to fill a diagram.
 
@@ -83,6 +91,10 @@ Try to follow the documented setup, invocation, failure explanation and recovery
 For lifecycle changes, inspect startup failure, shutdown, cancellation, timeouts and partial effects. Review persistent versus disposable state, compatibility, upgrades and rollback where the change affects them. Diagnostics should distinguish a failed observation from a completed action and avoid exposing protected input. Observability should answer actual operational questions rather than create another telemetry platform.
 
 Check the manual verification recipe required by [CLI guidance](../../../../apps/cli/AGENTS.md#manual-feature-verification) for user-facing CLI work. Record whether it was run and its prerequisites. For library-only delivery, explain what users can inspect today and what remains unexposed. Documentation should make honest developer use possible without treating automated tests as a manual journey.
+
+## Sources for proportionality
+
+[Google's review guidance](https://google.github.io/eng-practices/review/reviewer/looking-for.html) motivates inspecting human comprehension and present need. [YAGNI](https://martinfowler.com/bliki/Yagni.html) distinguishes speculative capabilities from useful refactoring and tests. [SRE troubleshooting](https://sre.google/sre-book/effective-troubleshooting/) motivates observations and testable hypotheses before corrective expansion. These inform review questions. Repository contracts and the explicit maintainability bar own requirements.
 
 ## Owners and limits
 
