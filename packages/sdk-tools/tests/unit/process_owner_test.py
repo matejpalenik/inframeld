@@ -396,6 +396,87 @@ class GroupObservationTests(unittest.TestCase):
         observation.stdout.close.assert_called_once()
         self.assertEqual(clock(), 450)
 
+    def test_completed_observer_cost_prevents_a_fragmented_term_probe(self) -> None:
+        target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+        clock = Mock(return_value=0)
+        signals: list[tuple[signal.Signals, int]] = []
+
+        def observe(_target: OwnedTarget, cutoff: int, _phase: str) -> bool:
+            allowance = min(cutoff - clock(), 1000)
+            read_ms = allowance - min(50, max(1, allowance // 4))
+            if read_ms < 100:
+                clock.return_value += read_ms
+                raise TimeoutError
+            clock.return_value += 100
+            return not any(number == signal.SIGKILL for number, _at in signals)
+
+        def sleep(seconds: float) -> None:
+            clock.return_value += round(seconds * 1000)
+
+        def send(_pid: int, number: signal.Signals) -> None:
+            signals.append((number, clock()))
+
+        with (
+            patch("src.system.process_owner._clock", clock),
+            patch("src.system.process_owner.observe_members", side_effect=observe),
+            patch("time.sleep", side_effect=sleep),
+            patch("os.waitid", return_value=SimpleNamespace(si_status=0, si_code=1)),
+            patch("os.waitpid", return_value=(123, 0)),
+            patch("os.killpg", side_effect=send),
+        ):
+            self.assertEqual(stop_target(target, 600, 600, "command"), "quiescent")
+        self.assertEqual(signals, [(signal.SIGTERM, 100), (signal.SIGKILL, 300)])
+        self.assertEqual(clock(), 400)
+        self.assertEqual(target.errors, [])
+        self.assertTrue(target.reaped)
+        self.assertFalse(target.owned)
+
+    def test_known_cost_refusal_remains_unknown_and_unfinished_work_is_not_a_sample(self) -> None:
+        clock = Mock(return_value=0)
+        signals: list[tuple[signal.Signals, int]] = []
+        observations: list[str] = []
+        for completed in (True, False):
+            with self.subTest(completed=completed):
+                target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+                clock.return_value = 0
+                signals.clear()
+                observations.clear()
+
+                def observe(
+                    _target: OwnedTarget, _cutoff: int, phase: str, *, completed: bool = completed
+                ) -> bool:
+                    observations.append(phase)
+                    clock.return_value += 240 if len(observations) == 1 else 10
+                    if len(observations) == 1 and not completed:
+                        _target.errors.append("observation-child-unresolved")
+                    return not any(number == signal.SIGKILL for number, _at in signals)
+
+                def sleep(seconds: float) -> None:
+                    clock.return_value += round(seconds * 1000)
+
+                def send(_pid: int, number: signal.Signals) -> None:
+                    signals.append((number, clock()))
+
+                with (
+                    patch("src.system.process_owner._clock", clock),
+                    patch("src.system.process_owner.observe_members", side_effect=observe),
+                    patch("time.sleep", side_effect=sleep),
+                    patch("os.waitid", return_value=SimpleNamespace(si_status=0, si_code=1)),
+                    patch("os.waitpid", return_value=(123, 0)),
+                    patch("os.killpg", side_effect=send),
+                ):
+                    result = stop_target(target, 600, 600, "command")
+                self.assertEqual(signals, [(signal.SIGTERM, 240), (signal.SIGKILL, 300)])
+                self.assertTrue(target.reaped)
+                self.assertFalse(target.owned)
+                if completed:
+                    self.assertEqual(result, "unknown")
+                    self.assertEqual(target.errors, ["group-shutdown-unconfirmed"])
+                    self.assertEqual(observations, ["initial"])
+                else:
+                    self.assertIn("kill", observations)
+                    self.assertEqual(target.errors, ["observation-child-unresolved"])
+
     def test_observation_without_its_reap_slice_is_skipped_before_owned_escalation(self) -> None:
         target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
         clock = Mock(return_value=480)
@@ -430,9 +511,11 @@ class GroupObservationTests(unittest.TestCase):
         clock = Mock(return_value=0)
         signals: list[tuple[signal.Signals, int]] = []
 
-        def observe(_target: OwnedTarget, cutoff: int, _phase: str) -> bool:
-            clock.return_value = cutoff
-            raise TimeoutError
+        def observe(_target: OwnedTarget, cutoff: int, phase: str) -> bool:
+            if phase == "initial":
+                clock.return_value = cutoff
+                raise TimeoutError
+            return False
 
         def send(_pid: int, number: signal.Signals) -> None:
             signals.append((number, clock()))
@@ -451,6 +534,7 @@ class GroupObservationTests(unittest.TestCase):
         self.assertTrue(target.reaped)
         self.assertFalse(target.owned)
         self.assertIn("group-observation-failed", target.errors)
+        self.assertNotIn("group-shutdown-unconfirmed", target.errors)
 
     def test_executable_descendant_is_distinct_from_retained_zombie(self) -> None:
         self.assertTrue(executable_members(b"123 123 Z\n124 123 S\n", 123))

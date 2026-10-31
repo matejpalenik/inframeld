@@ -184,6 +184,13 @@ def _clock() -> int:
     return time.monotonic_ns() // 1_000_000
 
 
+def _observation_deadlines(cutoff: int, now: int) -> tuple[int, int]:
+    """Keep observation reads and their termination/wait inside the existing phase."""
+    deadline = min(cutoff, now + 1000)
+    read_deadline = deadline - min(50, max(1, (deadline - now) // 4))
+    return deadline, read_deadline
+
+
 def observe_members(
     target: OwnedTarget, deadline: int, phase: Literal["initial", "term", "kill"] = "initial"
 ) -> bool:
@@ -194,12 +201,10 @@ def observe_members(
         if len(target.errors) < 12 and not any(tag.startswith("ps-") for tag in target.errors):
             target.errors.append(f"ps-{phase}-{step}-{category}")
 
-    deadline = min(deadline, _clock() + 1000)
+    deadline, read_deadline = _observation_deadlines(deadline, _clock())
     if _clock() >= deadline:
         record("spawn", "timeout")
         raise TimeoutError
-    # Reserve part of this observation's phase for its own kill and wait.
-    read_deadline = deadline - min(50, max(1, (deadline - _clock()) // 4))
     environment = dict(os.environ)
     for name in ("PS_PERSONALITY", "CMD_ENV", "I_WANT_A_BROKEN_PS"):
         environment.pop(name, None)
@@ -278,17 +283,27 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
         term_deadline = min(term_deadline, _clock() + 1500)
     quiescent = False
     observation_valid = True
+    observation_ms = 0
 
     def check(cutoff: int, phase: Literal["initial", "term", "kill"]) -> bool:
-        nonlocal observation_valid
+        nonlocal observation_valid, observation_ms
         # Do not start a new ps child when its read/kill/wait slice no longer fits.
         # Skipping reports no quiescence and leaves owned escalation intact.
         if cutoff - _clock() <= min(50, max(1, cleanup_ms // 10)):
             return False
         if not target.observe():
             return False
+        started = _clock()
+        _, read_deadline = _observation_deadlines(cutoff, started)
+        # Completed cost is a scheduling hint, never evidence of cleanup or future latency.
+        if read_deadline <= started or read_deadline - started < observation_ms:
+            return False
+        errors_before = len(target.errors)
         try:
-            return not observe_members(target, cutoff, phase)
+            live = observe_members(target, cutoff, phase)
+            if len(target.errors) == errors_before:
+                observation_ms = max(observation_ms, _clock() - started)
+            return not live
         except (OSError, ValueError, subprocess.SubprocessError, TimeoutError):
             observation_valid = False
             if "group-observation-failed" not in target.errors:
