@@ -4,6 +4,8 @@ Alice has a backend change waiting for integration and an independent CLI PR rea
 
 The [Backlog Delivery skill](../../../.agents/skills/inframeld-backlog-delivery/SKILL.md) owns common policy. Its references cover [scheduling and dependencies](../../../.agents/skills/inframeld-backlog-delivery/references/coordinator.md), [worker delivery](../../../.agents/skills/inframeld-backlog-delivery/references/worker.md), [assignment binding](../../../.agents/skills/inframeld-backlog-delivery/references/assignment-protocol.md) and [gates/recovery](../../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md). This guide owns setup, launch, adoption and evaluation. Load only the route needed.
 
+When delivery discovers a separate bug or an expanding tooling repair, use [defect triage](../../../.agents/skills/inframeld-backlog-delivery/references/discovered-defects.md). The [historical #237 case](../../../.agents/skills/inframeld-backlog-delivery/references/case-237-testing-repair.md) explains the difference between useful safety repairs and a repair sequence that fails to converge.
+
 ## Choose an operating mode
 
 | Mode | Coordination and completion |
@@ -35,6 +37,8 @@ pnpm delivery:test
 `delivery:plan` reads `matejpalenik/inframeld`, milestone 1 (`v1`), through authenticated GitHub CLI access. It returns dependencies, candidates and possible ownership conflicts without GitHub writes. Inspect actual issues, acceptance, open/unpublished work and semantic contracts before assigning. Exclude Studio and aggregate epics. Later issues do not silently enter a launched snapshot.
 
 `delivery:rehearse` exercises synthetic helper gates without GitHub calls or native workers. `delivery:test` tests helper behavior. Neither proves role loading or a live launch.
+
+Make issue-creation authority explicit in a live launch. For example: "The coordinator may create, deduplicate and link incidental defect issues in this repository, using understandable examples, evidence and proposed next steps. Recording them does not add new implementation outcomes to the finite snapshot." This clause authorizes reports, not broader features, risk waivers or host repair. Necessary supporting work follows the existing assignment and prerequisite policy. Without creation authority, retain drafts instead of asking permission for unrelated external writes.
 
 Store native run records outside every checkout in a task-authorized writable directory. Do not broaden global permissions merely to store state. Only the coordinator writes the record and grants shared resources. On interruption, reconcile actual agents, worktrees, PR heads and resources. Stale timestamps do not prove cleanup or writer termination.
 
@@ -74,6 +78,8 @@ Use normal hooks, independent review and current required CI. A coherent commit 
 
 An overloaded run should temporarily stop opening new implementation assignments. This is a scheduling checkpoint, not a request to pause the Goal or kill commands. Let safe active operations finish and reconcile ownership first.
 
+Adopt revised decision guidance at the next safe assignment, repair or PR checkpoint. Do not interrupt a useful nearly completed operation, restart an accepted plan or repeat valid checks solely because a historical case or example was added. A newly established immediate safety problem still stops its affected action. New assignments follow current guidance.
+
 1. Fetch actual main and inspect the guidance change. Preserve dirty branches, existing authorizations, passed evidence, blockers and cumulative retry history.
 2. Read current policy directly. Existing role threads may retain older prompt instructions. Send affected participants the accepted policy and explicit ownership changes, preserving their verified model and capabilities. If immutable role instructions conflict, stop the affected action and reassign at a safe checkpoint to a session that loads the new policy. Do not claim old profiles reloaded.
 3. List current useful PR boundaries and exact blockers. Prioritize the smallest qualified shared maintenance change if it unlocks required checks. Then finish eligible current capabilities through review, verification and merge one at a time. Independent existing checks and reviews may continue.
@@ -94,6 +100,11 @@ Before substantive workflow edits, define a few must-pass outcomes. Validate fro
 | Blocked writer with independent eligible work | Preserve checkpoint, stop positively, reconcile and reuse safely. |
 | Useful supporting capability with feature work remaining | Scoped review/checks and no false issue closure. |
 | A small harness repair proposes another general supervisor | Review the demonstrated need and minimal maintained alternative before expansion. |
+| Review discovers a pre-existing bug outside the accepted behavior and required checks | Record or draft a separate defect, prioritize it and continue the feature without silently absorbing the repair. |
+| A required hook invokes a known unsafe helper | Identify the actual dependency and choose a focused prerequisite, a reviewed maintained equivalent or a parked feature. No bypass or automatic deferral. |
+| The replacement needs substantial fixes and the same real acceptance case still fails | Reassess the complete change against main and select a bounded next action. Do not reset attempts or approve only the last patch. |
+| A defect is found by source review before runtime execution | Write a junior-readable issue with an example, evidence, impact, tentative remedy and acceptance. Do not claim an observed runtime incident or expand the snapshot. |
+| A new issue-creation request has no GitHub write authority | Keep a draft. Do not infer publication authority from the skill. |
 | Optional report formatting fails after retained test results | Recover the report without inventing success or needlessly rerunning valid checks. |
 | Three unsuccessful remediation cycles | Stop affected work and explain the remaining blocker. |
 | Stopped machine, unknown other users or recurring fault | Apply only the bounded permitted recovery, otherwise stop dependent runtime work. |
@@ -104,6 +115,8 @@ Before substantive workflow edits, define a few must-pass outcomes. Validate fro
 When authorized independent contexts are available, inspect actual loaded files, decisions and artifacts. Respect environments where subagents are unavailable or prohibited. Do not evade that restriction through another CLI process. Report editorial walkthroughs, helper tests, discovery checks, independent trials and real product qualification separately. Static checks do not prove agent behavior.
 
 After adoption, use a small authorized real batch to assess time to useful PR/merge, review/integration waiting, feature versus harness work, repeated checks without new evidence and avoidable approval requests. Reuse existing observations. Do not add a monitoring framework or optimize agent occupancy.
+
+Keep trial prompts separate from the expected decisions in this table. Include both a genuine verification blocker and an unrelated defect, a failed report after valid raw results, an expanding runner repair and a routine task that should use only workspace commands. Compare outcomes and observable scope decisions, rather than rewarding more receipts or higher self-ratings. Structural validation and helper tests do not establish improved autonomous delivery. Record unavailable independent trials explicitly and evaluate on a small real delivery before scaling.
 
 ## Maintain the personal adapter
 
