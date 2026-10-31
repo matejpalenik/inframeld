@@ -7,6 +7,10 @@
     "title": "Guides",
     "links": [
       {
+        "title": "Inspect your CLI version offline",
+        "href": "/guides/inspect-cli-version"
+      },
+      {
         "title": "Check whether your original request was accepted",
         "href": "/guides/recover-original-request"
       }
