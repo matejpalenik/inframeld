@@ -9,7 +9,7 @@
     "@types/node": "26.6.5",
     "esbuild": "0.28.2",
     "playwright": "1.64.1",
-    "smol-toml": "1.9.0",
+    "smol-toml": "1.9.1",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "zod": "4.6.7"
