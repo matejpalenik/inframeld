@@ -9,6 +9,8 @@ import {
   withResources,
   type OwnedProcess,
 } from "../../src/system/process.ts";
+import { describeError } from "../../src/workflows/stages.ts";
+import { withDeniedFixtureRecovery } from "../native/fixtures/denied-cleanup.ts";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -20,6 +22,147 @@ import { Duplex, PassThrough, Writable } from "node:stream";
 const finiteFixture = fileURLToPath(
   new URL("./fixtures/process_tree.py", import.meta.url),
 );
+
+test("denied fixture receipt reconciliation runs after an early assertion and retains its identity", async () => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-denied-unit-"));
+  const original = new Error("early assertion");
+  let release!: (value: unknown) => void, observed!: () => void;
+  const receipt = new Promise<unknown>((resolve) => {
+    release = resolve;
+  });
+  const reading = new Promise<void>((resolve) => {
+    observed = resolve;
+  });
+  const running = withDeniedFixtureRecovery(
+    work,
+    performance.now() + 500,
+    async () => {
+      throw original;
+    },
+    async () => {
+      observed();
+      return receipt;
+    },
+  );
+  void running.catch(() => {});
+  try {
+    assert.equal(
+      await Promise.race([
+        reading.then(() => "reading"),
+        running.then(
+          () => "finished",
+          () => "finished",
+        ),
+      ]),
+      "reading",
+    );
+    release({ reaped: true });
+    await assert.rejects(running, (error: unknown) => error === original);
+  } finally {
+    release({ reaped: true });
+    await running.catch(() => {});
+    await rm(work, { recursive: true, force: true });
+  }
+});
+
+test("denied fixture preserves original and distinct failed reconciliation in order", async () => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-denied-unit-"));
+  const original = new Error("early assertion"),
+    receiptFailure = new Error("receipt unavailable");
+  try {
+    await assert.rejects(
+      withDeniedFixtureRecovery(
+        work,
+        performance.now() + 40,
+        async () => {
+          throw original;
+        },
+        async () => {
+          throw receiptFailure;
+        },
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 2);
+        assert.equal(error.errors[0], original);
+        assert.ok(error.errors[1] instanceof Error);
+        assert.equal(error.errors[1].cause, receiptFailure);
+        return true;
+      },
+    );
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
+});
+
+test("an assertion failure still reconciles through the independent observer and retains both failures", async (context) => {
+  const original = new Error("original assertion");
+  const observation = new Error("observation failed");
+  let observed = false;
+  context.mock.method(childProcess, "execFile", ((...args: unknown[]) => {
+    observed = true;
+    const callback = args.at(-1) as (
+      error: Error,
+      stdout: string,
+      stderr: string,
+    ) => void;
+    callback(observation, "", "");
+  }) as typeof childProcess.execFile);
+  await assert.rejects(
+    withResources(
+      async () => {
+        throw original;
+      },
+      async () => {
+        await executablePids(performance.now() + 50);
+      },
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof AggregateError);
+      assert.deepEqual(error.errors, [original, observation]);
+      return true;
+    },
+  );
+  assert.equal(observed, true);
+});
+
+/** Independent read-only physical observation, never cleanup authority. */
+async function executablePids(deadline: number): Promise<Set<number>> {
+  const remaining = deadline - performance.now();
+  if (remaining <= 0) throw new Error("Physical observation deadline expired");
+  const environment: NodeJS.ProcessEnv = { ...process.env, LC_ALL: "C" };
+  for (const key of ["PS_PERSONALITY", "CMD_ENV", "I_WANT_A_BROKEN_PS"])
+    delete environment[key];
+  const stdout = await new Promise<string>((resolve, reject) => {
+    childProcess.execFile(
+      "ps",
+      ["-A", "-o", "pid=,stat="],
+      {
+        env: environment,
+        timeout: Math.max(1, Math.floor(remaining)),
+        maxBuffer: 4 * 1024 * 1024,
+      },
+      (error, output) => (error ? reject(error) : resolve(output)),
+    );
+  });
+  const live = new Set<number>();
+  for (const row of stdout.split("\n")) {
+    if (!row.trim()) continue;
+    const fields = row.trim().split(/\s+/);
+    const pid = Number(fields[0]);
+    if (
+      fields.length !== 2 ||
+      !Number.isSafeInteger(pid) ||
+      pid <= 0 ||
+      !/^[A-Za-z+<>-]+$/.test(fields[1]!)
+    )
+      throw new Error("Invalid physical process observation");
+    if (!fields[1]!.startsWith("Z")) live.add(pid);
+  }
+  if (performance.now() >= deadline)
+    throw new Error("Physical observation deadline expired");
+  return live;
+}
 
 /** Deliver valid owner evidence and flushed bytes before acquisition resumes. */
 async function pureHelper(
@@ -457,17 +600,10 @@ test(
           const metadata = JSON.parse(await readFile(trace, "utf8")) as {
             target: number;
           };
-          const observation = await command("ps", ["-A", "-o", "pid=,stat="]);
+          const live = await executablePids(performance.now() + 500);
           assert.ok(
-            observation.stdout.split("\n").some((line) => {
-              const [pid, state] = line.trim().split(/\s+/);
-              return (
-                Number(pid) === metadata.target &&
-                state &&
-                !state.startsWith("Z")
-              );
-            }),
-            "Missing control evidence must not be represented as released resources",
+            live.has(metadata.target),
+            "Unconfirmed target remains executable before its fuse",
           );
         },
         async () => {
@@ -492,7 +628,7 @@ test(
 test(
   "Node controller death leaves missing owner evidence while the helper stops its target",
   { timeout: 5000 },
-  async () => {
+  async (context) => {
     const work = await mkdtemp(join(tmpdir(), "sdk-owner-node-death-"));
     const controller = join(work, "controller.mts");
     const ready = join(work, "ready.json");
@@ -506,56 +642,75 @@ test(
     await writeFile(
       controller,
       [
-        `import {startProcess, command} from ${JSON.stringify(source)};`,
+        `import {startProcess} from ${JSON.stringify(source)};`,
+        'import {execFile} from "node:child_process";',
+        'import {promisify} from "node:util";',
         'import {writeFile} from "node:fs/promises";',
         `const child = await startProcess("python3", ["-B", ${JSON.stringify(finiteFixture)}, "wait"], {timeout:3000,cleanupTimeout:500});`,
-        'const parent = await command("ps", ["-p", String(child.pid), "-o", "ppid="], {timeout:500});',
+        'const parent = await promisify(execFile)("ps", ["-p", String(child.pid), "-o", "ppid="], {timeout:500,maxBuffer:4096,env:{...process.env,LC_ALL:"C",PS_PERSONALITY:undefined,CMD_ENV:undefined,I_WANT_A_BROKEN_PS:undefined}});',
         `await writeFile(${JSON.stringify(ready)}, JSON.stringify({target:child.pid,helper:Number(parent.stdout.trim())}));`,
         "await child.result;",
         `await writeFile(${JSON.stringify(receipt)}, "complete");`,
       ].join("\n"),
     );
-    let observed = false;
+    let observed = false,
+      passed = false;
+    const entered = performance.now();
+    const cleanupDeadline = entered + 1500;
     try {
-      await assert.rejects(
-        command(process.execPath, ["--import", loader, controller], {
-          timeout: 1000,
-          cleanupTimeout: 500,
-          env: { NODE_TEST_CONTEXT: undefined },
-        }),
-        /timed out/,
-      );
-      const processes = JSON.parse(await readFile(ready, "utf8")) as {
-        target: number;
-        helper: number;
-      };
-      await assert.rejects(readFile(receipt), { code: "ENOENT" });
-      const deadline = performance.now() + 1000;
-      while (performance.now() < deadline) {
-        const state = await command("ps", ["-A", "-o", "pid=,stat="]);
-        const live = state.stdout.split("\n").some((line) => {
-          const [pid, status] = line.trim().split(/\s+/);
-          return (
-            [processes.target, processes.helper].includes(Number(pid)) &&
-            status &&
-            !status.startsWith("Z")
+      await withResources(
+        async () => {
+          await assert.rejects(
+            command(process.execPath, ["--import", loader, controller], {
+              timeout: 1000,
+              cleanupTimeout: 500,
+              env: { NODE_TEST_CONTEXT: undefined },
+            }).catch((error: unknown) => {
+              context.diagnostic(describeError(error));
+              throw error;
+            }),
+            /timed out/,
           );
-        });
-        if (!live) {
-          observed = true;
-          break;
-        }
-        await delay(10);
-      }
-      assert.ok(
-        observed,
-        "EOF cleanup must stop executable work before the four-second fuse",
+        },
+        async () => {
+          const processes = JSON.parse(await readFile(ready, "utf8")) as {
+            target: number;
+            helper: number;
+          };
+          assert.ok(
+            Number.isSafeInteger(processes.target) && processes.target > 0,
+          );
+          assert.ok(
+            Number.isSafeInteger(processes.helper) && processes.helper > 0,
+          );
+          // Reconciliation still runs after an assertion failure. Its later result cannot qualify cleanup.
+          const reconciliationDeadline = Math.min(
+            entered + 2500,
+            performance.now() + 1000,
+          );
+          while (performance.now() < reconciliationDeadline) {
+            const live = await executablePids(reconciliationDeadline);
+            if (!live.has(processes.target) && !live.has(processes.helper)) {
+              observed = true;
+              break;
+            }
+            await delay(10);
+          }
+          assert.ok(
+            observed,
+            "EOF cleanup must stop executable work before the finite fuse",
+          );
+          assert.ok(
+            performance.now() < cleanupDeadline,
+            "Positive cleanup must precede the original execution and cleanup deadline",
+          );
+          await assert.rejects(readFile(receipt), { code: "ENOENT" });
+        },
       );
-      // Observation reconciles the physical fixture. It does not create the lost
-      // controller's missing owner-completion receipt or make its timeout green.
+      passed = true;
     } finally {
-      if (observed) await rm(work, { recursive: true, force: true });
-      else console.error(`Node-death fixture remains unresolved at ${work}`);
+      if (passed && observed) await rm(work, { recursive: true, force: true });
+      else console.error(`Node-death fixture evidence retained at ${work}`);
     }
   },
 );
@@ -685,14 +840,9 @@ test("same-group descendants stop after an early leader exit with open or closed
         );
         const descendant = Number(await readFile(marker, "utf8"));
         assert.ok(descendant > 0);
-        const state = await command("ps", ["-A", "-o", "pid=,stat="]);
+        const live = await executablePids(began + 2000);
         assert.ok(
-          !state.stdout.split("\n").some((line) => {
-            const [pid, status] = line.trim().split(/\s+/);
-            return (
-              Number(pid) === descendant && status && !status.startsWith("Z")
-            );
-          }),
+          !live.has(descendant),
           "Successful cleanup must leave no executable descendant",
         );
         assert.ok(
@@ -745,7 +895,7 @@ test("cancellation of an acquired target retains its reason and cached cleanup",
   await first;
 });
 
-test("cancellation still finishes descendants after their leader has exited", async () => {
+test("cancellation still finishes descendants after their leader has exited", async (context) => {
   const work = await mkdtemp(join(tmpdir(), "sdk-owner-orphan-cancel-"));
   const marker = join(work, "descendant");
   const controller = new AbortController();
@@ -760,24 +910,53 @@ test("cancellation still finishes descendants after their leader has exited", as
   );
   void running.catch(() => {});
   let complete = false;
+  const entered = performance.now();
+  const cleanupDeadline = entered + 1000;
   try {
-    let exited = false;
-    const deadline = performance.now() + 1000;
-    while (performance.now() < deadline) {
-      try {
-        await readFile(marker + ".orphaned");
-        exited = true;
-        break;
-      } catch {
-        await delay(5);
-      }
-    }
-    assert.ok(
-      exited,
-      "Descendant must observe the leader's exit before cancellation",
+    await withResources(
+      async () => {
+        let exited = false;
+        while (performance.now() < cleanupDeadline) {
+          try {
+            await readFile(marker + ".orphaned");
+            exited = true;
+            break;
+          } catch {
+            await delay(5);
+          }
+        }
+        assert.ok(
+          exited,
+          "Descendant must observe the leader's exit before cancellation",
+        );
+        const reason = new Error("cancel orphaned descendant");
+        controller.abort(reason);
+        await assert.rejects(
+          running.catch((error: unknown) => {
+            context.diagnostic(describeError(error));
+            throw error;
+          }),
+          (error: unknown) => error === reason,
+        );
+      },
+      async () => {
+        controller.abort();
+        await running.catch(() => {});
+        const pid = Number(await readFile(marker, "utf8"));
+        assert.ok(Number.isSafeInteger(pid) && pid > 0);
+        const live = await executablePids(
+          Math.min(entered + 2000, performance.now() + 500),
+        );
+        assert.ok(
+          !live.has(pid),
+          "The cancelled descendant must no longer execute",
+        );
+        assert.ok(
+          performance.now() < cleanupDeadline,
+          "Physical cleanup must precede its original allowance and fuse",
+        );
+      },
     );
-    controller.abort(new Error("cancel orphaned descendant"));
-    await assert.rejects(running, /cancel orphaned descendant/);
     complete = true;
   } finally {
     controller.abort();

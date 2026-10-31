@@ -22,7 +22,7 @@ import {
   type ProfileReport,
 } from "../conformance/report.ts";
 import { cases } from "../../tests/conformance/index.ts";
-import { stage, type Stage } from "./stages.ts";
+import { stage, type Stage, type StageResult } from "./stages.ts";
 
 export interface TestSelection {
   profile?: Profile;
@@ -46,6 +46,7 @@ export async function testConformance(
     const directory = join(work, profile);
     await mkdir(directory, { recursive: true });
     const reportPath = join(directory, "report.json");
+    let profileCompleted = true;
     try {
       const result = await run(
         process.execPath,
@@ -81,6 +82,7 @@ export async function testConformance(
       console.log(result.stdout);
     } catch (error) {
       errors.push(error);
+      profileCompleted = false;
     }
     try {
       reports.push(
@@ -95,6 +97,8 @@ export async function testConformance(
         }),
       );
     }
+    // Read any completed report before blocking subsequent runtime admission.
+    if (!profileCompleted) break;
   }
   const expected = selection.caseId
     ? cases.filter((entry) => entry.id === selection.caseId)
@@ -119,34 +123,80 @@ export async function testSdk(
   work: string,
   stages: Stage[],
   selection: TestSelection = {},
-): Promise<void> {
+  admission: StageResult = { passed: true, mayStartProcess: true },
+  recordStage: typeof stage = stage,
+): Promise<StageResult> {
   let runtime: Runtime | undefined;
-  await stage(stages, "compilation", async () => {
-    runtime = await buildRuntime(language, work);
-    return { bindings: runtime.bindings };
-  });
-  await stage(stages, "native-typing", () => typecheckNative(language));
-  await stage(stages, "native-models", async () => {
-    if (!runtime)
-      throw new Error("Native model checks blocked by compilation failure");
-    await checkNativeModels(language, runtime);
-  });
-  await stage(stages, "native-regressions", async () => {
-    if (!runtime)
-      throw new Error("Driver regressions blocked by compilation failure");
-    await checkNativeRegressions(language, runtime);
-  });
-  await stage(stages, "http", async () => {
-    if (!runtime)
-      throw new Error("HTTP behavior blocked by compilation failure");
-    return testConformance(language, work, runtime, selection);
-  });
-  if (language === "rust")
-    await stage(stages, "synthetic-capabilities", () =>
-      run(
-        "cargo",
-        ["test", "--locked", "-p", "inframeld-sdk-test-rust-capabilities"],
-        "rust-capabilities",
-      ),
+  let permitted = admission.mayStartProcess;
+  const compilation = await recordStage(
+    stages,
+    "compilation",
+    async () => {
+      runtime = await buildRuntime(language, work);
+      return { bindings: runtime.bindings };
+    },
+    permitted,
+  );
+  permitted &&= compilation.mayStartProcess;
+  const typing = await recordStage(
+    stages,
+    "native-typing",
+    () => typecheckNative(language),
+    permitted,
+  );
+  permitted &&= typing.mayStartProcess;
+  const models = await recordStage(
+    stages,
+    "native-models",
+    async () => {
+      if (!runtime)
+        throw new Error("Native model checks blocked by compilation failure");
+      await checkNativeModels(language, runtime);
+    },
+    permitted && admission.passed && compilation.passed,
+  );
+  permitted &&= models.mayStartProcess;
+  const nativeAdmitted = permitted && admission.passed && compilation.passed;
+  const regressions = await recordStage(
+    stages,
+    "native-regressions",
+    async () => {
+      if (!runtime)
+        throw new Error("Driver regressions blocked by compilation failure");
+      await checkNativeRegressions(language, runtime);
+    },
+    nativeAdmitted,
+  );
+  // A clean outer launcher cannot establish failed nested fixture ownership.
+  permitted &&=
+    regressions.mayStartProcess && (!nativeAdmitted || regressions.passed);
+  const http = await recordStage(
+    stages,
+    "http",
+    async () => {
+      if (!runtime)
+        throw new Error("HTTP behavior blocked by compilation failure");
+      return testConformance(language, work, runtime, selection);
+    },
+    permitted && admission.passed && compilation.passed,
+  );
+  permitted &&= http.mayStartProcess;
+  if (language === "rust") {
+    const synthetic = await recordStage(
+      stages,
+      "synthetic-capabilities",
+      () =>
+        run(
+          "cargo",
+          ["test", "--locked", "-p", "inframeld-sdk-test-rust-capabilities"],
+          "rust-capabilities",
+        ),
+      permitted && admission.passed && compilation.passed,
     );
+    permitted &&= synthetic.mayStartProcess;
+  }
+  return {
+    passed: stages.every((entry) => entry.status === "passed"),
+    mayStartProcess: permitted,
+  };
 }

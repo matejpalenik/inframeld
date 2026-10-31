@@ -1,5 +1,6 @@
 """Prove wait ownership at a syscall boundary without real process signals."""
 
+import os
 import signal
 import subprocess
 import unittest
@@ -13,6 +14,7 @@ from src.system.process_owner import (
     decode_document,
     executable_members,
     main,
+    observe_members,
     parse_start,
     stop_target,
 )
@@ -73,7 +75,7 @@ class RetainedOwnershipTests(unittest.TestCase):
             patch("os.waitid", return_value=SimpleNamespace(si_status=0, si_code=1)),
             patch("os.waitpid", return_value=(123, 0)),
             patch("os.killpg", side_effect=PermissionError) as send,
-            patch("src.system.process_owner._members", return_value=False),
+            patch("src.system.process_owner.observe_members", return_value=False),
             patch("src.system.process_owner._clock", return_value=0),
         ):
             self.assertEqual(stop_target(target, 1000, 100, "command"), "quiescent")
@@ -185,6 +187,89 @@ class ControlDocumentTests(unittest.TestCase):
 
 
 class GroupObservationTests(unittest.TestCase):
+    def test_observer_timeout_keeps_its_own_termination_and_wait_inside_the_phase(self) -> None:
+        target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+        observation = Mock()
+        observation.stdout.fileno.return_value = 456
+        observation.poll.return_value = None
+        observation.wait.return_value = 0
+        clock = Mock(return_value=0)
+
+        def timeout(
+            _read: object, _write: object, _error: object, seconds: float
+        ) -> tuple[list[object], list[object], list[object]]:
+            clock.return_value = round(seconds * 1000)
+            return [], [], []
+
+        with (
+            patch("src.system.process_owner._clock", clock),
+            patch("subprocess.Popen", return_value=observation),
+            patch("os.set_blocking"),
+            patch("select.select", side_effect=timeout),
+            self.assertRaises(TimeoutError),
+        ):
+            observe_members(target, 500)
+        observation.kill.assert_called_once()
+        observation.wait.assert_called_once_with(timeout=0.05)
+        observation.stdout.close.assert_called_once()
+        self.assertEqual(clock(), 450)
+
+    def test_observation_without_its_reap_slice_is_skipped_before_owned_escalation(self) -> None:
+        target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+        clock = Mock(return_value=480)
+        signals: list[tuple[signal.Signals, int]] = []
+
+        def observe(_target: OwnedTarget, cutoff: int) -> bool:
+            self.assertGreater(
+                cutoff - clock(), 50, "Do not admit an observer without its own slice"
+            )
+            return False
+
+        def sleep(seconds: float) -> None:
+            clock.return_value += round(seconds * 1000)
+
+        def send(_pid: int, number: signal.Signals) -> None:
+            signals.append((number, clock()))
+
+        with (
+            patch("src.system.process_owner._clock", clock),
+            patch("src.system.process_owner.observe_members", side_effect=observe),
+            patch("time.sleep", side_effect=sleep),
+            patch("os.waitid", return_value=SimpleNamespace(si_status=0, si_code=1)),
+            patch("os.waitpid", return_value=(123, 0)),
+            patch("os.killpg", side_effect=send),
+        ):
+            self.assertEqual(stop_target(target, 1000, 1000, "command"), "quiescent")
+        self.assertIn((signal.SIGKILL, 500), signals)
+        self.assertEqual(target.errors, [])
+
+    def test_slow_observation_preserves_owned_escalation_and_finalization(self) -> None:
+        target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+        clock = Mock(return_value=0)
+        signals: list[tuple[signal.Signals, int]] = []
+
+        def observe(_target: OwnedTarget, cutoff: int) -> bool:
+            clock.return_value = cutoff
+            raise TimeoutError
+
+        def send(_pid: int, number: signal.Signals) -> None:
+            signals.append((number, clock()))
+
+        with (
+            patch("src.system.process_owner._clock", clock),
+            patch("src.system.process_owner.observe_members", side_effect=observe),
+            patch("os.waitid", return_value=SimpleNamespace(si_status=0, si_code=1)),
+            patch("os.waitpid", return_value=(123, 0)),
+            patch("os.killpg", side_effect=send),
+        ):
+            self.assertEqual(stop_target(target, 1000, 1000, "command"), "unknown")
+
+        self.assertIn((signal.SIGKILL, 500), signals)
+        self.assertLess(clock(), 1000)
+        self.assertTrue(target.reaped)
+        self.assertFalse(target.owned)
+        self.assertIn("group-observation-failed", target.errors)
+
     def test_executable_descendant_is_distinct_from_retained_zombie(self) -> None:
         self.assertTrue(executable_members(b"123 123 Z\n124 123 S\n", 123))
         self.assertFalse(executable_members(b"123 123 Z\n124 999 S\n", 123))
@@ -252,6 +337,17 @@ class GroupObservationTests(unittest.TestCase):
         observation.wait.return_value = 0
 
         with (
+            patch.dict(
+                os.environ,
+                {
+                    "PS_PERSONALITY": "bsd",
+                    "CMD_ENV": "sco",
+                    "I_WANT_A_BROKEN_PS": "1",
+                    "LC_ALL": "hostile",
+                    "SENTINEL": "preserved",
+                },
+                clear=True,
+            ),
             patch("subprocess.Popen", return_value=observation) as spawn,
             patch("os.set_blocking") as configure,
             patch("src.system.process_owner._clock", return_value=0),
@@ -265,13 +361,16 @@ class GroupObservationTests(unittest.TestCase):
 
         spawn.assert_called_once()
         configure.assert_called_once_with(456, False)
+        observer_env = {"LC_ALL": "C", "SENTINEL": "preserved"}
         spawn.assert_called_once_with(
             ["ps", "-A", "-o", "pid=,pgid=,stat="],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
+            env=observer_env,
         )
-        observation.wait.assert_called_once_with(timeout=1)
+        self.assertGreater(observation.wait.call_args.kwargs["timeout"], 0)
+        self.assertLess(observation.wait.call_args.kwargs["timeout"], 1)
         observation.kill.assert_not_called()
         stream.close.assert_called_once()
         self.assertEqual(result, "quiescent")
@@ -313,7 +412,7 @@ class QueuedStopTests(unittest.TestCase):
         with (
             patch("src.system.process_owner.Control", return_value=control),
             patch("src.system.process_owner._clock", return_value=100),
-            patch("src.system.process_owner._members", return_value=False),
+            patch("src.system.process_owner.observe_members", return_value=False),
             patch("shutil.which", return_value="recording-ps"),
             patch("subprocess.Popen", return_value=child),
             patch("signal.signal"),

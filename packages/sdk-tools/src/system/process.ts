@@ -30,6 +30,41 @@ export interface ProcessOutcome {
   groupState: "quiescent" | "live" | "unknown";
   errors: string[];
 }
+
+/** Explicit owner evidence, separate from rendered error classifications. */
+export class ProcessFailure extends Error {
+  readonly #cleanupConfirmed: boolean;
+  constructor(
+    message: string,
+    cleanupConfirmed: boolean,
+    readonly state?: Readonly<{
+      terminal?: ProcessOutcome;
+      helperCode: number | null | undefined;
+      helperClosed: boolean;
+      streamsEnded: boolean;
+    }>,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.#cleanupConfirmed = cleanupConfirmed;
+  }
+  static hasConfirmedCleanup(error: unknown): boolean {
+    return (
+      error instanceof ProcessFailure &&
+      #cleanupConfirmed in error &&
+      error.#cleanupConfirmed
+    );
+  }
+}
+
+/** Unknown errors are never evidence that an owned subprocess finished cleanup. */
+export function hasConfirmedCleanup(error: unknown): boolean {
+  try {
+    return ProcessFailure.hasConfirmedCleanup(error);
+  } catch {
+    return false;
+  }
+}
 export interface OwnedProcess {
   readonly pid: number;
   readonly capture: Readonly<{
@@ -484,7 +519,24 @@ class ProcessOwner implements OwnedProcess {
     this.stderr.destroy();
     this.control.destroy();
     this.helper.unref();
-    if (this.failure) this.completion.reject(this.failure);
+    if (this.failure)
+      this.completion.reject(
+        new ProcessFailure(
+          this.failure.message,
+          noTarget &&
+            this.helperClosed &&
+            this.stdout.readableEnded &&
+            this.stderr.readableEnded,
+          {
+            terminal,
+            helperCode: this.helperCode,
+            helperClosed: this.helperClosed,
+            streamsEnded:
+              this.stdout.readableEnded && this.stderr.readableEnded,
+          },
+          { cause: this.failure },
+        ),
+      );
     else
       this.completion.resolve(
         terminal ?? {
@@ -515,7 +567,14 @@ export async function startProcess(
     try {
       await owner.close();
     } catch (cleanup) {
-      if (cleanup !== primary)
+      if (
+        cleanup !== primary &&
+        !(
+          cleanup instanceof ProcessFailure &&
+          hasConfirmedCleanup(cleanup) &&
+          cleanup.cause === primary
+        )
+      )
         throw new AggregateError(
           [primary, cleanup],
           "Subprocess startup and cleanup failed",
@@ -557,8 +616,9 @@ export async function command(
       throw new Error(`${program} exceeded its ${limit}-byte output budget`);
     options.signal?.throwIfAborted();
     if (result.status !== 0)
-      throw new Error(
+      throw new ProcessFailure(
         `${program} exited ${result.status}\n${capture.output.slice(-5000)}`,
+        true,
       );
   } catch (error) {
     failure =

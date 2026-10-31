@@ -1,17 +1,25 @@
 /** Keep native browser cleanup authority outside the test workers it observes. */
 import type { BrowserServer } from "playwright";
-import { chmod, mkdir, mkdtemp, open, rm, writeFile } from "node:fs/promises";
-import { constants } from "node:fs";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
 import type { Socket } from "node:net";
 import type { TestContext } from "node:test";
 import http from "node:http";
 import { syncBuiltinESMExports } from "node:module";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { artifacts, cache, home } from "../../../src/config.ts";
-import { command, withResources } from "../../../src/system/process.ts";
+import { command } from "../../../src/system/process.ts";
 import { budgets } from "../../../src/system/budgets.ts";
+import {
+  FixtureDiagnostics,
+  fixtureDiagnostic,
+  prepareFixtureCapture,
+  observeFixtureController,
+  acquireProtectedFixtureDirectory,
+  type FixtureCapture,
+  type FixtureCaptureSlot,
+} from "./fixture-diagnostics.ts";
 
 export interface FixtureChannel {
   onData(receive: (bytes: Uint8Array) => void): void;
@@ -24,279 +32,6 @@ export interface FixtureClock {
   now(): number;
   set(milliseconds: number, action: () => void): unknown;
   clear(timer: unknown): void;
-}
-
-export type FixtureDiagnosticScope = "broker" | "assertion" | "worker";
-export type FixtureCaptureSlot = "probe" | "controller" | "timeout";
-export interface FixtureCaptureMetadata {
-  bytes: number;
-  device: number;
-  inode: number;
-}
-export interface FixtureCapture {
-  path: string;
-  check(deadline: number): Promise<FixtureCaptureMetadata>;
-}
-
-export function fixtureCaptureMetadata(
-  initial: FixtureCaptureMetadata,
-  current: FixtureCaptureMetadata,
-): FixtureCaptureMetadata {
-  if (
-    ![
-      initial.bytes,
-      initial.device,
-      initial.inode,
-      current.bytes,
-      current.device,
-      current.inode,
-    ].every((value) => Number.isSafeInteger(value) && value >= 0) ||
-    current.bytes > 64 * 1024 * 1024 ||
-    current.device !== initial.device ||
-    current.inode !== initial.inode
-  )
-    throw new Error("Invalid protected capture");
-  return { ...current };
-}
-
-/** Publish fixed facts only. Captured text and original errors stay protected. */
-export function fixtureDiagnostic(value: unknown): string {
-  const invalid = () => {
-    throw new Error("Invalid fixture diagnostic");
-  };
-  if (
-    !value ||
-    typeof value !== "object" ||
-    ![Object.prototype, null].includes(Object.getPrototypeOf(value))
-  )
-    return invalid();
-  const fields = Object.getOwnPropertyDescriptors(value);
-  const allowed = [
-    "phase",
-    "category",
-    "status",
-    "peer",
-    "caseId",
-    "slot",
-    "bytes",
-    "device",
-    "inode",
-  ];
-  if (
-    Object.entries(fields).some(
-      ([key, field]) => !allowed.includes(key) || !("value" in field),
-    )
-  )
-    return invalid();
-  const row = value as Record<string, unknown>;
-  if (
-    typeof row.phase !== "string" ||
-    typeof row.category !== "string" ||
-    ![
-      "probe-controller",
-      "native-controller",
-      "nested-controller",
-      "peer-lost",
-      "startup",
-      "ready",
-      "shutdown-observed",
-      "finalize-started",
-      "fixture-close-settled",
-      "backend-outcome-settled",
-      "browser-receipt-settled",
-      "cleanup-report-written",
-      "timeout-assertion",
-      "receipt-read",
-      "receipt-match",
-      "assertion-finally",
-      "fixture-terminal",
-    ].includes(row.phase) ||
-    ![
-      "started",
-      "passed",
-      "failed",
-      "cancelled",
-      "unknown",
-      "capture-unproved",
-      "capture-checked",
-      "capture-invalid",
-      "diagnostic-failed",
-      "cleanup-failed",
-      "expected-close-deadline",
-      "owner-unknown",
-    ].includes(row.category)
-  )
-    return invalid();
-  const record: Record<string, unknown> = {
-    phase: row.phase,
-    category: row.category,
-    status: row.status ?? null,
-  };
-  if (
-    record.status !== null &&
-    (!Number.isSafeInteger(record.status) ||
-      Number(record.status) < 0 ||
-      Number(record.status) > 255)
-  )
-    return invalid();
-  for (const key of ["peer", "caseId", "slot"]) {
-    if (!(key in row)) continue;
-    const choices =
-      key === "peer"
-        ? ["supervisor", "profile", "unbound"]
-        : key === "slot"
-          ? ["probe", "controller", "timeout"]
-          : [
-              "worker-loss",
-              "startup-cancel",
-              "stalled-close",
-              "profile-timeout",
-            ];
-    if (typeof row[key] !== "string" || !choices.includes(row[key]))
-      return invalid();
-    record[key] = row[key];
-  }
-  for (const key of ["bytes", "device", "inode"]) {
-    if (!(key in row)) continue;
-    if (!Number.isSafeInteger(row[key]) || Number(row[key]) < 0)
-      return invalid();
-    record[key] = row[key];
-  }
-  return JSON.stringify(record) + "\n";
-}
-
-export class FixtureDiagnostics {
-  private readonly records: string[] = [];
-  private deadline: number | undefined;
-  private writing: Promise<void> | undefined;
-  constructor(readonly scope: FixtureDiagnosticScope) {}
-  note(value: unknown): void {
-    const record = fixtureDiagnostic(value);
-    const limit = this.scope === "broker" ? 8192 : 4096;
-    if (
-      this.records.length >= 32 ||
-      Buffer.byteLength(
-        "[" +
-          [...this.records, record].map((line) => line.trim()).join(",") +
-          "]\n",
-      ) > limit
-    )
-      throw new Error("Fixture diagnostic limit exceeded");
-    this.records.push(record);
-  }
-  snapshot(): string {
-    return "[" + this.records.map((line) => line.trim()).join(",") + "]\n";
-  }
-  async write(
-    folder: string,
-    deadline: number,
-    clock: FixtureClock = browserFixtureClock,
-    writer: (path: string, bytes: string) => Promise<void> = async (
-      path,
-      bytes,
-    ) => {
-      await writeFile(path, bytes, { mode: 0o600 });
-    },
-  ): Promise<void> {
-    this.deadline = Math.min(this.deadline ?? deadline, deadline);
-    const bytes = this.snapshot();
-    this.writing = (this.writing ?? Promise.resolve()).then(() =>
-      admit(
-        clock,
-        () => writer(join(folder, this.scope + "-status.json"), bytes),
-        this.deadline!,
-        "report",
-      ),
-    );
-    return this.writing;
-  }
-}
-
-export async function prepareFixtureCapture(
-  folder: string,
-  slot: FixtureCaptureSlot,
-  deadline: number,
-  clock: FixtureClock = browserFixtureClock,
-): Promise<FixtureCapture> {
-  if (!["probe", "controller", "timeout"].includes(slot))
-    throw new Error("Invalid protected capture");
-  if (clock.now() >= deadline) throw new FixtureDeadline("capture-deadline");
-  const path = join(folder, slot + ".raw.log");
-  const created = await open(path, "wx", 0o600);
-  const initial = await withResources(
-    async () => {
-      const status = await created.stat();
-      if (!status.isFile() || (status.mode & 0o777) !== 0o600)
-        throw new Error("Invalid protected capture");
-      return fixtureCaptureMetadata(
-        { bytes: status.size, device: status.dev, inode: status.ino },
-        { bytes: status.size, device: status.dev, inode: status.ino },
-      );
-    },
-    () => created.close(),
-  );
-  let checking: Promise<FixtureCaptureMetadata> | undefined;
-  return {
-    path,
-    check(end) {
-      return (checking ??= admit(
-        clock,
-        async () => {
-          const file = await open(
-            path,
-            constants.O_RDONLY | constants.O_NOFOLLOW,
-          );
-          return withResources(
-            async () => {
-              const status = await file.stat();
-              if (!status.isFile() || (status.mode & 0o777) !== 0o600)
-                throw new Error("Invalid protected capture");
-              return fixtureCaptureMetadata(initial, {
-                bytes: status.size,
-                device: status.dev,
-                inode: status.ino,
-              });
-            },
-            () => file.close(),
-          );
-        },
-        end,
-        "capture",
-      ));
-    },
-  };
-}
-
-export async function observeFixtureController<T>(
-  diagnostics: FixtureDiagnostics,
-  phase: "probe-controller" | "native-controller" | "nested-controller",
-  work: () => Promise<T>,
-): Promise<T> {
-  let value!: T,
-    failure: unknown,
-    failed = false;
-  try {
-    value = await work();
-  } catch (error) {
-    failure = error;
-    failed = true;
-  }
-  try {
-    diagnostics.note({
-      phase,
-      category: failed ? "failed" : "passed",
-      status: failed ? null : 0,
-    });
-  } catch (error) {
-    if (failed)
-      throw new AggregateError(
-        [failure, error],
-        "Controller and diagnostic recording failed",
-      );
-    throw error;
-  }
-  if (failed) throw failure;
-  return value;
 }
 
 export interface BrowserLease {
@@ -964,9 +699,6 @@ class OwnedBrowserCase {
       throw error;
     }
   }
-  privateText(): string[] {
-    return [this.nonce, ...(this.endpoint ? [this.endpoint] : [])];
-  }
   private actual(operation: "close" | "kill", deadline: number): Promise<void> {
     let result = this.apiCalls.get(operation);
     if (!result) {
@@ -1101,15 +833,6 @@ export class BrowserFixtureOwner {
   private total = 0;
   private accepted = 0;
   constructor(readonly options: BrowserOwnerOptions) {}
-
-  redact(text: string): string {
-    for (const value of [
-      this.options.nonce,
-      ...[...this.cases.values()].flatMap((c) => c.privateText()),
-    ])
-      if (value) text = text.replaceAll(value, "<browser-fixture-private>");
-    return text;
-  }
 
   busy(id: string): boolean {
     return [...this.cases.values()].some((c) => c.id !== id && c.row.held);
@@ -1332,6 +1055,7 @@ export class BrowserFixtureOwner {
       alive = false;
       peer.browser?.peers.delete(peer);
       if (peer.browser?.row.held) {
+        peer.browser.fail("client-lost");
         try {
           if (!this.lostPeers.has(peer.browser.id)) {
             this.lostPeers.add(peer.browser.id);
@@ -1345,8 +1069,6 @@ export class BrowserFixtureOwner {
           }
         } catch {
           if (this.errors.length < 16) this.errors.push("diagnostic-failed");
-        } finally {
-          peer.browser.fail("client-lost");
         }
       }
     });
@@ -1463,20 +1185,6 @@ export async function acquireBrowserFixtureDirectory(
   return { folder, socketPath };
 }
 
-/** Keep raw captures outside the ordinary browser-owner artifact directory. */
-export async function acquireProtectedFixtureDirectory(
-  report: string,
-): Promise<string> {
-  const folder = await mkdtemp(join("/tmp", basename(report) + ".protected-"));
-  try {
-    await chmod(folder, 0o700);
-  } catch (error) {
-    await rm(folder, { recursive: true, force: true });
-    throw error;
-  }
-  return folder;
-}
-
 async function runFixture(mode: string): Promise<void> {
   if (!["profile", "native", "worker-loss-probe"].includes(mode))
     throw new Error("Unknown fixed browser fixture mode");
@@ -1563,10 +1271,11 @@ async function runFixture(mode: string): Promise<void> {
         owner,
         async (signal) => {
           const began = performance.now();
-          const capture = await prepareFixtureCapture(
-            protectedFolder,
-            "probe",
+          const capture = await admit(
+            browserFixtureClock,
+            () => prepareFixtureCapture(protectedFolder, "probe"),
             began + 15000,
+            "capture",
           );
           captures.set("probe", capture);
           await observeFixtureController(diagnostics, "probe-controller", () =>
@@ -1619,10 +1328,11 @@ async function runFixture(mode: string): Promise<void> {
         owner,
         async (signal) => {
           const began = performance.now();
-          const capture = await prepareFixtureCapture(
-            protectedFolder,
-            "controller",
+          const capture = await admit(
+            browserFixtureClock,
+            () => prepareFixtureCapture(protectedFolder, "controller"),
             began + 900000,
+            "capture",
           );
           captures.set("controller", capture);
           await observeFixtureController(diagnostics, "native-controller", () =>
@@ -1721,7 +1431,12 @@ async function runFixture(mode: string): Promise<void> {
       );
       for (const [slot, capture] of captures) {
         try {
-          const metadata = await capture.check(stopDeadline);
+          const metadata = await admit(
+            browserFixtureClock,
+            () => capture.check(),
+            stopDeadline,
+            "capture",
+          );
           diagnostics.note({
             phase: slot === "probe" ? "probe-controller" : "native-controller",
             category: "capture-checked",
@@ -1739,7 +1454,12 @@ async function runFixture(mode: string): Promise<void> {
           });
         }
       }
-      await diagnostics.write(protectedFolder, stopDeadline);
+      await admit(
+        browserFixtureClock,
+        () => diagnostics.write(protectedFolder),
+        stopDeadline,
+        "report",
+      );
       await admit(
         browserFixtureClock,
         () =>
@@ -1787,12 +1507,13 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  await runFixture(process.argv[2] ?? "").catch(() => {
+  await runFixture(process.argv[2] ?? "").catch((error: unknown) => {
     process.stderr.write(
       fixtureDiagnostic({
         phase: "fixture-terminal",
         category: "failed",
         status: null,
+        failure: error,
       }),
     );
     process.exitCode = 1;

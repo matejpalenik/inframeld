@@ -13,9 +13,12 @@ import {
   observeProfileListener,
   expectedStalledCloseFailure,
   stalledCloseMessages,
+} from "./browser-owner.ts";
+import {
   FixtureDiagnostics,
   fixtureDiagnostic,
-} from "./browser-owner.ts";
+} from "./fixture-diagnostics.ts";
+import { withinDeadline } from "../../../src/system/deadline.ts";
 
 const { chromium } = await import("playwright");
 installInterruptHandlers();
@@ -51,12 +54,14 @@ if (process.env.SDK_BROWSER_OWNER_PROBE === "1") {
         }),
       );
     };
-    const record = (phase: string, category: string) => {
+    const record = (phase: string, category: string, failure?: unknown) => {
       try {
-        diagnostics.note({ phase, category, status: null });
-        void diagnostics
-          .write(diagnosticFolder, entered + 10000)
-          .catch(diagnosticFailure);
+        diagnostics.note({
+          phase,
+          category,
+          status: null,
+          ...(failure !== undefined ? { failure } : {}),
+        });
       } catch {
         diagnosticFailure();
       }
@@ -108,6 +113,7 @@ if (process.env.SDK_BROWSER_OWNER_PROBE === "1") {
           record(
             "fixture-close-settled",
             expectedGracefulFailure ? "expected-close-deadline" : "failed",
+            error,
           );
         }
         const backend = await fixture.backend.cleanup;
@@ -133,6 +139,10 @@ if (process.env.SDK_BROWSER_OWNER_PROBE === "1") {
         );
         record("cleanup-report-written", "passed");
         client.end();
+        await withinDeadline(
+          diagnostics.write(diagnosticFolder),
+          Math.max(0, entered + 10000 - performance.now()),
+        );
       })());
     let observeShutdown!: () => void;
     const shutdownObserved = new Promise<void>((resolve) => {
@@ -141,12 +151,13 @@ if (process.env.SDK_BROWSER_OWNER_PROBE === "1") {
     const onShutdown = () => {
       record("shutdown-observed", "started");
       const finishing = finalize();
-      void finishing.catch(() => {
+      void finishing.catch((error: unknown) => {
         process.stderr.write(
           fixtureDiagnostic({
             phase: "fixture-terminal",
             category: "cleanup-failed",
             status: null,
+            failure: error,
           }),
         );
       });

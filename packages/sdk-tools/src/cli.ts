@@ -50,39 +50,63 @@ const summary = {
   }[],
 };
 
+let subprocessAllowed = true;
+let harnessPassed = true;
 try {
   if (["test", "verify"].includes(selection.action)) {
-    await stage(summary.common, "tooling-typecheck", () =>
+    const typing = await stage(summary.common, "tooling-typecheck", () =>
       run(
         join(home, "node_modules/.bin/tsc"),
         ["-p", join(home, "tsconfig.tools.json")],
         "tooling-typecheck",
       ),
     );
-    await stage(summary.common, "harness-regressions", async () => {
-      const tests = (await readdir(join(home, "tests/unit")))
-        .filter((name) => name.endsWith(".test.ts"))
-        .map((name) => join(home, "tests/unit", name));
-      await run(
-        process.execPath,
-        [
-          "--import",
-          join(home, "node_modules/tsx/dist/loader.mjs"),
-          "--test",
-          ...tests,
-        ],
-        "harness-regressions",
-      );
-    });
-  }
-  if (selection.action === "verify")
-    await stage(summary.common, "backend-contract", () =>
-      run(
-        "uv",
-        ["run", "--directory", "apps/backend", "pytest", "tests/unit/contract"],
-        "backend-contract",
-      ),
+    subprocessAllowed &&= typing.mayStartProcess;
+    const harness = await stage(
+      summary.common,
+      "harness-regressions",
+      async () => {
+        const tests = (await readdir(join(home, "tests/unit")))
+          .filter((name) => name.endsWith(".test.ts"))
+          .map((name) => join(home, "tests/unit", name));
+        await run(
+          process.execPath,
+          [
+            "--import",
+            join(home, "node_modules/tsx/dist/loader.mjs"),
+            "--test",
+            ...tests,
+          ],
+          "harness-regressions",
+        );
+      },
+      subprocessAllowed,
     );
+    harnessPassed = typing.passed && harness.passed;
+    // An outer test runner cannot prove cleanup of failed nested fixtures.
+    subprocessAllowed &&= harnessPassed && harness.mayStartProcess;
+  }
+  if (selection.action === "verify") {
+    const contract = await stage(
+      summary.common,
+      "backend-contract",
+      () =>
+        run(
+          "uv",
+          [
+            "run",
+            "--directory",
+            "apps/backend",
+            "pytest",
+            "tests/unit/contract",
+          ],
+          "backend-contract",
+        ),
+      subprocessAllowed,
+    );
+    subprocessAllowed &&= contract.mayStartProcess;
+    harnessPassed &&= contract.passed;
+  }
 
   for (const language of selection.selected) {
     const stages: Stage[] = [];
@@ -91,22 +115,41 @@ try {
       `\n${language.toUpperCase()}${selection.partial ? " (partial local run)" : ""}`,
     );
     try {
-      if (selection.action === "setup") await setupSdk(language, stages);
-      else {
-        if (["generate", "check", "verify"].includes(selection.action))
-          await stage(
+      if (selection.action === "setup") {
+        const result = await setupSdk(language, stages, {
+          passed: true,
+          mayStartProcess: subprocessAllowed,
+        });
+        subprocessAllowed &&= result.mayStartProcess;
+      } else {
+        if (["generate", "check", "verify"].includes(selection.action)) {
+          const generated = await stage(
             stages,
             selection.action === "generate"
               ? "generation"
               : "regeneration-drift",
             () => generate(language, selection.action !== "generate"),
+            subprocessAllowed,
           );
-        if (["test", "verify"].includes(selection.action))
-          await testSdk(language, work, stages, selection);
-        if (selection.action === "verify")
-          await verifyPackage(language, work, stages);
+          subprocessAllowed &&= generated.mayStartProcess;
+        }
+        if (["test", "verify"].includes(selection.action)) {
+          const result = await testSdk(language, work, stages, selection, {
+            passed: harnessPassed,
+            mayStartProcess: subprocessAllowed,
+          });
+          subprocessAllowed &&= result.mayStartProcess;
+        }
+        if (selection.action === "verify") {
+          const result = await verifyPackage(language, work, stages, {
+            passed: harnessPassed,
+            mayStartProcess: subprocessAllowed,
+          });
+          subprocessAllowed &&= result.mayStartProcess;
+        }
       }
     } catch (error) {
+      subprocessAllowed = false;
       stages.push({
         name: "workflow",
         status: "failed",
@@ -133,10 +176,18 @@ try {
               recursive: true,
             });
           }
-        await withinDeadline(
-          rm(work, { recursive: true, force: true }),
-          budgets.cleanup,
-        );
+        if (subprocessAllowed)
+          await withinDeadline(
+            rm(work, { recursive: true, force: true }),
+            budgets.cleanup,
+          );
+        else
+          stages.push({
+            name: "cleanup",
+            status: "failed",
+            milliseconds: 0,
+            error: "Cleanup unconfirmed, private work retained",
+          });
       } catch (error) {
         stages.push({
           name: "cleanup",

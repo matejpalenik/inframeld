@@ -12,7 +12,7 @@ Use `pnpm delivery:plan` for the GitHub snapshot and dependency candidates. Insp
 
 Use the [assignment brief](assignment-protocol.md#use-one-short-assignment-brief). Clear ownership once. Request independent plan review for material architecture, authorization, public-contract, persistence, shared-harness changes or a newly proposed cross-issue boundary. A routine implementation within accepted patterns needs a proportionate scope check and later independent implementation review, not another extensive planning ceremony.
 
-For a material plan, seek roughly 9/10 on the relevant quality rubrics and at most 2/10 overengineering risk, where lower risk is better. Review the complete proposed capability, including verification infrastructure. If material gaps prevent those targets, reconsider the scope or approach before dependent implementation. Explain the actual gap and smallest remedy rather than requesting a preferred score. Implementation-only evidence is N/A at planning time. These are design targets, not new numerical merge gates or reasons to polish optional details indefinitely.
+For a material plan, seek roughly 9/10 on the relevant quality rubrics and apply Review's binding [maintainability bar](../../inframeld-review/references/scoring-and-report.md#apply-the-maintainability-bar). Review the complete proposed capability, including verification infrastructure. Reconsider scope or approach when the bar is unmet, even on the first repair attempt. Explain the actual gap and smallest remedy rather than requesting a preferred score. Implementation-only evidence is N/A at planning time. The quality targets do not justify polishing optional details indefinitely or averaging away maintenance findings.
 
 ### Review a newly discovered dependency
 

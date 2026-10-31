@@ -184,24 +184,33 @@ def _clock() -> int:
     return time.monotonic_ns() // 1_000_000
 
 
-def _members(target: OwnedTarget, deadline: int) -> bool:
+def observe_members(target: OwnedTarget, deadline: int) -> bool:
     """Read a checked, byte-bounded ps result within the existing stop deadline."""
     deadline = min(deadline, _clock() + 1000)
     if _clock() >= deadline:
         raise TimeoutError
+    # Reserve part of this observation's phase for its own kill and wait.
+    read_deadline = deadline - min(50, max(1, (deadline - _clock()) // 4))
+    environment = dict(os.environ)
+    for name in ("PS_PERSONALITY", "CMD_ENV", "I_WANT_A_BROKEN_PS"):
+        environment.pop(name, None)
+    environment["LC_ALL"] = "C"
     observation = subprocess.Popen(
         ["ps", "-A", "-o", "pid=,pgid=,stat="],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
+        env=environment,
     )
     assert observation.stdout is not None
     output = bytearray()
     stream = observation.stdout
     try:
         os.set_blocking(stream.fileno(), False)
-        while _clock() < deadline:
-            readable, _, _ = select.select([stream], [], [], max(0, deadline - _clock()) / 1000)
+        while _clock() < read_deadline:
+            readable, _, _ = select.select(
+                [stream], [], [], max(0, read_deadline - _clock()) / 1000
+            )
             if not readable:
                 raise TimeoutError
             chunk = os.read(stream.fileno(), 65536)
@@ -231,33 +240,39 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
     """Finish owned signalling and reaping inside the first fixed cleanup budget."""
     reserve = min(1000, max(1, cleanup_ms // 2))
     term_deadline = deadline - reserve
+    # Leave the end of the original allowance for the retained leader and terminal record.
+    final_deadline = deadline - min(50, max(1, cleanup_ms // 10))
     if mode == "backend":
         term_deadline = min(term_deadline, _clock() + 1500)
     quiescent = False
     observation_valid = True
 
-    def check() -> bool:
+    def check(cutoff: int) -> bool:
         nonlocal observation_valid
+        # Do not start a new ps child when its read/kill/wait slice no longer fits.
+        # Skipping reports no quiescence and leaves owned escalation intact.
+        if cutoff - _clock() <= min(50, max(1, cleanup_ms // 10)):
+            return False
         if not target.observe():
             return False
         try:
-            return not _members(target, deadline)
+            return not observe_members(target, cutoff)
         except (OSError, ValueError, subprocess.SubprocessError, TimeoutError):
             observation_valid = False
             if "group-observation-failed" not in target.errors:
                 target.errors.append("group-observation-failed")
             return False
 
-    quiescent = check()
+    quiescent = check(term_deadline)
     for number, phase_deadline in (
         (signal.SIGTERM, term_deadline),
-        (signal.SIGKILL, deadline),
+        (signal.SIGKILL, final_deadline),
     ):
         if quiescent or not target.owned or _clock() >= deadline:
             break
         target.signal_group(number)
         while target.owned and _clock() < phase_deadline:
-            quiescent = check()
+            quiescent = check(phase_deadline)
             if quiescent:
                 break
             time.sleep(min(0.01, max(0, phase_deadline - _clock()) / 1000))

@@ -43,6 +43,6 @@ Delivery does not authorize host or Podman-machine repair. Only the coordinator 
 
 ## Finish and report honestly
 
-Follow the [three-cycle and failure policy](references/gates-and-recovery.md#classify-failures-and-bound-remediation). Keep required findings and checks enforced. Preserve current base/head binding while reusing unchanged evidence only after explicit revalidation. CodeRabbit remains advisory under its existing policy. Scores never determine merge eligibility.
+Follow the [three-cycle and failure policy](references/gates-and-recovery.md#classify-failures-and-bound-remediation). Keep required findings and checks enforced. Preserve current base/head binding while reusing unchanged evidence only after explicit revalidation. CodeRabbit remains advisory under its existing policy. Review's [maintainability bar](../inframeld-review/references/scoring-and-report.md#apply-the-maintainability-bar) is binding for plan and implementation readiness. Other ratings remain descriptive, not arithmetic merge gates.
 
 The coordinator performs authorized native merges serially with an expected-head guard and observes actual main afterward. Park blocked checkpoints and reuse safely released capacity for independent work. A Goal completes only when its authorized outcome is actually delivered and reconciled. Low usage, a pushed branch or a helper's readiness result does not establish completion.
