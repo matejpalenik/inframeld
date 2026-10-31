@@ -54,6 +54,10 @@ The run record lives outside every checkout, so rebases cannot overwrite it. The
 
 Before another attempt, classify the failure as product behavior, maintained harness/configuration, diagnostic/evidence setup or unavailable environment. State the remaining accepted behavior, root-cause hypothesis, proposed scoped correction and meaningful verification. Keep this in the existing issue history. Do not build another retry controller.
 
+Compare the remaining failure with the previous attempt. State what actually improved, what evidence rules out a hypothesis and which acceptance remains unmet. More passing pure tests or better diagnostics can be useful without resolving the failed real journey. The [discovery policy](discovered-defects.md) owns whether that defect should interrupt the feature.
+
+When the same acceptance case remains failing or replacement code needs substantial new corrections, reassess the complete repair against main before expanding it. Choose a smaller evidence-based correction, a useful prerequisite boundary, a reviewed maintained alternative or a parked checkpoint. Review fixtures and supervision costs with the implementation. A narrow patch's good score cannot certify the accumulated solution. This reassessment stays within the remaining authorization and attempt limit. It grants no additional cycle.
+
 A remediation cycle is a bounded attempt to resolve a blocker through a hypothesis, correction and relevant verification. Count unsuccessful cycles on the issue, including harness/setup attempts that leave the blocker unresolved. An expected behavioral TDD red, individual subprocess or optional formatting repair is not automatically a failed cycle. Three unsuccessful remediation cycles stop that issue for human direction. Carry the unresolved history across phase changes, renamed probes, supporting PRs and worker reassignment. A new label does not reset the allowance.
 
 | Failure | Response within existing authorization |

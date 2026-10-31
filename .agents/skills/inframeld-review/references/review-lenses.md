@@ -34,6 +34,8 @@ Do not equate DRY with removing all repeated text. Sharing a real rule prevents 
 
 A finding about unnecessary complexity must name the component, the absent or disproportional need, its maintenance cost and a simpler alternative with preserved invariants. Vague suggestions to simplify, add layers or use a familiar pattern are not actionable. Do not call known required safety overengineering merely because its implementation takes code.
 
+When a repair expands or its replacement needs substantial corrections, assess the accumulated change against main, including its test fixtures, supervision and new failure modes. A good score for the latest small patch or a process-only slice does not rate the whole solution. Identify the reviewed boundary and remaining qualification explicitly. For coordinated delivery, [defect triage](../../inframeld-backlog-delivery/references/discovered-defects.md) owns the decision to separate, defer or park the newly discovered work. Do not restart unrelated audits after routine corrections.
+
 ## Correctness, data integrity and architecture
 
 Trace supplied input to the actual effect, including representation changes, validation, checked scope and returned facts. Check empty/absent/unknown distinctions, boundary values and supported malformed input. Use contracts rather than guessing meaning from a name. For externally observable changes, verify callers, native OpenAPI, generated consumers and applicable compatibility obligations agree.
