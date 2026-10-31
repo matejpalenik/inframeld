@@ -16,6 +16,7 @@ An SDK test can additionally show that the generated client sent the right reque
 ## Essential constraints
 
 - Choose tests for the behavior and failure boundary. A mock can establish interactions and decisions, not an unexecuted database or provider guarantee.
+- Describe both the behavior checked and the resources used. Require cleanup after setup or assertion failure, and stop dependent runtime checks when resource ownership or cleanup is unresolved. The references below distinguish these cases from ordinary independent assertion failures.
 - Keep service-dependent tests isolated from development databases, credentials and volumes. Use the existing private test procedures rather than an improvised stack or broad cleanup.
 - Establish acceptance through repository-owned behavioral tests and maintained workspace commands. Temporary diagnostics answer a bounded question and remain partial evidence. Review expanding harness repairs before adding executors or duplicate supervision. [Isolation and evidence](references/isolation-and-evidence.md#maintained-commands-and-diagnostic-probes) owns these limits and routes delivery to its host boundary.
 - Distinguish passed, failed, skipped and unavailable checks. Inspect enabled integration flags and the actual collected/executed scenarios before claiming a whole suite or product journey passed.
@@ -26,8 +27,8 @@ An SDK test can additionally show that the generated client sent the right reque
 
 | Task | Read |
 | --- | --- |
-| Choose a unit, HTTP, database or provider test | [Test strategy](references/test-strategy.md) |
-| Investigate fixtures, integration setup, cleanup or evidence claims | [Isolation and evidence](references/isolation-and-evidence.md) |
+| Choose a test boundary, classify resources or assess assertions and doubles | [Test strategy](references/test-strategy.md) |
+| Investigate fixture ownership, integration setup, cleanup failures or evidence claims | [Isolation and evidence](references/isolation-and-evidence.md) |
 | Run a focused check or integration stack | [Testing runbook](../../../docs/development/guides/testing.md) |
 | Explain CI relevance, not-applicable results or manual full verification | [CI selection and proof boundaries](../../../docs/development/guides/testing.md#ci-selection) |
 | Explain dependency caches, invalidation or cold/warm CI evidence | [CI cache policy](../../../docs/development/guides/testing.md#ci-dependency-caches) |
