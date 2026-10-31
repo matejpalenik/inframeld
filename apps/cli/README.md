@@ -1,6 +1,6 @@
 # Inframeld CLI foundation
 
-The Rust `inframeld` executable currently provides offline help and build/compatibility information. It does not start services. Login, target selection, product commands, JSON automation and descriptive dry-run remain separate delivery work (#158–#160 and their owning issues). The [common automation contract](../../.agents/skills/inframeld-application-contracts/references/cli-output-and-automation.md) is accepted design, with runtime delivery still pending.
+The Rust `inframeld` executable provides offline help, human and machine-readable build information, and descriptive dry-run for `version`. These commands require no services, configuration or credentials. Login, target selection and product command families remain separate delivery work (#158–#160 and their owning issues). The [common automation contract](../../.agents/skills/inframeld-application-contracts/references/cli-output-and-automation.md) is accepted design. Its offline version consumer is described below, while progress, queries, lists and mutations still need their owning executable integrations.
 
 ```sh
 inframeld --help
@@ -9,6 +9,45 @@ inframeld version --help
 ```
 
 No arguments displays help. Invalid arguments exit with code 2. Help and version require no network, configuration, credentials, Docker or writable home. The generated SDK adapter is exercised through an isolated HTTP test, not exposed as an extra product command.
+
+## Inspect offline version output
+
+Use `inframeld version --json` to inspect the installed executable in a script. The [user guide](../docs/src/app/guides/inspect-cli-version/page.mdx) explains its fields and recovery limits. This command reads embedded build information, not a running installation. Development metadata reports no qualified runtime and leaves remote compatibility unverified.
+
+`--json` writes one final JSON object to stdout. Explicit `--jsonl` writes one compact final record whose `result` contains that object. Neither version nor its dry-run emits progress. Choose one output mode. Both flags together produce a JSON usage failure and exit 2. Help and a recognized root `--version` remain plain-text exceptions.
+
+`inframeld version --dry-run --json` describes the intended embedded-metadata read and stdout output without reading the embedded values. It checks arguments only. Its successful plan does not verify build metadata, runtime readiness or compatibility. `--no-input`, `--plain` and `--no-color` are accepted global booleans, but version never prompts and these flags do not change JSON data. All six global flags can appear before or after `version`.
+
+### Manually check the version feature
+
+Use a binary built with this feature, either installed as described below or built from source. Older archives may reject the new flags. From any working directory with that binary on `PATH`, run these commands individually:
+
+```sh
+inframeld version
+inframeld version --json
+inframeld --json version
+inframeld version --jsonl
+inframeld version --dry-run
+inframeld version --dry-run --json
+inframeld version --dry-run --jsonl
+```
+
+Each exits 0 when output is written successfully. Human version output retains the embedded version, revision, dirty-source flag, target and compatibility policy, ending with `Remote compatibility: unverified`. Both ordinary JSON flag positions produce the same fields. Their six required top-level fields are `schemaVersion`, `mode`, `outcome`, `data`, `error` and `warnings`. Execute mode has the nine version-data fields documented in the user guide. Unknown embedded revision becomes JSON `null`, independently of `sourceDirty`. `qualifiedRuntime` is `null` for this development profile. JSONL contains exactly one final `type: "result"` record, with no progress or trailing record. Successful stderr is empty.
+
+Human dry-run says that embedded values were not read and remote compatibility was not checked. Machine dry-run has `mode: "dryRun"`, `outcome: "succeeded"`, `operationPerformed: false` in its plan data, `error: null` and `warnings: []`. It contains intended actions rather than actual metadata values.
+
+Check a rejection and the plain-text exceptions separately:
+
+```sh
+inframeld --json
+inframeld version --json --jsonl
+inframeld version --help --json
+inframeld --json --version
+```
+
+The first two exit 2, with `outcome: "failed"`, `data: null` and the safe `invalid_arguments` error on stdout, plus a fixed diagnostic on stderr. No submitted argument values are echoed. The last two display plain text and exit 0. An exact help flag before standalone `--` takes precedence over argument errors or conflicting output modes. Tokens after that delimiter do not select machine output or dry-run.
+
+These checks change no configuration, credentials or installation data and need no cleanup. Redirecting output creates files only through the shell. Treat a missing, malformed or incomplete machine result as failed output and check the process status. A machine stdout write or flush failure, including a broken pipe, exits 1 and may leave only a prefix. It never appends a replacement result. Plain human/help/version output preserves its existing broken-pipe exit 0 behavior. Forced termination can prevent any final output. The feature adds no signal or durable-work workflow.
 
 ## Install and remove a packaged executable
 
@@ -85,7 +124,7 @@ The command/parser and output layers handle local presentation only. Explicit co
 
 ## Rust tooling layout
 
-The runtime starts in `src/main.rs`, with parsing and dispatch in private `src/app.rs`. The library preserves `inframeld_cli::run` through a re-export. `src/commands/version.rs` handles the offline version command using `BuildMetadata::render`, which also supplies the text checked by packaging qualification. It has no separate empty argument record or general reporting framework.
+The runtime starts in `src/main.rs`, with parsing, dispatch and bounded final reporting in private `src/app.rs`. The library preserves `inframeld_cli::run` through a re-export. `src/commands/version.rs` maps validated embedded metadata into typed version data and supplies its descriptive plan. Human version still uses `BuildMetadata::render`, which also supplies the text checked by packaging qualification. This offline consumer does not establish a general product-command framework.
 
 The private xtask follows the same entry-point split: `src/main.rs` reports the result, `src/arguments.rs` declares clap inputs and `src/app.rs` dispatches them. `src/package.rs` coordinates packaging through `PackagingContext`, which owns resolved build inputs and configured commands. `src/verify/mod.rs` retains the verification API and evidence record, `src/verify/inspect.rs` checks archives before execution and `src/verify/native.rs` owns native installation and execution qualification. Archive and bounded-process mechanics remain in `src/archive.rs` and `src/process.rs`.
 
@@ -97,13 +136,13 @@ Archive reads reject unsafe paths, links, duplicates, unexpected files and overs
 
 [ADR-0096](../../docs/adr/ADR-0096-select-reusable-rust-cli-presentation-libraries.md) accepts focused libraries behind shared presentation components. The runtime baseline is declared in this package, insta is a development dependency, and clap_complete/clap_mangen belong to the private xtask. The optional `rich-diagnostics` Cargo feature includes miette. Default builds omit it, while the all-features checks above compile it.
 
-The [Rust Standards library reference](../../.agents/skills/inframeld-rust-standards/references/cli-libraries.md) owns the responsibility map and deferred alternatives. Manifests and Cargo.lock own exact versions and features. Dependency availability does not implement shared components, prompts, snapshots, completion/manual generation or public JSON behavior.
+The [Rust Standards library reference](../../.agents/skills/inframeld-rust-standards/references/cli-libraries.md) owns the responsibility map and deferred alternatives. Manifests and Cargo.lock own exact versions and features. Dependency availability does not implement prompts, snapshots, completion/manual generation or product-command output. Offline version JSON has its own implemented consumer and bounded contract.
 
 <a id="proposed-command-and-presentation-organization"></a>
 
 ## Command and presentation organization
 
-[ADR-0097](../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md) accepts command-family modules within one CLI package, command-local clap declarations and typed results before shared reporting. The [Rust Standards structure reference](../../.agents/skills/inframeld-rust-standards/references/cli-structure.md) explains placement through a worked declaration and the end-to-end lifecycle flowchart. [Application Contracts' presentation reference](../../.agents/skills/inframeld-application-contracts/references/cli-presentation-components.md) owns reusable components consuming the accepted output/result contracts. These are accepted targets. General JSON, progress and product-command implementation and qualification remain separate work.
+[ADR-0097](../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md) accepts command-family modules within one CLI package, command-local clap declarations and typed results before shared reporting. The [Rust Standards structure reference](../../.agents/skills/inframeld-rust-standards/references/cli-structure.md) explains placement through a worked declaration and the end-to-end lifecycle flowchart. [Application Contracts' presentation reference](../../.agents/skills/inframeld-application-contracts/references/cli-presentation-components.md) owns reusable components consuming the accepted output/result contracts. Offline version implements its own JSON, final-only JSONL and descriptive dry-run. Integration and qualification for other command families, progress, warnings, change views and pagination remain separate work. This supporting feature does not complete #158.
 
 ## Stateless server discovery
 
