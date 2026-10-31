@@ -280,7 +280,7 @@ fn report_help(
 
 fn plain(bytes: &[u8], stdout: &mut impl Write, stderr: &mut impl Write) -> io::Result<u8> {
     if bytes.len() > STDOUT_LIMIT {
-        diagnostic(LocalError::OutputLimitExceeded, stderr)?;
+        let _ = diagnostic(LocalError::OutputLimitExceeded, stderr);
         return Ok(1);
     }
     stdout.write_all(bytes)?;
@@ -322,7 +322,7 @@ fn failure(
     stderr: &mut impl Write,
 ) -> io::Result<u8> {
     if intent.format == Format::Human {
-        diagnostic(error, stderr)?;
+        let _ = diagnostic(error, stderr);
         return Ok(error.exit());
     }
     let _ = diagnostic(error, stderr);
@@ -367,4 +367,42 @@ fn machine<T: Serialize>(
         return Ok(1);
     }
     Ok(exit)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{self, Write};
+
+    use super::{STDOUT_LIMIT, plain};
+
+    #[derive(Debug)]
+    enum DiagnosticFailure {
+        Write,
+        Flush,
+    }
+
+    impl Write for DiagnosticFailure {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            match self {
+                Self::Write => Err(io::ErrorKind::BrokenPipe.into()),
+                Self::Flush => Ok(bytes.len()),
+            }
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Err(io::ErrorKind::BrokenPipe.into())
+        }
+    }
+
+    #[test]
+    fn diagnostic_failure_keeps_the_plain_output_limit_rejection() {
+        let codes = [DiagnosticFailure::Write, DiagnosticFailure::Flush].map(|mut diagnostic| {
+            let mut output = Vec::new();
+            let code = plain(&vec![b'x'; STDOUT_LIMIT + 1], &mut output, &mut diagnostic)
+                .map_err(|error| error.kind());
+            assert!(output.is_empty());
+            code
+        });
+        assert_eq!(codes, [Ok(1), Ok(1)]);
+    }
 }

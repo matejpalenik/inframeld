@@ -444,6 +444,33 @@ fn broken_human_diagnostic_does_not_suppress_the_final_machine_usage_result() {
 }
 
 #[test]
+fn human_usage_keeps_its_exit_when_the_diagnostic_write_or_flush_fails() {
+    let codes = [
+        OutputFault {
+            fail_after: Some(0),
+            ..OutputFault::default()
+        },
+        OutputFault {
+            fail_flush: true,
+            ..OutputFault::default()
+        },
+        OutputFault {
+            zero_write: true,
+            ..OutputFault::default()
+        },
+    ]
+    .map(|mut diagnostic| {
+        let mut output = Vec::new();
+        let code = run(["inframeld", "--unknown"], &mut output, &mut diagnostic)
+            .map_err(|error| error.kind());
+        assert!(output.is_empty());
+        assert!(diagnostic.bytes.len() <= 1_024);
+        code
+    });
+    assert_eq!(codes, [Ok(2), Ok(2), Ok(2)]);
+}
+
+#[test]
 fn successive_short_writes_complete_one_result_before_success() {
     let mut output = OutputFault {
         short: true,
@@ -508,4 +535,43 @@ fn real_broken_machine_pipe_fails_while_plain_version_keeps_its_pipe_exception()
         assert!(output.stderr.len() <= 1_024);
         assert_eq!(std::fs::read_dir(home.path()).unwrap().count(), 0);
     }
+}
+
+#[test]
+// A deadline failure panics only after this test's child has been killed and reaped.
+#[allow(clippy::panic)]
+fn a_closed_stderr_diagnostic_cannot_make_an_invalid_invocation_succeed() {
+    let home = TempDir::new().unwrap();
+    std::fs::set_permissions(home.path(), std::fs::Permissions::from_mode(0o500)).unwrap();
+    let (reader, writer) = io::pipe().unwrap();
+    // Closing the reader before spawn makes failure independent of scheduling.
+    drop(reader);
+    let mut child = ProcessCommand::new(assert_cmd::cargo::cargo_bin!("inframeld"))
+        .arg("--unknown")
+        .env_clear()
+        .env("HOME", home.path())
+        .env("PATH", "")
+        .current_dir(home.path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::from(writer))
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if child.try_wait().unwrap().is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            child.kill().unwrap();
+            child.wait().unwrap();
+            panic!("offline command exceeded its process deadline");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output().unwrap();
+    std::fs::set_permissions(home.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    assert!(output.stderr.is_empty());
+    assert_eq!(std::fs::read_dir(home.path()).unwrap().count(), 0);
 }
