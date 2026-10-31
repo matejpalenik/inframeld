@@ -32,9 +32,9 @@ jobs:
       matrix:
         include:
           - language: javascript-typescript
-            required: ${{ needs.changes.outputs.codeql_javascript }}
+            required: ${{ github.event_name == 'pull_request' && 'true' || needs.changes.outputs.codeql_javascript }}
           - language: python
-            required: ${{ needs.changes.outputs.codeql_python }}
+            required: ${{ github.event_name == 'pull_request' && 'true' || needs.changes.outputs.codeql_python }}
 
     steps:
       - name: Require valid selection
