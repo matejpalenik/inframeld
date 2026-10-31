@@ -29,6 +29,6 @@
     "url": "https://github.com/matejpalenik/inframeld"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   }
 }
