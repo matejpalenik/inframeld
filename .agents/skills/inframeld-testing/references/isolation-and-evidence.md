@@ -52,6 +52,24 @@ Focused provider runs use the same private graph and readiness/migration path. T
 
 Close clients, database resources and bounded subprocesses through the existing lifecycle helpers, including cancellation and log draining where applicable. A timeout or lost acknowledgment may occur after an effect. Cleanup/retry assertions must preserve the owning operation's meaning and budget rather than blindly repeating work.
 
+### Fixtures must clean up when the test fails
+
+Register teardown as soon as each resource is acquired, before waiting for readiness or making assertions. Use the framework's existing lifecycle hooks, context managers or `try/finally` as appropriate. If setup acquires a second resource and then fails, the first still needs cleanup. Always await owned asynchronous work and close/drain its relevant handles within the existing bounded lifecycle. Preserve both the original failure and a cleanup failure. No passing assertion can override unresolved cleanup.
+
+For example, Alice starts a child and waits for a readiness file. If the child never announces readiness, that assertion may throw before the normal cancellation step. A `finally` block that only removes the directory leaves the command running until another timeout. Teardown must still cancel and await the owned command. Cleaning only a recorded descendant PID is unsafe and does not settle the owned leader. Use the existing ownership mechanism rather than adding an emergency PID-kill script.
+
+When fixture lifecycle changes, cover the relevant failure before readiness, assertion failure or cancellation path as well as normal completion. Exercise actual owned resources where real cleanup is the claim. A check that only observes the cleanup method being called cannot establish that the resource is gone. Avoid unowned processes and forced identifier reuse. Necessary fixture programs should be readable and maintained with their owning tests. Move substantial embedded programs to ordinary fixture files when that improves understanding, without turning a small stub into a new controller or banning shell/Python fixtures outright.
+
+### Decide whether later checks are still independent
+
+| Failure | What may continue | What must stop |
+| --- | --- | --- |
+| Ordinary scenario assertion, with valid shared prerequisites and confirmed cleanup | Checks whose inputs and resources are genuinely independent | Any check that needs the failed result as a prerequisite |
+| Common harness, build or contract stage invalidates a later check's prerequisite | Unaffected static checks or isolated work with its own valid prerequisites | Dependent execution, until the prerequisite is restored |
+| Resource ownership, process shutdown or shared cleanup is unresolved | Reporting and work that cannot touch the unsettled runtime or resources | Dependent runtime checks, retries and additional service startup |
+
+For example, one SDK decoding assertion can fail while another isolated SDK check remains useful. A common process-lifetime regression that cannot confirm shutdown is different. Recording it as failed and launching the remaining SDK runtime stages can reuse an unsettled environment and create secondary failures. Keep the failed result visible and stop affected execution. Use a small decision at the existing workflow boundary, not another scheduler. During delivery, the existing coordinator still owns shared access and recovery allowances.
+
 ## Interpret outcomes by what ran
 
 | Observation | Supported conclusion |
@@ -70,3 +88,7 @@ Keep model-provider calls controlled in ordinary tests and SDK qualification. Co
 The [test strategy](test-strategy.md) owns layer selection, and [SDK qualification](../../inframeld-sdks/references/shared-qualification.md) owns client-specific completeness and protocol assertions. Keep newly implemented layers and unrun platform/provider journeys explicit instead of presenting future design as a current test suite.
 
 SDK verification reports native typing, model/capability checks, shared HTTP scenarios, archive construction and installed consumers separately. Validation provenance distinguishes generated model decoding from generated schema validation, parsed JSON and no validation. Nullable/bodyless fixtures establish capabilities, while real provider and persistence qualification remain separate. See [current hardening evidence](../../../../docs/development/reports/sdk-hardening-verification.md) before describing checks as executed or recommending issue closure.
+
+## Supporting guidance
+
+[pytest's safe fixture structure](https://docs.pytest.org/en/stable/how-to/fixtures.html#safe-fixture-structure) explains pairing acquired resources with teardown. [Google SRE troubleshooting](https://sre.google/sre-book/effective-troubleshooting/) supports explicit hypotheses and discriminating evidence when a maintained check fails. These principles inform the local guidance. They neither authorize host repair nor replace the repository's actual commands and lifecycle contracts.
