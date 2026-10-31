@@ -20,6 +20,14 @@ Bind each accepted risk to its originating review role, exact review reference a
 
 Revalidate current issue acceptance before merge. A changed issue body, updated blocker or material acceptance change invalidates the affected readiness claim. A foundation can close its own scoped issue when acceptance is met. It cannot close a complete feature issue merely because another issue might later connect it to an executable journey.
 
+### Revalidate evidence without repeating unrelated work
+
+A normal result needs the command, tested revision/content, relevant environment, actual outcome, raw-log reference where useful and accepted behavior it establishes. Keep separate role judgments where the helper requires them. Do not add a manifest, fingerprint, per-command review or second state system merely to describe a routine formatter or unit test.
+
+Current helper receipts must still bind to the current base/head and issue revision. When binding changes, create a current assessment after inspecting the delta. It may cite earlier raw test results for unchanged relevant content with an explicit applicability explanation. Do not relabel an earlier run as freshly executed. A documentation correction need not rerun unchanged database behavior, while an authorization change may require broad requalification. Required final-head CI cannot be replaced by earlier results.
+
+A broken optional report writer does not erase retained valid evidence. Recover the report from the raw result without inventing data. If required source binding, test outcome or cleanup cannot be established, keep that claim unverified. Tests passing before failed cleanup do not make a complete integration run successful. Re-run only what remains unknown or whose premises changed.
+
 ## Merge useful prerequisites without closing the feature
 
 A supporting PR may deliver a coherent, useful capability from an unfinished issue. It must belong to the authorized snapshot and have explicit acceptance examples, accurate limits and no speculative unused framework. Independently review the scope against the full issue, identifying remaining acceptance and explaining why each deferred native blocker is unnecessary for this particular capability. Preserve those blockers on the issue and full assignment. A missing prerequisite needed by the supporting capability still blocks its merge.
@@ -28,21 +36,46 @@ For example, a maintained transient login helper may be useful before saved cred
 
 Bind acceptance, code, documentation and DX receipts explicitly to the supporting PR number, scope and actual base/head. All actual required checks, current authorization, independent reviews, P0/P1/P2 rules, CodeRabbit handling and expected-head merge guard still apply. Inspect PR and included commit closing references. Supporting PRs use no closing keywords and leave the larger issue open.
 
-Use `assess-prerequisite` with the independently reviewed packet described in [the helper contract](../../../../scripts/delivery/README.md#assess-a-supporting-pr). It assesses only the supporting boundary and never reports issue completion. Observe its actual merge with `observe_prerequisite_merge`. Do not use full-issue `observe_merge` or invent a ready full-issue acceptance receipt for that event. Unknown merge outcomes block further execution and ownership changes until reconciled. Confirm the feature issue stayed open, retain the remaining acceptance and refresh affected dependent work against actual main.
+In native delivery, use `assess-prerequisite` with the independently reviewed packet described in [the helper contract](../../../../scripts/delivery/README.md#assess-a-supporting-pr). It assesses only the supporting boundary and never reports issue completion. Observe its actual merge with `observe_prerequisite_merge`. Do not use full-issue `observe_merge` or invent a ready full-issue acceptance receipt for that event. The personal separate-chat pilot applies the same scope, review and check criteria through its [human-merge handoff and personal evidence record](../../../../scripts/delivery/personal-skill/references/coordinator.md#execute-and-hand-off), without invoking native helpers or adopting their schema. In either mode, unknown merge outcomes block further execution and ownership changes until reconciled. Confirm the feature issue stayed open, retain remaining acceptance and refresh dependent work against actual main.
 
 ## Shared resources are observed ownership
 
-Workers request resources from the coordinator before starting shared integration activity. A claim names its owner, worktree/run and resource identity. Use one integration owner when the suite depends on shared Compose projects, fixed ports, database state or cleanup. Keep independent unit and fixture checks parallel when they do not use the same resources.
+The coordinator schedules shared integration and records its owner. It may designate the implementation worker as executor. A grant covers one complete maintained operation, its documented startup/cleanup and bounded scoped diagnostics, with the executor, worktree, clean frozen revision, command and affected resource identities. It does not need a new grant for every internal subprocess. It cannot override a stricter actual launch restriction. Reviewers request evidence and remain read-only.
+
+Use one active integration operation when Compose projects, fixed ports, database state or cleanup are shared. Freeze the tested source, including documentation/generation writers, until exit and cleanup are reconciled. Afterward verify source still matches the frozen revision. Integration evidence never qualifies a different content state.
+
+Independent unit/fixture checks and a worker's private outputs can run in parallel under the assignment's existing permission. They need another resource grant only when another task actually shares those outputs or services. Never treat an engine-wide resource as private merely because the worktree is separate.
 
 Release only after observing teardown and the actual resource state. A timeout, expired timestamp, killed terminal or missing agent response does not prove cleanup. Mark uncertain cleanup as still occupied, reconcile processes/containers/ports and then release. Do not broadly prune containers, delete databases, steal ports or terminate another agent's work. Resource state records coordination, not a substitute for actual sandbox permissions.
 
 The run record lives outside every checkout, so rebases cannot overwrite it. The coordinator is its sole writer. Use run/coordinator identity and expected-revision updates, and inspect conflicts instead of overwriting newer records. Atomic state persistence prevents partial files. It does not make two independently acting coordinators safe.
 
+## Classify failures and bound remediation
+
+Before another attempt, classify the failure as product behavior, maintained harness/configuration, diagnostic/evidence setup or unavailable environment. State the remaining accepted behavior, root-cause hypothesis, proposed scoped correction and meaningful verification. Keep this in the existing issue history. Do not build another retry controller.
+
+A remediation cycle is a bounded attempt to resolve a blocker through a hypothesis, correction and relevant verification. Count unsuccessful cycles on the issue, including harness/setup attempts that leave the blocker unresolved. An expected behavioral TDD red, individual subprocess or optional formatting repair is not automatically a failed cycle. Three unsuccessful remediation cycles stop that issue for human direction. Carry the unresolved history across phase changes, renamed probes, supporting PRs and worker reassignment. A new label does not reset the allowance.
+
+| Failure | Response within existing authorization |
+| --- | --- |
+| Intended behavioral red while authoring a test | Continue TDD. Fix import/collection/setup errors before interpreting behavior. |
+| Product or maintained harness test fails | Make a bounded evidence-based correction within scope and verify it. Preserve the cycle history. |
+| Invocation or diagnostic setup is wrong | Correct the demonstrated setup error within the same bounded work. Do not claim it proves a product defect or allow endless setup variants. |
+| Optional report formatting fails after valid raw results | Recover the report and preserve valid results. Repeat only missing evidence. |
+| Required outcome, source binding or cleanup is unknown | Keep it unverified. Stop affected shared execution and reconcile before reuse. |
+| The same failure recurs without new evidence | Stop repeating the command or variants. Explain the blocker and use only a justified remaining remediation attempt. |
+| A pending contract/authority decision or prohibited host repair is needed | Stop dependent actions immediately, regardless of cycles remaining. |
+| Three unsuccessful cycles | Report attempts, exact blocker and a concrete next decision. Continue only independent authorized work. |
+
+Future approvals should authorize a scoped repair/qualification operation with its retry and safety boundaries. Do not introduce a generic “any unexpected failure stops all work” condition for ordinary delivery. Existing explicit one-shot or stricter human stop conditions remain binding until changed by the human. An extra cycle does not expand scope, host authority or permission to waive findings.
+
+Unknown resource ownership, possible effects outside the authorized fixture or uncontained security risk can stop execution before the cycle ceiling. A safe source-only correction may continue only where it does not depend on the uncertain resource. Escalations identify what remains unproven, what each attempt established, why another attempt has a better basis and its exact stopping point. Do not ask merely to repeat an unchanged attempt.
+
 ## Keep delivery out of host repair
 
 Delivery implements repository capabilities. It is not a host-administration or container-runtime repair task. This boundary also applies when a Debug or Docker skill suggests broader investigation. A retry grant, a new probe or an extra remediation cycle does not authorize host changes.
 
-Use maintained repository commands for complete checks. Allow only bounded diagnostics needed to distinguish a repository defect, probe setup error and unavailable environment. Record what actually ran. A probe failure is not proof that the maintained journey failed, and a successful probe does not establish complete qualification. Use existing phase budgets and stop on an unchanged repeated failure rather than running variants without new evidence.
+Use maintained repository commands and the [Testing diagnostic/harness policy](../../inframeld-testing/references/isolation-and-evidence.md#maintained-commands-and-diagnostic-probes). Stop extended host/guest forensics once evidence establishes that deeper repair is needed. Record the environment blocker instead of pursuing a workaround outside delivery.
 
 The coordinator may inspect machine/runtime status and make one bounded recovery attempt for the same incident: start the existing stopped or crashed machine, or stop/start an existing machine confirmed stuck. First reconcile active integration commands and machine users. Preserve unrelated containers, volumes and services. If unrelated use is unknown or restarting would disrupt work outside the authorization, stop runtime-dependent delivery and report that blocker. Workers and specialists request recovery from the coordinator and never restart the machine themselves.
 
@@ -59,7 +92,7 @@ After that attempt, perform a bounded health check and reconcile owned resources
 
 Locked dependencies inside an assigned worktree or disposable test image, repository Dockerfile/Compose changes and cleanup of positively owned fixtures remain ordinary scoped delivery operations. They do not permit host-wide installation, reconfiguration or cleanup. An explicitly requested infrastructure task is separate work with its own authorization.
 
-The existing three-unsuccessful-cycle ceiling still applies to issue remediation. Record repository, harness and diagnostic setup failures honestly. Moving to another stage or private probe does not erase unsuccessful cycles or permit unbounded setup corrections. A need for prohibited host repair stops delivery immediately, even before the first cycle is exhausted. Report the failed command/phase, bounded observations, recovery attempted, resource state and what the user must resolve. Do not supply a script that performs the prohibited repair as the next delivery action.
+The [remediation policy](#classify-failures-and-bound-remediation) remains in force, but prohibited host repair stops affected runtime work immediately, even before the first cycle is exhausted. Report the failed command/phase, bounded observations, recovery attempted, resource state and what the user must resolve. Do not supply a script that performs the prohibited repair as the next delivery action.
 
 ## Merge the reviewed head serially
 
