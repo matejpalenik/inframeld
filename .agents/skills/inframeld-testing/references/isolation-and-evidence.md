@@ -66,7 +66,7 @@ When fixture lifecycle changes, cover the relevant failure before readiness, ass
 | --- | --- | --- |
 | Ordinary scenario assertion, with valid shared prerequisites and confirmed cleanup | Checks whose inputs and resources are genuinely independent | Any check that needs the failed result as a prerequisite |
 | Common harness, build or contract stage invalidates a later check's prerequisite | Unaffected static checks or isolated work with its own valid prerequisites | Dependent execution, until the prerequisite is restored |
-| Resource ownership, process shutdown or shared cleanup is unresolved | Reporting and work that cannot touch the unsettled runtime or resources | Dependent runtime checks, retries and additional service startup |
+| Resource ownership, process shutdown or shared cleanup is unresolved | Reporting and work that cannot touch the unsettled runtime or resources | Dependent runtime checks, retries and additional service startup that uses or may conflict with the unsettled runtime or resources |
 
 For example, one SDK decoding assertion can fail while another isolated SDK check remains useful. A common process-lifetime regression that cannot confirm shutdown is different. Recording it as failed and launching the remaining SDK runtime stages can reuse an unsettled environment and create secondary failures. Keep the failed result visible and stop affected execution. Use a small decision at the existing workflow boundary, not another scheduler. During delivery, the existing coordinator still owns shared access and recovery allowances.
 
