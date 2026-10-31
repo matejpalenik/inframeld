@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem in Inframeld
+description: Report an observed or source-supported problem in Inframeld
 title: "[Bug]: "
 labels:
   - bug
@@ -20,7 +20,7 @@ body:
     id: reproduction
     attributes:
       label: Reproduction steps
-      description: Provide the smallest reliable reproduction.
+      description: Provide the smallest reliable reproduction, or the source evidence if the risk was found in review. Distinguish what ran from what is inferred.
       placeholder: |
         1. Run ...
         2. Configure ...
@@ -34,6 +34,20 @@ body:
       description: Provide the release, branch, or commit where you observed the problem.
     validations:
       required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Who or what is affected?
+      description: Give a concrete example and explain whether the problem blocks a feature, a required check, or ordinary use. Define unfamiliar terms.
+      placeholder: Alice runs a required SDK check, but cleanup cannot safely stop the test backend. This blocks that verification path.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution or next investigation
+      description: If known, suggest the smallest correction and how to check it. Otherwise name what should be investigated. Separate hypotheses from confirmed causes.
+      placeholder: Check which cleanup operation remains pending, add a focused regression, and repair the existing runner while preserving its deadlines. Broader runner redesign is outside this report.
   - type: dropdown
     id: area
     attributes:

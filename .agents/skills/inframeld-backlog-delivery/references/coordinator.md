@@ -12,7 +12,11 @@ Use `pnpm delivery:plan` for the GitHub snapshot and dependency candidates. Insp
 
 Use the [assignment brief](assignment-protocol.md#use-one-short-assignment-brief). Clear ownership once. Request independent plan review for material architecture, authorization, public-contract, persistence, shared-harness changes or a newly proposed cross-issue boundary. A routine implementation within accepted patterns needs a proportionate scope check and later independent implementation review, not another extensive planning ceremony.
 
+For a material plan, seek roughly 9/10 on the relevant quality rubrics and at most 2/10 overengineering risk, where lower risk is better. Review the complete proposed capability, including verification infrastructure. If material gaps prevent those targets, reconsider the scope or approach before dependent implementation. Explain the actual gap and smallest remedy rather than requesting a preferred score. Implementation-only evidence is N/A at planning time. These are design targets, not new numerical merge gates or reasons to polish optional details indefinitely.
+
 ### Review a newly discovered dependency
+
+Use [defect triage](discovered-defects.md) when the discovery is a bug or tooling problem. Decide whether it belongs to the feature, is a genuine verification prerequisite, or can be recorded for later. The coordinator owns authorized issue publication and checks for duplicates. Recording a defect and authorizing its implementation are separate decisions.
 
 Before absorbing another feature, state the accepted behavior that cannot be implemented or verified, missing evidence, owning issue and exact unblock condition. Sharing an authentication topic is not itself a dependency.
 
@@ -46,6 +50,8 @@ When several branches wait on the same prerequisite, review queues grow, or harn
 List active capabilities, reviewed checkpoints, real blockers and the next useful merge. Finish one coherent prerequisite or ready capability at a time through review, required checks and merge. Independent workers may still perform already assigned private checks, documentation and review. Keep truly blocked work parked. Resume new dispatch once ownership is reconciled and the integration/review queue can finish another independent assignment. No arbitrary waiting period or permanent serial-only mode is needed.
 
 Prioritize a narrowly scoped shared maintenance PR when it genuinely unlocks several qualified branches. Do not bypass hooks, weaken cleanup or add another execution framework to avoid that blocker. Review any expansion of the maintenance scope under [Testing's harness boundary](../../inframeld-testing/references/isolation-and-evidence.md#keep-harness-repairs-bounded).
+
+Name the next useful PR and what still prevents it. If correction attempts create further infrastructure work while the same acceptance case fails, reassess the whole repair rather than approve only its next small patch. The [#237 case](case-237-testing-repair.md) illustrates why separate worktrees and scoped review scores alone do not establish progress.
 
 ### Park blocked work and reuse its worker
 

@@ -16,6 +16,7 @@ Every assigned role reads the [assignment protocol](references/assignment-protoc
 | Task | Read |
 | --- | --- |
 | Select work, resolve dependencies, limit parallelism or adopt an overloaded run | [Coordination and scheduling](references/coordinator.md) |
+| Discover an incidental defect or decide whether a repair should block delivery | [Defect triage](references/discovered-defects.md), with the [historical #237 case](references/case-237-testing-repair.md) for an expanding test-runner repair |
 | Implement an assignment and test its behavior | [Worker delivery](references/worker.md) |
 | Schedule integration, assess evidence, recover or merge | [Gates and recovery](references/gates-and-recovery.md) |
 | Rehearse, launch, evaluate or install the personal adapter | [Delivery guide](../../../docs/development/guides/backlog-delivery.md) |
@@ -33,6 +34,8 @@ Parallelize verified independent work. Serialize overlapping contracts, shared o
 ## Verify through maintained commands
 
 Use repository-owned behavioral unit and integration tests and documented workspace entry points. A temporary diagnostic answers one bounded question and remains partial evidence. Do not replace acceptance with private controllers, repeat variants without new evidence or grow a harness repair into a general framework. [Testing](../inframeld-testing/references/isolation-and-evidence.md) owns those boundaries.
+
+Classify discoveries before absorbing them. Publish clear incidental defect issues only under actual issue-creation authority. Logging a defect does not admit new implementation to the finite snapshot or waive a required check. Review the complete repair again when its scope grows or corrections stop converging.
 
 The coordinator alone writes run state and allocates shared resources. It may designate one worker to execute a frozen revision's maintained integration operation. Observe exit and cleanup before releasing that resource. Private worktree outputs and isolated tests need no new resource grant unless they collide with another owner. Helpers record and assess observations. They do not authorize actions or authenticate evidence.
 

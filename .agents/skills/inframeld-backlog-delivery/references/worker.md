@@ -10,6 +10,8 @@ Confirm the useful outcome, acceptance examples, exclusions, base, owned paths/c
 
 Report overlap before crossing a path or contract boundary. Different worktrees do not authorize competing lockfile, migration, generator or common CLI changes. Ask for one owner or serial handoff instead of inventing an adapter to avoid alignment. A newly discovered dependency needs the coordinator's [accepted-behavior assessment](coordinator.md#review-a-newly-discovered-dependency), not automatic permission to absorb another feature.
 
+For a discovered defect, preserve the feature checkpoint and report the observed example, evidence, affected check and proposed disposition under [defect triage](discovered-defects.md). Draft a clear issue when useful. During coordinated delivery the coordinator owns publication and assignment changes. Do not silently repair an unrelated component, publish duplicate reports or treat a new issue as a fresh retry allowance.
+
 ## Implement and test through the workspace
 
 Follow scaffold-first behavioral TDD. Establish the necessary public seam, require the intended behavioral failure, implement the smallest real correction and refactor with focused tests green. Fix collection and setup errors before interpreting a red test. Do not add architecture-enforcement tests or speculative infrastructure.
