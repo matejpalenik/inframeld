@@ -1,8 +1,12 @@
 """Prove wait ownership at a syscall boundary without real process signals."""
 
+import errno
+import json
 import os
 import signal
+import socket
 import subprocess
+import time
 import unittest
 from types import SimpleNamespace
 from typing import cast
@@ -103,6 +107,44 @@ class RetainedOwnershipTests(unittest.TestCase):
 
 
 class ControlDocumentTests(unittest.TestCase):
+    def test_socketpair_unread_and_drained_stop_close(self) -> None:
+        terminal: dict[str, object] = {
+            "type": "finished",
+            "status": 0,
+            "reason": "target-exit",
+            "leaderReaped": True,
+            "groupState": "quiescent",
+            "errors": [],
+        }
+        for drained in (False, True):
+            caller_socket, helper_socket = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+            with self.subTest(drained=drained), caller_socket, helper_socket:
+                caller = Control(caller_socket.fileno())
+                helper = Control(helper_socket.fileno())
+                deadline = time.monotonic_ns() // 1_000_000 + 500
+                stop: dict[str, object] = {"type": "stop", "reason": "close", "deadline": deadline}
+                caller.send(stop, deadline)
+                if drained:
+                    self.assertEqual(helper.receive(deadline, 16384), {"version": 1, **stop})
+                helper.send(terminal, deadline)
+                helper_socket.close()
+                self.assertEqual(caller.receive(deadline, 16384), {"version": 1, **terminal})
+                ending = "unknown"
+                try:
+                    result = caller.receive(deadline, 16384)
+                except EOFError:
+                    ending = "eof"
+                except OSError as error:
+                    self.assertEqual(error.errno, errno.ECONNRESET)
+                    ending = "ECONNRESET"
+                else:
+                    self.fail(f"No terminal channel closure observed: {result is None}")
+                if drained:
+                    self.assertEqual(ending, "eof")
+                print(
+                    json.dumps({"stopDrained": drained, "terminalReceived": True, "ending": ending})
+                )
+
     def test_missing_platform_capabilities_refuse_without_startup(self) -> None:
         control = Mock()
         unsupported_signal = SimpleNamespace()
@@ -187,6 +229,82 @@ class ControlDocumentTests(unittest.TestCase):
 
 
 class GroupObservationTests(unittest.TestCase):
+    def test_first_observer_diagnostic_identifies_step_without_replacing_exception(self) -> None:
+        for step, failure, category in (
+            ("spawn", OSError("private"), "os"),
+            ("read", TimeoutError("private"), "timeout"),
+            ("wait", subprocess.TimeoutExpired("private", 0.5), "timeout"),
+            ("parse", ValueError("private"), "malformed"),
+        ):
+            with self.subTest(step=step):
+                target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+                observation = Mock()
+                observation.stdout.fileno.return_value = 456
+                observation.poll.return_value = 0
+                observation.wait.return_value = 0
+                if step == "wait":
+                    observation.wait.side_effect = failure
+                with (
+                    patch(
+                        "subprocess.Popen",
+                        return_value=observation,
+                        side_effect=failure if step == "spawn" else None,
+                    ),
+                    patch("src.system.process_owner._clock", return_value=0),
+                    patch("os.set_blocking"),
+                    patch(
+                        "select.select",
+                        return_value=([observation.stdout], [], []),
+                        side_effect=failure if step == "read" else None,
+                    ),
+                    patch("os.read", side_effect=[b"123 123 Z\n", b""]),
+                    patch(
+                        "src.system.process_owner.executable_members",
+                        return_value=False,
+                        side_effect=failure if step == "parse" else None,
+                    ),
+                    self.assertRaises(type(failure)) as raised,
+                ):
+                    observe_members(target, 500, "term")
+                self.assertIs(raised.exception, failure)
+                self.assertEqual(target.errors, [f"ps-term-{step}-{category}"])
+
+    def test_first_observer_diagnostic_distinguishes_nonzero_and_reap_failure(self) -> None:
+        for nonzero in (True, False):
+            with self.subTest(nonzero=nonzero):
+                target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+                observation = Mock()
+                observation.stdout.fileno.return_value = 456
+                observation.wait.return_value = 1 if nonzero else 0
+                observation.poll.side_effect = None if nonzero else OSError("private")
+                observation.poll.return_value = 1
+                with (
+                    patch("subprocess.Popen", return_value=observation),
+                    patch("src.system.process_owner._clock", return_value=0),
+                    patch("os.set_blocking"),
+                    patch("select.select", return_value=([observation.stdout], [], [])),
+                    patch("os.read", side_effect=[b"123 123 Z\n", b""]),
+                    self.assertRaises(ValueError if nonzero else OSError),
+                ):
+                    observe_members(target, 500, "kill")
+                self.assertEqual(
+                    target.errors, ["ps-kill-wait-nonzero" if nonzero else "ps-kill-reap-os"]
+                )
+
+    def test_first_observer_diagnostic_stays_first_and_leaves_cleanup_error_capacity(self) -> None:
+        for existing in ([], ["retained"] * 12):
+            with self.subTest(existing=len(existing)):
+                target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+                target.errors.extend(existing)
+                for phase in ("initial", "kill"):
+                    with (
+                        patch("subprocess.Popen", side_effect=OSError("private")),
+                        patch("src.system.process_owner._clock", return_value=0),
+                        self.assertRaises(OSError),
+                    ):
+                        observe_members(target, 500, phase)
+                self.assertEqual(target.errors, existing or ["ps-initial-spawn-os"])
+
     def test_observer_timeout_keeps_its_own_termination_and_wait_inside_the_phase(self) -> None:
         target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
         observation = Mock()
@@ -219,7 +337,7 @@ class GroupObservationTests(unittest.TestCase):
         clock = Mock(return_value=480)
         signals: list[tuple[signal.Signals, int]] = []
 
-        def observe(_target: OwnedTarget, cutoff: int) -> bool:
+        def observe(_target: OwnedTarget, cutoff: int, _phase: str) -> bool:
             self.assertGreater(
                 cutoff - clock(), 50, "Do not admit an observer without its own slice"
             )
@@ -248,7 +366,7 @@ class GroupObservationTests(unittest.TestCase):
         clock = Mock(return_value=0)
         signals: list[tuple[signal.Signals, int]] = []
 
-        def observe(_target: OwnedTarget, cutoff: int) -> bool:
+        def observe(_target: OwnedTarget, cutoff: int, _phase: str) -> bool:
             clock.return_value = cutoff
             raise TimeoutError
 
@@ -322,7 +440,10 @@ class GroupObservationTests(unittest.TestCase):
         spawn.assert_called_once()
         configure.assert_called_once_with(456, False)
         self.assertEqual(result, "unknown")
-        self.assertEqual(target.errors, ["group-observation-failed", "group-shutdown-unconfirmed"])
+        self.assertEqual(
+            target.errors,
+            ["ps-initial-read-os", "group-observation-failed", "group-shutdown-unconfirmed"],
+        )
         self.assertTrue(target.reaped)
         self.assertFalse(target.owned)
         send.assert_not_called()

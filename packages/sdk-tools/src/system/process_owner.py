@@ -10,7 +10,7 @@ import sys
 import time
 from contextlib import suppress
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Literal, cast
 
 
 @dataclass(frozen=True)
@@ -184,10 +184,19 @@ def _clock() -> int:
     return time.monotonic_ns() // 1_000_000
 
 
-def observe_members(target: OwnedTarget, deadline: int) -> bool:
+def observe_members(
+    target: OwnedTarget, deadline: int, phase: Literal["initial", "term", "kill"] = "initial"
+) -> bool:
     """Read a checked, byte-bounded ps result within the existing stop deadline."""
+
+    def record(step: str, category: str) -> None:
+        # Keep only the first fixed diagnostic, with room for existing cleanup errors.
+        if len(target.errors) < 12 and not any(tag.startswith("ps-") for tag in target.errors):
+            target.errors.append(f"ps-{phase}-{step}-{category}")
+
     deadline = min(deadline, _clock() + 1000)
     if _clock() >= deadline:
+        record("spawn", "timeout")
         raise TimeoutError
     # Reserve part of this observation's phase for its own kill and wait.
     read_deadline = deadline - min(50, max(1, (deadline - _clock()) // 4))
@@ -195,16 +204,21 @@ def observe_members(target: OwnedTarget, deadline: int) -> bool:
     for name in ("PS_PERSONALITY", "CMD_ENV", "I_WANT_A_BROKEN_PS"):
         environment.pop(name, None)
     environment["LC_ALL"] = "C"
-    observation = subprocess.Popen(
-        ["ps", "-A", "-o", "pid=,pgid=,stat="],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        env=environment,
-    )
+    try:
+        observation = subprocess.Popen(
+            ["ps", "-A", "-o", "pid=,pgid=,stat="],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env=environment,
+        )
+    except OSError:
+        record("spawn", "os")
+        raise
     assert observation.stdout is not None
     output = bytearray()
     stream = observation.stdout
+    step = "read"
     try:
         os.set_blocking(stream.fileno(), False)
         while _clock() < read_deadline:
@@ -221,19 +235,37 @@ def observe_members(target: OwnedTarget, deadline: int) -> bool:
                 raise ValueError("Process observation exceeded its byte budget.")
         else:
             raise TimeoutError
+        step = "wait"
         code = observation.wait(timeout=max(0, deadline - _clock()) / 1000)
         if code != 0:
+            record("wait", "nonzero")
             raise ValueError("Process observation failed.")
+        step = "parse"
         return executable_members(bytes(output), target.child.pid)
+    except (OSError, ValueError, subprocess.SubprocessError, TimeoutError) as error:
+        category = (
+            "timeout"
+            if isinstance(error, (TimeoutError, subprocess.TimeoutExpired))
+            else "os"
+            if isinstance(error, OSError)
+            else "malformed"
+        )
+        record(step, category)
+        raise
     finally:
         # Python is the sole waiter of this separate immediate ps child too.
-        if observation.poll() is None:
-            observation.kill()
-            try:
-                observation.wait(timeout=max(0, deadline - _clock()) / 1000)
-            except subprocess.TimeoutExpired:
-                target.errors.append("observation-child-unresolved")
-        stream.close()
+        try:
+            if observation.poll() is None:
+                observation.kill()
+                try:
+                    observation.wait(timeout=max(0, deadline - _clock()) / 1000)
+                except subprocess.TimeoutExpired:
+                    record("reap", "timeout")
+                    target.errors.append("observation-child-unresolved")
+            stream.close()
+        except OSError:
+            record("reap", "os")
+            raise
 
 
 def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) -> str:
@@ -247,7 +279,7 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
     quiescent = False
     observation_valid = True
 
-    def check(cutoff: int) -> bool:
+    def check(cutoff: int, phase: Literal["initial", "term", "kill"]) -> bool:
         nonlocal observation_valid
         # Do not start a new ps child when its read/kill/wait slice no longer fits.
         # Skipping reports no quiescence and leaves owned escalation intact.
@@ -256,14 +288,14 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
         if not target.observe():
             return False
         try:
-            return not observe_members(target, cutoff)
+            return not observe_members(target, cutoff, phase)
         except (OSError, ValueError, subprocess.SubprocessError, TimeoutError):
             observation_valid = False
             if "group-observation-failed" not in target.errors:
                 target.errors.append("group-observation-failed")
             return False
 
-    quiescent = check(term_deadline)
+    quiescent = check(term_deadline, "initial")
     for number, phase_deadline in (
         (signal.SIGTERM, term_deadline),
         (signal.SIGKILL, final_deadline),
@@ -272,7 +304,7 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
             break
         target.signal_group(number)
         while target.owned and _clock() < phase_deadline:
-            quiescent = check(phase_deadline)
+            quiescent = check(phase_deadline, "term" if number == signal.SIGTERM else "kill")
             if quiescent:
                 break
             time.sleep(min(0.01, max(0, phase_deadline - _clock()) / 1000))

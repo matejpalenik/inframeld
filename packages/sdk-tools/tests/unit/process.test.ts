@@ -8,6 +8,7 @@ import {
   stopProcess,
   withResources,
   type OwnedProcess,
+  ProcessFailure,
 } from "../../src/system/process.ts";
 import { describeError } from "../../src/workflows/stages.ts";
 import { withDeniedFixtureRecovery } from "../native/fixtures/denied-cleanup.ts";
@@ -22,6 +23,155 @@ import { Duplex, PassThrough, Writable } from "node:stream";
 const finiteFixture = fileURLToPath(
   new URL("./fixtures/process_tree.py", import.meta.url),
 );
+
+/** Inspect only the known retained-owner shapes, never arbitrary error text. */
+function retainedFailureFacts(error: unknown): {
+  code: string;
+  syscall: string;
+  observer: string[];
+} {
+  const facts = {
+    code: "unknown",
+    syscall: "unknown",
+    observer: [] as string[],
+  };
+  try {
+    let owner: unknown = error;
+    if (error instanceof AggregateError) {
+      const errors: unknown = Object.getOwnPropertyDescriptor(
+        error,
+        "errors",
+      )?.value;
+      owner = Array.isArray(errors)
+        ? Object.getOwnPropertyDescriptor(errors, "1")?.value
+        : undefined;
+    } else if (error instanceof Error && !(error instanceof ProcessFailure)) {
+      owner = Object.getOwnPropertyDescriptor(error, "cause")?.value;
+    }
+    if (!(owner instanceof ProcessFailure)) return facts;
+    const cause: unknown = Object.getOwnPropertyDescriptor(
+      owner,
+      "cause",
+    )?.value;
+    if (cause instanceof Error) {
+      const code: unknown = Object.getOwnPropertyDescriptor(
+        cause,
+        "code",
+      )?.value;
+      const syscall: unknown = Object.getOwnPropertyDescriptor(
+        cause,
+        "syscall",
+      )?.value;
+      if (
+        typeof code === "string" &&
+        [
+          "EPIPE",
+          "ECONNRESET",
+          "ECONNABORTED",
+          "EIO",
+          "EBADF",
+          "ETIMEDOUT",
+          "ERR_STREAM_DESTROYED",
+          "ERR_STREAM_WRITE_AFTER_END",
+          "ERR_SOCKET_CLOSED",
+        ].includes(code)
+      )
+        facts.code = code;
+      if (syscall === "read" || syscall === "write") facts.syscall = syscall;
+    }
+    const state: unknown = Object.getOwnPropertyDescriptor(
+      owner,
+      "state",
+    )?.value;
+    if (!state || typeof state !== "object") return facts;
+    const terminal: unknown = Object.getOwnPropertyDescriptor(
+      state,
+      "terminal",
+    )?.value;
+    if (!terminal || typeof terminal !== "object") return facts;
+    const errors: unknown = Object.getOwnPropertyDescriptor(
+      terminal,
+      "errors",
+    )?.value;
+    if (!Array.isArray(errors)) return facts;
+    for (let index = 0; index < 16; index++) {
+      const tag: unknown = Object.getOwnPropertyDescriptor(
+        errors,
+        String(index),
+      )?.value;
+      if (
+        typeof tag === "string" &&
+        /^ps-(initial|term|kill)-(spawn|read|wait|parse|reap)-(timeout|os|nonzero|malformed)$/.test(
+          tag,
+        )
+      ) {
+        facts.observer.push(tag);
+        break;
+      }
+    }
+  } catch {
+    /* Diagnostic access cannot replace the original error. */
+  }
+  return facts;
+}
+
+test("retained failure facts expose only actual own allowlisted cause properties", () => {
+  const original = Object.assign(new Error("private endpoint and argv"), {
+    code: "ECONNRESET",
+    syscall: "read",
+  });
+  const owner = new ProcessFailure("private", false, undefined, {
+    cause: original,
+  });
+  const aggregate = new AggregateError(
+    [new Error("timeout"), owner],
+    "private",
+  );
+  assert.deepEqual(retainedFailureFacts(aggregate), {
+    code: "ECONNRESET",
+    syscall: "read",
+    observer: [],
+  });
+  assert.equal(owner.cause, original);
+  let touched = false;
+  const hostile = new Error("private");
+  Object.defineProperty(hostile, "code", {
+    get() {
+      touched = true;
+      return "EPIPE";
+    },
+  });
+  assert.deepEqual(
+    retainedFailureFacts(
+      new ProcessFailure("private", false, undefined, { cause: hostile }),
+    ),
+    { code: "unknown", syscall: "unknown", observer: [] },
+  );
+  assert.equal(touched, false);
+});
+
+test("retained failure facts include only fixed first observer tags from the known owner", () => {
+  const owner = new ProcessFailure("private", false, {
+    helperCode: 1,
+    helperClosed: true,
+    streamsEnded: true,
+    terminal: {
+      status: 0,
+      reason: "target-exit",
+      leaderReaped: true,
+      groupState: "unknown",
+      errors: [
+        "group-observation-failed",
+        "ps-term-read-timeout",
+        "private-data",
+      ],
+    },
+  });
+  assert.deepEqual(
+    retainedFailureFacts(new Error("timeout", { cause: owner })),
+    { code: "unknown", syscall: "unknown", observer: ["ps-term-read-timeout"] },
+  );
+});
 
 test("denied fixture receipt reconciliation runs after an early assertion and retains its identity", async () => {
   const work = await mkdtemp(join(tmpdir(), "sdk-denied-unit-"));
@@ -667,6 +817,7 @@ test(
               env: { NODE_TEST_CONTEXT: undefined },
             }).catch((error: unknown) => {
               context.diagnostic(describeError(error));
+              context.diagnostic(JSON.stringify(retainedFailureFacts(error)));
               throw error;
             }),
             /timed out/,
@@ -804,6 +955,7 @@ test("same-group descendants stop after an early leader exit with open or closed
   );
   const spawn = childProcess.spawn;
   let personality: NodeJS.ProcessEnv = {};
+  let complete = false;
   context.mock.method(childProcess, "spawn", ((
     program: string,
     args: readonly string[],
@@ -830,31 +982,43 @@ test("same-group descendants stop after an early leader exit with open or closed
       for (const pipes of ["open", "closed"]) {
         const began = performance.now();
         const marker = join(work, `${name}-${pipes}`);
-        await command(
-          "python3",
-          ["-B", finiteFixture, "leader", marker, pipes],
-          {
-            timeout: 2000,
-            cleanupTimeout: 600,
+        await withResources(
+          async () => {
+            await command(
+              "python3",
+              ["-B", finiteFixture, "leader", marker, pipes],
+              {
+                timeout: 2000,
+                cleanupTimeout: 600,
+              },
+            ).catch((error: unknown) => {
+              context.diagnostic(describeError(error));
+              context.diagnostic(JSON.stringify(retainedFailureFacts(error)));
+              throw error;
+            });
           },
-        );
-        const descendant = Number(await readFile(marker, "utf8"));
-        assert.ok(descendant > 0);
-        const live = await executablePids(began + 2000);
-        assert.ok(
-          !live.has(descendant),
-          "Successful cleanup must leave no executable descendant",
-        );
-        assert.ok(
-          performance.now() - began < 2000,
-          "Owner cleanup must finish before the four-second fuse",
+          async () => {
+            const descendant = Number(await readFile(marker, "utf8"));
+            assert.ok(descendant > 0);
+            // Later physical absence is custody only if the owner already failed.
+            const live = await executablePids(began + 2000);
+            assert.ok(
+              !live.has(descendant),
+              "Successful cleanup must leave no executable descendant",
+            );
+            assert.ok(
+              performance.now() - began < 2000,
+              "Owner cleanup must finish before the four-second fuse",
+            );
+          },
         );
       }
     }
+    complete = true;
   } finally {
     context.mock.restoreAll();
     syncBuiltinESMExports();
-    await rm(work, { recursive: true, force: true });
+    if (complete) await rm(work, { recursive: true, force: true });
   }
 });
 
@@ -934,6 +1098,7 @@ test("cancellation still finishes descendants after their leader has exited", as
         await assert.rejects(
           running.catch((error: unknown) => {
             context.diagnostic(describeError(error));
+            context.diagnostic(JSON.stringify(retainedFailureFacts(error)));
             throw error;
           }),
           (error: unknown) => error === reason,
