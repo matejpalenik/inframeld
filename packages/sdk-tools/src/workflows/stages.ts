@@ -43,6 +43,25 @@ export function describeError(error: unknown): string {
       const detail: Record<string, unknown> = {
         kind: value instanceof AggregateError ? "aggregate" : "error",
       };
+      const code: unknown = fields.code?.value;
+      detail.code =
+        typeof code === "string" &&
+        [
+          "EPIPE",
+          "ECONNRESET",
+          "ECONNABORTED",
+          "EIO",
+          "EBADF",
+          "ETIMEDOUT",
+          "ERR_STREAM_DESTROYED",
+          "ERR_STREAM_WRITE_AFTER_END",
+          "ERR_SOCKET_CLOSED",
+        ].includes(code)
+          ? code
+          : "unknown";
+      const syscall: unknown = fields.syscall?.value;
+      detail.syscall =
+        syscall === "read" || syscall === "write" ? syscall : "unknown";
       if (value instanceof ProcessFailure) {
         detail.kind = hasConfirmedCleanup(value)
           ? "command-failed"
@@ -74,7 +93,11 @@ export function describeError(error: unknown): string {
             const errors: unknown = row.errors?.value;
             if (Array.isArray(errors))
               detail.errors = arrayValues(errors, 16).map((entry: unknown) =>
-                typeof entry === "string" && allowed.includes(entry)
+                typeof entry === "string" &&
+                (allowed.includes(entry) ||
+                  /^ps-(initial|term|kill)-(spawn|read|wait|parse|reap)-(timeout|os|nonzero|malformed)$/.test(
+                    entry,
+                  ))
                   ? entry
                   : "unknown",
               );

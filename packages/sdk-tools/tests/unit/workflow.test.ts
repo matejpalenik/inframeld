@@ -91,6 +91,117 @@ test("nested error publication is bounded, cycle safe and does not reveal arbitr
   assert.ok(!describeError(hostile).includes("sensitive"));
 });
 
+test("error publication retains only actual own allowlisted cause properties", () => {
+  const original = Object.assign(new Error("private endpoint and argv"), {
+    code: "ECONNRESET",
+    syscall: "read",
+  });
+  const owner = new ProcessFailure("private", false, undefined, {
+    cause: original,
+  });
+  const aggregate = new AggregateError(
+    [new Error("timeout"), owner],
+    "private",
+  );
+  assert.deepEqual(JSON.parse(describeError(aggregate)), {
+    kind: "aggregate",
+    code: "unknown",
+    syscall: "unknown",
+    errors: [
+      { kind: "error", code: "unknown", syscall: "unknown" },
+      {
+        kind: "cleanup-unconfirmed",
+        code: "unknown",
+        syscall: "unknown",
+        cause: { kind: "error", code: "ECONNRESET", syscall: "read" },
+      },
+    ],
+  });
+  assert.equal(owner.cause, original);
+  assert.equal(hasConfirmedCleanup(owner), false);
+  let touched = false;
+  const hostile = new Error("private");
+  for (const property of ["code", "syscall"])
+    Object.defineProperty(hostile, property, {
+      get() {
+        touched = true;
+        return "private";
+      },
+    });
+  assert.deepEqual(JSON.parse(describeError(hostile)), {
+    kind: "error",
+    code: "unknown",
+    syscall: "unknown",
+  });
+  assert.equal(touched, false);
+  assert.deepEqual(
+    JSON.parse(
+      describeError(
+        Object.assign(new Error("private"), {
+          code: "private",
+          syscall: "private",
+        }),
+      ),
+    ),
+    { kind: "error", code: "unknown", syscall: "unknown" },
+  );
+});
+
+test("error publication retains only fixed observer tags within its existing bounds", () => {
+  const owner = new ProcessFailure("private", false, {
+    helperCode: 1,
+    helperClosed: true,
+    streamsEnded: true,
+    terminal: {
+      status: 0,
+      reason: "target-exit",
+      leaderReaped: true,
+      groupState: "unknown",
+      errors: [
+        "group-observation-failed",
+        "ps-term-read-timeout",
+        "ps-term-read-timeout-private",
+        "ps-TERM-read-timeout",
+        "private-data",
+      ],
+    },
+  });
+  assert.deepEqual(
+    JSON.parse(describeError(new Error("timeout", { cause: owner }))),
+    {
+      kind: "error",
+      code: "unknown",
+      syscall: "unknown",
+      cause: {
+        kind: "cleanup-unconfirmed",
+        code: "unknown",
+        syscall: "unknown",
+        helperCode: 1,
+        helperClosed: true,
+        streamsEnded: true,
+        leaderReaped: true,
+        groupState: "unknown",
+        errors: [
+          "group-observation-failed",
+          "ps-term-read-timeout",
+          "unknown",
+          "unknown",
+          "unknown",
+        ],
+      },
+    },
+  );
+  const aggregate = new AggregateError(
+    Array.from({ length: 8 }, () => owner),
+    "private",
+  );
+  const published = describeError(aggregate);
+  assert.ok(Buffer.byteLength(published) <= 4096);
+  assert.ok(!published.includes("private"));
+  assert.equal(owner.state?.terminal?.errors[1], "ps-term-read-timeout");
+  assert.equal(hasConfirmedCleanup(owner), false);
+});
+
 test("blocked stages cannot invoke dependent runtime callbacks and preserve independent reports", async () => {
   const stages: Stage[] = [];
   const prerequisite = await stage(stages, "harness", async () => {
