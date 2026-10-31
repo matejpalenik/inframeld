@@ -5,6 +5,7 @@ import { root, home, cache, packageRoot, type Language } from "../config.ts";
 import { run } from "../system/run.ts";
 import { buildTypescript } from "../system/typescript.ts";
 import { wheel, python, pythonVersions } from "../system/python.ts";
+import { budgets } from "../system/budgets.ts";
 
 export const runtimeSchema = z.object({
   bindings: z.array(z.string()),
@@ -177,12 +178,11 @@ export async function checkNativeRegressions(
       [
         "--import",
         join(home, "node_modules/tsx/dist/loader.mjs"),
-        "--test",
-        join(home, "tests/native/driver.test.ts"),
-        join(home, "tests/native/lifecycle.test.ts"),
-        join(home, "tests/native/profile-resources.test.ts"),
+        join(home, "tests/native/fixtures/browser-owner.ts"),
+        "native",
       ],
       "typescript-driver-regressions",
+      { cleanupTimeout: budgets.cleanup },
     );
   }
 }
@@ -205,12 +205,32 @@ export async function typecheckNative(language: Language): Promise<void> {
       python,
       [
         "-m",
+        "pyright",
+        "-p",
+        join(home, "pyrightconfig.json"),
+        "--pythonversion",
+        "3.13",
+        "--venvpath",
+        cache,
+        join(home, "src/system/process_owner.py"),
+        join(home, "tests/unit/process_owner_test.py"),
+        join(home, "tests/unit/fixtures/process_tree.py"),
+      ],
+      "python-process-owner-types",
+    );
+    await run(
+      python,
+      [
+        "-m",
         "ruff",
         "check",
         "--config",
         join(home, "pyproject.toml"),
         join(home, "drivers/python"),
         join(home, "consumers/python"),
+        join(home, "src/system/process_owner.py"),
+        join(home, "tests/unit/process_owner_test.py"),
+        join(home, "tests/unit/fixtures/process_tree.py"),
       ],
       "python-driver-lint",
     );
@@ -225,6 +245,9 @@ export async function typecheckNative(language: Language): Promise<void> {
         join(home, "pyproject.toml"),
         join(home, "drivers/python"),
         join(home, "consumers/python"),
+        join(home, "src/system/process_owner.py"),
+        join(home, "tests/unit/process_owner_test.py"),
+        join(home, "tests/unit/fixtures/process_tree.py"),
       ],
       "python-driver-format",
     );

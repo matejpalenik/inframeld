@@ -1,11 +1,15 @@
-import { spawn } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { root, cache } from "../config.ts";
-import { kill, stopProcess, withResources } from "../system/process.ts";
-import { budgets } from "../system/budgets.ts";
+import {
+  startProcess,
+  stopProcess,
+  withResources,
+  type ProcessOutcome,
+} from "../system/process.ts";
+import { budgets, profileBudget } from "../system/budgets.ts";
 import { shutdown } from "../system/shutdown.ts";
 import type { JsonValue } from "./protocol.ts";
 
@@ -19,7 +23,7 @@ export async function controlJson(
     signal: AbortSignal.any([
       shutdown.signal,
       ...(init.signal ? [init.signal] : []),
-      AbortSignal.timeout(Math.max(1, timeout)),
+      AbortSignal.timeout(Math.max(1, Math.floor(timeout))),
     ]),
   });
   if (!response.ok)
@@ -29,6 +33,7 @@ export async function controlJson(
 export interface Backend {
   url: string;
   pid: number;
+  cleanup: Promise<ProcessOutcome>;
   close(): Promise<void>;
 }
 
@@ -37,97 +42,135 @@ export async function startBackend(
   origin?: string,
   signal = shutdown.signal,
   startupTimeout: number = budgets.startup,
+  startupDeadline = performance.now() + startupTimeout,
+  executionDeadline = performance.now() + profileBudget() + budgets.cleanup,
 ): Promise<Backend> {
   signal.throwIfAborted();
-  const address = join(work, "address");
-  const child = spawn(
-    join(root, "apps/backend/.venv/bin/python"),
-    [
-      "-m",
-      "tests.support.sdk_server",
-      "serve",
-      address,
-      ...(origin ? ["--browser-origin", origin] : []),
-    ],
-    {
-      cwd: join(root, "apps/backend"),
-      // The profile owns this process group so forced profile cleanup reaches the fixture Python process.
-      detached: false,
-      env: { ...process.env, UV_CACHE_DIR: join(cache, "uv") },
-      stdio: ["ignore", "pipe", "pipe"],
+  const deadline = Math.min(
+    startupDeadline,
+    performance.now() + startupTimeout,
+  );
+  const lifetime = new AbortController();
+  const interrupt = () => lifetime.abort(signal.reason);
+  const shutdownInterrupt = () => lifetime.abort(shutdown.signal.reason);
+  signal.addEventListener("abort", interrupt, { once: true });
+  if (signal.aborted) interrupt();
+  let child;
+  try {
+    child = await startProcess(
+      join(root, "apps/backend/.venv/bin/python"),
+      [
+        "-m",
+        "tests.support.sdk_server",
+        "serve",
+        join(work, "address"),
+        ...(origin ? ["--browser-origin", origin] : []),
+      ],
+      {
+        cwd: join(root, "apps/backend"),
+        env: { UV_CACHE_DIR: join(cache, "uv") },
+        mode: "backend",
+        maxOutputBytes: 4 * 1024 * 1024,
+        startupDeadline: deadline,
+        executionDeadline,
+        signal: lifetime.signal,
+      },
+    );
+  } catch (error) {
+    signal.removeEventListener("abort", interrupt);
+    throw error;
+  }
+  let failure: Error | undefined;
+  let ended = false;
+  const observeOutput = () => {
+    if (child.capture.overflow)
+      failure ??= new Error("Backend exceeded its 4 MiB output budget");
+  };
+  observeOutput();
+  void child.result.then(
+    () => {
+      ended = true;
+    },
+    (error: unknown) => {
+      ended = true;
+      observeOutput();
+      failure ??=
+        error instanceof Error ? error : new Error("Backend owner failed");
     },
   );
-  let output = "";
-  let failure: Error | undefined;
-  const append = (value: Buffer) => {
-    if (failure) return;
-    output += value.toString();
-    if (Buffer.byteLength(output) > 4 * 1024 * 1024) {
-      output = output.slice(-4 * 1024 * 1024);
-      failure = new Error("Backend exceeded its 4 MiB output budget");
-      kill(child);
+  let closing: Promise<void> | undefined;
+  const close = () => {
+    if (!closing) {
+      signal.removeEventListener("abort", interrupt);
+      shutdown.signal.removeEventListener("abort", shutdownInterrupt);
+      closing = withResources(
+        async () => {
+          const errors: unknown[] = [];
+          try {
+            await stopProcess(child);
+          } catch (error) {
+            errors.push(error);
+          }
+          // Stopping can produce final output, even with successful owner evidence.
+          observeOutput();
+          if (failure && !errors.includes(failure)) errors.unshift(failure);
+          if (errors.length === 1) throw errors[0];
+          if (errors.length)
+            throw new AggregateError(
+              errors,
+              "Backend output and cleanup failed",
+            );
+        },
+        () => writeFile(join(work, "backend.log"), child.capture.output),
+      );
     }
-  };
-  child.stdout.on("data", append);
-  child.stderr.on("data", append);
-  child.on("error", (error) => {
-    failure = error;
-  });
-  const interrupt = () => kill(child);
-  signal.addEventListener("abort", interrupt, { once: true });
-  const close = async () => {
-    signal.removeEventListener("abort", interrupt);
-    shutdown.signal.removeEventListener("abort", interrupt);
-    await withResources(
-      async () => {
-        if (failure) throw failure;
-      },
-      () =>
-        withResources(
-          async () => {
-            if (!(shutdown.signal.aborted && child.signalCode))
-              await stopProcess(child);
-          },
-          () => writeFile(join(work, "backend.log"), output),
-        ),
-    );
+    return closing;
   };
   try {
-    const deadline = Date.now() + startupTimeout;
-    while (Date.now() < deadline) {
+    while (performance.now() < deadline) {
       signal.throwIfAborted();
+      observeOutput();
       if (failure) throw failure;
-      if (child.exitCode !== null) throw new Error(`Backend exited: ${output}`);
+      if (ended)
+        throw new Error(
+          `Backend exited before readiness: ${child.capture.output}`,
+        );
       try {
         const url = (
-          await readFile(address, { encoding: "utf8", signal })
+          await readFile(join(work, "address"), { encoding: "utf8", signal })
         ).trim();
         await controlJson(
           url + "/health",
           { signal },
-          Math.min(500, deadline - Date.now()),
+          Math.min(500, deadline - performance.now()),
         );
         signal.throwIfAborted();
         signal.removeEventListener("abort", interrupt);
-        shutdown.signal.addEventListener("abort", interrupt, { once: true });
+        shutdown.signal.addEventListener("abort", shutdownInterrupt, {
+          once: true,
+        });
         shutdown.signal.throwIfAborted();
-        if (!child.pid) throw new Error("Backend has no process identity");
-        return { url, pid: child.pid, close };
+        return { url, pid: child.pid, cleanup: child.result, close };
       } catch {
         signal.throwIfAborted();
       }
-      await delay(50, undefined, { signal });
+      await delay(
+        Math.min(50, Math.max(0, deadline - performance.now())),
+        undefined,
+        { signal },
+      );
     }
-    throw new Error(`Backend startup timed out: ${output}`);
+    throw new Error(`Backend startup timed out: ${child.capture.output}`);
   } catch (error) {
+    const primary = signal.aborted ? signal.reason : error;
     try {
       await close();
     } catch (cleanup) {
       throw new AggregateError(
-        [error, cleanup],
+        [primary, cleanup],
         "Backend startup and cleanup failed",
       );
     }
-    throw error;
+    throw primary;
   }
 }
