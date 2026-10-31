@@ -25,7 +25,7 @@ pnpm test:integration
 
 Alice changes the CLI README. CI still checks formatting and commit messages, but does not compile Rust or start identity providers. If her PR also contains an earlier Rust change, the complete PR diff still selects CLI checks at its latest head.
 
-The [shared selector](../../../.github/scripts/ci_changes.py) owns dependency groups. The [reusable workflow](../../../.github/workflows/changes.yml) tests that selector, reads the complete Git comparison and publishes fixed check-family flags. All four caller workflows report selection even when their expensive work is not applicable. A selection summary records the original paths and selected families. It does not establish that application tests ran.
+The [shared selector](../../../.github/scripts/ci_changes.py) owns dependency groups. The [reusable workflow](../../../.github/workflows/changes.yml) tests that selector, reads the complete Git comparison and publishes fixed check-family flags. The table describes selector outputs. CodeQL also applies the PR compatibility exception below. All four caller workflows report selection even when their expensive work is not applicable. A selection summary records the original paths and selected families. It does not establish that application tests ran.
 
 | Inputs | Selected checks |
 | --- | --- |
@@ -52,7 +52,7 @@ Contributor prose in the web and documentation apps selects that app's formattin
 
 PRs compare merge-base to head, including every commit in the PR. Changes only on the base branch do not select that PR's work. Main pushes compare the event's before/after revisions. Git reports additions, deletions and both sides of a rename, without an API file-list cutoff. An absent initial baseline selects full verification. Failed comparisons and invalid outputs fail detection. Quality, Backend foundation and the SDK aggregate reject failed selection rather than treating it as a valid skip.
 
-Scheduled CodeQL runs still scan both languages. The weekly CLI security run audits dependencies without starting native packaging, because advisories can change independently of source. Manual runs select complete verification for their workflow. The SDK's existing `macos` input remains available and defaults to `true`.
+Pull requests retain both complete CodeQL language analyses, including documentation-only and single-language changes, to satisfy native merge protection. Main pushes keep language-based selection. Scheduled CodeQL runs still scan both languages. The weekly CLI security run audits dependencies without starting native packaging, because advisories can change independently of source. Manual runs select complete verification for their workflow. The SDK's existing `macos` input remains available and defaults to `true`.
 
 From the repository root, check the selector without application dependencies:
 
@@ -83,7 +83,7 @@ gh workflow run codeql.yml --ref "$ci_branch"
 
 When adding a consumed configuration file, fixture or workspace member, update the selector and its behavioral examples together. Keep the source paths and reasons in one owner. Local developer commands such as `pnpm check` remain complete and unchanged.
 
-**Merge and evidence boundaries.** Preserve the current required Quality, Backend foundation and CodeRabbit checks and the separate native CodeQL alert rule. Job-level selection avoids [missing required workflow checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks). Native [CodeQL merge protection](https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection) must also accept documentation-only and single-language skips in published PRs. That remote compatibility remains pending until observed. If GitHub requires analysis in those cases, retain PR analysis as the compatibility exception. Do not replace native protection with a successful shell job, change alert thresholds or upload fabricated results. External activation of additional required checks remains a separate decision.
+**Merge and evidence boundaries.** Preserve the current required Quality, Backend foundation and CodeRabbit checks and the separate native CodeQL alert rule. Job-level selection avoids [missing required workflow checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks). The current native [CodeQL merge protection](https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection) blocked merge when a Python-only PR scan omitted the JavaScript/TypeScript configuration present on main, despite successful workflow jobs. The workflow therefore retains both existing language analyses on every PR as the compatibility exception. Confirm both configurations and the native merge-rule outcome on the final head. Do not replace native protection with a successful shell job, change alert thresholds or upload fabricated results. External activation of additional required checks remains a separate decision.
 
 <a id="ci-dependency-caches"></a>
 
