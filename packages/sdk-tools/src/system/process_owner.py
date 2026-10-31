@@ -173,7 +173,7 @@ def executable_members(payload: bytes, group: int) -> bool:
         if len(fields) != 3:
             raise ValueError("Incomplete process observation.")
         pid, pgid = int(fields[0]), int(fields[1])
-        if pid <= 0 or pgid <= 0:
+        if pid <= 0 or pgid < 0:
             raise ValueError("Invalid process observation.")
         if pgid == group and not fields[2].startswith("Z"):
             live = True
@@ -190,7 +190,7 @@ def _members(target: OwnedTarget, deadline: int) -> bool:
     if _clock() >= deadline:
         raise TimeoutError
     observation = subprocess.Popen(
-        ["ps", "-axo", "pid=,pgid=,stat="],
+        ["ps", "-A", "-o", "pid=,pgid=,stat="],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,

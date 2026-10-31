@@ -189,9 +189,21 @@ class GroupObservationTests(unittest.TestCase):
         self.assertTrue(executable_members(b"123 123 Z\n124 123 S\n", 123))
         self.assertFalse(executable_members(b"123 123 Z\n124 999 S\n", 123))
 
-    def test_incomplete_observation_is_not_an_empty_group(self) -> None:
-        with self.assertRaises(ValueError):
-            executable_members(b"incomplete\n", 123)
+    def test_zero_group_rows_preserve_exact_target_membership(self) -> None:
+        payload = b"2 0 S\n99 1234 R\n123 123 Z+\n"
+        self.assertFalse(executable_members(payload, 123))
+        self.assertTrue(executable_members(payload + b"124 123 S\n", 123))
+
+    def test_invalid_observation_is_not_an_empty_group(self) -> None:
+        for payload in (
+            b"incomplete\n",
+            b"123 123 S extra\n",
+            b"0 123 S\n",
+            b"-1 123 S\n",
+            b"123 -1 S\n",
+        ):
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                executable_members(payload, 123)
 
     def test_observer_setup_failure_reaps_and_closes_without_claiming_quiescence(self) -> None:
         target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
@@ -253,6 +265,12 @@ class GroupObservationTests(unittest.TestCase):
 
         spawn.assert_called_once()
         configure.assert_called_once_with(456, False)
+        spawn.assert_called_once_with(
+            ["ps", "-A", "-o", "pid=,pgid=,stat="],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
         observation.wait.assert_called_once_with(timeout=1)
         observation.kill.assert_not_called()
         stream.close.assert_called_once()

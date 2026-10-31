@@ -7,7 +7,7 @@ import type { Socket } from "node:net";
 import type { TestContext } from "node:test";
 import http from "node:http";
 import { syncBuiltinESMExports } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { artifacts, cache, home } from "../../../src/config.ts";
 import { command, withResources } from "../../../src/system/process.ts";
@@ -1463,6 +1463,20 @@ export async function acquireBrowserFixtureDirectory(
   return { folder, socketPath };
 }
 
+/** Keep raw captures outside the ordinary browser-owner artifact directory. */
+export async function acquireProtectedFixtureDirectory(
+  report: string,
+): Promise<string> {
+  const folder = await mkdtemp(join("/tmp", basename(report) + ".protected-"));
+  try {
+    await chmod(folder, 0o700);
+  } catch (error) {
+    await rm(folder, { recursive: true, force: true });
+    throw error;
+  }
+  return folder;
+}
+
 async function runFixture(mode: string): Promise<void> {
   if (!["profile", "native", "worker-loss-probe"].includes(mode))
     throw new Error("Unknown fixed browser fixture mode");
@@ -1473,8 +1487,7 @@ async function runFixture(mode: string): Promise<void> {
   if (!evidence.startsWith("/"))
     throw new Error("Invalid private browser fixture path");
   await mkdir(dirname(evidence), { recursive: true });
-  const protectedFolder = await mkdtemp(evidence + ".protected-");
-  await chmod(protectedFolder, 0o700);
+  const protectedFolder = await acquireProtectedFixtureDirectory(evidence);
   const { folder, socketPath } = await acquireBrowserFixtureDirectory();
   const nonce = randomBytes(24).toString("hex");
   process.env.PLAYWRIGHT_BROWSERS_PATH ??= join(cache, "browsers");

@@ -3,13 +3,15 @@ import assert from "node:assert/strict";
 import {
   chmod,
   mkdtemp,
+  mkdir,
   rm,
   writeFile,
   readFile,
   lstat,
+  realpath,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { basename, isAbsolute, join, sep } from "node:path";
 import test from "node:test";
 import { cache } from "../../src/config.ts";
 import { startProfile } from "../../src/conformance/profile.ts";
@@ -23,6 +25,7 @@ import {
   expectedStalledCloseFailure,
   stalledCloseMessages,
   acquireBrowserFixtureDirectory,
+  acquireProtectedFixtureDirectory,
   fixtureDiagnostic,
   fixtureCaptureMetadata,
   FixtureDiagnostics,
@@ -121,8 +124,19 @@ test(
   "pure fixture diagnostics retains a private capture and checks its identity",
   { timeout: 5000 },
   async () => {
-    const folder = await mkdtemp(join(tmpdir(), "sdk-diagnostic-capture-"));
+    const work = await mkdtemp(join(tmpdir(), "sdk-diagnostic-capture-"));
+    let folder: string | undefined;
     try {
+      const publication = join(work, "artifacts");
+      await mkdir(publication);
+      const report = join(publication, "sdk-diagnostic-capture.json");
+      folder = await acquireProtectedFixtureDirectory(report);
+      const canonicalArtifacts = await realpath(publication);
+      const canonicalFolder = await realpath(folder);
+      assert.equal((await lstat(folder)).mode & 0o777, 0o700);
+      assert.ok(basename(folder).startsWith(basename(report) + ".protected-"));
+      assert.notEqual(canonicalFolder, canonicalArtifacts);
+      assert.ok(!canonicalFolder.startsWith(canonicalArtifacts + sep));
       const capture = await prepareFixtureCapture(
         folder,
         "timeout",
@@ -134,7 +148,8 @@ test(
       assert.equal(metadata.bytes, Buffer.byteLength("nonce-fragment\uFFFD"));
       assert.ok(metadata.device >= 0 && metadata.inode > 0);
     } finally {
-      await rm(folder, { recursive: true, force: true });
+      if (folder) await rm(folder, { recursive: true, force: true });
+      await rm(work, { recursive: true, force: true });
     }
   },
 );
@@ -1779,7 +1794,7 @@ test(
         performance.now() - began < 2000,
         "Incomplete outcome must precede the four-second fixture fuse",
       );
-      const state = await command("ps", ["-axo", "pid=,stat="]);
+      const state = await command("ps", ["-A", "-o", "pid=,stat="]);
       assert.ok(
         state.stdout.split("\n").some((row) => {
           const [candidate, status] = row.trim().split(/\s+/);

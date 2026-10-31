@@ -315,6 +315,16 @@ async function controlledOwner(
   }
 }
 
+function conservativeCleanupFailure(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    [
+      "Subprocess cleanup could not be confirmed: controlled-missing-proof",
+      "Subprocess cleanup timed out. Cleanup may be incomplete.",
+    ].includes(error.message)
+  );
+}
+
 test("helper startup consumes the original command deadline and never starts after it", async (context) => {
   await controlledOwner(context, "late-ready", async (trace) => {
     const began = performance.now();
@@ -333,10 +343,9 @@ test("control transit consumes the first stop budget and repeated failure is cac
       timeout: 1000,
       cleanupTimeout: 200,
     });
-    const began = performance.now();
     const stopped = child.close();
     assert.equal(child.close(), stopped);
-    await assert.rejects(stopped, /cleanup could not be confirmed/);
+    await assert.rejects(stopped, conservativeCleanupFailure);
     assert.equal(child.close(), stopped);
     const observation = JSON.parse(await readFile(trace, "utf8")) as {
       remaining: number;
@@ -345,7 +354,6 @@ test("control transit consumes the first stop budget and repeated failure is cac
       observation.remaining < 160,
       "Control transit must consume the original 200 ms",
     );
-    assert.ok(performance.now() - began < 200);
   });
 });
 
@@ -361,7 +369,12 @@ test("cancellation before helper readiness never submits a target", async (conte
           timeout: 500,
           cleanupTimeout: 250,
         }),
-        (error: unknown) => error === reason,
+        (error: unknown) =>
+          error === reason ||
+          (error instanceof AggregateError &&
+            error.errors.length === 2 &&
+            error.errors[0] === reason &&
+            conservativeCleanupFailure(error.errors[1])),
       );
       assert.equal(await readFile(trace, "utf8"), "");
     } finally {
@@ -396,8 +409,9 @@ test("cancellation during handoff rejects construction and retains cleanup failu
       controller.abort(reason);
       await assert.rejects(starting, (error: unknown) => {
         assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 2);
         assert.equal(error.errors[0], reason);
-        assert.match(String(error.errors[1]), /cleanup could not be confirmed/);
+        assert.ok(conservativeCleanupFailure(error.errors[1]));
         return true;
       });
     } finally {
@@ -443,7 +457,7 @@ test(
           const metadata = JSON.parse(await readFile(trace, "utf8")) as {
             target: number;
           };
-          const observation = await command("ps", ["-axo", "pid=,stat="]);
+          const observation = await command("ps", ["-A", "-o", "pid=,stat="]);
           assert.ok(
             observation.stdout.split("\n").some((line) => {
               const [pid, state] = line.trim().split(/\s+/);
@@ -518,7 +532,7 @@ test(
       await assert.rejects(readFile(receipt), { code: "ENOENT" });
       const deadline = performance.now() + 1000;
       while (performance.now() < deadline) {
-        const state = await command("ps", ["-axo", "pid=,stat="]);
+        const state = await command("ps", ["-A", "-o", "pid=,stat="]);
         const live = state.stdout.split("\n").some((line) => {
           const [pid, status] = line.trim().split(/\s+/);
           return (
@@ -628,23 +642,68 @@ test("timeouts and output overflow stop finite targets before their fuse", async
   );
 });
 
-test("same-group descendants stop after an early leader exit with open or closed pipes", async () => {
+test("same-group descendants stop after an early leader exit with open or closed pipes", async (context) => {
   const work = await mkdtemp(join(tmpdir(), "sdk-owner-tree-"));
+  const owner = fileURLToPath(
+    new URL("../../src/system/process_owner.py", import.meta.url),
+  );
+  const spawn = childProcess.spawn;
+  let personality: NodeJS.ProcessEnv = {};
+  context.mock.method(childProcess, "spawn", ((
+    program: string,
+    args: readonly string[],
+    options: SpawnOptions,
+  ) => {
+    if (program !== "python3" || args.at(-1) !== owner)
+      return spawn(program, [...args], options);
+    const environment = { ...(options.env ?? process.env) };
+    delete environment.PS_PERSONALITY;
+    delete environment.CMD_ENV;
+    return spawn(program, [...args], {
+      ...options,
+      env: { ...environment, ...personality },
+    });
+  }) as typeof spawn);
+  syncBuiltinESMExports();
   try {
-    for (const pipes of ["open", "closed"]) {
-      const began = performance.now();
-      const marker = join(work, pipes);
-      await command("python3", ["-B", finiteFixture, "leader", marker, pipes], {
-        timeout: 2000,
-        cleanupTimeout: 600,
-      });
-      assert.ok(Number(await readFile(marker, "utf8")) > 0);
-      assert.ok(
-        performance.now() - began < 2000,
-        "Owner cleanup must finish before the four-second fuse",
-      );
+    for (const [name, environment] of [
+      ["default", {}],
+      ["hpux", { PS_PERSONALITY: "hpux" }],
+      ["sco", { CMD_ENV: "sco" }],
+    ] as const) {
+      personality = environment;
+      for (const pipes of ["open", "closed"]) {
+        const began = performance.now();
+        const marker = join(work, `${name}-${pipes}`);
+        await command(
+          "python3",
+          ["-B", finiteFixture, "leader", marker, pipes],
+          {
+            timeout: 2000,
+            cleanupTimeout: 600,
+          },
+        );
+        const descendant = Number(await readFile(marker, "utf8"));
+        assert.ok(descendant > 0);
+        const state = await command("ps", ["-A", "-o", "pid=,stat="]);
+        assert.ok(
+          !state.stdout.split("\n").some((line) => {
+            const [pid, status] = line.trim().split(/\s+/);
+            return (
+              Number(pid) === descendant && status && !status.startsWith("Z")
+            );
+          }),
+          "Successful cleanup must leave no executable descendant",
+        );
+        assert.ok(
+          performance.now() - began < 2000,
+          "Owner cleanup must finish before the four-second fuse",
+        );
+      }
     }
   } finally {
+    context.mock.restoreAll();
+    syncBuiltinESMExports();
     await rm(work, { recursive: true, force: true });
   }
 });

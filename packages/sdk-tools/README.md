@@ -76,12 +76,12 @@ Tests use Node's standard runner and assertions. Shared HTTP case failures print
 
 Native fixture stdout and stderr contain fixed JSON status records with `phase`, `category` and a known numeric `status` or `null`. Optional peer, case and capture metadata are validated fields. Terminal categories include `passed`, `failed` and `owner-unknown`. The fixture does not forward controller output, error messages, stacks or causes, even on success. Read the fixed phases alongside actual owner receipts to investigate assertion failure, peer loss and lifecycle order. They do not establish a cause or successful cleanup by themselves.
 
-Protected diagnostics remain in private sibling directories named with `.protected-` and a unique suffix. Use the owning run's custody record to locate the exact retained directories:
+Protected diagnostics for the configured browser-owner report are allocated under `/tmp` as `<report-basename>.protected-<unique-suffix>`, outside the ordinary artifact tree. Nested timeout diagnostics remain beside their private case work directory. In CI these raw captures are job-local and may become unavailable after runner teardown. Use the owning run's custody record to locate the exact retained directories:
 
-| Directory beside | Retained files |
+| Private location | Retained files |
 | --- | --- |
-| The configured browser-owner report | `probe.raw.log`, `controller.raw.log`, `broker-status.json` |
-| The nested timeout case's work directory | `timeout.raw.log`, `assertion-status.json`, `worker-status.json` |
+| `/tmp/<report-basename>.protected-*` for the configured browser-owner report | `probe.raw.log`, `controller.raw.log`, `broker-status.json` |
+| A sibling of the nested timeout case's work directory | `timeout.raw.log`, `assertion-status.json`, `worker-status.json` |
 
 Directories have mode `0700` and files `0600`. The three raw captures are **PROTECTED RAW EVIDENCE**: unsanitized decoded command text that may be incomplete and is not a byte-faithful stream copy. `capture-checked` confirms file identity and encoded-size checks, not sanitization or completeness. Only the run owner and authorized reviewer should inspect these originals privately. Do not paste captures, publish excerpts or make redacted tails. `capture-unproved`, invalid or unavailable evidence remains a diagnostic limit. Recovery starts before diagnostic I/O and keeps its original deadline. Diagnostic collection or later physical reconciliation cannot turn a failed positive cleanup case into passing qualification.
 
