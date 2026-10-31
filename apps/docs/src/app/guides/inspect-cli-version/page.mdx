@@ -1,0 +1,163 @@
+export const pageMetadata = {
+  title: "Inspect your CLI version offline",
+  description:
+    "Read the installed Inframeld CLI's build information as JSON without connecting to an installation.",
+}
+
+# Inspect your CLI version offline
+
+Use `inframeld version --json` when a script needs to identify the installed executable. It reads build information embedded in that binary. It does not contact an Inframeld installation, authenticate, load saved configuration or start services.
+
+## Before you begin
+
+You need an `inframeld` binary that includes the offline JSON version feature, available on your shell's `PATH`. Older binaries may reject these flags. The [CLI README](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#install-and-remove-a-packaged-executable) explains archive installation and its platform limits. If a suitable archive is unavailable, follow its [source build instructions](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#build-and-check-from-source). This guide does not establish a published release or qualify an additional platform.
+
+Run the commands below in your terminal from any working directory. You need no backend, Docker, credentials or writable home directory. The commands write their results to the terminal and create no files.
+
+## Read the build information
+
+For human-readable output, run `inframeld version`. For a structured result, run:
+
+<CodeGroup>
+
+```shell
+inframeld version --json
+```
+
+</CodeGroup>
+
+On success, the command exits `0`, writes one JSON object followed by a newline to stdout, and leaves stderr empty. This is illustrative output, not a captured build or platform qualification:
+
+<CodeGroup>
+
+```json
+{
+  "schemaVersion": 1,
+  "mode": "execute",
+  "outcome": "succeeded",
+  "data": {
+    "cliVersion": "0.0.0",
+    "revision": null,
+    "sourceDirty": false,
+    "target": "aarch64-apple-darwin",
+    "qualifiedRuntime": null,
+    "policy": "matching-qualified-releases",
+    "buildStatus": "development",
+    "remoteVerification": "unavailable",
+    "remoteCompatibility": "unverified"
+  },
+  "error": null,
+  "warnings": []
+}
+```
+
+</CodeGroup>
+
+The actual version, source revision, dirty-source flag and target come from your binary. All nine `data` fields are required:
+
+| Field                 | Meaning                                                                                                                |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `cliVersion`          | The version recorded when this executable was built.                                                                   |
+| `revision`            | The recorded 40-character hexadecimal source revision, or `null` when no revision was available.                       |
+| `sourceDirty`         | Whether the build recorded locally modified source inputs. This boolean is independent of whether a revision is known. |
+| `target`              | The executable's Rust target triple, identifying its build platform and architecture.                                  |
+| `qualifiedRuntime`    | `null` in this development profile, meaning no runtime release is qualified.                                           |
+| `policy`              | `matching-qualified-releases`, the policy for pairing qualified CLI and runtime releases.                              |
+| `buildStatus`         | `development` for the supported current build profile.                                                                 |
+| `remoteVerification`  | `unavailable`, meaning automatic remote compatibility verification is unavailable.                                     |
+| `remoteCompatibility` | `unverified`, because this invocation performs no remote compatibility check.                                          |
+
+<Note>
+  Successful version inspection identifies the binary. It does not establish
+  that a running installation is healthy or compatible. A `null` qualified
+  runtime is not permission to pair the CLI with an arbitrary runtime.
+</Note>
+
+Parse fields rather than matching indentation or field order. Check `schemaVersion`, `mode`, `outcome` and the required data before using the result. Reject an unsupported schema version or missing or malformed required fields. Ignore additional fields. For this offline command, successful results have `error: null` and `warnings: []`.
+
+## Choose a final JSONL record
+
+If your consumer requires newline-delimited JSON, select it explicitly:
+
+<CodeGroup>
+
+```shell
+inframeld version --jsonl
+```
+
+</CodeGroup>
+
+This writes exactly one compact line followed by a newline. The outer object has `schemaVersion: 1`, `type: "result"` and `result`, which contains the complete ordinary JSON object shown above. `result` is an object, not a JSON-encoded string. Version inspection emits no progress records and nothing after its final record. Piping output does not select JSONL automatically.
+
+Choose either `--json` or `--jsonl`. Supplying both is a usage error. The global flags work before or after `version`, so `inframeld --json version` selects the same JSON result.
+
+## Explain the command without reading the build values
+
+Use descriptive dry-run to see the intended operation without performing its embedded-metadata read:
+
+<CodeGroup>
+
+```shell
+inframeld version --dry-run --json
+```
+
+</CodeGroup>
+
+A successful explanation exits `0` with `mode: "dryRun"`, `outcome: "succeeded"`, `error: null` and `warnings: []`. Its `data` is this plan, rather than actual build values:
+
+<CodeGroup>
+
+```json
+{
+  "command": "version",
+  "intendedReads": ["embeddedBuildMetadata"],
+  "intendedDestination": "stdout",
+  "outgoingDataCategories": ["buildIdentity", "compatibilityPolicy"],
+  "intendedEffects": ["writeVersionInformationToStdout"],
+  "checksPerformed": ["argumentsValidated"],
+  "unresolvedChoices": [],
+  "operationPerformed": false
+}
+```
+
+</CodeGroup>
+
+Only argument validation occurred. The intended read and effect describe what executing `version` would do. Dry-run does not read or validate the embedded build values, check remote compatibility, access credentials or change an installation. Use `inframeld version --dry-run` for the human explanation, or replace `--json` with `--jsonl` for one final plan record.
+
+## Handle usage and output failures
+
+Machine output needs an explicit command. For example, `inframeld --json` exits `2` and reports:
+
+<CodeGroup>
+
+```json
+{
+  "schemaVersion": 1,
+  "mode": "execute",
+  "outcome": "failed",
+  "data": null,
+  "error": {
+    "source": "cli",
+    "code": "invalid_arguments",
+    "message": "Check the supplied arguments and use --help for usage."
+  },
+  "warnings": []
+}
+```
+
+</CodeGroup>
+
+A controlled failure also writes a fixed diagnostic to stderr. It does not echo submitted argument values. `--jsonl` uses its final record for the same failure.
+
+| Failure                                 | Next step                                                                                                                                               |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Exit `2`, `invalid_arguments`           | Check `inframeld version --help`. Supply `version`, remove unsupported inputs and choose one output mode.                                               |
+| Exit `1`, `invalid_build_metadata`      | Use a trusted build with valid embedded information, or rebuild from the maintained source instructions.                                                |
+| Exit `1`, `output_limit_exceeded`       | The build information could not fit the supported output bounds. Report the safe error code with the binary's origin. Output is not silently truncated. |
+| Missing, incomplete or malformed output | Check the process status and output destination. Do not treat a partial object or missing final record as success.                                      |
+
+A machine stdout write or flush failure, including a broken pipe, exits `1`. It may leave no bytes or only part of the result. The CLI does not append a replacement object or switch to human stdout. A bounded `output_write_failed` diagnostic may reach stderr if that stream still works. Forced termination can also prevent final output. Plain human, help and root-version output retain their existing broken-pipe exit `0` behavior.
+
+Help and the recognized root `--version` flag are plain-text exceptions, even with a machine flag. For example, `inframeld version --help --json` shows help and `inframeld --json --version` shows the short version. An exact `--help` or `-h` before standalone `--` wins over argument errors and output conflicts. Tokens after that delimiter do not select output mode or dry-run.
+
+Version never prompts. `--no-input` makes noninteractive intent explicit. `--plain` and `--no-color` affect presentation without changing JSON. These offline commands do not provide login, queries, list traversal, mutations or progress reporting. Repeating version inspection reads the same binary again and needs no installation recovery or cleanup.

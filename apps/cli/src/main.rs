@@ -1,4 +1,4 @@
-//! Enter the CLI and preserve its offline output and broken-pipe exit behavior.
+//! Preserve plain-output pipe behavior after machine reporting owns its failures.
 
 use std::io;
 use std::process::ExitCode;

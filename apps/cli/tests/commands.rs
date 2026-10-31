@@ -4,13 +4,14 @@
 #![allow(clippy::unwrap_used)]
 use assert_cmd::{Command, cargo::cargo_bin_cmd};
 use predicates::prelude::*;
-use std::os::unix::fs::PermissionsExt;
+use std::{os::unix::fs::PermissionsExt, time::Duration};
 use tempfile::TempDir;
 
 fn isolated(home: &TempDir) -> Command {
     let mut command = cargo_bin_cmd!("inframeld");
     command.env_clear().env("HOME", home.path()).env("PATH", "");
     command.current_dir(home.path());
+    command.timeout(Duration::from_secs(5));
     command
 }
 
