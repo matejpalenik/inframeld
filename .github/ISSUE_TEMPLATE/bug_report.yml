@@ -8,6 +8,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time to report a problem. Please remove secrets and private data before submitting.
+        You do not need to know the cause or solution. Maintainers will agree the delivery scope and acceptance during triage.
   - type: textarea
     id: description
     attributes:
@@ -48,6 +49,18 @@ body:
       label: Proposed solution or next investigation
       description: If known, suggest the smallest correction and how to check it. Otherwise name what should be investigated. Separate hypotheses from confirmed causes.
       placeholder: Check which cleanup operation remains pending, add a focused regression, and repair the existing runner while preserving its deadlines. Broader runner redesign is outside this report.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: What should work after the fix?
+      description: If known, describe an observable result that would show the problem is fixed. Maintainers can complete this during triage.
+      placeholder: The SDK check stops its own backend and browser within the existing deadline, without hiding a test or cleanup failure.
+  - type: textarea
+    id: exclusions
+    attributes:
+      label: Related work outside this report
+      description: Optionally name related behavior that should stay outside this fix. You do not need to define the implementation.
+      placeholder: Repair test cleanup without changing Project permissions or host-machine configuration.
   - type: dropdown
     id: area
     attributes:
