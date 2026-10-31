@@ -1,30 +1,30 @@
-# Coordinate backlog delivery from one chat
+# Deliver useful changes from one coordinating chat
 
-The main chat is the coordinator. It can hold one explicitly requested Goal while native subagents implement and review bounded assignments in separate worktrees. Workers do not need their own Goals. The coordinator owns scheduling, shared resources, current acceptance and the decision to merge an eligible PR.
+Alice has a backend change waiting for integration and an independent CLI PR ready for review. The coordinator schedules the shared stack once, finishes the useful PR and keeps the blocked branch intact. Success means reviewed capabilities reach main. Agent occupancy and test counts do not establish delivery.
 
-The checked-in setup prepares this workflow and a read-only rehearsal. It does not start a live backlog run. The local helpers inspect issues, maintain evidence and assess supplied merge observations. They do not spawn agents, create Goals, push branches, create PRs or merge them.
+The [Backlog Delivery skill](../../../.agents/skills/inframeld-backlog-delivery/SKILL.md) owns common policy. Its references cover [scheduling and dependencies](../../../.agents/skills/inframeld-backlog-delivery/references/coordinator.md), [worker delivery](../../../.agents/skills/inframeld-backlog-delivery/references/worker.md), [assignment binding](../../../.agents/skills/inframeld-backlog-delivery/references/assignment-protocol.md) and [gates/recovery](../../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md). This guide owns setup, launch, adoption and evaluation. Load only the route needed.
 
-## Roles and capacity
+## Choose an operating mode
 
-| Role | Responsibility | Shared target maximum |
-| --- | --- | --- |
-| Main chat | Scope, Goal, scheduling, ownership, resource grants, merge decisions and rebase notifications | One coordinator |
-| `inframeld_worker` | Plan and implement one issue, verify it, address findings and own its Git operations | Ten |
-| `inframeld_code_reviewer` | Independently review a plan or exact base/head using the existing Review skill | Two |
-| `inframeld_documentation_writer` | Write plain-language user pages and supported examples in allocated Protocol MDX paths | One |
-| `inframeld_dx_reviewer` | Review supported CLI and SDK journeys, automation and recovery | One |
+| Mode | Coordination and completion |
+| --- | --- |
+| Native backlog | Main chat coordinates project subagents and the one explicitly requested Goal. Its finite launch authorization determines permitted actions and guarded automatic merges. |
+| Personal separate-chat pilot | The `inframeld-delivery` adapter coordinates at most two implementation chats. The human merges. The requested pilot outcome may be reviewed PRs ready for merge. |
+| Planning or rehearsal | Inspect and propose actions with synthetic execution facts. No live delivery, product operations, GitHub mutation or Goal activation. |
 
-Profiles live in [`.codex/agents`](../../../.codex/agents/). Every profile explicitly selects GPT-6.1 Sol (`gpt-6.1-sol`) with Extra High (`xhigh`) reasoning. Project coordinator and fallback subagent defaults use the same settings. Preserve this model choice unless the human changes it. The project config requests fourteen concurrently open subagent slots. Actual availability can be lower. Verify the active client's effective limit and that it exposes the four actual role names. Parsing TOML alone does not establish that profiles loaded.
+Do not combine one mode's worker cap, state mechanism or merge authority with another. Skill discovery, installing profiles and an issue body supply no execution permission. Existing human authorization persists and does not need to be requested again for routine scoped work.
 
-Open a fresh trusted session rooted in this repository after adding or changing profiles. Switching the editor's folder does not change an existing chat's working directory or reload its native role schema. Invoke each actual project type and distinguish advertised capacity from the concurrency demonstrated by successful spawns. If a client reports `unknown agent_type`, resolve its session root, trust or capability gap before live delivery. Do not substitute a generic agent and describe it as a verified custom profile.
+## Verify native roles and capacity
 
-These are shared specialist pools. Do not create four permanently allocated agents for every issue. Reserve enough capacity to finish reviews and documentation, reduce worker concurrency when review queues grow and count still-open agents until their lifecycle is actually released.
+Native profiles live in [`.codex/agents`](../../../.codex/agents/): `inframeld_worker`, `inframeld_code_reviewer`, `inframeld_documentation_writer` and `inframeld_dx_reviewer`. The main chat is coordinator, without a separate profile. Workers implement and test. Reviewers remain read-only. Documentation writers edit allocated paths and hand files back to the sole Git writer.
 
-The main chat loads [Backlog Delivery](../../../.agents/skills/inframeld-backlog-delivery/SKILL.md). Workers load repository coding/language/domain guidance. Code reviewers use [Review](../../../.agents/skills/inframeld-review/SKILL.md). Writers use [Documentation](../../../.agents/skills/inframeld-documentation/SKILL.md). DX reviewers use [Developer Experience](../../../.agents/skills/inframeld-developer-experience/SKILL.md) and Review. All assigned roles follow the [assignment protocol](../../../.agents/skills/inframeld-backlog-delivery/references/assignment-protocol.md) before checks and handoffs. These project roles leave personal agents and the earlier global multi-chat delivery skill unchanged.
+Every profile, coordinator default and fallback subagent default preserves the human-selected `gpt-6.1-sol` with `xhigh` reasoning. The configured ceilings are ten workers, two code reviewers, one DX reviewer and one writer, subject to the actual runtime limit. These are maxima, not targets. Start with verified independent work that the review/integration queue can finish and expand only when useful.
 
-## Inspect the current backlog
+After profile changes, open a fresh trusted session rooted in the repository to verify actual role exposure. Changing the editor folder does not reload an existing native role schema. A TOML parse proves syntax, not invocation. If a client reports `unknown agent_type`, report the session-root, trust or capability gap. Do not relabel a generic agent as a verified project profile or change global permissions/model settings to force a pass. Existing sessions may continue with verified capabilities and directly read current guidance while reporting stale profile instructions honestly.
 
-Run these commands from the repository root:
+## Inspect and retain a finite snapshot
+
+These copyable commands run from the repository root:
 
 ```bash
 pnpm delivery:plan
@@ -32,78 +32,85 @@ pnpm delivery:rehearse
 pnpm delivery:test
 ```
 
-`delivery:plan` reads repository `matejpalenik/inframeld`, milestone number 1, `v1`, through the authenticated GitHub CLI. It returns a snapshot, dependency candidates, blockers, ownership conflicts and likely unlocks. It makes no GitHub writes. A candidate is not proof that its code can change independently. The coordinator must inspect affected paths and semantic contracts before assignment.
+`delivery:plan` reads `matejpalenik/inframeld`, milestone 1 (`v1`), through authenticated GitHub CLI access. It returns dependencies, candidates and possible ownership conflicts without GitHub writes. Inspect actual issues, acceptance, open/unpublished work and semantic contracts before assigning. Exclude Studio and aggregate epics. Later issues do not silently enter a launched snapshot.
 
-`delivery:rehearse` uses temporary synthetic rehearsal state and demonstrates gate outcomes without GitHub calls. `delivery:test` runs the helper's behavioral unit tests. These commands do not exercise native role loading or prove that a full delivery run can launch.
+`delivery:rehearse` exercises synthetic helper gates without GitHub calls or native workers. `delivery:test` tests helper behavior. Neither proves role loading or a live launch.
 
-The future scope is a finite snapshot of open implementation issues at launch. Exclude Studio and treat aggregate epics as completion summaries rather than leaf assignments. Later issues do not silently enter the run. An issue blocked on an accepted decision remains blocked while independent tasks can continue.
+Store native run records outside every checkout in a task-authorized writable directory. Do not broaden global permissions merely to store state. Only the coordinator writes the record and grants shared resources. On interruption, reconcile actual agents, worktrees, PR heads and resources. Stale timestamps do not prove cleanup or writer termination.
 
-## Keep run state outside checkouts
-
-Choose an authorized absolute run directory outside every repository checkout. A suitable local location is a dedicated directory under the task workspace's parent, provided it is writable in the active session. Do not put runtime records into a branch or broaden sandbox access to a global configuration directory merely to store them.
-
-Inspect an existing record with:
+Inspect an existing record with this command, replacing the illustrative absolute path:
 
 ```bash
 pnpm delivery:status --state /absolute/outside-checkouts/run/state.json
 ```
 
-The [helper contract](../../../scripts/delivery/README.md) owns exact JSON fields and command flags. `init` creates a record with run/coordinator identity, mode, authorization reference and finite allowed issues. `apply` requires those identities and the expected revision for state-only claim, revision, evidence, resource and merge-observation operations. `assess-merge` evaluates supplied evidence without merging. It returns exit status zero for a valid blocked or pending assessment too, so inspect the JSON `verdict` rather than treating command success as merge readiness.
+The [helper contract](../../../scripts/delivery/README.md) owns exact fields and flags. `init` and `apply` perform validated local updates. Assessment commands inspect supplied observations and do not merge or authorize actions. A successful command exit can report a blocked assessment, so inspect its JSON verdict. Keep the existing record/schema validation and revision checks. Do not create per-command state machinery for routine private tests.
 
-Only the coordinator writes the run record and grants shared resources. Atomic persistence prevents partial records and revision checks reject stale writes. Neither mechanism authenticates a claim or makes competing coordinators safe. On restart, reconcile recorded agents, branches, PRs and resources against actual state before dispatching replacement work. Unknown cleanup remains occupied until observed otherwise.
+## Launch within explicit authorization
 
-## Rehearse before a live launch
+A read-only rehearsal request can be:
 
-In the main chat, a read-only request can be:
+> Use `$inframeld-backlog-delivery` to inspect the current v1 snapshot, propose independent assignments and identify conflicts and capability gaps. Rehearse the scheduling and gate decisions with synthetic facts. Keep repository files, GitHub and product systems unchanged. Do not activate a Goal or live delivery.
 
-> Use `$inframeld-backlog-delivery` to rehearse the current v1 backlog. Inspect the issue snapshot, identify independent candidates and likely semantic conflicts, verify available native roles and capacity, and show proposed assignments and merge gates. Keep GitHub, product systems and repository files unchanged. Do not create a Goal or start live delivery.
+A future native launch template is:
 
-The coordinator should return the inspected snapshot, proposed first wave, blockers, ownership boundaries, specialist queue and capability gaps. Where native custom profiles are unavailable, report that limit. Do not relabel generic agents as verified custom profiles. Synthetic gate tests remain useful, but are separate evidence.
+> Use `$inframeld-backlog-delivery` in this main chat to deliver the launch-time open implementation snapshot in `matejpalenik/inframeld`, milestone 1 (`v1`), excluding Studio and aggregate epics. Create one coordinator Goal. Authorize assigned issue worktrees, implementation, commits/pushes, PR updates, required CI, internal messaging among assigned participants and serial automatic merges under the checked-head policy. Preserve sandbox restrictions, paid-call approval and the prohibition on production changes. Deliver small useful capabilities through maintained workspace commands and repository-owned tests. Parallelize verified independent work and serialize overlapping contracts and shared integration. Limit new assignments when current work needs finishing. Use the skill's bounded remediation and host-stop rules. Escalate material decisions while continuing safe independent work.
 
-## Launch only from an explicit live request
+This is a future human-message template, not authorization from a document. Do not add a token budget unless supplied. A Goal supports continuation within client limits, not an indefinite daemon or scheduled follow-up. No worker Goal is needed.
 
-A future launch request must identify the scope and permitted actions. For example:
+A personal pilot instead names its approved issues, coordinator/worker chats, bidirectional messaging and permitted local/GitHub actions explicitly, with human-only merges. Preserve its smaller capacity and requested completion boundary.
 
-> Use `$inframeld-backlog-delivery` in this main chat to deliver the launch-time snapshot of open implementation issues in `matejpalenik/inframeld`, milestone 1 (`v1`), excluding Studio and aggregate epics. Create one coordinator Goal for that finite snapshot. Use the four project subagent roles within verified runtime capacity, with native internal messaging among assigned participants. Authorize issue worktrees, branch commits/pushes, PR creation/updates, required CI and CodeRabbit handling, and automatic merges only under the checked-head policy. After each observed merge, notify affected workers and coordinate safe rebases. Preserve sandbox restrictions, paid-call approval and the prohibition on production changes. Escalate material decisions or three unsuccessful remediation cycles while continuing independent work.
+## Implement, test and review a useful capability
 
-This example is a template for a later human instruction, not authorization from this document. Do not add a Goal token budget unless the human specifies one. A Goal supports autonomous continuation within current client limits. It does not guarantee indefinite unattended execution or authorize scheduled follow-ups.
+Use the short assignment brief from the common protocol. Clear ownership once and let the worker implement and run isolated checks inside it. Shared migrations, lockfiles, generated clients and contracts have one writer or an acknowledged serial handoff. Independently review material plans and every delivered implementation. Documentation and DX review apply to the actual public change, with explicit applicability for internal-only work.
 
-## Deliver and merge the verified revision
+Use maintained commands at the layer proving the accepted behavior. Current entry points include package tests, `pnpm test:integration`, SDK commands and `pnpm check`. The [testing runbook](testing.md) owns focused flags, fixture setup and cleanup. A direct documented shell command can be the same maintained route as its `pnpm` alias. A private probe remains partial evidence. Do not substitute mocks for real guarantees or remove required qualification to reduce runtime.
 
-Each issue has one worktree and one Git writer. The worker owns implementation and all Git operations. The documentation writer receives disjoint paths and hands edited files back to the worker. A named owner handles shared navigation. Shared lockfiles, migrations, OpenAPI, generated clients and integration resources require explicit ownership or serial handoffs.
+The coordinator may grant a frozen revision's complete integration operation to one named worker executor. Keep source frozen, account for all shared resources and release only after observed exit and cleanup. Reviewers request evidence without starting services. Private build outputs do not need another grant unless another task uses them. Unknown cleanup blocks the affected resources, not every independent source task.
 
-The coordinator checks native dependencies and semantic overlap before dispatch. Workers report overlap before crossing scope. After implementation, independent reviewers inspect the actual base/head. User-facing documentation and DX applicability are explicit. Freeze all branch writes before final evidence. A changed issue, push, rebase or new main revision invalidates affected readiness.
+Use normal hooks, independent review and current required CI. A coherent commit or PR need not wait for final CI that can only run after pushing. The [gate policy](../../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md) owns findings, advisory CodeRabbit, supporting PRs and serial expected-head merges. Never bypass hooks/protections or restart CodeRabbit to force a review. A supporting PR leaves remaining issue acceptance open. Observe actual main and refresh affected work after merging.
 
-P0 and P1 findings must be fixed. Required P2 findings block merge unless the human explicitly accepts that bounded risk and follow-up for the actual change. P3 suggestions are optional. Numerical scores explain quality and confidence, and are never a demand for endless polishing. Three unsuccessful remediation cycles escalate the remaining concern.
+## Adopt revised guidance in an active run
 
-Required local checks, independent local reviews and final-head CI must be observed. CodeRabbit is advisory. Wait for its existing run to finish, route any substantive comments through independent local review, and skip analysis if it provides no comments for any reason. Never trigger or restart it manually. Record the actual bot result and review coverage without claiming that skipped analysis completed. Preserve GitHub settings and enforce actual required statuses under the [gate policy](../../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md). The helper cannot authenticate review JSON, so the coordinator verifies original sources.
+An overloaded run should temporarily stop opening new implementation assignments. This is a scheduling checkpoint, not a request to pause the Goal or kill commands. Let safe active operations finish and reconcile ownership first.
 
-Only the coordinator merges, serially, using a supported guard for the checked head after rechecking current base, issue acceptance, actual branch rules and all required gates. It observes the result before recording completion. It then broadcasts the new main revision and changed contracts. Workers acknowledge a safe checkpoint before rebasing, resolve semantic conflicts, regenerate owned artifacts and obtain new affected evidence.
+1. Fetch actual main and inspect the guidance change. Preserve dirty branches, existing authorizations, passed evidence, blockers and cumulative retry history.
+2. Read current policy directly. Existing role threads may retain older prompt instructions. Send affected participants the accepted policy and explicit ownership changes, preserving their verified model and capabilities. If immutable role instructions conflict, stop the affected action and reassign at a safe checkpoint to a session that loads the new policy. Do not claim old profiles reloaded.
+3. List current useful PR boundaries and exact blockers. Prioritize the smallest qualified shared maintenance change if it unlocks required checks. Then finish eligible current capabilities through review, verification and merge one at a time. Independent existing checks and reviews may continue.
+4. Park genuinely blocked work with a recoverable checkpoint and positive writer-stop acknowledgment. Use existing retirement/adoption operations after cleanup. Never reset attempts or discard work to start fresh.
+5. Revalidate each later branch against observed main. Resume new independent dispatch when review/integration capacity is available and current ownership is clear.
 
-Complete the Goal only after the finite authorized snapshot is actually delivered and reconciled. A pushed branch, a helper's `ready` result or low remaining usage is not completion.
+New policy does not retroactively relax a stricter one-shot human approval, expand merge authority or waive findings. Obtain a specific decision only where the existing authorization actually conflicts. Do not ask to reapprove the whole run.
 
-## Keep blocked issues from stopping independent delivery
+## Rehearse and evaluate the decisions
 
-When a new dependency appears, identify which accepted behavior needs it before expanding another feature's assignment. Independently review the smallest honest boundary: a documented prerequisite, an existing supported procedure, a useful supporting PR or an integrated delivery. Keep required findings open until properly resolved. See [dependency review](../../../.agents/skills/inframeld-backlog-delivery/references/coordinator.md#review-a-newly-discovered-dependency).
+Before substantive workflow edits, define a few must-pass outcomes. Validate frontmatter, links, role TOML and command/source accuracy. Keep detailed change evidence outside skills. Test these cases through realistic requests, with expected decisions withheld from trial prompts:
 
-Preserve blocked work at a recoverable checkpoint, record its exact blocker and next action, obtain the writer's stop acknowledgment and verify resource cleanup. Retire the unfinished assignment before reusing that worker on a verified independent issue. Resume it later with `adopt`. The shared integration slot serializes integration execution, not unrelated implementation or private checks.
+| Raw situation | Expected behavior |
+| --- | --- |
+| Two issues with independent paths/contracts | Parallel implementation within real capacity. |
+| Shared authorization contract or migration | One owner or serial delivery before dependent writes. |
+| Two requests for the fixed integration stack | One named executor and observed cleanup before the next. |
+| Blocked writer with independent eligible work | Preserve checkpoint, stop positively, reconcile and reuse safely. |
+| Useful supporting capability with feature work remaining | Scoped review/checks and no false issue closure. |
+| A small harness repair proposes another general supervisor | Review the demonstrated need and minimal maintained alternative before expansion. |
+| Optional report formatting fails after retained test results | Recover the report without inventing success or needlessly rerunning valid checks. |
+| Three unsuccessful remediation cycles | Stop affected work and explain the remaining blocker. |
+| Stopped machine, unknown other users or recurring fault | Apply only the bounded permitted recovery, otherwise stop dependent runtime work. |
+| Proposed VM network/DNS/storage repair | Stop at the host boundary. |
+| New revision after review | Current binding and explicit reassessment of affected evidence. |
+| Ordinary question, standalone review or synthetic authority | No unrequested delivery or real mutation. |
 
-A supporting PR may merge a useful qualified capability while the larger issue stays open. Its scope, deferred dependencies and remaining acceptance need independent review. Use `assess-prerequisite` and `observe_prerequisite_merge`, retain all ordinary checks and merge guards, and use no closing references. Full-issue acceptance and completion counts remain unchanged. [Supporting-PR gates](../../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md#merge-useful-prerequisites-without-closing-the-feature) own the details.
+When authorized independent contexts are available, inspect actual loaded files, decisions and artifacts. Respect environments where subagents are unavailable or prohibited. Do not evade that restriction through another CLI process. Report editorial walkthroughs, helper tests, discovery checks, independent trials and real product qualification separately. Static checks do not prove agent behavior.
 
-## Stop at the host boundary
+After adoption, use a small authorized real batch to assess time to useful PR/merge, review/integration waiting, feature versus harness work, repeated checks without new evidence and avoidable approval requests. Reuse existing observations. Do not add a monitoring framework or optimize agent occupancy.
 
-Delivery may fix repository code, Dockerfiles and Compose/test configuration. It must not repair or reconfigure the host or Podman machine. The only machine-recovery exception is one coordinator-controlled start of an existing stopped machine, or one coordinated restart of a confirmed stuck machine, after reconciling other users. Stop runtime-dependent work if recovery fails, cannot be confirmed or the same fault recurs. Changing VM networking/storage/settings, host trust/DNS/permissions, global tools, resetting/recreating machines and broad pruning are outside delivery authority. An extra issue-remediation cycle does not expand this boundary. See [host recovery and immediate stop conditions](../../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md#keep-delivery-out-of-host-repair).
+## Maintain the personal adapter
 
-Future launch requests can add:
+The reviewable source for the installed personal skill is [`scripts/delivery/personal-skill/`](../../../scripts/delivery/personal-skill/). It contains its entry point and three mode adapters, with common requirements owned by repository references. It is outside automatic repository skill discovery.
 
-> Review newly discovered dependencies against accepted behavior before expanding an issue. Preserve blocked checkpoints and reuse stopped workers for verified independent tasks. Permit reviewed supporting PRs without declaring their larger issues complete. Use maintained acceptance commands and bounded diagnostic probes. Do not repair or reconfigure the host or Podman machine. Permit only the coordinated existing-machine start/restart exception in the delivery skill, then stop runtime-dependent work if recovery fails, cannot be confirmed or the same fault recurs.
+After reviewing and merging an update, compare the installed `/Users/matej/.agents/skills/inframeld-delivery/` files with their previous versions before replacing only these four owned files. Preserve unrelated metadata and intervening edits. Validate the installed skill and its routes from an actual assigned checkout. A missing repository reference is a reported capability gap, not permission to fall back to another checkout.
 
-This example does not modify an existing Goal or expand an active run's authorization. Its coordinator must reconcile new guidance with the actual checked revision before adopting it.
+## Sources and limits
 
-## Rehearse the changed decisions
-
-Use synthetic requests in isolated fresh contexts when permitted. Keep expected outcomes in the evaluator's private record rather than giving the answering agent an answer key. Include a newly discovered login prerequisite, a parked writer with an independent task available, a qualified supporting PR, an underqualified helper, a stopped machine, a hung machine shared with unrelated work, failed restart recovery and a proposed VM-network repair. Add ordinary explanation and standalone-review controls. Inspect loaded references and actual proposed actions. No real machine or live run mutation is needed to rehearse these decisions. Static walkthroughs and helper tests are not independent agent evaluations. Report unavailable evaluations explicitly.
-
-## Configuration sources
-
-The project uses current native standalone agent files and project-scoped configuration described in [OpenAI's subagent documentation](https://learn.chatgpt.com/docs/agent-configuration/subagents) and [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference). Role instructions do not create a separate security sandbox. Each agent inherits the parent session's permissions, and managed restrictions still apply.
+The project uses native standalone agents under [OpenAI's subagent guidance](https://learn.chatgpt.com/docs/agent-configuration/subagents) and [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference). Profiles inherit actual session permissions and do not establish separate security sandboxes. Focused entry points and conditional references follow [official skill guidance](https://learn.chatgpt.com/docs/build-skills). Behavioral evaluation follows [Testing Agent Skills Systematically with Evals](https://developers.openai.com/blog/eval-skills). These sources guide the workflow structure. Repository-specific scheduling and stop policies are local decisions, not claims of runtime enforcement.

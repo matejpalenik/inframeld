@@ -4,6 +4,12 @@ These private, standard-library Python tools support the main coordinator chat. 
 
 Use Python 3.13 or newer. The repository pins the supported version in `mise.toml`. No Python packages are needed for the commands or tests.
 
+Common delivery policy lives in [Backlog Delivery](../../.agents/skills/inframeld-backlog-delivery/SKILL.md). Keep assignment scope, scheduling, remediation and host rules there rather than adding parallel helper policies. The coordinator can reserve one complete maintained integration operation for a named worker executor. Private isolated checks do not need per-subprocess reservations. Existing reservation validation remains unchanged.
+
+Source revisions still clear evidence under the operations below. A current assessment may explicitly revalidate unchanged earlier raw results after inspecting the delta, with accurate provenance. It cannot substitute old CI for a required final-head check or assert a run happened on different content. No state/schema migration is introduced by these workflow changes.
+
+The [personal adapter source](personal-skill/) is versioned here for review and installed separately. Its separate-chat record, two-worker cap and human merges do not use this native state helper. See the [installation and adoption guide](../../docs/development/guides/backlog-delivery.md#maintain-the-personal-adapter).
+
 ## Read the backlog
 
 From the repository root:
