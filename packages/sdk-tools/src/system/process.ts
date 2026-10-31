@@ -429,6 +429,7 @@ class ProcessOwner implements OwnedProcess {
             errors: value.errors as string[],
           };
           this.beginStop(value.reason);
+          this.control.end();
           break;
         }
         default:

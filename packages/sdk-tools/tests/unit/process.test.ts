@@ -203,8 +203,6 @@ async function pureHelper(
       groupState: "quiescent",
       errors: scenario.errors ?? [],
     });
-    helper.emit("exit", 0, null);
-    helper.emit("close", 0, null);
   };
   const later = (action: () => void, milliseconds: number) => {
     const timer = setTimeout(action, milliseconds);
@@ -263,6 +261,10 @@ async function pureHelper(
       callback();
     },
   });
+  control.once("finish", () => {
+    helper.emit("exit", 0, null);
+    helper.emit("close", 0, null);
+  });
   const fake = Object.assign(helper, {
     stdout,
     stderr,
@@ -292,6 +294,19 @@ async function pureHelper(
     syncBuiltinESMExports();
   }
 }
+
+test("pure stub terminal completion ends control writes before helper close", async (context) => {
+  await pureHelper(context, {}, async () => {
+    const child = await startProcess("unused", [], {
+      timeout: 1000,
+      cleanupTimeout: 100,
+    });
+    assert.equal((await child.result).groupState, "quiescent");
+    const closed = child.close();
+    assert.equal(child.close(), closed);
+    await closed;
+  });
+});
 
 test("pure stub early owner output preserves stdout, stderr, split UTF-8 and log", async (context) => {
   const work = await mkdtemp(join(tmpdir(), "sdk-pure-output-"));

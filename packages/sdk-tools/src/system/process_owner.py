@@ -366,6 +366,27 @@ class Control:
                 raise EOFError
             self.buffer.extend(chunk)
 
+    def finish(self, deadline: int, stop_received: bool) -> None:
+        """Read only the remaining STOP and clean EOF before the original cutoff."""
+        while True:
+            if _clock() >= deadline:
+                raise TimeoutError
+            try:
+                document = self.receive(deadline, 16384)
+            except EOFError:
+                if self.buffer:
+                    raise ValueError("Incomplete final control document.") from None
+                if _clock() >= deadline:
+                    raise TimeoutError from None
+                return
+            if document is None:
+                raise TimeoutError
+            if stop_received:
+                raise ValueError("Unexpected additional stop document.")
+            # This validates queued input only. Target cleanup and its deadline are final.
+            _stop_document(document)
+            stop_received = True
+
 
 def _stop_document(value: dict[str, object]) -> tuple[str, int]:
     if (
@@ -390,6 +411,7 @@ def main() -> int:
     deadline = _clock() + 2000
     cancelled = False
     stopping = False
+    stop_received = False
 
     def interrupt(number: int, frame: object) -> None:
         nonlocal cancelled
@@ -439,6 +461,7 @@ def main() -> int:
             document = control.receive(min(request.execution_deadline, _clock() + 10), 16384)
             if document is not None:
                 reason, requested_deadline = _stop_document(document)
+                stop_received = True
                 deadline = min(requested_deadline, _clock() + request.cleanup_ms)
                 stopping = True
                 break
@@ -478,6 +501,7 @@ def main() -> int:
             },
             deadline,
         )
+        control.finish(deadline, stop_received)
     except (OSError, ValueError, TimeoutError):
         return 1
     finally:

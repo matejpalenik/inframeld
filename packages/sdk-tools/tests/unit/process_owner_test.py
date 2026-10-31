@@ -1,6 +1,5 @@
 """Prove wait ownership at a syscall boundary without real process signals."""
 
-import errno
 import json
 import os
 import signal
@@ -107,6 +106,78 @@ class RetainedOwnershipTests(unittest.TestCase):
 
 
 class ControlDocumentTests(unittest.TestCase):
+    def test_finish_consumes_only_the_remaining_stop_then_clean_eof(self) -> None:
+        stop = b'{"version":1,"type":"stop","reason":"cancel","deadline":9}\n'
+        for received in (False, True):
+            with self.subTest(received=received), patch("os.set_blocking"):
+                control = Control(123)
+                control.buffer = bytearray(b"" if received else stop)
+                with (
+                    patch("src.system.process_owner._clock", return_value=0),
+                    patch("select.select", return_value=([123], [], [])),
+                    patch("os.read", return_value=b""),
+                    patch.object(control, "receive", wraps=control.receive) as receive,
+                ):
+                    control.finish(500, received)
+                self.assertEqual(
+                    receive.call_args_list, [call(500, 16384)] * (1 if received else 2)
+                )
+                self.assertEqual(control.buffer, bytearray())
+
+    def test_finish_rejects_partial_malformed_duplicate_and_oversize_frames(self) -> None:
+        stop = b'{"version":1,"type":"stop","reason":"cancel","deadline":9}\n'
+        for payload, received in (
+            (b'{"version":1', False),
+            (b'{"version":1,"type":"unexpected"}\n', False),
+            (stop + stop, False),
+            (stop, True),
+            (b"x" * 16385, False),
+        ):
+            with self.subTest(size=len(payload), received=received), patch("os.set_blocking"):
+                control = Control(123)
+                control.buffer = bytearray(payload)
+                with (
+                    patch("src.system.process_owner._clock", return_value=0),
+                    patch("select.select", return_value=([123], [], [])),
+                    patch("os.read", return_value=b""),
+                    self.assertRaises(ValueError),
+                ):
+                    control.finish(500, received)
+
+    def test_finish_preserves_transport_failure_and_the_original_deadline(self) -> None:
+        with patch("os.set_blocking"):
+            control = Control(123)
+        failure = OSError("private transport failure")
+        with (
+            patch("src.system.process_owner._clock", return_value=0),
+            patch("select.select", return_value=([123], [], [])),
+            patch("os.read", side_effect=failure),
+            self.assertRaises(OSError) as raised,
+        ):
+            control.finish(500, False)
+        self.assertIs(raised.exception, failure)
+        for expired in (False, True):
+            with (
+                self.subTest(expired=expired),
+                patch("src.system.process_owner._clock", return_value=500 if expired else 0),
+                patch("select.select", return_value=([], [], [])),
+                self.assertRaises(TimeoutError),
+            ):
+                control.finish(500, False)
+        clock = Mock(return_value=0)
+
+        def late_eof(_fd: int, _maximum: int) -> bytes:
+            clock.return_value = 500
+            return b""
+
+        with (
+            patch("src.system.process_owner._clock", clock),
+            patch("select.select", return_value=([123], [], [])),
+            patch("os.read", side_effect=late_eof),
+            self.assertRaises(TimeoutError),
+        ):
+            control.finish(500, False)
+
     def test_socketpair_unread_and_drained_stop_close(self) -> None:
         terminal: dict[str, object] = {
             "type": "finished",
@@ -116,34 +187,27 @@ class ControlDocumentTests(unittest.TestCase):
             "groupState": "quiescent",
             "errors": [],
         }
-        for drained in (False, True):
+        for order in ("queued-before-terminal", "preconsumed-stop", "stop-after-terminal"):
             caller_socket, helper_socket = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
-            with self.subTest(drained=drained), caller_socket, helper_socket:
+            with self.subTest(order=order), caller_socket, helper_socket:
                 caller = Control(caller_socket.fileno())
                 helper = Control(helper_socket.fileno())
                 deadline = time.monotonic_ns() // 1_000_000 + 500
                 stop: dict[str, object] = {"type": "stop", "reason": "close", "deadline": deadline}
-                caller.send(stop, deadline)
-                if drained:
+                if order != "stop-after-terminal":
+                    caller.send(stop, deadline)
+                if order == "preconsumed-stop":
                     self.assertEqual(helper.receive(deadline, 16384), {"version": 1, **stop})
                 helper.send(terminal, deadline)
-                helper_socket.close()
                 self.assertEqual(caller.receive(deadline, 16384), {"version": 1, **terminal})
-                ending = "unknown"
-                try:
-                    result = caller.receive(deadline, 16384)
-                except EOFError:
-                    ending = "eof"
-                except OSError as error:
-                    self.assertEqual(error.errno, errno.ECONNRESET)
-                    ending = "ECONNRESET"
-                else:
-                    self.fail(f"No terminal channel closure observed: {result is None}")
-                if drained:
-                    self.assertEqual(ending, "eof")
-                print(
-                    json.dumps({"stopDrained": drained, "terminalReceived": True, "ending": ending})
-                )
+                if order == "stop-after-terminal":
+                    caller.send(stop, deadline)
+                caller_socket.shutdown(socket.SHUT_WR)
+                helper.finish(deadline, order == "preconsumed-stop")
+                helper_socket.close()
+                with self.assertRaises(EOFError):
+                    caller.receive(deadline, 16384)
+                print(json.dumps({"order": order, "terminalReceived": True, "ending": "eof"}))
 
     def test_missing_platform_capabilities_refuse_without_startup(self) -> None:
         control = Mock()
@@ -504,12 +568,15 @@ class GroupObservationTests(unittest.TestCase):
 class QueuedStopTests(unittest.TestCase):
     """A queued close cannot hide a leader that already exited."""
 
-    def outcome(self, status: int | None) -> tuple[dict[str, object], list[signal.Signals]]:
+    def outcome(
+        self, status: int | None, *, queued: bool = True, finish_error: Exception | None = None
+    ) -> tuple[dict[str, object], list[signal.Signals]]:
         control = Mock()
         control.fd = 3
         start = ControlDocumentTests().start()
         stop = {"version": 1, "type": "stop", "reason": "close", "deadline": 170}
-        control.receive.side_effect = [start, stop]
+        control.receive.side_effect = [start, stop if queued else None]
+        control.finish.side_effect = finish_error
         sends: list[dict[str, object]] = []
 
         def record(value: dict[str, object], _deadline: int) -> None:
@@ -537,12 +604,15 @@ class QueuedStopTests(unittest.TestCase):
             patch("shutil.which", return_value="recording-ps"),
             patch("subprocess.Popen", return_value=child),
             patch("signal.signal"),
-            patch("os.close"),
+            patch("os.close") as close,
             patch("os.waitid", side_effect=observe),
             patch("os.waitpid", return_value=(123, raw_status)),
             patch("os.killpg", side_effect=send),
         ):
-            self.assertEqual(main(), 0)
+            self.assertEqual(main(), 1 if finish_error else 0)
+        control.finish.assert_called_once_with(170 if queued else 200, queued)
+        self.assertEqual(control.method_calls[-1], call.finish(170 if queued else 200, queued))
+        self.assertEqual(close.call_args, call(3))
         terminal = sends[-1]
         self.assertEqual(terminal["type"], "finished")
         self.assertEqual(terminal["groupState"], "quiescent")
@@ -566,6 +636,12 @@ class QueuedStopTests(unittest.TestCase):
         self.assertEqual(terminal["status"], 128 + signal.SIGTERM)
         self.assertEqual(terminal["reason"], "close")
         self.assertEqual(signals, [signal.SIGTERM])
+
+    def test_autonomous_exit_allows_only_the_remaining_stop_at_finish(self) -> None:
+        self.outcome(0, queued=False)
+
+    def test_failed_control_finish_keeps_successful_target_cleanup_a_helper_failure(self) -> None:
+        self.outcome(0, finish_error=TimeoutError())
 
 
 if __name__ == "__main__":
