@@ -88,6 +88,8 @@ Adopt revised decision guidance at the next safe assignment, repair or PR checkp
 
 New policy does not retroactively relax a stricter one-shot human approval, expand merge authority or waive findings. Obtain a specific decision only where the existing authorization actually conflicts. Do not ask to reapprove the whole run.
 
+When readiness requirements change, reassess only the affected plan or implementation at that safe checkpoint. Apply the current [maintainability bar](../../../.agents/skills/inframeld-review/references/scoring-and-report.md#apply-the-maintainability-bar) to the whole useful boundary. Do not assume an older score or risk acceptance meets it, interrupt necessary cleanup, discard validated work or rerun unchanged checks solely to adopt the guidance.
+
 ## Rehearse and evaluate the decisions
 
 Before substantive workflow edits, define a few must-pass outcomes. Validate frontmatter, links, role TOML and command/source accuracy. Keep detailed change evidence outside skills. Test these cases through realistic requests, with expected decisions withheld from trial prompts:
@@ -100,6 +102,13 @@ Before substantive workflow edits, define a few must-pass outcomes. Validate fro
 | Blocked writer with independent eligible work | Preserve checkpoint, stop positively, reconcile and reuse safely. |
 | Useful supporting capability with feature work remaining | Scoped review/checks and no false issue closure. |
 | A small harness repair proposes another general supervisor | Review the demonstrated need and minimal maintained alternative before expansion. |
+| A plan is otherwise highly rated but has 4/10 overengineering risk | Return Changes needed under Review's ceiling. Explain the material cost and smaller alternative without adjusting the score to obtain approval. |
+| A demonstrated ownership defect needs a small maintained helper | Judge the actual safety requirement and whole maintenance cost. Do not reject it solely because it adds a helper or protocol. |
+| A feature repair replaces the workspace test route with a private shell controller | Stop expansion and choose a maintained regression or separately scoped tooling repair. |
+| A timeout follows a potentially completed external write | Inspect original identity, saved outcome and uncertainty handling. Do not infer failure or authorize duplicate effects. |
+| A correct implementation already preserves the affected transaction and retry contract | Report no material finding within scope. Do not invent another abstraction or optional test as a blocker. |
+| A help-only change is requested for review | Review its actual clarity and output contract without loading unrelated state/recovery guidance. |
+| A status reader precedes a separately owned deletion producer | Review its accepted component boundary without importing the producer's implementation into the issue. |
 | Review discovers a pre-existing bug outside the accepted behavior and required checks | Record or draft a separate defect, prioritize it and continue the feature without silently absorbing the repair. |
 | A required hook invokes a known unsafe helper | Identify the actual dependency and choose a focused prerequisite, a reviewed maintained equivalent or a parked feature. No bypass or automatic deferral. |
 | The replacement needs substantial fixes and the same real acceptance case still fails | Reassess the complete change against main and select a bounded next action. Do not reset attempts or approve only the last patch. |
