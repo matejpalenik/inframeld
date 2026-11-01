@@ -953,15 +953,31 @@ test(
 );
 
 test("an owned finite target starts and closes before its safety fuse", async () => {
+  const deadline = performance.now() + 2000;
   const child = await startProcess("python3", ["-B", finiteFixture, "wait"], {
     timeout: 1000,
-    cleanupTimeout: 300,
+    cleanupTimeout: 1000,
   });
-  try {
-    assert.ok(child.pid > 0);
-  } finally {
-    await child.close();
-  }
+  await withResources(
+    () =>
+      withResources(
+        async () => {
+          assert.ok(child.pid > 0);
+        },
+        () => child.close(),
+      ),
+    async () => {
+      const live = await executablePids(deadline);
+      assert.ok(
+        !live.has(child.pid),
+        "Closed target must no longer be executable",
+      );
+      assert.ok(
+        performance.now() < deadline,
+        "Ownership cleanup and physical observation must precede the four-second fuse",
+      );
+    },
+  );
 });
 
 test("a reaped child never authorizes a numeric signal", async (context) => {
