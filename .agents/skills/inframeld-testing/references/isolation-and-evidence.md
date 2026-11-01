@@ -12,6 +12,17 @@ Application scenarios receive fresh temporary databases through the existing fix
 
 The integration graph publishes no host ports and exposes no container socket to the runner. Follow its private service addresses rather than recreating provider services on public host ports. Controlled provider collaborators in database tests and real provider services in native scenarios establish different boundaries.
 
+### Check setup before a service or process run
+
+Use the maintained setup instructions to confirm the selected worktree, pinned tools, locked dependency installation, repository-approved build scripts and required execution access before a long service/process-dependent run. Reuse known setup evidence rather than adding a preflight script or repeating installation after every edit. A coordination grant does not change the client's sandbox permissions.
+
+| Observed setup problem | Useful next action |
+| --- | --- |
+| Binding a loopback socket or inspecting owned processes fails with a permission error | Establish whether the execution context denies that operation. If so, use the client's permitted approval/access path for the maintained command, or report it unavailable. The denial alone does not demonstrate a product or harness defect. |
+| Installation skipped build scripts required by the selected check | Restore the maintained frozen installation with the repository-approved scripts before qualifying that environment. Do not substitute a script-disabled install merely to get a command to finish. |
+
+Reconcile any acquired fixtures before another run. Correcting setup does not establish a product fix, grant broader host permissions or justify changing the harness to evade restrictions. Any rerun still needs actual execution authority, available resources and the remaining retry allowance. Preserve stricter human stop conditions and the existing failed-attempt history under [delivery recovery](../../inframeld-backlog-delivery/references/gates-and-recovery.md#classify-failures-and-bound-remediation).
+
 ### Maintained commands and diagnostic probes
 
 Complete acceptance runs use maintained repository commands and their selected pinned configuration. Prefer workspace entry points and documented focused/manual routes. A `pnpm` alias may invoke the same shell, Python or Cargo command directly documented by the runbook. The spelling alone does not establish safety, and service-dependent behavior still needs its real test boundary.
