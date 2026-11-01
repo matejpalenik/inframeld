@@ -283,27 +283,26 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
         term_deadline = min(term_deadline, _clock() + 1500)
     quiescent = False
     observation_valid = True
-    observation_ms = 0
+    term_observed = False
 
     def check(cutoff: int, phase: Literal["initial", "term", "kill"]) -> bool:
-        nonlocal observation_valid, observation_ms
+        nonlocal observation_valid, term_observed
         # Do not start a new ps child when its read/kill/wait slice no longer fits.
         # Skipping reports no quiescence and leaves owned escalation intact.
         if cutoff - _clock() <= min(50, max(1, cleanup_ms // 10)):
             return False
         if not target.observe():
             return False
+        if phase == "term" and term_observed:
+            return False
         started = _clock()
         _, read_deadline = _observation_deadlines(cutoff, started)
-        # Completed cost is a scheduling hint, never evidence of cleanup or future latency.
-        if read_deadline <= started or read_deadline - started < observation_ms:
+        if read_deadline <= started:
             return False
-        errors_before = len(target.errors)
         try:
-            live = observe_members(target, cutoff, phase)
-            if len(target.errors) == errors_before:
-                observation_ms = max(observation_ms, _clock() - started)
-            return not live
+            if phase == "term":
+                term_observed = True
+            return not observe_members(target, cutoff, phase)
         except (OSError, ValueError, subprocess.SubprocessError, TimeoutError):
             observation_valid = False
             if "group-observation-failed" not in target.errors:
