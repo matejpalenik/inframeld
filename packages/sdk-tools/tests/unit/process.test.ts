@@ -685,17 +685,36 @@ function conservativeCleanupFailure(error: unknown): boolean {
   );
 }
 
-test("helper startup consumes the original command deadline and never starts after it", async (context) => {
-  await controlledOwner(context, "late-ready", async (trace, closed) => {
-    const began = performance.now();
-    await assert.rejects(
-      startProcess("unused", [], { timeout: 40, cleanupTimeout: 250 }),
-      /startup timed out/,
+test("pure stub helper startup consumes the original deadline and never submits START after it", async (context) => {
+  let now = 1000;
+  let submitted = false;
+  context.mock.method(performance, "now", () => now);
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    await pureHelper(
+      context,
+      {
+        startWrite: (complete) => {
+          submitted = true;
+          complete();
+        },
+      },
+      async (stops) => {
+        const starting = startProcess("unused", [], {
+          timeout: 40,
+          cleanupTimeout: 250,
+        });
+        // Expire the original watchdog before the already queued READY is delivered.
+        now += 40;
+        context.mock.timers.tick(40);
+        await assert.rejects(starting, /startup timed out/);
+        assert.deepEqual(stops, []);
+      },
     );
-    assert.ok(performance.now() - began < 290);
-    await closed();
-    assert.equal(await readFile(trace, "utf8"), "");
-  });
+    assert.equal(submitted, false);
+  } finally {
+    context.mock.timers.reset();
+  }
 });
 
 test("pure stub control transit consumes the first stop budget and repeated failure is cached", async (context) => {
