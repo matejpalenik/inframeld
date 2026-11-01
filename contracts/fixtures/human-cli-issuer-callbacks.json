@@ -1,0 +1,26 @@
+[
+  {
+    "issuer": "https://identity.test/",
+    "path": "/oauth/callback/f543c294a7fe6692da27b201052d7bc2feba8313ad3edd0f65901754eebe09d6"
+  },
+  {
+    "issuer": "https://identity.test",
+    "path": "/oauth/callback/faa33887ba724e72f400cff427d9d8b0f19006266e56d8a18827a4f07077aa11"
+  },
+  {
+    "issuer": "https://IDENTITY.test/",
+    "path": "/oauth/callback/a70142fce8518c662d7e53aca6b06c62c670fe3bbbc40de55d7c433188abf41f"
+  },
+  {
+    "issuer": "https://identity.test/tenant/a",
+    "path": "/oauth/callback/47db45c9494727a18ea9ed1449443ab59e5ab429b121927b16bf757e34c0068c"
+  },
+  {
+    "issuer": "https://identity.test/ténant/",
+    "path": "/oauth/callback/ecff3059759ae122da776bc2e31c51df11eb60c3483441497a46586abdd987de"
+  },
+  {
+    "issuer": "https://identity.test/ténant/",
+    "path": "/oauth/callback/79aa52038145faacd06e8b113a166dc3ac77aa1ac9fa0946bdc52540e3cb5ca2"
+  }
+]

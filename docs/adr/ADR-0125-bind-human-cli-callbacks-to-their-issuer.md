@@ -39,7 +39,7 @@ Patch the existing client in place, preserving independent login chains and cons
 
 Distinct paths provide a documented defense for the supported deployment profile while native issuer identification remains unavailable. Exact-byte hashing must agree across the provisioner and CLI. Cutover needs explicit pending-attempt handling and real provider evidence for old codes, consent and credential-chain preservation.
 
-The old shared-path provisioner remains the inspected implementation at this recording checkpoint. Callback validation, provider/alternative-client tests, rendered acquisition, platform and deployment qualification remain unfinished. The operator acquisition gap stays open. No proxy-invented issuer parameter, private protocol fork, post-exchange substitute, admission shortcut or broader repair authority is introduced.
+The production provisioner now receives the exact trusted issuer from the existing setup command and registers only its derived callback path. Managed changes use in-place patching and bounded readback, without deliberately resetting consent or revoking independent chains. The maintained pinned-provider run passed legacy cutover and independent-chain preservation. Original codes retained their URI binding, while unchanged legacy consent resumed to invalid-current-registration without a code. These are pin-specific compatibility observations under PD-ACCESS-07, not complete acquisition qualification. Complete callback validation, rendered acquisition, platform and deployment qualification remain unfinished. The operator acquisition gap stays open. No proxy-invented issuer parameter, private protocol fork, post-exchange substitute, admission shortcut or broader repair authority is introduced.
 
 ## Links
 
