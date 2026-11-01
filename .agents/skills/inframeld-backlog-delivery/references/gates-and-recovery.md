@@ -20,6 +20,22 @@ Bind each accepted risk to its originating review role, exact review reference a
 
 Revalidate current issue acceptance before merge. A changed issue body, updated blocker or material acceptance change invalidates the affected readiness claim. A foundation can close its own scoped issue when acceptance is met. It cannot close a complete feature issue merely because another issue might later connect it to an executable journey.
 
+### Separate implementation and human acceptance
+
+For a human-facing feature, confirm the linked qualification issue exists and covers the actual delivery. [Testing](../../inframeld-testing/references/human-qualification.md) owns its procedure, engineering preparation and human execution records. Keep these conclusions distinct:
+
+| Conclusion | Required evidence |
+| --- | --- |
+| Implementation accepted | The agreed implementation boundary, current independent reviews and required automated checks are satisfied |
+| Ready for human qualification | Required capabilities exist in the selected artifacts and the complete supported procedure has an observed successful engineering dry run |
+| Human accepted | A person performed the required cases and recorded accepted results against identified artifacts |
+
+A code PR can merge when its own accepted boundary and actual gates are satisfied. A promised complete journey still depends on its real producers and interfaces. Creating a qualification issue does not deliver those prerequisites, waive a finding or supply an acceptance deferral. A feature issue whose acceptance includes the complete experience stays open until the required acceptance exists, unless the human explicitly accepts a narrower boundary or deferral. Preserve already recorded decisions without requesting them again. A properly scoped foundation issue may close while the broader journey remains tracked separately.
+
+Do not infer human acceptance from a worker's dry run, browser automation or a green integration suite. Close the qualification issue only after actual accepted human results cover its required scope. Record code merged and human acceptance pending separately in delivery summaries. A deferred journey is not verified. Goal completion follows its actual authorized outcome and recorded deferrals, not the existence of follow-up tickets.
+
+Qualification can become runnable once the relevant PR/artifacts are delivered, without waiting for the implementation issue to close. Do not create mutual blocking edges between that issue and its qualification ticket. Native blockers identify missing prerequisite capabilities. Existing closure criteria and explicit scope decisions preserve full-feature acceptance without inventing another state system.
+
 ### Revalidate evidence without repeating unrelated work
 
 A normal result needs the command, tested revision/content, relevant environment, actual outcome, raw-log reference where useful and accepted behavior it establishes. Keep separate role judgments where the helper requires them. Do not add a manifest, fingerprint, per-command review or second state system merely to describe a routine formatter or unit test.

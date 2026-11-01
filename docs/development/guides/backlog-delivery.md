@@ -40,6 +40,8 @@ pnpm delivery:test
 
 Make issue-creation authority explicit in a live launch. For example: "The coordinator may create, deduplicate and link incidental defect issues in this repository, using understandable examples, evidence and proposed next steps. Recording them does not add new implementation outcomes to the finite snapshot." This clause authorizes reports, not broader features, risk waivers or host repair. Necessary supporting work follows the existing assignment and prerequisite policy. Without creation authority, retain drafts instead of asking permission for unrelated external writes.
 
+Include human-qualification tracking when authorized: "The coordinator may create, update and link one qualification issue for each human-facing feature in the authorized delivery scope, using the maintained template. Tracking does not admit new implementation issues or waive acceptance." Before dispatch, follow the [prerequisite check](../../../.agents/skills/inframeld-backlog-delivery/references/coordinator.md#check-prerequisites-before-assignment). [Human qualification](../../../.agents/skills/inframeld-testing/references/human-qualification.md) owns the single issue template, engineering preparation and human run evidence. Existing authority persists, while rehearsal remains draft-only.
+
 Store native run records outside every checkout in a task-authorized writable directory. Do not broaden global permissions merely to store state. Only the coordinator writes the record and grants shared resources. On interruption, reconcile actual agents, worktrees, PR heads and resources. Stale timestamps do not prove cleanup or writer termination.
 
 Inspect an existing record with this command, replacing the illustrative absolute path:
@@ -96,6 +98,14 @@ Before substantive workflow edits, define a few must-pass outcomes. Validate fro
 
 | Raw situation | Expected behavior |
 | --- | --- |
+| A promised operator journey requires an unfinished login/proof producer | Deliver the required capability first or select independent work. Start a component only under its explicit independent acceptance boundary. |
+| A producer issue is open, but its required capability has a qualified merged PR | Inspect that increment and reassess the broad blocker without claiming the entire producer issue complete. |
+| A human-facing feature has no qualification issue, or already has one for the same delivery | Create under actual authority or reuse the existing issue. Without publication authority, retain a draft and report the handoff gap. |
+| A qualification procedure has guessed commands or an unavailable handoff | Keep preparation with engineering. Explain the missing capability and owner rather than assigning the procedure to a human. |
+| An engineer or browser automation follows the procedure successfully | Record that evidence separately. Do not mark human acceptance passed or close its qualification issue. |
+| A useful component PR is ready while its broader human journey remains untested | Apply its accepted boundary and gates. Preserve full-feature acceptance or an explicit human deferral and the open qualification issue. |
+| A proposed qualification dependency would require implementation-issue closure before testing merged code | Use delivered artifact readiness and acyclic native blockers. Do not create a mutual closure dependency. |
+| An internal refactor supports an existing tested user journey | Explain applicability and link that journey without inventing a separate manual feature or new test framework. |
 | Two issues with independent paths/contracts | Parallel implementation within real capacity. |
 | Shared authorization contract or migration | One owner or serial delivery before dependent writes. |
 | Two requests for the fixed integration stack | One named executor and observed cleanup before the next. |

@@ -8,7 +8,27 @@ Setup, planning and rehearsal do not authorize delivery. For a native live launc
 
 Default native scope is the launch-time open implementation snapshot in `matejpalenik/inframeld`, milestone 1 (`v1`). Exclude Studio and aggregate epics. Later issues need authorization. Reconcile already delivered work from actual merged evidence. A closed specification issue does not prove an implemented prerequisite exists.
 
+A live run needs actual authority to create, update and link qualification issues for human-facing features in its finite scope. Reuse existing human authorization without asking again for each ticket. Without publication authority, retain a draft and report the gap before the required handoff. Qualification tracking does not add an implementation assignment to the allowlist. A missing implementation prerequisite outside that scope still needs the existing scope authorization.
+
 Use `pnpm delivery:plan` for the GitHub snapshot and dependency candidates. Inspect issue acceptance, native blockers, open PRs, unpublished work and likely contracts before assignment. The helper cannot establish code independence. Missing decisions block dependent work, while unrelated authorized work may proceed.
+
+### Check prerequisites before assignment
+
+Follow one concrete user operation before dispatching a writer. Identify the capabilities consumed by the promised behavior and its required checks, including any human journey. Record their owners and inspected delivery evidence in the existing [brief](assignment-protocol.md#use-one-short-assignment-brief):
+
+| Prerequisite | Evidence needed before assignment |
+| --- | --- |
+| Behavior | The required producer/interface exists in the intended base with accepted semantics |
+| Verification | The maintained verification route and its necessary real capabilities exist and can be executed under actual authorization |
+| Human journey | The capabilities needed for the promised user experience are delivered, or that journey is explicitly outside an accepted component boundary |
+
+Inspect relevant code/interfaces, merged PRs and scoped evidence. An approved design, an open implementation branch, a closed specification or a mocked response does not establish a delivered capability. This is a source/contract check, not a requirement to run full qualification before every assignment. Queued shared integration and final CI run at their normal stages. Test doubles remain valid for the decisions they actually demonstrate.
+
+Do not start a feature whose promised behavior or required verification depends on an unfinished capability. Prioritize the smallest useful prerequisite within authorization, or park the feature and assign verified independent work. If a narrow component is genuinely useful without the missing capability, establish its explicit accepted boundary and independent verification before starting it. Do not quietly convert a promised usable journey into an unused library, speculative adapter or deferred test. Existing human scope decisions remain authoritative, and routine choices need no new approval ceremony.
+
+Require the capability, not completion of every related issue. A qualified supporting PR may supply the needed sign-in step while its broader owning issue remains open. Reassess native blockers against that actual delivered increment, recording why a broad edge is now satisfied. Never claim the larger issue is complete. Keep dependency relationships acyclic and avoid blanket parent/epic blockers.
+
+For each human-facing feature, create or reuse its one linked `type:qualification` issue using the [maintained template](../../../../.github/ISSUE_TEMPLATE/human_qualification.md). Plan its concrete outcome and prerequisites now, then obtain the worker's tested procedure before assigning it to a human. Apply [Testing's human-qualification guidance](../../inframeld-testing/references/human-qualification.md). Several PRs for the same feature share that ticket. Internal changes identify the journey they support or a scoped non-applicability reason. Do not create another status ledger or copy the template into every skill.
 
 Use the [assignment brief](assignment-protocol.md#use-one-short-assignment-brief). Clear ownership once. Request independent plan review for material architecture, authorization, public-contract, persistence, shared-harness changes or a newly proposed cross-issue boundary. A routine implementation within accepted patterns needs a proportionate scope check and later independent implementation review, not another extensive planning ceremony.
 

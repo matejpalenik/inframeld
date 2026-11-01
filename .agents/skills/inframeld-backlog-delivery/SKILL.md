@@ -16,6 +16,7 @@ Every assigned role reads the [assignment protocol](references/assignment-protoc
 | Task | Read |
 | --- | --- |
 | Select work, resolve dependencies, limit parallelism or adopt an overloaded run | [Coordination and scheduling](references/coordinator.md) |
+| Prepare a human-facing feature's acceptance procedure | [Human qualification and its issue template](../inframeld-testing/references/human-qualification.md) |
 | Discover an incidental defect or decide whether a repair should block delivery | [Defect triage](references/discovered-defects.md), with the [historical #237 case](references/case-237-testing-repair.md) for an expanding test-runner repair |
 | Implement an assignment and test its behavior | [Worker delivery](references/worker.md) |
 | Schedule integration, assess evidence, recover or merge | [Gates and recovery](references/gates-and-recovery.md) |
@@ -26,6 +27,10 @@ The native main chat holds the one explicitly requested Goal. Workers and specia
 ## Keep the assignment small and the worker autonomous
 
 Assign the smallest coherent useful capability with acceptance examples, exclusions, owned paths/contracts, real dependencies and maintained verification commands. It may complete an issue or form an explicitly reviewed supporting PR. Never claim partial work completes the larger feature.
+
+Before assignment, [check the concrete prerequisites](references/coordinator.md#check-prerequisites-before-assignment) for behavior, verification and the human journey against delivered capabilities. Finish a missing prerequisite first or choose independent work. Only an explicitly accepted component boundary may proceed without a capability that the complete journey needs.
+
+Every human-facing feature needs one linked human-qualification issue under actual publication authority. Reuse the same feature's issue across its PRs. Plan it early, then complete and dry-run its real procedure before human handoff. A tracking issue neither delivers missing implementation nor establishes human acceptance. [Testing](../inframeld-testing/references/human-qualification.md) owns the procedure and template.
 
 The coordinator clears ownership once. Workers then make routine scoped edits, write behavioral tests and run isolated checks without per-command acknowledgments. Independently review plans for material architecture, security, public-contract, persistence or shared-harness changes. Every delivered implementation still receives independent review. Resolve triggered human decisions before dependent work.
 
