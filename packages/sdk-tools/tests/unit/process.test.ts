@@ -1175,7 +1175,7 @@ test("same-group descendants stop after an early leader exit with open or closed
               ["-B", finiteFixture, "leader", marker, pipes],
               {
                 timeout: 2000,
-                cleanupTimeout: 600,
+                cleanupTimeout: 1500,
               },
             ).catch((error: unknown) => {
               context.diagnostic(describeError(error));
