@@ -1,7 +1,7 @@
 //! Own offline argument intent, bounded final reporting and process-outcome meaning.
 
 use std::{
-    ffi::{OsStr, OsString},
+    ffi::OsString,
     io::{self, Write},
 };
 
@@ -10,10 +10,13 @@ use serde::Serialize;
 
 use crate::{
     arguments::{Arguments, Command},
-    commands::version::{self, VersionError},
+    commands::{
+        targets as target_commands,
+        version::{self, VersionError},
+    },
 };
 
-const STDOUT_LIMIT: usize = 16_384;
+const STDOUT_LIMIT: usize = 128 * 1024;
 
 /// Output intent is diagnostic-only until clap has accepted the invocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +38,8 @@ enum Mode {
 enum Outcome {
     Succeeded,
     Failed,
+    Uncertain,
+    Interrupted,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -116,7 +121,7 @@ impl LocalError {
         ErrorBody {
             source: "cli",
             code: self.code(),
-            message: self.message(),
+            message: self.message().to_owned(),
         }
     }
 }
@@ -134,7 +139,7 @@ impl From<VersionError> for LocalError {
 struct ErrorBody {
     source: &'static str,
     code: &'static str,
-    message: &'static str,
+    message: String,
 }
 
 /// One typed final result is shared by version data and its explanation.
@@ -146,7 +151,7 @@ struct Envelope<T> {
     outcome: Outcome,
     data: Option<T>,
     error: Option<ErrorBody>,
-    warnings: [(); 0],
+    warnings: Vec<target_commands::Warning>,
 }
 
 #[derive(Debug, Serialize)]
@@ -158,12 +163,14 @@ struct FinalRecord<'a, T> {
     result: &'a Envelope<T>,
 }
 
-/// Run an invocation without loading persistent context or starting services.
+/// Run the selected command with bounded reporting and explicit command effects.
 ///
 /// Static help and recognized clap version retain their plain-text channels.
 /// Machine results and controlled parsing failures are bounded and never echo
-/// submitted values. Dry-run explains the version read without performing it.
-/// No path loads credentials, writes user state or contacts an installation.
+/// submitted values. Help and version are offline. Target commands can read or
+/// update public local bindings and contact credential-free installation discovery.
+/// Dry-run describes the selected operation without its network or write effects.
+/// No invocation loads credentials or starts installation services.
 ///
 /// # Errors
 /// Returns plain-channel I/O failures for the executable's existing pipe policy.
@@ -217,6 +224,11 @@ pub fn run(
         conflict: false,
     };
     match parsed.command {
+        Some(Command::Target(arguments)) => {
+            let execution =
+                target_commands::run(arguments, parsed.target.as_deref(), parsed.dry_run, stderr);
+            report_target(selected, &execution, stdout, stderr)
+        }
         Some(Command::Version) if parsed.dry_run => success(
             selected,
             version::plan(),
@@ -243,39 +255,88 @@ fn report_help(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> io::Result<u8> {
-    let first = arguments
-        .iter()
-        .skip(1)
-        .take_while(|value| *value != "--")
-        .find(|value| {
-            !matches!(
-                value.to_str(),
-                Some(
-                    "--json"
-                        | "--jsonl"
-                        | "--dry-run"
-                        | "--no-input"
-                        | "--plain"
-                        | "--no-color"
-                        | "-h"
-                        | "--help"
-                )
-            )
-        });
     let mut command = Arguments::command();
-    // Prepare inherited global options and parent usage before selecting a child.
     command.build();
-    let mut output = Vec::new();
-    if first.is_some_and(|value| value == OsStr::new("version")) {
-        let version = command
-            .find_subcommand_mut("version")
-            .ok_or_else(|| io::Error::other("Version help is unavailable."))?;
-        version.write_long_help(&mut output)?;
-    } else {
-        command.write_long_help(&mut output)?;
+    let mut skip_value = false;
+    for value in arguments.iter().skip(1).take_while(|value| *value != "--") {
+        if skip_value {
+            skip_value = false;
+            continue;
+        }
+        let Some(token) = value.to_str() else { break };
+        if matches!(
+            token,
+            "--json"
+                | "--jsonl"
+                | "--dry-run"
+                | "--no-input"
+                | "--plain"
+                | "--no-color"
+                | "-h"
+                | "--help"
+        ) {
+            continue;
+        }
+        let (name, attached) = token
+            .split_once('=')
+            .map_or((token, false), |(name, _)| (name, true));
+        if name == "--target"
+            || (command.get_name() == "add" && matches!(name, "--url" | "--ca-cert" | "--proxy"))
+        {
+            skip_value = !attached;
+            continue;
+        }
+        if let Some(child) = command.find_subcommand(token).cloned() {
+            command = child;
+        } else {
+            break;
+        }
     }
+    let mut output = Vec::new();
+    command.write_long_help(&mut output)?;
     output.push(b'\n');
     plain(&output, stdout, stderr)
+}
+
+fn report_target(
+    intent: Intent,
+    execution: &target_commands::Execution,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> io::Result<u8> {
+    let report = &execution.report;
+    let human = report.human();
+    for warning in &report.warnings {
+        let _ = writeln!(stderr, "warning: {}", warning.message);
+    }
+    if let Some(error) = &report.error {
+        let _ = writeln!(stderr, "error: {error}");
+    }
+    if intent.format == Format::Human {
+        if !human.is_empty() && plain(human.as_bytes(), stdout, stderr)? != 0 {
+            return Ok(1);
+        }
+        return Ok(report.exit);
+    }
+    let outcome = match &report.error {
+        None => Outcome::Succeeded,
+        Some(crate::targets::TargetError::Uncertain) => Outcome::Uncertain,
+        Some(crate::targets::TargetError::Interrupted) => Outcome::Interrupted,
+        Some(_) => Outcome::Failed,
+    };
+    let result = Envelope {
+        schema_version: 1,
+        mode: intent.mode,
+        outcome,
+        data: report.data.as_ref(),
+        error: report.error.as_ref().map(|error| ErrorBody {
+            source: "cli",
+            code: error.code(),
+            message: error.to_string(),
+        }),
+        warnings: report.warnings.clone(),
+    };
+    machine(intent, &result, report.exit, stdout, stderr)
 }
 
 fn plain(bytes: &[u8], stdout: &mut impl Write, stderr: &mut impl Write) -> io::Result<u8> {
@@ -310,7 +371,7 @@ fn success<T: Serialize>(
         outcome: Outcome::Succeeded,
         data: Some(data),
         error: None,
-        warnings: [],
+        warnings: vec![],
     };
     machine(intent, &result, 0, stdout, stderr)
 }
@@ -332,7 +393,7 @@ fn failure(
         outcome: Outcome::Failed,
         data: None,
         error: Some(error.body()),
-        warnings: [],
+        warnings: vec![],
     };
     machine(intent, &result, error.exit(), stdout, stderr)
 }

@@ -6,6 +6,7 @@ pub mod client;
 mod commands;
 pub mod context;
 pub mod metadata;
+mod targets;
 
 pub use app::run;
 pub mod discovery;

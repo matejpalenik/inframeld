@@ -60,6 +60,14 @@ pub async fn discover(
     discover_with_context(api_identity, options, None).await
 }
 
+/// Check saved public identifiers without granting managed-local trust or sending a request.
+pub(crate) fn validate_saved_identity(api: &str, issuer: &str) -> Result<(), DiscoveryError> {
+    let policy = url_policy::UrlPolicy::new(None);
+    policy.api_url(api)?;
+    policy.issuer_url(issuer)?;
+    Ok(())
+}
+
 /// Trusted managed-runtime identity, separate from untrusted returned metadata.
 ///
 /// Only the managed-runtime owner may supply this context. There is deliberately

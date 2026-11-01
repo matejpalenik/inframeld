@@ -1,4 +1,4 @@
-//! Declare root selection and the implemented zero-argument version command.
+//! Declare global invocation policy and the implemented command families.
 
 use clap::{Parser, Subcommand};
 
@@ -10,9 +10,12 @@ use clap::{Parser, Subcommand};
     version,
     color = clap::ColorChoice::Never,
     about = "Work with Inframeld through its generated application client",
-    after_help = "Examples:\n  inframeld --help\n  inframeld version\n  inframeld version --help\n\nInstalling this executable does not start or change an installation.\nProduct commands are delivered separately."
+    after_help = "Examples:\n  inframeld --help\n  inframeld version\n  inframeld version --help\n\nInstalling this executable does not start or change an installation.\nBrowser login and authenticated product commands are delivered separately."
 )]
 pub(crate) struct Arguments {
+    /// Override the registered target for this invocation only.
+    #[arg(long, global = true)]
+    pub target: Option<String>,
     /// Emit one final versioned JSON result.
     #[arg(long, global = true)]
     pub json: bool,
@@ -37,6 +40,8 @@ pub(crate) struct Arguments {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
+    /// Register and select credential-free installation connections
+    Target(crate::commands::targets::Arguments),
     /// Show offline build information and qualified runtime pairing
     #[command(
         after_help = "Example: inframeld version\n\nThis reads embedded metadata only. Remote compatibility remains unverified."

@@ -1,0 +1,131 @@
+export const pageMetadata = {
+  title: "Register and select a target",
+  description:
+    "Save a trusted HTTPS installation connection, choose a local default and inspect its cached identity without signing in.",
+}
+
+# Register and select a target
+
+Save your development installation as `dev` so you can refer to it by a short local label. A target records an installation connection. Registering or selecting one does not sign you in, select a Project or grant access.
+
+## Before you begin
+
+Use an `inframeld` executable that includes `target add`, `target use` and `target show`, available on your shell's `PATH`. The [CLI README](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#build-and-check-from-source) explains source builds and [archive installation](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#install-and-remove-a-packaged-executable). An older executable may reject these commands. This guide does not establish a published release or additional platform support.
+
+Ask the installation operator for its exact public HTTPS API URL. The installation must already publish compatible discovery metadata and have its official OAuth client configured. Use that API identity, including any path or trailing slash, rather than an account page, arbitrary API route or private administration address. The example `https://api.dev.example.com` must be replaced with your operator's value.
+
+Run these commands in your terminal from any working directory. Registration needs network access to the installation and its advertised identity provider, plus a writable local configuration directory. You need no account, token or administrator credential. HTTP API URLs, including manually entered loopback HTTP URLs, are unsupported by these commands.
+
+## Register the connection
+
+Choose a label of 1–64 ASCII letters, digits, dots, underscores or hyphens, starting with a letter or digit. Labels are case-sensitive, so `dev` and `Dev` are different names.
+
+Choose the necessary trust inputs before the first registration. With certificates trusted by the system, run:
+
+<CodeGroup>
+
+```shell
+inframeld target add dev --url https://api.dev.example.com
+```
+
+</CodeGroup>
+
+If your operator supplies a private certificate authority, use this alternative instead. Replace the URL and certificate path with the supplied values:
+
+<CodeGroup>
+
+```shell
+inframeld target add dev --url https://api.dev.example.com \
+  --ca-cert /absolute/path/to/installation-ca.pem
+```
+
+</CodeGroup>
+
+`--ca-cert` accepts a public PEM certificate bundle, not a private key. You can repeat it for up to eight files, each at most 256 KiB. The CLI saves absolute file references, without copying their contents or pinning their hashes. Keep those operator-managed files available. Their contents are read once for a network attempt, and changes affect the next attempt.
+
+If your installation requires a proxy, add `--proxy http://proxy.example.com:8080` with the operator's actual proxy origin. Only explicit credential-free HTTP(S) origins are supported, without user information, a query or fragment. Inherited proxy environment variables are not adopted. Certificate and hostname verification remain enabled.
+
+The command reads public API and identity-provider metadata without credentials. It checks their identity and supported protocol before saving the installation ID, API URL, issuer, official client and chosen transport settings. A successful registration exits `0` and reports the target, registration result, API and installation ID. It does not change your selected target.
+
+After successful discovery, repeating an identical registration reports that it is already registered. The same label cannot silently replace a different identity or transport configuration. Choose a new label for a different connection.
+
+## Inspect and select the target
+
+Inspect the new connection explicitly, before making it your default:
+
+<CodeGroup>
+
+```shell
+inframeld target show --target dev
+```
+
+</CodeGroup>
+
+This reads the saved binding without contacting the server. Its API, issuer and installation ID are cached registration facts. They do not establish current reachability, TLS validity, compatibility, sign-in or permission.
+
+Save `dev` as your local preference, then inspect the effective choice:
+
+<CodeGroup>
+
+```shell
+inframeld target use dev
+inframeld target show
+```
+
+</CodeGroup>
+
+`use` works offline and changes only the saved target preference. It does not refresh credentials or edit shell variables. An unknown label fails without selecting another target.
+
+For `show`, the first applicable selector wins:
+
+| Selector           | Effect                                                            |
+| ------------------ | ----------------------------------------------------------------- |
+| `--target dev`     | Uses that registered target for this invocation only.             |
+| `INFRAMELD_TARGET` | Uses the label named by the current environment. It is not a URL. |
+| Saved preference   | Used when neither override is present.                            |
+
+An invalid or unknown effective selector is an error, not permission to fall back. A valid explicit flag ignores lower-priority environment values. `add` and `use` take their label as a positional argument and reject a competing `--target` flag.
+
+If `INFRAMELD_TARGET` is set, `use` still saves your requested preference but warns that this shell continues to use the environment value. If that value cannot resolve, the effective target remains unresolved. Unset the variable yourself or inspect with an explicit `--target` override. The CLI never changes your shell configuration.
+
+## Use structured output or preview a change
+
+For a structured cached inspection, run:
+
+<CodeGroup>
+
+```shell
+inframeld target show --target dev --json --no-input
+```
+
+</CodeGroup>
+
+Check the process status and final `outcome`. Successful inspection has `data.verification: "savedBinding"`, and `data.source` identifies `flag`, `environment` or `saved`. Registration instead reports `discoveryValidated`, describing that registration attempt. Warnings remain separate from success and may also appear on stderr.
+
+Choose `--jsonl` instead of `--json` for one final result record. These target commands emit no progress records. Help remains plain text. The [CLI output guide](/guides/inspect-cli-version#choose-a-final-jsonl-record) explains the shared final-record wrapper. `--plain` and `--no-color` affect presentation, while `--no-input` prevents interaction. These commands do not prompt or launch a browser.
+
+Preview registration without contacting the server or saving a target:
+
+<CodeGroup>
+
+```shell
+inframeld target add dev --url https://api.dev.example.com --dry-run --json
+```
+
+</CodeGroup>
+
+Dry-run validates arguments and transport inputs and reads the local registry. If CA files were supplied, it reads and validates them too. Its plan describes intended effects. It does not validate remote metadata or prove that executing registration will succeed. Dry-run for `use` or `show` also reads local state and performs no network call or preference write.
+
+## Recover from a failure
+
+| Result                                                         | Next step                                                                                                                                                   |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `discovery_tls` or `invalid_ca_file`                           | Check the operator's URL and public certificate bundle. Keep TLS verification enabled.                                                                      |
+| Discovery unavailable, unsupported or identity mismatch        | Confirm the exact API identity and provider configuration with the operator. Do not substitute an issuer from an error or treat this as a password failure. |
+| `target_binding_conflict`                                      | Keep the existing binding. Use a different local label for the different connection.                                                                        |
+| `target_not_found`                                             | Check the label and selection source. Register the intended target explicitly.                                                                              |
+| `target_state_busy`                                            | Another local update holds the registry lock. Retry after it finishes.                                                                                      |
+| `invalid_target_state` or `target_state_io`                    | Preserve the configuration and inspect its path and permissions. Do not delete other targets to repair this invocation.                                     |
+| `target_write_uncertain`, interruption or missing final output | The local change may already exist. Inspect it with `target show --target dev` before repeating a save. Missing output does not prove rollback.             |
+
+Local state lives under `$XDG_CONFIG_HOME/inframeld`, or `$HOME/.config/inframeld` when `XDG_CONFIG_HOME` is unset. Registration and selection leave that intended local state in place. They create no installation resources, accounts or credentials.
