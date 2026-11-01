@@ -1,12 +1,35 @@
-/** Actual Chromium ownership under startup interruption and failed graceful close. */
+/** Actual browser and profile ownership, independent of pure protocol cases. */
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdtemp,
+  rm,
+  writeFile,
+  readFile,
+  lstat,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import type { BrowserServer } from "playwright";
+import { withDeniedFixtureRecovery } from "./fixtures/denied-cleanup.ts";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { cache } from "../../src/config.ts";
 import { startProfile } from "../../src/conformance/profile.ts";
+import { withinDeadline } from "../../src/system/deadline.ts";
+import {
+  openBrowserCase,
+  observeProfileListener,
+  expectedStalledCloseFailure,
+  stalledCloseMessages,
+} from "./fixtures/browser-owner.ts";
+import {
+  FixtureDiagnostics,
+  fixtureDiagnostic,
+  prepareFixtureCapture,
+  observeFixtureController,
+  type FixtureCapture,
+} from "./fixtures/fixture-diagnostics.ts";
 
 process.env.PLAYWRIGHT_BROWSERS_PATH ??= join(cache, "browsers");
 const { chromium } = await import("playwright");
@@ -15,17 +38,32 @@ test(
   "startup cancellation closes a browser acquired before the fixture returns",
   { timeout: 30_000 },
   async (context) => {
+    const entered = performance.now();
     const work = await mkdtemp(join(tmpdir(), "sdk-startup-cancel-"));
     const controller = new AbortController();
-    let owned: BrowserServer | undefined;
-    const launch = chromium.launchServer.bind(chromium);
+    const signal = AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(
+        Math.max(1, Math.floor(entered + 30000 - performance.now())),
+      ),
+    ]);
+    const client = await openBrowserCase(
+      "startup-cancel",
+      entered + 30000,
+      entered + 30000,
+    );
+    let confirmed = false;
     context.mock.method(
       chromium,
       "launchServer",
-      async (options: Parameters<typeof chromium.launchServer>[0]) => {
-        owned = await launch(options);
+      async (options: {
+        channel: "chromium";
+        headless: true;
+        timeout: number;
+      }) => {
+        const browser = await client.launch(options);
         controller.abort(new Error("cancel startup after browser allocation"));
-        return owned;
+        return browser;
       },
     );
     try {
@@ -35,18 +73,24 @@ test(
           "typescript-chromium",
           { bindings: [], typescriptBundle: join(work, "driver.mjs") },
           work,
-          controller.signal,
+          signal,
         ),
         /cancel startup/,
       );
-      assert.ok(owned);
-      assert.ok(
-        owned.process().exitCode !== null ||
-          owned.process().signalCode !== null,
-      );
+      assert.equal((await client.completion).origin, "profile");
+      confirmed = true;
     } finally {
-      await owned?.kill();
-      await rm(work, { recursive: true, force: true });
+      client.end();
+      if (confirmed) await rm(work, { recursive: true, force: true });
+      else
+        process.stderr.write(
+          fixtureDiagnostic({
+            phase: "fixture-terminal",
+            category: "owner-unknown",
+            caseId: "startup-cancel",
+            status: null,
+          }),
+        );
     }
   },
 );
@@ -55,17 +99,20 @@ test(
   "a stalled browser close is force-killed and remains a cleanup failure",
   { timeout: 30_000 },
   async (context) => {
+    const entered = performance.now();
     const work = await mkdtemp(join(tmpdir(), "sdk-browser-kill-"));
-    let owned: BrowserServer | undefined;
-    const launch = chromium.launchServer.bind(chromium);
+    const client = await openBrowserCase(
+      "stalled-close",
+      entered + 30000,
+      entered + 30000,
+    );
+    const listenerClosed = observeProfileListener(context);
+    let confirmed = false;
     context.mock.method(
       chromium,
       "launchServer",
-      async (options: Parameters<typeof chromium.launchServer>[0]) => {
-        owned = await launch(options);
-        context.mock.method(owned, "close", () => new Promise<void>(() => {}));
-        return owned;
-      },
+      (options: { channel: "chromium"; headless: true; timeout: number }) =>
+        client.launch(options),
     );
     try {
       await writeFile(join(work, "driver.mjs"), "export const bindings=[];");
@@ -73,16 +120,34 @@ test(
         "typescript-chromium",
         { bindings: [], typescriptBundle: join(work, "driver.mjs") },
         work,
+        AbortSignal.timeout(
+          Math.max(1, Math.floor(entered + 30000 - performance.now())),
+        ),
       );
-      await assert.rejects(fixture.close(), /cleanup/);
-      assert.ok(owned);
-      assert.ok(
-        owned.process().exitCode !== null ||
-          owned.process().signalCode !== null,
-      );
+      await assert.rejects(fixture.close(), (error: unknown) => {
+        assert.ok(
+          expectedStalledCloseFailure(error),
+          "Unexpected profile cleanup failure",
+        );
+        return true;
+      });
+      const receipt = await client.completion;
+      assert.equal(receipt.origin, "profile");
+      assert.equal(receipt.operation, "kill");
+      assert.equal(listenerClosed(), true);
+      confirmed = true;
     } finally {
-      await owned?.kill();
-      await rm(work, { recursive: true, force: true });
+      client.end();
+      if (confirmed) await rm(work, { recursive: true, force: true });
+      else
+        process.stderr.write(
+          fixtureDiagnostic({
+            phase: "fixture-terminal",
+            category: "owner-unknown",
+            caseId: "stalled-close",
+            status: null,
+          }),
+        );
     }
   },
 );
@@ -91,72 +156,205 @@ test(
   "an enclosing test-runner timeout drains a profile before killing survivors",
   { timeout: 30_000 },
   async () => {
-    const { readFile } = await import("node:fs/promises");
     const { z } = await import("zod");
     const { command } = await import("../../src/system/process.ts");
     const { home } = await import("../../src/config.ts");
+    const entered = performance.now();
     const work = await mkdtemp(join(tmpdir(), "sdk-profile-timeout-"));
-    let processes: { browser: number; backend: number } | undefined;
+    const supervisor = await openBrowserCase(
+      "profile-timeout",
+      entered + 5000,
+      entered + 10000,
+    );
+    let confirmed = false;
+    const diagnostics = new FixtureDiagnostics("assertion"),
+      errors: unknown[] = [];
+    let protectedFolder: string | undefined,
+      capture: FixtureCapture | undefined;
+    let phase = "timeout-assertion";
     try {
+      protectedFolder = await mkdtemp(work + ".protected-");
+      await chmod(protectedFolder, 0o700);
+      capture = await withinDeadline(
+        prepareFixtureCapture(protectedFolder, "timeout"),
+        Math.max(0, entered + 5000 - performance.now()),
+      );
+      diagnostics.note({ phase, category: "started", status: null });
       await assert.rejects(
-        command(
-          process.execPath,
-          [
-            "--import",
-            join(home, "node_modules/tsx/dist/loader.mjs"),
-            "--test",
-            join(home, "tests/native/fixtures/timeout-profile.ts"),
-          ],
-          {
-            timeout: 5000,
-            cleanupTimeout: 5000,
-            env: { SDK_TIMEOUT_WORK: work, NODE_TEST_CONTEXT: undefined },
-          },
+        observeFixtureController(diagnostics, "nested-controller", () =>
+          command(
+            process.execPath,
+            [
+              "--import",
+              join(home, "node_modules/tsx/dist/loader.mjs"),
+              join(home, "tests/native/fixtures/timeout-profile.ts"),
+            ],
+            {
+              timeout: 5000,
+              cleanupTimeout: 5000,
+              executionDeadline: entered + 5000,
+              log: capture!.path,
+              env: {
+                SDK_TIMEOUT_WORK: work,
+                SDK_TIMEOUT_DIAGNOSTICS: protectedFolder,
+                SDK_BROWSER_OWNER_CASE_CAP: supervisor.nonce,
+                NODE_TEST_CONTEXT: undefined,
+              },
+            },
+          ),
         ),
         (error: unknown) => {
-          if (error instanceof AggregateError)
-            throw new Error(
-              error.errors
-                .map((entry: unknown) =>
-                  entry instanceof Error ? entry.stack : String(entry),
-                )
-                .join("\n"),
-            );
+          // This positive case requires outer terminal evidence, rather than an
+          // interchangeable incomplete-cleanup result under the same five seconds.
+          assert.ok(!(error instanceof AggregateError), String(error));
           assert.match(String(error), /timed out/);
           return true;
         },
       );
-      processes = z
-        .object({ browser: z.number().int(), backend: z.number().int() })
-        .parse(JSON.parse(await readFile(join(work, "ready.json"), "utf8")));
-      for (const pid of Object.values(processes)) {
-        assert.throws(
-          () => process.kill(pid, 0),
-          (error: unknown) =>
-            typeof error === "object" &&
-            error !== null &&
-            "code" in error &&
-            error.code === "ESRCH",
-          `Owned profile process ${pid} survived its deadline or could not be inspected`,
-        );
+      diagnostics.note({ phase, category: "passed", status: null });
+      phase = "receipt-read";
+      diagnostics.note({ phase, category: "started", status: null });
+      const receipt = z
+        .object({
+          backend: z.object({
+            leaderReaped: z.literal(true),
+            groupState: z.literal("quiescent"),
+            errors: z.array(z.string()).length(0),
+          }),
+          browser: z.literal(true),
+          listener: z.literal(true),
+          profileComplete: z.literal(true),
+          owner: z.object({
+            ownerId: z.string().regex(/^[a-f0-9]{64}$/),
+            requestId: z.number().int().positive(),
+            origin: z.literal("profile"),
+            fulfilled: z.literal(true),
+            closeObserved: z.literal(true),
+          }),
+          cleanupError: z.string().min(1),
+          expectedGracefulFailure: z.literal(true),
+          cleanupDetails: z.array(z.enum(stalledCloseMessages)).length(1),
+        })
+        .parse(JSON.parse(await readFile(join(work, "cleanup.json"), "utf8")));
+      const workerStatus = join(protectedFolder, "worker-status.json");
+      const workerFile = await lstat(workerStatus);
+      assert.ok(
+        workerFile.isFile() &&
+          (workerFile.mode & 0o777) === 0o600 &&
+          workerFile.size <= 4096,
+      );
+      const workerRecords: unknown = JSON.parse(
+        await readFile(workerStatus, "utf8"),
+      );
+      assert.ok(Array.isArray(workerRecords));
+      const workerFacts = workerRecords.map(
+        (record: unknown) =>
+          JSON.parse(fixtureDiagnostic(record)) as {
+            phase: string;
+            category: string;
+          },
+      );
+      assert.ok(
+        workerFacts.some(
+          (record) =>
+            record.phase === "cleanup-report-written" &&
+            record.category === "passed",
+        ),
+        "Worker diagnostics must complete without concealing a diagnostic failure",
+      );
+      phase = "receipt-match";
+      diagnostics.note({ phase, category: "started", status: null });
+      assert.equal(receipt.browser, true);
+      const independent = await supervisor.completion;
+      assert.equal(independent.ownerId, receipt.owner.ownerId);
+      assert.equal(independent.requestId, receipt.owner.requestId);
+      assert.ok(
+        performance.now() < entered + 10000,
+        "Production evidence must precede emergency recovery and the unchanged five-second stop window",
+      );
+      confirmed = true;
+      diagnostics.note({ phase, category: "passed", status: null });
+    } catch (error) {
+      errors.push(error);
+      try {
+        diagnostics.note({
+          phase,
+          category: "failed",
+          status: null,
+          failure: error,
+        });
+      } catch (diagnostic) {
+        errors.push(diagnostic);
       }
     } finally {
-      if (!processes) {
-        try {
-          processes = z
-            .object({ browser: z.number().int(), backend: z.number().int() })
-            .parse(
-              JSON.parse(await readFile(join(work, "ready.json"), "utf8")),
+      try {
+        diagnostics.note({
+          phase: "assertion-finally",
+          category: confirmed ? "passed" : "failed",
+          status: null,
+        });
+      } catch (error) {
+        errors.push(error);
+      }
+      supervisor.end();
+      try {
+        if (confirmed) await rm(work, { recursive: true, force: true });
+        else
+          process.stderr.write(
+            fixtureDiagnostic({
+              phase: "fixture-terminal",
+              category: "owner-unknown",
+              caseId: "profile-timeout",
+              status: null,
+            }),
+          );
+      } catch (error) {
+        errors.push(error);
+      }
+      if (protectedFolder) {
+        if (capture) {
+          try {
+            const metadata = await withinDeadline(
+              capture.check(),
+              Math.max(0, entered + 10000 - performance.now()),
             );
-        } catch {}
-      }
-      for (const pid of Object.values(processes ?? {})) {
+            diagnostics.note({
+              phase: "nested-controller",
+              category: "capture-checked",
+              slot: "timeout",
+              ...metadata,
+              status: null,
+            });
+          } catch (error) {
+            errors.push(error);
+            try {
+              diagnostics.note({
+                phase: "nested-controller",
+                category: "capture-invalid",
+                slot: "timeout",
+                status: null,
+              });
+            } catch (diagnostic) {
+              errors.push(diagnostic);
+            }
+          }
+        }
         try {
-          process.kill(pid, "SIGKILL");
-        } catch {}
+          await withinDeadline(
+            diagnostics.write(protectedFolder),
+            Math.max(0, entered + 10000 - performance.now()),
+          );
+        } catch (error) {
+          errors.push(error);
+        }
       }
-      await rm(work, { recursive: true, force: true });
     }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length)
+      throw new AggregateError(
+        errors,
+        "Profile assertion and diagnostics failed",
+      );
   },
 );
 
@@ -164,12 +362,14 @@ test(
   "denied termination still permits bounded nonzero CLI exit",
   { timeout: 10_000 },
   async () => {
-    const { readFile } = await import("node:fs/promises");
+    const testDeadline = performance.now() + 10000;
+    const { z } = await import("zod");
     const { command } = await import("../../src/system/process.ts");
     const { home } = await import("../../src/config.ts");
     const work = await mkdtemp(join(tmpdir(), "sdk-denied-exit-"));
     const marker = join(work, "pid");
-    try {
+    await withDeniedFixtureRecovery(work, testDeadline, async () => {
+      const began = performance.now();
       await assert.rejects(
         command(
           process.execPath,
@@ -187,12 +387,49 @@ test(
         ),
         /exited 1/,
       );
-    } finally {
-      try {
-        const pid = Number(await readFile(marker, "utf8"));
-        process.kill(-pid, "SIGKILL");
-      } catch {}
-      await rm(work, { recursive: true, force: true });
-    }
+      const uncertain = z
+        .object({
+          unknown: z.literal(true),
+          ownerResult: z.literal(1),
+          helper: z.number().int().positive(),
+          targets: z.array(z.number().int().positive()).min(1),
+        })
+        .parse(
+          JSON.parse(await readFile(join(work, "uncertain.json"), "utf8")),
+        );
+      const pid = Number(await readFile(marker, "utf8"));
+      const failures = z
+        .object({ primary: z.string(), cleanup: z.string() })
+        .parse(JSON.parse(await readFile(join(work, "failure.json"), "utf8")));
+      assert.match(failures.primary, /expected fixture cancellation/);
+      assert.match(failures.cleanup, /cleanup/i);
+      assert.ok(uncertain.targets.includes(pid));
+      assert.ok(
+        performance.now() - began < 2000,
+        "Incomplete outcome must precede the four-second fixture fuse",
+      );
+      const observationEnvironment: NodeJS.ProcessEnv = {
+        ...process.env,
+        LC_ALL: "C",
+      };
+      for (const key of ["PS_PERSONALITY", "CMD_ENV", "I_WANT_A_BROKEN_PS"])
+        delete observationEnvironment[key];
+      const state = await promisify(execFile)(
+        "ps",
+        ["-A", "-o", "pid=,stat="],
+        {
+          env: observationEnvironment,
+          timeout: Math.max(1, Math.floor(began + 2000 - performance.now())),
+          maxBuffer: 4 * 1024 * 1024,
+        },
+      );
+      assert.ok(
+        state.stdout.split("\n").some((row) => {
+          const [candidate, status] = row.trim().split(/\s+/);
+          return Number(candidate) === pid && status && !status.startsWith("Z");
+        }),
+        "The independent safety fuse must not satisfy the cleanup assertion",
+      );
+    });
   },
 );

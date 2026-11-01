@@ -464,7 +464,7 @@ def spawn(*arguments, **options):
         os.kill(os.getpid(), signal.SIGTERM)
     return child
 subprocess.Popen = spawn
-raise SystemExit(runner(root, cleanup_work_seconds=0.2, term_seconds=0.2, kill_seconds=0.2).run([]))
+raise SystemExit(runner(root, cleanup_work_seconds=1.0, term_seconds=0.2, kill_seconds=0.2).run([]))
 """
     with launch(tmp_path, {}, program=program) as probe:
         status, _, errors = probe.finish()

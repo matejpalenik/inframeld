@@ -6,7 +6,7 @@ import type { Browser, BrowserServer } from "playwright";
 import { home, cache, type Profile } from "../config.ts";
 import { run } from "../system/run.ts";
 import { withResources } from "../system/process.ts";
-import { budgets } from "../system/budgets.ts";
+import { budgets, profileBudget } from "../system/budgets.ts";
 import { shutdown } from "../system/shutdown.ts";
 import { withinDeadline } from "../system/deadline.ts";
 import { startBackend, type Backend } from "./backend.ts";
@@ -40,7 +40,9 @@ export async function startProfile(
   work: string,
   signal = shutdown.signal,
 ): Promise<ProfileFixture> {
-  const startupDeadline = Date.now() + budgets.startup;
+  const entered = performance.now();
+  const startupDeadline = entered + budgets.startup;
+  const backendDeadline = entered + profileBudget() + budgets.cleanup;
   const startupSignal = AbortSignal.any([
     signal,
     shutdown.signal,
@@ -48,7 +50,7 @@ export async function startProfile(
   ]);
   const remaining = () => {
     startupSignal.throwIfAborted();
-    return Math.max(1, startupDeadline - Date.now());
+    return Math.max(1, startupDeadline - performance.now());
   };
   let browserServer: BrowserServer | undefined;
   let browser: Browser | undefined,
@@ -145,6 +147,8 @@ export async function startProfile(
       profile === "typescript-chromium" ? origin : undefined,
       startupSignal,
       remaining(),
+      startupDeadline,
+      backendDeadline,
     );
     remaining();
     const execute = async (

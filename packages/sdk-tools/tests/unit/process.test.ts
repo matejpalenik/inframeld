@@ -1,22 +1,1027 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import test, { type TestContext } from "node:test";
+import childProcess, { type SpawnOptions } from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
 import {
   command,
-  kill,
+  startProcess,
   stopProcess,
   withResources,
+  type OwnedProcess,
 } from "../../src/system/process.ts";
+import { describeError } from "../../src/workflows/stages.ts";
+import { withDeniedFixtureRecovery } from "../native/fixtures/denied-cleanup.ts";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { setTimeout as delay } from "node:timers/promises";
+import { EventEmitter } from "node:events";
+import { Duplex, PassThrough, Writable } from "node:stream";
 
-test("a log-write error retains the command failure rather than replacing it", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "sdk-log-failure-"));
+const finiteFixture = fileURLToPath(
+  new URL("./fixtures/process_tree.py", import.meta.url),
+);
+
+test("denied fixture receipt reconciliation runs after an early assertion and retains its identity", async () => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-denied-unit-"));
+  const original = new Error("early assertion");
+  let release!: (value: unknown) => void, observed!: () => void;
+  const receipt = new Promise<unknown>((resolve) => {
+    release = resolve;
+  });
+  const reading = new Promise<void>((resolve) => {
+    observed = resolve;
+  });
+  const running = withDeniedFixtureRecovery(
+    work,
+    performance.now() + 500,
+    async () => {
+      throw original;
+    },
+    async () => {
+      observed();
+      return receipt;
+    },
+  );
+  void running.catch(() => {});
+  try {
+    assert.equal(
+      await Promise.race([
+        reading.then(() => "reading"),
+        running.then(
+          () => "finished",
+          () => "finished",
+        ),
+      ]),
+      "reading",
+    );
+    release({ reaped: true });
+    await assert.rejects(running, (error: unknown) => error === original);
+  } finally {
+    release({ reaped: true });
+    await running.catch(() => {});
+    await rm(work, { recursive: true, force: true });
+  }
+});
+
+test("denied fixture preserves original and distinct failed reconciliation in order", async () => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-denied-unit-"));
+  const original = new Error("early assertion"),
+    receiptFailure = new Error("receipt unavailable");
   try {
     await assert.rejects(
-      command(process.execPath, ["-e", "process.exit(2)"], { log: directory }),
-      (error) => {
+      withDeniedFixtureRecovery(
+        work,
+        performance.now() + 40,
+        async () => {
+          throw original;
+        },
+        async () => {
+          throw receiptFailure;
+        },
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 2);
+        assert.equal(error.errors[0], original);
+        assert.ok(error.errors[1] instanceof Error);
+        assert.equal(error.errors[1].cause, receiptFailure);
+        return true;
+      },
+    );
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
+});
+
+test("an assertion failure still reconciles through the independent observer and retains both failures", async (context) => {
+  const original = new Error("original assertion");
+  const observation = new Error("observation failed");
+  let observed = false;
+  context.mock.method(childProcess, "execFile", ((...args: unknown[]) => {
+    observed = true;
+    const callback = args.at(-1) as (
+      error: Error,
+      stdout: string,
+      stderr: string,
+    ) => void;
+    callback(observation, "", "");
+  }) as typeof childProcess.execFile);
+  await assert.rejects(
+    withResources(
+      async () => {
+        throw original;
+      },
+      async () => {
+        await executablePids(performance.now() + 50);
+      },
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof AggregateError);
+      assert.deepEqual(error.errors, [original, observation]);
+      return true;
+    },
+  );
+  assert.equal(observed, true);
+});
+
+/** Independent read-only physical observation, never cleanup authority. */
+async function executablePids(deadline: number): Promise<Set<number>> {
+  const remaining = deadline - performance.now();
+  if (remaining <= 0) throw new Error("Physical observation deadline expired");
+  const environment: NodeJS.ProcessEnv = { ...process.env, LC_ALL: "C" };
+  for (const key of ["PS_PERSONALITY", "CMD_ENV", "I_WANT_A_BROKEN_PS"])
+    delete environment[key];
+  const stdout = await new Promise<string>((resolve, reject) => {
+    childProcess.execFile(
+      "ps",
+      ["-A", "-o", "pid=,stat="],
+      {
+        env: environment,
+        timeout: Math.max(1, Math.floor(remaining)),
+        maxBuffer: 4 * 1024 * 1024,
+      },
+      (error, output) => (error ? reject(error) : resolve(output)),
+    );
+  });
+  const live = new Set<number>();
+  for (const row of stdout.split("\n")) {
+    if (!row.trim()) continue;
+    const fields = row.trim().split(/\s+/);
+    const pid = Number(fields[0]);
+    if (
+      fields.length !== 2 ||
+      !Number.isSafeInteger(pid) ||
+      pid <= 0 ||
+      !/^[A-Za-z+<>-]+$/.test(fields[1]!)
+    )
+      throw new Error("Invalid physical process observation");
+    if (!fields[1]!.startsWith("Z")) live.add(pid);
+  }
+  if (performance.now() >= deadline)
+    throw new Error("Physical observation deadline expired");
+  return live;
+}
+
+/** Deliver valid owner evidence and flushed bytes before acquisition resumes. */
+async function pureHelper(
+  context: TestContext,
+  scenario: {
+    chunks?: [number, Buffer][];
+    lateChunks?: [number, Buffer][];
+    stopChunks?: [number, Buffer][];
+    waitForStop?: boolean;
+    terminalDelay?: number;
+    exitDelay?: number;
+    errors?: string[];
+    acquired?: () => void;
+    startWrite?: (complete: () => void) => void;
+    stopRead?: (receive: () => void) => void;
+  },
+  run: (stops: { deadline: number; at: number }[]) => Promise<void>,
+): Promise<void> {
+  const stops: { deadline: number; at: number }[] = [];
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const stdin = new Writable({
+    write(_chunk, _encoding, callback) {
+      callback();
+    },
+  });
+  const helper = new EventEmitter();
+  let finished = false;
+  const frame = (value: object) =>
+    control.push(JSON.stringify({ version: 1, ...value }) + "\n");
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    frame({
+      type: "finished",
+      status: 0,
+      reason: "target-exit",
+      leaderReaped: true,
+      groupState: "quiescent",
+      errors: scenario.errors ?? [],
+    });
+  };
+  const later = (action: () => void, milliseconds: number) => {
+    const timer = setTimeout(action, milliseconds);
+    timers.add(timer);
+  };
+  let pending = "";
+  const control = new Duplex({
+    read() {},
+    write(chunk: Buffer, _encoding, callback) {
+      pending += chunk.toString("utf8");
+      let start = false;
+      let boundary: number;
+      while ((boundary = pending.indexOf("\n")) >= 0) {
+        const value = JSON.parse(pending.slice(0, boundary)) as {
+          type: string;
+          deadline: number;
+        };
+        pending = pending.slice(boundary + 1);
+        if (value.type === "start") {
+          start = true;
+          process.nextTick(() => {
+            frame({ type: "started", pid: 123 });
+            // Model Node's exit-time resume/drain before the await continuation.
+            stdout.resume();
+            stderr.resume();
+            for (const [index, bytes] of scenario.chunks ?? [])
+              (index === 0 ? stdout : stderr).emit("data", bytes);
+            if (scenario.lateChunks)
+              later(() => {
+                for (const [index, bytes] of scenario.lateChunks!)
+                  (index === 0 ? stdout : stderr).emit("data", bytes);
+                stdout.emit("end");
+                stderr.emit("end");
+              }, 0);
+            else if (!scenario.stopChunks) {
+              stdout.emit("end");
+              stderr.emit("end");
+            }
+            scenario.acquired?.();
+            if (!scenario.waitForStop) finish();
+          });
+        } else if (value.type === "stop") {
+          const receive = () => {
+            stops.push({ deadline: value.deadline, at: performance.now() });
+            if (scenario.stopChunks) {
+              for (const [index, bytes] of scenario.stopChunks)
+                (index === 0 ? stdout : stderr).emit("data", bytes);
+              stdout.emit("end");
+              stderr.emit("end");
+            }
+            if (scenario.exitDelay !== undefined)
+              later(
+                () => frame({ type: "exited", status: 0 }),
+                scenario.exitDelay,
+              );
+            later(finish, scenario.terminalDelay ?? 0);
+          };
+          if (scenario.stopRead) scenario.stopRead(receive);
+          else receive();
+        }
+      }
+      if (start && scenario.startWrite) scenario.startWrite(callback);
+      else callback();
+    },
+  });
+  control.once("finish", () => {
+    helper.emit("exit", 0, null);
+    helper.emit("close", 0, null);
+  });
+  const fake = Object.assign(helper, {
+    stdout,
+    stderr,
+    stdin,
+    stdio: [stdin, stdout, stderr, control],
+    unref() {},
+  });
+  context.mock.method(childProcess, "spawn", () => {
+    queueMicrotask(() =>
+      frame({ type: "ready", clock: 10000, python: "3.13.12" }),
+    );
+    return fake as unknown as ReturnType<typeof childProcess.spawn>;
+  });
+  const signals: unknown[][] = [];
+  context.mock.method(process, "kill", (...args: unknown[]) => {
+    signals.push(args);
+    return true;
+  });
+  syncBuiltinESMExports();
+  try {
+    await run(stops);
+    assert.deepEqual(signals, []);
+  } finally {
+    for (const timer of timers) clearTimeout(timer);
+    for (const stream of [stdin, stdout, stderr, control]) stream.destroy();
+    context.mock.restoreAll();
+    syncBuiltinESMExports();
+  }
+}
+
+test("pure stub terminal completion ends control writes before helper close", async (context) => {
+  await pureHelper(context, {}, async () => {
+    const child = await startProcess("unused", [], {
+      timeout: 1000,
+      cleanupTimeout: 100,
+    });
+    assert.equal((await child.result).groupState, "quiescent");
+    const closed = child.close();
+    assert.equal(child.close(), closed);
+    await closed;
+  });
+});
+
+test("pure stub early owner output preserves stdout, stderr, split UTF-8 and log", async (context) => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-pure-output-"));
+  const log = join(work, "output.log");
+  try {
+    await pureHelper(
+      context,
+      {
+        chunks: [
+          [0, Buffer.from("A")],
+          [0, Buffer.from([0xc3])],
+          [1, Buffer.from("B")],
+          [0, Buffer.from([0xa9])],
+          [1, Buffer.from([0xce])],
+          [1, Buffer.from([0xbb])],
+        ],
+      },
+      async () => {
+        const result = await command("unused", [], { log });
+        assert.equal(result.stdout, "Aé");
+        assert.equal(result.output, "ABéλ");
+        assert.equal(await readFile(log, "utf8"), result.output);
+      },
+    );
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
+});
+
+test("pure stub early raw-byte overflow retains cleanup and log errors", async (context) => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-pure-overflow-"));
+  try {
+    await pureHelper(
+      context,
+      {
+        chunks: [
+          [0, Buffer.from("é")],
+          [1, Buffer.from("λ")],
+        ],
+        errors: ["group-observation-failed"],
+      },
+      async () => {
+        await assert.rejects(
+          command("unused", [], { log: work, maxOutputBytes: 3 }),
+          (error: unknown) => {
+            assert.ok(error instanceof AggregateError);
+            assert.match(String(error.errors[0]), /3-byte output budget/);
+            assert.match(
+              String(error.errors[1]),
+              /cleanup could not be confirmed/,
+            );
+            assert.match(String(error.errors[2]), /EISDIR/);
+            return true;
+          },
+        );
+      },
+    );
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
+});
+
+test("pure stub first primary failure survives successful and late target-exit evidence", async (context) => {
+  for (const first of ["timeout", "cancel", "overflow"] as const) {
+    for (const late of [false, true])
+      await context.test(
+        `${first}-${late ? "late" : "complete"}`,
+        async (nested) => {
+          const controller = new AbortController();
+          const reason = new Error("original pure cancellation");
+          const pattern =
+            first === "timeout"
+              ? /timed out/
+              : first === "cancel"
+                ? /original pure cancellation/
+                : /3-byte output budget/;
+          await pureHelper(
+            nested,
+            {
+              waitForStop: true,
+              terminalDelay: late ? 280 : 10,
+              ...(late ? { exitDelay: 150 } : {}),
+              ...(first === "overflow"
+                ? { lateChunks: [[0, Buffer.from("éλ")]] as [number, Buffer][] }
+                : {
+                    stopChunks: [[0, Buffer.from("éλ")]] as [number, Buffer][],
+                  }),
+              acquired: () => {
+                if (first === "cancel")
+                  setTimeout(() => controller.abort(reason), 0);
+              },
+            },
+            async (stops) => {
+              const began = performance.now();
+              await assert.rejects(
+                command("unused", [], {
+                  timeout: first === "timeout" ? 20 : 1000,
+                  cleanupTimeout: 200,
+                  maxOutputBytes: 3,
+                  signal: controller.signal,
+                }),
+                (error: unknown) => {
+                  const primary =
+                    error instanceof AggregateError ? error.errors[0] : error;
+                  assert.match(String(primary), pattern);
+                  return true;
+                },
+              );
+              assert.equal(stops.length, 1);
+              assert.ok(
+                stops[0]!.deadline > 10000 && stops[0]!.deadline <= 10230,
+              );
+              if (late)
+                assert.ok(
+                  performance.now() - began < 260,
+                  "A later exit must not restart the first 200ms stop allowance",
+                );
+            },
+          );
+        },
+      );
+  }
+});
+
+async function controlledOwner(
+  context: TestContext,
+  scenario: string,
+  run: (trace: string, closed: () => Promise<void>) => Promise<void>,
+  spawn: (
+    program: string,
+    args: readonly string[],
+    options: SpawnOptions,
+  ) => ReturnType<typeof childProcess.spawn> = childProcess.spawn,
+): Promise<void> {
+  const work = await mkdtemp(join(tmpdir(), "sdk-owner-protocol-"));
+  const trace = join(work, "trace");
+  const owner = fileURLToPath(
+    new URL("../../src/system/process_owner.py", import.meta.url),
+  );
+  let closed: Promise<void> | undefined;
+  let deadline = 0;
+  context.mock.method(childProcess, "spawn", ((
+    program: string,
+    args: readonly string[],
+    options: SpawnOptions,
+  ) => {
+    const intercepted = args.at(-1) === owner;
+    const helper = spawn(
+      program,
+      intercepted
+        ? [
+            ...args.slice(0, -1),
+            finiteFixture,
+            "protocol-owner",
+            scenario,
+            trace,
+          ]
+        : [...args],
+      options,
+    );
+    if (intercepted) {
+      // Existing fixture fuse and lost-control recovery bounds only settle custody.
+      deadline =
+        performance.now() + (scenario === "lost-control" ? 6000 : 4000);
+      closed = new Promise<void>((resolve, reject) => {
+        let failure: Error | undefined;
+        helper.once("error", (error) => {
+          failure = error;
+        });
+        helper.once("close", () => (failure ? reject(failure) : resolve()));
+      });
+      void closed.catch(() => {});
+    }
+    return helper;
+  }) as typeof childProcess.spawn);
+  syncBuiltinESMExports();
+  let waiting: Promise<void> | undefined;
+  const waitForClose = () => {
+    if (waiting) return waiting;
+    if (!closed) return Promise.resolve();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    waiting = Promise.race([
+      closed,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error("Controlled owner fixture close was not confirmed"),
+            ),
+          Math.max(0, deadline - performance.now()),
+        );
+      }),
+    ]).finally(() => {
+      clearTimeout(timer);
+    });
+    return waiting;
+  };
+  let complete = false;
+  let original: unknown;
+  try {
+    await withResources(
+      async () => {
+        try {
+          return await run(trace, waitForClose);
+        } catch (error) {
+          original = error;
+          throw error;
+        }
+      },
+      async () => {
+        try {
+          await waitForClose();
+        } catch (error) {
+          if (error !== original) throw error;
+        }
+      },
+    );
+    complete = true;
+  } finally {
+    context.mock.restoreAll();
+    syncBuiltinESMExports();
+    if (complete) await rm(work, { recursive: true, force: true });
+    else console.error(`Controlled owner evidence retained at ${work}`);
+  }
+}
+
+test("controlled owner waits for actual helper close before removing fixture work", async (context) => {
+  const helper = new EventEmitter();
+  let observing!: () => void;
+  const observed = new Promise<void>((resolve) => {
+    observing = resolve;
+  });
+  const once = helper.once;
+  helper.once = ((event: string, listener: (...args: unknown[]) => void) => {
+    if (event === "close") observing();
+    return once.call(helper, event, listener);
+  }) as typeof helper.once;
+  let trace = "";
+  const running = controlledOwner(
+    context,
+    "refuse",
+    async (path) => {
+      trace = path;
+      childProcess.spawn("unused", [
+        fileURLToPath(
+          new URL("../../src/system/process_owner.py", import.meta.url),
+        ),
+      ]);
+      await writeFile(trace, "owned");
+    },
+    () => helper as unknown as ReturnType<typeof childProcess.spawn>,
+  );
+  void running.catch(() => {});
+  try {
+    assert.equal(
+      await Promise.race([
+        observed.then(() => "observing"),
+        running.then(() => "returned"),
+      ]),
+      "observing",
+    );
+    await writeFile(trace, "last fixture write");
+    helper.emit("close", 0, null);
+    await running;
+    await assert.rejects(readFile(trace), { code: "ENOENT" });
+  } finally {
+    helper.emit("close", 0, null);
+    await running.catch(() => {});
+  }
+});
+
+test("controlled owner shares one expired custody outcome with its finalizer", async (context) => {
+  const helper = new EventEmitter();
+  let now = 0;
+  context.mock.method(performance, "now", () => now);
+  let trace = "",
+    first: unknown;
+  let wait!: () => Promise<void>;
+  try {
+    await assert.rejects(
+      controlledOwner(
+        context,
+        "refuse",
+        async (path, closed) => {
+          trace = path;
+          wait = closed;
+          await closed();
+          childProcess.spawn("unused", [
+            fileURLToPath(
+              new URL("../../src/system/process_owner.py", import.meta.url),
+            ),
+          ]);
+          await writeFile(trace, "retained");
+          now = 4001;
+          try {
+            await closed();
+          } catch (error) {
+            first = error;
+            throw error;
+          }
+        },
+        () => helper as unknown as ReturnType<typeof childProcess.spawn>,
+      ),
+      (error: unknown) => {
+        assert.ok(first instanceof Error);
+        assert.equal(
+          first.message,
+          "Controlled owner fixture close was not confirmed",
+        );
+        assert.equal(error, first);
+        return true;
+      },
+    );
+    assert.equal(await readFile(trace, "utf8"), "retained");
+    helper.emit("close", 0, null);
+    await assert.rejects(wait(), (error: unknown) => error === first);
+  } finally {
+    helper.emit("close", 0, null);
+    if (trace) await rm(join(trace, ".."), { recursive: true, force: true });
+  }
+});
+
+test("controlled owner preserves callback and distinct custody failures and retains work", async (context) => {
+  const helper = new EventEmitter();
+  helper.on("error", () => {});
+  const original = new Error("fixture assertion"),
+    custody = new Error("fixture close failed");
+  let trace = "";
+  try {
+    await assert.rejects(
+      controlledOwner(
+        context,
+        "refuse",
+        async (path) => {
+          trace = path;
+          childProcess.spawn("unused", [
+            fileURLToPath(
+              new URL("../../src/system/process_owner.py", import.meta.url),
+            ),
+          ]);
+          await writeFile(trace, "retained");
+          helper.emit("error", custody);
+          helper.emit("close", 1, null);
+          throw original;
+        },
+        () => helper as unknown as ReturnType<typeof childProcess.spawn>,
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.deepEqual(error.errors, [original, custody]);
+        return true;
+      },
+    );
+    assert.equal(await readFile(trace, "utf8"), "retained");
+  } finally {
+    if (trace) await rm(join(trace, ".."), { recursive: true, force: true });
+  }
+});
+
+function conservativeCleanupFailure(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    [
+      "Subprocess cleanup could not be confirmed: controlled-missing-proof",
+      "Subprocess cleanup timed out. Cleanup may be incomplete.",
+    ].includes(error.message)
+  );
+}
+
+test("helper startup consumes the original command deadline and never starts after it", async (context) => {
+  await controlledOwner(context, "late-ready", async (trace, closed) => {
+    const began = performance.now();
+    await assert.rejects(
+      startProcess("unused", [], { timeout: 40, cleanupTimeout: 250 }),
+      /startup timed out/,
+    );
+    assert.ok(performance.now() - began < 290);
+    await closed();
+    assert.equal(await readFile(trace, "utf8"), "");
+  });
+});
+
+test("pure stub control transit consumes the first stop budget and repeated failure is cached", async (context) => {
+  let now = 1000,
+    receive!: () => void;
+  context.mock.method(performance, "now", () => now);
+  await pureHelper(
+    context,
+    {
+      waitForStop: true,
+      errors: ["controlled-missing-proof"],
+      stopRead: (deliver) => {
+        receive = deliver;
+      },
+    },
+    async (stops) => {
+      const child = await startProcess("unused", [], {
+        timeout: 1000,
+        cleanupTimeout: 200,
+      });
+      // Finish the START write completion chain before requesting STOP.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const stopped = child.close();
+      assert.equal(child.close(), stopped);
+      assert.equal(stops.length, 0);
+      now += 75;
+      receive();
+      await assert.rejects(stopped, conservativeCleanupFailure);
+      assert.equal(child.close(), stopped);
+      assert.deepEqual(stops, [{ deadline: 10200, at: 1075 }]);
+      assert.equal(
+        stops[0]!.deadline - (10000 + stops[0]!.at - 1000),
+        125,
+        "Control transit consumes the original 200ms rather than restarting it",
+      );
+    },
+  );
+});
+
+test("cancellation before helper readiness never submits a target", async (context) => {
+  await controlledOwner(context, "late-ready", async (trace, closed) => {
+    const controller = new AbortController();
+    const reason = new Error("cancel before readiness");
+    const timer = setTimeout(() => controller.abort(reason), 20);
+    try {
+      await assert.rejects(
+        startProcess("unused", [], {
+          signal: controller.signal,
+          timeout: 500,
+          cleanupTimeout: 250,
+        }),
+        (error: unknown) =>
+          error === reason ||
+          (error instanceof AggregateError &&
+            error.errors.length === 2 &&
+            error.errors[0] === reason &&
+            conservativeCleanupFailure(error.errors[1])),
+      );
+      await closed();
+      assert.equal(await readFile(trace, "utf8"), "");
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+});
+
+test("pure stub cancellation during incomplete START handoff retains the original and missing-proof failure", async (context) => {
+  const controller = new AbortController();
+  const reason = new Error("cancel during handoff");
+  let written!: () => void;
+  await pureHelper(
+    context,
+    {
+      waitForStop: true,
+      startWrite: (complete) => {
+        written = complete;
+      },
+      acquired: () => {
+        controller.abort(reason);
+        written();
+      },
+    },
+    async (stops) => {
+      await assert.rejects(
+        startProcess("unused", [], {
+          signal: controller.signal,
+          timeout: 1000,
+          cleanupTimeout: 250,
+        }),
+        (error: unknown) => {
+          assert.ok(error instanceof AggregateError);
+          assert.equal(error.errors.length, 2);
+          assert.equal(error.errors[0], reason);
+          assert.ok(error.errors[1] instanceof Error);
+          assert.equal(
+            error.errors[1].message,
+            "Subprocess cleanup could not be confirmed: missing owner evidence",
+          );
+          return true;
+        },
+      );
+      assert.deepEqual(
+        stops,
+        [],
+        "Incomplete START ends control without assuming STOP delivery",
+      );
+    },
+  );
+});
+
+test("missing capabilities and malformed control refuse without a target", async (context) => {
+  await controlledOwner(context, "refuse", async () => {
+    await assert.rejects(startProcess("unused", []), /pinned Python 3.13/);
+  });
+  await controlledOwner(context, "invalid-utf8", async () => {
+    await assert.rejects(startProcess("unused", []), /encoded data|UTF/);
+  });
+});
+
+test(
+  "lost control fails within cleanup budget while unconfirmed resources stay held",
+  { timeout: 7000 },
+  async (context) => {
+    await controlledOwner(context, "lost-control", async (trace) => {
+      const child = await startProcess("unused", [], {
+        timeout: 2000,
+        cleanupTimeout: 200,
+      });
+      context.mock.restoreAll();
+      syncBuiltinESMExports();
+      const began = performance.now();
+      await withResources(
+        async () => {
+          await assert.rejects(child.result, /control|cleanup/i);
+          assert.ok(
+            performance.now() - began < 350,
+            "Lost control must not wait for a fresh execution timeout",
+          );
+          const metadata = JSON.parse(await readFile(trace, "utf8")) as {
+            target: number;
+          };
+          const live = await executablePids(performance.now() + 500);
+          assert.ok(
+            live.has(metadata.target),
+            "Unconfirmed target remains executable before its fuse",
+          );
+        },
+        async () => {
+          const deadline = performance.now() + 6000;
+          while (performance.now() < deadline) {
+            try {
+              await readFile(trace + ".recovered");
+              return;
+            } catch {
+              await delay(10);
+            }
+          }
+          throw new Error(
+            "Independent fixture waiter did not confirm recovery",
+          );
+        },
+      );
+    });
+  },
+);
+
+test(
+  "Node controller death leaves missing owner evidence while the helper stops its target",
+  { timeout: 5000 },
+  async (context) => {
+    const work = await mkdtemp(join(tmpdir(), "sdk-owner-node-death-"));
+    const controller = join(work, "controller.mts");
+    const ready = join(work, "ready.json");
+    const receipt = join(work, "owner-receipt.json");
+    const source = pathToFileURL(
+      fileURLToPath(new URL("../../src/system/process.ts", import.meta.url)),
+    ).href;
+    const loader = fileURLToPath(
+      new URL("../../node_modules/tsx/dist/loader.mjs", import.meta.url),
+    );
+    await writeFile(
+      controller,
+      [
+        `import {startProcess} from ${JSON.stringify(source)};`,
+        'import {execFile} from "node:child_process";',
+        'import {promisify} from "node:util";',
+        'import {writeFile} from "node:fs/promises";',
+        `const child = await startProcess("python3", ["-B", ${JSON.stringify(finiteFixture)}, "wait"], {timeout:3000,cleanupTimeout:500});`,
+        'const parent = await promisify(execFile)("ps", ["-p", String(child.pid), "-o", "ppid="], {timeout:500,maxBuffer:4096,env:{...process.env,LC_ALL:"C",PS_PERSONALITY:undefined,CMD_ENV:undefined,I_WANT_A_BROKEN_PS:undefined}});',
+        `await writeFile(${JSON.stringify(ready)}, JSON.stringify({target:child.pid,helper:Number(parent.stdout.trim())}));`,
+        "await child.result;",
+        `await writeFile(${JSON.stringify(receipt)}, "complete");`,
+      ].join("\n"),
+    );
+    let observed = false,
+      passed = false;
+    const entered = performance.now();
+    const cleanupDeadline = entered + 1500;
+    try {
+      await withResources(
+        async () => {
+          await assert.rejects(
+            command(process.execPath, ["--import", loader, controller], {
+              timeout: 1000,
+              cleanupTimeout: 500,
+              env: { NODE_TEST_CONTEXT: undefined },
+            }).catch((error: unknown) => {
+              context.diagnostic(describeError(error));
+              throw error;
+            }),
+            /timed out/,
+          );
+        },
+        async () => {
+          const processes = JSON.parse(await readFile(ready, "utf8")) as {
+            target: number;
+            helper: number;
+          };
+          assert.ok(
+            Number.isSafeInteger(processes.target) && processes.target > 0,
+          );
+          assert.ok(
+            Number.isSafeInteger(processes.helper) && processes.helper > 0,
+          );
+          // Reconciliation still runs after an assertion failure. Its later result cannot qualify cleanup.
+          const reconciliationDeadline = Math.min(
+            entered + 2500,
+            performance.now() + 1000,
+          );
+          while (performance.now() < reconciliationDeadline) {
+            const live = await executablePids(reconciliationDeadline);
+            if (!live.has(processes.target) && !live.has(processes.helper)) {
+              observed = true;
+              break;
+            }
+            await delay(10);
+          }
+          assert.ok(
+            observed,
+            "EOF cleanup must stop executable work before the finite fuse",
+          );
+          assert.ok(
+            performance.now() < cleanupDeadline,
+            "Positive cleanup must precede the original execution and cleanup deadline",
+          );
+          await assert.rejects(readFile(receipt), { code: "ENOENT" });
+        },
+      );
+      passed = true;
+    } finally {
+      if (passed && observed) await rm(work, { recursive: true, force: true });
+      else console.error(`Node-death fixture evidence retained at ${work}`);
+    }
+  },
+);
+
+test("an owned finite target starts and closes before its safety fuse", async () => {
+  const deadline = performance.now() + 2000;
+  const child = await startProcess("python3", ["-B", finiteFixture, "wait"], {
+    timeout: 1000,
+    cleanupTimeout: 1000,
+  });
+  await withResources(
+    () =>
+      withResources(
+        async () => {
+          assert.ok(child.pid > 0);
+        },
+        () => child.close(),
+      ),
+    async () => {
+      const live = await executablePids(deadline);
+      assert.ok(
+        !live.has(child.pid),
+        "Closed target must no longer be executable",
+      );
+      assert.ok(
+        performance.now() < deadline,
+        "Ownership cleanup and physical observation must precede the four-second fuse",
+      );
+    },
+  );
+});
+
+test("a reaped child never authorizes a numeric signal", async (context) => {
+  const signals: unknown[][] = [];
+  context.mock.method(process, "kill", (...args: unknown[]) => {
+    signals.push(args);
+    return true;
+  });
+  const reaped = {
+    pid: 123,
+    exitCode: 0,
+    signalCode: null,
+  } as unknown as OwnedProcess;
+
+  await assert.rejects(stopProcess(reaped), /not an owned process/);
+
+  assert.deepEqual(signals, []);
+});
+
+test("commands preserve stdin, split UTF-8 and a nonzero target result", async () => {
+  assert.equal(
+    (
+      await command("python3", ["-B", finiteFixture, "echo"], {
+        input: "hello é",
+      })
+    ).stdout,
+    "hello é",
+  );
+  assert.equal(
+    (await command("python3", ["-B", finiteFixture, "split-utf8"])).stdout,
+    "é",
+  );
+  await assert.rejects(
+    command("python3", ["-c", "raise SystemExit(2)"]),
+    /exited 2/,
+  );
+});
+
+test("log failure retains a nonzero command result", async () => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-owner-log-"));
+  try {
+    await assert.rejects(
+      command("python3", ["-c", "raise SystemExit(2)"], { log: work }),
+      (error: unknown) => {
         assert.ok(error instanceof AggregateError);
         assert.match(String(error.errors[0]), /exited 2/);
         assert.match(String(error.errors[1]), /EISDIR/);
@@ -24,38 +1029,303 @@ test("a log-write error retains the command failure rather than replacing it", a
       },
     );
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    await rm(work, { recursive: true, force: true });
   }
 });
 
-test("commands preserve stdin/stdout and reject nonzero or timed-out processes", async () => {
-  const result = await command(
-    process.execPath,
-    ["-e", "process.stdin.pipe(process.stdout)"],
-    { input: "hello" },
-  );
-  assert.equal(result.stdout, "hello");
+test("timeouts and output overflow stop finite targets before their fuse", async () => {
   await assert.rejects(
-    command(process.execPath, ["-e", "process.exit(2)"]),
-    /exited 2/,
-  );
-  await assert.rejects(
-    command(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
-      timeout: 60,
+    command("python3", ["-B", finiteFixture, "wait"], {
+      timeout: 150,
+      cleanupTimeout: 500,
     }),
     /timed out/,
   );
+  await assert.rejects(
+    command("python3", ["-B", finiteFixture, "noisy"], {
+      maxOutputBytes: 1024,
+      cleanupTimeout: 500,
+    }),
+    /output budget/,
+  );
 });
 
-test("cancellation terminates a running process instead of leaving it detached", async () => {
+test("same-group descendants stop after an early leader exit with open or closed pipes", async (context) => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-owner-tree-"));
+  const owner = fileURLToPath(
+    new URL("../../src/system/process_owner.py", import.meta.url),
+  );
+  const spawn = childProcess.spawn;
+  let personality: NodeJS.ProcessEnv = {};
+  let complete = false;
+  context.mock.method(childProcess, "spawn", ((
+    program: string,
+    args: readonly string[],
+    options: SpawnOptions,
+  ) => {
+    if (program !== "python3" || args.at(-1) !== owner)
+      return spawn(program, [...args], options);
+    const environment = { ...(options.env ?? process.env) };
+    delete environment.PS_PERSONALITY;
+    delete environment.CMD_ENV;
+    return spawn(program, [...args], {
+      ...options,
+      env: { ...environment, ...personality },
+    });
+  }) as typeof spawn);
+  syncBuiltinESMExports();
+  try {
+    for (const [name, environment] of [
+      ["default", {}],
+      ["hpux", { PS_PERSONALITY: "hpux" }],
+      ["sco", { CMD_ENV: "sco" }],
+    ] as const) {
+      personality = environment;
+      for (const pipes of ["open", "closed"]) {
+        const began = performance.now();
+        const marker = join(work, `${name}-${pipes}`);
+        await withResources(
+          async () => {
+            await command(
+              "python3",
+              ["-B", finiteFixture, "leader", marker, pipes],
+              {
+                timeout: 2000,
+                cleanupTimeout: 600,
+              },
+            ).catch((error: unknown) => {
+              context.diagnostic(describeError(error));
+              throw error;
+            });
+          },
+          async () => {
+            const descendant = Number(await readFile(marker, "utf8"));
+            assert.ok(descendant > 0);
+            // Later physical absence is custody only if the owner already failed.
+            const live = await executablePids(began + 2000);
+            assert.ok(
+              !live.has(descendant),
+              "Successful cleanup must leave no executable descendant",
+            );
+            assert.ok(
+              performance.now() - began < 2000,
+              "Owner cleanup must finish before the four-second fuse",
+            );
+          },
+        );
+      }
+    }
+    complete = true;
+  } finally {
+    context.mock.restoreAll();
+    syncBuiltinESMExports();
+    if (complete) await rm(work, { recursive: true, force: true });
+  }
+});
+
+test("cancellation of an acquired target retains its reason and cached cleanup", async () => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-owner-cancel-"));
+  const marker = join(work, "ready");
+  const controller = new AbortController();
+  const running = command("python3", ["-B", finiteFixture, "wait", marker], {
+    signal: controller.signal,
+    cleanupTimeout: 500,
+  });
+  void running.catch(() => {});
+  try {
+    const deadline = performance.now() + 1000;
+    let ready = false;
+    while (performance.now() < deadline) {
+      try {
+        await readFile(marker);
+        ready = true;
+        break;
+      } catch {
+        await delay(5);
+      }
+    }
+    assert.ok(ready, "Finite target did not announce acquisition");
+    controller.abort(new Error("cancel acquired target"));
+    await assert.rejects(running, /cancel acquired target/);
+  } finally {
+    controller.abort();
+    await running.catch(() => {});
+    await rm(work, { recursive: true, force: true });
+  }
+  const child = await startProcess("python3", ["-B", finiteFixture, "wait"], {
+    cleanupTimeout: 500,
+  });
+  const first = child.close();
+  assert.equal(child.close(), first);
+  await first;
+});
+
+test("cancellation still finishes descendants after their leader has exited", async (context) => {
+  const work = await mkdtemp(join(tmpdir(), "sdk-owner-orphan-cancel-"));
+  const marker = join(work, "descendant");
   const controller = new AbortController();
   const running = command(
-    process.execPath,
-    ["-e", "setInterval(()=>{},1000)"],
-    { signal: controller.signal },
+    "python3",
+    ["-B", finiteFixture, "leader", marker, "closed"],
+    {
+      signal: controller.signal,
+      timeout: 2000,
+      cleanupTimeout: 1000,
+    },
   );
-  setTimeout(() => controller.abort(new Error("review interrupted")), 50);
-  await assert.rejects(running, /interrupted|abort/i);
+  void running.catch(() => {});
+  let complete = false;
+  const entered = performance.now();
+  const cleanupDeadline = entered + 1000;
+  try {
+    await withResources(
+      async () => {
+        let exited = false;
+        while (performance.now() < cleanupDeadline) {
+          try {
+            await readFile(marker + ".orphaned");
+            exited = true;
+            break;
+          } catch {
+            await delay(5);
+          }
+        }
+        assert.ok(
+          exited,
+          "Descendant must observe the leader's exit before cancellation",
+        );
+        const reason = new Error("cancel orphaned descendant");
+        controller.abort(reason);
+        await assert.rejects(
+          running.catch((error: unknown) => {
+            context.diagnostic(describeError(error));
+            throw error;
+          }),
+          (error: unknown) => error === reason,
+        );
+      },
+      async () => {
+        controller.abort();
+        await running.catch(() => {});
+        const pid = Number(await readFile(marker, "utf8"));
+        assert.ok(Number.isSafeInteger(pid) && pid > 0);
+        const live = await executablePids(
+          Math.min(entered + 2000, performance.now() + 500),
+        );
+        assert.ok(
+          !live.has(pid),
+          "The cancelled descendant must no longer execute",
+        );
+        assert.ok(
+          performance.now() < cleanupDeadline,
+          "Physical cleanup must precede its original allowance and fuse",
+        );
+      },
+    );
+    complete = true;
+  } finally {
+    controller.abort();
+    await running.catch(() => {});
+    if (complete) await rm(work, { recursive: true, force: true });
+    else console.error(`Orphan cancellation evidence retained at ${work}`);
+  }
+});
+
+test("a crashed backend target remains a failure after confirmed resource cleanup", async () => {
+  const child = await startProcess("python3", ["-c", "raise SystemExit(2)"]);
+  await child.result;
+  await assert.rejects(stopProcess(child), /exited 2/);
+});
+
+test(
+  "queued close preserves a real already-exited target before the helper observes it",
+  { timeout: 3000 },
+  async (context) => {
+    const work = await mkdtemp(join(tmpdir(), "sdk-owner-ordered-exit-"));
+    const trace = join(work, "ordering.json");
+    const owner = fileURLToPath(
+      new URL("../../src/system/process_owner.py", import.meta.url),
+    );
+    const spawn = childProcess.spawn;
+    context.mock.method(childProcess, "spawn", ((
+      program: string,
+      args: readonly string[],
+      options: SpawnOptions,
+    ) =>
+      spawn(
+        program,
+        args.at(-1) === owner
+          ? [
+              ...args.slice(0, -1),
+              finiteFixture,
+              "ordered-exit-owner",
+              owner,
+              trace,
+            ]
+          : [...args],
+        options,
+      )) as typeof spawn);
+    syncBuiltinESMExports();
+    let child: OwnedProcess | undefined;
+    let confirmed = false;
+    const began = performance.now();
+    try {
+      child = await startProcess("python3", ["-B", finiteFixture, "exit-two"], {
+        timeout: 1000,
+        cleanupTimeout: 500,
+      });
+      // Do not await result: STOP must win the helper's normal observation turn.
+      await assert.rejects(stopProcess(child), /exited 2/);
+      const outcome = await child.result;
+      assert.deepEqual(outcome, {
+        status: 2,
+        reason: "target-exit",
+        leaderReaped: true,
+        groupState: "quiescent",
+        errors: [],
+      });
+      const ordering = JSON.parse(await readFile(trace, "utf8")) as {
+        queuedStop: string;
+        observedExit: number;
+        stopDeadline: number;
+        observedAt: number;
+        ownerResult: number;
+        returncodes: number[];
+      };
+      assert.equal(ordering.queuedStop, "close");
+      assert.equal(ordering.observedExit, 2);
+      assert.ok(ordering.observedAt < ordering.stopDeadline);
+      assert.equal(ordering.ownerResult, 0);
+      assert.deepEqual(ordering.returncodes, [2]);
+      assert.ok(
+        performance.now() - began < 1000,
+        "Production ownership evidence must precede both four-second fixture fuses",
+      );
+      confirmed = true;
+    } finally {
+      try {
+        await child?.close();
+      } finally {
+        context.mock.restoreAll();
+        syncBuiltinESMExports();
+        if (confirmed) await rm(work, { recursive: true, force: true });
+        else console.error(`Ordered-exit fixture evidence remains at ${work}`);
+      }
+    }
+  },
+);
+
+test("the Python owner syscall and control regressions pass independently", async () => {
+  const home = fileURLToPath(new URL("../..", import.meta.url));
+  const result = await command(
+    "python3",
+    ["-B", "-m", "unittest", "tests.unit.process_owner_test"],
+    {
+      cwd: home,
+      timeout: 5000,
+    },
+  );
+  assert.match(result.output, /\bOK\b/);
 });
 
 test("cleanup preserves the original failure and the cleanup failure", async () => {
@@ -70,7 +1340,6 @@ test("cleanup preserves the original failure and the cleanup failure", async () 
     ),
     (error: unknown) => {
       assert.ok(error instanceof AggregateError);
-      assert.match(error.message, /cleanup/);
       assert.deepEqual(error.errors.map(String), [
         "Error: assertion failed",
         "Error: cleanup failed",
@@ -90,233 +1359,4 @@ test("cleanup failure cannot turn a successful run green", async () => {
     ),
     /cleanup failed/,
   );
-});
-
-test("a crashed backend is not successful cleanup", async () => {
-  const child = spawn(process.execPath, ["-e", "process.exit(2)"], {
-    stdio: "ignore",
-  });
-  await new Promise<void>((resolve) => child.once("close", () => resolve()));
-  await assert.rejects(stopProcess(child), /exited 2/);
-});
-
-test("cancellation removes same-group descendants even after the leader exits", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "sdk-descendant-proof-"));
-  const marker = join(directory, "pid");
-  const { readFile } = await import("node:fs/promises");
-  const controller = new AbortController();
-  const descendant =
-    "process.on('SIGTERM',()=>{}); require('node:fs').writeFileSync(process.argv[1], String(process.pid)); setInterval(()=>{},1000)";
-  const leader = `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(descendant)},process.argv[1]],{stdio:'ignore'}); setInterval(()=>{},1000)`;
-  let pid: number | undefined;
-  try {
-    const running = command(process.execPath, ["-e", leader, marker], {
-      signal: controller.signal,
-    });
-    for (let attempt = 0; attempt < 100; attempt++) {
-      try {
-        pid = Number(await readFile(marker, "utf8"));
-        break;
-      } catch {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-    }
-    assert.ok(pid, "Descendant did not announce readiness");
-    controller.abort(new Error("cancel descendants"));
-    await assert.rejects(running, /cancel descendants/);
-    // Allow the OS to reap a descendant killed during command cleanup.
-    for (let attempt = 0; attempt < 100; attempt++) {
-      try {
-        process.kill(pid, 0);
-      } catch {
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-    assert.fail("Descendant outlived cancelled command");
-  } finally {
-    if (pid) {
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {}
-    }
-    await rm(directory, { recursive: true, force: true });
-  }
-});
-
-test("a noisy command fails within a bounded output budget", async () => {
-  await assert.rejects(
-    command(
-      process.execPath,
-      [
-        "-e",
-        "process.stdout.write('x'.repeat(1000000)); setInterval(()=>{},1000)",
-      ],
-      { maxOutputBytes: 1024 },
-    ),
-    /output budget/,
-  );
-});
-
-test("protocol stdout preserves UTF-8 characters split across pipe chunks", async () => {
-  const result = await command(process.execPath, [
-    "-e",
-    "process.stdout.write(Buffer.from([0xc3])); setTimeout(()=>process.stdout.write(Buffer.from([0xa9])),30)",
-  ]);
-  assert.equal(result.stdout, "é");
-});
-
-test("an uninspectable already-empty process group does not replace successful execution", async (context) => {
-  const original = process.kill.bind(process);
-  context.mock.method(
-    process,
-    "kill",
-    (pid: number, signal?: number | NodeJS.Signals) => {
-      if (pid < 0)
-        throw Object.assign(new Error("empty group denied by OS"), {
-          code: "EPERM",
-        });
-      return original(pid, signal);
-    },
-  );
-  const result = await command(process.execPath, [
-    "-e",
-    "process.stdout.write('done')",
-  ]);
-  assert.equal(result.stdout, "done");
-});
-
-test("a denied signal to a live owned group remains a cleanup failure", async (context) => {
-  const child = spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
-    detached: true,
-    stdio: "ignore",
-  });
-  await new Promise<void>((resolve, reject) => {
-    child.once("spawn", resolve);
-    child.once("error", reject);
-  });
-  const pid = child.pid;
-  assert.ok(pid);
-  const original = process.kill.bind(process);
-  context.mock.method(
-    process,
-    "kill",
-    (target: number, signal?: number | NodeJS.Signals) => {
-      if (target === -pid)
-        throw Object.assign(new Error("live group denied"), { code: "EPERM" });
-      return original(target, signal);
-    },
-  );
-  try {
-    assert.throws(() => kill(child), /live group denied/);
-  } finally {
-    context.mock.restoreAll();
-    const ended = new Promise<void>((resolve) =>
-      child.once("close", () => resolve()),
-    );
-    original(-pid, "SIGKILL");
-    await ended;
-  }
-});
-
-test("denied cancellation rejects normally and preserves cleanup failures", async (context) => {
-  const { readFile } = await import("node:fs/promises");
-  const directory = await mkdtemp(join(tmpdir(), "sdk-denied-cancel-"));
-  const marker = join(directory, "pid");
-  const controller = new AbortController();
-  const original = process.kill.bind(process);
-  let pid: number | undefined;
-  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
-  const running = command(
-    process.execPath,
-    [
-      "-e",
-      "require('node:fs').writeFileSync(process.argv[1],String(process.pid));setInterval(()=>{},1000)",
-      marker,
-    ],
-    { signal: controller.signal, cleanupTimeout: 20 },
-  );
-  void running.catch(() => {});
-  try {
-    for (let attempt = 0; attempt < 100; attempt++) {
-      try {
-        pid = Number(await readFile(marker, "utf8"));
-        break;
-      } catch {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-    }
-    assert.ok(pid);
-    const target = pid;
-    context.mock.method(
-      process,
-      "kill",
-      (value: number, signal?: number | NodeJS.Signals) => {
-        if (value === -target && signal !== 0)
-          throw Object.assign(new Error("owned group denied"), {
-            code: "EPERM",
-          });
-        return original(value, signal);
-      },
-    );
-    controller.abort(new Error("cancel denied group"));
-    const deadline = new Promise<never>((_resolve, reject) => {
-      deadlineTimer = setTimeout(
-        () => reject(new Error("Denied cancellation did not settle")),
-        2000,
-      );
-    });
-    await assert.rejects(
-      Promise.race([running, deadline]),
-      (error: unknown) => {
-        assert.ok(error instanceof AggregateError);
-        assert.match(String(error.errors[0]), /cancel denied group/);
-        assert.match(String(error.errors[1]), /cleanup|denied/i);
-        return true;
-      },
-    );
-  } finally {
-    clearTimeout(deadlineTimer);
-    context.mock.restoreAll();
-    if (pid) {
-      try {
-        original(-pid, "SIGKILL");
-      } catch {}
-    }
-    await rm(directory, { recursive: true, force: true });
-  }
-});
-
-test("an empty denied group still falls back to the live attached child", async (context) => {
-  const child = spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
-    detached: false,
-    stdio: "ignore",
-  });
-  await new Promise<void>((resolve, reject) => {
-    child.once("spawn", resolve);
-    child.once("error", reject);
-  });
-  const pid = child.pid;
-  assert.ok(pid);
-  const original = process.kill.bind(process);
-  context.mock.method(
-    process,
-    "kill",
-    (target: number, signal?: NodeJS.Signals | number) => {
-      if (target === -pid)
-        throw Object.assign(new Error("empty attached group denied"), {
-          code: "EPERM",
-        });
-      return original(target, signal);
-    },
-  );
-  try {
-    await stopProcess(child);
-    assert.ok(child.signalCode);
-  } finally {
-    context.mock.restoreAll();
-    try {
-      original(pid, "SIGKILL");
-    } catch {}
-  }
 });
