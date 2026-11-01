@@ -60,10 +60,17 @@ Give the exact supported cleanup procedure and explain what it removes. Identify
 
 ## Execution records
 
+Record shared qualification details once in this ticket:
+
+- Tested artifact revisions.
+- Failure-injection method, or `Not applicable` when none was used.
+
+Reference these details from each run and record changes rather than overwriting earlier evidence.
+
 Record each execution in a separate comment, preserving the reusable procedure:
 
 - Tester and date.
-- Tested artifacts, platform and configuration.
+- Artifact selection, platform and configuration, with any differences from the shared details.
 - Case and failed or blocked step, if any.
 - Expected and actual result.
 - Passed, Failed, Blocked or Not run for each required case.
