@@ -1,7 +1,12 @@
 [
   {
     "title": "Get started",
-    "links": [{ "title": "Introduction", "href": "/" }]
+    "links": [
+      {
+        "title": "Introduction",
+        "href": "/"
+      }
+    ]
   },
   {
     "title": "Guides",
@@ -13,6 +18,10 @@
       {
         "title": "Check whether your original request was accepted",
         "href": "/guides/recover-original-request"
+      },
+      {
+        "title": "Read retained deletion status",
+        "href": "/guides/read-deletion-status"
       }
     ]
   }

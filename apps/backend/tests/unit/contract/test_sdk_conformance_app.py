@@ -468,3 +468,35 @@ def test_original_lookup_fixture_preserves_null_scope_guard_and_unknown_referenc
     }
     assert witness["jsonBody"] == body
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_deletion_status_fixture_uses_the_production_read_and_exact_query() -> None:
+    operation = "settled +/&é"
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/deletion-wire",
+            json={"calls": {"deletion-wire": {"kind": "none"}}},
+        )
+        response = client.get(
+            "/v1/deletions/status",
+            params={"operationId": operation},
+            headers={"Authorization": "Bearer sdk-human", "X-SDK-Test": "deletion-wire"},
+        )
+        evidence = client.get("/sdk-control/cases/deletion-wire").json()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "outcome": "retained",
+        "operationId": operation,
+        "jobState": "succeeded",
+        "admissionConfirmed": True,
+        "accessBlocked": True,
+        "applicationShutdownComplete": True,
+        "physicalCleanupComplete": True,
+        "retentionExpiresAt": "2030-01-01T00:00:00Z",
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert evidence["observations"]["deletion-wire"]["query"] == (
+        "operationId=settled+%2B%2F%26%C3%A9"
+    )
+    assert evidence["counts"] == {"deletion-wire": 1}

@@ -32,6 +32,7 @@ from inframeld_backend.bootstrap.access_composition import create_access_compone
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
+from inframeld_backend.bootstrap.deletion_status_composition import open_deletion_status_lookup
 from inframeld_backend.bootstrap.original_operation_lookup_composition import (
     open_original_operation_lookup,
 )
@@ -44,6 +45,9 @@ from inframeld_backend.shared.http.middleware.request_context_middleware import 
     RequestContextMiddleware,
 )
 from inframeld_backend.shared.http.openapi.problem_openapi import configure_problem_openapi
+from inframeld_backend.shared.http.routes.deletion_status_routes import (
+    create_deletion_status_router,
+)
 from inframeld_backend.shared.http.routes.health_routes import router as health_router
 from inframeld_backend.shared.http.routes.original_operation_lookup_routes import (
     create_original_operation_lookup_router,
@@ -147,6 +151,11 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_original_operation_lookup_router(
                 human_session, partial(open_original_operation_lookup, database)
+            )
+        )
+        application.include_router(
+            create_deletion_status_router(
+                human_session, partial(open_deletion_status_lookup, database)
             )
         )
 

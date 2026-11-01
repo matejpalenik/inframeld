@@ -248,6 +248,7 @@ services:
       <<: *oauth-settings
       INFRAMELD_ENVIRONMENT: local
       INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE: /run/secrets/idempotency_fingerprint_hmac
+      INFRAMELD_DELETION_STATUS_RETENTION__DAYS: ${INFRAMELD_DELETION_STATUS_RETENTION__DAYS-30}
       INFRAMELD_DATABASE__HOST: postgres
       INFRAMELD_DATABASE__PORT: "5432"
       INFRAMELD_DATABASE__NAME: inframeld

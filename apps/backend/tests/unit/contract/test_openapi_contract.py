@@ -325,3 +325,51 @@ def test_lookup_wire_alternatives_require_their_discriminator_and_uncertainty(
     """Clients must reject absent outcome tags and absent explicit uncertainty fields."""
     schema = create_app().openapi()["components"]["schemas"][model]
     assert required <= set(schema.get("required", []))
+
+
+def test_deletion_status_contract_preserves_human_read_and_explicit_unknowns() -> None:
+    """Give generated clients the registered, content-free read and required nullable facts."""
+    schema = create_app().openapi()
+    assert "/v1/deletions/status" in schema["paths"]
+    operation = schema["paths"]["/v1/deletions/status"]["get"]
+    assert operation["operationId"] == "getDeletionStatus"
+    assert operation["security"] == [{"KratosSession": []}, {"HumanBearer": []}]
+    assert "requestBody" not in operation
+    assert len(operation["parameters"]) == 1
+    parameter = operation["parameters"][0]
+    assert parameter["name"] == "operationId"
+    assert parameter["in"] == "query" and parameter["required"] is True
+    assert parameter["schema"]["minLength"] == 1
+    assert parameter["schema"]["maxLength"] == 128
+
+    components = schema["components"]["schemas"]
+    success = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    assert success == {"$ref": "#/components/schemas/DeletionStatusResponse"}
+    alternatives = components["DeletionStatusResponse"]
+    assert alternatives["discriminator"] == {
+        "propertyName": "outcome",
+        "mapping": {
+            "retained": "#/components/schemas/RetainedDeletionStatusResponse",
+            "unresolved": "#/components/schemas/UnresolvedDeletionStatusResponse",
+        },
+    }
+    retained = components["RetainedDeletionStatusResponse"]
+    assert retained["additionalProperties"] is False
+    fields = {
+        "outcome",
+        "operationId",
+        "jobState",
+        "admissionConfirmed",
+        "accessBlocked",
+        "applicationShutdownComplete",
+        "physicalCleanupComplete",
+        "retentionExpiresAt",
+    }
+    assert set(retained["required"]) == set(retained["properties"]) == fields
+    for name in fields - {"outcome", "operationId"}:
+        assert any(part.get("type") == "null" for part in retained["properties"][name]["anyOf"])
+    unresolved = components["UnresolvedDeletionStatusResponse"]
+    assert unresolved["additionalProperties"] is False
+    assert set(unresolved["required"]) == set(unresolved["properties"]) == {"outcome"}
+    for status in ("400", "401", "403", "422", "500", "503"):
+        assert set(operation["responses"][status]["content"]) == {"application/problem+json"}

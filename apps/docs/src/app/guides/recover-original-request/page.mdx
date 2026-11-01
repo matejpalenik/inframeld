@@ -256,6 +256,12 @@ An unresolved response contains only:
 
 It does not say whether history was absent, expired, or did not match the full original identity. Repeating a successful lookup does not extend the original record's expiry. An accepted asynchronous result remains a statement about original acceptance, even if the job later changes state. Lookup does not provide a job URL or current job progress.
 
+## Read a known Project deletion operation
+
+If you already have the original deletion operation ID, [read its retained deletion status](/guides/read-deletion-status). That separate content-free reader permits the currently eligible original initiating human to read after ordinary Project membership disappears. It grants no cancellation, continuation or restored access.
+
+Keep the operation ID before losing membership. This original-request lookup still checks its own current authority before searching and is not an alternative permission bypass. An unresolved deletion-status read does not establish completion or authorize another deletion.
+
 ## Handle an error or lost response
 
 Error responses use `application/problem+json`. Read the HTTP status and problem details before deciding how to proceed. An SDK decoding error can also occur with HTTP `200`, so check the SDK error even when the status looks successful.

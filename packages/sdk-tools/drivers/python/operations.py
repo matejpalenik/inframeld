@@ -187,6 +187,22 @@ async def lookup_async(clients: Clients, call: Call) -> NativeResponse:
     )
 
 
+def deletion_status_sync(clients: Clients, call: Call) -> NativeResponse:
+    return OperationsApi(clients.production).get_deletion_status_sync_with_http_info(
+        operation_id=string(call.query["operationId"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def deletion_status_async(clients: Clients, call: Call) -> NativeResponse:
+    return await OperationsApi(clients.production).get_deletion_status_with_http_info(
+        operation_id=string(call.query["operationId"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 def payload_sync(clients: Clients, call: Call) -> NativeResponse:
     return DefaultApi(clients.fixtures).contract_fixture_payload_sync_with_http_info(
         contract_fixture_payload=payload_body(call),
@@ -344,6 +360,7 @@ BINDINGS: dict[Operation, Binding] = {
     "decideHumanOAuthConsent": Binding(decide_consent_sync, decide_consent_async),
     "assignProjectUseOnlyGrant": Binding(assign_grant_sync, assign_grant_async),
     "lookupOriginalOperation": Binding(lookup_sync, lookup_async),
+    "getDeletionStatus": Binding(deletion_status_sync, deletion_status_async),
     "contractFixturePayload": Binding(payload_sync, payload_async),
     "contractFixturePage": Binding(page_sync, page_async),
     "contractFixtureUpload": Binding(upload_sync, upload_async),

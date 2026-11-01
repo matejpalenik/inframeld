@@ -144,6 +144,16 @@ Expose no Project name, inventory, private-content counts, payloads, excerpts or
 
 This projection grants no cancellation, continuation, restoration or replacement membership. Host maintenance is not a product-credential fallback. [Project deletion](../../inframeld-knowledge/references/project-deletion.md) owns admission and physical completion. This document selects neither new retention periods nor an additional deletion-state enum.
 
+### Implemented content-free reader
+
+`GET /v1/deletions/status` takes exactly one opaque, nonblank `operationId` query value of at most 128 characters. It accepts no caller-selected Project, actor or broader query scope. Existing human cookie/bearer authentication precedes request-local current-eligibility authorization and original initiator/binding matching. Ordinary membership is not required for this narrow read.
+
+An eligible noninitiator receives the same `200` unresolved object as missing, expired or binding-only history. This denies disclosure without confirming whether another human's record exists. Invalid/stale credentials and currently ineligible humans retain authentication/authorization failures before projection disclosure. Missing or malformed dependencies remain failed observations, not unresolved history.
+
+A retained response has `outcome`, original `operationId`, nullable `jobState`, `admissionConfirmed`, `accessBlocked`, `applicationShutdownComplete`, `physicalCleanupComplete` and `retentionExpiresAt`. All fields are required, and unknown facts remain explicit nulls rather than false. The unresolved response contains only `outcome: "unresolved"`. Reads and problems use `no-store`. Native OpenAPI owns the exact schema. [The task guide](../../../../apps/docs/src/app/guides/read-deletion-status/page.mdx) owns runnable HTTP/generated-client examples.
+
+The binding captures the accepted deletion-status retention profile. An unfinished authoritative obligation is not expired as ordinary settled history. A first valid settled observation fixes the expiry from its captured profile, and later reads/settings never extend it. See [Project deletion](../../inframeld-knowledge/references/project-deletion.md) and its owning retention policy. The reader consumes these facts without writing or continuing deletion. Authentic admission, shutdown and physical-cleanup producers remain separate delivery.
+
 ## Retention, delivery and acceptance
 
 Preserve [at least 24 hours of completed duplicate detection and active-work retention](idempotency-and-replay.md#limit-guarantees-to-retained-authoritative-history). An established expiry is published unchanged. Repeated reads or retries do not extend it. That floor does not select job-history or deletion-status lifetimes. Accepted [PD-KNOWLEDGE-02](../../inframeld-knowledge/references/decision-retention-erasure-policy.md#approved-resolution) selects job-history and deletion-status periods. The [accepted queue policy](decision-queue-saturation-and-cleanup.md#approved-resolution) and [PD-ARCHITECTURE-01](../../inframeld-architecture/references/decision-supported-operating-envelope.md#approved-resolution) select saturation and numerical operating limits. Runtime qualification remains required.

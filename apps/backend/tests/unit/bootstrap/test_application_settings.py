@@ -326,3 +326,61 @@ def test_consent_settings_parse_explicit_public_url_and_remember_duration(
         assert settings.remember_consent_seconds == 7200
     finally:
         get_settings.cache_clear()
+
+
+@pytest.mark.parametrize(("configured", "expected"), [(None, 30), ("7", 7), ("90", 90)])
+def test_aggregate_environment_selects_deletion_status_retention(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    configured: str | None,
+    expected: int,
+) -> None:
+    if configured is not None:
+        monkeypatch.setenv("INFRAMELD_DELETION_STATUS_RETENTION__DAYS", configured)
+
+    selected = _load_bearer_settings().model_dump().get("deletion_status_retention")
+    assert selected == {"days": expected}
+
+
+@pytest.mark.parametrize("configured", ["0", "-1", "91", "true", "30.5", "unparseable"])
+def test_invalid_aggregate_retention_environment_is_rejected(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    configured: str,
+) -> None:
+    monkeypatch.setenv("INFRAMELD_DELETION_STATUS_RETENTION__DAYS", configured)
+
+    with pytest.raises(ValidationError) as caught:
+        _load_bearer_settings()
+
+    assert caught.value.errors()[0]["loc"] == ("deletion_status_retention", "days")
+
+
+def test_retention_configuration_error_identifies_field_without_echoing_input(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    env_file = tmp_path / "empty-test.env"
+    env_file.write_text("", encoding="utf-8")
+    marker = "private-invalid-retention-input"
+    values = {
+        "INFRAMELD_ENVIRONMENT": "test",
+        "INFRAMELD_TEST_ENV_FILE": str(env_file),
+        "INFRAMELD_DATABASE__NAME": "retention-test",
+        "INFRAMELD_DATABASE__USER": "retention-test",
+        "INFRAMELD_DATABASE__PASSWORD": "test-only-password",
+        "INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE": str(tmp_path / "unused-fingerprint.key"),
+        "INFRAMELD_DELETION_STATUS_RETENTION__DAYS": marker,
+    }
+    for name, value in values.items():
+        monkeypatch.setenv(name, value)
+
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(RuntimeError) as caught:
+            get_settings()
+        assert "deletion_status_retention.days" in str(caught.value)
+        assert marker not in str(caught.value)
+    finally:
+        get_settings.cache_clear()
