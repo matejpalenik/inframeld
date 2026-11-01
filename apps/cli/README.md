@@ -1,6 +1,6 @@
 # Inframeld CLI foundation
 
-The Rust `inframeld` executable provides offline help, human and machine-readable build information, and descriptive dry-run for `version`. These commands require no services, configuration or credentials. Login, target selection and product command families remain separate delivery work (#158–#160 and their owning issues). The [common automation contract](../../.agents/skills/inframeld-application-contracts/references/cli-output-and-automation.md) is accepted design. Its offline version consumer is described below, while progress, queries, lists and mutations still need their owning executable integrations.
+The Rust `inframeld` executable provides offline help/version and credential-free `target add`, `target use` and `target show`. Help and version require no services, configuration or credentials. Registration validates public HTTPS discovery, while selection and readback use local state. Login, account/Project selection and other product commands remain separate delivery work. Full #158 and #159 remain open. The [common automation contract](../../.agents/skills/inframeld-application-contracts/references/cli-output-and-automation.md) is accepted design. Its offline version consumer is described below, while progress, queries, lists and mutations still need their owning executable integrations.
 
 ```sh
 inframeld --help
@@ -16,7 +16,7 @@ Use `inframeld version --json` to inspect the installed executable in a script. 
 
 `--json` writes one final JSON object to stdout. Explicit `--jsonl` writes one compact final record whose `result` contains that object. Neither version nor its dry-run emits progress. Choose one output mode. Both flags together produce a JSON usage failure and exit 2. Help and a recognized root `--version` remain plain-text exceptions.
 
-`inframeld version --dry-run --json` describes the intended embedded-metadata read and stdout output without reading the embedded values. It checks arguments only. Its successful plan does not verify build metadata, runtime readiness or compatibility. `--no-input`, `--plain` and `--no-color` are accepted global booleans, but version never prompts and these flags do not change JSON data. All six global flags can appear before or after `version`.
+`inframeld version --dry-run --json` describes the intended embedded-metadata read and stdout output without reading the embedded values. It checks arguments only. Its successful plan does not verify build metadata, runtime readiness or compatibility. `--no-input`, `--plain` and `--no-color` are accepted global booleans, but version never prompts and these flags do not change JSON data. These global flags can appear before or after `version`. The target selector is irrelevant to offline version output.
 
 ### Manually check the version feature
 
@@ -150,7 +150,74 @@ The library's `discovery::discover` validates one exact HTTPS API identity witho
 
 Start reading at [`src/discovery/mod.rs`](src/discovery/mod.rs), which preserves the public interface and keeps managed-local context fields private. The operation lives in `discover.rs`, installation records and provider validation in `installation.rs`, URL decisions in `url_policy.rs`, provider HTTP adaptation in `oidc_transport.rs` and safe failures in `error.rs`. Transport scenarios remain together in `transport_tests.rs`, while pure URL tests live beside their policy. This split follows responsibilities rather than requiring identical layer folders for every capability.
 
-Discovery allows ten seconds overall, five per request and 64 KiB per response, with redirects and retries disabled. The internal managed-local context has no public constructor or deserialization path. Its origin/installation checks are tested with controlled trusted context. Actual managed-runtime ownership remains #162. Target persistence and login remain #159/#160. The [server discovery guide](../../docs/development/guides/server-discovery.md) describes the wire profile and operator setup, with [manual inspection steps and their limits](../../docs/development/guides/server-discovery.md#manually-check-the-current-delivery).
+Discovery allows ten seconds overall, five per request and 64 KiB per response, with redirects and retries disabled. The internal managed-local context has no public constructor or deserialization path. Its origin/installation checks are tested with controlled trusted context. Actual managed-runtime ownership remains #162. The target commands below own persistence. Login remains #160. The [server discovery guide](../../docs/development/guides/server-discovery.md) describes the wire profile and operator setup, with [manual inspection steps and their limits](../../docs/development/guides/server-discovery.md#manually-check-the-current-delivery).
+
+## Register and select credential-free targets
+
+Use `target add LABEL --url HTTPS_URL` to validate public API, issuer and signing-key metadata and save a connection. Registration does not select it. `target use LABEL` explicitly saves the global preference. `target show` reads the effective registered target using `--target`, then `INFRAMELD_TARGET`, then the saved preference. An explicit override never changes saved state. `add` and `use` reject a competing `--target`. Unknown or invalid effective values fail without falling back.
+
+The [user guide](../docs/src/app/guides/register-a-target/page.mdx) covers the real commands, explicit CA/proxy inputs and failure recovery. They never load an account or credential, open a browser, select a Project or grant access. The common output contract is implemented only for these commands and offline version. Broader #158 behavior remains open.
+
+The schema version 1 JSON registry is `$XDG_CONFIG_HOME/inframeld/targets`, or `$HOME/.config/inframeld/targets` when the variable is unset. A configured root must be absolute. The CLI does not read `.env` or search the working directory. The registry is bounded to 4 MiB, its directory is private 0700 and files are 0600. Malformed, unsupported, symlinked or insecure state is rejected without rewriting it. A separate `targets.lock` inode provides a kernel writer lock, with a two-second acquisition budget and 25 ms waits. Its presence alone does not indicate a live writer. Writers reload current state under the lock and publish a same-directory temporary file through file sync, atomic replacement and directory sync. Discovery runs outside that lock. A post-publication error retains the actual file and reports uncertainty.
+
+Labels use 1-64 ASCII letters/digits/dots/underscores/hyphens, starting with a letter or digit, and compare exactly. A label cannot replace a different installation/API/issuer/client/transport binding. Repeating an identical registration after successful discovery reports `alreadyRegistered`. No reconfiguration, target deletion, credential store or config-revision framework is delivered.
+
+`--ca-cert FILE` accepts up to 8 public PEM bundles of 256 KiB each. Only absolute operator-managed references are stored. Each network attempt reads their current contents once and uses that parsed snapshot throughout discovery. File or symlink changes affect the next attempt. Missing/invalid configured CA data fails instead of being omitted. `--proxy URL` accepts one explicit credential-free HTTP(S) origin. User information, queries, fragments and non-root paths are rejected. Ambient proxy settings remain disabled. HTTPS validation, discovery deadlines and exact original API/issuer spelling remain unchanged. Entered HTTP URLs do not create managed-local trust.
+
+All target commands support human output, one final JSON object or explicit final-only JSONL, and descriptive dry-run. Dry-run validates the supplied local inputs and registry without discovery or writes. `show` labels its result `savedBinding`, without claiming current reachability or permission. `use` reports when an environment value continues to override the saved preference. INT/TERM produce130/143 and preserve confirmed local effects. A blocked or interrupted final output can be incomplete. Read `target show` before repeating a save with an uncertain result.
+
+### Manually check target registration and selection
+
+Prerequisites: build this source with the pinned toolchain, have an operator-supplied exact public HTTPS API identity, compatible enabled discovery and issuer configuration, network/VPN access and the required trusted CA. These are credential-free checks. No account, token, private admin access or seed operation is required. A complete engineering walkthrough against an operator-configured installation is separate from controlled local TLS tests and must precede human handoff in #185. #298 covers a different repair/proof journey.
+
+From the repository root, build the actual executable:
+
+```sh
+cargo build --locked -p inframeld-cli
+```
+
+Use a disposable test shell for this recipe. Set `api_url` to the operator's exact API identity, replacing the example. Create one disposable configuration root and clear the inherited target selector so bare readback uses the saved preference. Keep the same variables for every command below:
+
+```sh
+api_url='https://api.dev.example.com'
+target_config_root="$(mktemp -d)"
+unset INFRAMELD_TARGET
+XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target add dev --url "$api_url" --dry-run --json --no-input
+XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target show --target dev --json --no-input
+```
+
+The dry-run exits 0 with `remoteVerification: "notPerformed"`. The inspection exits 1 with `target_not_found`, because preview did not save a target. If the installation needs a private CA or proxy, add the actual `--ca-cert`/`--proxy` inputs to both registration invocations. Preserve the operator's CA file during cleanup.
+
+Run registration and inspect it explicitly before selecting it:
+
+```sh
+XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target add dev --url "$api_url" --json --no-input
+XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target show --target dev
+XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target use dev --json --no-input
+XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target show --jsonl --no-input
+```
+
+Each exits 0 on success. Registration returns `registration: "saved"` and `selectionChanged: false`. Explicit readback shows the same installation/API/issuer. `use` reports `savedTarget: "dev"`. The final JSONL invocation emits one result record with `verification: "savedBinding"`. No sign-in or Project state is created. Repeating the identical registration reports `alreadyRegistered`.
+
+Check precedence and safe rejection:
+
+```sh
+INFRAMELD_TARGET=missing XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target show --target dev --json
+INFRAMELD_TARGET=missing XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target show --json
+XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target add local --url http://127.0.0.1:9 --json
+XDG_CONFIG_HOME="$target_config_root" target/debug/inframeld target show --json
+```
+
+The first exits 0 using `flag` without persisting the override. The second exits 1 rather than falling back. HTTP registration exits 2 with `discovery_invalid_url`. The last readback still selects `dev` and its original binding. Compare human and machine facts, observe any environment warning, and retain only safe outputs. For interruption or uncertain persistence, inspect the saved target before repeating a change.
+
+Remove only the disposable configuration root you created:
+
+```sh
+rm -r -- "$target_config_root"
+unset target_config_root api_url
+```
+
+Record actual executable revision/platform, exact configured public identity, commands, results and cleanup separately from automated tests. If that installation is unavailable, report the walkthrough as not run and keep human preparation with engineering. A readable recipe or green unit suite is not a human acceptance result.
 
 ## Human recipient-proof acquisition boundary
 

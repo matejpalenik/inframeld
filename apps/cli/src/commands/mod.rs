@@ -1,3 +1,4 @@
-//! Execute the implemented offline commands without persistent or remote context.
+//! Own offline build inspection and explicit public target registration and selection.
 
+pub(crate) mod targets;
 pub(crate) mod version;

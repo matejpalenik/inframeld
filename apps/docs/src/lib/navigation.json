@@ -16,6 +16,10 @@
         "href": "/guides/inspect-cli-version"
       },
       {
+        "title": "Register and select a target",
+        "href": "/guides/register-a-target"
+      },
+      {
         "title": "Check whether your original request was accepted",
         "href": "/guides/recover-original-request"
       },

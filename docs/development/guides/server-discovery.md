@@ -2,7 +2,7 @@
 
 An operator gives Alice one canonical API URL. Discovery returns public installation and identity-provider facts. It does not authenticate Alice, create membership or establish release compatibility. [ADR-0098](../../adr/ADR-0098-publish-bounded-first-party-discovery.md) records the accepted profile.
 
-Issue #118 implements backend publication and the Rust library that validates those facts. The executable currently exposes help and version only. Saving a remote target remains #159 and browser login remains #160, so Alice cannot yet add an installation or sign in through the CLI.
+Issue #118 implements backend publication and the Rust library that validates those facts. The executable exposes credential-free target registration, local selection and cached readback, alongside offline help/version. Browser login and account/Project selection remain separate delivery work. Follow the [target walkthrough](../../../apps/cli/README.md#manually-check-target-registration-and-selection) for actual commands and prerequisites.
 
 ## Configure publication
 
@@ -38,7 +38,7 @@ for label, value in (
 PY
 ```
 
-Expect `valid: accepted unchanged=True` followed by `invalid: rejected`. This checks local syntax validation only. It reads no application configuration, makes no network request and saves nothing, so no cleanup is needed. It does not qualify issuer agreement, the configured admin-endpoint guard or a complete CLI registration. The executable still has no discovery command.
+Expect `valid: accepted unchanged=True` followed by `invalid: rejected`. This checks local syntax validation only. It reads no application configuration, makes no network request and saves nothing, so no cleanup is needed. It does not qualify issuer agreement, the configured admin-endpoint guard or a complete CLI registration. The target registration command performs the full client discovery sequence before saving its binding.
 
 ## Read metadata
 
@@ -80,7 +80,7 @@ The public entry point and records remain reachable through [`discovery`](../../
 
 ## Manually check the current delivery
 
-The user goal is to recognize the installation behind the operator's URL before saving a target or starting login. The current delivery can be inspected at the public HTTP boundary. It has no discovery command in the executable yet.
+The user goal is to recognize the installation behind the operator's URL before saving a target or starting login. The current delivery can be inspected at the public HTTP boundary. Use the [target registration walkthrough](../../../apps/cli/README.md#manually-check-target-registration-and-selection) to exercise discovery and local persistence through the executable. The publication-only checks below remain useful independently.
 
 From the repository root, with the pinned Rust toolchain installed, inspect the available CLI commands:
 
@@ -88,7 +88,7 @@ From the repository root, with the pinned Rust toolchain installed, inspect the 
 cargo run --locked -p inframeld-cli --bin inframeld -- --help
 ```
 
-Expect help listing `version`, with no target-registration, discovery or login command. This checks the current command surface and does not contact an installation.
+Expect help listing `version` and the `target` family. `target add --help` documents registration inputs. Login remains unavailable. This checks the current command surface and does not contact an installation.
 
 To inspect server publication, use an already-running installation with discovery configured as above, network or VPN access and a trusted HTTPS certificate. Replace the example hostname with the operator's actual hostname. This example assumes its exact configured API identity is `https://inframeld.company.example/api/v1`:
 
@@ -118,4 +118,4 @@ For a separate automated check of the Rust library, run from the repository root
 cargo test --locked -p inframeld-cli --lib discovery::
 ```
 
-These tests use controlled local servers, require no company installation and cover success and rejection behavior. Once #159 exposes target registration and #160 exposes login, their guides must add the actual executable commands and expected saved-target and authenticated behavior.
+These tests use controlled local servers, require no company installation and cover success and rejection behavior. The [target guide](../../../apps/cli/README.md#register-and-select-credential-free-targets) documents executable registration and saved-target behavior. Login and its authenticated human journey remain unimplemented and unqualified here.
