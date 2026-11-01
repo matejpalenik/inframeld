@@ -126,6 +126,72 @@ test("an assertion failure still reconciles through the independent observer and
   assert.equal(observed, true);
 });
 
+test("physical observer keeps unknown and modified unknown states possibly live", async (context) => {
+  context.mock.method(childProcess, "execFile", ((...args: unknown[]) => {
+    assert.equal(args[0], "ps");
+    assert.deepEqual(args[1], ["-A", "-o", "pid=,stat="]);
+    const options = args[2] as childProcess.ExecFileOptions;
+    assert.equal(options.env?.LC_ALL, "C");
+    for (const key of ["PS_PERSONALITY", "CMD_ENV", "I_WANT_A_BROKEN_PS"])
+      assert.equal(options.env?.[key], undefined);
+    assert.equal(options.maxBuffer, 4 * 1024 * 1024);
+    assert.ok(Number(options.timeout) > 0 && Number(options.timeout) <= 500);
+    const callback = args.at(-1) as (error: null, stdout: string) => void;
+    callback(null, "101 ?\n102 ?s\n103 ?<+\n104 S+\n105 Z\n106 Z+\n");
+  }) as typeof childProcess.execFile);
+  assert.deepEqual(
+    await executablePids(performance.now() + 500),
+    new Set([101, 102, 103, 104]),
+  );
+});
+
+test("physical observer rejects malformed observations with fixed private reasons", async (context) => {
+  let output = "";
+  context.mock.method(childProcess, "execFile", ((...args: unknown[]) => {
+    const callback = args.at(-1) as (error: null, stdout: string) => void;
+    callback(null, output);
+  }) as typeof childProcess.execFile);
+  for (const [row, reason] of [
+    ["111", "columns"],
+    ["111 S private-row", "columns"],
+    ["0 S", "pid"],
+    ["-1 S", "pid"],
+    ["not-a-pid S", "pid"],
+    ["9007199254740992 S", "pid"],
+    ["111 Z?", "state"],
+    ["111 S?", "state"],
+    ["111 ??", "state"],
+    ["111 S!private-row", "state"],
+  ]) {
+    output = row!;
+    await assert.rejects(executablePids(performance.now() + 500), {
+      message: `Invalid physical process observation (${reason})`,
+    });
+  }
+});
+
+test("physical observer rejects observations outside the original deadline", async (context) => {
+  let now = 1000,
+    calls = 0;
+  context.mock.method(performance, "now", () => now);
+  context.mock.method(childProcess, "execFile", ((...args: unknown[]) => {
+    calls++;
+    now = 1001;
+    const callback = args.at(-1) as (error: null, stdout: string) => void;
+    callback(null, "111 S\n");
+  }) as typeof childProcess.execFile);
+  await assert.rejects(
+    executablePids(1000),
+    /Physical observation deadline expired/,
+  );
+  assert.equal(calls, 0);
+  await assert.rejects(
+    executablePids(1001),
+    /Physical observation deadline expired/,
+  );
+  assert.equal(calls, 1);
+});
+
 /** Independent read-only physical observation, never cleanup authority. */
 async function executablePids(deadline: number): Promise<Set<number>> {
   const remaining = deadline - performance.now();
@@ -150,13 +216,12 @@ async function executablePids(deadline: number): Promise<Set<number>> {
     if (!row.trim()) continue;
     const fields = row.trim().split(/\s+/);
     const pid = Number(fields[0]);
-    if (
-      fields.length !== 2 ||
-      !Number.isSafeInteger(pid) ||
-      pid <= 0 ||
-      !/^[A-Za-z+<>-]+$/.test(fields[1]!)
-    )
-      throw new Error("Invalid physical process observation");
+    if (fields.length !== 2)
+      throw new Error("Invalid physical process observation (columns)");
+    if (!Number.isSafeInteger(pid) || pid <= 0)
+      throw new Error("Invalid physical process observation (pid)");
+    if (!/^(?:[A-Za-z+<>-]+|\?[A-Za-z+<>-]*)$/.test(fields[1]!))
+      throw new Error("Invalid physical process observation (state)");
     if (!fields[1]!.startsWith("Z")) live.add(pid);
   }
   if (performance.now() >= deadline)
