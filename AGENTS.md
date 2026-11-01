@@ -41,7 +41,7 @@ Read the skill whose invariant or behavior the question concerns. Domain skills 
 | Shared SDK generation policy, new endpoint coverage or cross-language qualification | [SDKs](.agents/skills/inframeld-sdks/SKILL.md) |
 | TypeScript SDK consumption, Fetch/Zod behavior or generator maintenance | [TypeScript SDK](.agents/skills/inframeld-typescript-sdk/SKILL.md) |
 | Python SDK consumption, HTTPX/Pydantic behavior or generator maintenance | [Python SDK](.agents/skills/inframeld-python-sdk/SKILL.md) |
-| Choosing test layers, dependency isolation or interpreting verification evidence | [Testing](.agents/skills/inframeld-testing/SKILL.md) |
+| Choosing test layers, preparing human acceptance, dependency isolation or interpreting verification evidence | [Testing](.agents/skills/inframeld-testing/SKILL.md) |
 
 Use the client's skill invocation mechanism when available. If discovery misses a skill, read its linked SKILL.md directly, for example through `$inframeld-pipelines`. Actually read the relevant body and reference. Briefly identify a skill on first use. Follow specific neighboring guide sections when a dependency matters, adding another skill only when its broader context matters. Do not load all skills or every linked document for a small question. Unrelated styling/general programming needs no domain skill.
 

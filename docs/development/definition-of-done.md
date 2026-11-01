@@ -13,6 +13,14 @@ This is the shared completion contract for implementation tickets. A ticket adds
 
 Qualification tickets additionally record the tested artifact revisions, environment, failure-injection method, results and limitations. A failing gate remains open. Documenting the intended test is not passing it. Completed historical tickets are not reopened solely because this template was adopted.
 
+## Human-facing features
+
+Each human-facing feature in an active or new delivery has one linked human-qualification issue using the [maintained template](../../.github/ISSUE_TEMPLATE/human_qualification.md). Several PRs for the same delivery share that issue. Internal changes identify their supported journey or explain why separate human qualification is inapplicable. [Human qualification](../../.agents/skills/inframeld-testing/references/human-qualification.md) owns runnable setup, actions/expected results, engineering dry runs, human execution records and cleanup. An incomplete procedure or unavailable capability remains with engineering, not a person asked to discover the steps.
+
+Implementation acceptance, readiness for human testing and actual human acceptance are separate conclusions under the [delivery gates](../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md#separate-implementation-and-human-acceptance). A PR may merge under its accepted component boundary, but a full-feature issue retains its promised acceptance unless the human explicitly accepts a narrower scope or deferral. A qualification issue closes on actual accepted human results, not creation of a follow-up, automation or an engineering dry run. Preserve historical evidence and already approved deferrals. Do not introduce cyclic dependencies by requiring implementation-issue closure before testing delivered artifacts.
+
+## SDK qualification
+
 For SDK-affecting HTTP changes, follow the [shared endpoint and conformance workflow](../../.agents/skills/inframeld-sdks/references/shared-qualification.md). [ADR-0090](../adr/ADR-0090-qualify-sdks-with-shared-contract-scenarios.md) accepts scenarios and native bindings for every delivered operation, with required checks for selected SDKs. The unified SDK runner and operation-coverage gate are implemented. Automatic Linux checks cover applicable PRs, with macOS for generator and platform-sensitive process/browser/lifecycle changes, plus manual runs. Report actual platform execution separately, and configure external branch rules to require the SDK conformance aggregate.
 
 Use the [endpoint walkthrough](../../packages/sdk-tools/docs/adding-endpoint.md) to keep shared inputs and assertions beside each other. After explicit regeneration, run complete `pnpm sdk:verify`. Profile/case-filtered runs are partial local evidence. Review changed fields, exact status, native model constraints and independent backend observations even when operation coverage already passes.

@@ -1,6 +1,6 @@
 ---
 name: inframeld-testing
-description: Guides Inframeld test-layer selection, dependency isolation and verification evidence. Use for unit, contract or integration strategy and test-environment diagnosis. SDK generator conformance belongs to SDK skills.
+description: Choose Inframeld test boundaries and prepare human acceptance procedures. Use for test strategy, fixture isolation or verification evidence. SDK generator conformance belongs to SDK skills.
 ---
 
 # Inframeld Testing
@@ -28,6 +28,7 @@ An SDK test can additionally show that the generated client sent the right reque
 | Task | Read |
 | --- | --- |
 | Choose a test boundary, classify resources or assess assertions and doubles | [Test strategy](references/test-strategy.md) |
+| Prepare human acceptance cases, runnable instructions or execution records | [Human qualification](references/human-qualification.md) and its maintained issue template |
 | Investigate fixture ownership, integration setup, cleanup failures or evidence claims | [Isolation and evidence](references/isolation-and-evidence.md) |
 | Run a focused check or integration stack | [Testing runbook](../../../docs/development/guides/testing.md) |
 | Explain CI relevance, not-applicable results or manual full verification | [CI selection and proof boundaries](../../../docs/development/guides/testing.md#ci-selection) |
