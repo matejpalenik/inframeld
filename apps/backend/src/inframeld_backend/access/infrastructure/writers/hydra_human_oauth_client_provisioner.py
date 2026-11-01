@@ -1,5 +1,6 @@
 import asyncio
 import math
+from hashlib import sha256
 from json import JSONDecodeError
 from threading import Lock
 from time import monotonic
@@ -25,6 +26,7 @@ from inframeld_backend.access.application.protocols.human_oauth_client_provision
     HumanOAuthClientProvisioner,
 )
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
+from inframeld_backend.access.domain.value_objects.oauth_issuer import OAuthIssuer
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -69,7 +71,7 @@ class HydraHumanOAuthClientProvisioner(HumanOAuthClientProvisioner):
 
     @override
     async def ensure_client(
-        self, *, api_audience: HumanAPIAudience, timeout_seconds: float
+        self, *, issuer: OAuthIssuer, api_audience: HumanAPIAudience, timeout_seconds: float
     ) -> HumanOAuthClientProvisioningOutcome:
         if (
             isinstance(timeout_seconds, bool)
@@ -83,6 +85,7 @@ class HydraHumanOAuthClientProvisioner(HumanOAuthClientProvisioner):
                 return await asyncio.to_thread(
                     self._ensure,
                     api_audience,
+                    issuer,
                     state,
                 )
         except ApiException:
@@ -117,14 +120,16 @@ class HydraHumanOAuthClientProvisioner(HumanOAuthClientProvisioner):
             ) from None
 
     @staticmethod
-    def _profile(audience: HumanAPIAudience) -> OAuth2Client:
+    def _profile(audience: HumanAPIAudience, issuer: OAuthIssuer) -> OAuth2Client:
+        issuer_digest = sha256(issuer.value.encode("utf-8")).hexdigest()
+
         return OAuth2Client(
             client_id="inframeld-cli",
             client_name="Inframeld CLI",
             token_endpoint_auth_method="none",
             grant_types=["authorization_code", "refresh_token"],
             response_types=["code"],
-            redirect_uris=["http://127.0.0.1/oauth/callback"],
+            redirect_uris=[f"http://127.0.0.1/oauth/callback/{issuer_digest}"],
             scope="openid offline_access inframeld:api",
             audience=[audience.value],
             subject_type="public",
@@ -150,7 +155,7 @@ class HydraHumanOAuthClientProvisioner(HumanOAuthClientProvisioner):
         return changes
 
     def _ensure(
-        self, audience: HumanAPIAudience, state: _ProvisioningCallState
+        self, audience: HumanAPIAudience, issuer: OAuthIssuer, state: _ProvisioningCallState
     ) -> HumanOAuthClientProvisioningOutcome:
         def read() -> OAuth2Client | None:
             try:
@@ -164,7 +169,7 @@ class HydraHumanOAuthClientProvisioner(HumanOAuthClientProvisioner):
                 raise DependencyUnavailableError()
             return response
 
-        desired = self._profile(audience)
+        desired = self._profile(audience, issuer)
         current = read()
         if current is None:
             budget = state.admit_write()

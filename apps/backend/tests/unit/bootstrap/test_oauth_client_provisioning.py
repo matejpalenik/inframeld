@@ -56,7 +56,9 @@ def test_matching_client_returns_json_without_application_database_settings(
         token_endpoint_auth_method="none",
         grant_types=["authorization_code", "refresh_token"],
         response_types=["code"],
-        redirect_uris=["http://127.0.0.1/oauth/callback"],
+        redirect_uris=[
+            "http://127.0.0.1/oauth/callback/f543c294a7fe6692da27b201052d7bc2feba8313ad3edd0f65901754eebe09d6"
+        ],
         scope="openid offline_access inframeld:api",
         audience=["https://api.test"],
         subject_type="public",

@@ -18,6 +18,7 @@ import httpx2
 import pytest
 from ory_hydra_client import ApiClient, Configuration, OAuth2Api
 from ory_hydra_client.exceptions import ApiException
+from ory_hydra_client.models.accept_o_auth2_consent_request import AcceptOAuth2ConsentRequest
 from ory_hydra_client.models.json_patch import JsonPatch
 from ory_hydra_client.models.o_auth2_client import OAuth2Client
 from pydantic import BaseModel, ConfigDict
@@ -38,6 +39,7 @@ from tests.support.kratos_browser import register_human
 from inframeld_backend.access.application.enums.human_oauth_client_provisioning_outcome import (
     HumanOAuthClientProvisioningOutcome,
 )
+from inframeld_backend.access.domain.value_objects.oauth_issuer import OAuthIssuer
 from inframeld_backend.access.infrastructure.writers.hydra_human_oauth_client_provisioner import (
     HydraHumanOAuthClientProvisioner,
 )
@@ -70,6 +72,12 @@ class ProvisionedProviderScenario:
     provisioner: HydraHumanOAuthClientProvisioner
     provider: HydraTestProvider
     endpoints: HydraTestEndpointsDTO
+    issuer: OAuthIssuer
+
+
+def _callback(issuer: OAuthIssuer, port: int) -> str:
+    digest = hashlib.sha256(issuer.value.encode("utf-8")).hexdigest()
+    return f"http://127.0.0.1:{port}/oauth/callback/{digest}"
 
 
 def _browser(public_url: str = KRATOS_PUBLIC_URL) -> httpx2.AsyncClient:
@@ -95,13 +103,20 @@ async def _provisioned(*, short: bool = False) -> AsyncGenerator[ProvisionedProv
             if status != 404:
                 raise
         provisioner = HydraHumanOAuthClientProvisioner(sdk)
+        issuer = OAuthIssuer(f"{endpoints.public_url}/")
         assert (
-            await provisioner.ensure_client(api_audience=API_AUDIENCE, timeout_seconds=5)
+            await provisioner.ensure_client(
+                issuer=issuer, api_audience=API_AUDIENCE, timeout_seconds=5
+            )
             is HumanOAuthClientProvisioningOutcome.CREATED
         )
         async with httpx2.AsyncClient(timeout=5, trust_env=False, follow_redirects=False) as http:
             yield ProvisionedProviderScenario(
-                sdk, provisioner, HydraTestProvider(http, endpoints=endpoints), endpoints
+                sdk,
+                provisioner,
+                HydraTestProvider(http, endpoints=endpoints, redirect_uri=_callback(issuer, 49152)),
+                endpoints,
+                issuer,
             )
     finally:
         try:
@@ -137,7 +152,7 @@ async def test_setup_reconciliation_preserves_logins_and_unrelated_client_metada
         try:
             assert (
                 await scenario.provisioner.ensure_client(
-                    api_audience=API_AUDIENCE, timeout_seconds=5
+                    issuer=scenario.issuer, api_audience=API_AUDIENCE, timeout_seconds=5
                 )
                 is HumanOAuthClientProvisioningOutcome.UNCHANGED
             )
@@ -155,7 +170,7 @@ async def test_setup_reconciliation_preserves_logins_and_unrelated_client_metada
             )
             assert (
                 await scenario.provisioner.ensure_client(
-                    api_audience=API_AUDIENCE, timeout_seconds=5
+                    issuer=scenario.issuer, api_audience=API_AUDIENCE, timeout_seconds=5
                 )
                 is HumanOAuthClientProvisioningOutcome.UPDATED
             )
@@ -180,6 +195,126 @@ async def test_setup_reconciliation_preserves_logins_and_unrelated_client_metada
 
 
 @pytest.mark.asyncio
+async def test_shared_callback_cutover_preserves_chains_and_original_pending_bindings() -> None:
+    """Patch a legacy registration with live chains, unexchanged codes and unfinished consent.
+
+    Administrative approval is test setup. It does not qualify the account UI or CLI.
+    Pinned Hydra retains a code's original URI but rejects an unchanged legacy consent resume.
+    """
+    legacy_callback = "http://127.0.0.1:49152/oauth/callback"
+    async with (
+        asyncio.timeout(30),
+        _provisioned() as scenario,
+        _browser() as alice_browser,
+        _browser() as bob_browser,
+        httpx2.AsyncClient(timeout=5, trust_env=False, follow_redirects=False) as http,
+    ):
+        await asyncio.to_thread(
+            scenario.sdk.patch_o_auth2_client,
+            id=CLIENT_ID,
+            json_patch=[
+                JsonPatch(
+                    op="add",
+                    path="/redirect_uris",
+                    value=["http://127.0.0.1/oauth/callback"],
+                )
+            ],
+            _request_timeout=5,
+        )
+        legacy = HydraTestProvider(http, endpoints=scenario.endpoints, redirect_uri=legacy_callback)
+        alice, bob = await register_human(alice_browser), await register_human(bob_browser)
+        alices = await legacy.issue_tokens(alice, browser=alice_browser, remember_login=True)
+        bobs = await legacy.issue_tokens(bob, browser=bob_browser, remember_login=True)
+        original_code = await legacy.approve_login_and_consent(await legacy.begin_login(alice))
+        rewritten_code = await legacy.approve_login_and_consent(await legacy.begin_login(alice))
+        pending_consent = await legacy.begin_native_consent(bob, browser=bob_browser)
+        original_consent = await asyncio.to_thread(
+            scenario.sdk.get_o_auth2_consent_request,
+            consent_challenge=pending_consent.challenge.get_secret_value(),
+            _request_timeout=5,
+        )
+        original_url = original_consent.request_url
+        assert original_url is not None
+        original_request = parse_qs(urlsplit(original_url).query)
+        assert original_request.get("redirect_uri") == [legacy_callback]
+
+        assert (
+            await scenario.provisioner.ensure_client(
+                issuer=scenario.issuer, api_audience=API_AUDIENCE, timeout_seconds=5
+            )
+            is HumanOAuthClientProvisioningOutcome.UPDATED
+        )
+        current = await asyncio.to_thread(
+            scenario.sdk.get_o_auth2_client, id=CLIENT_ID, _request_timeout=5
+        )
+        digest = hashlib.sha256(scenario.issuer.value.encode("utf-8")).hexdigest()
+        assert current.redirect_uris == [f"http://127.0.0.1/oauth/callback/{digest}"]
+
+        # Independent codes distinguish the original binding from a consumed wrong-URI attempt.
+        assert (
+            await legacy.exchange_authorization_code(
+                rewritten_code, redirect_uri=_callback(scenario.issuer, 49152)
+            )
+            is None
+        )
+        retained_tokens = await legacy.exchange_authorization_code(original_code)
+        assert retained_tokens is not None, "The pending original-URI code was rejected."
+        assert await legacy.token_is_active(retained_tokens.access_token)
+        retained_consent = await asyncio.to_thread(
+            scenario.sdk.get_o_auth2_consent_request,
+            consent_challenge=pending_consent.challenge.get_secret_value(),
+            _request_timeout=5,
+        )
+        retained_url = retained_consent.request_url
+        assert retained_url is not None
+        retained_request = parse_qs(urlsplit(retained_url).query)
+        assert retained_request.get("redirect_uri") == [legacy_callback]
+        for parameter in ("state", "code_challenge"):
+            original = original_request.get(parameter, [])
+            retained = retained_request.get(parameter, [])
+            assert len(original) == len(retained) == 1
+            matches = secrets.compare_digest(original[0], retained[0])
+            assert matches, "Pending consent's original binding changed."
+        assert retained_consent.subject == bob.subject.value
+
+        accepted = await asyncio.to_thread(
+            scenario.sdk.accept_o_auth2_consent_request,
+            consent_challenge=pending_consent.challenge.get_secret_value(),
+            accept_o_auth2_consent_request=AcceptOAuth2ConsentRequest(
+                grant_scope=["inframeld:api", "offline_access"],
+                grant_access_token_audience=[API_AUDIENCE.value],
+                remember=False,
+            ),
+            _request_timeout=5,
+        )
+        continuation = accepted.redirect_to
+        parsed_continuation = urlsplit(continuation)
+        assert (
+            f"{parsed_continuation.scheme}://{parsed_continuation.netloc}"
+            == scenario.endpoints.public_url
+        )
+        assert parsed_continuation.path == "/oauth2/auth"
+        assert parse_qs(parsed_continuation.query).get("redirect_uri") == [legacy_callback]
+
+        resumed = await bob_browser.get(continuation)
+        assert resumed.status_code == 302
+        error_location = urlsplit(resumed.headers.get("location", ""))
+        assert f"{error_location.scheme}://{error_location.netloc}" == scenario.endpoints.public_url
+        assert error_location.path == "/oauth2/fallbacks/error"
+        error_parameters = parse_qs(error_location.query)
+        assert error_parameters.get("error") == ["invalid_request"]
+        assert "code" not in error_parameters
+
+        for tokens in (alices, bobs):
+            assert await scenario.provider.token_is_active(tokens.access_token)
+            assert await scenario.provider.refresh_tokens(tokens) is not None
+        assert await scenario.provider.login_can_skip(alice_browser)
+        assert await scenario.provider.login_can_skip(bob_browser)
+        new_tokens = await scenario.provider.issue_tokens(alice)
+        assert await scenario.provider.token_is_active(new_tokens.access_token)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("port", [49152, 52731])
 async def test_registered_loopback_callback_accepts_the_cli_chosen_port(port: int) -> None:
     async with (
@@ -192,7 +327,7 @@ async def test_registered_loopback_callback_accepts_the_cli_chosen_port(port: in
         provider = HydraTestProvider(
             http,
             endpoints=scenario.endpoints,
-            redirect_uri=f"http://127.0.0.1:{port}/oauth/callback",
+            redirect_uri=_callback(scenario.issuer, port),
         )
         tokens = await provider.issue_tokens(alice)
         assert await provider.token_is_active(tokens.access_token)
@@ -207,7 +342,7 @@ async def test_exchange_requires_the_same_callback_used_for_authorization() -> N
         )
         assert (
             await scenario.provider.exchange_authorization_code(
-                code, redirect_uri="http://127.0.0.1:52731/oauth/callback"
+                code, redirect_uri=_callback(scenario.issuer, 52731)
             )
             is None
         )
@@ -215,24 +350,29 @@ async def test_exchange_requires_the_same_callback_used_for_authorization() -> N
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "redirect",
+    "redirect_template",
     [
-        "http://localhost:49152/oauth/callback",
-        "http://127.0.0.2:49152/oauth/callback",
-        "http://[::1]:49152/oauth/callback",
+        "http://localhost:49152{path}",
+        "http://127.0.0.2:49152{path}",
+        "http://[::1]:49152{path}",
         "http://127.0.0.1:49152/wrong",
-        "https://outside.test/oauth/callback",
-        "http://127.0.0.1:49152/oauth/callback?extra=1",
-        "http://127.0.0.1:49152/oauth/callback#fragment",
-        "https://127.0.0.1:49152/oauth/callback",
+        "http://127.0.0.1:49152/oauth/callback",
+        "http://127.0.0.1:49152/oauth/callback/" + "0" * 64,
+        "https://outside.test{path}",
+        "http://127.0.0.1:49152{path}?extra=1",
+        "http://127.0.0.1:49152{path}#fragment",
+        "https://127.0.0.1:49152{path}",
     ],
 )
-async def test_registration_rejects_unsupported_callback_hosts_and_paths(redirect: str) -> None:
+async def test_registration_rejects_unsupported_callback_hosts_and_paths(
+    redirect_template: str,
+) -> None:
     async with (
         asyncio.timeout(30),
         _provisioned() as scenario,
         httpx2.AsyncClient(timeout=5, trust_env=False, follow_redirects=False) as http,
     ):
+        redirect = redirect_template.format(path=urlsplit(_callback(scenario.issuer, 49152)).path)
         verifier = secrets.token_urlsafe(48)
         challenge = (
             base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
