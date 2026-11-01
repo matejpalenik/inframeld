@@ -444,13 +444,17 @@ async function controlledOwner(
   context: TestContext,
   scenario: string,
   run: (trace: string, closed: () => Promise<void>) => Promise<void>,
+  spawn: (
+    program: string,
+    args: readonly string[],
+    options: SpawnOptions,
+  ) => ReturnType<typeof childProcess.spawn> = childProcess.spawn,
 ): Promise<void> {
   const work = await mkdtemp(join(tmpdir(), "sdk-owner-protocol-"));
   const trace = join(work, "trace");
   const owner = fileURLToPath(
     new URL("../../src/system/process_owner.py", import.meta.url),
   );
-  const spawn = childProcess.spawn;
   let closed: Promise<void> | undefined;
   let deadline = 0;
   context.mock.method(childProcess, "spawn", ((
@@ -486,7 +490,7 @@ async function controlledOwner(
       void closed.catch(() => {});
     }
     return helper;
-  }) as typeof spawn);
+  }) as typeof childProcess.spawn);
   syncBuiltinESMExports();
   let waiting: Promise<void> | undefined;
   const waitForClose = () => {
@@ -549,21 +553,21 @@ test("controlled owner waits for actual helper close before removing fixture wor
     if (event === "close") observing();
     return once.call(helper, event, listener);
   }) as typeof helper.once;
-  context.mock.method(
-    childProcess,
-    "spawn",
+  let trace = "";
+  const running = controlledOwner(
+    context,
+    "refuse",
+    async (path) => {
+      trace = path;
+      childProcess.spawn("unused", [
+        fileURLToPath(
+          new URL("../../src/system/process_owner.py", import.meta.url),
+        ),
+      ]);
+      await writeFile(trace, "owned");
+    },
     () => helper as unknown as ReturnType<typeof childProcess.spawn>,
   );
-  let trace = "";
-  const running = controlledOwner(context, "refuse", async (path) => {
-    trace = path;
-    childProcess.spawn("unused", [
-      fileURLToPath(
-        new URL("../../src/system/process_owner.py", import.meta.url),
-      ),
-    ]);
-    await writeFile(trace, "owned");
-  });
   void running.catch(() => {});
   try {
     assert.equal(
@@ -585,11 +589,6 @@ test("controlled owner waits for actual helper close before removing fixture wor
 
 test("controlled owner shares one expired custody outcome with its finalizer", async (context) => {
   const helper = new EventEmitter();
-  context.mock.method(
-    childProcess,
-    "spawn",
-    () => helper as unknown as ReturnType<typeof childProcess.spawn>,
-  );
   let now = 0;
   context.mock.method(performance, "now", () => now);
   let trace = "",
@@ -597,24 +596,29 @@ test("controlled owner shares one expired custody outcome with its finalizer", a
   let wait!: () => Promise<void>;
   try {
     await assert.rejects(
-      controlledOwner(context, "refuse", async (path, closed) => {
-        trace = path;
-        wait = closed;
-        await closed();
-        childProcess.spawn("unused", [
-          fileURLToPath(
-            new URL("../../src/system/process_owner.py", import.meta.url),
-          ),
-        ]);
-        await writeFile(trace, "retained");
-        now = 4001;
-        try {
+      controlledOwner(
+        context,
+        "refuse",
+        async (path, closed) => {
+          trace = path;
+          wait = closed;
           await closed();
-        } catch (error) {
-          first = error;
-          throw error;
-        }
-      }),
+          childProcess.spawn("unused", [
+            fileURLToPath(
+              new URL("../../src/system/process_owner.py", import.meta.url),
+            ),
+          ]);
+          await writeFile(trace, "retained");
+          now = 4001;
+          try {
+            await closed();
+          } catch (error) {
+            first = error;
+            throw error;
+          }
+        },
+        () => helper as unknown as ReturnType<typeof childProcess.spawn>,
+      ),
       (error: unknown) => {
         assert.ok(first instanceof Error);
         assert.equal(
@@ -637,28 +641,28 @@ test("controlled owner shares one expired custody outcome with its finalizer", a
 test("controlled owner preserves callback and distinct custody failures and retains work", async (context) => {
   const helper = new EventEmitter();
   helper.on("error", () => {});
-  context.mock.method(
-    childProcess,
-    "spawn",
-    () => helper as unknown as ReturnType<typeof childProcess.spawn>,
-  );
   const original = new Error("fixture assertion"),
     custody = new Error("fixture close failed");
   let trace = "";
   try {
     await assert.rejects(
-      controlledOwner(context, "refuse", async (path) => {
-        trace = path;
-        childProcess.spawn("unused", [
-          fileURLToPath(
-            new URL("../../src/system/process_owner.py", import.meta.url),
-          ),
-        ]);
-        await writeFile(trace, "retained");
-        helper.emit("error", custody);
-        helper.emit("close", 1, null);
-        throw original;
-      }),
+      controlledOwner(
+        context,
+        "refuse",
+        async (path) => {
+          trace = path;
+          childProcess.spawn("unused", [
+            fileURLToPath(
+              new URL("../../src/system/process_owner.py", import.meta.url),
+            ),
+          ]);
+          await writeFile(trace, "retained");
+          helper.emit("error", custody);
+          helper.emit("close", 1, null);
+          throw original;
+        },
+        () => helper as unknown as ReturnType<typeof childProcess.spawn>,
+      ),
       (error: unknown) => {
         assert.ok(error instanceof AggregateError);
         assert.deepEqual(error.errors, [original, custody]);
