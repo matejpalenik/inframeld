@@ -69,6 +69,31 @@ pub async fn observe(
                 .await
         ),
         "getHealth" => observed!(client.get_health().await),
+        "resolveProjectName" => observed!(
+            client
+                .resolve_project_name(request.path.as_ref().unwrap()["name"].as_str().unwrap())
+                .await
+        ),
+        "getProjectMetadata" => observed!(
+            client
+                .get_project_metadata(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap()
+                )
+                .await
+        ),
+        "updateProjectMetadata" => observed!(
+            client
+                .update_project_metadata(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
         "getCurrentSession" => observed!(client.get_current_session().await),
         "inspectHumanOAuthConsent" => observed!(
             client

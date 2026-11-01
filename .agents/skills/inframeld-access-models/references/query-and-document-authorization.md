@@ -156,10 +156,12 @@ A permission's **scope** is the exact installation, project, group, or resource 
 | Target | Named actions or authority |
 | --- | --- |
 | Installation organization | Admit users, Suspend users, Restore users, Create projects. |
-| Project | [Seventeen initial creator actions](actions-and-initial-grants.md#initial-project-grants), including Inspect feedback and named resource-creation actions. |
+| Project | [Eighteen initial creator actions](actions-and-initial-grants.md#initial-project-grants), including Inspect feedback and named resource-creation actions. |
 | Individual Pipeline | Query, Inspect query traces, Build, View configuration, Edit configuration, Delete, six Evaluation operations and human case-audience administration. |
 | Individual Deployment | Query, Inspect query traces, Manage releases, View configuration, Edit configuration, Delete, own `feedback:write`. |
 | Access group | Add documents, Update documents, Delete documents. Manager assignment is separate from these grants. |
 | Individual application account | Issue application keys, Revoke application keys, Delete application account. |
+
+The eighteenth Project action is human-only `edit-project-metadata` for exact-Project Name/Display-name changes and first selector allocation. It supplies no Query, document, membership or provisioning authority. [The approved metadata decision](decision-project-metadata-authority.md) owns its current checks and restricted host repair. These #120 consumers remain unfinished here. Automatic creator seeding remains #223/#27 selected design.
 
 The [fixed capability catalogue](actions-and-initial-grants.md#capability-catalogue) records reviewed identifiers, targets and principal eligibility, including Collection, Source, connection and profile actions. Basic visibility follows [section 4](memberships-groups-and-handover.md#sharing), rather than a universal View permission.

@@ -18,6 +18,9 @@ const BINDINGS: &[&str] = &[
     "assignProjectUseOnlyGrant",
     "lookupOriginalOperation",
     "getDeletionStatus",
+    "resolveProjectName",
+    "getProjectMetadata",
+    "updateProjectMetadata",
     "contractFixturePayload",
     "contractFixturePage",
     "contractFixtureUpload",
@@ -71,6 +74,9 @@ async fn main() {
                 | "assignProjectUseOnlyGrant"
                 | "lookupOriginalOperation"
                 | "getDeletionStatus"
+                | "resolveProjectName"
+                | "getProjectMetadata"
+                | "updateProjectMetadata"
         ) {
             if let Some(token) = call
                 .headers
@@ -82,7 +88,10 @@ async fn main() {
             }
         }
         // This header is a generated operation argument, not a default header.
-        if call.operation == "assignProjectUseOnlyGrant" {
+        if matches!(
+            call.operation.as_str(),
+            "assignProjectUseOnlyGrant" | "updateProjectMetadata"
+        ) {
             additional_headers.remove("Idempotency-Key");
         }
         client = client.with_headers(additional_headers);

@@ -2,7 +2,7 @@
 
 Alice submits a grant for Bob but loses its acknowledgment. She retained the original request key, installation, Organization, Project and authority guard. `POST /v1/operations/lookup` reads the backend's retained admission metadata without assigning the grant again. The [owning contract](../../../.agents/skills/inframeld-application-contracts/references/operation-recovery-contracts.md#original-request-lookup) defines authority and unknown outcomes.
 
-The HTTP router, Access authorization and PostgreSQL projection are implemented. The delivered grant route is the complete business example. Shared Project admission and Organization reservation support also have lookup paths, but do not deliver another business endpoint. Native-client qualification and real persistence verification remain distinct checks. No CLI lookup command or local recovery-hint runtime is delivered here.
+The HTTP router, Access authorization and PostgreSQL projection are implemented. The delivered grant and Project metadata routes provide complete business operations. Shared admission and reservation lookup support does not imply other domain endpoints. Native-client qualification and real persistence verification remain distinct checks. No CLI lookup command or local recovery-hint runtime is delivered here.
 
 ## Retain the original request context
 
@@ -29,6 +29,8 @@ The [lookup request model](../../../apps/backend/src/inframeld_backend/shared/ht
 
 Send that JSON to the configured backend's `/v1/operations/lookup` with `Content-Type: application/json` and the existing human credential. A browser-cookie request also needs its trusted `Origin` and `X-Inframeld-CSRF: 1`. Human bearer authentication follows the existing credential contract. The original key belongs in the body, and lookup accepts no command payload or fingerprint. The received body is limited to 32 KiB. Unknown fields, duplicate JSON keys and invalid guard combinations fail validation.
 
+For a Project metadata PATCH, retain canonical route `/v1/projects/{project_id}/metadata`, family `project_action_use` and action `edit-project-metadata`. Current exact metadata authority still applies before lookup. The [naming guide](../../../apps/docs/src/app/guides/name-and-rename-project/page.mdx#handle-a-failure-or-lost-acknowledgment) explains same-key write recovery. Metadata lookup does not repeat the change or return current Project fields.
+
 Generic Project lookup uses `project_action_use` and the accepted original Project action. Organization lookup uses `organization_action_use`, its original Organization action and explicit `projectId: null`. Preserve the original method and canonical logical route exactly. Today's grants, defaults or aliases cannot reconstruct missing original meaning.
 
 ## Interpret the observation
@@ -43,7 +45,7 @@ Access checks the expected guard from current facts before reservation history i
 | `recovery_required` | The original operation requires recovery without an established asynchronous admission |
 | `unresolved` | No retained authoritative match can be established |
 
-Unresolved has exactly one field, `outcome`. It does not explain whether history was absent, expired, insufficiently bound or mismatched. It does not establish that nothing happened. A retained asynchronous admission remains accepted regardless of a later job state. The current shared record stores no job reference, so lookup cannot supply a job URL or current progress.
+Unresolved has exactly one field, `outcome`. It does not explain whether history was absent, expired, insufficiently bound or mismatched. It does not establish that nothing happened. A retained asynchronous admission remains accepted regardless of a later job state. The public lookup response still reports an unknown job reference and supplies no job URL or current progress.
 
 Invalid input, missing/rejected authentication, hidden scope, denied current authority and unavailable dependencies remain safe problem responses. A timeout or disconnect is a failed observation. Neither Unresolved nor a failed observation authorizes resubmission, a replacement operation or a provider call. Repeated successful reads preserve the original expiry.
 

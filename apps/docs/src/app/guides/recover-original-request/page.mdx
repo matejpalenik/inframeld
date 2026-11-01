@@ -67,6 +67,8 @@ For other supported operations, preserve the original authority meaning:
 | Generic Project operation | `project_action_use`       | Original Project action      | Original Project UUID |
 | Organization operation    | `organization_action_use`  | Original Organization action | Explicit `null`       |
 
+For a Project metadata change, retain method `PATCH`, canonical route `/v1/projects/{project_id}/metadata`, family `project_action_use` and action `edit-project-metadata`. [Name and rename an existing Project](/guides/name-and-rename-project) explains the write and recovery path. Lookup observes its retained operation metadata. A separate Project metadata GET reports current fields.
+
 A grant lookup requires `project_grant_read`. The weaker `project_action_use` guard cannot replace it. Lookup checks your current authority before searching retained history. It does not repeat the recipient's eligibility check from the original assignment.
 
 ## Send the lookup

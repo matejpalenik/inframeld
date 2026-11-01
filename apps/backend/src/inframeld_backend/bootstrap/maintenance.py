@@ -11,11 +11,17 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from structlog.contextvars import bound_contextvars
 
+from inframeld_backend.access.application.commands.repair_project_metadata_authority_command import (
+    RepairProjectMetadataAuthorityCommand,
+)
 from inframeld_backend.access.application.commands.resume_identity_recovery_cleanup_command import (
     ResumeIdentityRecoveryCleanupCommand,
 )
 from inframeld_backend.access.application.enums.recovery_maintenance_error_code import (
     RecoveryMaintenanceErrorCode,
+)
+from inframeld_backend.access.application.errors.project_metadata_maintenance_error import (
+    ProjectMetadataMaintenanceError,
 )
 from inframeld_backend.access.application.errors.recovery_maintenance_error import (
     RecoveryMaintenanceError,
@@ -23,9 +29,13 @@ from inframeld_backend.access.application.errors.recovery_maintenance_error impo
 from inframeld_backend.access.application.services.identity_recovery_cleanup_resume_service import (
     IdentityRecoveryCleanupResumeService,
 )
+from inframeld_backend.access.cli.errors.project_metadata_maintenance_input_error import (
+    ProjectMetadataMaintenanceInputError,
+)
 from inframeld_backend.access.cli.errors.recovery_maintenance_input_error import (
     RecoveryMaintenanceInputError,
 )
+from inframeld_backend.access.cli.maintenance_cli import MaintenanceCli
 from inframeld_backend.access.cli.recovery_maintenance_cli import RecoveryMaintenanceCli
 from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_cleanup_resume_facts_reader import (
     PostgresIdentityRecoveryCleanupResumeFactsReader,
@@ -41,6 +51,12 @@ from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_
 )
 from inframeld_backend.bootstrap.maintenance_application_settings import (
     MaintenanceApplicationSettings,
+)
+from inframeld_backend.bootstrap.project_metadata_maintenance_settings import (
+    ProjectMetadataMaintenanceSettings,
+)
+from inframeld_backend.bootstrap.project_metadata_repair_composition import (
+    execute_project_metadata_repair,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
@@ -58,8 +74,13 @@ from inframeld_backend.shared.infrastructure.resources.database import Database
 
 
 async def _execute(
-    command: ResumeIdentityRecoveryCleanupCommand, settings: MaintenanceApplicationSettings
+    command: ResumeIdentityRecoveryCleanupCommand | RepairProjectMetadataAuthorityCommand,
+    settings: MaintenanceApplicationSettings,
 ) -> dict[str, object]:
+    if isinstance(command, RepairProjectMetadataAuthorityCommand):
+        if not isinstance(settings, ProjectMetadataMaintenanceSettings):
+            raise RuntimeError("The metadata repair configuration is missing.")
+        return await execute_project_metadata_repair(command, settings)
     database = Database(settings.database)
     try:
         await database.startup()
@@ -103,10 +124,14 @@ def main(arguments: Sequence[str] | None = None) -> int:
     try:
         if arguments:
             raise ValueError("Unsupported arguments.")
-        command = RecoveryMaintenanceCli.read(sys.stdin.buffer)
+        command = MaintenanceCli.read(sys.stdin.buffer)
         error["operationId"] = command.operation_id.value
-        settings = MaintenanceApplicationSettings.model_validate({})
-    except RecoveryMaintenanceInputError as failure:
+        settings = (
+            ProjectMetadataMaintenanceSettings.model_validate({})
+            if isinstance(command, RepairProjectMetadataAuthorityCommand)
+            else MaintenanceApplicationSettings.model_validate({})
+        )
+    except (RecoveryMaintenanceInputError, ProjectMetadataMaintenanceInputError) as failure:
         if failure.operation_id is not None:
             error["operationId"] = failure.operation_id.value
         return _emit(error | {"code": "invalid_input"}, 2)
@@ -116,7 +141,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     configure_logging(level=settings.log_level, log_format=settings.log_format, stream=sys.stderr)
     try:
         response = asyncio.run(_execute(command, settings))
-    except RecoveryMaintenanceError as failure:
+    except (RecoveryMaintenanceError, ProjectMetadataMaintenanceError) as failure:
         code = failure.code.value
     except (
         DependencyUnavailableError,

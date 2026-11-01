@@ -189,3 +189,7 @@ For contributor routes, start with [developer documentation](../development/READ
 - [ADR-0121: Qualify a small single-host operating envelope](ADR-0121-qualify-a-small-single-host-operating-envelope.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
 
 - [ADR-0122: Qualify cold-backup recovery and explicit maintenance objectives](ADR-0122-qualify-cold-backup-recovery-and-explicit-maintenance-objectives.md). Accepted on 2026-10-29 under the developer's decision authority. Implementation and qualification remain separate.
+
+- [ADR-0124: Authorize Project metadata changes explicitly](ADR-0124-authorize-project-metadata-changes-explicitly.md). Accepted on 2026-10-30. Partially supersedes ADR-0059’s Project creator list/count with the eighteenth human-only action, selects exact naming/legacy compatibility and the narrow host-repair delivery boundary. Implementation and qualification remain unfinished.
+
+- [ADR-0125: Bind human CLI callbacks to their issuer](ADR-0125-bind-human-cli-callbacks-to-their-issuer.md). Accepted on 2026-10-30. Narrowly supersedes the shared callback-path/response-association contract under ADR-0053. Exact issuer hashing, restricted deployment prerequisites and cutover are selected, with implementation and qualification unfinished.

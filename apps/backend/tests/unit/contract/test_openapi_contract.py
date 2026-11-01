@@ -55,6 +55,9 @@ def test_openapi_contract_matches_application() -> None:
         ("/v1/session", "get"),
         ("/v1/projects/{project_id}/grants", "post"),
         ("/v1/operations/lookup", "post"),
+        ("/v1/projects/{project_id}/metadata", "get"),
+        ("/v1/projects/{project_id}/metadata", "patch"),
+        ("/v1/projects/by-name/{name}", "get"),
     ],
 )
 def test_human_routes_declare_cookie_or_bearer_and_authentication_errors(
@@ -373,3 +376,27 @@ def test_deletion_status_contract_preserves_human_read_and_explicit_unknowns() -
     assert set(unresolved["required"]) == set(unresolved["properties"]) == {"outcome"}
     for status in ("400", "401", "403", "422", "500", "503"):
         assert set(operation["responses"][status]["content"]) == {"application/problem+json"}
+
+
+def test_project_metadata_contract_keeps_optional_replacements_nonnullable_and_legacy_responses_unbounded() -> (
+    None
+):
+    schema = create_app().openapi()
+    request = schema["components"]["schemas"]["ProjectMetadataUpdateRequest"]
+    assert request["additionalProperties"] is False
+    assert request["required"] == ["expectedMetadataRevision"]
+    assert request["properties"]["name"]["type"] == "string"
+    assert request["properties"]["name"]["maxLength"] == 63
+    assert request["properties"]["displayName"]["type"] == "string"
+    assert request["properties"]["displayName"]["maxLength"] == 128
+    response = schema["components"]["schemas"]["ProjectMetadataResponse"]
+    assert "maxLength" not in response["properties"]["displayName"]
+    assert any(part.get("type") == "null" for part in response["properties"]["name"]["anyOf"])
+
+
+def test_metadata_patch_declares_its_actual_framing_problems() -> None:
+    operation = create_app().openapi()["paths"]["/v1/projects/{project_id}/metadata"]["patch"]
+    for status in ("413", "415"):
+        assert operation["responses"][status]["content"] == {
+            "application/problem+json": {"schema": {"$ref": "#/components/schemas/ProblemDetails"}}
+        }

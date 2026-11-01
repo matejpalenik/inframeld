@@ -1965,3 +1965,135 @@ pub struct HumanOAuthConsentDecisionResponse {
     #[serde(rename = "redirectTo")]
     pub redirect_to: String,
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectMetadataChangeResponse {
+    ///Stored presentation label, including retained legacy values.
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    ///Original replay deadline, unchanged by retries.
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Review revision for metadata changes, separate from permission revision.
+    #[serde(rename = "metadataRevision")]
+    pub metadata_revision: i64,
+    ///Exact current selector, or null until explicitly allocated.
+    #[serde(deserialize_with = "presence_serde::required_nullable")]
+    pub name: Option<String>,
+    ///Original operation identity for safe recovery.
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    ///Owning installation Organization.
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    ///Permanent Project identity, preserved through rename.
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectMetadataResponse {
+    ///Stored presentation label, including retained legacy values.
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    ///Review revision for metadata changes, separate from permission revision.
+    #[serde(rename = "metadataRevision")]
+    pub metadata_revision: i64,
+    ///Exact current selector, or null until explicitly allocated.
+    #[serde(deserialize_with = "presence_serde::required_nullable")]
+    pub name: Option<String>,
+    ///Owning installation Organization.
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    ///Permanent Project identity, preserved through rename.
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+///Omitted fields preserve stored values. Explicit null never clears either field.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectMetadataUpdateRequest {
+    ///New label in Unicode code points. Omit to preserve even an unrestricted legacy label.
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(
+        rename = "displayName",
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "presence_serde::optional_nonnull"
+    )]
+    pub display_name: Option<String>,
+    ///Metadata revision reviewed for this exact change.
+    ///Constraint: minimum=0, maximum=9223372036854775807
+    #[serde(rename = "expectedMetadataRevision")]
+    pub expected_metadata_revision: u64,
+    ///Explicit exact selector replacement. Omit to preserve the current selector.
+    ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "presence_serde::optional_nonnull"
+    )]
+    pub name: Option<String>,
+}
+impl ProjectMetadataUpdateRequest {
+    /// Construct this request with every required wire field.
+    pub fn new(expected_metadata_revision: u64) -> Self {
+        Self {
+            expected_metadata_revision,
+            display_name: None,
+            name: None,
+        }
+    }
+    /// Start a dependency-free builder with every required wire field.
+    pub fn builder(
+        expected_metadata_revision: u64,
+    ) -> ProjectMetadataUpdateRequestBuilder {
+        ProjectMetadataUpdateRequestBuilder::new(expected_metadata_revision)
+    }
+}
+/// Dependency-free builder for [`#struct_name`].
+#[derive(Debug, Clone)]
+#[must_use]
+pub struct ProjectMetadataUpdateRequestBuilder {
+    value: ProjectMetadataUpdateRequest,
+}
+impl ProjectMetadataUpdateRequestBuilder {
+    /// Start a builder with every required wire field.
+    pub fn new(expected_metadata_revision: u64) -> Self {
+        Self {
+            value: ProjectMetadataUpdateRequest::new(expected_metadata_revision),
+        }
+    }
+    #[doc = concat!("Set the optional `", "displayName", "` request field.")]
+    #[must_use]
+    pub fn display_name(mut self, display_name: String) -> Self {
+        self.value.display_name = Some(display_name);
+        self
+    }
+    #[doc = concat!("Set the optional `", "name", "` request field.")]
+    #[must_use]
+    pub fn name(mut self, name: String) -> Self {
+        self.value.name = Some(name);
+        self
+    }
+    /// Finish building the request model.
+    pub fn build(self) -> ProjectMetadataUpdateRequest {
+        self.value
+    }
+}
+///Expose the currently authorized Project identified by an exact scoped Name.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectNameResolutionResponse {
+    ///Stored presentation label, including retained legacy values.
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    ///Review revision for metadata changes, separate from permission revision.
+    #[serde(rename = "metadataRevision")]
+    pub metadata_revision: i64,
+    ///Exact current selector, or null until explicitly allocated.
+    #[serde(deserialize_with = "presence_serde::required_nullable")]
+    pub name: Option<String>,
+    ///Owning installation Organization.
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    ///Permanent Project identity, preserved through rename.
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}

@@ -22,6 +22,10 @@
       {
         "title": "Read retained deletion status",
         "href": "/guides/read-deletion-status"
+      },
+      {
+        "title": "Name and rename an existing Project",
+        "href": "/guides/name-and-rename-project"
       }
     ]
   }

@@ -53,6 +53,26 @@ const calls = {
     }),
   contractFixtureMedia: (client: Client, call: SdkCall) =>
     fixtures.contractFixtureMedia(options(client, call)),
+  resolveProjectName: (client: Client, call: SdkCall) =>
+    sdk.resolveProjectName({
+      ...options(client, call),
+      path: call.path as { name: string },
+    }),
+  getProjectMetadata: (client: Client, call: SdkCall) =>
+    sdk.getProjectMetadata({
+      ...options(client, call),
+      path: call.path as { project_id: string },
+    }),
+  updateProjectMetadata: (client: Client, call: SdkCall) =>
+    sdk.updateProjectMetadata({
+      ...options(client, call),
+      path: call.path as { project_id: string },
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.UpdateProjectMetadataData["body"],
+    }),
   getHealth: (client: Client, call: SdkCall) =>
     sdk.getHealth(options(client, call)),
   getCurrentSession: (client: Client, call: SdkCall) =>

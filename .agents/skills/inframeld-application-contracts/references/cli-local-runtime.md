@@ -43,7 +43,7 @@ A target named `local`, a private RFC1918 address, a hostname resolving to loopb
 | --- | --- |
 | Host CLI/browser to the managed local API, account UI and Ory public endpoints | HTTP permitted only at the runtime's exact configured loopback origins |
 | The managed stack's internal service calls | Private same-machine container-network HTTP is permitted where supported. No host publication of admin/storage services |
-| Desktop browser to the temporary CLI OAuth callback | HTTP on literal loopback and the registered `/oauth/callback` path. RFC 8252 exception, independently of local/remote target |
+| Desktop browser to the temporary CLI OAuth callback | HTTP on literal `127.0.0.1`, an ephemeral port and the exact issuer-bound `/oauth/callback/<digest>` path. [PD-ACCESS-07](../../inframeld-access-models/references/decision-human-cli-issuer-binding.md) owns binding and qualification, independently of local/remote target |
 | CLI/browser to remote, LAN-accessible or production public endpoints | Certificate-verified HTTPS. Private IPs and environment labels do not waive it |
 | External model/identity-provider traffic | Preserve verified HTTPS and existing provider policy. Local HTTP does not authorize secret-bearing HTTP to a provider |
 

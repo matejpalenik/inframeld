@@ -1,0 +1,287 @@
+export const pageMetadata = {
+  title: "Name and rename an existing Project",
+  description:
+    "Choose an exact Project selector and change its display label while preserving its permanent ID.",
+}
+
+# Name and rename an existing Project
+
+Give an existing Project a command-friendly Name, or change its display label, while scripts and saved relationships keep using the same permanent ID. This guide uses the HTTP API and generated SDKs. There is no CLI naming or Project creation command.
+
+## Before you begin
+
+You need the backend URL, an existing Project UUID and a current human credential for that installation. Reads require current Project visibility and membership. Changes also require the exact human-only `edit-project-metadata` permission on that Project. A Name or a remembered ID supplies no authority.
+
+These examples assume you already have a human bearer token. The repository does not yet provide a complete, qualified login/account-UI journey for acquiring one. Configuring the OAuth client alone does not sign you in. Existing Projects receive no automatic metadata grant. Read the [conditional operator prerequisites](https://github.com/matejpalenik/inframeld/blob/main/docs/development/operations/project-metadata-repair.md) before considering host repair.
+
+Set these variables in the terminal where you will run the examples. Replace the URL, token and Project ID with your installation's values. Use a URL without a trailing slash. Keep the key with the original request file before sending a change.
+
+```shell
+export INFRAMELD_URL='https://YOUR_INFRAMELD_BACKEND'
+export INFRAMELD_TOKEN='YOUR_CURRENT_HUMAN_BEARER_TOKEN'
+export PROJECT_ID='00000000-0000-4000-8000-000000000003'
+export PROJECT_METADATA_KEY='project-support-name-1'
+```
+
+SDK alternatives require the locally built [Python](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-python#build-and-use-locally), [TypeScript](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-typescript#build-and-use-locally), or [Rust](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-rust#build-and-use-locally) package in a separate example project. The SDKs are not published to package registries.
+
+## Read the current metadata
+
+Run this command from your example project's working directory:
+
+```shell
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/metadata" \
+  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header 'Accept: application/json'
+```
+
+A successful read returns `projectId`, `organizationId`, `name`, `displayName` and `metadataRevision`. Keep the permanent `projectId` for later requests. A `null` Name means that no selector has been allocated yet. It does not make the Project inaccessible by ID.
+
+For the next example, suppose the read shows an unallocated Name and `metadataRevision: 0`. Use your actual reviewed revision instead of `0` if it differs. The metadata revision detects competing metadata changes. It is separate from the Access revision used for permission changes and operator repair.
+
+## Choose an exact Name
+
+Names contain 1–63 lowercase ASCII letters, digits or hyphens, start with a letter and end with a letter or digit. `support`, `support-ops` and `production` are valid. There are no additional reserved words. Names are unique within the installation's Organization, including Projects you cannot see.
+
+Display names are non-unique labels. New replacements contain 1–128 Unicode code points, are nonblank and have no surrounding whitespace, controls, surrogates or line/paragraph separators. A displayed character can contain several code points. Changing a label does not change the Name or permanent ID.
+
+Suggestions are previews only. A label such as Équipe Support can suggest `equipe-support`, but does not allocate it. Allocating a Name requires your explicit value. Lookup never lowercases, trims, searches by display label or chooses a near match. An unavailable or invalid choice requires another explicit review, not an automatic suffix or truncation.
+
+Save the following as the complete new file `project-name-change.json` in your example project. This allocates `support` while preserving the stored label:
+
+```json
+{
+  "expectedMetadataRevision": 0,
+  "name": "support"
+}
+```
+
+Omitting `displayName` preserves it exactly, even if a legacy label is long, blank or contains controls. Do not copy an invalid legacy label back as a replacement. Omitted `name` likewise preserves the current selector. Explicit `null` cannot clear either field, and a request must replace at least one field.
+
+## Send the reviewed change
+
+Choose one alternative. Each sends the same saved file and request key to `PATCH /v1/projects/{project_id}/metadata`. Keep both unchanged if the acknowledgment is lost.
+
+<CodeGroup>
+
+```shell
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PATCH \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/metadata" \
+  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header "Idempotency-Key: $PROJECT_METADATA_KEY" \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @project-name-change.json
+```
+
+```python
+# Complete new file: rename_project.py. Run with: python rename_project.py
+import asyncio
+import json
+import os
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.project_metadata_update_request import (
+    ProjectMetadataUpdateRequest,
+)
+
+
+async def main() -> None:
+    body = ProjectMetadataUpdateRequest.model_validate(
+        json.loads(Path("project-name-change.json").read_text(encoding="utf-8"))
+    )
+    configuration = Configuration(host=os.environ["INFRAMELD_URL"])
+    async with ApiClient(configuration) as client:
+        try:
+            response = await AccessApi(client).update_project_metadata_with_http_info(
+                project_id=UUID(os.environ["PROJECT_ID"]),
+                idempotency_key=os.environ["PROJECT_METADATA_KEY"],
+                project_metadata_update_request=body,
+                _headers={
+                    "Authorization": f"Bearer {os.environ['INFRAMELD_TOKEN']}"
+                },
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            print(f"Change could not be confirmed: HTTP {error.status}")
+            print(error.body)
+            print("Keep the original request file and key.")
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("No usable response. Keep the original request file and key.")
+            raise SystemExit(1) from error
+
+        print(f"HTTP {response.status_code}")
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+// Complete new file: rename-project.ts in an ESM example project.
+// With Node 26 and the locally built SDK installed, run: node rename-project.ts
+import { readFileSync } from "node:fs"
+import {
+  createClient,
+  updateProjectMetadata,
+  type ProjectMetadataUpdateRequest,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const key = process.env.PROJECT_METADATA_KEY
+if (!baseUrl || !token || !projectId || !key) {
+  throw new Error("Set the four environment variables from this guide")
+}
+
+const body: ProjectMetadataUpdateRequest = JSON.parse(
+  readFileSync("project-name-change.json", "utf8")
+)
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const result = await updateProjectMetadata({
+  client,
+  path: { project_id: projectId },
+  body,
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Idempotency-Key": key,
+  },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error) {
+  console.error("Change could not be confirmed:", result.error.kind)
+  console.error("HTTP status:", result.response?.status)
+  if (result.error.kind === "api") {
+    console.error(result.error.body)
+  } else {
+    console.error(result.error.message)
+  }
+  console.error("Keep the original request file and key.")
+  process.exitCode = 1
+} else if (result.data) {
+  console.log("HTTP", result.response?.status)
+  console.log(JSON.stringify(result.data, null, 2))
+} else {
+  throw new Error("No usable result. Keep the original request file and key.")
+}
+```
+
+```rust
+// Complete new file: src/main.rs in a separate Cargo project.
+// Add the locally built inframeld-sdk as a path dependency, plus:
+// serde_json = "1"
+// tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+// Run beside project-name-change.json with: cargo run
+use inframeld_sdk::{HttpClient, ProjectMetadataUpdateRequest};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let body: ProjectMetadataUpdateRequest =
+        serde_json::from_str(&std::fs::read_to_string("project-name-change.json")?)?;
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let project_id = std::env::var("PROJECT_ID")?;
+    let key = std::env::var("PROJECT_METADATA_KEY")?;
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    match client.update_project_metadata(project_id, key, body).await {
+        Ok(response) => {
+            println!("HTTP {}", response.status);
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+        }
+        Err(error) => {
+            if let Some(context) = error.api() {
+                eprintln!("Change could not be confirmed: HTTP {}", context.status);
+                eprintln!("{}", context.body);
+            } else {
+                eprintln!("No usable response: {error}");
+            }
+            eprintln!("Keep the original request file and key.");
+            return Err(error.into());
+        }
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+On HTTP `200`, inspect `projectId`, `name`, `displayName` and `metadataRevision`. The ID stays the same. An actual change advances the metadata revision. A same-value update need not advance it. `operationId` identifies the original operation, and `idempotencyExpiresAt` is its retained replay deadline. Replaying does not extend that deadline.
+
+A replay returns the original change result. Another authorized change may have happened since then, so use a separate metadata GET to inspect today's values.
+
+## Resolve the Name and keep the ID
+
+After allocation succeeds, resolve the exact Name:
+
+```shell
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/by-name/support" \
+  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header 'Accept: application/json'
+```
+
+The response contains the same permanent Project ID and currently permitted metadata. Save the ID for durable references. Display labels never select a Project. Resolution stays within the authenticated installation and Organization, with current visibility checks.
+
+## Rename or replace the label
+
+For a distinct, reviewed change, read the current metadata again. Save the complete new file `project-rename.json` below, replacing `1` with the revision you reviewed. Choose a new request key for this new operation:
+
+```json
+{
+  "expectedMetadataRevision": 1,
+  "name": "support-ops",
+  "displayName": "Support Operations"
+}
+```
+
+Send it from the same example directory:
+
+```shell
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PATCH \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/metadata" \
+  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header 'Idempotency-Key: project-support-rename-1' \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @project-rename.json
+```
+
+Name and Display name change atomically. A collision, stale revision, invalid replacement or revoked authority changes neither field. Both labels and Names can change while the Project ID and stored relationships remain fixed.
+
+After a successful rename from `support` to `support-ops`, the old selector stops with HTTP `404`. It never redirects or selects another Project. Inspect the original Project by its retained ID to find its current metadata under current authority. Retired Names cannot be allocated to a different Project.
+
+## Handle a failure or lost acknowledgment
+
+| Result                                             | Meaning and next action                                                                                                                                                                                         |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401`                                              | Supply a currently valid human credential for this installation.                                                                                                                                                |
+| `403`                                              | Current authority is insufficient. A known request key cannot bypass it.                                                                                                                                        |
+| `404`                                              | The Project is missing, hidden or unavailable through that selector. An authorized retired-name lookup directs you to the original ID. Do not guess another resource.                                           |
+| `409`                                              | Inspect the Problem Details. A Name may be unavailable, the reviewed revision may be stale, or the original key may have different or unfinished meaning. Review current state before a distinct new operation. |
+| `400` or `422`                                     | Correct invalid framing or fields. Extra/duplicate fields, explicit null and an empty change are rejected. A failed validation is not a successful rename.                                                      |
+| `413` or `415`                                     | Use one JSON object with `Content-Type: application/json`, at most 32 KiB.                                                                                                                                      |
+| Timeout, disconnect, `503` or SDK decoding failure | The change may have committed. Preserve the original ID, method, route, key, reviewed revision and input. Do not create replacement work merely because the response was lost.                                  |
+
+Repeat the original PATCH only with its original key and exact request meaning, under current authorization. Alternatively, [look up the original operation](/guides/recover-original-request) using method `PATCH`, canonical route `/v1/projects/{project_id}/metadata`, family `project_action_use` and action `edit-project-metadata`. Lookup returns retained operation metadata, not today's Project fields. An unresolved observation does not establish that nothing happened.
+
+HTTP errors use `application/problem+json`. SDK failures retain available HTTP context, and decoding can fail even with status `200`. The examples use five-second deadlines and do not automatically retry a write. Browser-cookie callers additionally need the installation's trusted Origin and `X-Inframeld-CSRF: 1` for PATCH. Do not copy browser cookies into shared examples.

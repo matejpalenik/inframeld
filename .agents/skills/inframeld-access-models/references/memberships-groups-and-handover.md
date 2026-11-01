@@ -82,7 +82,7 @@ The following table shows what someone may see while their account, membership, 
 
 | Information | Who may see it |
 | --- | --- |
-| Project name and ID | Current project members. Installation permissions alone do not reveal every project. |
+| Project Name, Display name and ID | Current project members. Installation permissions alone do not reveal every project. |
 | Pipeline or Deployment name, ID, and basic availability | Someone with any effective action on that resource, at either grant level. |
 | Resource configuration | Someone with View configuration or Edit configuration on that resource. |
 | Group name and ID | Its members, managers, or people and applications with an action on it. Only managers may see who its members and managers are. |
@@ -90,6 +90,8 @@ The following table shows what someone may see while their account, membership, 
 | Assigned actions and their grant levels | A human who may grant that exact action on that target. Humans may also inspect their own permissions. |
 | Eligible recipients of a grant | Authorized project grantors see a limited directory containing stable ID, display name, and human/application kind. |
 | Safe application-key metadata | A human with Issue or Revoke permission on that application. Delete alone is insufficient. |
+
+Project metadata changes separately require human-only `edit-project-metadata`, current eligibility/membership and expected metadata revision. Membership administration supplies no rename authority. [The approved metadata contract](decision-project-metadata-authority.md) preserves original IDs, legacy labels and atomic stale/collision failure. Handover must preserve an eligible human grantor of this exact responsibility under the ordinary last-grantor rules. #120’s narrow host repair supplies only a stranded first grant, not broader membership management. These additions remain unimplemented at this recording checkpoint.
 
 These views do not expose document contents, unrelated grants, linked private resources, or saved secrets. Seeing a Deployment does not reveal its Pipeline. The recipient directory covers neither the whole installation nor a complete list of who has access to everything.
 
@@ -128,7 +130,7 @@ In the following table, `revision` means the required `expectedAccessRevision` f
 | `POST /v1/organizations/{organization_id}/human-admissions` | `admitHuman` | `HumanAdmissionRequest`: `identityId`, `expectedAccessRevision`. `HumanAdmissionResponse`: mutation fields, `organizationId`, `principalId`, `changed` | `admit-users`. Verify current configured Kratos identity and unique authority/subject link. 201 new admission, 200 already-admitted no change. Never restore a blocked principal. |
 | `POST /v1/organizations/{organization_id}/humans/{principal_id}/suspend` | `suspendHuman` | `HumanSuspensionRequest`: revision, `reason`. `HumanSuspensionResponse`: mutation fields, organization/principal IDs, `accessBlocked: true`, `cleanupOperationId` | `suspend-users`. 202 after immediate suspension/block plus original durable cleanup obligation commit. No handover prerequisite. |
 | `POST /v1/organizations/{organization_id}/humans/{principal_id}/restore` | `restoreHuman` | `HumanRestorationRequest`: revision, `securityReviewReference`. `HumanRestorationResponse`: mutation fields, organization/principal IDs | `restore-users`. 200 only after current stable Kratos identity, same legitimate principal, required confirmed cleanup, security review and no pending newer block. Does not recreate relationships. |
-| `POST /v1/projects` | `createProject` | `ProjectCreationRequest`: `organizationId`, `name`, `displayName`, revision. `ProjectCreationResponse`: mutation fields, `projectId`, names and fixed seventeen `initialGrants` | Organization `create-projects`. 201. Save creator membership/grants/audit/result together. Starter provisioning remains's separate workflow. |
+| `POST /v1/projects` | `createProject` | `ProjectCreationRequest`: `organizationId`, `name`, `displayName`, revision. `ProjectCreationResponse`: mutation fields, `projectId`, names and fixed eighteen `initialGrants` | Organization `create-projects`. 201. Save creator membership/grants/audit/result together. Starter provisioning remains a separate workflow. Automatic creator seeding is selected design for #223/#27, not delivered by #120. |
 | `PUT /v1/projects/{project_id}/members/{principal_id}` | `addProjectMember` | `ProjectMembershipRequest`: revision. `ProjectMembershipResponse`: mutation fields, project/principal IDs, `member: true`, `changed` | `manage-project-members`. Admitted eligible human recipient only. 201 added or 200 unchanged. Application membership comes from account creation. |
 | `DELETE /v1/projects/{project_id}/members/{principal_id}` | `removeProjectMember` | Revision query / `ProjectMembershipRemovalResponse`: mutation fields, IDs, `removed: true`, `changed` | `manage-project-members`. 200. Ordinary handover, remove that human's project grants/groups/managers together. Application retirement is separate. |
 | `POST /v1/projects/{project_id}/access-groups` | `createAccessGroup` | `AccessGroupCreationRequest`: names, revision. `AccessGroupCreationResponse`: mutation fields, `projectId`, `accessGroupId`, names, `creatorPrincipalId` | `create-access-groups`. 201 with creator membership/management together, no extra document grants. |

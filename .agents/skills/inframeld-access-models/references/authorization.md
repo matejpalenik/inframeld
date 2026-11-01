@@ -51,7 +51,9 @@ Loaded objects and their immutable snapshots belong to one active transaction. B
 
 ## Administration and document audiences
 
-Do not infer permission from a title, creator history, installation administration or membership. Fixed creator assignments are explicit grants, not permanent authority. The accepted catalogue defines seventeen initial additional-Project actions, thirteen Pipeline actions and seven Deployment actions. The historical eleven-action seed is superseded. Existing resources receive no automatic backfill.
+Do not infer permission from a title, creator history, installation administration or membership. Fixed creator assignments are explicit grants, not permanent authority. The accepted catalogue defines eighteen initial additional-Project actions, thirteen Pipeline actions and seven Deployment actions. The historical eleven- and seventeen-action Project seeds are superseded only as recorded by [ADR-0124](../../../../docs/adr/ADR-0124-authorize-project-metadata-changes-explicitly.md). Existing resources receive no automatic backfill.
+
+Project first selector allocation and Name/Display-name changes require human-only `edit-project-metadata` on that exact Project, current eligibility/membership and expected metadata revision. Metadata revision is separate from permission revision. Current membership permits basic Project metadata disclosure, not changes. The [approved metadata decision](decision-project-metadata-authority.md) defines lossless legacy handling, protected replay and the narrow first-grant repair. At this checkpoint these #120 paths remain unimplemented. Automatic eighteen-grant creator assignment belongs to #223 ordinary creation and #27 private starters.
 
 An audience is the set of groups permitted to read protected material. Document audiences, source/imported-case audiences and upload defaults need deliberate authorized destination groups. Imported metadata and upstream access-control lists cannot grant access.
 
@@ -186,7 +188,7 @@ These examples record the design review, not executed tests or implemented guara
 | An accepted case revision is edited or imported with an acceptance claim. | The changed/new revision is unreviewed until exact-revision review. Provenance does not supply authority. |
 | The only manager is suspended and an operator repairs the group. | Suspend immediately. Repair only the reviewed stranded responsibility, giving the eligible replacement membership and management together. |
 
-**Accepted scope:** fixed capability identifiers/targets/eligibility, seventeen Project creator grants and exact-resource creator assignments, human-only resource provisioning with application updates, case-audience administration/import defaults, single-use invitation rules and non-query diagnostic deferral. [The contract reference](actions-and-initial-grants.md) records application inputs/results, transport compatibility, maintenance intent and reviewed scenarios.
+**Accepted scope:** fixed capability identifiers/targets/eligibility, eighteen Project creator grants and exact-resource creator assignments, human-only resource provisioning with application updates, case-audience administration/import defaults, single-use invitation rules and non-query diagnostic deferral. [The contract reference](actions-and-initial-grants.md) records application inputs/results, transport compatibility, maintenance intent and reviewed scenarios.
 
 **Also settled by the final approval:** session fields and 5/10/15-second configurable starting budgets, safe authentication problem/challenge literals, new 32-KiB/100-assignment Access limits, exact-action grant listing, cookie/CSRF invitation admission, show-once key outcomes, the 64-KiB maintenance command and the 8-KiB private recovery callback boundary.
 

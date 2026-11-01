@@ -317,6 +317,154 @@ export type ProblemDetails = {
 };
 
 /**
+ * ProjectMetadataChangeResponse
+ */
+export type ProjectMetadataChangeResponse = {
+    /**
+     * Displayname
+     *
+     * Stored presentation label, including retained legacy values.
+     */
+    displayName: string;
+    /**
+     * Idempotencyexpiresat
+     *
+     * Original replay deadline, unchanged by retries.
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Metadatarevision
+     *
+     * Review revision for metadata changes, separate from permission revision.
+     */
+    metadataRevision: number;
+    /**
+     * Name
+     *
+     * Exact current selector, or null until explicitly allocated.
+     */
+    name: string | null;
+    /**
+     * Operationid
+     *
+     * Original operation identity for safe recovery.
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     *
+     * Owning installation Organization.
+     */
+    organizationId: string;
+    /**
+     * Projectid
+     *
+     * Permanent Project identity, preserved through rename.
+     */
+    projectId: string;
+};
+
+/**
+ * ProjectMetadataResponse
+ */
+export type ProjectMetadataResponse = {
+    /**
+     * Displayname
+     *
+     * Stored presentation label, including retained legacy values.
+     */
+    displayName: string;
+    /**
+     * Metadatarevision
+     *
+     * Review revision for metadata changes, separate from permission revision.
+     */
+    metadataRevision: number;
+    /**
+     * Name
+     *
+     * Exact current selector, or null until explicitly allocated.
+     */
+    name: string | null;
+    /**
+     * Organizationid
+     *
+     * Owning installation Organization.
+     */
+    organizationId: string;
+    /**
+     * Projectid
+     *
+     * Permanent Project identity, preserved through rename.
+     */
+    projectId: string;
+};
+
+/**
+ * ProjectMetadataUpdateRequest
+ *
+ * Omitted fields preserve stored values. Explicit null never clears either field.
+ */
+export type ProjectMetadataUpdateRequest = {
+    /**
+     * Displayname
+     *
+     * New label in Unicode code points. Omit to preserve even an unrestricted legacy label.
+     */
+    displayName?: string;
+    /**
+     * Expectedmetadatarevision
+     *
+     * Metadata revision reviewed for this exact change.
+     */
+    expectedMetadataRevision: number;
+    /**
+     * Name
+     *
+     * Explicit exact selector replacement. Omit to preserve the current selector.
+     */
+    name?: string;
+};
+
+/**
+ * ProjectNameResolutionResponse
+ *
+ * Expose the currently authorized Project identified by an exact scoped Name.
+ */
+export type ProjectNameResolutionResponse = {
+    /**
+     * Displayname
+     *
+     * Stored presentation label, including retained legacy values.
+     */
+    displayName: string;
+    /**
+     * Metadatarevision
+     *
+     * Review revision for metadata changes, separate from permission revision.
+     */
+    metadataRevision: number;
+    /**
+     * Name
+     *
+     * Exact current selector, or null until explicitly allocated.
+     */
+    name: string | null;
+    /**
+     * Organizationid
+     *
+     * Owning installation Organization.
+     */
+    organizationId: string;
+    /**
+     * Projectid
+     *
+     * Permanent Project identity, preserved through rename.
+     */
+    projectId: string;
+};
+
+/**
  * ProjectUseOnlyGrantRequest
  */
 export type ProjectUseOnlyGrantRequest = {
@@ -837,6 +985,62 @@ export type LookupOriginalOperationResponses = {
 
 export type LookupOriginalOperationResponse = LookupOriginalOperationResponses[keyof LookupOriginalOperationResponses];
 
+export type ResolveProjectNameData = {
+    body?: never;
+    path: {
+        /**
+         * Name
+         *
+         * Exact Project selector in the current installation and Organization.
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/v1/projects/by-name/{name}';
+};
+
+export type ResolveProjectNameErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Invalid input
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ResolveProjectNameError = ResolveProjectNameErrors[keyof ResolveProjectNameErrors];
+
+export type ResolveProjectNameResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectNameResolutionResponse;
+};
+
+export type ResolveProjectNameResponse = ResolveProjectNameResponses[keyof ResolveProjectNameResponses];
+
 export type AssignProjectUseOnlyGrantData = {
     body: ProjectUseOnlyGrantRequest;
     headers: {
@@ -896,6 +1100,128 @@ export type AssignProjectUseOnlyGrantResponses = {
 };
 
 export type AssignProjectUseOnlyGrantResponse = AssignProjectUseOnlyGrantResponses[keyof AssignProjectUseOnlyGrantResponses];
+
+export type GetProjectMetadataData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/metadata';
+};
+
+export type GetProjectMetadataErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Invalid input
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetProjectMetadataError = GetProjectMetadataErrors[keyof GetProjectMetadataErrors];
+
+export type GetProjectMetadataResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectMetadataResponse;
+};
+
+export type GetProjectMetadataResponse = GetProjectMetadataResponses[keyof GetProjectMetadataResponses];
+
+export type UpdateProjectMetadataData = {
+    body: ProjectMetadataUpdateRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/metadata';
+};
+
+export type UpdateProjectMetadataErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Invalid input
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type UpdateProjectMetadataError = UpdateProjectMetadataErrors[keyof UpdateProjectMetadataErrors];
+
+export type UpdateProjectMetadataResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectMetadataChangeResponse;
+};
+
+export type UpdateProjectMetadataResponse = UpdateProjectMetadataResponses[keyof UpdateProjectMetadataResponses];
 
 export type GetCurrentSessionData = {
     body?: never;

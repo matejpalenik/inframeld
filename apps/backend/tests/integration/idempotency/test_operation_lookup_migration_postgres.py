@@ -10,6 +10,7 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from tests.support.access_scenarios import MockAccessScenarios
 from tests.support.legacy_operation_reservation_row import LegacyOperationReservationRow
+from tests.support.project_metadata_scenarios import seed_legacy_project_authorization
 
 from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
     BACKEND_ROOT,
@@ -39,9 +40,7 @@ async def test_only_fixed_grant_history_gets_authoritative_backfill(
     expiry = datetime(2030, 1, 1, tzinfo=UTC)
     try:
         async with database.session() as session, session.begin():
-            seed = await MockAccessScenarios.seed_project_authorization(
-                session, is_project_member=True, has_action_grant=False
-            )
+            seed = await seed_legacy_project_authorization(session)
             for operation, route in [
                 ("old-grant", "/v1/projects/{project_id}/grants"),
                 ("old-generic", "/v1/original-project-operation"),

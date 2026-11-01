@@ -10,3 +10,5 @@ import "./responses.ts";
 export { cases } from "../../src/conformance/cases.ts";
 
 import "./discovery.ts";
+
+import "./project-metadata.ts";

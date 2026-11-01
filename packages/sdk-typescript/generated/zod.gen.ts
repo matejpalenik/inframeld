@@ -154,6 +154,54 @@ export const zOriginalOperationLookupRequest = z.object({
 });
 
 /**
+ * ProjectMetadataChangeResponse
+ */
+export const zProjectMetadataChangeResponse = z.object({
+    displayName: z.string(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    metadataRevision: z.int(),
+    name: z.string().nullable(),
+    operationId: z.string(),
+    organizationId: z.uuid(),
+    projectId: z.uuid()
+});
+
+/**
+ * ProjectMetadataResponse
+ */
+export const zProjectMetadataResponse = z.object({
+    displayName: z.string(),
+    metadataRevision: z.int(),
+    name: z.string().nullable(),
+    organizationId: z.uuid(),
+    projectId: z.uuid()
+});
+
+/**
+ * ProjectMetadataUpdateRequest
+ *
+ * Omitted fields preserve stored values. Explicit null never clears either field.
+ */
+export const zProjectMetadataUpdateRequest = z.object({
+    displayName: z.string().min(1).max(128).optional(),
+    expectedMetadataRevision: z.int().gte(0).lte(9223372036854776000),
+    name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/).optional()
+});
+
+/**
+ * ProjectNameResolutionResponse
+ *
+ * Expose the currently authorized Project identified by an exact scoped Name.
+ */
+export const zProjectNameResolutionResponse = z.object({
+    displayName: z.string(),
+    metadataRevision: z.int(),
+    name: z.string().nullable(),
+    organizationId: z.uuid(),
+    projectId: z.uuid()
+});
+
+/**
  * ProjectUseOnlyGrantRequest
  */
 export const zProjectUseOnlyGrantRequest = z.object({
@@ -570,6 +618,55 @@ export const zLookupOriginalOperation503Representation0Response = zProblemDetail
  */
 export const zLookupOriginalOperationResponse = zOperationLookupResponse;
 
+export const zResolveProjectNamePath = z.object({
+    name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/)
+});
+
+/**
+ * Successful Response
+ */
+export const zResolveProjectName200Representation0Response = zProjectNameResolutionResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zResolveProjectName400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zResolveProjectName401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zResolveProjectName403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zResolveProjectName404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zResolveProjectName409Representation0Response = zProblemDetails;
+
+/**
+ * Invalid input
+ */
+export const zResolveProjectName422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zResolveProjectName503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zResolveProjectNameResponse = zProjectNameResolutionResponse;
+
 export const zAssignProjectUseOnlyGrantBody = zProjectUseOnlyGrantRequest;
 
 export const zAssignProjectUseOnlyGrantHeaders = z.object({
@@ -624,6 +721,120 @@ export const zAssignProjectUseOnlyGrant503Representation0Response = zProblemDeta
  * Successful Response
  */
 export const zAssignProjectUseOnlyGrantResponse = zProjectUseOnlyGrantResponse;
+
+export const zGetProjectMetadataPath = z.object({
+    project_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetProjectMetadata200Representation0Response = zProjectMetadataResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetProjectMetadata400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetProjectMetadata401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetProjectMetadata403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zGetProjectMetadata404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zGetProjectMetadata409Representation0Response = zProblemDetails;
+
+/**
+ * Invalid input
+ */
+export const zGetProjectMetadata422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetProjectMetadata503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetProjectMetadataResponse = zProjectMetadataResponse;
+
+export const zUpdateProjectMetadataBody = zProjectMetadataUpdateRequest;
+
+export const zUpdateProjectMetadataHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zUpdateProjectMetadataPath = z.object({
+    project_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zUpdateProjectMetadata200Representation0Response = zProjectMetadataChangeResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zUpdateProjectMetadata400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zUpdateProjectMetadata401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zUpdateProjectMetadata403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zUpdateProjectMetadata404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zUpdateProjectMetadata409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zUpdateProjectMetadata413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zUpdateProjectMetadata415Representation0Response = zProblemDetails;
+
+/**
+ * Invalid input
+ */
+export const zUpdateProjectMetadata422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zUpdateProjectMetadata503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zUpdateProjectMetadataResponse = zProjectMetadataChangeResponse;
 
 /**
  * Successful Response

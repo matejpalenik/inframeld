@@ -1,0 +1,2 @@
+class ProjectMetadataStaleRevisionError(Exception):
+    pass

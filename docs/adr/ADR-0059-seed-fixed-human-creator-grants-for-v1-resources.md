@@ -1,6 +1,6 @@
 # ADR-0059: Seed fixed human creator grants for v1 resources
 
-**Status:** Accepted; supersedes [ADR-0057](ADR-0057-seed-explicit-reviewed-project-creator-grants.md).
+**Status:** Accepted. Supersedes [ADR-0057](ADR-0057-seed-explicit-reviewed-project-creator-grants.md). Partially superseded by [ADR-0124](ADR-0124-authorize-project-metadata-changes-explicitly.md), only the Project creator list/count.
 
 **Date:** 2026-10-04
 
@@ -16,6 +16,8 @@ Alice creates a Project and needs explicit authority to configure its ordinary r
 The developer accepted the explicit expansion. An unrestricted administrator role remains excluded by bounded delegation.
 
 ## Decision Outcome
+
+This historical decision selected seventeen Project actions. ADR-0124 adds `edit-project-metadata` as the eighteenth explicit Project creator assignment on 2026-10-30. The seventeen-action rationale below is preserved. All other creator assignments and safeguards remain accepted.
 
 Seed the seventeen named Project actions and the fixed human creator assignments for each resource in [the initial-assignment contract](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#initial-assignments). Pipeline creation assigns thirteen actions; Deployment creation assigns seven, including `feedback:write`. Source, Collection, connection, immutable profile and application-account assignments are separately enumerated.
 

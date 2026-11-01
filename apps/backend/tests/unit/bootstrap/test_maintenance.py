@@ -4,6 +4,7 @@ import logging
 import os
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
@@ -364,3 +365,53 @@ def test_valid_correlation_survives_an_unsupported_mode(
         "operationId": "operator-request",
         "code": "invalid_input",
     }
+
+
+def test_restricted_metadata_mode_uses_safe_output_without_affecting_recovery_configuration(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: "Path"
+) -> None:
+    request = {
+        "schemaVersion": 1,
+        "mode": "repair-stranded-authority",
+        "expectedInstallationId": "00000000-0000-0000-0000-000000000004",
+        "operationId": "metadata-repair",
+        "operatorLabel": "Operator",
+        "reason": "Repair metadata authority",
+        "expectedAccessRevision": 0,
+        "expectedIdentityId": "00000000-0000-0000-0000-000000000005",
+        "identityProof": {"kind": "hydra-access-token", "accessToken": "private-proof"},
+        "responsibility": {
+            "kind": "action-grantor",
+            "target": {"kind": "project", "projectId": "00000000-0000-0000-0000-000000000003"},
+            "actionId": "edit-project-metadata",
+        },
+    }
+    _stdin(monkeypatch, json.dumps(request).encode())
+    configuration = {
+        "INFRAMELD_DATABASE__NAME": "test",
+        "INFRAMELD_DATABASE__USER": "test",
+        "INFRAMELD_DATABASE__PASSWORD": "test-only",
+        "INFRAMELD_KRATOS__PUBLIC_URL": "http://kratos.test:4433",
+        "INFRAMELD_KRATOS__ADMIN_URL": "http://kratos.test:4434",
+        "INFRAMELD_KRATOS__AUTHORITY": "kratos:test",
+        "INFRAMELD_HYDRA__ADMIN_URL": "http://hydra.test:4445",
+        "INFRAMELD_HYDRA__ISSUER": "https://issuer.test",
+        "INFRAMELD_HYDRA__API_AUDIENCE": "https://api.test",
+        "INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE": str(tmp_path / "fingerprint.key"),
+    }
+    for key, value in configuration.items():
+        monkeypatch.setenv(key, value)
+    execute = AsyncMock(
+        return_value={
+            "schemaVersion": 1,
+            "mode": "repair-stranded-authority",
+            "operationId": "metadata-repair",
+            "outcome": "repaired",
+        }
+    )
+    monkeypatch.setattr(maintenance, "_execute", execute)
+    assert maintenance.main(()) == 0
+    output = capsys.readouterr().out
+    assert json.loads(output)["outcome"] == "repaired"
+    assert "private-proof" not in output
+    execute.assert_awaited_once()

@@ -8,6 +8,9 @@ from fastapi import FastAPI
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
 )
+from inframeld_backend.access.application.services.project_metadata_fingerprint_service import (
+    ProjectMetadataFingerprintService,
+)
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
@@ -25,6 +28,9 @@ from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
 from inframeld_backend.access.http.routes.project_grant_routes import (
     create_project_grant_router,
 )
+from inframeld_backend.access.http.routes.project_metadata_routes import (
+    create_project_metadata_router,
+)
 from inframeld_backend.access.infrastructure.resources.installation_discovery_resource import (
     InstallationDiscoveryResource,
 )
@@ -37,6 +43,10 @@ from inframeld_backend.bootstrap.original_operation_lookup_composition import (
     open_original_operation_lookup,
 )
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
+from inframeld_backend.bootstrap.project_metadata_composition import (
+    open_project_metadata,
+    open_project_name_resolution,
+)
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -89,13 +99,11 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             if client is not None:
                 provider_cleanup.callback(client.rest_client.pool_manager.clear)
 
-        fingerprints = ProjectGrantChangeFingerprintService(
-            RequestFingerprintService(
-                FileRequestFingerprintKeyReader(
-                    resolved_settings.request_fingerprint.key_file
-                ).read()
-            )
+        request_fingerprints = RequestFingerprintService(
+            FileRequestFingerprintKeyReader(resolved_settings.request_fingerprint.key_file).read()
         )
+        fingerprints = ProjectGrantChangeFingerprintService(request_fingerprints)
+        metadata_fingerprints = ProjectMetadataFingerprintService(request_fingerprints)
 
         discovery = (
             InstallationDiscoveryResource(resolved_settings.discovery, resolved_settings.hydra)
@@ -145,6 +153,15 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_project_grant_router(
                 human_session, partial(open_project_grant_change, database, fingerprints)
+            )
+        )
+
+        application.include_router(
+            create_project_metadata_router(
+                human_session,
+                partial(open_project_metadata, database, metadata_fingerprints),
+                partial(open_project_metadata, database, metadata_fingerprints),
+                partial(open_project_name_resolution, database),
             )
         )
 

@@ -165,3 +165,15 @@ The [Access write protocol](grant-administration.md#storing-access-and-handling-
 ## Implemented persistence authority
 
 For exact delivered columns, keys and indexes, read [0001_initial](../../../../apps/backend/migrations/versions/0001_initial.py), then [0002 reservations](../../../../apps/backend/migrations/versions/0002_idempotency_reservations.py), [0003 installation identity](../../../../apps/backend/migrations/versions/0003_installation_identity.py), [0004 recovery](../../../../apps/backend/migrations/versions/0004_identity_recovery.py) and [0005 credential versions](../../../../apps/backend/migrations/versions/0005_human_credential_versions.py). Logical and proposed physical relationships above do not override these migrations or establish future tables as delivered. Partial ORM mappings are adapter definitions.
+
+<a id="project-metadata-persistence"></a>
+
+## Approved Project metadata and repair persistence
+
+**Not implemented at this recording checkpoint.** [ADR-0124](../../../../docs/adr/ADR-0124-authorize-project-metadata-changes-explicitly.md) and the [owning decision](decision-project-metadata-authority.md) require a distinct initially nullable Project selector and metadata revision. Preserve the existing unrestricted `projects.name` text exactly as the legacy Display name. Reads/replay and selector-only writes must not apply submitted-replacement validation to that retained value. Physical column/table names remain migration-owned choices.
+
+Store current/retired exact name bindings with permanent resource identity, authoritative installation/Organization/kind/scope and binding revision. Enforce scoped collisions/non-reuse atomically, including inaccessible resources without disclosure. Metadata revision remains separate from `access_revision`. Save reservation, metadata, audit and original outcome together. Name retirement retains only the accepted minimal safety metadata under the [retention policy](../../inframeld-knowledge/references/decision-retention-erasure-policy.md).
+
+`edit-project-metadata` is a human-only exact Project action. #120 must extend current eligibility and original-request authority recognition while preserving existing accepted actions and the fixed `create-access-groups` grant-route boundary. No automatic grant backfill follows from a migration.
+
+The narrow host repair needs typed repair receipt data containing the original safe result and exact reviewed meaning, operator attribution/reason and before/after revisions. Preserve installation/operator-request-ID uniqueness across modes. Existing recovery receipts must be recognized before recovery-specific decoding. Preserve their real recovery/run fields and replay behavior, without fictitious recovery values for a metadata repair. Assignment, Access revision, required audit and receipt commit together. Keyed fingerprints exclude replaceable proof bytes, which never enter persisted receipts/audit. The [repair workflow](host-maintenance.md#project-metadata-authority-repair) owns proof, current-state checks and safe replay ordering.

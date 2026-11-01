@@ -281,3 +281,31 @@ for (const [id, fault] of [
     },
   );
 }
+
+sdkTest(
+  { id: "lookup-project-metadata", operation, outcome: "success" },
+  async ({ call }) => {
+    const body = {
+      ...input,
+      method: "PATCH",
+      requestedRoute: "/v1/projects/{project_id}/metadata",
+      key: "sdk-metadata-key",
+      expectedAuthority: {
+        family: "project_action_use",
+        actionId: "edit-project-metadata",
+      },
+    };
+    const { observation, witness } = await call({
+      operation,
+      headers: bearer,
+      body,
+      timeout: 2000,
+    });
+    assert.deepEqual(assertSuccess(observation, 200), {
+      ...completed,
+      operationId: "sdk-metadata-operation",
+    });
+    assertJsonBody(witness, body);
+    assert.deepEqual(headerValues(observation, "cache-control"), ["no-store"]);
+  },
+);
