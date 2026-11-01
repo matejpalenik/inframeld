@@ -176,6 +176,8 @@ async function pureHelper(
     exitDelay?: number;
     errors?: string[];
     acquired?: () => void;
+    startWrite?: (complete: () => void) => void;
+    stopRead?: (receive: () => void) => void;
   },
   run: (stops: { deadline: number; at: number }[]) => Promise<void>,
 ): Promise<void> {
@@ -213,6 +215,7 @@ async function pureHelper(
     read() {},
     write(chunk: Buffer, _encoding, callback) {
       pending += chunk.toString("utf8");
+      let start = false;
       let boundary: number;
       while ((boundary = pending.indexOf("\n")) >= 0) {
         const value = JSON.parse(pending.slice(0, boundary)) as {
@@ -220,7 +223,8 @@ async function pureHelper(
           deadline: number;
         };
         pending = pending.slice(boundary + 1);
-        if (value.type === "start")
+        if (value.type === "start") {
+          start = true;
           process.nextTick(() => {
             frame({ type: "started", pid: 123 });
             // Model Node's exit-time resume/drain before the await continuation.
@@ -242,23 +246,28 @@ async function pureHelper(
             scenario.acquired?.();
             if (!scenario.waitForStop) finish();
           });
-        else if (value.type === "stop") {
-          stops.push({ deadline: value.deadline, at: performance.now() });
-          if (scenario.stopChunks) {
-            for (const [index, bytes] of scenario.stopChunks)
-              (index === 0 ? stdout : stderr).emit("data", bytes);
-            stdout.emit("end");
-            stderr.emit("end");
-          }
-          if (scenario.exitDelay !== undefined)
-            later(
-              () => frame({ type: "exited", status: 0 }),
-              scenario.exitDelay,
-            );
-          later(finish, scenario.terminalDelay ?? 0);
+        } else if (value.type === "stop") {
+          const receive = () => {
+            stops.push({ deadline: value.deadline, at: performance.now() });
+            if (scenario.stopChunks) {
+              for (const [index, bytes] of scenario.stopChunks)
+                (index === 0 ? stdout : stderr).emit("data", bytes);
+              stdout.emit("end");
+              stderr.emit("end");
+            }
+            if (scenario.exitDelay !== undefined)
+              later(
+                () => frame({ type: "exited", status: 0 }),
+                scenario.exitDelay,
+              );
+            later(finish, scenario.terminalDelay ?? 0);
+          };
+          if (scenario.stopRead) scenario.stopRead(receive);
+          else receive();
         }
       }
-      callback();
+      if (start && scenario.startWrite) scenario.startWrite(callback);
+      else callback();
     },
   });
   control.once("finish", () => {
@@ -434,7 +443,7 @@ test("pure stub first primary failure survives successful and late target-exit e
 async function controlledOwner(
   context: TestContext,
   scenario: string,
-  run: (trace: string) => Promise<void>,
+  run: (trace: string, closed: () => Promise<void>) => Promise<void>,
 ): Promise<void> {
   const work = await mkdtemp(join(tmpdir(), "sdk-owner-protocol-"));
   const trace = join(work, "trace");
@@ -442,14 +451,17 @@ async function controlledOwner(
     new URL("../../src/system/process_owner.py", import.meta.url),
   );
   const spawn = childProcess.spawn;
+  let closed: Promise<void> | undefined;
+  let deadline = 0;
   context.mock.method(childProcess, "spawn", ((
     program: string,
     args: readonly string[],
     options: SpawnOptions,
-  ) =>
-    spawn(
+  ) => {
+    const intercepted = args.at(-1) === owner;
+    const helper = spawn(
       program,
-      args.at(-1) === owner
+      intercepted
         ? [
             ...args.slice(0, -1),
             finiteFixture,
@@ -459,11 +471,64 @@ async function controlledOwner(
           ]
         : [...args],
       options,
-    )) as typeof spawn);
+    );
+    if (intercepted) {
+      // Existing fixture fuse and lost-control recovery bounds only settle custody.
+      deadline =
+        performance.now() + (scenario === "lost-control" ? 6000 : 4000);
+      closed = new Promise<void>((resolve, reject) => {
+        let failure: Error | undefined;
+        helper.once("error", (error) => {
+          failure = error;
+        });
+        helper.once("close", () => (failure ? reject(failure) : resolve()));
+      });
+      void closed.catch(() => {});
+    }
+    return helper;
+  }) as typeof spawn);
   syncBuiltinESMExports();
+  let waiting: Promise<void> | undefined;
+  const waitForClose = () => {
+    if (waiting) return waiting;
+    if (!closed) return Promise.resolve();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    waiting = Promise.race([
+      closed,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error("Controlled owner fixture close was not confirmed"),
+            ),
+          Math.max(0, deadline - performance.now()),
+        );
+      }),
+    ]).finally(() => {
+      clearTimeout(timer);
+    });
+    return waiting;
+  };
   let complete = false;
+  let original: unknown;
   try {
-    await run(trace);
+    await withResources(
+      async () => {
+        try {
+          return await run(trace, waitForClose);
+        } catch (error) {
+          original = error;
+          throw error;
+        }
+      },
+      async () => {
+        try {
+          await waitForClose();
+        } catch (error) {
+          if (error !== original) throw error;
+        }
+      },
+    );
     complete = true;
   } finally {
     context.mock.restoreAll();
@@ -472,6 +537,139 @@ async function controlledOwner(
     else console.error(`Controlled owner evidence retained at ${work}`);
   }
 }
+
+test("controlled owner waits for actual helper close before removing fixture work", async (context) => {
+  const helper = new EventEmitter();
+  let observing!: () => void;
+  const observed = new Promise<void>((resolve) => {
+    observing = resolve;
+  });
+  const once = helper.once;
+  helper.once = ((event: string, listener: (...args: unknown[]) => void) => {
+    if (event === "close") observing();
+    return once.call(helper, event, listener);
+  }) as typeof helper.once;
+  context.mock.method(
+    childProcess,
+    "spawn",
+    () => helper as unknown as ReturnType<typeof childProcess.spawn>,
+  );
+  let trace = "";
+  const running = controlledOwner(context, "refuse", async (path) => {
+    trace = path;
+    childProcess.spawn("unused", [
+      fileURLToPath(
+        new URL("../../src/system/process_owner.py", import.meta.url),
+      ),
+    ]);
+    await writeFile(trace, "owned");
+  });
+  void running.catch(() => {});
+  try {
+    assert.equal(
+      await Promise.race([
+        observed.then(() => "observing"),
+        running.then(() => "returned"),
+      ]),
+      "observing",
+    );
+    await writeFile(trace, "last fixture write");
+    helper.emit("close", 0, null);
+    await running;
+    await assert.rejects(readFile(trace), { code: "ENOENT" });
+  } finally {
+    helper.emit("close", 0, null);
+    await running.catch(() => {});
+  }
+});
+
+test("controlled owner shares one expired custody outcome with its finalizer", async (context) => {
+  const helper = new EventEmitter();
+  context.mock.method(
+    childProcess,
+    "spawn",
+    () => helper as unknown as ReturnType<typeof childProcess.spawn>,
+  );
+  let now = 0;
+  context.mock.method(performance, "now", () => now);
+  let trace = "",
+    first: unknown;
+  let wait!: () => Promise<void>;
+  try {
+    await assert.rejects(
+      controlledOwner(context, "refuse", async (path, closed) => {
+        trace = path;
+        wait = closed;
+        await closed();
+        childProcess.spawn("unused", [
+          fileURLToPath(
+            new URL("../../src/system/process_owner.py", import.meta.url),
+          ),
+        ]);
+        await writeFile(trace, "retained");
+        now = 4001;
+        try {
+          await closed();
+        } catch (error) {
+          first = error;
+          throw error;
+        }
+      }),
+      (error: unknown) => {
+        assert.ok(first instanceof Error);
+        assert.equal(
+          first.message,
+          "Controlled owner fixture close was not confirmed",
+        );
+        assert.equal(error, first);
+        return true;
+      },
+    );
+    assert.equal(await readFile(trace, "utf8"), "retained");
+    helper.emit("close", 0, null);
+    await assert.rejects(wait(), (error: unknown) => error === first);
+  } finally {
+    helper.emit("close", 0, null);
+    if (trace) await rm(join(trace, ".."), { recursive: true, force: true });
+  }
+});
+
+test("controlled owner preserves callback and distinct custody failures and retains work", async (context) => {
+  const helper = new EventEmitter();
+  helper.on("error", () => {});
+  context.mock.method(
+    childProcess,
+    "spawn",
+    () => helper as unknown as ReturnType<typeof childProcess.spawn>,
+  );
+  const original = new Error("fixture assertion"),
+    custody = new Error("fixture close failed");
+  let trace = "";
+  try {
+    await assert.rejects(
+      controlledOwner(context, "refuse", async (path) => {
+        trace = path;
+        childProcess.spawn("unused", [
+          fileURLToPath(
+            new URL("../../src/system/process_owner.py", import.meta.url),
+          ),
+        ]);
+        await writeFile(trace, "retained");
+        helper.emit("error", custody);
+        helper.emit("close", 1, null);
+        throw original;
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.deepEqual(error.errors, [original, custody]);
+        return true;
+      },
+    );
+    assert.equal(await readFile(trace, "utf8"), "retained");
+  } finally {
+    if (trace) await rm(join(trace, ".."), { recursive: true, force: true });
+  }
+});
 
 function conservativeCleanupFailure(error: unknown): boolean {
   return (
@@ -484,39 +682,57 @@ function conservativeCleanupFailure(error: unknown): boolean {
 }
 
 test("helper startup consumes the original command deadline and never starts after it", async (context) => {
-  await controlledOwner(context, "late-ready", async (trace) => {
+  await controlledOwner(context, "late-ready", async (trace, closed) => {
     const began = performance.now();
     await assert.rejects(
       startProcess("unused", [], { timeout: 40, cleanupTimeout: 250 }),
       /startup timed out/,
     );
-    assert.equal(await readFile(trace, "utf8"), "");
     assert.ok(performance.now() - began < 290);
+    await closed();
+    assert.equal(await readFile(trace, "utf8"), "");
   });
 });
 
-test("control transit consumes the first stop budget and repeated failure is cached", async (context) => {
-  await controlledOwner(context, "stop-budget", async (trace) => {
-    const child = await startProcess("unused", [], {
-      timeout: 1000,
-      cleanupTimeout: 200,
-    });
-    const stopped = child.close();
-    assert.equal(child.close(), stopped);
-    await assert.rejects(stopped, conservativeCleanupFailure);
-    assert.equal(child.close(), stopped);
-    const observation = JSON.parse(await readFile(trace, "utf8")) as {
-      remaining: number;
-    };
-    assert.ok(
-      observation.remaining < 160,
-      "Control transit must consume the original 200 ms",
-    );
-  });
+test("pure stub control transit consumes the first stop budget and repeated failure is cached", async (context) => {
+  let now = 1000,
+    receive!: () => void;
+  context.mock.method(performance, "now", () => now);
+  await pureHelper(
+    context,
+    {
+      waitForStop: true,
+      errors: ["controlled-missing-proof"],
+      stopRead: (deliver) => {
+        receive = deliver;
+      },
+    },
+    async (stops) => {
+      const child = await startProcess("unused", [], {
+        timeout: 1000,
+        cleanupTimeout: 200,
+      });
+      // Finish the START write completion chain before requesting STOP.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const stopped = child.close();
+      assert.equal(child.close(), stopped);
+      assert.equal(stops.length, 0);
+      now += 75;
+      receive();
+      await assert.rejects(stopped, conservativeCleanupFailure);
+      assert.equal(child.close(), stopped);
+      assert.deepEqual(stops, [{ deadline: 10200, at: 1075 }]);
+      assert.equal(
+        stops[0]!.deadline - (10000 + stops[0]!.at - 1000),
+        125,
+        "Control transit consumes the original 200ms rather than restarting it",
+      );
+    },
+  );
 });
 
 test("cancellation before helper readiness never submits a target", async (context) => {
-  await controlledOwner(context, "late-ready", async (trace) => {
+  await controlledOwner(context, "late-ready", async (trace, closed) => {
     const controller = new AbortController();
     const reason = new Error("cancel before readiness");
     const timer = setTimeout(() => controller.abort(reason), 20);
@@ -534,6 +750,7 @@ test("cancellation before helper readiness never submits a target", async (conte
             error.errors[0] === reason &&
             conservativeCleanupFailure(error.errors[1])),
       );
+      await closed();
       assert.equal(await readFile(trace, "utf8"), "");
     } finally {
       clearTimeout(timer);
@@ -541,47 +758,48 @@ test("cancellation before helper readiness never submits a target", async (conte
   });
 });
 
-test("cancellation during handoff rejects construction and retains cleanup failure", async (context) => {
-  await controlledOwner(context, "handoff-abort", async (trace) => {
-    const controller = new AbortController();
-    const reason = new Error("cancel during handoff");
-    const starting = startProcess("unused", [], {
-      signal: controller.signal,
-      timeout: 1000,
-      cleanupTimeout: 250,
-    });
-    void starting.catch(() => {});
-    try {
-      const deadline = performance.now() + 500;
-      let submitted = false;
-      while (performance.now() < deadline) {
-        try {
-          await readFile(trace);
-          submitted = true;
-          break;
-        } catch {
-          await delay(5);
-        }
-      }
-      assert.ok(submitted, "Controlled owner did not receive START");
-      controller.abort(reason);
-      await assert.rejects(starting, (error: unknown) => {
-        assert.ok(error instanceof AggregateError);
-        assert.equal(error.errors.length, 2);
-        assert.equal(error.errors[0], reason);
-        assert.ok(conservativeCleanupFailure(error.errors[1]));
-        return true;
-      });
-    } finally {
-      controller.abort(reason);
-      await starting
-        .then(
-          (child) => child.close(),
-          () => {},
-        )
-        .catch(() => {});
-    }
-  });
+test("pure stub cancellation during incomplete START handoff retains the original and missing-proof failure", async (context) => {
+  const controller = new AbortController();
+  const reason = new Error("cancel during handoff");
+  let written!: () => void;
+  await pureHelper(
+    context,
+    {
+      waitForStop: true,
+      startWrite: (complete) => {
+        written = complete;
+      },
+      acquired: () => {
+        controller.abort(reason);
+        written();
+      },
+    },
+    async (stops) => {
+      await assert.rejects(
+        startProcess("unused", [], {
+          signal: controller.signal,
+          timeout: 1000,
+          cleanupTimeout: 250,
+        }),
+        (error: unknown) => {
+          assert.ok(error instanceof AggregateError);
+          assert.equal(error.errors.length, 2);
+          assert.equal(error.errors[0], reason);
+          assert.ok(error.errors[1] instanceof Error);
+          assert.equal(
+            error.errors[1].message,
+            "Subprocess cleanup could not be confirmed: missing owner evidence",
+          );
+          return true;
+        },
+      );
+      assert.deepEqual(
+        stops,
+        [],
+        "Incomplete START ends control without assuming STOP delivery",
+      );
+    },
+  );
 });
 
 test("missing capabilities and malformed control refuse without a target", async (context) => {

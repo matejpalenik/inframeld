@@ -48,41 +48,22 @@ def main() -> None:
             os.write(3, b"\xff\n")
             read_document()
             return
+        if scenario != "lost-control":
+            raise ValueError("Unknown controlled owner scenario")
         send({"type": "ready", "clock": time.monotonic_ns() // 1_000_000, "python": "3.13.12"})
         read_document()
-        if scenario == "handoff-abort":
-            Path(trace).write_text(json.dumps({"submitted": True}))
-            time.sleep(0.075)
-        if scenario == "lost-control":
-            signal.alarm(8)
-            child = subprocess.Popen(
-                [sys.executable, "-B", __file__, "wait"],
-                stdin=subprocess.DEVNULL,
-                close_fds=True,
-                start_new_session=True,
-            )
-            send({"type": "started", "pid": child.pid})
-            os.close(3)
-            Path(trace).write_text(json.dumps({"target": child.pid, "helper": os.getpid()}))
-            child.wait(timeout=6)
-            Path(trace + ".recovered").write_text(json.dumps({"reaped": True}))
-            return
-        send({"type": "started", "pid": os.getpid()})
-        time.sleep(0.075)
-        stop = json.loads(read_document())
-        Path(trace).write_text(
-            json.dumps({"remaining": stop["deadline"] - time.monotonic_ns() // 1_000_000})
+        signal.alarm(8)
+        child = subprocess.Popen(
+            [sys.executable, "-B", __file__, "wait"],
+            stdin=subprocess.DEVNULL,
+            close_fds=True,
+            start_new_session=True,
         )
-        send(
-            {
-                "type": "finished",
-                "status": None,
-                "reason": "close",
-                "leaderReaped": False,
-                "groupState": "unknown",
-                "errors": ["controlled-missing-proof"],
-            }
-        )
+        send({"type": "started", "pid": child.pid})
+        os.close(3)
+        Path(trace).write_text(json.dumps({"target": child.pid, "helper": os.getpid()}))
+        child.wait(timeout=6)
+        Path(trace + ".recovered").write_text(json.dumps({"reaped": True}))
         return
     if mode in ("backend-owner", "denied-owner", "ordered-exit-owner"):
         owner_path, marker = sys.argv[2:4]
