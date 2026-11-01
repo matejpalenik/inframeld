@@ -106,6 +106,9 @@ Before substantive workflow edits, define a few must-pass outcomes. Validate fro
 | A useful component PR is ready while its broader human journey remains untested | Apply its accepted boundary and gates. Preserve full-feature acceptance or an explicit human deferral and the open qualification issue. |
 | A proposed qualification dependency would require implementation-issue closure before testing merged code | Use delivered artifact readiness and acyclic native blockers. Do not create a mutual closure dependency. |
 | An internal refactor supports an existing tested user journey | Explain applicability and link that journey without inventing a separate manual feature or new test framework. |
+| A host suite cannot bind loopback sockets or inspect its owned processes because of execution permissions | Classify the demonstrated execution-context restriction, reconcile fixtures and use the permitted access path or report it unavailable. Preserve retry/stop conditions without repairing product code merely to evade the restriction. |
+| A selected check needs build scripts that were skipped during installation | Restore the maintained frozen installation with approved scripts before qualification. No inferred pass or extra retry allowance follows from correcting setup. |
+| A checkpoint has many command results but its delivery outcome is unclear | Name the next useful PR, exact remaining gate and owner of the next action in the ordinary update. Do not add another tracking system. |
 | Two issues with independent paths/contracts | Parallel implementation within real capacity. |
 | Shared authorization contract or migration | One owner or serial delivery before dependent writes. |
 | Two requests for the fixed integration stack | One named executor and observed cleanup before the next. |
