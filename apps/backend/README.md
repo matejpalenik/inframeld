@@ -23,6 +23,16 @@ Access recovery admission/completion and credential-state initialization share [
 
 [Contracts and data](../../docs/development/guides/contracts-and-data.md) routes to implemented types, generated HTTP schema and migrations. [The architecture introduction](../../docs/ARCHITECTURE.md) explains the accepted product. [AGENTS.md](../../AGENTS.md) distinguishes read-only guidance from requested implementation.
 
+## Retained deletion-status reader
+
+`GET /v1/deletions/status?operationId=...` reads a content-free observation for the currently eligible original initiating human. Existing Kratos session and human OAuth authentication remain in force. Ordinary Project membership may have disappeared. Another eligible human receives the same unresolved result as missing history, while invalid credentials and current ineligibility remain authentication/authorization failures. [Read retained deletion status](../docs/src/app/guides/read-deletion-status/page.mdx) covers HTTP/generated-client examples and recovery.
+
+Use the normal setup and migration path above. Migration `0013_deletion_status` follows `0010_durable_jobs` and adds the original binding and owner-observation tables. There is no dependency on the separately parked metadata or artifact-storage migrations.
+
+`INFRAMELD_DELETION_STATUS_RETENTION__DAYS` selects the profile for future bindings, with a 30-day default and a supported range of 1–90 whole days. A shorter period needs the existing reviewed policy update. Development Compose passes the same setting to the API. Changing it does not rewrite an existing captured profile or extend established expiry. An unfinished cleanup obligation is separate from settled-status expiry. The [owning retention policy](../../.agents/skills/inframeld-knowledge/references/decision-retention-erasure-policy.md#approved-resolution) explains that boundary.
+
+This component reads retained facts. It does not deliver authentic Delete-project admission, application/key shutdown or physical erasure. Seeded database/native-auth and controlled generated-client cases establish the reader boundary, not those producer workflows. No deletion-status CLI command is delivered here.
+
 ## Ordinary application worker
 
 `python -m inframeld_backend.application_worker` starts the shared PostgreSQL-backed worker without an HTTP listener. Development Compose exposes it through the opt-in `jobs` profile. Its default production handler registry is empty, and there is no generic job API or CLI. [Run the ordinary application worker](../../docs/development/operations/application-jobs.md) covers explicit schema migration, environment loading, settings, events and safe shutdown.

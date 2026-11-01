@@ -1433,6 +1433,351 @@ impl AsRef<str> for HumanOAuthScope {
         self.as_str()
     }
 }
+#[derive(Debug, Clone)]
+pub enum DeletionStatusResponse {
+    RetainedDeletionStatusResponse(RetainedDeletionStatusResponse),
+    UnresolvedDeletionStatusResponse(UnresolvedDeletionStatusResponse),
+}
+impl serde::Serialize for DeletionStatusResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::RetainedDeletionStatusResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(RetainedDeletionStatusResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("outcome") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "retained") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "outcome", stringify!(RetainedDeletionStatusResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "outcome",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "outcome".to_string(),
+                                serde_json::Value::String("retained".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::UnresolvedDeletionStatusResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(UnresolvedDeletionStatusResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("outcome") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "unresolved") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "outcome", stringify!(UnresolvedDeletionStatusResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "outcome",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "outcome".to_string(),
+                                serde_json::Value::String("unresolved".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+        }
+    }
+}
+impl<'de> serde::Deserialize<'de> for DeletionStatusResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = match value.get("outcome") {
+            Some(serde_json::Value::String(discriminator)) => {
+                Some(discriminator.as_str())
+            }
+            Some(_) => {
+                return Err(
+                    serde::de::Error::custom(
+                        concat!("non-string discriminator `", "outcome", "`",),
+                    ),
+                );
+            }
+            None => None,
+        };
+        match discriminator {
+            Some(discriminator) => {
+                match discriminator {
+                    "retained" => {
+                        let primary_error = match serde_json::from_value::<
+                            RetainedDeletionStatusResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::RetainedDeletionStatusResponse(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            UnresolvedDeletionStatusResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "retained", first_name,
+                                            stringify!(UnresolvedDeletionStatusResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::UnresolvedDeletionStatusResponse(payload),
+                                stringify!(UnresolvedDeletionStatusResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "unresolved" => {
+                        let primary_error = match serde_json::from_value::<
+                            UnresolvedDeletionStatusResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::UnresolvedDeletionStatusResponse(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            RetainedDeletionStatusResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "unresolved", first_name,
+                                            stringify!(RetainedDeletionStatusResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RetainedDeletionStatusResponse(payload),
+                                stringify!(RetainedDeletionStatusResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    other => {
+                        Err(
+                            serde::de::Error::custom(
+                                format!(
+                                    "unknown discriminator value `{other}` for `{}`", "outcome",
+                                ),
+                            ),
+                        )
+                    }
+                }
+            }
+            None => {
+                Err(
+                    serde::de::Error::custom(
+                        concat!("missing string discriminator `", "outcome", "`",),
+                    ),
+                )
+            }
+        }
+    }
+}
+///Report no authoritative permitted observation without echoing hidden history.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UnresolvedDeletionStatusResponse {
+    pub outcome: UnresolvedDeletionStatusResponseOutcome,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum UnresolvedDeletionStatusResponseOutcome {
+    #[default]
+    #[serde(rename = "unresolved")]
+    Unresolved,
+}
+impl UnresolvedDeletionStatusResponseOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unresolved => "unresolved",
+        }
+    }
+}
+impl ::std::fmt::Display for UnresolvedDeletionStatusResponseOutcome {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for UnresolvedDeletionStatusResponseOutcome {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+///Expose retained content-free facts with explicit unknown completion and expiry.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RetainedDeletionStatusResponse {
+    #[serde(
+        rename = "accessBlocked",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub access_blocked: Option<bool>,
+    #[serde(
+        rename = "admissionConfirmed",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub admission_confirmed: Option<bool>,
+    #[serde(
+        rename = "applicationShutdownComplete",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub application_shutdown_complete: Option<bool>,
+    #[serde(rename = "jobState", deserialize_with = "presence_serde::required_nullable")]
+    pub job_state: Option<JobStatus>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub outcome: RetainedDeletionStatusResponseOutcome,
+    #[serde(
+        rename = "physicalCleanupComplete",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub physical_cleanup_complete: Option<bool>,
+    #[serde(
+        rename = "retentionExpiresAt",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub retention_expires_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum RetainedDeletionStatusResponseOutcome {
+    #[default]
+    #[serde(rename = "retained")]
+    Retained,
+}
+impl RetainedDeletionStatusResponseOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Retained => "retained",
+        }
+    }
+}
+impl ::std::fmt::Display for RetainedDeletionStatusResponseOutcome {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for RetainedDeletionStatusResponseOutcome {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum JobStatus {
+    #[default]
+    #[serde(rename = "queued")]
+    Queued,
+    #[serde(rename = "running")]
+    Running,
+    #[serde(rename = "succeeded")]
+    Succeeded,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "canceled")]
+    Canceled,
+    #[serde(rename = "recovery_required")]
+    RecoveryRequired,
+}
+impl JobStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Queued => "queued",
+            Self::Running => "running",
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+            Self::Canceled => "canceled",
+            Self::RecoveryRequired => "recovery_required",
+        }
+    }
+}
+impl ::std::fmt::Display for JobStatus {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for JobStatus {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
 ///Expose safe synchronous outcome metadata without replaying content.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CompletedOperationLookupResponse {

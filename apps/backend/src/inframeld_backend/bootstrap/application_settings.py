@@ -19,6 +19,9 @@ from inframeld_backend.access.infrastructure.verifiers.pydantic_discovery_url_ve
     PydanticDiscoveryURLVerifier,
 )
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
+from inframeld_backend.shared.infrastructure.settings.deletion_status_retention_settings import (
+    DeletionStatusRetentionSettings,
+)
 from inframeld_backend.shared.infrastructure.settings.request_fingerprint_settings import (
     RequestFingerprintSettings,
 )
@@ -46,6 +49,9 @@ class ApplicationSettings(BaseSettings):
     hydra: HydraSettings | None = None
     human_authentication: HumanAuthenticationSettings = Field(
         default_factory=HumanAuthenticationSettings
+    )
+    deletion_status_retention: DeletionStatusRetentionSettings = Field(
+        default_factory=DeletionStatusRetentionSettings
     )
     discovery: DiscoverySettings | None = None
     csrf: CSRFSettings = Field(default_factory=CSRFSettings)

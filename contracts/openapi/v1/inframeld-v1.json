@@ -104,6 +104,23 @@
         "title": "CurrentSessionResponse",
         "type": "object"
       },
+      "DeletionStatusResponse": {
+        "discriminator": {
+          "mapping": {
+            "retained": "#/components/schemas/RetainedDeletionStatusResponse",
+            "unresolved": "#/components/schemas/UnresolvedDeletionStatusResponse"
+          },
+          "propertyName": "outcome"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RetainedDeletionStatusResponse"
+          },
+          {
+            "$ref": "#/components/schemas/UnresolvedDeletionStatusResponse"
+          }
+        ]
+      },
       "HumanOAuthConsentDecisionResponse": {
         "properties": {
           "redirectTo": {
@@ -250,6 +267,18 @@
         ],
         "title": "InframeldDiscoveryResponse",
         "type": "object"
+      },
+      "JobStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "succeeded",
+          "failed",
+          "canceled",
+          "recovery_required"
+        ],
+        "title": "JobStatus",
+        "type": "string"
       },
       "OAuthConsentDecision": {
         "enum": [
@@ -626,6 +655,117 @@
         "title": "RecoveryRequiredOperationLookupResponse",
         "type": "object"
       },
+      "RetainedDeletionStatusResponse": {
+        "additionalProperties": false,
+        "description": "Expose retained content-free facts with explicit unknown completion and expiry.",
+        "properties": {
+          "accessBlocked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accessblocked"
+          },
+          "admissionConfirmed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admissionconfirmed"
+          },
+          "applicationShutdownComplete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicationshutdowncomplete"
+          },
+          "jobState": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operationId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operationid",
+            "type": "string"
+          },
+          "outcome": {
+            "const": "retained",
+            "title": "Outcome",
+            "type": "string"
+          },
+          "physicalCleanupComplete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physicalcleanupcomplete"
+          },
+          "retentionExpiresAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retentionexpiresat"
+          }
+        },
+        "required": [
+          "outcome",
+          "operationId",
+          "jobState",
+          "admissionConfirmed",
+          "accessBlocked",
+          "applicationShutdownComplete",
+          "physicalCleanupComplete",
+          "retentionExpiresAt"
+        ],
+        "title": "RetainedDeletionStatusResponse",
+        "type": "object"
+      },
+      "UnresolvedDeletionStatusResponse": {
+        "additionalProperties": false,
+        "description": "Report no authoritative permitted observation without echoing hidden history.",
+        "properties": {
+          "outcome": {
+            "const": "unresolved",
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "UnresolvedDeletionStatusResponse",
+        "type": "object"
+      },
       "UnresolvedOperationLookupResponse": {
         "additionalProperties": false,
         "properties": {
@@ -874,6 +1014,124 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/v1/deletions/status": {
+      "get": {
+        "operationId": "getDeletionStatus",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "operationId",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Operationid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Internal server error"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "HumanBearer": []
+          }
+        ],
+        "summary": "Lookup",
+        "tags": [
+          "operations"
         ]
       }
     },

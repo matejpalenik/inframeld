@@ -16,6 +16,7 @@ export const operations = [
   "decideHumanOAuthConsent",
   "assignProjectUseOnlyGrant",
   "lookupOriginalOperation",
+  "getDeletionStatus",
   "contractFixturePayload",
   "contractFixturePage",
   "contractFixtureUpload",

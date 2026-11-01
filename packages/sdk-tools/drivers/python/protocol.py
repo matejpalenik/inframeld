@@ -13,6 +13,7 @@ Operation: TypeAlias = Literal[
     "decideHumanOAuthConsent",
     "assignProjectUseOnlyGrant",
     "lookupOriginalOperation",
+    "getDeletionStatus",
     "contractFixturePayload",
     "contractFixturePage",
     "contractFixtureUpload",

@@ -90,6 +90,18 @@ export const zInframeldDiscoveryResponse = z.object({
 });
 
 /**
+ * JobStatus
+ */
+export const zJobStatus = z.enum([
+    'queued',
+    'running',
+    'succeeded',
+    'failed',
+    'canceled',
+    'recovery_required'
+]);
+
+/**
  * OAuthConsentDecision
  */
 export const zOAuthConsentDecision = z.enum(['allow', 'deny']);
@@ -186,6 +198,36 @@ export const zRecoveryRequiredOperationLookupResponse = z.object({
     outcome: z.literal('recovery_required'),
     reason: z.literal('original_outcome_requires_recovery')
 });
+
+/**
+ * RetainedDeletionStatusResponse
+ *
+ * Expose retained content-free facts with explicit unknown completion and expiry.
+ */
+export const zRetainedDeletionStatusResponse = z.object({
+    accessBlocked: z.boolean().nullable(),
+    admissionConfirmed: z.boolean().nullable(),
+    applicationShutdownComplete: z.boolean().nullable(),
+    jobState: zJobStatus.nullable(),
+    operationId: z.string().min(1).max(128),
+    outcome: z.literal('retained'),
+    physicalCleanupComplete: z.boolean().nullable(),
+    retentionExpiresAt: z.iso.datetime().nullable()
+});
+
+/**
+ * UnresolvedDeletionStatusResponse
+ *
+ * Report no authoritative permitted observation without echoing hidden history.
+ */
+export const zUnresolvedDeletionStatusResponse = z.object({
+    outcome: z.literal('unresolved')
+});
+
+export const zDeletionStatusResponse = z.discriminatedUnion('outcome', [
+    zRetainedDeletionStatusResponse,
+    zUnresolvedDeletionStatusResponse
+]);
 
 /**
  * UnresolvedOperationLookupResponse
@@ -345,6 +387,50 @@ export const zGetHealth500Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zGetHealthResponse = z.record(z.string(), z.string());
+
+export const zGetDeletionStatusQuery = z.object({
+    operationId: z.string().min(1).max(128)
+});
+
+/**
+ * Successful Response
+ */
+export const zGetDeletionStatus200Representation0Response = zDeletionStatusResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetDeletionStatus400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetDeletionStatus401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetDeletionStatus403Representation0Response = zProblemDetails;
+
+/**
+ * Invalid input
+ */
+export const zGetDeletionStatus422Representation0Response = zProblemDetails;
+
+/**
+ * Internal server error
+ */
+export const zGetDeletionStatus500Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetDeletionStatus503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetDeletionStatusResponse = zDeletionStatusResponse;
 
 export const zInspectHumanOAuthConsentQuery = z.object({
     consent_challenge: z.string().min(1)

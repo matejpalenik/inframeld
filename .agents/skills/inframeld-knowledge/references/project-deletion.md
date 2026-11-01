@@ -36,7 +36,7 @@ The worker continues the exact deletion that was admitted even when ordinary mem
 | Physical cleanup unfinished | Known removal work remains. Late writes cannot restore use or publication authority. |
 | Physical cleanup complete | The owning cleanup completion requirements were established, subject to separately disclosed provider/backup limits. |
 
-These are required meanings, not a new public enum or another job state machine. The [logical deletion-status contract](../../inframeld-application-contracts/references/operation-recovery-contracts.md#deletion-status-inspection) specifies the bounded permitted projection. HTTP route/DTO names and the independently pending retention periods remain delivery work. An unavailable cleanup dependency never permits reporting success or reopening access to meet a timing goal.
+These are required meanings, not a new public enum or another job state machine. The [logical deletion-status contract](../../inframeld-application-contracts/references/operation-recovery-contracts.md#deletion-status-inspection) specifies the bounded permitted projection. The content-free reader is implemented at `GET /v1/deletions/status`. Its captured settled-status profile defaults to 30 days, with a 90-day operator maximum under the accepted retention policy. Unfinished authoritative obligations do not acquire that ordinary expiry. Reads/settings changes never extend an established expiry. An unavailable cleanup dependency never permits reporting success or reopening access to meet a timing goal.
 
 <a id="unresolved-protected-status-wording"></a> <a id="preserve-a-narrow-way-to-observe-deletion-completion"></a>
 
@@ -62,7 +62,7 @@ Alice may delete Legal Research without being able to read its private HR docume
 
 Deleting one Document in a surviving project remains different: check Delete documents on every current audience group before committing that Document's marker. A caller cannot select the whole-project worker path by supplying a deletion marker or claiming that admission already happened.
 
-Admission, confirmed access blocking and physical completion are separate reported facts. If cleanup stops after membership removal, the project stays blocked and the original operation records the unfinished steps. Protected job status exposes only safe progress to eligible readers, not private contents or general historical job payloads. It does not implicitly authorize cancellation or continuation. The [logical recovery reference](../../inframeld-application-contracts/references/operation-recovery-contracts.md) defines the accepted observation and recovery boundaries. Native HTTP delivery and runtime recovery checks remain prerequisite engineering work. This guide does not claim the deletion workflow has been implemented.
+Admission, confirmed access blocking and physical completion are separate reported facts. If cleanup stops after membership removal, the project stays blocked and the original operation records the unfinished steps. Protected job status exposes only safe progress to eligible readers, not private contents or general historical job payloads. It does not implicitly authorize cancellation or continuation. The [logical recovery reference](../../inframeld-application-contracts/references/operation-recovery-contracts.md) defines the accepted observation and recovery boundaries. The delivered HTTP reader and generated clients expose these retained facts with current human authorization. Seeded observations and reader checks do not establish authentic deletion admission or physical erasure. This guide does not claim the complete deletion workflow has been implemented.
 
 <a id="example-delete-a-project-while-its-embedding-job-is-running"></a>
 
@@ -83,7 +83,7 @@ Even if the model call finishes successfully, the deleted project's result canno
 
 ## Sources, implementation and open decisions
 
-This is accepted design, including the approved status-viewer resolution. It does not establish an implemented deletion route or verified physical completion.
+Admission and cleanup remain accepted design, including the approved status-viewer resolution. The retained status reader is implemented, as described in the [recovery contract](../../inframeld-application-contracts/references/operation-recovery-contracts.md#implemented-content-free-reader) and [user guide](../../../../apps/docs/src/app/guides/read-deletion-status/page.mdx). It does not establish an implemented admission producer or verified physical completion.
 
 - [Explicit source erasure](deletion-and-retention.md) and [ordinary retention/pins](retention-and-pins.md) own those lifecycle distinctions.
 - [Access transport boundaries](../../inframeld-access-models/references/grant-contracts.md) preserve current authority, operation identity and safe disclosure.

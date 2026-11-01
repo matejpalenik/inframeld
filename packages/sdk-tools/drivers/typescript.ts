@@ -72,6 +72,11 @@ const calls = {
       ...options(client, call),
       body: call.body as sdk.LookupOriginalOperationData["body"],
     }),
+  getDeletionStatus: (client: Client, call: SdkCall) =>
+    sdk.getDeletionStatus({
+      ...options(client, call),
+      query: call.query as sdk.GetDeletionStatusData["query"],
+    }),
   assignProjectUseOnlyGrant: (client: Client, call: SdkCall) =>
     sdk.assignProjectUseOnlyGrant({
       ...options(client, call),

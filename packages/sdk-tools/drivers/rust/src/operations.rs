@@ -89,6 +89,15 @@ pub async fn observe(
                 .lookup_original_operation(serde_json::from_value(body).unwrap())
                 .await
         ),
+        "getDeletionStatus" => observed!(
+            client
+                .get_deletion_status(
+                    request.query.as_ref().unwrap()["operationId"]
+                        .as_str()
+                        .unwrap()
+                )
+                .await
+        ),
         "assignProjectUseOnlyGrant" => observed!(
             client
                 .assign_project_use_only_grant(

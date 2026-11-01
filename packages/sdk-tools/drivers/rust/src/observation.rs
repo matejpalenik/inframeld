@@ -33,6 +33,15 @@ problems!(
 );
 problems!(GetHealthApiError, GetHealthApiError::Status500);
 problems!(
+    GetDeletionStatusApiError,
+    GetDeletionStatusApiError::Status400,
+    GetDeletionStatusApiError::Status401,
+    GetDeletionStatusApiError::Status403,
+    GetDeletionStatusApiError::Status422,
+    GetDeletionStatusApiError::Status500,
+    GetDeletionStatusApiError::Status503
+);
+problems!(
     InspectHumanOAuthConsentApiError,
     InspectHumanOAuthConsentApiError::Status400,
     InspectHumanOAuthConsentApiError::Status401,

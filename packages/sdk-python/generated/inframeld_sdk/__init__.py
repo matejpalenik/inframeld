@@ -34,12 +34,14 @@ __all__ = [
     "AcceptedOperationLookupResponse",
     "CompletedOperationLookupResponse",
     "CurrentSessionResponse",
+    "DeletionStatusResponse",
     "HumanOAuthConsentDecisionResponse",
     "HumanOAuthConsentDetailsResponse",
     "HumanOAuthConsentRequest",
     "HumanOAuthScope",
     "InProgressOperationLookupResponse",
     "InframeldDiscoveryResponse",
+    "JobStatus",
     "OAuthConsentDecision",
     "OperationLookupAuthorityFamily",
     "OperationLookupAuthorityRequest",
@@ -51,6 +53,8 @@ __all__ = [
     "ProjectUseOnlyGrantResponse",
     "ProtectedResourceMetadataResponse",
     "RecoveryRequiredOperationLookupResponse",
+    "RetainedDeletionStatusResponse",
+    "UnresolvedDeletionStatusResponse",
     "UnresolvedOperationLookupResponse",
     "ValidationIssue",
 ]
@@ -76,12 +80,14 @@ from inframeld_sdk.exceptions import ApiException as ApiException
 from inframeld_sdk.models.accepted_operation_lookup_response import AcceptedOperationLookupResponse as AcceptedOperationLookupResponse
 from inframeld_sdk.models.completed_operation_lookup_response import CompletedOperationLookupResponse as CompletedOperationLookupResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse as CurrentSessionResponse
+from inframeld_sdk.models.deletion_status_response import DeletionStatusResponse as DeletionStatusResponse
 from inframeld_sdk.models.human_o_auth_consent_decision_response import HumanOAuthConsentDecisionResponse as HumanOAuthConsentDecisionResponse
 from inframeld_sdk.models.human_o_auth_consent_details_response import HumanOAuthConsentDetailsResponse as HumanOAuthConsentDetailsResponse
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest as HumanOAuthConsentRequest
 from inframeld_sdk.models.human_o_auth_scope import HumanOAuthScope as HumanOAuthScope
 from inframeld_sdk.models.in_progress_operation_lookup_response import InProgressOperationLookupResponse as InProgressOperationLookupResponse
 from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
+from inframeld_sdk.models.job_status import JobStatus as JobStatus
 from inframeld_sdk.models.o_auth_consent_decision import OAuthConsentDecision as OAuthConsentDecision
 from inframeld_sdk.models.operation_lookup_authority_family import OperationLookupAuthorityFamily as OperationLookupAuthorityFamily
 from inframeld_sdk.models.operation_lookup_authority_request import OperationLookupAuthorityRequest as OperationLookupAuthorityRequest
@@ -93,6 +99,8 @@ from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGr
 from inframeld_sdk.models.project_use_only_grant_response import ProjectUseOnlyGrantResponse as ProjectUseOnlyGrantResponse
 from inframeld_sdk.models.protected_resource_metadata_response import ProtectedResourceMetadataResponse as ProtectedResourceMetadataResponse
 from inframeld_sdk.models.recovery_required_operation_lookup_response import RecoveryRequiredOperationLookupResponse as RecoveryRequiredOperationLookupResponse
+from inframeld_sdk.models.retained_deletion_status_response import RetainedDeletionStatusResponse as RetainedDeletionStatusResponse
+from inframeld_sdk.models.unresolved_deletion_status_response import UnresolvedDeletionStatusResponse as UnresolvedDeletionStatusResponse
 from inframeld_sdk.models.unresolved_operation_lookup_response import UnresolvedOperationLookupResponse as UnresolvedOperationLookupResponse
 from inframeld_sdk.models.validation_issue import ValidationIssue as ValidationIssue
 

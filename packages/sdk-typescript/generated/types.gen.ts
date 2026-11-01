@@ -70,6 +70,12 @@ export type CurrentSessionResponse = {
     principalId: string;
 };
 
+export type DeletionStatusResponse = ({
+    outcome: 'retained';
+} & RetainedDeletionStatusResponse) | ({
+    outcome: 'unresolved';
+} & UnresolvedDeletionStatusResponse);
+
 /**
  * HumanOAuthConsentDecisionResponse
  */
@@ -167,6 +173,11 @@ export type InframeldDiscoveryResponse = {
      */
     schema_version: 1;
 };
+
+/**
+ * JobStatus
+ */
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'recovery_required';
 
 /**
  * OAuthConsentDecision
@@ -409,6 +420,55 @@ export type RecoveryRequiredOperationLookupResponse = {
 };
 
 /**
+ * RetainedDeletionStatusResponse
+ *
+ * Expose retained content-free facts with explicit unknown completion and expiry.
+ */
+export type RetainedDeletionStatusResponse = {
+    /**
+     * Accessblocked
+     */
+    accessBlocked: boolean | null;
+    /**
+     * Admissionconfirmed
+     */
+    admissionConfirmed: boolean | null;
+    /**
+     * Applicationshutdowncomplete
+     */
+    applicationShutdownComplete: boolean | null;
+    jobState: JobStatus | null;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Outcome
+     */
+    outcome: 'retained';
+    /**
+     * Physicalcleanupcomplete
+     */
+    physicalCleanupComplete: boolean | null;
+    /**
+     * Retentionexpiresat
+     */
+    retentionExpiresAt: string | null;
+};
+
+/**
+ * UnresolvedDeletionStatusResponse
+ *
+ * Report no authoritative permitted observation without echoing hidden history.
+ */
+export type UnresolvedDeletionStatusResponse = {
+    /**
+     * Outcome
+     */
+    outcome: 'unresolved';
+};
+
+/**
  * UnresolvedOperationLookupResponse
  */
 export type UnresolvedOperationLookupResponse = {
@@ -578,6 +638,56 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type GetDeletionStatusData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Operationid
+         */
+        operationId: string;
+    };
+    url: '/v1/deletions/status';
+};
+
+export type GetDeletionStatusErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Invalid input
+     */
+    422: ProblemDetails;
+    /**
+     * Internal server error
+     */
+    500: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetDeletionStatusError = GetDeletionStatusErrors[keyof GetDeletionStatusErrors];
+
+export type GetDeletionStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: DeletionStatusResponse;
+};
+
+export type GetDeletionStatusResponse = GetDeletionStatusResponses[keyof GetDeletionStatusResponses];
 
 export type InspectHumanOAuthConsentData = {
     body?: never;

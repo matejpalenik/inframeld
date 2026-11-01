@@ -1,0 +1,220 @@
+export const pageMetadata = {
+  title: "Read retained deletion status",
+  description:
+    "Read a known Project deletion operation after membership disappears, without repeating the deletion.",
+}
+
+# Read retained deletion status
+
+Use this read when you have the original operation ID for a Project deletion and need its retained status. Alice can read her original operation after her Project membership disappears, provided her human account and credential are still eligible. The response contains status facts, without the Project's name, contents or inventory.
+
+This guide reads an existing observation. It does not start, resume or cancel a deletion, restore access or independently verify that stored bytes have been erased.
+
+## Before you begin
+
+You need the backend URL, a current human bearer credential for that installation, and the exact original deletion operation ID. Keep that ID before losing Project access. An operation ID identifies work but grants no permission.
+
+Use the same initiating human. An eligible administrator who did not initiate the deletion cannot obtain Alice's retained result. The server returns the same `unresolved` result it would return for missing history, so that administrator cannot discover whether Alice's record exists.
+
+Set these shell variables, replacing the placeholders with your existing values. Do not generate a new operation ID or substitute a Project name, job ID or request key. Use a backend URL without a trailing slash.
+
+<CodeGroup>
+
+```shell
+export INFRAMELD_URL='https://YOUR_INFRAMELD_BACKEND'
+export INFRAMELD_TOKEN='YOUR_HUMAN_BEARER_TOKEN'
+export INFRAMELD_OPERATION_ID='YOUR_ORIGINAL_DELETION_OPERATION_ID'
+```
+
+</CodeGroup>
+
+The SDK examples require a local build of the [Python](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-python#build-and-use-locally), [TypeScript](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-typescript#build-and-use-locally) or [Rust](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-rust#build-and-use-locally) package. Follow its instructions in a separate example project. These SDKs are not published to package registries. This guide supplies no CLI deletion-status or login command.
+
+## Read the original operation
+
+Choose one example. Each calls `GET /v1/deletions/status` once and preserves the original operation ID. The ID is an opaque, nonblank string of at most 128 characters. Do not trim or normalize it. The request accepts exactly one `operationId` query parameter, with no caller-selected Project or actor.
+
+<CodeGroup>
+
+```shell
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get "$INFRAMELD_URL/v1/deletions/status" \
+  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header 'Accept: application/json' \
+  --data-urlencode "operationId=$INFRAMELD_OPERATION_ID"
+```
+
+```python
+# Save as deletion_status.py. Run with: python deletion_status.py
+import asyncio
+import os
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.operations_api import OperationsApi
+from inframeld_sdk.exceptions import ApiException
+
+
+async def main() -> None:
+    configuration = Configuration(host=os.environ["INFRAMELD_URL"])
+    async with ApiClient(configuration) as client:
+        try:
+            response = await OperationsApi(client).get_deletion_status_with_http_info(
+                operation_id=os.environ["INFRAMELD_OPERATION_ID"],
+                _headers={
+                    "Authorization": f"Bearer {os.environ['INFRAMELD_TOKEN']}"
+                },
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            print(f"Status could not be read: HTTP {error.status}")
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("Status did not produce a usable response. Keep the original ID.")
+            raise SystemExit(1) from error
+
+        result = response.data.actual_instance
+        if result is None:
+            raise RuntimeError("Status returned no outcome")
+        print(f"HTTP {response.status_code}")
+        print(result.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+// Save as deletion-status.ts in an ESM project with the local SDK installed.
+// With Node 26, run with: node deletion-status.ts
+import { createClient, getDeletionStatus } from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const operationId = process.env.INFRAMELD_OPERATION_ID
+if (!baseUrl || !token || !operationId) {
+  throw new Error(
+    "Set INFRAMELD_URL, INFRAMELD_TOKEN and INFRAMELD_OPERATION_ID"
+  )
+}
+
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const result = await getDeletionStatus({
+  client,
+  query: { operationId },
+  headers: { Authorization: `Bearer ${token}` },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error) {
+  console.error("Status could not be read:", result.error.kind)
+  console.error("HTTP status:", result.response?.status)
+  process.exitCode = 1
+} else if (result.data) {
+  console.log("HTTP", result.response.status)
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+// Save as src/main.rs in a separate Cargo project.
+// Add the local inframeld-sdk path dependency, plus:
+// serde_json = "1"
+// tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+// Run with: cargo run
+use inframeld_sdk::HttpClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let operation_id = std::env::var("INFRAMELD_OPERATION_ID")?;
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    match client.get_deletion_status(&operation_id).await {
+        Ok(response) => {
+            println!("HTTP {}", response.status);
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+        }
+        Err(error) => {
+            if let Some(context) = error.api() {
+                eprintln!("Status could not be read: HTTP {}", context.status);
+            } else {
+                eprintln!("Status did not produce a usable response. Keep the original ID.");
+            }
+            return Err("Status read failed".into());
+        }
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+The HTTP, Python and TypeScript examples use five-second deadlines. The Rust client's default is five seconds. The SDK defaults do not automatically retry the request. A decoding failure is still a failure even if its HTTP status is `200`.
+
+## Interpret retained facts
+
+A successful read returns `outcome: "retained"` or `outcome: "unresolved"`, with `Cache-Control: no-store`. This is illustrative retained output:
+
+<CodeGroup>
+
+```json
+{
+  "outcome": "retained",
+  "operationId": "deletion-operation-1",
+  "jobState": "running",
+  "admissionConfirmed": true,
+  "accessBlocked": true,
+  "applicationShutdownComplete": false,
+  "physicalCleanupComplete": null,
+  "retentionExpiresAt": null
+}
+```
+
+</CodeGroup>
+
+The response confirms admission and blocked access. It reports unfinished application shutdown, while physical cleanup is unknown. It does not say that the Project's bytes are gone.
+
+| Field                                 | Meaning                                                                                             |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `operationId`                         | The original operation, not a new read or replacement deletion.                                     |
+| `jobState`                            | The existing job state, when available. Even `succeeded` alone does not establish physical cleanup. |
+| `admissionConfirmed`, `accessBlocked` | The owner's recorded admission and access-blocking facts.                                           |
+| `applicationShutdownComplete`         | Whether application/key shutdown is confirmed complete.                                             |
+| `physicalCleanupComplete`             | Whether the owning cleanup observation confirms physical completion.                                |
+| `retentionExpiresAt`                  | Established expiry of the retained status, or `null` when none has been established.                |
+
+Every field is present in a retained response. `null` means there is no authoritative value for that fact. It is different from the observed value `false`. Keep each fact separate rather than inventing a completion state from the job status.
+
+An established expiry is returned unchanged. Repeating the read or changing installation settings never extends that operation's captured expiry. A `null` expiry does not prove completion or promise permanent availability. The server rechecks current human eligibility on every read.
+
+## Handle unresolved status and failures
+
+An unresolved response contains only this object:
+
+<CodeGroup>
+
+```json
+{ "outcome": "unresolved" }
+```
+
+</CodeGroup>
+
+It supplies no permitted retained observation. Missing or expired history, insufficient original binding and a different initiating human are deliberately not distinguished. Do not treat it as proof that deletion completed, failed, never existed or had no effects.
+
+| Result                                     | Next step                                                                                                                                                     |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200` with `retained`                      | Interpret the separate facts and preserve any established expiry. You may repeat this read with the same context to observe later facts.                      |
+| `200` with `unresolved`                    | Check your original ID, installation and initiating human. Keep that context. Do not resubmit deletion or switch to an administrator to infer hidden history. |
+| `401`                                      | Supply a valid current human credential for the same installation. An expired, revoked or stale credential is not repaired by changing the operation ID.      |
+| `403`                                      | Resolve the current eligibility or authority restriction. Earlier initiation does not bypass suspension, retirement or recovery restrictions.                 |
+| `400` or `422`                             | Check authentication/input shape. Send exactly one nonblank `operationId`, with no extra query fields.                                                        |
+| `503`, network timeout or decoding failure | The read did not produce a usable status. Resolve the dependency/connection problem before repeating the same read. Do not infer a deletion outcome.          |
+| `500`                                      | Retain the request's diagnostic correlation and use the installation's normal support procedure. The response does not establish a deletion outcome.          |
+
+Errors use the existing Problem Details contract and do not turn missing history into an authorization explanation. This read gives no cancellation, continuation, replacement membership or host-maintenance authority. If you lost the original admission response, [original-request lookup](/guides/recover-original-request) has its own current-permission requirements. It cannot be used to bypass them after membership disappears.

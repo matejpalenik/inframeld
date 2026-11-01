@@ -91,6 +91,9 @@ from inframeld_backend.shared.application.dtos.operation_admission_context_dto i
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.retained_deletion_status_dto import (
+    RetainedDeletionStatusDTO,
+)
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
@@ -103,14 +106,24 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.application.protocols.deletion_status_lookup import (
+    DeletionStatusLookup,
+)
 from inframeld_backend.shared.application.protocols.original_operation_lookup import (
     OriginalOperationLookup,
+)
+from inframeld_backend.shared.application.queries.get_deletion_status_query import (
+    GetDeletionStatusQuery,
 )
 from inframeld_backend.shared.application.queries.lookup_original_operation_query import (
     LookupOriginalOperationQuery,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.http.routes.deletion_status_routes import (
+    create_deletion_status_router,
+)
 from inframeld_backend.shared.http.routes.health_routes import router as health_router
 from inframeld_backend.shared.http.routes.original_operation_lookup_routes import (
     create_original_operation_lookup_router,
@@ -277,6 +290,43 @@ async def _open_original_lookup() -> AsyncGenerator[OriginalOperationLookup]:
     yield MockSDKOriginalOperationLookup()
 
 
+class MockSDKDeletionStatusLookup(DeletionStatusLookup):
+    """Supply content-free application outcomes, without pretending to delete resources."""
+
+    @override
+    async def lookup(
+        self, *, access: AccessContextDTO, query: GetDeletionStatusQuery
+    ) -> RetainedDeletionStatusDTO | UnresolvedOperationDTO:
+        match query.operation_id.value:
+            case "settled +/&é":
+                return RetainedDeletionStatusDTO(
+                    query.operation_id,
+                    JobStatus.SUCCEEDED,
+                    True,
+                    True,
+                    True,
+                    True,
+                    datetime(2030, 1, 1, tzinfo=UTC),
+                )
+            case "active":
+                return RetainedDeletionStatusDTO(
+                    query.operation_id, JobStatus.RUNNING, True, True, False, None, None
+                )
+            case "unknown":
+                return RetainedDeletionStatusDTO(
+                    query.operation_id, None, None, None, None, None, None
+                )
+            case "unavailable":
+                raise DependencyUnavailableError()
+            case _:
+                return UnresolvedOperationDTO()
+
+
+@asynccontextmanager
+async def _open_deletion_status() -> AsyncGenerator[DeletionStatusLookup]:
+    yield MockSDKDeletionStatusLookup()
+
+
 async def _fault_response(fault: SDKFaultRequestDTO | None) -> Response | None:
     """Return an explicitly arranged wire response without changing production routes."""
     if fault is None:
@@ -382,6 +432,7 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(
         create_original_operation_lookup_router(authenticate, _open_original_lookup)
     )
+    application.include_router(create_deletion_status_router(authenticate, _open_deletion_status))
     application.include_router(create_human_oauth_consent_router(MockSDKConsentHandler(), csrf))
     counts: dict[str, int] = {}
     observations: dict[str, dict[str, JsonValue]] = {}
