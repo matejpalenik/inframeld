@@ -58,7 +58,7 @@ Choose the row matching the task. Workflow, contract and architecture views are 
 | First use and private defaults | [First use and private defaults](references/first-use-and-private-defaults.md) |
 | An unfamiliar shared term | [Shared vocabulary](references/glossary.md) |
 | Cross-domain ownership and pending navigation | [Find the owner before designing the component](references/module-map.md) |
-| Resource names and identity | [Resource names, display names and identity](references/resource-names-and-identity.md) |
+| Resource names and identity | [Resource names, display names and identity](references/resource-names-and-identity.md). For Project metadata authority, legacy allocation or first-grant repair, also read the [approved metadata decision](../inframeld-access-models/references/decision-project-metadata-authority.md). |
 | Runtime deployment and storage | [Runtime deployment and durable storage](references/runtime-deployment-and-storage.md) |
 | Storage topology | [Durable storage and ownership](references/storage-topology.md) |
 | Supported workload and qualification | [Supported workload and qualification](references/supported-workload-and-qualification.md) |

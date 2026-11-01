@@ -94,6 +94,39 @@ def _rejects_native_null() -> bool:
 
 
 class GeneratedModelTests(unittest.TestCase):
+    def test_metadata_change_preserves_omission_and_counts_unicode_code_points(self) -> None:
+        source: dict[str, JsonValue] = {"expectedMetadataRevision": 0, "name": "production"}
+        model = inframeld_sdk.ProjectMetadataUpdateRequest.model_validate(source)
+        self.assertEqual(body_value(model), source)
+        for field in ["name", "displayName"]:
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                inframeld_sdk.ProjectMetadataUpdateRequest.model_validate(source | {field: None})
+        for label in ["🧭" * 128, "e\u0301" * 64]:
+            value: dict[str, JsonValue] = {"expectedMetadataRevision": 0, "displayName": label}
+            self.assertEqual(
+                body_value(inframeld_sdk.ProjectMetadataUpdateRequest.model_validate(value)), value
+            )
+        for replacements in [{"name": "A"}, {"name": "a" * 64}, {"displayName": "🧭" * 129}]:
+            with self.subTest(replacements=replacements), self.assertRaises(ValueError):
+                inframeld_sdk.ProjectMetadataUpdateRequest.model_validate(
+                    {"expectedMetadataRevision": 0} | replacements
+                )
+
+    def test_metadata_read_requires_nullable_selector_and_preserves_legacy_label(self) -> None:
+        source: dict[str, JsonValue] = {
+            "projectId": "00000000-0000-4000-8000-000000000003",
+            "organizationId": "00000000-0000-4000-8000-000000000002",
+            "name": None,
+            "displayName": "legacy\x01\n" + "x" * 150,
+            "metadataRevision": 0,
+        }
+        self.assertEqual(
+            body_value(inframeld_sdk.ProjectMetadataResponse.model_validate(source)), source
+        )
+        source.pop("name")
+        with self.assertRaises(ValueError):
+            inframeld_sdk.ProjectMetadataResponse.model_validate(source)
+
     def test_original_lookup_preserves_null_scope_and_requires_the_guard(self) -> None:
         source: dict[str, JsonValue] = {
             "installationId": "00000000-0000-4000-8000-000000000001",

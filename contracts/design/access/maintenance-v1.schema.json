@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Inframeld version 1 maintenance input, design contract",
-  "description": "Bootstrap and stranded-authority repair remain design-only. Recovery-cleanup continuation is implemented by the backend maintenance command. A valid shape does not establish host authority.",
-  "$comment": "Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. ADR-0085 resolves PD-ACCESS-03. Enforce the 64 KiB received-byte bound, strict JSON integer tokens, duplicate-key rejection, one JSON value and verified host/installation authority separately. Bootstrap/repair require current recipient proof and reviewed scope. Recovery continuation forbids that proof and reviewed-run inputs, deduplicates the operator request and checks current original recovery eligibility and active runs. Only resume-recovery-cleanup is implemented by apps/backend/src/inframeld_backend/access/cli/mappers/recovery_maintenance_mapper.py. Bootstrap/repair remain design-only. JSON Schema integer validation accepts 1.0.",
+  "description": "Bootstrap and stranded-authority repair remain design-only at this recording checkpoint. ADR-0124 approves the exact Project edit-project-metadata repair subset for #120 delivery. Recovery-cleanup continuation is implemented. A schema-valid shape does not establish runtime support or host authority.",
+  "$comment": "Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. ADR-0085 resolves PD-ACCESS-03. Enforce the 64 KiB received-byte bound, strict JSON integer tokens, duplicate-key rejection, one JSON value and verified host/installation authority separately. Bootstrap/repair require current recipient proof and reviewed scope. Recovery continuation forbids that proof and reviewed-run inputs, deduplicates the operator request and checks current original recovery eligibility and active runs. Only resume-recovery-cleanup is implemented by apps/backend/src/inframeld_backend/access/cli/mappers/recovery_maintenance_mapper.py. Bootstrap/repair remain design-only. JSON Schema integer validation accepts 1.0. ADR-0124 selects only responsibility.kind action-grantor, target.kind project with its projectId, and literal actionId edit-project-metadata for the forthcoming #120 repair implementation. Other repair shapes remain future design, even when this schema accepts them. Preserve shared installation/operator operationId uniqueness and typed mode receipts. Proof verification, recipient eligibility, stranded/revision checks and atomic assignment/audit are application work, not schema validation.",
   "$defs": {
     "target": {
       "oneOf": [
@@ -208,7 +208,8 @@
           "required": ["kind", "target", "actionId"],
           "additionalProperties": false
         }
-      ]
+      ],
+      "$comment": "The broad variants preserve accepted future repair design. #120 runtime delivery is restricted to action-grantor on one exact Project for edit-project-metadata. Group-manager and other action/target combinations remain unsupported until separately delivered."
     }
   },
   "oneOf": [

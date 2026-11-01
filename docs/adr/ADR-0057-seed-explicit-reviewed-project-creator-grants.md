@@ -1,6 +1,6 @@
 # ADR-0057: Seed explicit reviewed project-creator grants
 
-**Status:** Superseded by [ADR-0059](ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md). The eleven-action decision below preserves its original rationale; ADR-0059 owns the current seventeen-action Project seed and fixed resource assignments.
+**Status:** Superseded by [ADR-0059](ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md). The eleven-action decision below preserves its original rationale. ADR-0059 records the historical seventeen-action Project seed and fixed resource assignments. [ADR-0124](ADR-0124-authorize-project-metadata-changes-explicitly.md) adds the eighteenth Project action while preserving the other resource assignments.
 
 **Date:** 2026-10-04
 

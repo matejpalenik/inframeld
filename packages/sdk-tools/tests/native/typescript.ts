@@ -96,3 +96,33 @@ const guessedLookupJob: Pick<AcceptedOperationLookupResponse, "jobReference"> =
     jobReference: "known",
   };
 void [missingLookupGuard, unknownLookupJob, guessedLookupJob];
+
+import type {
+  ProjectMetadataUpdateRequest,
+  ProjectMetadataResponse,
+} from "@inframeld/sdk";
+const selectorOnlyMetadata: ProjectMetadataUpdateRequest = {
+  expectedMetadataRevision: 0,
+  name: "production",
+};
+const unicodeMetadata: ProjectMetadataUpdateRequest = {
+  expectedMetadataRevision: 0,
+  displayName: "🧭".repeat(128),
+};
+const nullSelectorMetadata: Pick<ProjectMetadataResponse, "name"> = {
+  name: null,
+};
+// @ts-expect-error A nullable selector must still be present in a read response.
+const absentSelectorMetadata: Pick<ProjectMetadataResponse, "name"> = {};
+const clearedMetadata: ProjectMetadataUpdateRequest = {
+  expectedMetadataRevision: 0,
+  // @ts-expect-error An omitted replacement differs from an explicit null replacement.
+  displayName: null,
+};
+void [
+  selectorOnlyMetadata,
+  unicodeMetadata,
+  nullSelectorMetadata,
+  absentSelectorMetadata,
+  clearedMetadata,
+];

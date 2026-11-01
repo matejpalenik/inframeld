@@ -2,8 +2,8 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { AssignProjectUseOnlyGrantData, AssignProjectUseOnlyGrantErrors, AssignProjectUseOnlyGrantResponses, DecideHumanOAuthConsentData, DecideHumanOAuthConsentErrors, DecideHumanOAuthConsentResponses, GetCurrentSessionData, GetCurrentSessionErrors, GetCurrentSessionResponses, GetDeletionStatusData, GetDeletionStatusErrors, GetDeletionStatusResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetProtectedResourceMetadataData, GetProtectedResourceMetadataErrors, GetProtectedResourceMetadataForPathData, GetProtectedResourceMetadataForPathErrors, GetProtectedResourceMetadataForPathResponses, GetProtectedResourceMetadataResponses, InspectHumanOAuthConsentData, InspectHumanOAuthConsentErrors, InspectHumanOAuthConsentResponses, LookupOriginalOperationData, LookupOriginalOperationErrors, LookupOriginalOperationResponses } from './types.gen.js';
-import { zAssignProjectUseOnlyGrant201Representation0Response, zAssignProjectUseOnlyGrant400Representation0Response, zAssignProjectUseOnlyGrant401Representation0Response, zAssignProjectUseOnlyGrant403Representation0Response, zAssignProjectUseOnlyGrant404Representation0Response, zAssignProjectUseOnlyGrant409Representation0Response, zAssignProjectUseOnlyGrant422Representation0Response, zAssignProjectUseOnlyGrant503Representation0Response, zAssignProjectUseOnlyGrantResponse, zDecideHumanOAuthConsent200Representation0Response, zDecideHumanOAuthConsent400Representation0Response, zDecideHumanOAuthConsent401Representation0Response, zDecideHumanOAuthConsent403Representation0Response, zDecideHumanOAuthConsent404Representation0Response, zDecideHumanOAuthConsent422Representation0Response, zDecideHumanOAuthConsent503Representation0Response, zDecideHumanOAuthConsentResponse, zGetCurrentSession200Representation0Response, zGetCurrentSession400Representation0Response, zGetCurrentSession401Representation0Response, zGetCurrentSession403Representation0Response, zGetCurrentSession503Representation0Response, zGetCurrentSessionResponse, zGetDeletionStatus200Representation0Response, zGetDeletionStatus400Representation0Response, zGetDeletionStatus401Representation0Response, zGetDeletionStatus403Representation0Response, zGetDeletionStatus422Representation0Response, zGetDeletionStatus500Representation0Response, zGetDeletionStatus503Representation0Response, zGetDeletionStatusResponse, zGetHealth200Representation0Response, zGetHealth500Representation0Response, zGetHealthResponse, zGetProtectedResourceMetadata200Representation0Response, zGetProtectedResourceMetadata404Representation0Response, zGetProtectedResourceMetadata422Representation0Response, zGetProtectedResourceMetadata503Representation0Response, zGetProtectedResourceMetadataForPath200Representation0Response, zGetProtectedResourceMetadataForPath404Representation0Response, zGetProtectedResourceMetadataForPath422Representation0Response, zGetProtectedResourceMetadataForPath503Representation0Response, zGetProtectedResourceMetadataForPathResponse, zGetProtectedResourceMetadataResponse, zInspectHumanOAuthConsent200Representation0Response, zInspectHumanOAuthConsent400Representation0Response, zInspectHumanOAuthConsent401Representation0Response, zInspectHumanOAuthConsent403Representation0Response, zInspectHumanOAuthConsent404Representation0Response, zInspectHumanOAuthConsent422Representation0Response, zInspectHumanOAuthConsent503Representation0Response, zInspectHumanOAuthConsentResponse, zLookupOriginalOperation200Representation0Response, zLookupOriginalOperation400Representation0Response, zLookupOriginalOperation401Representation0Response, zLookupOriginalOperation403Representation0Response, zLookupOriginalOperation404Representation0Response, zLookupOriginalOperation413Representation0Response, zLookupOriginalOperation415Representation0Response, zLookupOriginalOperation422Representation0Response, zLookupOriginalOperation503Representation0Response, zLookupOriginalOperationResponse } from './zod.gen.js';
+import type { AssignProjectUseOnlyGrantData, AssignProjectUseOnlyGrantErrors, AssignProjectUseOnlyGrantResponses, DecideHumanOAuthConsentData, DecideHumanOAuthConsentErrors, DecideHumanOAuthConsentResponses, GetCurrentSessionData, GetCurrentSessionErrors, GetCurrentSessionResponses, GetDeletionStatusData, GetDeletionStatusErrors, GetDeletionStatusResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetProjectMetadataData, GetProjectMetadataErrors, GetProjectMetadataResponses, GetProtectedResourceMetadataData, GetProtectedResourceMetadataErrors, GetProtectedResourceMetadataForPathData, GetProtectedResourceMetadataForPathErrors, GetProtectedResourceMetadataForPathResponses, GetProtectedResourceMetadataResponses, InspectHumanOAuthConsentData, InspectHumanOAuthConsentErrors, InspectHumanOAuthConsentResponses, LookupOriginalOperationData, LookupOriginalOperationErrors, LookupOriginalOperationResponses, ResolveProjectNameData, ResolveProjectNameErrors, ResolveProjectNameResponses, UpdateProjectMetadataData, UpdateProjectMetadataErrors, UpdateProjectMetadataResponses } from './types.gen.js';
+import { zAssignProjectUseOnlyGrant201Representation0Response, zAssignProjectUseOnlyGrant400Representation0Response, zAssignProjectUseOnlyGrant401Representation0Response, zAssignProjectUseOnlyGrant403Representation0Response, zAssignProjectUseOnlyGrant404Representation0Response, zAssignProjectUseOnlyGrant409Representation0Response, zAssignProjectUseOnlyGrant422Representation0Response, zAssignProjectUseOnlyGrant503Representation0Response, zAssignProjectUseOnlyGrantResponse, zDecideHumanOAuthConsent200Representation0Response, zDecideHumanOAuthConsent400Representation0Response, zDecideHumanOAuthConsent401Representation0Response, zDecideHumanOAuthConsent403Representation0Response, zDecideHumanOAuthConsent404Representation0Response, zDecideHumanOAuthConsent422Representation0Response, zDecideHumanOAuthConsent503Representation0Response, zDecideHumanOAuthConsentResponse, zGetCurrentSession200Representation0Response, zGetCurrentSession400Representation0Response, zGetCurrentSession401Representation0Response, zGetCurrentSession403Representation0Response, zGetCurrentSession503Representation0Response, zGetCurrentSessionResponse, zGetDeletionStatus200Representation0Response, zGetDeletionStatus400Representation0Response, zGetDeletionStatus401Representation0Response, zGetDeletionStatus403Representation0Response, zGetDeletionStatus422Representation0Response, zGetDeletionStatus500Representation0Response, zGetDeletionStatus503Representation0Response, zGetDeletionStatusResponse, zGetHealth200Representation0Response, zGetHealth500Representation0Response, zGetHealthResponse, zGetProjectMetadata200Representation0Response, zGetProjectMetadata400Representation0Response, zGetProjectMetadata401Representation0Response, zGetProjectMetadata403Representation0Response, zGetProjectMetadata404Representation0Response, zGetProjectMetadata409Representation0Response, zGetProjectMetadata422Representation0Response, zGetProjectMetadata503Representation0Response, zGetProjectMetadataResponse, zGetProtectedResourceMetadata200Representation0Response, zGetProtectedResourceMetadata404Representation0Response, zGetProtectedResourceMetadata422Representation0Response, zGetProtectedResourceMetadata503Representation0Response, zGetProtectedResourceMetadataForPath200Representation0Response, zGetProtectedResourceMetadataForPath404Representation0Response, zGetProtectedResourceMetadataForPath422Representation0Response, zGetProtectedResourceMetadataForPath503Representation0Response, zGetProtectedResourceMetadataForPathResponse, zGetProtectedResourceMetadataResponse, zInspectHumanOAuthConsent200Representation0Response, zInspectHumanOAuthConsent400Representation0Response, zInspectHumanOAuthConsent401Representation0Response, zInspectHumanOAuthConsent403Representation0Response, zInspectHumanOAuthConsent404Representation0Response, zInspectHumanOAuthConsent422Representation0Response, zInspectHumanOAuthConsent503Representation0Response, zInspectHumanOAuthConsentResponse, zLookupOriginalOperation200Representation0Response, zLookupOriginalOperation400Representation0Response, zLookupOriginalOperation401Representation0Response, zLookupOriginalOperation403Representation0Response, zLookupOriginalOperation404Representation0Response, zLookupOriginalOperation413Representation0Response, zLookupOriginalOperation415Representation0Response, zLookupOriginalOperation422Representation0Response, zLookupOriginalOperation503Representation0Response, zLookupOriginalOperationResponse, zResolveProjectName200Representation0Response, zResolveProjectName400Representation0Response, zResolveProjectName401Representation0Response, zResolveProjectName403Representation0Response, zResolveProjectName404Representation0Response, zResolveProjectName409Representation0Response, zResolveProjectName422Representation0Response, zResolveProjectName503Representation0Response, zResolveProjectNameResponse, zUpdateProjectMetadata200Representation0Response, zUpdateProjectMetadata400Representation0Response, zUpdateProjectMetadata401Representation0Response, zUpdateProjectMetadata403Representation0Response, zUpdateProjectMetadata404Representation0Response, zUpdateProjectMetadata409Representation0Response, zUpdateProjectMetadata413Representation0Response, zUpdateProjectMetadata415Representation0Response, zUpdateProjectMetadata422Representation0Response, zUpdateProjectMetadata503Representation0Response, zUpdateProjectMetadataResponse } from './zod.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -167,6 +167,30 @@ export const lookupOriginalOperation = <ThrowOnError extends boolean = false>(op
 });
 
 /**
+ * Resolve
+ */
+export const resolveProjectName = <ThrowOnError extends boolean = false>(options: Options<ResolveProjectNameData, ThrowOnError>): RequestResult<ResolveProjectNameResponses, ResolveProjectNameErrors, ThrowOnError> => (options.client ?? client).get<ResolveProjectNameResponses, ResolveProjectNameErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'ory_kratos_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/v1/projects/by-name/{name}',
+    ...options,
+    responseValidator: async (data) => await zResolveProjectNameResponse.parseAsync(data),
+    responseContract: {
+        200: { hasBody: true, representations: [{ mediaType: 'application/json', validator: async (data) => await zResolveProjectName200Representation0Response.parseAsync(data) }] },
+        400: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zResolveProjectName400Representation0Response.parseAsync(data) }] },
+        401: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zResolveProjectName401Representation0Response.parseAsync(data) }] },
+        403: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zResolveProjectName403Representation0Response.parseAsync(data) }] },
+        404: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zResolveProjectName404Representation0Response.parseAsync(data) }] },
+        409: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zResolveProjectName409Representation0Response.parseAsync(data) }] },
+        422: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zResolveProjectName422Representation0Response.parseAsync(data) }] },
+        503: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zResolveProjectName503Representation0Response.parseAsync(data) }] }
+    }
+});
+
+/**
  * Assign Use Only
  */
 export const assignProjectUseOnlyGrant = <ThrowOnError extends boolean = false>(options: Options<AssignProjectUseOnlyGrantData, ThrowOnError>): RequestResult<AssignProjectUseOnlyGrantResponses, AssignProjectUseOnlyGrantErrors, ThrowOnError> => (options.client ?? client).post<AssignProjectUseOnlyGrantResponses, AssignProjectUseOnlyGrantErrors, ThrowOnError>({
@@ -187,6 +211,60 @@ export const assignProjectUseOnlyGrant = <ThrowOnError extends boolean = false>(
         409: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zAssignProjectUseOnlyGrant409Representation0Response.parseAsync(data) }] },
         422: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zAssignProjectUseOnlyGrant422Representation0Response.parseAsync(data) }] },
         503: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zAssignProjectUseOnlyGrant503Representation0Response.parseAsync(data) }] }
+    },
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get
+ */
+export const getProjectMetadata = <ThrowOnError extends boolean = false>(options: Options<GetProjectMetadataData, ThrowOnError>): RequestResult<GetProjectMetadataResponses, GetProjectMetadataErrors, ThrowOnError> => (options.client ?? client).get<GetProjectMetadataResponses, GetProjectMetadataErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'ory_kratos_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/v1/projects/{project_id}/metadata',
+    ...options,
+    responseValidator: async (data) => await zGetProjectMetadataResponse.parseAsync(data),
+    responseContract: {
+        200: { hasBody: true, representations: [{ mediaType: 'application/json', validator: async (data) => await zGetProjectMetadata200Representation0Response.parseAsync(data) }] },
+        400: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProjectMetadata400Representation0Response.parseAsync(data) }] },
+        401: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProjectMetadata401Representation0Response.parseAsync(data) }] },
+        403: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProjectMetadata403Representation0Response.parseAsync(data) }] },
+        404: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProjectMetadata404Representation0Response.parseAsync(data) }] },
+        409: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProjectMetadata409Representation0Response.parseAsync(data) }] },
+        422: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProjectMetadata422Representation0Response.parseAsync(data) }] },
+        503: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zGetProjectMetadata503Representation0Response.parseAsync(data) }] }
+    }
+});
+
+/**
+ * Update
+ */
+export const updateProjectMetadata = <ThrowOnError extends boolean = false>(options: Options<UpdateProjectMetadataData, ThrowOnError>): RequestResult<UpdateProjectMetadataResponses, UpdateProjectMetadataErrors, ThrowOnError> => (options.client ?? client).patch<UpdateProjectMetadataResponses, UpdateProjectMetadataErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'ory_kratos_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/v1/projects/{project_id}/metadata',
+    ...options,
+    responseValidator: async (data) => await zUpdateProjectMetadataResponse.parseAsync(data),
+    responseContract: {
+        200: { hasBody: true, representations: [{ mediaType: 'application/json', validator: async (data) => await zUpdateProjectMetadata200Representation0Response.parseAsync(data) }] },
+        400: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zUpdateProjectMetadata400Representation0Response.parseAsync(data) }] },
+        401: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zUpdateProjectMetadata401Representation0Response.parseAsync(data) }] },
+        403: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zUpdateProjectMetadata403Representation0Response.parseAsync(data) }] },
+        404: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zUpdateProjectMetadata404Representation0Response.parseAsync(data) }] },
+        409: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zUpdateProjectMetadata409Representation0Response.parseAsync(data) }] },
+        413: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zUpdateProjectMetadata413Representation0Response.parseAsync(data) }] },
+        415: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zUpdateProjectMetadata415Representation0Response.parseAsync(data) }] },
+        422: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zUpdateProjectMetadata422Representation0Response.parseAsync(data) }] },
+        503: { hasBody: true, representations: [{ mediaType: 'application/problem+json', validator: async (data) => await zUpdateProjectMetadata503Representation0Response.parseAsync(data) }] }
     },
     headers: {
         'Content-Type': 'application/json',

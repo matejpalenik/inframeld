@@ -27,8 +27,14 @@ from inframeld_backend.access.application.dtos.verified_human_identity_dto impor
 from inframeld_backend.access.application.enums.identity_recovery_cleanup_resume_outcome import (
     IdentityRecoveryCleanupResumeOutcome,
 )
+from inframeld_backend.access.application.enums.recovery_maintenance_error_code import (
+    RecoveryMaintenanceErrorCode,
+)
 from inframeld_backend.access.application.enums.recovery_maintenance_mode import (
     RecoveryMaintenanceMode,
+)
+from inframeld_backend.access.application.errors.recovery_maintenance_error import (
+    RecoveryMaintenanceError,
 )
 from inframeld_backend.access.application.protocols.identity_recovery_cleanup_resume_facts_reader import (
     IdentityRecoveryCleanupResumeFactsReader,
@@ -94,7 +100,11 @@ class PostgresIdentityRecoveryCleanupResumeFactsReader(IdentityRecoveryCleanupRe
         if row is None:
             return None
 
+        if row.mode == "repair-stranded-authority":
+            raise RecoveryMaintenanceError(RecoveryMaintenanceErrorCode.KEY_REUSED)
         mode = RecoveryMaintenanceMode(row.mode)
+        if row.recovery_operation_id is None or row.released is None:
+            raise RuntimeError("The recovery maintenance receipt has no recovery result.")
         command = ResumeIdentityRecoveryCleanupCommand(
             installation_id,
             operation_id,

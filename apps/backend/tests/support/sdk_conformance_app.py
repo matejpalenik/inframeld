@@ -28,6 +28,9 @@ from inframeld_backend.access.application.commands.assign_project_use_only_grant
 from inframeld_backend.access.application.commands.decide_human_oauth_consent_command import (
     DecideHumanOAuthConsentCommand,
 )
+from inframeld_backend.access.application.commands.update_project_metadata_command import (
+    UpdateProjectMetadataCommand,
+)
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto import (
     HumanOAuthConsentDetailsDTO,
@@ -35,9 +38,16 @@ from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto i
 from inframeld_backend.access.application.dtos.oauth_consent_continuation_dto import (
     OAuthConsentContinuationDTO,
 )
+from inframeld_backend.access.application.dtos.project_metadata_change_result_dto import (
+    ProjectMetadataChangeResultDTO,
+)
+from inframeld_backend.access.application.dtos.project_metadata_dto import ProjectMetadataDTO
 from inframeld_backend.access.application.dtos.public_discovery_dto import PublicDiscoveryDTO
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
+)
+from inframeld_backend.access.application.errors.retired_project_name_error import (
+    RetiredProjectNameError,
 )
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
@@ -49,8 +59,21 @@ from inframeld_backend.access.application.protocols.human_session_authenticator 
     HumanSessionAuthenticator,
 )
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
+from inframeld_backend.access.application.protocols.project_metadata_changer import (
+    ProjectMetadataChanger,
+)
+from inframeld_backend.access.application.protocols.project_metadata_reader import (
+    ProjectMetadataReader,
+)
+from inframeld_backend.access.application.protocols.project_name_resolver import ProjectNameResolver
+from inframeld_backend.access.application.queries.get_project_metadata_query import (
+    GetProjectMetadataQuery,
+)
 from inframeld_backend.access.application.queries.inspect_human_oauth_consent_query import (
     InspectHumanOAuthConsentQuery,
+)
+from inframeld_backend.access.application.queries.resolve_project_name_query import (
+    ResolveProjectNameQuery,
 )
 from inframeld_backend.access.application.value_objects.browser_session_credential import (
     BrowserSessionCredential,
@@ -63,7 +86,9 @@ from inframeld_backend.access.domain.enums.human_oauth_scope import HumanOAuthSc
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
@@ -76,6 +101,9 @@ from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
 from inframeld_backend.access.http.routes.project_grant_routes import create_project_grant_router
+from inframeld_backend.access.http.routes.project_metadata_routes import (
+    create_project_metadata_router,
+)
 from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
     AcceptedAsyncOperationDTO,
 )
@@ -105,6 +133,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     AuthenticationRequiredError,
     DependencyUnavailableError,
+    StaleRevisionError,
 )
 from inframeld_backend.shared.application.protocols.deletion_status_lookup import (
     DeletionStatusLookup,
@@ -121,6 +150,7 @@ from inframeld_backend.shared.application.queries.lookup_original_operation_quer
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.http.routes.deletion_status_routes import (
     create_deletion_status_router,
 )
@@ -227,6 +257,80 @@ async def _open_grant_change() -> AsyncGenerator[ProjectGrantChanger]:
     yield MockSDKGrantChanger()
 
 
+class MockSDKProjectMetadata(ProjectMetadataReader, ProjectMetadataChanger, ProjectNameResolver):
+    """Supply explicit metadata observations without claiming persistence or grant administration."""
+
+    @staticmethod
+    def _metadata(
+        project_id: ProjectId,
+        name: ResourceName | None = None,
+        display_name: str | None = None,
+        revision: int = 0,
+    ) -> ProjectMetadataDTO:
+        return ProjectMetadataDTO(
+            OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            project_id,
+            name,
+            "legacy\x01\n" + "x" * 150 if display_name is None else display_name,
+            revision,
+        )
+
+    @override
+    async def get(
+        self, *, access: AccessContextDTO, query: GetProjectMetadataQuery
+    ) -> ProjectMetadataDTO:
+        return self._metadata(query.project_id)
+
+    @override
+    async def resolve(
+        self, *, access: AccessContextDTO, query: ResolveProjectNameQuery
+    ) -> ProjectMetadataDTO:
+        project_id = ProjectId(UUID("00000000-0000-4000-8000-000000000003"))
+        if query.name == ResourceName("former-support"):
+            raise RetiredProjectNameError(project_id, ResourceName("support"))
+        return self._metadata(project_id, query.name)
+
+    @override
+    async def update(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: UpdateProjectMetadataCommand,
+        context: OperationAdmissionContextDTO,
+    ) -> ProjectMetadataChangeResultDTO:
+        if command.expected_metadata_revision != 0:
+            raise StaleRevisionError()
+        return ProjectMetadataChangeResultDTO(
+            self._metadata(
+                command.project_id,
+                command.name,
+                None if command.display_name is None else command.display_name.value,
+                1,
+            ),
+            CompletedSynchronousOperationDTO(
+                OperationId("sdk-metadata-operation"),
+                True,
+                OperationReplayKind.SAFE_RESULT,
+                datetime(2030, 1, 1, tzinfo=UTC),
+            ),
+        )
+
+
+@asynccontextmanager
+async def _open_metadata_reader() -> AsyncGenerator[ProjectMetadataReader]:
+    yield MockSDKProjectMetadata()
+
+
+@asynccontextmanager
+async def _open_metadata_changer() -> AsyncGenerator[ProjectMetadataChanger]:
+    yield MockSDKProjectMetadata()
+
+
+@asynccontextmanager
+async def _open_name_resolver() -> AsyncGenerator[ProjectNameResolver]:
+    yield MockSDKProjectMetadata()
+
+
 class MockSDKOriginalOperationLookup(OriginalOperationLookup):
     """Supply explicit retained outcomes without a database or business dispatch."""
 
@@ -243,7 +347,14 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
         query.expected_authority.require_supported_scope(
             project_id=query.project_id, method=query.method, requested_route=query.requested_route
         )
-        original_action = "create-projects" if query.project_id is None else "create-access-groups"
+        metadata = query.requested_route == "/v1/projects/{project_id}/metadata"
+        original_action = (
+            "edit-project-metadata"
+            if metadata
+            else "create-projects"
+            if query.project_id is None
+            else "create-access-groups"
+        )
         if (
             query.installation_id.value != UUID("00000000-0000-4000-8000-000000000001")
             or query.organization_id.value != UUID("00000000-0000-4000-8000-000000000002")
@@ -260,6 +371,13 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
         ):
             return UnresolvedOperationDTO()
 
+        if metadata and query.method == "PATCH" and query.key.value == "sdk-metadata-key":
+            return CompletedSynchronousOperationDTO(
+                OperationId("sdk-metadata-operation"),
+                False,
+                OperationReplayKind.SAFE_RESULT,
+                datetime(2030, 1, 1, tzinfo=UTC),
+            )
         operation = OperationId("sdk-original-operation")
         match query.key.value:
             case "completed +/&é" | "issued-secret" | "answer-receipt":
@@ -429,6 +547,14 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(health_router)
     application.include_router(create_session_router(authenticate))
     application.include_router(create_project_grant_router(authenticate, _open_grant_change))
+    application.include_router(
+        create_project_metadata_router(
+            authenticate,
+            _open_metadata_reader,
+            _open_metadata_changer,
+            _open_name_resolver,
+        )
+    )
     application.include_router(
         create_original_operation_lookup_router(authenticate, _open_original_lookup)
     )

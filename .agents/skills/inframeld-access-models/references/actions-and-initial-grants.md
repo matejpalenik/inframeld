@@ -34,17 +34,21 @@ Use `inspect-budget` and the separate human-only `manage-budget`, each on the ex
 
 <a id="seventeen-explicit-initial-project-grants"></a>
 
-#### Seventeen explicit initial project grants
+<a id="eighteen-explicit-initial-project-grants"></a>
 
-The fixed list is `manage-project-members`, `create-access-groups`, `create-application-accounts`, `create-pipelines`, `create-deployments`, `manage-upload-defaults`, `delete-project`, `inspect-budget`, `manage-budget`, `manage-trace-policy`, `delete-trace-history`, `inspect-feedback`, `create-collections`, `create-sources`, `create-model-connections`, `create-processing-profiles` and `create-embedding-profiles`.
+#### Eighteen explicit initial project grants
 
-[The initial-assignment contract](#initial-assignments) owns this list and the enumerated human creator assignments for Pipelines, Deployments, Collections, Sources, connections, profiles and application accounts. [ADR-0059](../../../../docs/adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md) supersedes the earlier eleven-action seed. These are removable exact-target grants, not an administrator role, future-action wildcard or automatic backfill for existing projects. Pipeline creators receive thirteen assignments. Deployment creators receive seven, including own-feedback authority. Resource grants supply neither document access nor rights on another resource.
+The fixed list is `manage-project-members`, `create-access-groups`, `create-application-accounts`, `create-pipelines`, `create-deployments`, `manage-upload-defaults`, `delete-project`, `inspect-budget`, `manage-budget`, `manage-trace-policy`, `delete-trace-history`, `inspect-feedback`, `create-collections`, `create-sources`, `create-model-connections`, `create-processing-profiles`, `create-embedding-profiles` and `edit-project-metadata`.
+
+[The initial-assignment contract](#initial-assignments) owns this list and the enumerated human creator assignments for Pipelines, Deployments, Collections, Sources, connections, profiles and application accounts. [ADR-0059](../../../../docs/adr/ADR-0059-seed-fixed-human-creator-grants-for-v1-resources.md) expanded the historical eleven-action seed to seventeen. [ADR-0124](../../../../docs/adr/ADR-0124-authorize-project-metadata-changes-explicitly.md) adds only `edit-project-metadata` as the eighteenth Project assignment, preserving the other resource assignments. These are removable exact-target grants, not an administrator role, future-action wildcard or automatic backfill for existing projects. Pipeline creators receive thirteen assignments. Deployment creators receive seven, including own-feedback authority. Resource grants supply neither document access nor rights on another resource.
+
+**Delivery boundary:** #120 must implement recognition/current authorization of the new human-only action and restricted first-grant host repair for existing Projects. This checkpoint records that contract before dependent code. Automatic creator assignment remains selected design for ordinary Project creation in #223 and private starters in #27. Neither production provisioner exists at this checkpoint. They must commit all eighteen assignments with the Project, creator membership, audit and original outcome. Existing Projects receive no automatic backfill. The four Organization bootstrap grants are unchanged.
 
 For example, Alice keeps her starter and creates Legal Research for a separate workload. Ordinary project administration owns this creation operation:
 
 1. Check that Alice is an eligible human with current installation-level Create projects permission. There is no existing project membership to require yet.
 2. Check the reviewed Name and Display name. An unavailable Name fails without silently choosing a different one or revealing another project's owner.
-3. Save the project, Alice's membership, the seventeen explicit initial assignments, audit and original-request outcome together. If the transaction fails, none of these partial records remains.
+3. Save the project, Alice's membership, the eighteen explicit initial assignments, audit and original-request outcome together. If the transaction fails, none of these partial records remains.
 4. Return the committed identity. If the response is lost, recover that original result under current access. Do not create another project or restore grants removed since creation.
 
 Creation alone does not create RAG resources, change the starter or change the CLI's saved selection. Setup and import are separate next operations. If either is interrupted, the completed project remains. CLI access management presents ordinary creation and deletion. Setup uses the same creation operation. Starter provisioning remains a separate responsibility and does not depend on Create projects.
@@ -77,6 +81,7 @@ Applications may receive **can use** only for eligible actions. Humans may recei
 | `suspend-users` | Organization | Human | Immediately block a human even if responsibilities become stranded. |
 | `restore-users` | Organization | Human | Deliberately restore a suspended human after identity/security review and required cleanup. |
 | `create-projects` | Organization | Human | Create an additional ordinary project. Starter provisioning remains separate. |
+| `edit-project-metadata` | Project | Human | First selector allocation and Name/Display-name changes on this Project under current authority and expected metadata revision. Supplies no membership, provisioning or other resource authority. |
 | `manage-project-members` | Project | Human | Add/remove eligible members and review membership invitations. Not grant administration. |
 | `create-access-groups` | Project | Human | Create a project-local group and explicitly initialize human membership/management. |
 | `create-application-accounts` | Project | Human | Create an empty application account and its creator administration assignments. No key or inherited rights. |
@@ -159,7 +164,7 @@ Creation checks current human eligibility and the matching Project Create action
 
 | New resource | Fixed creator assignments |
 | --- | --- |
-| Additional Project | Seventeen: `manage-project-members`, `create-access-groups`, `create-application-accounts`, `create-pipelines`, `create-deployments`, `manage-upload-defaults`, `delete-project`, `inspect-budget`, `manage-budget`, `manage-trace-policy`, `delete-trace-history`, `inspect-feedback`, `create-collections`, `create-sources`, `create-model-connections`, `create-processing-profiles`, `create-embedding-profiles`. Requires Organization `create-projects`. Starter provisioning has its separate admission boundary. |
+| Additional Project | Eighteen: `manage-project-members`, `create-access-groups`, `create-application-accounts`, `create-pipelines`, `create-deployments`, `manage-upload-defaults`, `delete-project`, `inspect-budget`, `manage-budget`, `manage-trace-policy`, `delete-trace-history`, `inspect-feedback`, `create-collections`, `create-sources`, `create-model-connections`, `create-processing-profiles`, `create-embedding-profiles`, `edit-project-metadata`. Requires Organization `create-projects`. Starter provisioning has its separate admission boundary. |
 | Pipeline | Thirteen: `query`, `inspect-query-traces`, `build-pipeline`, `view-pipeline-configuration`, `edit-pipeline-configuration`, `delete-pipeline`, the six Evaluation operational actions above, and `manage-evaluation-case-audiences`. |
 | Deployment | Seven: `query`, `inspect-query-traces`, `manage-releases`, `view-deployment-configuration`, `edit-deployment-configuration`, `delete-deployment`, `feedback:write`. A ready compatible initial version is required. |
 | Collection | `view-collection`, `edit-collection`, `delete-collection`. |

@@ -1,0 +1,48 @@
+# Bind each human CLI callback to its trusted issuer
+
+**PD-ACCESS-07 · ACCEPTED on 2026-10-30.** The developer approved this concrete design and its named guide/ADR reconciliation. [ADR-0125](../../../../docs/adr/ADR-0125-bind-human-cli-callbacks-to-their-issuer.md) narrowly supersedes the shared callback path under ADR-0053. Implementation and security qualification remain unfinished. This is an accepted contract, not an unaccepted proposal or permission to enable an unqualified flow.
+
+Alice has dev and production targets. An authorization response from production must not enter dev's code exchange, even if it carries a plausible state value. Access owns human login and recipient-proof meaning. The CLI owns its temporary listener and frozen attempt context. Private installation setup owns official-client registration. Backend admission, current permissions and host maintenance retain their separate authority checks.
+
+Read this reference before changing callback registration, receiving human CLI success/error responses, interpreting issuer-response capability metadata or claiming a maintained recipient-proof acquisition journey. [Login registration](human-cli-login.md#cli-client-registration) and [the login transaction](human-cli-credential-lifecycle.md#cli-login-transaction) are its workflow entry points.
+
+## Exact issuer and callback binding
+
+Use `/oauth/callback/<digest>`, where `digest` is the complete 64-character lowercase hexadecimal SHA-256 of the exact trusted issuer string's UTF-8 bytes. Preserve spelling, case, path and trailing slash. Do not normalize a URL, truncate the hash or accept a caller-selected suffix. The digest identifies the binding. It is neither a secret nor authentication proof. Reject conflicting issuer-to-path mappings.
+
+The private official-client provisioner registers exactly `http://127.0.0.1/oauth/callback/<digest>` without a port for that installation. Only the ephemeral port varies during authorization. Keep one public `inframeld-cli`, code-only responses, S256 PKCE, the existing scopes/audience and literal IPv4 loopback. No wildcard, dynamic registration, alternative client or CLI-held administration credential is introduced. Code exchange uses the identical complete redirect URI captured for the attempt, including its chosen port.
+
+The selected distinct-path defense has a deployment prerequisite. Administration must remain trusted and private, with no attacker-accessible client registration or alternative approval path. The honest server must not register another issuer's callback path. The provisioner preserves unrelated clients, so its successful reconciliation cannot certify this condition. Metadata without an issuer parameter cannot certify it either. Installations permitting attacker-controlled registration fall outside this defense's qualified profile.
+
+## Associate every response before exchange
+
+Freeze the complete attempt context before opening the browser: trusted installation and target identities, exact API/audience/issuer/client, validated provider endpoints and transport policy, account intent, complete redirect URI, fresh state, nonce and PKCE material. Keep transient secrets in memory. A callback cannot choose an issuer, endpoint, target or account.
+
+Before exchanging a code or classifying an OAuth error, validate the actual listener address/port, exact Host/path and pending state against that context. Reject malformed or repeated singleton parameters, contradictory success/error payloads, replay and cross-attempt responses. Success and error responses receive the same association checks. Do not follow `error_uri` or reflect uncontrolled descriptions.
+
+When provider metadata advertises RFC 9207, require one exact matching `iss` on both success and error responses. When unadvertised `iss` is supplied, the selected local policy also requires one exact match. An absent `iss` is allowed only with the qualified distinct-path defense and its deployment prerequisites. State alone is insufficient. A later ID-token check cannot replace association before code exchange.
+
+Use maintained-library token/ID-token validation, including signature, issuer, client audience, expiry and nonce. Do not decode opaque access tokens. The transient access token for maintenance goes directly from protected memory into protected host stdin, without token files, logs or command arguments. Host execution authorizes maintenance. Independent current Hydra/Kratos verification identifies the recipient. Token acquisition supplies neither local admission nor repair authority.
+
+## Change registration without reinterpreting pending work
+
+Patch the existing client in place. Do not delete/recreate it, reset consent or deliberately revoke independent login chains. Cancel and restart outstanding browser attempts during cutover. Registration changes do not themselves cancel listeners, consent requests or outstanding codes. Never rewrite a pending attempt's redirect URI or keep the shared path as a fallback. The one-minute authorization-code lifetime does not prove older login/consent flows have drained.
+
+An actual issuer or other authentication-binding configuration change still invalidates the affected saved logins under the existing [credential lifecycle](human-cli-credential-lifecycle.md#cli-credential-lifecycle). Callback cutover alone must not be described as account-wide revocation. Preservation of existing access/refresh chains and outstanding-flow behavior requires provider evidence.
+
+## Evidence, alternatives and delivery boundary
+
+The scoped 2026-10-30 probe of digest-pinned Hydra v26.2.0 reported no RFC 9207 advertisement and no `iss` on success/error callbacks. It performed no token exchange and used administrative test approval. Upstream schema/response-writer inspection found no supported native switch in that release. These observations justify the bounded choice, not a claim about every Hydra build, production TLS or usable operator acquisition.
+
+Maintained native RFC 9207 support remains preferable when a supported configuration or suitable maintained release is found and qualified on both outcomes. A proxy-invented issuer parameter, private protocol fork or post-exchange ID-token substitute is not selected. Waiting for upstream support would leave the helper-dependent journey blocked. Restricting the product to one issuer would conflict with the accepted multi-installation CLI journey. One pending transaction or invocation does not create that restriction.
+
+At this recording checkpoint the inspected provisioner still registers the old shared path. Its existing callback/provider tests qualify that earlier implementation only. The stateless discovery library does not implement a callback receiver. The bounded maintained proof client belongs in the single selected `apps/cli/src/auth/` capability, with flow, callback, transport, recipient-proof and maintenance-handoff responsibilities. Those components are not implemented by recording this decision. No parallel authentication framework or new public command syntax is selected.
+
+Qualification must exercise real-provider success/error, two-issuer swapped callbacks, exact-byte hash vectors across Python/Rust, wrong listener/path/Host/port/state, repeated/contradictory parameters, PKCE/nonce, cancellation and replay. Also test public-registration rejection, alternative-client consent rejection, registration cutover, outstanding code/consent behavior and preservation of independent credential chains. Render and exercise the maintained human/operator journey before closing its acquisition gap. Account UI, platform and deployment limits remain explicit. There is no remaining policy choice in this reference, but those implementation and qualification obligations remain open.
+
+## Sources
+
+- [ADR-0053](../../../../docs/adr/ADR-0053-use-kratos-and-hydra-for-human-cli-authentication.md) retains Kratos/Hydra ownership, first-party policy and host-proof separation. [ADR-0098](../../../../docs/adr/ADR-0098-publish-bounded-first-party-discovery.md) retains anonymous exact-identity discovery.
+- [RFC 9700 §4.4.2.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.4.2.2) documents distinct per-issuer redirect URIs and the attacker-created-client limitation.
+- [RFC 8252 §7.3](https://www.rfc-editor.org/rfc/rfc8252.html#section-7.3) supplies the native loopback port exception. [RFC 9207 §2.4](https://www.rfc-editor.org/rfc/rfc9207.html#section-2.4) owns issuer comparison and advertised support.
+- Inspected old-path implementation: [provisioner](../../../../apps/backend/src/inframeld_backend/access/infrastructure/writers/hydra_human_oauth_client_provisioner.py) and [provider scenarios](../../../../apps/backend/tests/integration/access/test_hydra_cli_provisioning.py). Their presence does not qualify the replacement.

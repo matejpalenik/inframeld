@@ -49,6 +49,10 @@ __all__ = [
     "OriginalOperationLookupRequest",
     "PathInner",
     "ProblemDetails",
+    "ProjectMetadataChangeResponse",
+    "ProjectMetadataResponse",
+    "ProjectMetadataUpdateRequest",
+    "ProjectNameResolutionResponse",
     "ProjectUseOnlyGrantRequest",
     "ProjectUseOnlyGrantResponse",
     "ProtectedResourceMetadataResponse",
@@ -95,6 +99,10 @@ from inframeld_sdk.models.operation_lookup_response import OperationLookupRespon
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest as OriginalOperationLookupRequest
 from inframeld_sdk.models.path_inner import PathInner as PathInner
 from inframeld_sdk.models.problem_details import ProblemDetails as ProblemDetails
+from inframeld_sdk.models.project_metadata_change_response import ProjectMetadataChangeResponse as ProjectMetadataChangeResponse
+from inframeld_sdk.models.project_metadata_response import ProjectMetadataResponse as ProjectMetadataResponse
+from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest as ProjectMetadataUpdateRequest
+from inframeld_sdk.models.project_name_resolution_response import ProjectNameResolutionResponse as ProjectNameResolutionResponse
 from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest as ProjectUseOnlyGrantRequest
 from inframeld_sdk.models.project_use_only_grant_response import ProjectUseOnlyGrantResponse as ProjectUseOnlyGrantResponse
 from inframeld_sdk.models.protected_resource_metadata_response import ProtectedResourceMetadataResponse as ProtectedResourceMetadataResponse

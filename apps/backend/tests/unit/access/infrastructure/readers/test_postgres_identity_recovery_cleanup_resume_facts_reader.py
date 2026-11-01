@@ -66,3 +66,28 @@ async def test_unrecognized_saved_mode_cannot_be_returned_as_a_valid_receipt(
                 installation_id=InstallationId(row.installation_id),
                 operation_id=OperationId(row.operator_request_id),
             )
+
+
+@pytest.mark.asyncio
+async def test_metadata_repair_request_key_conflicts_before_recovery_decoding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from inframeld_backend.access.application.enums.recovery_maintenance_error_code import (
+        RecoveryMaintenanceErrorCode,
+    )
+    from inframeld_backend.access.application.errors.recovery_maintenance_error import (
+        RecoveryMaintenanceError,
+    )
+
+    row = _receipt_row("repair-stranded-authority")
+    row.recovery_operation_id = None
+    row.released = None
+    row.outcome = "repaired"
+    async with AsyncSession() as session, session.begin():
+        monkeypatch.setattr(session, "get", AsyncMock(return_value=row))
+        with pytest.raises(RecoveryMaintenanceError) as failure:
+            await PostgresIdentityRecoveryCleanupResumeFactsReader(session).receipt(
+                installation_id=InstallationId(row.installation_id),
+                operation_id=OperationId(row.operator_request_id),
+            )
+        assert failure.value.code is RecoveryMaintenanceErrorCode.KEY_REUSED

@@ -500,3 +500,50 @@ def test_deletion_status_fixture_uses_the_production_read_and_exact_query() -> N
         "operationId=settled+%2B%2F%26%C3%A9"
     )
     assert evidence["counts"] == {"deletion-wire": 1}
+
+
+def test_metadata_fixture_uses_real_read_resolve_and_change_routes_with_exact_input() -> None:
+    project_id = "00000000-0000-4000-8000-000000000003"
+    headers = {"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-metadata-key"}
+    body = {"expectedMetadataRevision": 0, "name": "support", "displayName": "Support 🧭"}
+    with TestClient(create_sdk_conformance_app()) as client:
+        original = client.get(f"/v1/projects/{project_id}/metadata", headers=headers)
+        resolved = client.get("/v1/projects/by-name/support", headers=headers)
+        changed = client.patch(f"/v1/projects/{project_id}/metadata", headers=headers, json=body)
+        empty = client.patch(
+            f"/v1/projects/{project_id}/metadata",
+            headers=headers,
+            json={"expectedMetadataRevision": 0},
+        )
+        null = client.patch(
+            f"/v1/projects/{project_id}/metadata",
+            headers=headers,
+            json={"expectedMetadataRevision": 0, "displayName": None},
+        )
+    assert original.status_code == resolved.status_code == changed.status_code == 200
+    assert original.json()["name"] is None
+    assert original.json()["displayName"] == "legacy\u0001\n" + "x" * 150
+    assert resolved.json()["name"] == "support"
+    assert resolved.json()["projectId"] == changed.json()["projectId"] == project_id
+    assert changed.json()["name"] == "support" and changed.json()["displayName"] == "Support 🧭"
+    assert changed.json()["metadataRevision"] == 1
+    assert changed.json()["operationId"] == "sdk-metadata-operation"
+    assert changed.headers["cache-control"] == "no-store"
+    assert empty.status_code == null.status_code == 422
+
+
+def test_metadata_fixture_enforces_cookie_csrf_and_exact_name_validation() -> None:
+    project_id = "00000000-0000-4000-8000-000000000003"
+    body = {"expectedMetadataRevision": 0, "name": "production"}
+    cookie = {"Cookie": "ory_kratos_session=sdk-cookie", "Idempotency-Key": "sdk-metadata-key"}
+    with TestClient(create_sdk_conformance_app()) as client:
+        denied = client.patch(f"/v1/projects/{project_id}/metadata", headers=cookie, json=body)
+        permitted = client.patch(
+            f"/v1/projects/{project_id}/metadata",
+            headers=cookie | {"Origin": "https://account.test", "X-Inframeld-CSRF": "1"},
+            json=body,
+        )
+        uppercase = client.get("/v1/projects/by-name/Support", headers=cookie)
+    assert denied.status_code == 403
+    assert permitted.status_code == 200 and permitted.json()["name"] == "production"
+    assert uppercase.status_code == 422

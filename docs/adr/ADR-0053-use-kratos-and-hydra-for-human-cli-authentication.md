@@ -2,6 +2,8 @@
 
 **Status:** Accepted. Partially supersedes [ADR-0012](ADR-0012-use-kratos-for-human-authentication.md) only where its browser-focused scope deferred Hydra/OAuth issuance for human CLI use. Kratos identity, browser sessions and Inframeld authorization remain selected.
 
+**Callback binding:** [ADR-0125](ADR-0125-bind-human-cli-callbacks-to-their-issuer.md), accepted on 2026-10-30, narrowly supersedes the linked shared callback-path contract and selects response association. All other choices and this historical rationale remain accepted. Replacement implementation/qualification are separate.
+
 **Date:** 2026-09-28. The decision was accepted during CLI design on this date and reconciled into the architecture on 2026-09-29.
 
 ## Context and Problem Statement

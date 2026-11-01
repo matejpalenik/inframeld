@@ -1,8 +1,5 @@
-import json
 from datetime import UTC
 from uuid import UUID
-
-from pydantic import TypeAdapter
 
 from inframeld_backend.access.application.commands.resume_identity_recovery_cleanup_command import (
     ResumeIdentityRecoveryCleanupCommand,
@@ -13,21 +10,9 @@ from inframeld_backend.access.application.dtos.identity_recovery_cleanup_resume_
 from inframeld_backend.access.cli.errors.recovery_maintenance_input_error import (
     RecoveryMaintenanceInputError,
 )
+from inframeld_backend.access.cli.mappers.maintenance_input_mapper import MaintenanceInputMapper
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
-
-
-def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("Duplicate field.")
-        result[key] = value
-    return result
-
-
-def _reject_constant(_value: str) -> object:
-    raise ValueError("Invalid JSON constant.")
 
 
 def _text(value: object) -> str:
@@ -43,24 +28,8 @@ class RecoveryMaintenanceMapper:
     def read(payload: bytes) -> ResumeIdentityRecoveryCleanupCommand:
         operation_id = None
         try:
-            if len(payload) > 65_536:
-                raise ValueError("Oversize request.")
-
-            data: object = json.loads(
-                payload.decode("utf-8"),
-                object_pairs_hook=_unique_object,
-                parse_constant=_reject_constant,
-            )
-            values = TypeAdapter(dict[str, object]).validate_python(data, strict=True)
-            correlation = values.get("operationId")
-            if (
-                isinstance(correlation, str)
-                and correlation.strip()
-                and len(correlation) <= 128
-                and "\x00" not in correlation
-            ):
-                correlation.encode("utf-8")
-                operation_id = OperationId(correlation)
+            values = MaintenanceInputMapper.read(payload)
+            operation_id = MaintenanceInputMapper.correlation(values)
 
             if set(values) != {
                 "schemaVersion",

@@ -61,6 +61,8 @@ The domain responsibilities and focused internal boundaries are accepted. Each m
 
 [PD-ACCESS-03 production recovery contracts](../../inframeld-access-models/references/decision-recovery-production-completion.md) are resolved by ADR-0085. Consult their acceptance matrix and owning workflows for the implemented private callbacks, durable cleanup and protected host continuation, with their qualification limits. First-local-admission integration, account restoration and other maintenance modes remain separate work.
 
+The [approved Project metadata decision](../../inframeld-access-models/references/decision-project-metadata-authority.md), recorded by [ADR-0124](../../../../docs/adr/ADR-0124-authorize-project-metadata-changes-explicitly.md) on 2026-10-30, selects exact naming bounds, legacy preservation, human-only metadata action18 and narrow first-grant repair. Access owns Project metadata authority and persistence. Shared resolution validates typed bindings without becoming a resource-provisioning engine. These #120 contracts are not implemented at this recording checkpoint. Automatic eighteen-grant creator seeding remains selected design for #223 ordinary creation and #27 private starters.
+
 ## Accepted decision navigation
 
 The developer approved the presented batches and authorized best-effort resolution of all remaining choices on 2026-10-29. These records now select policy. Numerical limits/objectives are chosen qualification targets, not measured support. Follow only the owning contract matching the work. Native DTOs, physical schemas and tests remain normal implementation tasks, without reopening these choices.

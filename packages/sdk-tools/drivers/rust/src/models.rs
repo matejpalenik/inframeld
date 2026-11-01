@@ -1,6 +1,41 @@
 #[cfg(test)]
 mod tests {
     #[test]
+    fn metadata_selector_change_preserves_omission_and_unicode_without_label_normalization() {
+        use inframeld_sdk::types::ProjectMetadataUpdateRequest;
+        let input = serde_json::json!({"expectedMetadataRevision": 0, "name": "production"});
+        let value: ProjectMetadataUpdateRequest = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(serde_json::to_value(value).unwrap(), input);
+        for field in ["name", "displayName"] {
+            let mut invalid = input.clone();
+            invalid[field] = serde_json::Value::Null;
+            assert!(serde_json::from_value::<ProjectMetadataUpdateRequest>(invalid).is_err());
+        }
+        for label in ["🧭".repeat(128), "e\u{301}".repeat(64)] {
+            let input = serde_json::json!({"expectedMetadataRevision": 0, "displayName": label});
+            let value: ProjectMetadataUpdateRequest =
+                serde_json::from_value(input.clone()).unwrap();
+            assert_eq!(serde_json::to_value(value).unwrap(), input);
+        }
+    }
+
+    #[test]
+    fn metadata_read_requires_nullable_selector_and_preserves_unrestricted_legacy_label() {
+        use inframeld_sdk::types::ProjectMetadataResponse;
+        let input = serde_json::json!({
+            "projectId":"00000000-0000-4000-8000-000000000003",
+            "organizationId":"00000000-0000-4000-8000-000000000002",
+            "name":null, "displayName": "legacy\u{1}\n".to_string() + &"x".repeat(150),
+            "metadataRevision": 0
+        });
+        let value: ProjectMetadataResponse = serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(serde_json::to_value(value).unwrap(), input);
+        let mut omitted = input;
+        omitted.as_object_mut().unwrap().remove("name");
+        assert!(serde_json::from_value::<ProjectMetadataResponse>(omitted).is_err());
+    }
+
+    #[test]
     fn original_lookup_requires_the_guard_and_preserves_null_organization_scope() {
         let input = serde_json::json!({
             "installationId":"00000000-0000-4000-8000-000000000001",

@@ -10,11 +10,11 @@ Alice wants to use the CLI as the same person she uses in the browser. She signs
 
 ## Follow login and consent
 
-1. Resolve the trusted installation and official client before opening the browser. Native Kratos login supplies the verified Hydra subject and provider-session binding. Inframeld must not implement another password verifier or competing login-approval service.
+1. Resolve the trusted installation and official client, then freeze the complete [issuer-bound callback attempt](human-cli-credential-lifecycle.md#cli-login-transaction) before opening the browser. Native Kratos login supplies the verified Hydra subject and provider-session binding. Inframeld must not implement another password verifier or competing login-approval service.
 2. The cookie-only Access consent API freshly reads Hydra's challenge. Check `inframeld-cli`, supported scopes and the exact configured API audience before browser verification or local-state initialization. Unsupported access returns the selected early 403, even with an invalid supplied cookie. HTTP credential selection and POST CSRF still take precedence.
 3. Inspection and denial use read-only checks and never initialize credential versions. Approval has an explicit capture, browser-verify and state-reread path. It returns a required binding only when both observations were unblocked and unchanged.
 4. Check the current Kratos browser identity and exact provider subject. Consent can precede local admission and must neither provision an account nor create grants. Return only a checked continuation to the configured public Hydra authorization endpoint.
-5. Hydra finishes the protocol. The CLI uses secure, installation/account-bound credential storage and coordinated refresh. Each product request privately verifies active token semantics, audience, client and required API scope, then checks current Kratos identity eligibility and the same existing local human before authorization.
+5. Hydra finishes the protocol. The CLI checks success and error association against the exact receiving URI, state and issuer policy before code exchange or error classification. It uses the identical attempt redirect URI at exchange. [PD-ACCESS-07](decision-human-cli-issuer-binding.md) owns the selected defense and pending qualification. The CLI uses secure, installation/account-bound credential storage and coordinated refresh. Each product request privately verifies active token semantics, audience, client and required API scope, then checks current Kratos identity eligibility and the same existing local human before authorization.
 
 Provider I/O stays outside SQL transactions, with finite deadlines and no automatic approval retry. A timed-out approval may still finish at Hydra.
 
@@ -56,8 +56,10 @@ sequenceDiagram
         Note over Consent: Require unchanged unblocked observations and binding
         Consent->>Hydra: Approve exact access with checked binding
         Hydra-->>Browser: Checked public continuation and authorization code
-        Browser-->>CLI: Loopback callback with state
-        CLI->>Hydra: Exchange code with PKCE verifier
+        Browser-->>CLI: Exact issuer-bound loopback callback
+        CLI->>CLI: Check receiving URI, state and issuer association
+        Note over CLI,Hydra: Apply association checks to success and OAuth errors before exchange
+        CLI->>Hydra: Exchange code with PKCE and identical attempt redirect URI
         Hydra-->>CLI: Installation/account-bound credentials
     end
 ```

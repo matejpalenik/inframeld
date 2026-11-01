@@ -704,3 +704,90 @@ async def test_host_continuation_does_not_restore_account_or_repeat_ineligible_c
             await session.scalar(select(func.count()).select_from(IdentityRecoveryCleanupRunRow))
             == 2
         )
+
+
+async def test_metadata_repair_cannot_reinterpret_real_completed_recovery_receipt(
+    database: Database, temporary_postgres_settings: DatabaseSettings
+) -> None:
+    from uuid import UUID
+
+    from tests.support.project_metadata_scenarios import (
+        metadata_repair_service,
+        seed_metadata_repair_recipient,
+    )
+
+    from inframeld_backend.access.application.commands.repair_project_metadata_authority_command import (
+        RepairProjectMetadataAuthorityCommand,
+    )
+    from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+    from inframeld_backend.access.application.enums.project_metadata_maintenance_error_code import (
+        ProjectMetadataMaintenanceErrorCode,
+    )
+    from inframeld_backend.access.application.errors.project_metadata_maintenance_error import (
+        ProjectMetadataMaintenanceError,
+    )
+    from inframeld_backend.access.application.value_objects.human_access_token_credential import (
+        HumanAccessTokenCredential,
+    )
+    from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
+        ProjectActionGrantRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.project_metadata_repair_receipt_row import (
+        ProjectMetadataRepairReceiptRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+
+    recovery = await _prepare(database)
+    revoker = Revoker()
+    revoker.cli = CONFIRMED
+    await _execute(database, revoker)
+    original = await _resume(recovery, temporary_postgres_settings)
+    assert original["outcome"] == "cleanup-confirmed"
+    async with database.session() as session, session.begin():
+        retained = await PostgresIdentityRecoveryCleanupResumeFactsReader(session).receipt(
+            installation_id=recovery.expected_installation_id, operation_id=recovery.operation_id
+        )
+        assert retained is not None
+    identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority("kratos:metadata-test"), IdentitySubject(str(uuid4()))
+    )
+    seed, binding = await seed_metadata_repair_recipient(database, identity)
+    repair = RepairProjectMetadataAuthorityCommand(
+        binding.installation_id,
+        recovery.operation_id,
+        seed.project_id,
+        0,
+        UUID(identity.subject.value),
+        "Metadata operator",
+        "Repair exact metadata responsibility",
+        HumanAccessTokenCredential("post-authentication-fixture-proof"),
+    )
+    async with database.session() as session:
+        with pytest.raises(ProjectMetadataMaintenanceError) as failure:
+            await metadata_repair_service(session).repair(
+                access=AccessContextDTO(seed.principal_id, binding),
+                command=repair,
+            )
+        assert failure.value.code is ProjectMetadataMaintenanceErrorCode.KEY_REUSED
+    async with database.session() as session, session.begin():
+        assert (
+            await PostgresIdentityRecoveryCleanupResumeFactsReader(session).receipt(
+                installation_id=binding.installation_id, operation_id=recovery.operation_id
+            )
+            == retained
+        )
+        project = await session.get(ProjectRow, seed.project_id.value)
+        assert project is not None and project.access_revision == 0
+        assert (
+            await session.scalar(select(func.count()).select_from(ProjectMetadataRepairReceiptRow))
+            == 0
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(ProjectActionGrantRow)
+                .where(ProjectActionGrantRow.project_id == seed.project_id.value)
+            )
+            == 0
+        )
+    assert await _resume(recovery, temporary_postgres_settings) == original

@@ -87,7 +87,7 @@ Application, Kratos and Hydra databases use three separate named volumes, preser
 
 ## Run the ordinary application worker
 
-After applying schema `0010_durable_jobs`, start the worker from the same checkout as the API, with the development database still running:
+After applying schema `0014_project_metadata`, start the worker from the same checkout as the API, with the development database still running:
 
 ```bash
 mise exec -- uv run --project apps/backend --locked --env-file apps/backend/.env python -m inframeld_backend.application_worker
@@ -332,7 +332,9 @@ It prepares the private services and runs `python -m inframeld_backend.provision
 
 Successful output identifies `inframeld-cli` and `created`, `updated` or `unchanged`. Exit 0 means the resulting profile was verified, 2 means invalid configuration/arguments and 1 means operational failure. Stopping and write admission share one synchronized decision. A stop that wins prevents mutation. Once a write is admitted, it may still be dispatched or finish late, and a timeout reports `outcome_unknown`. Do not infer failure or blindly repeat the mutation. After checking the provider, explicitly run setup again to reconcile current state. Diagnostics contain no client secrets or provider response bodies.
 
-The [registered profile](../../../.agents/skills/inframeld-access-models/references/human-cli-login.md#cli-client-registration) is public, requires S256 PKCE, uses opaque access tokens and registers `http://127.0.0.1/oauth/callback`. Hydra allows ephemeral callback ports with that fixed host/path. Setup repairs managed drift and removes client-specific lifetime overrides without deleting the client, other clients or existing login chains.
+The inspected provisioner currently registers the public S256-PKCE client with opaque access tokens and the old `http://127.0.0.1/oauth/callback` path. Its ephemeral-port behavior is existing evidence, not qualification of the replacement. The [accepted profile](../../../.agents/skills/inframeld-access-models/references/human-cli-login.md#cli-client-registration) now selects exactly `http://127.0.0.1/oauth/callback/<digest>` without a port, where `digest` is the full lowercase SHA-256 of the exact trusted issuer UTF-8 bytes. Preserve spelling, case, path and trailing slash. Only the ephemeral port varies, and exchange uses the identical complete redirect URI captured for the attempt. Replacement runtime implementation remains unfinished at this recording checkpoint.
+
+[ADR-0125](../../adr/ADR-0125-bind-human-cli-callbacks-to-their-issuer.md) requires trusted private administration, no attacker-accessible registration or alternative approval path, and no registration of another issuer's callback on the honest server. Setup preserves unrelated clients, so reconciliation cannot certify those conditions. Cutover must patch the official client in place, preserving consent and independent login chains. Cancel and restart pending browser attempts without rewriting their URI or retaining a shared-path fallback. Neither registration change nor code expiry proves outstanding consent/login flows have ended. Qualify those cases before enabling the replacement. Setup's existing lifetime-override removal and bounded write/unknown-outcome rules remain unchanged.
 
 Root `.env` can override these native settings:
 
@@ -391,11 +393,19 @@ Do not add migrations to `pnpm dev` or API startup.
 
 Read [testing](../guides/testing.md) next. For accepted production boundaries, see [runtime and networking](../operations/runtime-and-networking.md).
 
+<a id="project-metadata"></a>
+
+## Project metadata and restricted repair
+
+The backend supports metadata reads by permanent Project ID, exact Name resolution and atomic Name/Display-name changes for an existing Project. Changes require current human-only `edit-project-metadata` authority and a reviewed metadata revision. [Name and rename an existing Project](../../../apps/docs/src/app/guides/name-and-rename-project/page.mdx) gives the HTTP/generated-client path. It does not create Projects or allocate creator grants.
+
+The backend-only maintenance command also consumes the narrow `repair-stranded-authority` request for that exact action. [Project metadata authority repair](../operations/project-metadata-repair.md) records its protected input, additional configuration and safe receipt/replay behavior. Its fresh human proof prerequisite lacks a qualified client/account-UI acquisition journey, so it is not a complete first-grant walkthrough. `pnpm dev:oauth:configure` registers the client and does not acquire that proof.
+
 <a id="private-recovery-callbacks"></a>
 
 ## Private recovery callbacks
 
-The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the supported head, currently `0010_durable_jobs`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
+The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the supported head, currently `0014_project_metadata`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
 
 Supply a dedicated 32 to 256 byte printable ASCII key through `INFRAMELD_RECOVERY_KEY_HOST_FILE`. The mounted regular file must be readable by the container's runtime UID 10001, with mode 0400 or 0600 as seen inside the container. Compose file-backed secrets do not reliably remap host ownership. Provision the correct runtime ownership rather than making the file group/world-readable. Do not reuse an API, database or fingerprint secret.
 
@@ -411,7 +421,7 @@ For rotation, configure a current file plus optional retiring file and `INFRAMEL
 
 Alice remains blocked after Hydra rejects cleanup or a run exhausts its budget. Fix the provider/configuration problem first. A trusted deployment operator can then authorize one additional twelve-attempt, one-hour run of the original recovery. This is a local container command with no network endpoint. Keep container-exec and database credentials restricted to operators.
 
-Apply the supported schema `0010_durable_jobs` deliberately before starting the updated backend, callbacks or worker. Migration `0008_host_maintenance_receipts` introduced the maintenance receipt. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
+Apply the supported schema `0014_project_metadata` deliberately before starting the updated backend, callbacks or worker. Migration `0008_host_maintenance_receipts` introduced the maintenance receipt. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
 
 Obtain the expected installation UUID from your protected installation record and the original recovery operation ID from protected recovery records. Replace the placeholders below. Choose a unique operator request ID and retain the exact request privately until its outcome is known. Supply attribution and the repair reason, without passwords, cookies or tokens.
 
@@ -429,7 +439,7 @@ podman compose -f compose.dev.yaml exec -T backend inframeld-maintenance <<'JSON
 JSON
 ```
 
-Use `docker compose` on Docker. Do not add a root/privileged override or expose Hydra administration. Other maintenance modes remain design-only and are rejected by this command.
+Use `docker compose` on Docker. Do not add a root/privileged override or expose Hydra administration. The separate [Project metadata repair mode](../operations/project-metadata-repair.md) requires additional identity-verification configuration and fresh recipient proof. It does not widen this recovery-continuation procedure.
 
 Exit 0 returns the original accepted result: `cleanup-authorized` includes its run ID and UTC deadline, while `already-completed` and `cleanup-confirmed` create no provider run. Exit 2 means invalid input/configuration. Exit 1 means an operational failure or controlled rejection, with a safe code. `cleanup_run_active` means the existing budget still owns the work, including a live final attempt. A missing or interrupted stdout response is unknown. Send the **same exact request and request ID** to recover its original result. A new ID authorizes new work and is not a substitute for recovering a lost acknowledgment.
 

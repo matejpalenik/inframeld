@@ -9,6 +9,7 @@ from inframeld_backend.shared.application.errors.application_errors import Inval
 
 _PROJECT_ACTIONS = frozenset(
     {
+        "edit-project-metadata",
         "manage-project-members",
         "create-access-groups",
         "create-application-accounts",

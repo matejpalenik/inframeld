@@ -13,6 +13,7 @@ from inframeld_sdk.api.health_api import HealthApi
 from inframeld_sdk.api.operations_api import OperationsApi
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
+from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest
 from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest
 from inframeld_sdk_fixtures.api.default_api import DefaultApi
 from inframeld_sdk_fixtures.models.contract_fixture_payload import ContractFixturePayload
@@ -168,6 +169,58 @@ async def assign_grant_async(clients: Clients, call: Call) -> NativeResponse:
         project_use_only_grant_request=grant_body(call),
         _request_timeout=call.timeout / 1000,
         _headers=call.headers,
+    )
+
+
+def metadata_read_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_project_metadata_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def metadata_read_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_project_metadata_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def metadata_resolve_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).resolve_project_name_sync_with_http_info(
+        name=call.path["name"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def metadata_resolve_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).resolve_project_name_with_http_info(
+        name=call.path["name"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def metadata_change_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).update_project_metadata_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_metadata_update_request=ProjectMetadataUpdateRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def metadata_change_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).update_project_metadata_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_metadata_update_request=ProjectMetadataUpdateRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
     )
 
 
@@ -361,6 +414,9 @@ BINDINGS: dict[Operation, Binding] = {
     "assignProjectUseOnlyGrant": Binding(assign_grant_sync, assign_grant_async),
     "lookupOriginalOperation": Binding(lookup_sync, lookup_async),
     "getDeletionStatus": Binding(deletion_status_sync, deletion_status_async),
+    "getProjectMetadata": Binding(metadata_read_sync, metadata_read_async),
+    "resolveProjectName": Binding(metadata_resolve_sync, metadata_resolve_async),
+    "updateProjectMetadata": Binding(metadata_change_sync, metadata_change_async),
     "contractFixturePayload": Binding(payload_sync, payload_async),
     "contractFixturePage": Binding(page_sync, page_async),
     "contractFixtureUpload": Binding(upload_sync, upload_async),

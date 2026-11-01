@@ -156,3 +156,38 @@ problems!(
     LookupOriginalOperationApiError::Status422,
     LookupOriginalOperationApiError::Status503
 );
+
+problems!(
+    ResolveProjectNameApiError,
+    ResolveProjectNameApiError::Status400,
+    ResolveProjectNameApiError::Status401,
+    ResolveProjectNameApiError::Status403,
+    ResolveProjectNameApiError::Status404,
+    ResolveProjectNameApiError::Status409,
+    ResolveProjectNameApiError::Status422,
+    ResolveProjectNameApiError::Status503
+);
+
+problems!(
+    GetProjectMetadataApiError,
+    GetProjectMetadataApiError::Status400,
+    GetProjectMetadataApiError::Status401,
+    GetProjectMetadataApiError::Status403,
+    GetProjectMetadataApiError::Status404,
+    GetProjectMetadataApiError::Status409,
+    GetProjectMetadataApiError::Status422,
+    GetProjectMetadataApiError::Status503
+);
+
+problems!(
+    UpdateProjectMetadataApiError,
+    UpdateProjectMetadataApiError::Status400,
+    UpdateProjectMetadataApiError::Status401,
+    UpdateProjectMetadataApiError::Status403,
+    UpdateProjectMetadataApiError::Status404,
+    UpdateProjectMetadataApiError::Status409,
+    UpdateProjectMetadataApiError::Status413,
+    UpdateProjectMetadataApiError::Status415,
+    UpdateProjectMetadataApiError::Status422,
+    UpdateProjectMetadataApiError::Status503
+);
