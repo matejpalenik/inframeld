@@ -1,7 +1,9 @@
 import asyncio
+import json
 import threading
 from collections.abc import Iterator
 from contextlib import AbstractContextManager
+from pathlib import Path
 from types import TracebackType
 from typing import override
 from unittest.mock import patch
@@ -10,6 +12,7 @@ import pytest
 from ory_hydra_client import ApiClient, Configuration, OAuth2Api
 from ory_hydra_client.exceptions import ApiException
 from ory_hydra_client.models.o_auth2_client import OAuth2Client
+from pydantic import TypeAdapter
 
 from inframeld_backend.access.application.enums.human_oauth_client_provisioning_outcome import (
     HumanOAuthClientProvisioningOutcome,
@@ -21,6 +24,7 @@ from inframeld_backend.access.application.errors.oauth_client_provisioning_uncer
     OAuthClientProvisioningUncertainError,
 )
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
+from inframeld_backend.access.domain.value_objects.oauth_issuer import OAuthIssuer
 from inframeld_backend.access.infrastructure.writers.hydra_human_oauth_client_provisioner import (
     HydraHumanOAuthClientProvisioner,
 )
@@ -29,6 +33,16 @@ from inframeld_backend.shared.application.errors.application_errors import (
 )
 
 AUDIENCE = HumanAPIAudience("https://api.example.test")
+VECTORS = TypeAdapter(list[dict[str, str]]).validate_python(
+    json.loads(
+        (
+            Path(__file__).resolve().parents[7]
+            / "contracts/fixtures/human-cli-issuer-callbacks.json"
+        ).read_text()
+    )
+)
+ISSUER = OAuthIssuer(VECTORS[0]["issuer"])
+CALLBACK = "http://127.0.0.1" + VECTORS[0]["path"]
 
 
 class _MockWriteAdmissionLock(AbstractContextManager[None]):
@@ -83,7 +97,7 @@ def _profile() -> OAuth2Client:
         token_endpoint_auth_method="none",
         grant_types=["authorization_code", "refresh_token"],
         response_types=["code"],
-        redirect_uris=["http://127.0.0.1/oauth/callback"],
+        redirect_uris=[CALLBACK],
         scope="openid offline_access inframeld:api",
         audience=[AUDIENCE.value],
         subject_type="public",
@@ -106,7 +120,7 @@ async def test_missing_client_is_created_with_the_exact_profile_and_verified(
         patch.object(client, "delete_o_auth2_client") as delete,
     ):
         result = await HydraHumanOAuthClientProvisioner(client).ensure_client(
-            api_audience=AUDIENCE, timeout_seconds=1
+            issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
         )
     assert result is HumanOAuthClientProvisioningOutcome.CREATED
     assert read.call_count == 2
@@ -120,7 +134,7 @@ async def test_missing_client_is_created_with_the_exact_profile_and_verified(
     assert sent.response_types == ["code"]
     assert sent.scope == "openid offline_access inframeld:api"
     assert sent.audience == [AUDIENCE.value]
-    assert sent.redirect_uris == ["http://127.0.0.1/oauth/callback"]
+    assert sent.redirect_uris == [CALLBACK]
     assert sent.subject_type == "public" and sent.access_token_strategy == "opaque"
     assert sent.skip_consent is False
     assert 0 < create.call_args.kwargs["_request_timeout"] <= 1
@@ -136,7 +150,7 @@ async def test_matching_registration_performs_no_write(client: OAuth2Api) -> Non
     ):
         assert (
             await HydraHumanOAuthClientProvisioner(client).ensure_client(
-                api_audience=AUDIENCE, timeout_seconds=1
+                issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
             )
             is HumanOAuthClientProvisioningOutcome.UNCHANGED
         )
@@ -158,7 +172,7 @@ async def test_drift_is_patched_without_overwriting_metadata_or_retaining_hidden
     ):
         assert (
             await HydraHumanOAuthClientProvisioner(client).ensure_client(
-                api_audience=AUDIENCE, timeout_seconds=1
+                issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
             )
             is HumanOAuthClientProvisioningOutcome.UPDATED
         )
@@ -192,14 +206,14 @@ async def test_concurrent_create_conflict_is_reread_once_without_another_mutatio
         if matches:
             assert (
                 await HydraHumanOAuthClientProvisioner(client).ensure_client(
-                    api_audience=AUDIENCE, timeout_seconds=1
+                    issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
                 )
                 is HumanOAuthClientProvisioningOutcome.UNCHANGED
             )
         else:
             with pytest.raises(OAuthClientProvisioningRejectedError):
                 await HydraHumanOAuthClientProvisioner(client).ensure_client(
-                    api_audience=AUDIENCE, timeout_seconds=1
+                    issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
                 )
     assert read.call_count == 2
     create.assert_called_once()
@@ -229,7 +243,7 @@ async def test_timeout_outcomes_distinguish_a_possible_write_from_an_unavailable
         pytest.raises(expected) as failure,
     ):
         await HydraHumanOAuthClientProvisioner(client).ensure_client(
-            api_audience=AUDIENCE, timeout_seconds=1
+            issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
         )
     assert create.call_count == (0 if stage == "read" else 1)
     assert "secret" not in str(failure.value)
@@ -247,7 +261,7 @@ async def test_explicit_rejection_is_safe_and_not_retried(client: OAuth2Api) -> 
         pytest.raises(OAuthClientProvisioningRejectedError) as failure,
     ):
         await HydraHumanOAuthClientProvisioner(client).ensure_client(
-            api_audience=AUDIENCE, timeout_seconds=1
+            issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
         )
     create.assert_called_once()
     assert "provider-secret" not in str(failure.value)
@@ -269,7 +283,7 @@ async def test_unverifiable_readback_after_creation_remains_uncertain(
         pytest.raises(OAuthClientProvisioningUncertainError),
     ):
         await HydraHumanOAuthClientProvisioner(client).ensure_client(
-            api_audience=AUDIENCE, timeout_seconds=1
+            issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
         )
     create.assert_called_once()
 
@@ -287,7 +301,7 @@ async def test_missing_sdk_envelope_never_confirms_configuration(
         pytest.raises(expected),
     ):
         await HydraHumanOAuthClientProvisioner(client).ensure_client(
-            api_audience=AUDIENCE, timeout_seconds=1
+            issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
         )
 
 
@@ -312,7 +326,7 @@ async def test_stopped_read_cannot_dispatch_a_later_write(client: OAuth2Api, can
     ):
         task = asyncio.create_task(
             HydraHumanOAuthClientProvisioner(client).ensure_client(
-                api_audience=AUDIENCE, timeout_seconds=1
+                issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
             )
         )
         try:
@@ -359,7 +373,7 @@ async def test_stopping_before_write_admission_prevents_mutation(
     ):
         task = asyncio.create_task(
             HydraHumanOAuthClientProvisioner(client).ensure_client(
-                api_audience=AUDIENCE, timeout_seconds=1
+                issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
             )
         )
         try:
@@ -407,7 +421,7 @@ async def test_admitted_write_remains_uncertain_before_sdk_dispatch(
     ):
         task = asyncio.create_task(
             HydraHumanOAuthClientProvisioner(client).ensure_client(
-                api_audience=AUDIENCE, timeout_seconds=1
+                issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
             )
         )
         try:
@@ -438,7 +452,7 @@ async def test_admitted_write_remains_uncertain_before_sdk_dispatch(
 async def test_invalid_deadlines_cannot_reach_hydra(client: OAuth2Api, budget: float) -> None:
     with patch.object(client, "get_o_auth2_client") as read, pytest.raises(ValueError):
         await HydraHumanOAuthClientProvisioner(client).ensure_client(
-            api_audience=AUDIENCE, timeout_seconds=budget
+            issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=budget
         )
     read.assert_not_called()
 
@@ -465,7 +479,7 @@ async def test_blocked_write_keeps_its_unknown_outcome_after_a_late_acknowledgem
     ):
         task = asyncio.create_task(
             HydraHumanOAuthClientProvisioner(client).ensure_client(
-                api_audience=AUDIENCE, timeout_seconds=1
+                issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
             )
         )
         try:
@@ -487,3 +501,48 @@ async def test_blocked_write_keeps_its_unknown_outcome_after_a_late_acknowledgem
         read.assert_called_once()
         create.assert_called_once()
         assert 0 < create.call_args.kwargs["_request_timeout"] <= 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("vector", VECTORS)
+async def test_exact_issuer_callback_is_preserved_without_normalization(
+    client: OAuth2Api, vector: dict[str, str]
+) -> None:
+    expected = _profile()
+    expected.redirect_uris = ["http://127.0.0.1" + vector["path"]]
+    with (
+        patch.object(client, "get_o_auth2_client", return_value=expected),
+        patch.object(client, "patch_o_auth2_client", return_value=expected) as update,
+        patch.object(client, "create_o_auth2_client") as create,
+    ):
+        outcome = await HydraHumanOAuthClientProvisioner(client).ensure_client(
+            issuer=OAuthIssuer(vector["issuer"]), api_audience=AUDIENCE, timeout_seconds=1
+        )
+    assert outcome is HumanOAuthClientProvisioningOutcome.UNCHANGED
+    update.assert_not_called()
+    create.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_shared_callback_is_replaced_in_place_without_recreating_the_client(
+    client: OAuth2Api,
+) -> None:
+    """Replace only the redirect registration through one patch, without create or delete."""
+    current = _profile()
+    current.redirect_uris = ["http://127.0.0.1/oauth/callback"]
+    with (
+        patch.object(client, "get_o_auth2_client", side_effect=[current, _profile()]),
+        patch.object(client, "patch_o_auth2_client", return_value=_profile()) as update,
+        patch.object(client, "create_o_auth2_client") as create,
+        patch.object(client, "delete_o_auth2_client") as delete,
+    ):
+        outcome = await HydraHumanOAuthClientProvisioner(client).ensure_client(
+            issuer=ISSUER, api_audience=AUDIENCE, timeout_seconds=1
+        )
+    assert outcome is HumanOAuthClientProvisioningOutcome.UPDATED
+    patches = update.call_args.kwargs["json_patch"]
+    assert [(entry.op, entry.path, entry.value) for entry in patches] == [
+        ("add", "/redirect_uris", [CALLBACK])
+    ]
+    create.assert_not_called()
+    delete.assert_not_called()

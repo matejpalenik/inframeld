@@ -48,7 +48,9 @@ async def _provision(settings: OAuthClientProvisioningSettings) -> str:
                         break
                 await asyncio.sleep(0.25)
         return await HydraHumanOAuthClientProvisioner(OAuth2Api(sdk)).ensure_client(
-            api_audience=settings.hydra.api_audience, timeout_seconds=settings.timeout_seconds
+            issuer=settings.hydra.issuer,
+            api_audience=settings.hydra.api_audience,
+            timeout_seconds=settings.timeout_seconds,
         )
     finally:
         sdk.rest_client.pool_manager.clear()

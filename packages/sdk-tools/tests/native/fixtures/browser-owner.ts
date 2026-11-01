@@ -559,18 +559,33 @@ function bound<T>(
   if (clock.now() >= deadline)
     return Promise.reject(new FixtureDeadline(`${phase}-deadline`));
   return new Promise<T>((resolve, reject) => {
-    const timer = clock.set(deadline - clock.now(), () =>
-      reject(new FixtureDeadline(`${phase}-deadline`)),
-    );
-    promise
-      .then(
-        (value) =>
+    let settled = false;
+    let timer: unknown;
+    const settle = (action: () => void) => {
+      if (settled) return;
+      settled = true;
+      clock.clear(timer);
+      action();
+    };
+    const expire = () => {
+      if (settled) return;
+      // Timer delivery does not prove the captured monotonic deadline elapsed.
+      const remaining = deadline - clock.now();
+      if (remaining > 0) {
+        clock.clear(timer);
+        timer = clock.set(remaining, expire);
+      } else settle(() => reject(new FixtureDeadline(`${phase}-deadline`)));
+    };
+    timer = clock.set(deadline - clock.now(), expire);
+    promise.then(
+      (value) =>
+        settle(() =>
           clock.now() >= deadline
             ? reject(new FixtureDeadline(`${phase}-deadline`))
             : resolve(value),
-        reject,
-      )
-      .finally(() => clock.clear(timer));
+        ),
+      (error: unknown) => settle(() => reject(error)),
+    );
   });
 }
 

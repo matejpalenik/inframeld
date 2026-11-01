@@ -514,7 +514,37 @@ test("pure browser owner keeps the original close window usable for profile kill
     const closing = api.close();
     void closing.catch(() => {});
     await browserTicks();
-    h.clock.advance(2500);
+    const deadline = h.clock.now() + 2500;
+    const timers = [...h.clock.timers].filter(
+      ([, timer]) => timer.at === deadline,
+    );
+    assert.ok(timers.length > 0);
+    let outcome = "pending";
+    void closing.then(
+      () => {
+        outcome = "resolved";
+      },
+      () => {
+        outcome = "rejected";
+      },
+    );
+    h.clock.time = deadline - 0.25;
+    for (const [id, timer] of timers) {
+      h.clock.timers.delete(id);
+      timer.action();
+    }
+    await browserTicks();
+    assert.equal(outcome, "pending");
+    assert.equal(
+      h.messages.some(
+        (message) => message.op === "close" && message.ok === false,
+      ),
+      false,
+    );
+    assert.equal(h.disconnected(), false);
+    assert.equal(h.owner.snapshot().cases[0]?.emergency, false);
+    assert.deepEqual(h.owner.snapshot().cases[0]?.errors, []);
+    h.clock.advance(0.25);
     await browserTicks();
     await assert.rejects(closing, /close-deadline/);
     assert.equal(
@@ -534,6 +564,83 @@ test("pure browser owner keeps the original close window usable for profile kill
     client.end();
     h.clock.advance(5001);
     await browserTicks();
+  }
+});
+
+test("pure browser owner clears rearmed report timers on settlement and ignores stale callbacks", async () => {
+  for (const rejected of [false, true]) {
+    const h = browserHarness();
+    const report = pending<void>();
+    const original = new Error("controlled report failure");
+    let deadline = 0;
+    const running = superviseBrowserWorker(
+      h.owner,
+      async () => {},
+      (limit) => {
+        deadline = limit;
+        return report.promise;
+      },
+      h.clock,
+    );
+    void running.catch(() => {});
+    try {
+      await browserTicks();
+      const scheduled = [...h.clock.timers].find(
+        ([, timer]) => timer.at === deadline,
+      );
+      assert.ok(scheduled);
+      h.clock.time = deadline - 0.25;
+      h.clock.timers.delete(scheduled[0]);
+      scheduled[1].action();
+      await browserTicks();
+      const rearmed = [...h.clock.timers.values()];
+      assert.equal(rearmed.length, 1);
+      assert.equal(rearmed[0]?.at, deadline);
+      if (rejected) {
+        report.reject(original);
+        await assert.rejects(running, (error: unknown) => error === original);
+      } else {
+        report.resolve();
+        await running;
+      }
+      assert.equal(h.clock.timers.size, 0);
+      scheduled[1].action();
+      rearmed[0]!.action();
+      await browserTicks();
+      assert.equal(h.clock.timers.size, 0);
+    } finally {
+      report.resolve();
+      await running.catch(() => {});
+      h.clock.advance(1);
+      await browserTicks();
+    }
+  }
+});
+
+test("pure browser owner rejects late report success before its timer is dispatched", async () => {
+  const h = browserHarness();
+  const report = pending<void>();
+  let deadline = 0;
+  const running = superviseBrowserWorker(
+    h.owner,
+    async () => {},
+    (limit) => {
+      deadline = limit;
+      return report.promise;
+    },
+    h.clock,
+  );
+  void running.catch(() => {});
+  try {
+    await browserTicks();
+    assert.ok(deadline > h.clock.now());
+    h.clock.time = deadline;
+    report.resolve();
+    await assert.rejects(running, /report-deadline/);
+    assert.equal(h.clock.timers.size, 0);
+  } finally {
+    report.resolve();
+    await running.catch(() => {});
   }
 });
 
