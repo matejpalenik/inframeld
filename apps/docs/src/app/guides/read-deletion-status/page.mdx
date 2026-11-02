@@ -8,9 +8,11 @@ export const pageMetadata = {
 
 Use this read when you have the original operation ID for a Project deletion and need its retained status. Alice can read her original operation after her Project membership disappears, provided her human account and credential are still eligible. The response contains status facts, without the Project's name, contents or inventory.
 
-This guide reads an existing observation. It does not start, resume or cancel a deletion, restore access or independently verify that stored bytes have been erased.
+Read each reported fact separately. A completed job alone does not establish that stored bytes have been erased.
 
-## Before you begin
+<a id="before-you-begin" />
+
+## Use the original human and operation ID
 
 You need the backend URL, a current human bearer credential for that installation, and the exact original deletion operation ID. Keep that ID before losing Project access. An operation ID identifies work but grants no permission.
 
@@ -28,7 +30,7 @@ export INFRAMELD_OPERATION_ID='YOUR_ORIGINAL_DELETION_OPERATION_ID'
 
 </CodeGroup>
 
-The SDK examples require a local build of the [Python](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-python#build-and-use-locally), [TypeScript](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-typescript#build-and-use-locally) or [Rust](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-rust#build-and-use-locally) package. Follow its instructions in a separate example project. These SDKs are not published to package registries. This guide supplies no CLI deletion-status or login command.
+The For an SDK alternative, follow the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) setup in a separate example project. These examples use the delivered HTTP operations. [CLI command reference](/clients/cli/commands) lists available CLI tasks.
 
 ## Read the original operation
 
@@ -36,13 +38,15 @@ Choose one example. Each calls `GET /v1/deletions/status` once and preserves the
 
 <CodeGroup>
 
-```shell
+```shell {{ title: "cURL" }}
 curl --silent --show-error --fail-with-body \
   --max-time 5 \
   --get "$INFRAMELD_URL/v1/deletions/status" \
-  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header @- \
   --header 'Accept: application/json' \
-  --data-urlencode "operationId=$INFRAMELD_OPERATION_ID"
+  --data-urlencode "operationId=$INFRAMELD_OPERATION_ID" <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
 ```
 
 ```python
@@ -113,7 +117,7 @@ if (result.error) {
   console.error("HTTP status:", result.response?.status)
   process.exitCode = 1
 } else if (result.data) {
-  console.log("HTTP", result.response.status)
+  console.log("HTTP", result.response?.status)
   console.log(JSON.stringify(result.data, null, 2))
 }
 ```

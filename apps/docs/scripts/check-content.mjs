@@ -7,7 +7,13 @@ const root = fileURLToPath(new URL("../", import.meta.url))
 const navigation = JSON.parse(
   await readFile(new URL("../src/lib/navigation.json", import.meta.url), "utf8")
 )
-const errors = await validateContent(root, navigation)
+const contract = JSON.parse(
+  await readFile(
+    new URL("../../../contracts/openapi/v1/inframeld-v1.json", import.meta.url),
+    "utf8"
+  )
+)
+const errors = await validateContent(root, navigation, contract)
 if (errors.length) {
   console.error(errors.join("\n"))
   process.exitCode = 1

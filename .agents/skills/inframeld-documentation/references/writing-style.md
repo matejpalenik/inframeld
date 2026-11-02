@@ -30,6 +30,12 @@ Preserve exact wire names inside code. If the implementation returns `accepted_a
 
 A task page opens with an outcome and the condition where the reader should use it. State required setup before the first command. Put optional alternatives after the smallest complete path. Explain a default where it affects what happens. Avoid a long conceptual introduction before the reader can make progress.
 
+Choose one primary reader. A general CLI task shows ordinary human output first. JSON/JSONL leads when the page explicitly serves automation. API reference can lead with HTTP and typed clients. Do not make a human guide double as the complete machine-output specification.
+
+Prerequisites contain only what the reader must have before acting. If a version check needs an installed CLI, link to its installation page and show the command. Omit a separate setup heading when it adds no useful work. Keep release availability, source-build recipes, output field catalogs and diagnostic implementation details in their owning pages.
+
+Describe what the feature does. Keep a negative statement only when it changes a choice, prevents a plausible misunderstanding or protects privacy/data. A lost-response warning matters because another write may duplicate effects. A list of unrelated things an offline version command does not do adds no comparable value.
+
 Each step should have a reason when it is not obvious, a concrete action and an observable result. Name the file or environment before a code block. Explain the output immediately after it. Put warnings beside the action they constrain. Do not collect important permission or retry conditions in a remote “edge cases” section.
 
 Choose headings that answer a question or name an action: “Keep the original context”, “Check the result” or “When access changes”. Use a table to compare parallel outcomes or fields. Use numbered steps for a sequence. Avoid turning a connected explanation into a long list of isolated facts.
@@ -55,5 +61,6 @@ These are original Inframeld examples, not replacements for inspected endpoint d
 | On timeout, retry the operation. | If you lose the response, keep the original request context and follow the documented recovery path. | Avoids implying that a new write is safe. |
 | The secure interface supports all SDKs. | The selected Python, TypeScript and Rust clients use the delivered OpenAPI contract. Requests still require current permission. | Replaces broad reassurance with a checkable claim. |
 | As can be seen above, the request was processed. | The response includes the original operation ID. | Describes the evidence without claiming more than it shows. |
+| Start a general version guide with JSON, then list the services it never starts. | Show `inframeld --version`, explain the result, and link to machine output for scripts. | Matches the human task and moves the automation contract to reference. |
 
 Read the page aloud during the final edit. Remove repeated setup, vague transitions and claims that a reader cannot verify. Preserve exact conditions and meaningful exceptions. Use no semicolons or em dashes in prose, comments or docstrings.

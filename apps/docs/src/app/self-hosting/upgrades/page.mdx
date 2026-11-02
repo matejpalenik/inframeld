@@ -1,0 +1,24 @@
+export const pageMetadata = {
+  title: "Upgrades and compatibility",
+  description: "Choose coherent artifacts and preserve recovery information.",
+}
+
+# Upgrades and compatibility
+
+Choose application and CLI artifacts from an explicitly compatible, qualified release set. A version string or a successful health request alone cannot establish that pairing.
+
+## Inspect what you have
+
+[Read the CLI build information](/guides/inspect-cli-version), retain the artifact's origin, and identify the backend revision you are running. Development CLI metadata reports remote compatibility as unverified and no qualified runtime release.
+
+## Update a development checkout
+
+Select the source revision deliberately, read its migration and configuration changes, and install the locked dependencies for that revision. Database migration changes existing state. Keep a recoverable environment before applying it.
+
+A qualified production upgrade and rollback recipe is not available in this preview. Schema rollback and application rollback have different requirements. [Backup and restore](/self-hosting/backup-and-restore) explains the recovery boundary.
+
+## Keep client configuration explicit
+
+An updated target's trusted installation identity, issuer and transport settings must agree with the connection you intend to use. A changed label or current preference is not permission to rebind an old operation to a new installation.
+
+Check [changelog and support](/changelog-and-support) for delivered changes and safe reporting.

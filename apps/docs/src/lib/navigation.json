@@ -3,8 +3,65 @@
     "title": "Get started",
     "links": [
       {
-        "title": "Introduction",
-        "href": "/"
+        "title": "Choose your starting point",
+        "href": "/get-started"
+      },
+      {
+        "title": "Install Inframeld",
+        "href": "/get-started/install-inframeld"
+      },
+      {
+        "title": "Install the CLI",
+        "href": "/get-started/install-cli"
+      },
+      {
+        "title": "Connect and sign in",
+        "href": "/get-started/connect"
+      },
+      {
+        "title": "Quickstart: get an answer from your documents",
+        "href": "/get-started/first-answer"
+      }
+    ]
+  },
+  {
+    "title": "Product",
+    "links": [
+      {
+        "title": "What is Inframeld?",
+        "href": "/product"
+      },
+      {
+        "title": "How Inframeld works",
+        "href": "/product/how-it-works"
+      },
+      {
+        "title": "Projects, people and permissions",
+        "href": "/product/projects-and-permissions"
+      },
+      {
+        "title": "Documents, versions and collections",
+        "href": "/product/documents-and-collections"
+      },
+      {
+        "title": "Models, processing and search",
+        "href": "/product/models-and-search"
+      },
+      {
+        "title": "Pipelines and builds",
+        "href": "/product/pipelines-and-builds"
+      },
+      {
+        "title": "Evaluation and comparisons",
+        "href": "/product/evaluation"
+      },
+      {
+        "title": "Deployments and releases",
+        "href": "/product/deployments-and-releases"
+      },
+      {
+        "title": "Glossary",
+        "href": "/product/glossary"
       }
     ]
   },
@@ -12,24 +69,150 @@
     "title": "Guides",
     "links": [
       {
-        "title": "Inspect your CLI version offline",
-        "href": "/guides/inspect-cli-version"
+        "title": "Add and manage knowledge",
+        "href": "/guides/knowledge"
       },
       {
-        "title": "Register and select a target",
-        "href": "/guides/register-a-target"
+        "title": "Configure models and processing",
+        "href": "/guides/models-and-processing"
       },
       {
-        "title": "Check whether your original request was accepted",
-        "href": "/guides/recover-original-request"
+        "title": "Configure pipelines and ask questions",
+        "href": "/guides/pipelines-and-questions"
       },
       {
-        "title": "Read retained deletion status",
-        "href": "/guides/read-deletion-status"
+        "title": "Evaluate answer quality",
+        "href": "/guides/evaluate-answers"
       },
       {
-        "title": "Name and rename an existing Project",
-        "href": "/guides/name-and-rename-project"
+        "title": "Publish, update and roll back",
+        "href": "/guides/publish-and-rollback"
+      },
+      {
+        "title": "Manage Projects and access",
+        "href": "/guides/projects-and-access"
+      },
+      {
+        "title": "Automate tasks and recover operations",
+        "href": "/guides/automation-and-recovery"
+      }
+    ]
+  },
+  {
+    "title": "CLI and SDKs",
+    "links": [
+      {
+        "title": "CLI",
+        "href": "/clients/cli",
+        "children": [
+          {
+            "title": "Overview and setup",
+            "href": "/clients/cli/setup"
+          },
+          {
+            "title": "Configuration",
+            "href": "/clients/cli/configuration"
+          },
+          {
+            "title": "Command reference",
+            "href": "/clients/cli/commands"
+          },
+          {
+            "title": "JSON output, exit codes and automation",
+            "href": "/clients/cli/automation"
+          }
+        ]
+      },
+      {
+        "title": "HTTP and cURL",
+        "href": "/clients/http"
+      },
+      {
+        "title": "Python SDK",
+        "href": "/clients/python"
+      },
+      {
+        "title": "TypeScript SDK",
+        "href": "/clients/typescript"
+      },
+      {
+        "title": "Rust SDK",
+        "href": "/clients/rust"
+      }
+    ]
+  },
+  {
+    "title": "API reference",
+    "links": [
+      {
+        "title": "Overview and authentication",
+        "href": "/api-reference"
+      },
+      {
+        "title": "Discovery and health",
+        "href": "/api-reference/discovery-and-health"
+      },
+      {
+        "title": "Projects and access",
+        "href": "/api-reference/projects-and-access"
+      },
+      {
+        "title": "Documents, collections and sources",
+        "href": "/api-reference/documents"
+      },
+      {
+        "title": "Processing and search",
+        "href": "/api-reference/processing"
+      },
+      {
+        "title": "Pipelines, queries and builds",
+        "href": "/api-reference/pipelines"
+      },
+      {
+        "title": "Evaluation",
+        "href": "/api-reference/evaluation"
+      },
+      {
+        "title": "Deployments and releases",
+        "href": "/api-reference/releases"
+      },
+      {
+        "title": "Operations, results and errors",
+        "href": "/api-reference/operations"
+      }
+    ]
+  },
+  {
+    "title": "Self-hosting",
+    "links": [
+      {
+        "title": "Requirements and deployment configuration",
+        "href": "/self-hosting"
+      },
+      {
+        "title": "Secure your installation",
+        "href": "/self-hosting/security"
+      },
+      {
+        "title": "Monitoring and troubleshooting",
+        "href": "/self-hosting/monitoring"
+      },
+      {
+        "title": "Backup and restore",
+        "href": "/self-hosting/backup-and-restore"
+      },
+      {
+        "title": "Upgrades and compatibility",
+        "href": "/self-hosting/upgrades"
+      }
+    ]
+  },
+  {
+    "title": "Changelog and support",
+    "links": [
+      {
+        "title": "Changelog and support",
+        "href": "/changelog-and-support"
       }
     ]
   }

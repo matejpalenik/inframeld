@@ -1,51 +1,36 @@
 export const pageMetadata = {
   title: "Inframeld documentation",
-  description: "Practical guides for using Inframeld and its API.",
+  description:
+    "Install, connect and use Inframeld through the CLI, HTTP and generated SDKs.",
 }
 
 # Inframeld documentation
 
-Inframeld provides governed retrieval and release workflows. Use these guides to understand a feature, make a request, and decide what to do with the result.
+Build grounded answers from your documents, test their quality and control which version serves your application.
 
-The documentation is growing alongside the application. Each guide describes behavior implemented in the repository. Links to source code help you check the details for your version.
+<Note>
+  This developer preview delivers local CLI tools, existing-account sign-in and
+  the public Access and operation-inspection APIs. The complete
+  document-to-answer workflow is still being delivered. Installation and client
+  pages explain the supported starting paths.
+</Note>
 
-## Start with a task
+## Start here
 
-If you submitted a request but lost its response, you can check the original request without submitting it again.
+- **Run your own environment:** [install Inframeld from source](/get-started/install-inframeld).
+- **Use your team's installation:** [connect and sign in](/get-started/connect).
+- **Build an integration:** make a first request with [HTTP](/clients/http), [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust).
+- **Use the terminal:** [install the CLI](/get-started/install-cli) and [register a target](/guides/register-a-target).
 
-<Button href="/guides/recover-original-request" arrow="right">
-  Check whether your original request was accepted
-</Button>
+## Find what you need
 
-The guide covers the HTTP endpoint and the Python, TypeScript, and Rust SDKs. It explains which details you need to retain and how to handle a result that cannot be resolved.
+| Section                               | Start here when you want to…                               |
+| ------------------------------------- | ---------------------------------------------------------- |
+| [Get started](/get-started)           | Install, connect or choose a first working example.        |
+| [Product](/product)                   | Understand documents, Pipelines, evaluations and releases. |
+| [Guides](/guides/projects-and-access) | Complete a supported task.                                 |
+| [CLI and SDKs](/clients/cli)          | Set up your preferred client.                              |
+| [API reference](/api-reference)       | Check an operation's inputs, responses and errors.         |
+| [Self-hosting](/self-hosting)         | Configure and operate your environment.                    |
 
-## Sign in to an existing account
-
-Use the HTTPS account site supplied by your installation operator, with an existing account and its configured password or email-code method. Your browser must trust the site's TLS certificate. The [account-site setup notes](https://github.com/matejpalenik/inframeld/blob/main/apps/web/README.md#https-reference-profile) describe operator configuration and current qualification limits. They are separate from a user sign-in procedure.
-
-For an operator-configured account origin such as `https://accounts.example.com`, replace the example origin below with the one you were given:
-
-1. Open `https://accounts.example.com/login`. Choose **Use your password** or **Use an email code** and follow the native provider form. Email-code login requires working delivery to your configured address.
-2. Follow the form's errors for a rejected password or code. For an expired browser flow, use the site's **Sign in** link to start a fresh flow. If a required interaction is unsupported, stop and ask the operator for a supported path. Required factors are not skipped.
-3. To sign out, open `https://accounts.example.com/logout` and activate **Sign out of browser**. Opening that page alone does not end the session. Browser logout has a separate lifecycle from CLI credentials.
-
-Sign-in establishes a browser session. Product use still requires existing admission and current permission. These pages do not create accounts, provide recovery or account management, or supply CLI bearer credentials or maintenance proof.
-
-A consent page displays the checked account subject and installation for an existing request. Approval and **Cancel** are explicit actions. The option to remember a new approval starts unchecked. If a decision's result cannot be confirmed, stop and do not submit it again. These pages do not provide a command to start CLI sign-in or construct a consent request.
-
-Browser history may retain native flow URLs. Keep those URLs, cookies and codes out of logs and shared screenshots.
-
-## Use the API and SDKs
-
-Use the backend URL and credentials provided for your Inframeld installation. The SDKs are currently available from this repository and are not published packages.
-
-- [Python SDK source and setup](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-python)
-- [TypeScript SDK source and setup](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-typescript)
-- [Rust SDK source and setup](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-rust)
-- [API schema](https://github.com/matejpalenik/inframeld/blob/main/contracts/openapi/v1/inframeld-v1.json)
-
-A CLI command for looking up an original request is not available yet. Use HTTP or an SDK for this task.
-
-## Get help
-
-[Open an issue](https://github.com/matejpalenik/inframeld/issues) to report a problem or suggest an improvement. Include the feature, your application version, and a minimal example. Remove credentials and private request data before sharing it.
+For the intended end-to-end journey, read [from your documents to an answer](/get-started/first-answer). For questions or a bug report, use [support](/changelog-and-support).

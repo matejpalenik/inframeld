@@ -1,0 +1,54 @@
+export const pageMetadata = {
+  title: "JSON output, exit codes and automation",
+  description: "Consume explicit machine results and preserve uncertainty.",
+}
+
+# JSON output, exit codes and automation
+
+Use machine output when a script consumes the CLI result. Human workflows can keep the ordinary command output.
+
+## Select an output mode
+
+<CodeGroup>
+
+```shell
+inframeld version --json
+inframeld version --jsonl
+```
+
+</CodeGroup>
+
+Choose one mode. Ordinary JSON is one result object. JSONL wraps the complete result in one final record for these commands. Piping stdout does not automatically select a mode.
+
+## Interpret the result
+
+| Field           | Meaning                                          |
+| --------------- | ------------------------------------------------ |
+| `schemaVersion` | The machine envelope version.                    |
+| `mode`          | Execution or descriptive dry-run.                |
+| `outcome`       | The command's reported outcome.                  |
+| `data`          | Command-specific observations or a preview plan. |
+| `error`         | A safe structured failure when present.          |
+| `warnings`      | Structured warnings.                             |
+
+Check process status and required fields. Reject an unsupported schema version, malformed required data or a missing final result. Ignore additional fields. Read the command-specific contract rather than assuming every successful inspection means a remote operation succeeded.
+
+## Preview a change
+
+<CodeGroup>
+
+```shell
+inframeld target use dev --dry-run --json
+```
+
+</CodeGroup>
+
+A preview describes the proposed change. It does not reserve or apply it. The [target guide](/guides/register-a-target#inspect-and-select-the-target) explains current/proposed preference fields and explicit known-null values.
+
+## Handle exits and incomplete output
+
+Usage errors exit `2`. Controlled execution or machine-output failures exit `1`. A successful supported command exits `0`. Help and the recognized root `--version` remain plain-text exceptions even when a machine flag is present.
+
+A failed stdout write can leave partial output. The CLI does not append a replacement success result. Check stderr and process status without treating a prefix as complete data. Plain human/help/version output retains its existing broken-pipe behavior.
+
+[Version metadata](/clients/cli/version-reference) documents its full field and output contract. For remote actions, preserve the original operation context and follow [recovery](/guides/automation-and-recovery) instead of retrying an uncertain write with a new identity.

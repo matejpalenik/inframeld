@@ -1,0 +1,79 @@
+export const pageMetadata = {
+  title: "TypeScript SDK",
+  description: "Build the local package and make a typed Fetch request.",
+}
+
+# TypeScript SDK
+
+Use `@inframeld/sdk` for generated operations, TypeScript models and validated responses. This preview supplies the package from the repository rather than a public npm release.
+
+## Build and install the package
+
+From the Inframeld checkout with its pinned toolchain and locked dependencies:
+
+<CodeGroup>
+
+```shell
+pnpm --filter @inframeld/sdk build
+pnpm --filter @inframeld/sdk exec npm pack --ignore-scripts
+```
+
+</CodeGroup>
+
+In a separate example directory, create this complete `package.json` for an ESM project:
+
+<CodeGroup>
+
+```json
+{
+  "name": "inframeld-example",
+  "private": true,
+  "type": "module"
+}
+```
+
+</CodeGroup>
+
+Install the resulting archive from that directory, replacing the checkout path below:
+
+<CodeGroup>
+
+```shell
+pnpm add /absolute/path/to/inframeld/packages/sdk-typescript/inframeld-sdk-0.0.0.tgz
+```
+
+</CodeGroup>
+
+Examples below use the repository's Node 26 toolchain.
+
+## Make a first request
+
+Set `INFRAMELD_URL` to your backend URL. Save this complete example as `health.ts`:
+
+<CodeGroup>
+
+```typescript
+import { createClient, getHealth } from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+if (!baseUrl) throw new Error("Set INFRAMELD_URL")
+
+const client = createClient({ baseUrl })
+const result = await getHealth({ client })
+if (result.error) throw new Error("The health request failed")
+console.log(result.data.status)
+```
+
+</CodeGroup>
+
+Run `node health.ts` with Node 26. A successful request prints `ok`.
+
+## Use protected operations
+
+Pass the configured client and an `Authorization` header to a generated operation. [Authentication](/api-reference#authentication) defines supported credentials. The [Project guide](/guides/name-and-rename-project) and [lookup guide](/guides/recover-original-request) demonstrate typed calls with equivalent HTTP/Python/Rust examples.
+
+## Inspect results
+
+The default fields result exposes `data`, `error`, the native `response` and available `rawBody`. Check the error branch, even after HTTP 200. Narrow `error.kind === "api"` before reading its validated problem body. Decode, transport and request failures have different meanings.
+
+Default requests have bounded buffered deadlines and manual redirects. Browser cookie requests also require the installation's supported Origin/CORS and CSRF configuration. A Node example does not establish browser authentication. Keep a lost-response recovery tied to its original operation.

@@ -14,7 +14,7 @@ The aim is to let developers ask the assistant about the product without holding
 
 Assume the reader knows basic programming but is new to this product and its architecture. Start with a small realistic example and the behavior's purpose. Follow the mechanism in causal order, define unfamiliar terms when they arise, and explain relevant failures, retries and changed permissions/state. Name the owner and distinguish accepted design from inspected implementation. Use tables or short steps only when they improve clarity.
 
-Every code snippet identifies its exact file path and whether it replaces existing code, follows/precedes a named line, or is a complete new file. Include the imports and surrounding function/class/configuration needed to apply it without guessing. Separate multi-file examples and explain their connection. Label illustrative pseudocode and copyable code. Preserve existing behavior unless the example explicitly changes it.
+For repository edit instructions, every code snippet identifies its exact file path and whether it replaces existing code, follows/precedes a named line, or is a complete new file. Include the imports and surrounding function/class/configuration needed to apply it without guessing. Separate multi-file examples and explain their connection. Label illustrative pseudocode and copyable code. Public documentation follows the Documentation skill's snippet-context rules: identify filenames for files the reader creates, working directories when they matter, and setup for shorter client examples. Ordinary terminal commands and HTTP requests do not need artificial replacement/insertion labels. Preserve existing behavior unless the example explicitly changes it.
 
 ## Load the relevant skill
 

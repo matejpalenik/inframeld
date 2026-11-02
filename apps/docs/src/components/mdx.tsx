@@ -119,3 +119,4 @@ export function Property({
     </li>
   )
 }
+export { ApiOperation, ApiSchema } from "@/components/ApiReference"

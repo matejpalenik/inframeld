@@ -1,6 +1,6 @@
 # Make examples useful and verifiable
 
-Alice should be able to tell whether a code block is ready to run or only illustrates one part of an explanation. Name the exact file path and label the block as a complete new file, a replacement, an insertion or a selected teaching fragment. Supply the imports, caller construction and lifecycle needed for a complete example. Do not hide required behavior behind ellipses.
+Alice should be able to tell whether a code block is ready to run or illustrates part of an explanation. Name files she creates, include imports/client construction/lifecycle in complete programs, and explain shared setup for shorter snippets. Identify a working directory when it matters. Ordinary terminal commands and HTTP requests do not need artificial replacement/insertion labels. Repository code-edit instructions retain their exact placement requirements. Do not hide required behavior behind ellipses.
 
 ## Connect setup, code and result
 
@@ -10,6 +10,12 @@ Give the file path before the code and the execution command after it. Separate 
 
 Language tabs should express the same task with equivalent identifiers, authority, route and expected result. Begin with the smallest useful path and add advanced options later. Use the actual generated client's return types. Python union wrappers, Rust enum variants and TypeScript narrowing differ. Do not replace them with a convenient handwritten application client or an invented shared wrapper.
 
+The standard alternatives are **CLI, cURL, Python, TypeScript and Rust**, in that order where applicable. Human CLI guides lead with the ordinary command. Shared API operations use cURL and the three generated SDKs, adding CLI only when its command exists. Installation, local preferences and version checks use their meaningful terminal examples. Omit unsupported tabs and link to the central client capability description rather than inventing an HTTP escape hatch or filling a tab with TODO text.
+
+Keep SDK setup in the corresponding client page. An endpoint example may reuse that explicitly named setup, while a complete first example includes imports and resource cleanup. Use existing `CodeGroup` title annotations for accurate labels. Do not force one JSON envelope onto clients with different native response wrappers.
+
+The API reference's `ApiOperation` and `ApiSchema` views read `contracts/openapi/v1/inframeld-v1.json` directly. Author operation explanations and verified examples beside those views. Keep every delivered operation represented, and use explicit model anchors in the model catalog. The content check verifies operation coverage alongside MDX/navigation links. Do not copy complete request/response schemas into a competing handwritten specification.
+
 Show failure handling when it affects safe use. An HTTP 200 response can carry an unresolved observation. Do not convert all non-success product outcomes into transport errors. Keep the delivered JSON shape exactly, including a result such as:
 
 ```json
@@ -18,7 +24,7 @@ Show failure handling when it affects safe use. An HTTP 200 response can carry a
 
 This result alone does not establish whether a retained request exists or whether the original action had effects. A comment or surrounding explanation must not claim otherwise. Do not insert a private reason field to make the example easier to explain.
 
-Run copyable examples against controlled fixtures when available. Record whether the example executed, the environment used and the implementation revision. A documentation build proves syntax and supported imports. It does not prove API behavior, persistence, authorization or provider qualification.
+Run copyable examples against controlled fixtures when available. Record whether the example executed, the environment used and the implementation revision. A documentation build checks MDX syntax and component imports. It does not compile fenced client programs or prove API behavior, persistence, authorization or provider qualification.
 
 ## Use the actual Protocol pipeline
 
@@ -39,9 +45,13 @@ Use lookup when you retained the original context but did not receive the respon
 
 ## Interpret an unresolved result
 
+<CodeGroup>
+
 ```json
 { "outcome": "unresolved" }
 ```
+
+</CodeGroup>
 
 <Note>
   This result does not establish that the original action had no effects.
@@ -64,7 +74,7 @@ The code follows the current adapter pattern. Check the neighboring implemented 
 
 Keep one clear page title. Use useful headings and verify their generated anchors. The current pipeline determines which heading levels enter the page navigation and search index. Preserve existing public anchors when revising a page. Avoid arbitrary imports or client components in ordinary documentation content.
 
-Use `CodeGroup` for equivalent alternatives, such as language versions of one operation. Give each tab an accurate title and keep ordering consistent across pages. A tab must not silently use a different permission model or task. Use the site's copy control and confirm that copied content contains code, not prompts or adjacent output.
+Wrap block fences in `CodeGroup`, including a single standalone command. The installed Protocol client rendering can reject an ungrouped fence with a `Children.only` error. The existing wrapper preserves code metadata and copy behavior without changing the renderer. Group equivalent alternatives, such as language versions of one operation, in the same `CodeGroup`. Give each tab an accurate title and keep ordering consistent across pages. A tab must not silently use a different permission model or task. Use the site's copy control and confirm that copied content contains code, not prompts or adjacent output.
 
 Use `Note` for a nearby condition that changes the reader's interpretation. It should not carry the entire happy path. `Row` and `Col` can align a focused explanation with its example when the existing template supports that layout. Keep reading order understandable on a narrow screen. Use `Properties` and `Property` only for an explanatory field subset. Generated schemas remain the authority for exact complete contracts.
 

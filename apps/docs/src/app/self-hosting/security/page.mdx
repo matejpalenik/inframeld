@@ -1,0 +1,26 @@
+export const pageMetadata = {
+  title: "Secure your installation",
+  description: "Protect ingress, credentials and current authorization.",
+}
+
+# Secure your installation
+
+Protect the installation's public connection and private administration surfaces before enabling account workflows.
+
+## Keep authority boundaries separate
+
+Kratos verifies browser identity and Hydra supplies the selected human OAuth flow. Inframeld admission, Project membership and action grants still determine product access. A browser sign-in does not make someone an installation administrator.
+
+The first administrator requires the separately authorized host-maintenance claim. Public signup or consent alone cannot supply host authority. Expose only the intended public services and keep provider administration private.
+
+## Configure trust
+
+Use HTTPS for remote installations and the account site. Preserve certificate and hostname checks. The delivered CLI target command requires HTTPS, including for a manually supplied loopback address.
+
+Keep secrets out of source control, URLs, command arguments, shared screenshots and logs. Use the installation's supported protected credential channels. Public CA bundles contain certificates, not private keys.
+
+## Review user access
+
+Apply current membership and action permissions. Administrators have no general document-reading bypass. [Projects and permissions](/product/projects-and-permissions) explains the user model and [authentication](/api-reference#authentication) distinguishes browser and bearer requests.
+
+Full production security qualification remains part of assembling the supported release. A healthy endpoint or successful local test alone does not establish that boundary.

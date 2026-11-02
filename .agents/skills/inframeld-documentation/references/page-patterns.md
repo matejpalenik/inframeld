@@ -12,6 +12,12 @@ Show the smallest complete example first. Supply a file path, imports, execution
 
 Do not create an imaginary installation or publication story for convenience. The selected SDKs may be built from this repository without being published packages. The CLI may have an implemented command while a broader accepted command design remains future work. Inspect the supported interface and use its actual prerequisites.
 
+## Home and section entries: help readers choose
+
+For home and section entries, follow [site structure](site-structure.md). The home page briefly explains the product, presents installation/connection/integration paths, and routes to a supported first result. A section entry groups related tasks or explains availability. It does not open with an obscure recovery operation or reproduce all child reference material. Shared setup has one canonical page.
+
+When a requested entry covers unfinished work, give a useful availability page: name the missing capability, explain the relevant concept and offer supported next steps. Avoid fictional examples, empty headings and a public delivery-status log.
+
 ## Task guide: solve a known problem
 
 A task guide assumes that the reader knows the desired outcome. A useful flow is:

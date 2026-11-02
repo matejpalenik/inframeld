@@ -1,0 +1,27 @@
+export const pageMetadata = {
+  title: "How Inframeld works",
+  description:
+    "Follow knowledge from admission to an answer and a controlled release.",
+}
+
+# How Inframeld works
+
+Consider a support team using two handbook documents. Inframeld keeps the documents, the processing choices and the version serving answers identifiable as the team makes changes.
+
+## Prepare knowledge
+
+A document has immutable versions. A collection selects exact versions, so replacing one document does not rewrite the collection that an older build used. Processing derives passages and searchable representations from those inputs.
+
+## Develop an answer path
+
+A Pipeline has working configuration for retrieval and generation. A build prepares and verifies a version from captured inputs. An ordinary query or comparison keeps the inputs it admitted even while you continue editing.
+
+## Evaluate and publish
+
+Evaluation uses reviewed cases and frozen benchmarks to compare fresh results. A Deployment's release policy separately determines whether a ready version receives traffic. A high score or successful build does not grant publication authority.
+
+## Change safely
+
+A failed build leaves healthy current traffic in place. Omitting a document from a new collection differs from erasing it. Erasure can make historical content unavailable, and every access still checks current permission.
+
+Read [documents and collections](/product/documents-and-collections), [Pipelines and builds](/product/pipelines-and-builds), and [releases](/product/deployments-and-releases) for the individual concepts.

@@ -1,0 +1,22 @@
+export const pageMetadata = {
+  title: "Models, processing and search",
+  description: "Understand model connections and prepared search data.",
+}
+
+# Models, processing and search
+
+Model connections identify the providers and settings used for a task. Processing choices determine how source content becomes passages and embeddings. Search uses those prepared representations to find evidence for a question.
+
+## Configure for a purpose
+
+Embedding and answer-generation roles can use different models. Credentials belong to their protected connection and current authority, rather than copied settings in every request. Model calls use the backend's gateway.
+
+## Reuse and readiness
+
+Compatible unchanged inputs can reuse derived search data. New physical generations remain identifiable. A record saying that work was requested is different from verified readiness to use its output.
+
+## Connect search to answers
+
+A Pipeline chooses how to retrieve and use evidence. Access filters remain part of retrieval. A search match is evidence for an answer, not proof that the answer is correct.
+
+[Configure models and processing](/guides/models-and-processing) describes current availability. [Pipelines and builds](/product/pipelines-and-builds) explains how these choices enter a prepared version.
