@@ -45,11 +45,10 @@ The account application does not persist OAuth access/refresh/ID tokens, PKCE ve
 
 ## Private checks
 
-From the repository root, using the pinned toolchain:
+From the repository root, using the pinned toolchain. The web `dev`, `build`, `typecheck` and `test` commands build the committed TypeScript SDK before consuming its output:
 
 ```bash
 mise exec -- pnpm install --frozen-lockfile
-mise exec -- pnpm --filter @inframeld/sdk build
 mise exec -- pnpm --filter @inframeld/web test
 mise exec -- pnpm --filter @inframeld/web lint
 mise exec -- pnpm --filter @inframeld/web format:check

@@ -30,7 +30,8 @@ test(
       await beginLogin(page)
       await passwordLogin(page, fixture, "Incorrect-fixture-password!")
       if (await session(context)) throw new Error()
-      if (!(await page.getByRole("alert").count())) throw new Error()
+      if (!(await page.getByRole("main").getByRole("alert").count()))
+        throw new Error()
       await passwordLogin(page, fixture)
       if ((await session(context))?.identity?.id !== fixture.subject)
         throw new Error()
@@ -111,7 +112,8 @@ test(
       await setTimeout(31_000)
       await submitCode(page, code)
       if (await session(context)) throw new Error()
-      if (!(await page.getByRole("alert").count())) throw new Error()
+      if (!(await page.getByRole("main").getByRole("alert").count()))
+        throw new Error()
     } catch {
       throw new Error("Native expired-code rejection qualification failed.")
     } finally {

@@ -4,15 +4,16 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "build:sdk": "pnpm --filter @inframeld/sdk --fail-if-no-match build",
+    "dev": "pnpm run build:sdk && next dev",
+    "build": "pnpm run build:sdk && next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "lint:fix": "eslint --fix --max-warnings 0",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,mdx,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,mdx,css}\"",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/unit/*.test.ts*",
+    "typecheck": "pnpm run build:sdk && tsc --noEmit",
+    "test": "pnpm run build:sdk && tsx --test tests/unit/*.test.ts*",
     "test:browser": "tsx --test --test-concurrency=1 tests/browser/*.test.ts"
   },
   "dependencies": {
