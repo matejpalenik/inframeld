@@ -2,7 +2,7 @@
 
 Alice scripts a command that admits work, then inspects its outcome. One machine result must describe the same permitted facts as the human view, including uncertainty and partial saved effects.
 
-> **Status:** common CLI representation accepted on 2026-10-29 through the approved joint #124/#156 specification plan. Runtime implementation and command-specific data models remain delivery work. The executable currently exposes offline help/version. No JSON flag, job command or output example below is a claim of an executable feature.
+> **Status:** common CLI representation accepted on 2026-10-29 through the approved joint #124/#156 specification plan. Help/version and the credential-free target commands implement final JSON/JSONL framing, safe exits, warnings and descriptive previews. Target previews and preference views have the bounded contracts below. Job/progress, backend-problem and pagination consumers remain delivery work. Illustrative domain examples do not publish those commands.
 
 ## Read the right contract
 
@@ -22,7 +22,7 @@ For controlled argument failures, use this diagnostic precedence before full com
 
 This narrow check neither parses command values nor resolves context. Valid invocations use clap's actual parsed options. Reviewed diagnostics never echo arbitrary argument values. Clap's successfully recognized short-version output retains its offline plain-text exception.
 
-These argument fragments belong to this reference's failed-parsing contract. They describe future behavior, not invocations supported by today's executable:
+These argument fragments belong to the executable's implemented failed-parsing contract. They establish framing and diagnostic intent, not support for an otherwise unknown command:
 
 | Argument fragment before a controlled usage failure | Diagnostic stdout | Envelope mode | Exit |
 | --- | --- | --- | --- |
@@ -179,6 +179,22 @@ Necessary bounded, normally authorized metadata reads are permitted. They can re
 Same-identity refresh is a narrow metadata-access exception, not permission to execute a requested login/issuance command. Inspect local input only within explicit scope and bounds, without an undisclosed filesystem scan or protected-content/secret disclosure. Invalid inputs still fail. Inaccessible metadata cannot appear as verified plan data.
 
 A successful explanation exits `0` without establishing execution, readiness, future permission, consent or a reserved revision. Removing the flag still requires normal admission and current authority. Reuse ordinary parsing, context and authorized metadata instead of duplicating policy in a planning engine. [Change presentation](cli-change-review.md#machine-change-views) owns typed proposed versus observed values.
+
+### Implemented target previews
+
+The existing target commands add `changes`, `outgoingDataCategories`, `destinations` and `unresolvedFacts` to their descriptive preview data. Existing fields and schema version remain unchanged. These are closed target-specific values, not an arbitrary planning document. [Target-preference views](cli-change-review.md#implemented-target-preference-consumer) own the change leaf and confirmed-save meaning.
+
+`outgoingDataCategories` describes network disclosures. Registration lists `publicApiIdentity` and `httpRequestMetadata`. Selection and saved-binding inspection list none. Local registry effects remain explicit in `intendedEffects`. Destinations contain at most five entries with kinds `localTargetRegistry`, `api`, `issuerMetadata`, `issuerKeySet` and optional `proxy`. The registry destination is symbolic and discloses no home path. The API entry carries the original validated API identity, not a separately constructed endpoint. An explicit proxy is a transport recipient and retains its credential-free origin.
+
+Remote destination `url` observations use the same known/unknown shape as change observations. Registration knows its supplied API and explicit proxy. Issuer and key-set destinations remain `{"known":false}` without a value until discovery validates them. A preview never performs that discovery. Existing URL and transport limits remain authoritative, and the preview discloses no credentials or CA contents.
+
+| Preview | Unresolved facts |
+| --- | --- |
+| `target add` | `remoteIdentityUnverified`, `providerDestinationsUnresolved`, `persistenceNotPerformed` |
+| `target use` | `persistenceNotPerformed`, `remoteHealthUnverified`, plus `effectiveTargetUnresolved` only for an unusable environment override |
+| `target show` | `remoteHealthUnverified` |
+
+Each list has at most three entries. `remoteVerification` remains `notPerformed`. `target use` reports the current cached effective target separately from its proposed saved preference, preserving environment warnings without claiming a save. Human output explains the same destinations, network categories and limits in plain language. These previews establish neither current TLS health nor complete login, account/Project selection or first-use acceptance. #158 and #159 remain open for their remaining consumers.
 
 ## Qualification and delivery
 

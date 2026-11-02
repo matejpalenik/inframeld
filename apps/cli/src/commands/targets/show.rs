@@ -1,5 +1,5 @@
 //! Read local effective context without implying current TLS, login or permissions.
-use super::{Data, Plan};
+use super::{Data, Destination, Plan, UnresolvedFact};
 use crate::targets::{Store, TargetError, resolve};
 
 pub(super) fn execute(store: &Store, explicit: Option<&str>) -> Result<Data, TargetError> {
@@ -37,5 +37,9 @@ pub(super) fn plan(store: &Store, explicit: Option<&str>) -> Result<Data, Target
         intended_effects: vec!["showSavedTarget"],
         checks_performed: vec!["argumentsValidated", "savedRegistryRead"],
         remote_verification: "notPerformed",
+        changes: vec![],
+        outgoing_data_categories: vec![],
+        destinations: vec![Destination::LocalTargetRegistry],
+        unresolved_facts: vec![UnresolvedFact::RemoteHealthUnverified],
     }))
 }

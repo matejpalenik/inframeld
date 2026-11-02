@@ -206,6 +206,8 @@ pub(crate) enum Change {
 pub(crate) struct Update {
     pub state: State,
     pub changed: bool,
+    /// The observed preference from the reload under the writer lock.
+    pub previous_selected_target: Option<String>,
 }
 
 /// One user's target registry. A separate persistent inode owns writer exclusion.
@@ -302,6 +304,7 @@ impl Store {
             }
         }
         let mut state = self.load()?;
+        let previous_selected_target = state.selected_target.clone();
         let changed = match change {
             Change::Register(target) => match state.targets.get(&target.label) {
                 Some(existing) if existing == &target => false,
@@ -326,7 +329,11 @@ impl Store {
                 File::open(directory)?.sync_all()
             })?;
         }
-        Ok(Update { state, changed })
+        Ok(Update {
+            state,
+            changed,
+            previous_selected_target,
+        })
     }
 }
 
@@ -715,5 +722,48 @@ mod tests {
         let persisted: State =
             serde_json::from_slice(&fs::read(home.path().join("targets")).unwrap()).unwrap();
         assert_eq!(persisted.targets["dev"], target("dev"));
+    }
+
+    #[tokio::test]
+    async fn selection_observation_comes_from_the_reload_after_acquiring_the_kernel_lock() {
+        let home = TempDir::new().unwrap();
+        let store = store(&home);
+        let stop = AtomicU8::new(0);
+        for label in ["dev", "prod"] {
+            store
+                .update(Change::Register(target(label)), &stop)
+                .await
+                .unwrap();
+        }
+        store
+            .update(Change::Select("dev".into()), &stop)
+            .await
+            .unwrap();
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(store.directory.join("targets.lock"))
+            .unwrap();
+        lock.lock().unwrap();
+        let mut waiting = Box::pin(store.update(Change::Select("dev".into()), &stop));
+        let early = tokio::select! {
+            result = &mut waiting => Some(result),
+            () = tokio::time::sleep(Duration::from_millis(30)) => None,
+        };
+        assert!(
+            early.is_none(),
+            "The existing kernel lock must exclude the waiting writer."
+        );
+        let mut intervening = store.load().unwrap();
+        intervening.selected_target = Some("prod".into());
+        publish(&store.directory, &intervening, |path| {
+            File::open(path)?.sync_all()
+        })
+        .unwrap();
+        lock.unlock().unwrap();
+        let update = waiting.await.unwrap();
+        assert_eq!(update.previous_selected_target.as_deref(), Some("prod"));
+        assert_eq!(update.state.selected_target.as_deref(), Some("dev"));
+        assert!(update.changed);
     }
 }

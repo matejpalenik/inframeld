@@ -18,7 +18,7 @@ pub(crate) struct Arguments {
     pub proxy: Option<String>,
 }
 
-use super::{Data, Plan, Report};
+use super::{Data, Destination, Observation, OutgoingDataCategory, Plan, Report, UnresolvedFact};
 use crate::{
     discovery,
     targets::{Change, Store, Target, TargetError, Transport, validate_label},
@@ -37,6 +37,23 @@ pub(super) fn plan(arguments: Arguments, store: &Store) -> Result<Data, TargetEr
     let transport = inputs(&arguments)?;
     transport.options()?;
     store.load()?;
+    let mut destinations = vec![
+        Destination::LocalTargetRegistry,
+        Destination::Api {
+            url: Observation::Known(arguments.url.clone()),
+        },
+        Destination::IssuerMetadata {
+            url: Observation::Unknown,
+        },
+        Destination::IssuerKeySet {
+            url: Observation::Unknown,
+        },
+    ];
+    if let Some(proxy) = transport.proxy {
+        destinations.push(Destination::Proxy {
+            url: Observation::Known(proxy),
+        });
+    }
     Ok(Data::Plan(Plan {
         operation: "target.add",
         requested_target: Some(arguments.label),
@@ -50,6 +67,17 @@ pub(super) fn plan(arguments: Arguments, store: &Store) -> Result<Data, TargetEr
             "transportInputsValidated",
         ],
         remote_verification: "notPerformed",
+        changes: vec![],
+        outgoing_data_categories: vec![
+            OutgoingDataCategory::PublicApiIdentity,
+            OutgoingDataCategory::HttpRequestMetadata,
+        ],
+        destinations,
+        unresolved_facts: vec![
+            UnresolvedFact::RemoteIdentityUnverified,
+            UnresolvedFact::ProviderDestinationsUnresolved,
+            UnresolvedFact::PersistenceNotPerformed,
+        ],
     }))
 }
 

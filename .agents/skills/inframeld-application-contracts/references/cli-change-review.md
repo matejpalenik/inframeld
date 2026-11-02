@@ -49,7 +49,7 @@ The column labels and field identity carry the meaning without styling. For exam
 
 ## Machine change views
 
-The client-owned change-view representation was accepted on 2026-10-29 through the approved joint #124/#156 specification plan. It is design, not an implemented field model or a backend history API.
+The client-owned change-view representation was accepted on 2026-10-29 through the approved joint #124/#156 specification plan. The target-preference consumer below implements a bounded field model. Other command-specific views remain delivery work, and this representation adds no backend history API.
 
 A command-specific typed `data` object may contain `changes`, a bounded array of views. Each view has `kind` (`proposed`, `confirmed` or `stale`), `resource` (the permitted typed resource reference) and `fields` (typed field changes). Kind maps respectively to Current/Proposed, Before/Now and Reviewed/Now. Keep admitted build inputs or other unchanged identities separate from a changing live/configuration value.
 
@@ -72,3 +72,13 @@ The following example belongs to this reference's `machine-change-views` section
 ```
 
 Confirmed views require authoritative evidence of the named effects. Stale views compare reviewed state with a permitted current observation and require fresh review before a new mutation. Unknown old state cannot become a confirmed change from zero. The command's typed field catalogue defines semantics, bounds and allowed values. This is not an arbitrary JSON-map renderer or a requirement to record additional backend state.
+
+### Implemented target-preference consumer
+
+[`target use`](../../../../apps/cli/src/commands/targets/use_target.rs) adds `changes` to its existing typed data. Its preview and save results contain at most one view, with resource `{"kind":"targetPreference"}` and exactly one field, `savedTarget`. A known value is an existing validated target label or `null` for an observed unset preference. A known `null` is not an unknown observation.
+
+A preview presents **Current / Proposed** from the local registry snapshot. It saves nothing and reserves no review. A confirmed changed save presents **Before / Now**, with both values supplied by the existing mutation's reload under its kernel writer lock. Reporting performs no second registry read. The saved preference remains distinct from an environment override and the effective target.
+
+A repeated save has `saveStatus: "unchanged"` and an empty `changes` array. Identical proposed values remain proposed and are labelled unchanged in plain text. Unconfirmed persistence retains the requested label and `saveStatus: "unconfirmed"`, without a confirmed view. Its existing `savedTarget` and `effectiveTarget` nulls mean that no current value was confirmed, rather than an observed empty preference. An interrupted result retains already-confirmed facts when available. Missing or incomplete final output establishes no absence of effects.
+
+This consumer renders color-free stacked labels and a plain arrow. Capable-terminal styling, stale-review views and other command families remain part of open #158. It introduces no new registry format, credential storage or backend operation. The [executable scenarios](../../../../apps/cli/tests/targets.rs) and real kernel-lock test cover this bounded consumer. The [target guide](../../../../apps/docs/src/app/guides/register-a-target/page.mdx) describes the user-visible observations. Complete first-use and human qualification remain separate.
