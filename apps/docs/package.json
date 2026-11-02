@@ -11,7 +11,7 @@
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc6 --noEmit",
     "content:check": "node scripts/check-content.mjs",
-    "test": "node --test scripts/content.test.mjs",
+    "test": "node --test scripts/*.test.mjs",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm content:check && pnpm test && pnpm build"
   },
   "browserslist": "defaults, not ie <= 11",

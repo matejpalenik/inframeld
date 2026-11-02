@@ -25,6 +25,8 @@ The example test configuration does not include a fingerprint key. Follow the ex
 
 Dependency installation runs only explicitly approved dependency build scripts. The workspace approves the pinned esbuild version used by the SDK tools. Keep strict build approval enabled and review a changed version's installation script before updating its approval. Do not suppress scripts to bypass a missing approval.
 
+SDK builds and checks use TypeScript 7. The private Hey API generator uses the separately pinned `typescript-compiler-api` alias because TypeScript 7 does not expose the JavaScript compiler API. Generator preparation links that alias only into its private staged source, preserving the existing generated output and installed workspace dependencies.
+
 Run `pnpm sdk:setup` once to prepare all selected generators and development tools. Append `rust`, `typescript` or `python` to prepare one SDK. Python uses an isolated environment from [hashed tooling requirements](requirements.lock). TypeScript setup installs Playwright's full Chromium build for its [modern headless channel](https://playwright.dev/docs/browsers#chromium-new-headless-mode). Linux also needs `pnpm --filter @inframeld/sdk-tools exec playwright install-deps chromium`.
 
 The default tool cache is `node_modules/.cache/inframeld-sdk-tools`. `INFRAMELD_SDK_TOOLS_DIR` selects another cache. `PLAYWRIGHT_BROWSERS_PATH` selects provisioned Chromium. Preparation verifies source and patch digests even when tools are cached. Downloads and installation are separate from SDK compilation.
