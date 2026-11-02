@@ -177,7 +177,7 @@ mod tests {
         assert_eq!(data["savedTarget"], serde_json::Value::Null);
         assert_eq!(data["effectiveTarget"], serde_json::Value::Null);
         assert_eq!(data["changes"], json!([]));
-        assert!(!report.human().contains("Before / Now"));
+        assert!(!report.human(false).contains("Before / Now"));
     }
 
     #[tokio::test]

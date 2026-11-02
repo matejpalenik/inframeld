@@ -142,7 +142,7 @@ The [Rust Standards library reference](../../.agents/skills/inframeld-rust-stand
 
 ## Command and presentation organization
 
-[ADR-0097](../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md) accepts command-family modules within one CLI package, command-local clap declarations and typed results before shared reporting. The [Rust Standards structure reference](../../.agents/skills/inframeld-rust-standards/references/cli-structure.md) explains placement through a worked declaration and the end-to-end lifecycle flowchart. [Application Contracts' presentation reference](../../.agents/skills/inframeld-application-contracts/references/cli-presentation-components.md) owns reusable components consuming the accepted output/result contracts. Offline version implements its own JSON, final-only JSONL and descriptive dry-run. Integration and qualification for other command families, progress, warnings, change views and pagination remain separate work. This supporting feature does not complete #158.
+[ADR-0097](../../docs/adr/ADR-0097-organize-rust-cli-by-command-family-and-typed-results.md) accepts command-family modules within one CLI package, command-local clap declarations and typed results before shared reporting. The [Rust Standards structure reference](../../.agents/skills/inframeld-rust-standards/references/cli-structure.md) explains placement through a worked declaration and the end-to-end lifecycle flowchart. [Application Contracts' presentation reference](../../.agents/skills/inframeld-application-contracts/references/cli-presentation-components.md) owns reusable components consuming the accepted output/result contracts. Offline version and target commands implement JSON, final-only JSONL and descriptive dry-run. Target preferences also have typed Current/Proposed and confirmed Before/Now views with bounded terminal styling. Other command families, general progress/warning presentation and pagination remain separate work. This supporting feature does not complete #158.
 
 ## Stateless server discovery
 
@@ -218,6 +218,30 @@ unset target_config_root api_url
 ```
 
 Record actual executable revision/platform, exact configured public identity, commands, results and cleanup separately from automated tests. If that installation is unavailable, report the walkthrough as not run and keep human preparation with engineering. A readable recipe or green unit suite is not a human acceptance result.
+
+### Compare terminal preference views
+
+This optional walkthrough needs an already prepared disposable configuration root with registered labels `prod` and `dev`, with `prod` saved. The registration recipe above creates only `dev`, so it does not supply this starting state by itself. Use the source-built executable from the repository root and replace the path below with that prepared root. These examples are a procedure, not a recorded operator pass.
+
+```sh
+style_config_root='/absolute/path/to/prepared-disposable-config-root'
+unset INFRAMELD_TARGET
+XDG_CONFIG_HOME="$style_config_root" target/debug/inframeld target use dev --dry-run
+XDG_CONFIG_HOME="$style_config_root" target/debug/inframeld target use dev --dry-run --plain
+XDG_CONFIG_HOME="$style_config_root" target/debug/inframeld target use dev --dry-run --json
+```
+
+The human previews show Current/Proposed, with `prod` and `dev` as the compared saved preference. They perform no network call or preference write. On eligible terminal stdout, only the unequal known values are styled: old red with strikethrough, new green. The plain and JSON forms keep the same facts without presentation ANSI. Green means new, not approved or applied.
+
+To check a confirmed save after reviewing the preview:
+
+```sh
+XDG_CONFIG_HOME="$style_config_root" target/debug/inframeld target use dev
+```
+
+A confirmed changed save shows Before/Now from the mutation's locked observation. Preview does not reserve that state. Repeated, unknown or unconfirmed observations do not gain a colored completed-change claim. After uncertainty, use the existing readback procedure before another save. Once the change is confirmed, restore the prepared original preference with `XDG_CONFIG_HOME="$style_config_root" target/debug/inframeld target use prod`, then unset `style_config_root`. Do not delete a prepared root you did not create.
+
+`--plain`, `--no-color`, nonempty `NO_COLOR`, `TERM=dumb` or non-terminal stdout disables this styling. `CLICOLOR_FORCE=1` overrides none of those vetoes. Empty `NO_COLOR` alone is not a veto, and `--no-input` does not disable styling. Help/version and JSON/JSONL remain unstyled. See the [target output reference](../docs/src/app/clients/cli/target-reference/page.mdx) for interpretation. Record any actual TTY exercise separately from the operator-configured HTTPS walkthrough and human acceptance in #185.
 
 ## Human recipient-proof acquisition boundary
 

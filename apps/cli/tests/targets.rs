@@ -368,6 +368,94 @@ fn change_views_identical_proposal_is_explicitly_unchanged_and_still_unsaved() {
 }
 
 #[test]
+fn captured_previews_stay_plain_and_machine_equivalent_even_when_color_is_forced() {
+    let home = TempDir::new().unwrap();
+    seed(&home);
+    let path = home.path().join(".config/inframeld/targets");
+    let before = fs::read(&path).unwrap();
+    let expected = result(&invoke(
+        &home,
+        &["target", "use", "dev", "--dry-run", "--json"],
+        None,
+    ));
+    for flags in [&[][..], &["--plain"][..], &["--no-color"][..]] {
+        for environment in [
+            None,
+            Some(("NO_COLOR", "1")),
+            Some(("NO_COLOR", "")),
+            Some(("TERM", "dumb")),
+        ] {
+            for format in [None, Some("--json"), Some("--jsonl")] {
+                let mut child = command(&home);
+                child
+                    .args(["target", "use", "dev", "--dry-run"])
+                    .args(flags)
+                    .env("TERM", "xterm-256color")
+                    .env("CLICOLOR_FORCE", "1");
+                if let Some((name, value)) = environment {
+                    child.env(name, value);
+                }
+                if let Some(format) = format {
+                    child.arg(format);
+                }
+                let output = child.output().unwrap();
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                assert!(!output.stdout.contains(&0x1b));
+                assert!(!output.stderr.contains(&0x1b));
+                if let Some(format) = format {
+                    let value = result(&output);
+                    let object = if format == "--jsonl" {
+                        &value["result"]
+                    } else {
+                        &value
+                    };
+                    assert_eq!(object, &expected);
+                } else {
+                    let text = String::from_utf8(output.stdout).unwrap();
+                    assert!(text.contains("Current / Proposed"));
+                    assert!(text.contains("  Current: prod\n  -> Proposed: dev\n"));
+                    assert!(text.contains("Remote verification: not performed"));
+                }
+                assert_eq!(fs::read(&path).unwrap(), before);
+                assert_eq!(fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
+            }
+        }
+    }
+}
+
+#[test]
+fn terminal_controls_in_saved_labels_never_reach_output_or_rewrite_state() {
+    let home = TempDir::new().unwrap();
+    seed(&home);
+    let path = home.path().join(".config/inframeld/targets");
+    let mut state: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    state["targets"]["dev"]["label"] = json!("dev\u{1b}]2;forged-title\u{7}");
+    fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
+    let before = fs::read(&path).unwrap();
+    for format in [None, Some("--json"), Some("--jsonl")] {
+        let mut child = command(&home);
+        child
+            .args(["target", "use", "dev", "--dry-run"])
+            .env("CLICOLOR_FORCE", "1")
+            .env("TERM", "xterm-256color");
+        if let Some(format) = format {
+            child.arg(format);
+        }
+        let output = child.output().unwrap();
+        assert_eq!(output.status.code(), Some(1));
+        assert!(!output.stdout.contains(&0x1b) && !output.stderr.contains(&0x1b));
+        assert!(!output.stdout.contains(&0x7) && !output.stderr.contains(&0x7));
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("forged-title"));
+        assert!(!String::from_utf8_lossy(&output.stderr).contains("forged-title"));
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
+}
+
+#[test]
 fn credential_bearing_proxy_is_rejected_without_echoing_it_or_saving_state() {
     let home = TempDir::new().unwrap();
     let output = invoke(

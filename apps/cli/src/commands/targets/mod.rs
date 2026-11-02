@@ -132,17 +132,33 @@ impl PreferenceChange {
         }
     }
 
-    fn human(&self) -> String {
+    fn human(&self, styled: bool) -> String {
         let (before, after) = match self.kind {
             ChangeKind::Proposed => ("Current", "Proposed"),
             ChangeKind::Confirmed => ("Before", "Now"),
         };
         let field = &self.fields[0];
         let unchanged = matches!((&field.before, &field.after), (Observation::Known(before), Observation::Known(after)) if before == after);
+        let mut before_value = preference_text(&field.before).to_owned();
+        let mut after_value = preference_text(&field.after).to_owned();
+        if styled
+            && !unchanged
+            && matches!(
+                (&field.before, &field.after),
+                (Observation::Known(_), Observation::Known(_))
+            )
+        {
+            let old = anstyle::Style::new()
+                .fg_color(Some(anstyle::AnsiColor::Red.into()))
+                .strikethrough();
+            let new = anstyle::Style::new().fg_color(Some(anstyle::AnsiColor::Green.into()));
+            before_value = format!("{}{before_value}{}", old.render(), old.render_reset());
+            after_value = format!("{}{after_value}{}", new.render(), new.render_reset());
+        }
         format!(
             "{before} / {after}\nSaved target\n  {before}: {}\n  -> {after}: {}{}\n",
-            preference_text(&field.before),
-            preference_text(&field.after),
+            before_value,
+            after_value,
             if unchanged { " (unchanged)" } else { "" },
         )
     }
@@ -280,7 +296,7 @@ impl Report {
         }
     }
 
-    pub(crate) fn human(&self) -> String {
+    pub(crate) fn human(&self, styled: bool) -> String {
         match &self.data {
             Some(Data::Registration {
                 target,
@@ -306,7 +322,7 @@ impl Report {
                     text.push_str("Preference unchanged.\n");
                 }
                 for change in changes {
-                    text.push_str(&change.human());
+                    text.push_str(&change.human(styled));
                 }
                 text
             }
@@ -334,7 +350,7 @@ impl Report {
                     plan.intended_effects.join(", ")
                 );
                 for change in &plan.changes {
-                    text.push_str(&change.human());
+                    text.push_str(&change.human(styled));
                 }
                 let categories = plan
                     .outgoing_data_categories
@@ -375,6 +391,88 @@ mod tests {
     use super::*;
 
     #[test]
+    fn capable_change_views_style_values_without_styling_their_meaning() {
+        for (kind, before, after) in [
+            (ChangeKind::Proposed, "Current", "Proposed"),
+            (ChangeKind::Confirmed, "Before", "Now"),
+        ] {
+            let change = PreferenceChange::new(kind, Some("prod".into()), Some("dev".into()));
+            assert_eq!(
+                change.human(true),
+                format!(
+                    "{before} / {after}\nSaved target\n  {before}: \u{1b}[9m\u{1b}[31mprod\u{1b}[0m\n  -> {after}: \u{1b}[32mdev\u{1b}[0m\n"
+                )
+            );
+            assert_eq!(
+                change.human(false),
+                format!("{before} / {after}\nSaved target\n  {before}: prod\n  -> {after}: dev\n")
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_and_identical_change_values_stay_neutral() {
+        for (before, after, expected) in [
+            (
+                Observation::Known(Some("dev".into())),
+                Observation::Known(Some("dev".into())),
+                "Current: dev\n  -> Proposed: dev (unchanged)",
+            ),
+            (
+                Observation::Known(None),
+                Observation::Known(None),
+                "Current: not selected\n  -> Proposed: not selected (unchanged)",
+            ),
+            (
+                Observation::Unknown,
+                Observation::Known(Some("dev".into())),
+                "Current: unknown\n  -> Proposed: dev",
+            ),
+            (
+                Observation::Known(Some("prod".into())),
+                Observation::Unknown,
+                "Current: prod\n  -> Proposed: unknown",
+            ),
+        ] {
+            let change = PreferenceChange {
+                kind: ChangeKind::Proposed,
+                resource: PreferenceResource::TargetPreference,
+                fields: [PreferenceField {
+                    field: "savedTarget",
+                    before,
+                    after,
+                }],
+            };
+            let text = change.human(true);
+            assert!(!text.contains('\u{1b}'), "{text:?}");
+            assert!(text.contains(expected), "{text}");
+        }
+    }
+
+    #[test]
+    fn unconfirmed_save_never_acquires_a_colored_completed_view() {
+        let report = Report {
+            data: Some(Data::Selection {
+                requested_target: "dev".into(),
+                saved_target: None,
+                effective_target: None,
+                source: None,
+                save_status: "unconfirmed",
+                changes: vec![],
+            }),
+            error: Some(TargetError::Uncertain),
+            warnings: vec![],
+            exit: 1,
+        };
+        assert_eq!(
+            report.human(true),
+            "Saved target: unconfirmed\nEffective target: unresolved\n"
+        );
+        assert_eq!(report.exit, 1);
+        assert!(matches!(report.error, Some(TargetError::Uncertain)));
+    }
+
+    #[test]
     fn an_interrupt_after_confirmed_save_retains_the_saved_preference() {
         let report = Report::success(Data::Selection {
             requested_target: "dev".into(),
@@ -382,11 +480,16 @@ mod tests {
             effective_target: Some("dev".into()),
             source: Some(SelectionSource::Saved),
             save_status: "saved",
-            changes: vec![],
+            changes: vec![PreferenceChange::new(
+                ChangeKind::Confirmed,
+                Some("prod".into()),
+                Some("dev".into()),
+            )],
         })
         .observe_stop(130);
         assert_eq!(report.exit, 130);
         assert!(matches!(report.error, Some(TargetError::Interrupted)));
+        assert!(report.human(true).contains("Before / Now\nSaved target\n  Before: \u{1b}[9m\u{1b}[31mprod\u{1b}[0m\n  -> Now: \u{1b}[32mdev\u{1b}[0m\n"));
         assert!(
             matches!(report.data, Some(Data::Selection { saved_target: Some(label), save_status: "saved", .. }) if label == "dev")
         );
