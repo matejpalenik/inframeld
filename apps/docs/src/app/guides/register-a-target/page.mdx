@@ -10,7 +10,7 @@ Save your development installation as `dev` so you can refer to it by a short lo
 
 ## Before you begin
 
-Use an `inframeld` executable that includes `target add`, `target use` and `target show`, available on your shell's `PATH`. The [CLI README](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#build-and-check-from-source) explains source builds and [archive installation](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#install-and-remove-a-packaged-executable). An older executable may reject these commands. This guide does not establish a published release or additional platform support.
+Use an `inframeld` executable that includes `target add`, `target use`, `target show` and their preference change views, available on your shell's `PATH`. The [CLI README](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#build-and-check-from-source) explains source builds and [archive installation](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#install-and-remove-a-packaged-executable). An older executable may reject these commands. This guide does not establish a published release or additional platform support.
 
 Ask the installation operator for its exact public HTTPS API URL. The installation must already publish compatible discovery metadata and have its official OAuth client configured. Use that API identity, including any path or trailing slash, rather than an account page, arbitrary API route or private administration address. The example `https://api.dev.example.com` must be replaced with your operator's value.
 
@@ -63,6 +63,40 @@ inframeld target show --target dev
 
 This reads the saved binding without contacting the server. Its API, issuer and installation ID are cached registration facts. They do not establish current reachability, TLS validity, compatibility, sign-in or permission.
 
+Preview the saved-preference change first:
+
+<CodeGroup>
+
+```shell
+inframeld target use dev --dry-run
+```
+
+</CodeGroup>
+
+**Current / Proposed** compares the currently saved preference with `dev`. It does not save or reserve that change. A displayed `not selected` means the registry currently has no saved preference. A proposal equal to the current value is marked `unchanged` and remains a preview.
+
+Add `--json` for structured observations. This is an illustrative `data.changes` entry for proposing `dev` when no preference is saved, not a captured result:
+
+<CodeGroup>
+
+```json
+{
+  "kind": "proposed",
+  "resource": { "kind": "targetPreference" },
+  "fields": [
+    {
+      "field": "savedTarget",
+      "before": { "known": true, "value": null },
+      "after": { "known": true, "value": "dev" }
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+Here `known: true` with `value: null` means an observed unset preference. It does not mean an unknown value. The preview's `effectiveTarget` and `source` describe the current selection, not the proposed preference.
+
 Save `dev` as your local preference, then inspect the effective choice:
 
 <CodeGroup>
@@ -75,6 +109,8 @@ inframeld target show
 </CodeGroup>
 
 `use` works offline and changes only the saved target preference. It does not refresh credentials or edit shell variables. An unknown label fails without selecting another target.
+
+A confirmed changed save displays **Before / Now**. Its old and new preferences come from the same locked update, so the old value can differ from an earlier preview if another process changed it. Structured output uses `kind: "confirmed"` in `data.changes`. Repeating an already saved choice reports `saveStatus: "unchanged"`, an empty `changes` array and neutral `Preference unchanged.` text, without a Before/Now change.
 
 For `show`, the first applicable selector wins:
 
@@ -116,16 +152,37 @@ inframeld target add dev --url https://api.dev.example.com --dry-run --json
 
 Dry-run validates arguments and transport inputs and reads the local registry. If CA files were supplied, it reads and validates them too. Its plan describes intended effects. It does not validate remote metadata or prove that executing registration will succeed. Dry-run for `use` or `show` also reads local state and performs no network call or preference write.
 
+Registration preview lists `publicApiIdentity` and `httpRequestMetadata` as intended outgoing network categories. These describe execution, not data sent by preview. Its destinations include the local registry and supplied API identity. Issuer-metadata and signing-key-set destinations remain unknown until discovery. An explicit proxy appears as an additional known destination. Unknown destinations have `known: false` and no `value`, rather than a guessed issuer URL.
+
+Preference and inspection previews list no outgoing network data and only the local registry as a destination. Plans retain `remoteVerification: "notPerformed"` and identify unresolved facts such as an unperformed save or unverified remote health. They expose no credential or CA contents. An unresolved environment override is reported separately from a proposed saved preference.
+
 ## Recover from a failure
 
-| Result                                                         | Next step                                                                                                                                                   |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `discovery_tls` or `invalid_ca_file`                           | Check the operator's URL and public certificate bundle. Keep TLS verification enabled.                                                                      |
-| Discovery unavailable, unsupported or identity mismatch        | Confirm the exact API identity and provider configuration with the operator. Do not substitute an issuer from an error or treat this as a password failure. |
-| `target_binding_conflict`                                      | Keep the existing binding. Use a different local label for the different connection.                                                                        |
-| `target_not_found`                                             | Check the label and selection source. Register the intended target explicitly.                                                                              |
-| `target_state_busy`                                            | Another local update holds the registry lock. Retry after it finishes.                                                                                      |
-| `invalid_target_state` or `target_state_io`                    | Preserve the configuration and inspect its path and permissions. Do not delete other targets to repair this invocation.                                     |
-| `target_write_uncertain`, interruption or missing final output | The local change may already exist. Inspect it with `target show --target dev` before repeating a save. Missing output does not prove rollback.             |
+| Result                                                         | Next step                                                                                                                                                                         |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `discovery_tls` or `invalid_ca_file`                           | Check the operator's URL and public certificate bundle. Keep TLS verification enabled.                                                                                            |
+| Discovery unavailable, unsupported or identity mismatch        | Confirm the exact API identity and provider configuration with the operator. Do not substitute an issuer from an error or treat this as a password failure.                       |
+| `target_binding_conflict`                                      | Keep the existing binding. Use a different local label for the different connection.                                                                                              |
+| `target_not_found`                                             | Check the label and selection source. Register the intended target explicitly.                                                                                                    |
+| `target_state_busy`                                            | Another local update holds the registry lock. Retry after it finishes.                                                                                                            |
+| `invalid_target_state` or `target_state_io`                    | Preserve the configuration and inspect its path and permissions. Do not delete other targets to repair this invocation.                                                           |
+| `target_write_uncertain`, interruption or missing final output | The local change may already exist. Read back the registration or preference as described below before deciding whether to repeat a save. Missing output does not prove rollback. |
+
+For uncertain registration, `inframeld target show --target dev` checks the registered `dev` binding. For uncertain preference changes, inspect without `--target` and with `INFRAMELD_TARGET` unset. Keep the same local configuration directory as the original command. This subshell leaves your surrounding shell's selector unchanged:
+
+<CodeGroup>
+
+```shell
+(
+  unset INFRAMELD_TARGET
+  inframeld target show --json
+)
+```
+
+</CodeGroup>
+
+Readback observes the registry's current contents. Another process may have changed them. It does not prove how the earlier save finished or that its disk persistence completed. If readback fails, retain the uncertainty and investigate its safe error.
+
+An unconfirmed preference save reports `saveStatus: "unconfirmed"`, null `savedTarget`/`effectiveTarget` values and no completed change record. Those nulls do not establish that no preference exists. An interrupted result can retain an already confirmed Before/Now change while still reporting interruption. Incomplete output can omit that evidence entirely. Check saved state before deciding what to do next.
 
 Local state lives under `$XDG_CONFIG_HOME/inframeld`, or `$HOME/.config/inframeld` when `XDG_CONFIG_HOME` is unset. Registration and selection leave that intended local state in place. They create no installation resources, accounts or credentials.

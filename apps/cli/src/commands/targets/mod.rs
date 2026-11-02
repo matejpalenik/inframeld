@@ -23,7 +23,7 @@ mod show;
 mod use_target;
 
 use crate::targets::{SelectionSource, Store, Target, TargetError};
-use serde::Serialize;
+use serde::{Serialize, Serializer, ser::SerializeStruct};
 use std::{
     fmt::Write as _,
     io::Write,
@@ -60,6 +60,7 @@ pub(crate) enum Data {
         source: Option<SelectionSource>,
         #[serde(rename = "saveStatus")]
         save_status: &'static str,
+        changes: Vec<PreferenceChange>,
     },
     Inspection {
         target: Target,
@@ -67,6 +68,157 @@ pub(crate) enum Data {
         verification: &'static str,
     },
     Plan(Plan),
+}
+
+/// A missing observation is distinct from an observed empty preference.
+#[derive(Debug)]
+pub(crate) enum Observation<T> {
+    Known(T),
+    Unknown,
+}
+
+impl<T: Serialize> Serialize for Observation<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut value = serializer.serialize_struct(
+            "Observation",
+            if matches!(self, Self::Known(_)) { 2 } else { 1 },
+        )?;
+        value.serialize_field("known", &matches!(self, Self::Known(_)))?;
+        if let Self::Known(observed) = self {
+            value.serialize_field("value", observed)?;
+        }
+        value.end()
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ChangeKind {
+    Proposed,
+    Confirmed,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum PreferenceResource {
+    TargetPreference,
+}
+
+#[derive(Debug, Serialize)]
+struct PreferenceField {
+    field: &'static str,
+    before: Observation<Option<String>>,
+    after: Observation<Option<String>>,
+}
+
+/// One change to the local saved preference, independent of shell overrides.
+#[derive(Debug, Serialize)]
+pub(crate) struct PreferenceChange {
+    kind: ChangeKind,
+    resource: PreferenceResource,
+    fields: [PreferenceField; 1],
+}
+
+impl PreferenceChange {
+    fn new(kind: ChangeKind, before: Option<String>, after: Option<String>) -> Self {
+        Self {
+            kind,
+            resource: PreferenceResource::TargetPreference,
+            fields: [PreferenceField {
+                field: "savedTarget",
+                before: Observation::Known(before),
+                after: Observation::Known(after),
+            }],
+        }
+    }
+
+    fn human(&self) -> String {
+        let (before, after) = match self.kind {
+            ChangeKind::Proposed => ("Current", "Proposed"),
+            ChangeKind::Confirmed => ("Before", "Now"),
+        };
+        let field = &self.fields[0];
+        let unchanged = matches!((&field.before, &field.after), (Observation::Known(before), Observation::Known(after)) if before == after);
+        format!(
+            "{before} / {after}\nSaved target\n  {before}: {}\n  -> {after}: {}{}\n",
+            preference_text(&field.before),
+            preference_text(&field.after),
+            if unchanged { " (unchanged)" } else { "" },
+        )
+    }
+}
+
+fn preference_text(observation: &Observation<Option<String>>) -> &str {
+    match observation {
+        Observation::Known(Some(label)) => label,
+        Observation::Known(None) => "not selected",
+        Observation::Unknown => "unknown",
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum OutgoingDataCategory {
+    PublicApiIdentity,
+    HttpRequestMetadata,
+}
+
+impl OutgoingDataCategory {
+    fn human(&self) -> &'static str {
+        match self {
+            Self::PublicApiIdentity => "public API identity",
+            Self::HttpRequestMetadata => "HTTP request metadata",
+        }
+    }
+}
+
+/// Planned recipients. Remote locations can remain unknown until discovery.
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum Destination {
+    LocalTargetRegistry,
+    Api { url: Observation<String> },
+    IssuerMetadata { url: Observation<String> },
+    IssuerKeySet { url: Observation<String> },
+    Proxy { url: Observation<String> },
+}
+
+impl Destination {
+    fn human(&self) -> String {
+        let (label, location) = match self {
+            Self::LocalTargetRegistry => return "local target registry".to_owned(),
+            Self::Api { url } => ("API identity", url),
+            Self::IssuerMetadata { url } => ("issuer metadata", url),
+            Self::IssuerKeySet { url } => ("issuer key set", url),
+            Self::Proxy { url } => ("proxy", url),
+        };
+        match location {
+            Observation::Known(url) => format!("{label}: {url}"),
+            Observation::Unknown => format!("{label}: unknown"),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum UnresolvedFact {
+    RemoteIdentityUnverified,
+    ProviderDestinationsUnresolved,
+    PersistenceNotPerformed,
+    EffectiveTargetUnresolved,
+    RemoteHealthUnverified,
+}
+
+impl UnresolvedFact {
+    fn human(&self) -> &'static str {
+        match self {
+            Self::RemoteIdentityUnverified => "remote identity unverified",
+            Self::ProviderDestinationsUnresolved => "provider destinations unknown",
+            Self::PersistenceNotPerformed => "save not performed",
+            Self::EffectiveTargetUnresolved => "effective target unresolved",
+            Self::RemoteHealthUnverified => "remote health unverified",
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -80,6 +232,10 @@ pub(crate) struct Plan {
     pub intended_effects: Vec<&'static str>,
     pub checks_performed: Vec<&'static str>,
     pub remote_verification: &'static str,
+    pub changes: Vec<PreferenceChange>,
+    pub outgoing_data_categories: Vec<OutgoingDataCategory>,
+    pub destinations: Vec<Destination>,
+    pub unresolved_facts: Vec<UnresolvedFact>,
 }
 
 /// Preserve confirmed facts when persistence or final reporting is incomplete.
@@ -137,12 +293,23 @@ impl Report {
             Some(Data::Selection {
                 saved_target,
                 effective_target,
+                save_status,
+                changes,
                 ..
-            }) => format!(
-                "Saved target: {}\nEffective target: {}\n",
-                saved_target.as_deref().unwrap_or("unconfirmed"),
-                effective_target.as_deref().unwrap_or("unresolved")
-            ),
+            }) => {
+                let mut text = format!(
+                    "Saved target: {}\nEffective target: {}\n",
+                    saved_target.as_deref().unwrap_or("unconfirmed"),
+                    effective_target.as_deref().unwrap_or("unresolved")
+                );
+                if *save_status == "unchanged" {
+                    text.push_str("Preference unchanged.\n");
+                }
+                for change in changes {
+                    text.push_str(&change.human());
+                }
+                text
+            }
             Some(Data::Inspection { target, source, .. }) => format!(
                 "Target: {}\nAPI: {}\nIssuer: {}\nInstallation: {}\nSource: {source:?}\nVerification: saved binding\n",
                 target.label, target.api_url, target.issuer_url, target.installation_id
@@ -166,6 +333,36 @@ impl Report {
                     "Intended effects: {}\nRemote verification: not performed",
                     plan.intended_effects.join(", ")
                 );
+                for change in &plan.changes {
+                    text.push_str(&change.human());
+                }
+                let categories = plan
+                    .outgoing_data_categories
+                    .iter()
+                    .map(OutgoingDataCategory::human)
+                    .collect::<Vec<_>>();
+                let _ = writeln!(
+                    text,
+                    "Outgoing network data: {}",
+                    if categories.is_empty() {
+                        "none".to_owned()
+                    } else {
+                        categories.join(", ")
+                    }
+                );
+                text.push_str("Destinations:\n");
+                for destination in &plan.destinations {
+                    let _ = writeln!(text, "  {}", destination.human());
+                }
+                let _ = writeln!(
+                    text,
+                    "Unresolved: {}",
+                    plan.unresolved_facts
+                        .iter()
+                        .map(UnresolvedFact::human)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
                 text
             }
             None => String::new(),
@@ -185,6 +382,7 @@ mod tests {
             effective_target: Some("dev".into()),
             source: Some(SelectionSource::Saved),
             save_status: "saved",
+            changes: vec![],
         })
         .observe_stop(130);
         assert_eq!(report.exit, 130);
@@ -239,12 +437,12 @@ pub(crate) fn run(
     };
     if dry_run {
         let planned = match arguments.command {
-            Command::Add(arguments) => add::plan(arguments, &store),
+            Command::Add(arguments) => add::plan(arguments, &store).map(Report::success),
             Command::Use(arguments) => use_target::plan(arguments, &store),
-            Command::Show => show::plan(&store, explicit),
+            Command::Show => show::plan(&store, explicit).map(Report::success),
         };
         return match planned {
-            Ok(data) => Report::success(data),
+            Ok(report) => report,
             Err(error) => Report::failure(error),
         }
         .into();

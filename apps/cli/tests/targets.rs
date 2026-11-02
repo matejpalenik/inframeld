@@ -154,6 +154,220 @@ fn human_show_preview_preserves_effective_context_without_writing_state() {
 }
 
 #[test]
+fn change_views_preview_the_observed_preference_without_writing_it() {
+    for preference in [Some("prod"), None] {
+        let home = TempDir::new().unwrap();
+        seed(&home);
+        let path = home.path().join(".config/inframeld/targets");
+        let mut state: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        state["selectedTarget"] = json!(preference);
+        fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
+        let before = fs::read(&path).unwrap();
+        for format in ["--json", "--jsonl"] {
+            let output = invoke(&home, &["target", "use", "dev", "--dry-run", format], None);
+            assert!(output.status.success());
+            let object = result(&output);
+            let object = if format == "--jsonl" {
+                &object["result"]
+            } else {
+                &object
+            };
+            assert_eq!(object["mode"], "dryRun");
+            assert_eq!(
+                object["data"]["changes"],
+                json!([{
+                    "kind":"proposed", "resource":{"kind":"targetPreference"},
+                    "fields":[{"field":"savedTarget", "before":{"known":true,"value":preference},
+                        "after":{"known":true,"value":"dev"}}]
+                }])
+            );
+            assert_eq!(object["data"]["outgoingDataCategories"], json!([]));
+            assert_eq!(
+                object["data"]["destinations"],
+                json!([{"kind":"localTargetRegistry"}])
+            );
+            assert_eq!(object["data"]["remoteVerification"], "notPerformed");
+        }
+        let output = invoke(
+            &home,
+            &["target", "use", "dev", "--dry-run", "--plain", "--no-color"],
+            None,
+        );
+        assert!(output.status.success());
+        let text = String::from_utf8(output.stdout).unwrap();
+        assert!(text.contains("Current / Proposed"), "{text}");
+        assert!(text.contains("Saved target"), "{text}");
+        assert!(
+            text.contains(preference.unwrap_or("not selected")),
+            "{text}"
+        );
+        assert!(text.contains("dev") && !text.contains('\u{1b}'));
+        assert_eq!(fs::read(&path).unwrap(), before);
+        assert_eq!(fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
+    }
+}
+
+#[test]
+fn change_views_confirm_only_the_saved_change_and_keep_an_override_separate() {
+    let home = TempDir::new().unwrap();
+    seed(&home);
+    let output = invoke(&home, &["target", "use", "dev", "--json"], Some("prod"));
+    assert!(output.status.success());
+    let object = result(&output);
+    assert_eq!(
+        object["data"]["changes"],
+        json!([{
+            "kind":"confirmed", "resource":{"kind":"targetPreference"},
+            "fields":[{"field":"savedTarget", "before":{"known":true,"value":"prod"},
+                "after":{"known":true,"value":"dev"}}]
+        }])
+    );
+    assert_eq!(object["data"]["savedTarget"], "dev");
+    assert_eq!(object["data"]["effectiveTarget"], "prod");
+    assert_eq!(object["data"]["source"], "environment");
+    assert_eq!(
+        object["warnings"][0]["code"],
+        "environment_overrides_saved_target"
+    );
+    let repeated = invoke(&home, &["target", "use", "dev", "--json"], None);
+    assert_eq!(result(&repeated)["data"]["saveStatus"], "unchanged");
+    assert_eq!(result(&repeated)["data"]["changes"], json!([]));
+    let unchanged = invoke(&home, &["target", "use", "dev"], None);
+    let text = String::from_utf8(unchanged.stdout).unwrap();
+    assert!(text.contains("unchanged"), "{text}");
+    assert!(!text.contains("Before / Now"));
+    let changed = invoke(&home, &["target", "use", "prod", "--plain"], None);
+    let text = String::from_utf8(changed.stdout).unwrap();
+    assert!(text.contains("Before / Now"), "{text}");
+    assert!(text.contains("dev") && text.contains("prod"));
+}
+
+#[test]
+fn change_views_preview_shell_overrides_without_claiming_a_save_or_fallback() {
+    let home = TempDir::new().unwrap();
+    seed(&home);
+    let path = home.path().join(".config/inframeld/targets");
+    let before = fs::read(&path).unwrap();
+    for environment in ["prod", "missing", "unsafe\u{1b}input"] {
+        let output = invoke(
+            &home,
+            &["target", "use", "dev", "--dry-run", "--json"],
+            Some(environment),
+        );
+        assert!(output.status.success());
+        let object = result(&output);
+        assert_eq!(object["data"]["source"], "environment");
+        assert_eq!(
+            object["warnings"][0]["code"],
+            "environment_overrides_saved_target"
+        );
+        if environment == "prod" {
+            assert_eq!(object["data"]["effectiveTarget"], "prod");
+        } else {
+            assert_eq!(object["data"]["effectiveTarget"], Value::Null);
+            assert_eq!(object["warnings"][1]["code"], "effective_target_unresolved");
+            assert!(
+                object["data"]["unresolvedFacts"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&json!("effectiveTargetUnresolved"))
+            );
+        }
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("unsafe"));
+        assert_eq!(fs::read(&path).unwrap(), before);
+        assert_eq!(fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
+    }
+}
+
+#[test]
+fn change_views_registration_preview_discloses_destinations_and_actual_unknowns() {
+    let home = TempDir::new().unwrap();
+    let arguments = [
+        "target",
+        "add",
+        "dev",
+        "--url",
+        "https://127.0.0.1:9/api/v1",
+        "--proxy",
+        "http://proxy.example.test:8080",
+        "--dry-run",
+    ];
+    let mut machine = arguments.to_vec();
+    machine.push("--json");
+    let output = invoke(&home, &machine, None);
+    assert!(output.status.success());
+    let data = &result(&output)["data"];
+    assert_eq!(
+        data["outgoingDataCategories"],
+        json!(["publicApiIdentity", "httpRequestMetadata"])
+    );
+    assert_eq!(
+        data["destinations"],
+        json!([
+            {"kind":"localTargetRegistry"},
+            {"kind":"api","url":{"known":true,"value":"https://127.0.0.1:9/api/v1"}},
+            {"kind":"issuerMetadata","url":{"known":false}},
+            {"kind":"issuerKeySet","url":{"known":false}},
+            {"kind":"proxy","url":{"known":true,"value":"http://proxy.example.test:8080"}}
+        ])
+    );
+    assert_eq!(
+        data["unresolvedFacts"],
+        json!([
+            "remoteIdentityUnverified",
+            "providerDestinationsUnresolved",
+            "persistenceNotPerformed"
+        ])
+    );
+    let output = invoke(&home, &arguments, None);
+    let text = String::from_utf8(output.stdout).unwrap();
+    for fact in [
+        "public API identity",
+        "HTTP request metadata",
+        "issuer metadata",
+        "issuer key set",
+        "unknown",
+        "proxy.example.test",
+        "save not performed",
+    ] {
+        assert!(text.contains(fact), "{text}");
+    }
+    assert_eq!(fs::read_dir(home.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn change_views_read_preview_labels_cached_scope_and_sends_nothing() {
+    let home = TempDir::new().unwrap();
+    seed(&home);
+    let output = invoke(&home, &["target", "show", "--dry-run", "--json"], None);
+    assert!(output.status.success());
+    let data = &result(&output)["data"];
+    assert_eq!(data["outgoingDataCategories"], json!([]));
+    assert_eq!(
+        data["destinations"],
+        json!([{"kind":"localTargetRegistry"}])
+    );
+    assert_eq!(data["unresolvedFacts"], json!(["remoteHealthUnverified"]));
+    assert_eq!(data["changes"], json!([]));
+}
+
+#[test]
+fn change_views_identical_proposal_is_explicitly_unchanged_and_still_unsaved() {
+    let home = TempDir::new().unwrap();
+    seed(&home);
+    let path = home.path().join(".config/inframeld/targets");
+    let before = fs::read(&path).unwrap();
+    let output = invoke(&home, &["target", "use", "prod", "--dry-run"], None);
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.contains("Current / Proposed"));
+    assert!(text.contains("unchanged"), "{text}");
+    assert!(text.contains("save not performed"));
+    assert!(!text.contains("Before / Now"));
+    assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
 fn credential_bearing_proxy_is_rejected_without_echoing_it_or_saving_state() {
     let home = TempDir::new().unwrap();
     let output = invoke(
