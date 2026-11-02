@@ -98,7 +98,7 @@ OAuth consent does not require or create a local Inframeld account. This lets a 
 
 The account UI may omit another approval prompt only when Hydra reports remembered consent and the current checks still pass. Recognizing the client is insufficient. Client-wide `skip_consent` configuration is rejected by this integration. Automatic continuation sends no new remember duration, even if the browser asks to remember again. Only an explicit new approval records the configured duration.
 
-The [browser API](#human-oauth-consent) exposes inspection and allow/deny operations. Both require the Kratos cookie, not a bearer token or application key. POST also requires the trusted Origin and CSRF header. Responses are non-cacheable and continuations stay on the configured public Hydra authorization endpoint. The small account UI must still render the page and preserve the browser context. No production recovery callback or release operation is wired here.
+The [browser API](#human-oauth-consent) exposes inspection and allow/deny operations. Both require the Kratos cookie, not a bearer token or application key. POST also requires the trusted Origin and CSRF header. Responses are non-cacheable and continuations stay on the configured public Hydra authorization endpoint. The supporting [account UI](../../../../apps/web/README.md) renders the existing-human login and consent pages, preserves browser context and stops on uncertain decisions. Its HTTPS/native qualification remains incomplete. No production recovery callback or release operation is wired here.
 
 <a id="implemented-oauth-consent-boundary"></a>
 
@@ -142,7 +142,7 @@ These records are not entities, local admissions, permission snapshots, credenti
 
 ### Browser consent is separate from product admission
 
-Alice's CLI login uses native Kratos authentication followed by [Access's consent operation](#native-hydra-consent). The future account UI uses these implemented operations, with the current Kratos session cookie:
+Alice's CLI login uses native Kratos authentication followed by [Access's consent operation](#native-hydra-consent). The supporting account UI consumes these implemented operations through the generated client, with the current Kratos session cookie:
 
 | Operation | Input and result |
 | --- | --- |

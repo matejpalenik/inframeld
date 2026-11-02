@@ -19,6 +19,22 @@ If you submitted a request but lost its response, you can check the original req
 
 The guide covers the HTTP endpoint and the Python, TypeScript, and Rust SDKs. It explains which details you need to retain and how to handle a result that cannot be resolved.
 
+## Sign in to an existing account
+
+Use the HTTPS account site supplied by your installation operator, with an existing account and its configured password or email-code method. Your browser must trust the site's TLS certificate. The [account-site setup notes](https://github.com/matejpalenik/inframeld/blob/main/apps/web/README.md#https-reference-profile) describe operator configuration and current qualification limits. They are separate from a user sign-in procedure.
+
+For an operator-configured account origin such as `https://accounts.example.com`, replace the example origin below with the one you were given:
+
+1. Open `https://accounts.example.com/login`. Choose **Use your password** or **Use an email code** and follow the native provider form. Email-code login requires working delivery to your configured address.
+2. Follow the form's errors for a rejected password or code. For an expired browser flow, use the site's **Sign in** link to start a fresh flow. If a required interaction is unsupported, stop and ask the operator for a supported path. Required factors are not skipped.
+3. To sign out, open `https://accounts.example.com/logout` and activate **Sign out of browser**. Opening that page alone does not end the session. Browser logout has a separate lifecycle from CLI credentials.
+
+Sign-in establishes a browser session. Product use still requires existing admission and current permission. These pages do not create accounts, provide recovery or account management, or supply CLI bearer credentials or maintenance proof.
+
+A consent page displays the checked account subject and installation for an existing request. Approval and **Cancel** are explicit actions. The option to remember a new approval starts unchecked. If a decision's result cannot be confirmed, stop and do not submit it again. These pages do not provide a command to start CLI sign-in or construct a consent request.
+
+Browser history may retain native flow URLs. Keep those URLs, cookies and codes out of logs and shared screenshots.
+
 ## Use the API and SDKs
 
 Use the backend URL and credentials provided for your Inframeld installation. The SDKs are currently available from this repository and are not published packages.

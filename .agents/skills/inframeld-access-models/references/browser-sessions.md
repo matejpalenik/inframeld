@@ -82,6 +82,8 @@ Ordinary human-only product operations return 403 for a verified application cal
 
 ## Implementation status and limits
 
+The supporting [account UI](../../../../apps/web/README.md) renders native password/code login, explicit browser logout and checked consent for an existing human. Registration, admission, recovery/settings, configured MFA/SSO and the complete CLI lifecycle remain outside that increment. Unsupported required provider interactions stop rather than being omitted. Its prepared browser decision/revocation cases and private HTTPS profile remain unqualified. Controlled expired-session401 tests establish UI handling, not natural session expiry. Complete human operator acceptance remains [#298](https://github.com/matejpalenik/inframeld/issues/298).
+
 The current human HTTP boundary implements cookie and human Hydra bearer selection on `GET /v1/session` and the supported project-grant write. Both services have deployment-configurable provider/total budgets with five/ten-second defaults. This does not establish the unfinished CLI request limit or application-key authenticator.
 
 The backend README owns execution commands. PostgreSQL scenarios use real application behavior with `Mock*Verifier` provider doubles. Separate real Hydra/Kratos scenarios exercise provider SDKs and current identity checks.
