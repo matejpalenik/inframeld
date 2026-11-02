@@ -100,7 +100,7 @@ class PostgresIdentityRecoveryCleanupResumeFactsReader(IdentityRecoveryCleanupRe
         if row is None:
             return None
 
-        if row.mode == "repair-stranded-authority":
+        if row.mode in {"repair-stranded-authority", "bootstrap-first-administrator"}:
             raise RecoveryMaintenanceError(RecoveryMaintenanceErrorCode.KEY_REUSED)
         mode = RecoveryMaintenanceMode(row.mode)
         if row.recovery_operation_id is None or row.released is None:

@@ -7,6 +7,9 @@ from uuid import UUID
 
 import pytest
 
+from inframeld_backend.access.application.commands.bootstrap_first_administrator_command import (
+    BootstrapFirstAdministratorCommand,
+)
 from inframeld_backend.access.application.commands.repair_project_metadata_authority_command import (
     RepairProjectMetadataAuthorityCommand,
 )
@@ -139,3 +142,24 @@ def test_mode_dispatch_preserves_the_existing_recovery_command() -> None:
     }
     command = MaintenanceCli.read(io.BytesIO(json.dumps(request).encode()))
     assert command.operation_id.value == "host-original"
+
+
+def test_mode_dispatch_accepts_the_fixed_first_administrator_claim() -> None:
+    request = {
+        "schemaVersion": 1,
+        "mode": "bootstrap-first-administrator",
+        "expectedInstallationId": str(UUID(int=4)),
+        "operationId": "first-claim",
+        "operatorLabel": "Operator",
+        "reason": "Establish first admission",
+        "expectedAccessRevision": 0,
+        "expectedIdentityId": str(UUID(int=5)),
+        "identityProof": {"kind": "hydra-access-token", "accessToken": "private-proof"},
+    }
+
+    command = MaintenanceCli.read(io.BytesIO(json.dumps(request).encode()))
+
+    assert isinstance(command, BootstrapFirstAdministratorCommand)
+    assert command.operation_id == OperationId("first-claim")
+    assert command.expected_identity_id == UUID(int=5)
+    assert command.expected_access_revision == 0

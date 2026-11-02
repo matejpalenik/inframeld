@@ -87,7 +87,7 @@ Application, Kratos and Hydra databases use three separate named volumes, preser
 
 ## Run the ordinary application worker
 
-After applying schema `0014_project_metadata`, start the worker from the same checkout as the API, with the development database still running:
+After applying schema `0016_first_administrator`, start the worker from the same checkout as the API, with the development database still running:
 
 ```bash
 mise exec -- uv run --project apps/backend --locked --env-file apps/backend/.env python -m inframeld_backend.application_worker
@@ -405,7 +405,7 @@ The backend-only maintenance command also consumes the narrow `repair-stranded-a
 
 ## Private recovery callbacks
 
-The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the supported head, currently `0014_project_metadata`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
+The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the supported head, currently `0016_first_administrator`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
 
 Supply a dedicated 32 to 256 byte printable ASCII key through `INFRAMELD_RECOVERY_KEY_HOST_FILE`. The mounted regular file must be readable by the container's runtime UID 10001, with mode 0400 or 0600 as seen inside the container. Compose file-backed secrets do not reliably remap host ownership. Provision the correct runtime ownership rather than making the file group/world-readable. Do not reuse an API, database or fingerprint secret.
 
@@ -421,7 +421,7 @@ For rotation, configure a current file plus optional retiring file and `INFRAMEL
 
 Alice remains blocked after Hydra rejects cleanup or a run exhausts its budget. Fix the provider/configuration problem first. A trusted deployment operator can then authorize one additional twelve-attempt, one-hour run of the original recovery. This is a local container command with no network endpoint. Keep container-exec and database credentials restricted to operators.
 
-Apply the supported schema `0014_project_metadata` deliberately before starting the updated backend, callbacks or worker. Migration `0008_host_maintenance_receipts` introduced the maintenance receipt. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
+Apply the supported schema `0016_first_administrator` deliberately before starting the updated backend, callbacks or worker. Migration `0008_host_maintenance_receipts` introduced the maintenance receipt. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
 
 Obtain the expected installation UUID from your protected installation record and the original recovery operation ID from protected recovery records. Replace the placeholders below. Choose a unique operator request ID and retain the exact request privately until its outcome is known. Supply attribution and the repair reason, without passwords, cookies or tokens.
 

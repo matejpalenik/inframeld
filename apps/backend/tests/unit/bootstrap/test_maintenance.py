@@ -18,8 +18,14 @@ from inframeld_backend.access.application.commands.resume_identity_recovery_clea
 from inframeld_backend.access.application.dtos.identity_recovery_cleanup_resume_result_dto import (
     IdentityRecoveryCleanupResumeResultDTO,
 )
+from inframeld_backend.access.application.enums.first_administrator_bootstrap_error_code import (
+    FirstAdministratorBootstrapErrorCode,
+)
 from inframeld_backend.access.application.enums.identity_recovery_cleanup_resume_outcome import (
     IdentityRecoveryCleanupResumeOutcome,
+)
+from inframeld_backend.access.application.errors.first_administrator_bootstrap_error import (
+    FirstAdministratorBootstrapError,
 )
 from inframeld_backend.access.cli.mappers.recovery_maintenance_mapper import (
     RecoveryMaintenanceMapper,
@@ -51,6 +57,22 @@ def _payload() -> bytes:
     ).encode()
 
 
+def _bootstrap_payload() -> bytes:
+    return json.dumps(
+        {
+            "schemaVersion": 1,
+            "mode": "bootstrap-first-administrator",
+            "expectedInstallationId": "1ff2c32e-2438-42fc-b2a8-60d4a59ad91a",
+            "operationId": "first-claim",
+            "operatorLabel": "Operator",
+            "reason": "First admission",
+            "expectedAccessRevision": 0,
+            "expectedIdentityId": "15ad714a-752d-49ef-a9e1-c5d1426df4fa",
+            "identityProof": {"kind": "hydra-access-token", "accessToken": "private-proof"},
+        }
+    ).encode()
+
+
 def _stdin(monkeypatch: pytest.MonkeyPatch, payload: bytes) -> None:
     monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO(payload), encoding="utf-8"))
 
@@ -61,6 +83,66 @@ def test_invalid_input_stops_before_configuration_or_database(
     _stdin(monkeypatch, b'{"secret":"never print"}')
     assert maintenance.main(()) == 2
     assert json.loads(capsys.readouterr().out) == {"schemaVersion": 1, "code": "invalid_input"}
+
+
+def test_bootstrap_requires_private_provider_configuration_before_execution(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _stdin(monkeypatch, _bootstrap_payload())
+    monkeypatch.setenv("INFRAMELD_DATABASE__NAME", "test")
+    monkeypatch.setenv("INFRAMELD_DATABASE__USER", "test")
+    monkeypatch.setenv("INFRAMELD_DATABASE__PASSWORD", "unused-test-only")
+    monkeypatch.delenv("INFRAMELD_HYDRA__ADMIN_URL", raising=False)
+    monkeypatch.delenv("INFRAMELD_KRATOS__ADMIN_URL", raising=False)
+    execute = AsyncMock(return_value={"outcome": "bootstrapped"})
+    monkeypatch.setattr(maintenance, "_execute", execute)
+
+    assert maintenance.main(()) == 2
+    assert json.loads(capsys.readouterr().out) == {
+        "schemaVersion": 1,
+        "operationId": "first-claim",
+        "code": "invalid_input",
+    }
+    execute.assert_not_awaited()
+
+
+def test_bootstrap_controlled_failure_has_only_safe_original_correlation(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _stdin(monkeypatch, _bootstrap_payload())
+    for name, value in {
+        "INFRAMELD_DATABASE__NAME": "test",
+        "INFRAMELD_DATABASE__USER": "test",
+        "INFRAMELD_DATABASE__PASSWORD": "unused-test-only",
+        "INFRAMELD_KRATOS__PUBLIC_URL": "http://kratos.test:4433",
+        "INFRAMELD_KRATOS__ADMIN_URL": "http://kratos.test:4434",
+        "INFRAMELD_KRATOS__AUTHORITY": "kratos:test",
+        "INFRAMELD_HYDRA__ADMIN_URL": "http://hydra.test:4445",
+        "INFRAMELD_HYDRA__ISSUER": "https://hydra.example.test/",
+        "INFRAMELD_HYDRA__API_AUDIENCE": "https://api.example.test",
+    }.items():
+        monkeypatch.setenv(name, value)
+    from inframeld_backend.bootstrap.application_settings import get_settings
+
+    monkeypatch.setenv(
+        "INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE",
+        str(get_settings().request_fingerprint.key_file),
+    )
+    execute = AsyncMock(
+        side_effect=FirstAdministratorBootstrapError(
+            FirstAdministratorBootstrapErrorCode.IDENTITY_INELIGIBLE
+        )
+    )
+    monkeypatch.setattr(maintenance, "_execute", execute)
+
+    assert maintenance.main(()) == 1
+    result = capsys.readouterr().out
+    assert "private-proof" not in result
+    assert json.loads(result) == {
+        "schemaVersion": 1,
+        "operationId": "first-claim",
+        "code": "identity_ineligible",
+    }
 
 
 def test_unsupported_arguments_fail_safely(capsys: pytest.CaptureFixture[str]) -> None:
