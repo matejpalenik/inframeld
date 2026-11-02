@@ -8,25 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
     AdmittedWorkAuthorityDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
-    HumanOAuthCredentialBindingDTO,
+from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto import (
+    ArtifactCleanupJobBindingDTO,
 )
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
-from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
-from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.human_credential_version import (
-    HumanCredentialVersion,
-)
-from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
-from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
-from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
-from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_snapshot_dto import JobSnapshotDTO
+from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
@@ -43,9 +31,14 @@ from inframeld_backend.shared.application.value_objects.job_payload import JobPa
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
-from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.infrastructure.mappers.postgres_job_binding_mapper import (
+    PostgresJobBindingMapper,
+)
 from inframeld_backend.shared.infrastructure.rows.application_job_queue_row import (
     ApplicationJobQueueRow,
+)
+from inframeld_backend.shared.infrastructure.rows.artifact_cleanup_obligation_row import (
+    ArtifactCleanupObligationRow,
 )
 from inframeld_backend.shared.infrastructure.rows.durable_job_attempt_row import (
     DurableJobAttemptRow,
@@ -135,10 +128,13 @@ class PostgresJobStore(JobStore):
     async def find(self, operation_id: OperationId) -> JobSnapshotDTO | None:
         row = await self._session.scalar(
             select(DurableJobRow)
-            .where(DurableJobRow.operation_id == operation_id.value)
+            .where(
+                DurableJobRow.operation_id == operation_id.value,
+                DurableJobRow.binding_kind == "product",
+            )
             .execution_options(populate_existing=True)
         )
-        return None if row is None else self._snapshot(row, await self._now())
+        return None if row is None else await self._snapshot(row, await self._now())
 
     @override
     async def next_candidate(self) -> JobSnapshotDTO | None:
@@ -162,7 +158,7 @@ class PostgresJobStore(JobStore):
             .with_for_update()
             .execution_options(populate_existing=True)
         )
-        return None if row is None else self._snapshot(row, now)
+        return None if row is None else await self._snapshot(row, now)
 
     @override
     async def start_attempt(
@@ -213,12 +209,10 @@ class PostgresJobStore(JobStore):
             )
         )
         await self._session.flush()
-        saved = self._snapshot(row, now)
+        saved = await self._snapshot(row, now)
         return JobAttemptContextDTO(
             saved.job_id,
-            saved.operation_id,
-            saved.request_id,
-            saved.authority,
+            saved.binding,
             saved.payload,
             saved.attempt,
             fence,
@@ -229,7 +223,7 @@ class PostgresJobStore(JobStore):
     @override
     async def require_current(self, context: JobAttemptContextDTO) -> JobSnapshotDTO:
         row, now = await self._owned_row(context)
-        return self._snapshot(row, now)
+        return await self._snapshot(row, now)
 
     @override
     async def checkpoint(
@@ -298,6 +292,9 @@ class PostgresJobStore(JobStore):
         ):
             raise JobFenceLostError()
         now = await self._now()
+        current = await self._snapshot(row, now)
+        if current.binding != job.binding or current.payload != job.payload:
+            raise JobFenceLostError("The observed original work binding changed.")
         if (
             row.status == JobStatus.RUNNING.value
             and row.lease_expires_at is not None
@@ -323,6 +320,7 @@ class PostgresJobStore(JobStore):
             update(DurableJobRow)
             .where(
                 DurableJobRow.id == job_id.value,
+                DurableJobRow.binding_kind == "product",
                 DurableJobRow.status.in_((JobStatus.QUEUED.value, JobStatus.RUNNING.value)),
             )
             .values(cancel_requested=True)
@@ -372,13 +370,8 @@ class PostgresJobStore(JobStore):
             or row.work_deadline <= now
         ):
             raise JobFenceLostError("The ordinary job attempt no longer owns its lease.")
-        saved = self._snapshot(row, now)
-        if (
-            saved.operation_id != context.operation_id
-            or saved.request_id != context.request_id
-            or saved.authority != context.authority
-            or saved.payload != context.payload
-        ):
+        saved = await self._snapshot(row, now)
+        if saved.binding != context.binding or saved.payload != context.payload:
             raise JobFenceLostError("The attempt does not match its original immutable work.")
         return row, now
 
@@ -404,60 +397,72 @@ class PostgresJobStore(JobStore):
     ) -> None:
         if reason is not None and len(reason) > 100:
             raise ValueError("A job outcome reason must be bounded.")
+        binding = (await self._snapshot(row, now)).binding
         await self._end_attempt(row, now, reason)
         row.status, row.reason, row.terminal_at = status.value, reason, now
         row.fence = row.worker_id = row.lease_expires_at = None
-        retention = update(IdempotencyReservationRow).where(
-            IdempotencyReservationRow.operation_id == row.operation_id,
-            IdempotencyReservationRow.state == OperationReservationState.REPLAYABLE,
-            IdempotencyReservationRow.replay_kind == OperationReplayKind.ASYNC_JOB,
-        )
-        if status is JobStatus.RECOVERY_REQUIRED or row.pending_effect is not None:
-            # Expiry must not turn an unresolved effect into newly admitted work.
-            await self._session.execute(retention.values(expires_at=None))
-        else:
-            await self._session.execute(
-                retention.where(IdempotencyReservationRow.expires_at.is_(None)).values(
-                    expires_at=now + timedelta(hours=24)
-                )
+        if isinstance(binding, ProductJobBindingDTO):
+            retention = update(IdempotencyReservationRow).where(
+                IdempotencyReservationRow.operation_id == binding.operation_id.value,
+                IdempotencyReservationRow.state == OperationReservationState.REPLAYABLE,
+                IdempotencyReservationRow.replay_kind == OperationReplayKind.ASYNC_JOB,
             )
+            if status is JobStatus.RECOVERY_REQUIRED or row.pending_effect is not None:
+                await self._session.execute(retention.values(expires_at=None))
+            else:
+                await self._session.execute(
+                    retention.where(IdempotencyReservationRow.expires_at.is_(None)).values(
+                        expires_at=now + timedelta(hours=24)
+                    )
+                )
+        else:
+            obligation = await self._session.scalar(
+                select(ArtifactCleanupObligationRow)
+                .where(ArtifactCleanupObligationRow.id == binding.obligation_id.value)
+                .with_for_update()
+            )
+            if obligation is None or PostgresJobBindingMapper.cleanup(obligation) != binding:
+                raise ConflictError("The original cleanup obligation cannot be confirmed.")
+            # Execution retirement cannot release physical bytes or change the
+            # originating product replay, including an expired business origin.
+            obligation.execution_status = status.value
+            obligation.execution_reason = reason
         await self._session.flush()
 
-    @staticmethod
-    def _snapshot(row: DurableJobRow, now: datetime) -> JobSnapshotDTO:
-        binding = None
-        if (
-            row.human_authority is not None
-            or row.human_subject is not None
-            or row.human_version is not None
-        ):
-            if (
-                row.human_authority is None
-                or row.human_subject is None
-                or row.human_version is None
-            ):
-                raise ConflictError("The original human security generation is incomplete.")
-            binding = HumanOAuthCredentialBindingDTO(
-                VerifiedHumanIdentityDTO(
-                    IdentityAuthority(row.human_authority), IdentitySubject(row.human_subject)
-                ),
-                InstallationId(row.installation_id),
-                HumanCredentialVersion(row.human_version),
+    async def _snapshot(self, row: DurableJobRow, now: datetime) -> JobSnapshotDTO:
+        binding: ProductJobBindingDTO | ArtifactCleanupJobBindingDTO
+        if row.binding_kind == "product":
+            binding = PostgresJobBindingMapper.product(row)
+        elif row.binding_kind == "artifact_cleanup" and row.cleanup_obligation_id is not None:
+            obligation = await self._session.get(
+                ArtifactCleanupObligationRow, row.cleanup_obligation_id
             )
-        authority = AdmittedWorkAuthorityDTO(
-            PrincipalId(row.principal_id),
-            PrincipalKind(row.principal_kind),
-            InstallationId(row.installation_id),
-            OrganizationId(row.organization_id),
-            ProjectId(row.project_id),
-            ActionId(row.action_id),
-            binding,
-        )
+            if obligation is None or any(
+                value is not None
+                for value in (
+                    row.operation_id,
+                    row.principal_id,
+                    row.principal_kind,
+                    row.action_id,
+                    row.human_authority,
+                    row.human_subject,
+                    row.human_version,
+                )
+            ):
+                raise ConflictError("The original cleanup job binding is incomplete.")
+            binding = PostgresJobBindingMapper.cleanup(obligation)
+            if (row.installation_id, row.organization_id, row.project_id, row.request_id) != (
+                binding.scope.installation_id.value,
+                binding.scope.organization_id.value,
+                binding.scope.project_id.value,
+                binding.origin.request_id.value,
+            ):
+                raise ConflictError("The original cleanup job scope is inconsistent.")
+        else:
+            raise ConflictError("The original job binding kind is unsupported.")
         return JobSnapshotDTO(
             JobId(row.id),
-            OperationId(row.operation_id),
-            RequestId(row.request_id),
-            authority,
+            binding,
             JobPayload(row.payload_kind, row.payload_version, row.payload),
             JobStatus(row.status),
             row.admitted_at,

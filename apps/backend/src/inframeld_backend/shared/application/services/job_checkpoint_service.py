@@ -5,6 +5,7 @@ from inframeld_backend.access.application.protocols.admitted_work_authorizer imp
 )
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_snapshot_dto import JobSnapshotDTO
+from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.errors.application_errors import AccessDeniedError
 from inframeld_backend.shared.application.errors.job_errors import JobStoppedError
 from inframeld_backend.shared.application.protocols.job_checkpoints import JobCheckpoints
@@ -84,8 +85,10 @@ class JobCheckpointService(JobCheckpoints):
         self._require_continuation(current)
 
     async def _guard(self, context: JobAttemptContextDTO) -> JobSnapshotDTO | None:
+        if not isinstance(context.binding, ProductJobBindingDTO):
+            raise JobStoppedError("Product checkpoints require the original product binding.")
         try:
-            await self._authorizer.require_current(context.authority)
+            await self._authorizer.require_current(context.binding.authority)
         except AccessDeniedError:
             # Stopped metadata is safe to retain. No protected result is saved.
             await self._jobs.finish(context, status=JobStatus.FAILED, reason="authority_changed")

@@ -15,14 +15,14 @@ class DurableJobRow(SharedPersistenceBase):
     __tablename__ = "durable_jobs"
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
-    operation_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    operation_id: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True)
     request_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     installation_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
-    principal_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
-    principal_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    principal_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    principal_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
     organization_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     project_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
-    action_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    action_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     payload_kind: Mapped[str] = mapped_column(String(100), nullable=False)
     payload_version: Mapped[int] = mapped_column(Integer, nullable=False)
     payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
@@ -48,4 +48,9 @@ class DurableJobRow(SharedPersistenceBase):
     reason: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
     terminal_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
+    )
+
+    binding_kind: Mapped[str] = mapped_column(String(32), nullable=False, default="product")
+    cleanup_obligation_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True, default=None
     )
