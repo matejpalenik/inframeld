@@ -36,6 +36,8 @@ For every human-facing feature, identify its linked qualification issue or repor
 
 You remain the sole Git writer. Inspect specialist handoffs and stop concurrent edits before staging owned changes. Do not capture or remove unrelated files with broad add/reset/clean operations. Commit coherent checkpoints through normal hooks under existing authorization. Pending final CI alone does not prohibit a useful commit or PR. Do not bypass an unsafe or required hook to force progress.
 
+Where practical, integrate an already merged prerequisite at a safe checkpoint before the final verification and review handoff. For example, a known base update can be adopted while a correction is being prepared, instead of fully reviewing the old base and immediately repeating that handoff on the new one. This is an ordering preference, not permission to skip hooks, rewrite saved checkpoints or wait indefinitely for future merges. Review the combined delta, retain final-head CI and [revalidate affected evidence](gates-and-recovery.md#revalidate-evidence-without-repeating-unrelated-work) after any later source or base change.
+
 Request independent implementation review with the actual base/head, issue revision, delivered boundary, tests, raw evidence and known gaps. DX review applies to CLI/SDK setup, public output, automation, recovery and examples. Reviewers inspect the actual diff. Missing review is not a passing review.
 
 Fix P0/P1 and required P2 findings, preserving the human's bounded P2 exception procedure. P3 suggestions remain optional. Re-review corrections and affected callers rather than restarting unrelated audits. Stop inventing work when no material finding remains. Scores never justify extra polishing.

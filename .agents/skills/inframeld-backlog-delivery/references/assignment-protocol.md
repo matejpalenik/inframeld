@@ -14,6 +14,8 @@ Read root and applicable directory instructions. Code work follows Coding Standa
 
 The brief identifies the issue and current acceptance, useful delivered behavior, a few acceptance examples, exclusions, branch/base, owned paths and contracts, dependencies, verification commands, permitted actions and handoff recipient. State whether the result completes the issue or is a supporting capability. A plan review identifies its plan revision, with implementation-only evidence N/A.
 
+For material cross-component or security-sensitive work, use [Testing's case-planning guidance](../../inframeld-testing/references/test-strategy.md#choose-cases-from-ownership-and-failures) to include the relevant rejection cases and required real boundaries in those same acceptance examples.
+
 Keep the [prerequisite check](coordinator.md#check-prerequisites-before-assignment) in this same brief, not a second record:
 
 | Brief item | Required detail |
