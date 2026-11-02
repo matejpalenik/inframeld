@@ -18,6 +18,7 @@ interface NavGroup {
   links: Array<{
     title: string
     href: string
+    nested?: boolean
   }>
 }
 
@@ -53,21 +54,24 @@ function NavLink({
   tag,
   active = false,
   isAnchorLink = false,
+  nested = false,
 }: {
   href: string
   children: React.ReactNode
   tag?: string
   active?: boolean
   isAnchorLink?: boolean
+  nested?: boolean
 }) {
   return (
     <CloseButton
       as={Link}
       href={href}
       aria-current={active ? "page" : undefined}
+      title={typeof children === "string" ? children : undefined}
       className={clsx(
         "flex justify-between gap-2 py-1 pr-3 text-sm transition",
-        isAnchorLink ? "pl-7" : "pl-4",
+        isAnchorLink || nested ? "pl-7" : "pl-4",
         active
           ? "text-zinc-900 dark:text-white"
           : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
@@ -196,7 +200,11 @@ function NavigationGroup({
         <ul role="list" className="border-l border-transparent">
           {group.links.map((link) => (
             <motion.li key={link.href} layout="position" className="relative">
-              <NavLink href={link.href} active={link.href === pathname}>
+              <NavLink
+                href={link.href}
+                active={link.href === pathname}
+                nested={link.nested}
+              >
                 {link.title}
               </NavLink>
               <AnimatePresence mode="popLayout" initial={false}>
@@ -235,7 +243,22 @@ function NavigationGroup({
   )
 }
 
-export const navigation: Array<NavGroup> = navigationData
+const sourceGroups: Array<{
+  title: string
+  links: Array<{
+    title: string
+    href: string
+    children?: Array<{ title: string; href: string }>
+  }>
+}> = navigationData
+
+export const navigation: Array<NavGroup> = sourceGroups.map((group) => ({
+  title: group.title,
+  links: group.links.flatMap((link) => [
+    { title: link.title, href: link.href },
+    ...(link.children ?? []).map((child) => ({ ...child, nested: true })),
+  ]),
+}))
 
 export function Navigation(props: React.ComponentPropsWithoutRef<"nav">) {
   return (

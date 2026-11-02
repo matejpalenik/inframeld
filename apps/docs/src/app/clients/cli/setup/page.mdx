@@ -1,0 +1,29 @@
+export const pageMetadata = {
+  title: "Overview and setup",
+  description: "Start using the delivered CLI.",
+}
+
+# Overview and setup
+
+[Install the CLI](/get-started/install-cli), then inspect the available commands:
+
+<CodeGroup>
+
+```shell
+inframeld --help
+inframeld --version
+```
+
+</CodeGroup>
+
+Use `inframeld version` for additional build information. [Check your CLI version](/guides/inspect-cli-version) explains the human workflow.
+
+## Connect a target
+
+Ask the installation operator for its exact public HTTPS API URL and any required public CA certificate. [Register and select the target](/guides/register-a-target), then inspect the cached registration with `inframeld target show`.
+
+## Choose an interface for the task
+
+The current CLI exposes `version` and `target add`, `target use`, and `target show`. It does not expose a generic HTTP escape hatch or all public backend operations. For an existing Project's metadata or retained operation status, use the corresponding [API guide](/api-reference).
+
+A browser sign-in or target registration alone does not create a saved usable CLI login. [Connect and sign in](/get-started/connect) explains the current account-site path and credential boundary.

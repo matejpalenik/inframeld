@@ -1,0 +1,35 @@
+export const pageMetadata = {
+  title: "Configuration",
+  description: "Understand target settings and the saved preference.",
+}
+
+# Configuration
+
+A target saves an installation connection under a local label, such as `dev`. The saved preference selects the default target for commands that use one.
+
+## Register and select
+
+[Register a target](/guides/register-a-target) using the operator's exact HTTPS API URL. Inspect it before selecting it:
+
+<CodeGroup>
+
+```shell
+inframeld target show --target dev
+inframeld target use dev --dry-run
+inframeld target use dev
+inframeld target show
+```
+
+</CodeGroup>
+
+The preview compares the saved preference with the proposed target. The real `use` command saves the preference. `show` reports the effective choice and cached connection identity.
+
+## Trust and proxy settings
+
+Configure an operator-supplied public CA bundle with `target add --ca-cert`. A configured proxy must be an explicit credential-free HTTP(S) origin. Certificate and hostname checks stay enabled. The [target guide](/guides/register-a-target#register-the-connection) explains supported bounds and identity checks.
+
+## Understand what is saved
+
+The registry stores connection metadata and a preference, not a human token. Preserve the registered installation's identity rather than treating a reused label as a new server. Cached identity establishes the saved binding, while a later network request must still validate its connection.
+
+See [machine output](/clients/cli/automation) for typed preference changes and [upgrades](/self-hosting/upgrades) for version compatibility.

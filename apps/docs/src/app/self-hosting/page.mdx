@@ -1,0 +1,25 @@
+export const pageMetadata = {
+  title: "Requirements and deployment configuration",
+  description:
+    "Understand the supported development deployment and the production boundary.",
+}
+
+# Requirements and deployment configuration
+
+Inframeld's target deployment is one server running Docker Compose. PostgreSQL owns application state, SeaweedFS owns artifacts, and Chroma stores derived vectors. The API and worker processes share the backend's application behavior.
+
+## Start with the supported preview
+
+[Install the development environment](/get-started/install-inframeld) to run the current source. The repository supplies pinned tools, locked dependencies, example backend settings and development database commands.
+
+A complete packaged production topology, ingress and assembled first-administrator workflow still require their owning delivery and qualification. Treat the source-based preview as a development environment.
+
+## Plan your installation
+
+- Separate public application ingress from private provider administration and database/storage services.
+- Provide durable storage for application state and source artifacts.
+- Configure trusted identity providers, email delivery and account-site HTTPS for the workflows you enable.
+- Protect provider secrets and installation configuration with the owning process's access controls.
+- Select a backup, restore and upgrade procedure that has actual evidence for your deployed artifacts.
+
+[Security](/self-hosting/security), [monitoring](/self-hosting/monitoring), [backup](/self-hosting/backup-and-restore) and [upgrades](/self-hosting/upgrades) cover these concerns separately. The [backend README](https://github.com/matejpalenik/inframeld/blob/main/apps/backend/README.md) owns current development Compose commands and configuration.

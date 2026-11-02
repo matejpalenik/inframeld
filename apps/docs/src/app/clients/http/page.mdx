@@ -1,0 +1,53 @@
+export const pageMetadata = {
+  title: "HTTP and cURL",
+  description: "Make a first request and configure protected requests.",
+}
+
+# HTTP and cURL
+
+Use your installation's backend URL to call its public HTTP API. An unauthenticated health request is a useful first check.
+
+## Make your first request
+
+Set the backend URL in your terminal. This local example matches the [development installation](/get-started/install-inframeld):
+
+<CodeGroup>
+
+```shell
+export INFRAMELD_URL='http://127.0.0.1:8000'
+curl --fail-with-body --silent --show-error --max-time 5 \
+  "$INFRAMELD_URL/health"
+```
+
+</CodeGroup>
+
+A successful response includes `"status": "ok"`. Remote installations use their operator-supplied HTTPS URL.
+
+## Call protected operations
+
+Follow [authentication](/api-reference#authentication) to obtain the credential supported by your installation. Protected examples use `INFRAMELD_TOKEN` for a current human bearer token. Keep it in your local secret-handling environment rather than source files or shared output.
+
+This request supplies its header through stdin so the token is not expanded into curl's argument list:
+
+<CodeGroup>
+
+```shell
+curl --fail-with-body --silent --show-error --max-time 5 \
+  --header @- "$INFRAMELD_URL/v1/session" <<EOF
+Authorization: Bearer ${INFRAMELD_TOKEN}
+Accept: application/json
+EOF
+```
+
+</CodeGroup>
+
+The session response identifies the current principal and installation context. A failed response remains a failure even when it contains useful diagnostic information. Avoid tracing commands that would reveal credentials.
+
+## Continue with a task
+
+- [Read or change an existing Project](/guides/name-and-rename-project).
+- [Look up an original operation](/guides/recover-original-request).
+- [Read retained deletion status](/guides/read-deletion-status).
+- [Browse all public operations](/api-reference).
+
+The [error reference](/api-reference/operations#errors-and-uncertain-effects) explains failures and uncertain writes. The generated SDKs provide typed interfaces to this same contract.

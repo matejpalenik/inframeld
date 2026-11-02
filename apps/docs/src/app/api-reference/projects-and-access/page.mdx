@@ -1,0 +1,55 @@
+export const pageMetadata = {
+  title: "Projects and access",
+  description:
+    "Inspect a session, Project metadata, grants and account-site consent.",
+}
+
+# Projects and access
+
+These operations use current identity and authority. [Authentication](/api-reference#authentication) establishes the credential context. [Projects and permissions](/product/projects-and-permissions) explains the resource model.
+
+## Inspect your session
+
+<ApiOperation operationId="getCurrentSession" />
+
+Read the current principal context with a valid human credential. [HTTP and cURL](/clients/http#call-protected-operations) shows a complete request. Each SDK exposes this operation through its generated client.
+
+## Read Project metadata
+
+<ApiOperation operationId="getProjectMetadata" />
+
+Use the permanent Project ID. [Name and rename a Project](/guides/name-and-rename-project) has cURL, Python, TypeScript and Rust examples with the same identifiers and authority.
+
+## Resolve an exact Project name
+
+<ApiOperation operationId="resolveProjectName" />
+
+Resolution uses an exact selector in the current installation and Organization. It is not fuzzy search. A display label is not an implicit selector. Missing, inaccessible or ambiguous observations preserve their documented disclosure boundary.
+
+## Update Project metadata
+
+<ApiOperation operationId="updateProjectMetadata" />
+
+Require current human `edit-project-metadata` authority, the reviewed metadata revision and the original idempotency key. Omitted fields preserve values. Explicit null does not clear either field. Renaming preserves the permanent ID. [The guide](/guides/name-and-rename-project) shows preparation, the typed write and uncertain-result recovery.
+
+## Assign a use-only grant
+
+<ApiOperation operationId="assignProjectUseOnlyGrant" />
+
+This operation assigns the delivered use-only `create-access-groups` action to the specified recipient. Supply the reviewed Project Access revision and a retained idempotency key. A grant does not bypass membership or the actor's current ability to grant that action.
+
+The request body's generated model is `ProjectUseOnlyGrantRequest`. [Assign a Project grant](/guides/assign-project-grant) shows equivalent cURL, Python, TypeScript and Rust programs. Preserve the original request context before dispatch so [lookup](/guides/recover-original-request) can observe an uncertain result.
+
+## Inspect account-site consent
+
+<ApiOperation operationId="inspectHumanOAuthConsent" />
+
+This is part of the configured browser account flow. It uses the current browser session and the supplied private consent challenge. Displayed inspection data does not authorize a later decision.
+
+## Decide account-site consent
+
+<ApiOperation operationId="decideHumanOAuthConsent" />
+
+The browser write requires its current session and CSRF/Origin safeguards. The backend rechecks the request rather than trusting an earlier inspection. Use the [account site](/get-started/connect#review-a-consent-request) for an interactive decision. Do not synthesize a consent request or substitute an arbitrary bearer token for the browser workflow.
+
+Keep the challenge and returned flow URLs private. A navigation-level consent result and complete Rust recipient-proof acquisition require distinct evidence.

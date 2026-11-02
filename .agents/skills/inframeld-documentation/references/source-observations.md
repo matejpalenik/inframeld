@@ -1,9 +1,11 @@
 # Sources behind the writing guide
 
-These are Inframeld editorial observations of public documentation checked on 2026-10-29. They are not an official OpenAI writing guide, copied product instructions or a requirement to imitate page appearance. The reusable pattern is purpose, setup, a small working example, an interpretable result and a useful next step.
+These are Inframeld editorial observations of public documentation checked on 2026-11-02. They are not an official OpenAI writing guide, copied product instructions or a requirement to imitate page appearance. The reusable pattern is purpose, setup, a small working example, an interpretable result and a useful next step.
 
 | Primary source | Observed technique | Inframeld adaptation |
 | --- | --- | --- |
+| [Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli) | Leads with the tool's purpose, installation and first use, with routes to focused configuration and command details. | Start with install/connect/use choices, lead CLI tasks with human output and keep machine contracts in reference. Product availability remains specific to Inframeld. |
+| [Build skills](https://learn.chatgpt.com/docs/build-skills) | Makes a skill discoverable through scoped metadata and keeps reusable instructions connected to supporting resources. | Keep the skill entry concise and put the full site hierarchy, page patterns and examples in directly linked references. |
 | [API documentation overview](https://developers.openai.com/api/docs) | Introduces a useful API task before routing readers into focused capabilities. | Open a section with what the reader can accomplish. Link to focused guides rather than listing internal modules. |
 | [Developer quickstart](https://developers.openai.com/api/docs/quickstart) | Puts setup before a small executable example and connects language choices to the same first result. | Name the file, supply imports and lifecycle, show the run command and explain the output. Verify our actual local SDK setup. |
 | [Streaming responses](https://developers.openai.com/api/docs/guides/streaming-responses) | Explains why streaming changes the reading experience, then shows the enabling option and incremental consumption. | Explain the purpose of an option before its mechanics. Preserve transport and product outcome boundaries. |

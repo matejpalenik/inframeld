@@ -1,0 +1,24 @@
+export const pageMetadata = {
+  title: "Command reference",
+  description: "Find delivered commands and their purpose.",
+}
+
+# Command reference
+
+For structured target observations and dry-run fields, see the [target output reference](/clients/cli/target-reference).
+
+Use `inframeld --help` and each command's `--help` for the exact parser interface of your binary.
+
+| Command                                | Purpose                                                  | Details                                                                     |
+| -------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `inframeld --version`                  | Print the short executable version.                      | [Version guide](/guides/inspect-cli-version)                                |
+| `inframeld version`                    | Inspect embedded build information.                      | [Build metadata reference](/clients/cli/version-reference)                  |
+| `inframeld target add LABEL --url URL` | Discover and register a trusted installation connection. | [Target registration](/guides/register-a-target#register-the-connection)    |
+| `inframeld target use LABEL`           | Save the default target preference.                      | [Target selection](/guides/register-a-target#inspect-and-select-the-target) |
+| `inframeld target show`                | Inspect the effective target and cached identity.        | [Configuration](/clients/cli/configuration)                                 |
+
+## Global behavior
+
+Use `--json` or `--jsonl` for machine output, and `--dry-run` for a supported command's descriptive preview. `--no-input` expresses noninteractive intent. Help and the root `--version` flag remain plain-text outputs. Read [automation](/clients/cli/automation) for exact outcome and failure handling.
+
+The public API has additional operations without CLI commands. Their [API reference](/api-reference) and generated SDKs are the supported interfaces for those tasks.

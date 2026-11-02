@@ -44,13 +44,20 @@ function collectPage(page) {
           if (attribute.name === "id" && typeof attribute.value === "string") {
             page.anchors.add(attribute.value)
           }
+          if (
+            node.name === "ApiOperation" &&
+            attribute.name === "operationId" &&
+            typeof attribute.value === "string"
+          ) {
+            page.apiOperations.add(attribute.value)
+          }
         }
       }
     })
   }
 }
 
-export async function validateContent(root, navigation = []) {
+export async function validateContent(root, navigation = [], contract) {
   const files = await glob("**/page.mdx", { cwd: path.join(root, "src/app") })
   const pages = new Map()
   const errors = []
@@ -62,6 +69,7 @@ export async function validateContent(root, navigation = []) {
       route: route.replace(/\/$/, "") || "/",
       anchors: new Set(),
       links: [],
+      apiOperations: new Set(),
     }
     pages.set(page.route, page)
     try {
@@ -78,7 +86,33 @@ export async function validateContent(root, navigation = []) {
   )
   for (const group of navigation) {
     for (const link of group.links) {
-      links.push({ href: link.href, source: "navigation", route: "/" })
+      for (const destination of [link, ...(link.children ?? [])]) {
+        links.push({ href: destination.href, source: "navigation", route: "/" })
+      }
+    }
+  }
+
+  if (contract) {
+    const delivered = new Set(
+      Object.values(contract.paths).flatMap((item) =>
+        Object.values(item).flatMap((operation) =>
+          operation?.operationId ? [operation.operationId] : []
+        )
+      )
+    )
+    const documented = new Set()
+    for (const page of pages.values()) {
+      for (const operationId of page.apiOperations) {
+        if (!delivered.has(operationId))
+          errors.push(
+            `${page.file}: ${operationId} is an unknown API operation`
+          )
+        documented.add(operationId)
+      }
+    }
+    for (const operationId of delivered) {
+      if (!documented.has(operationId))
+        errors.push(`${operationId} is not documented in the API reference`)
     }
   }
 
