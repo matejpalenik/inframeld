@@ -1,0 +1,35 @@
+{
+  admin off
+  auto_https off
+  log default {
+    output discard
+  }
+}
+
+https://inframeld.account.test:8443 {
+  tls /run/account-tls/server.pem /run/account-tls/server.key
+  header {
+    Cache-Control "private, no-store, max-age=0"
+    Referrer-Policy "no-referrer"
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    -Server
+  }
+  @kratos path /self-service/* /sessions/whoami
+  handle @kratos {
+    reverse_proxy kratos:4433
+  }
+  @api path /v1/* /.well-known/oauth-protected-resource
+  handle @api {
+    reverse_proxy backend:8000
+  }
+  handle {
+    reverse_proxy web:3000
+  }
+}
+
+https://hydra.account.test:8443 {
+  tls /run/account-tls/server.pem /run/account-tls/server.key
+  header Referrer-Policy no-referrer
+  reverse_proxy hydra:4444
+}

@@ -449,6 +449,9 @@ test("pure stub first primary failure survives successful and late target-exit e
       await context.test(
         `${first}-${late ? "late" : "complete"}`,
         async (nested) => {
+          let now = 1000;
+          nested.mock.method(performance, "now", () => now);
+          nested.mock.timers.enable({ apis: ["setTimeout"] });
           const controller = new AbortController();
           const reason = new Error("original pure cancellation");
           const pattern =
@@ -457,49 +460,84 @@ test("pure stub first primary failure survives successful and late target-exit e
               : first === "cancel"
                 ? /original pure cancellation/
                 : /3-byte output budget/;
-          await pureHelper(
-            nested,
-            {
-              waitForStop: true,
-              terminalDelay: late ? 280 : 10,
-              ...(late ? { exitDelay: 150 } : {}),
-              ...(first === "overflow"
-                ? { lateChunks: [[0, Buffer.from("éλ")]] as [number, Buffer][] }
-                : {
-                    stopChunks: [[0, Buffer.from("éλ")]] as [number, Buffer][],
-                  }),
-              acquired: () => {
-                if (first === "cancel")
-                  setTimeout(() => controller.abort(reason), 0);
-              },
-            },
-            async (stops) => {
-              const began = performance.now();
-              await assert.rejects(
-                command("unused", [], {
-                  timeout: first === "timeout" ? 20 : 1000,
-                  cleanupTimeout: 200,
-                  maxOutputBytes: 3,
-                  signal: controller.signal,
-                }),
-                (error: unknown) => {
-                  const primary =
-                    error instanceof AggregateError ? error.errors[0] : error;
-                  assert.match(String(primary), pattern);
-                  return true;
+          try {
+            await pureHelper(
+              nested,
+              {
+                waitForStop: true,
+                terminalDelay: late ? 280 : 10,
+                ...(late ? { exitDelay: 150 } : {}),
+                ...(first === "overflow"
+                  ? {
+                      lateChunks: [[0, Buffer.from("éλ")]] as [
+                        number,
+                        Buffer,
+                      ][],
+                    }
+                  : {
+                      stopChunks: [[0, Buffer.from("éλ")]] as [
+                        number,
+                        Buffer,
+                      ][],
+                    }),
+                acquired: () => {
+                  if (first === "cancel")
+                    setTimeout(() => controller.abort(reason), 0);
                 },
-              );
-              assert.equal(stops.length, 1);
-              assert.ok(
-                stops[0]!.deadline > 10000 && stops[0]!.deadline <= 10230,
-              );
-              if (late)
-                assert.ok(
-                  performance.now() - began < 260,
-                  "A later exit must not restart the first 200ms stop allowance",
-                );
-            },
-          );
+              },
+              async (stops) => {
+                let settled = false;
+                const completed = assert
+                  .rejects(
+                    command("unused", [], {
+                      timeout: first === "timeout" ? 20 : 1000,
+                      cleanupTimeout: 200,
+                      maxOutputBytes: 3,
+                      signal: controller.signal,
+                    }),
+                    (error: unknown) => {
+                      const primary =
+                        error instanceof AggregateError
+                          ? error.errors[0]
+                          : error;
+                      if (first === "cancel") assert.equal(primary, reason);
+                      else assert.match(String(primary), pattern);
+                      return true;
+                    },
+                  )
+                  .then(() => {
+                    settled = true;
+                  });
+                void completed.catch(() => {});
+                // Complete READY and START before the first failure is delivered.
+                await new Promise<void>((resolve) => setImmediate(resolve));
+                const elapsed = first === "timeout" ? 20 : 0;
+                now += elapsed;
+                nested.mock.timers.tick(elapsed);
+                await new Promise<void>((resolve) => setImmediate(resolve));
+                assert.deepEqual(stops, [
+                  { deadline: first === "timeout" ? 10220 : 10200, at: now },
+                ]);
+                assert.equal(settled, false);
+                if (late) {
+                  now += 150;
+                  nested.mock.timers.tick(150);
+                  await new Promise<void>((resolve) => setImmediate(resolve));
+                  assert.equal(settled, false);
+                  now += 50;
+                  nested.mock.timers.tick(50);
+                } else {
+                  now += 10;
+                  nested.mock.timers.tick(10);
+                }
+                await completed;
+                assert.equal(settled, true);
+                assert.equal(stops.length, 1);
+              },
+            );
+          } finally {
+            nested.mock.timers.reset();
+          }
         },
       );
   }
@@ -750,36 +788,46 @@ function conservativeCleanupFailure(error: unknown): boolean {
   );
 }
 
-test("pure stub helper startup consumes the original deadline and never submits START after it", async (context) => {
-  let now = 1000;
-  let submitted = false;
-  context.mock.method(performance, "now", () => now);
-  context.mock.timers.enable({ apis: ["setTimeout"] });
-  try {
-    await pureHelper(
-      context,
-      {
-        startWrite: (complete) => {
-          submitted = true;
-          complete();
-        },
-      },
-      async (stops) => {
-        const starting = startProcess("unused", [], {
-          timeout: 40,
-          cleanupTimeout: 250,
-        });
-        // Expire the original watchdog before the already queued READY is delivered.
-        now += 40;
-        context.mock.timers.tick(40);
-        await assert.rejects(starting, /startup timed out/);
-        assert.deepEqual(stops, []);
-      },
-    );
-    assert.equal(submitted, false);
-  } finally {
-    context.mock.timers.reset();
-  }
+test("pure stub helper startup never submits START after timeout or cancellation", async (context) => {
+  for (const first of ["timeout", "cancel"] as const)
+    await context.test(first, async (nested) => {
+      let now = 1000;
+      let submitted = false;
+      const controller = new AbortController();
+      const reason = new Error("cancel before readiness");
+      nested.mock.method(performance, "now", () => now);
+      nested.mock.timers.enable({ apis: ["setTimeout"] });
+      try {
+        await pureHelper(
+          nested,
+          {
+            startWrite: (complete) => {
+              submitted = true;
+              complete();
+            },
+          },
+          async (stops) => {
+            const starting = startProcess("unused", [], {
+              timeout: first === "timeout" ? 40 : 500,
+              cleanupTimeout: 250,
+              signal: controller.signal,
+            });
+            // Stop before the already queued READY is delivered.
+            const elapsed = first === "timeout" ? 40 : 20;
+            now += elapsed;
+            nested.mock.timers.tick(elapsed);
+            if (first === "cancel") controller.abort(reason);
+            if (first === "timeout")
+              await assert.rejects(starting, /startup timed out/);
+            else await assert.rejects(starting, (error) => error === reason);
+            assert.deepEqual(stops, []);
+          },
+        );
+        assert.equal(submitted, false);
+      } finally {
+        nested.mock.timers.reset();
+      }
+    });
 });
 
 test("pure stub control transit consumes the first stop budget and repeated failure is cached", async (context) => {
@@ -819,8 +867,8 @@ test("pure stub control transit consumes the first stop budget and repeated fail
   );
 });
 
-test("cancellation before helper readiness never submits a target", async (context) => {
-  await controlledOwner(context, "late-ready", async (trace, closed) => {
+test("cancellation settles actual late-ready helper custody", async (context) => {
+  await controlledOwner(context, "late-ready", async (_trace, closed) => {
     const controller = new AbortController();
     const reason = new Error("cancel before readiness");
     const timer = setTimeout(() => controller.abort(reason), 20);
@@ -838,8 +886,9 @@ test("cancellation before helper readiness never submits a target", async (conte
             error.errors[0] === reason &&
             conservativeCleanupFailure(error.errors[1])),
       );
-      await closed();
-      assert.equal(await readFile(trace, "utf8"), "");
+      const closing = closed();
+      assert.equal(closed(), closing);
+      await closing;
     } finally {
       clearTimeout(timer);
     }

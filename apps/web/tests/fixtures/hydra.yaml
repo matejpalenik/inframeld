@@ -1,0 +1,38 @@
+# Disposable qualification only. The official client setup owns registration.
+dsn: postgres://hydra_test:hydra-test-only@hydra-postgres:5432/hydra_test?sslmode=disable
+serve:
+  public:
+    port: 4444
+  admin:
+    port: 4445
+  tls:
+    allow_termination_from: [172.30.82.2/32]
+urls:
+  self:
+    issuer: https://hydra.account.test:8443/
+  login: https://inframeld.account.test:8443/self-service/login/browser
+  consent: https://inframeld.account.test:8443/consent
+  error: https://inframeld.account.test:8443/error
+secrets:
+  system: [INFRAMELD-ACCOUNT-HYDRA-SYSTEM-12345678]
+  cookie: [INFRAMELD-ACCOUNT-HYDRA-COOKIE-12345678]
+strategies:
+  access_token: opaque
+oidc:
+  dynamic_client_registration:
+    enabled: false
+oauth2:
+  pkce:
+    enforced: true
+    enforced_for_public_clients: true
+  grant:
+    refresh_token:
+      rotation_grace_period: 0s
+      rotation_grace_reuse_count: 0
+ttl:
+  access_token: 5m
+  refresh_token: 168h
+  auth_code: 1m
+log:
+  level: error
+  leak_sensitive_values: false
