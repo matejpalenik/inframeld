@@ -1,0 +1,271 @@
+export const pageMetadata = {
+  title: "Create an additional Project",
+  description:
+    "Create a separate Project with explicit initial permissions and recover the original result after response loss.",
+}
+
+# Create an additional Project
+
+Create a separate Production Project for an existing installation. The HTTP API creates the Project, adds you as a member and assigns eighteen explicit permissions on that Project. It leaves your other Projects and their resources unchanged.
+
+## Prepare your access
+
+You need the backend URL and a current human credential accepted by that installation. You must already be admitted to the installation and have its `create-projects` permission. Either grant level is sufficient. Being a member of another Project does not supply this permission.
+
+The examples assume `INFRAMELD_URL` and `INFRAMELD_TOKEN` are set through the shared [HTTP setup](/clients/http#call-protected-operations), using an existing valid human bearer token. This guide supplies no credential-acquisition recipe. The complete supported account-to-API procedure and human acceptance remain unfinished in [qualification #313](https://github.com/matejpalenik/inframeld/issues/313). Browser sign-in alone does not put a bearer token in your terminal. Start with [health](/clients/http#make-your-first-request) if you have no supported protected credential.
+
+For a generated SDK alternative, use the local source-package setup for [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) in a separate example project. There is no delivered CLI creation command or browser creation control.
+
+Creation persists the Project. For a disposable exercise, agree on the installation's supported teardown with its operator before creating resources. This preview has no public Project-deletion procedure.
+
+## Read your Organization access
+
+An Organization is the installation's scope for human admission and permission to create Projects. Read your own access to obtain its ID and the revision you will review before creation:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/my-organization-access" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+The successful response contains `organizationId`, your `principalId`, the Organization's `accessRevision` and its actual stored `grants`. Look for `actionId: "create-projects"`. `canGrant: false` still permits creation. `canGrant: true` additionally permits delegation under the separate administration contract.
+
+An eligible admitted human can receive `grants: []`. This is a successful read, but it supplies no permission to create. Ask an authorized administrator for the required permission through your installation's supported procedure. The read shows only your Organization assignments, not other people or all Projects. The server checks your current access again when you send the write.
+
+## Save the reviewed request
+
+Choose the exact Name `production` and display name `Production` for this example. A Name is a selector, while the display name is a label. The permanent ID is assigned by the server. [Project naming](/guides/name-and-rename-project#choose-an-exact-name) explains the character rules and uniqueness. An unavailable Name requires another explicit choice.
+
+Save this complete new file as `project-create.json` in your example directory. Replace the example Organization UUID with `organizationId` from your read, and replace `0` with the Organization `accessRevision` you reviewed:
+
+<CodeGroup>
+
+```json
+{
+  "organizationId": "00000000-0000-4000-8000-000000000001",
+  "expectedAccessRevision": 0,
+  "name": "production",
+  "displayName": "Production"
+}
+```
+
+</CodeGroup>
+
+Choose one request key for this creation. The key identifies your original attempt. Keep it with the complete request file before dispatch. Use a distinct key for a distinct creation, with at most 128 characters:
+
+<CodeGroup>
+
+```shell
+export PROJECT_CREATE_KEY='production-create-1'
+```
+
+</CodeGroup>
+
+## Create the Project
+
+Choose one alternative and run it from the directory containing `project-create.json`. Each sends the same saved body and key. After uncertain output, keep both unchanged. Save the Python program as `create_project.py`, the TypeScript program as `create-project.ts`, or the Rust program as `src/main.rs` in its example project:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request POST \
+  --url "$INFRAMELD_URL/v1/projects" \
+  --header @- \
+  --header "Idempotency-Key: $PROJECT_CREATE_KEY" \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @project-create.json <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+```python
+import asyncio
+import os
+from pathlib import Path
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.project_creation_request import ProjectCreationRequest
+
+
+async def main() -> None:
+    request = ProjectCreationRequest.model_validate_json(
+        Path("project-create.json").read_text(encoding="utf-8")
+    )
+    configuration = Configuration(host=os.environ["INFRAMELD_URL"])
+    async with ApiClient(configuration) as client:
+        try:
+            response = await AccessApi(client).create_project_with_http_info(
+                idempotency_key=os.environ["PROJECT_CREATE_KEY"],
+                project_creation_request=request,
+                _headers={
+                    "Authorization": f"Bearer {os.environ['INFRAMELD_TOKEN']}"
+                },
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            print(f"Creation could not be confirmed: HTTP {error.status}")
+            print(error.body)
+            print("Keep the original request file and key.")
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("No usable response. Keep the original request file and key.")
+            raise SystemExit(1) from error
+
+        print(f"HTTP {response.status_code}")
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import { readFileSync } from "node:fs"
+import {
+  createClient,
+  createProject,
+  type ProjectCreationRequest,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const key = process.env.PROJECT_CREATE_KEY
+if (!baseUrl || !token || !key) {
+  throw new Error("Set INFRAMELD_URL, INFRAMELD_TOKEN and PROJECT_CREATE_KEY")
+}
+
+const body: ProjectCreationRequest = JSON.parse(
+  readFileSync("project-create.json", "utf8")
+)
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const result = await createProject({
+  client,
+  body,
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Idempotency-Key": key,
+  },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error) {
+  console.error("Creation could not be confirmed:", result.error.kind)
+  console.error("HTTP status:", result.response?.status)
+  if (result.error.kind === "api") {
+    console.error(result.error.body)
+  } else {
+    console.error(result.error.message)
+  }
+  console.error("Keep the original request file and key.")
+  process.exitCode = 1
+} else if (result.data) {
+  console.log("HTTP", result.response?.status)
+  console.log(JSON.stringify(result.data, null, 2))
+} else {
+  throw new Error("No usable result. Keep the original request file and key.")
+}
+```
+
+```rust
+use inframeld_sdk::{HttpClient, ProjectCreationRequest};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let request: ProjectCreationRequest =
+        serde_json::from_str(&std::fs::read_to_string("project-create.json")?)?;
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let key = std::env::var("PROJECT_CREATE_KEY")?;
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    match client.create_project(key, request).await {
+        Ok(response) => {
+            println!("HTTP {}", response.status);
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+        }
+        Err(error) => {
+            if let Some(context) = error.api() {
+                eprintln!("Creation could not be confirmed: HTTP {}", context.status);
+                eprintln!("{}", context.body);
+            } else {
+                eprintln!("No usable response: {error}");
+            }
+            eprintln!("Keep the original request file and key.");
+            return Err(error.into());
+        }
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python create_project.py`, `node create-project.ts` with Node 26 in the ESM project, or `cargo run` from the Cargo project. The shared SDK setup pages supply the local dependency and runtime configuration.
+
+HTTP `201` returns the committed `projectId`, `organizationId`, `name` and `displayName`. Keep the permanent Project ID for later requests. The Project starts with `accessRevision: 1` and `metadataRevision: 0`. Creation leaves the Organization Access revision unchanged. These are different scopes, so do not use the returned Project revision as a later Organization revision.
+
+The response also includes `operationId`, `idempotencyExpiresAt` and `initialGrants`. The operation ID and deadline describe the retained original result. Each of the eighteen assignments targets this Project and has `canGrant: true`, including `edit-project-metadata`. They are removable permissions, not an unrestricted administrator role. The assignments, membership, Project and audit are saved together or none is committed.
+
+`initialGrants` records what creation assigned. It does not report your permissions today. A retained creation result can still list an assignment that was subsequently removed. Having permission to create a Collection or Pipeline also does not mean one was created. This operation creates no starter, documents, model connections or Deployment and does not change a saved CLI selection.
+
+## Inspect the Project by its permanent ID
+
+Set `PROJECT_ID` to the `projectId` returned by creation, then read its current metadata:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/metadata" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+The permanent ID should match. Immediately after creation, the Name, display name and metadata revision match the creation result too. A later authorized rename changes the current metadata without changing the ID. [Name and rename a Project](/guides/name-and-rename-project) explains that separate task.
+
+## Recover a lost response
+
+A timeout, disconnect, `503` or SDK decoding failure can leave the outcome uncertain. Keep the original installation, Organization ID, `POST` method, `/v1/projects` route, complete request file and request key. Do not submit replacement work merely because you did not receive a usable response.
+
+Within the retained replay period, repeat the original POST with the same key and complete original body, using a currently valid credential for the same human. Do not replace its reviewed revision with a newly read value. The server checks current human eligibility and `create-projects` before recovering the original result. Removed authority cannot be bypassed by retaining the key.
+
+An exact completed replay returns HTTP `201` with the same Project ID, operation identity, original names, initial revisions and initial-grant receipt. It does not extend `idempotencyExpiresAt`, recreate removed permissions or reverse a later rename. Use a separate metadata read to inspect today's names.
+
+If you retained the original installation binding, [original-request lookup](/guides/recover-original-request) can inspect retained operation metadata using the Organization scope, method `POST`, canonical route `/v1/projects`, family `organization_action_use` and action `create-projects`. Lookup is not the creation receipt or a current-permission listing. An unresolved observation does not prove that nothing happened. If the original result cannot be established or retention has expired, preserve the context and seek the installation's supported recovery path before considering a new creation.
+
+## Interpret a rejection
+
+| Result         | Meaning and next action                                                                                                                                                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401`          | Use a currently accepted human credential for this installation. Application keys cannot authenticate this human operation.                                                                                                 |
+| `403`          | Current human eligibility or `create-projects` authority does not permit the action. Retaining an original key does not bypass this check.                                                                                  |
+| `404`          | The requested Organization is missing or unavailable to this caller. Use the ID from your own-access read.                                                                                                                  |
+| `409`          | Inspect the Problem Details. The Name may be unavailable, the reviewed Organization revision may be stale, or the key may have different or unfinished meaning. An uncertain attempt still needs original-request recovery. |
+| `400` or `422` | Correct malformed authentication, invalid fields or JSON framing. Unknown/duplicate fields, null values for required inputs and invalid revisions are rejected.                                                             |
+| `413` or `415` | Send one JSON object with `Content-Type: application/json`, at most 32 KiB.                                                                                                                                                 |
+
+For a confirmed stale fresh request, read your own Organization access again and review a distinct request before sending it. For a confirmed Name conflict, choose another explicit Name. Neither failure leaves a partial new Project, membership or creator grants.
+
+Errors use `application/problem+json`. SDK failures retain available response context, and HTTP success alone cannot override a decoding failure. These examples do not automatically retry writes. Browser-cookie callers use the installation's actual cookie/Origin configuration and send `X-Inframeld-CSRF: 1` for POST. Do not combine a bearer token with a session cookie or copy browser cookies into shared examples.

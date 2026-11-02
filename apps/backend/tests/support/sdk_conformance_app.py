@@ -25,6 +25,9 @@ from starlette.responses import JSONResponse, RedirectResponse, Response, Stream
 from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
     AssignProjectUseOnlyGrantCommand,
 )
+from inframeld_backend.access.application.commands.create_project_command import (
+    CreateProjectCommand,
+)
 from inframeld_backend.access.application.commands.decide_human_oauth_consent_command import (
     DecideHumanOAuthConsentCommand,
 )
@@ -32,11 +35,21 @@ from inframeld_backend.access.application.commands.update_project_metadata_comma
     UpdateProjectMetadataCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.created_project_dto import CreatedProjectDTO
 from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto import (
     HumanOAuthConsentDetailsDTO,
 )
+from inframeld_backend.access.application.dtos.my_organization_access_dto import (
+    MyOrganizationAccessDTO,
+)
 from inframeld_backend.access.application.dtos.oauth_consent_continuation_dto import (
     OAuthConsentContinuationDTO,
+)
+from inframeld_backend.access.application.dtos.organization_action_grant_dto import (
+    OrganizationActionGrantDTO,
+)
+from inframeld_backend.access.application.dtos.project_creation_result_dto import (
+    ProjectCreationResultDTO,
 )
 from inframeld_backend.access.application.dtos.project_metadata_change_result_dto import (
     ProjectMetadataChangeResultDTO,
@@ -58,6 +71,10 @@ from inframeld_backend.access.application.protocols.human_oauth_consent_handler 
 from inframeld_backend.access.application.protocols.human_session_authenticator import (
     HumanSessionAuthenticator,
 )
+from inframeld_backend.access.application.protocols.my_organization_access_reader import (
+    MyOrganizationAccessReader,
+)
+from inframeld_backend.access.application.protocols.project_creator import ProjectCreator
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
 from inframeld_backend.access.application.protocols.project_metadata_changer import (
     ProjectMetadataChanger,
@@ -83,6 +100,8 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
 )
 from inframeld_backend.access.application.value_objects.oauth_client_id import OAuthClientId
 from inframeld_backend.access.domain.enums.human_oauth_scope import HumanOAuthScope
+from inframeld_backend.access.domain.policies.project_creation_policy import ProjectCreationPolicy
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
@@ -99,6 +118,12 @@ from inframeld_backend.access.http.routes.current_session_routes import create_s
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
+)
+from inframeld_backend.access.http.routes.organization_access_routes import (
+    create_organization_access_router,
+)
+from inframeld_backend.access.http.routes.project_creation_routes import (
+    create_project_creation_router,
 )
 from inframeld_backend.access.http.routes.project_grant_routes import create_project_grant_router
 from inframeld_backend.access.http.routes.project_metadata_routes import (
@@ -256,6 +281,60 @@ class MockSDKGrantChanger(ProjectGrantChanger):
 @asynccontextmanager
 async def _open_grant_change() -> AsyncGenerator[ProjectGrantChanger]:
     yield MockSDKGrantChanger()
+
+
+class MockSDKMyOrganizationAccess(MyOrganizationAccessReader):
+    @override
+    async def read(self, *, access: AccessContextDTO) -> MyOrganizationAccessDTO:
+        return MyOrganizationAccessDTO(
+            OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            access.actor_principal_id,
+            7,
+            (OrganizationActionGrantDTO(ActionId("create-projects"), False),),
+        )
+
+
+class MockSDKProjectCreator(ProjectCreator):
+    """Supply an original typed receipt without simulating persistence or authorization."""
+
+    @override
+    async def create(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: CreateProjectCommand,
+        context: OperationAdmissionContextDTO,
+    ) -> ProjectCreationResultDTO:
+        operation_id = OperationId("sdk-project-creation")
+        return ProjectCreationResultDTO(
+            CreatedProjectDTO(
+                operation_id,
+                command.organization_id,
+                ProjectId(UUID("00000000-0000-4000-8000-000000000004")),
+                access.actor_principal_id,
+                command.name,
+                command.display_name.value,
+                1,
+                0,
+                tuple(ActionId(action) for action in ProjectCreationPolicy.INITIAL_ACTIONS),
+            ),
+            CompletedSynchronousOperationDTO(
+                operation_id,
+                True,
+                OperationReplayKind.SAFE_RESULT,
+                datetime(2030, 1, 1, tzinfo=UTC),
+            ),
+        )
+
+
+@asynccontextmanager
+async def _open_my_organization_access() -> AsyncGenerator[MyOrganizationAccessReader]:
+    yield MockSDKMyOrganizationAccess()
+
+
+@asynccontextmanager
+async def _open_project_creator() -> AsyncGenerator[ProjectCreator]:
+    yield MockSDKProjectCreator()
 
 
 class MockSDKProjectMetadata(ProjectMetadataReader, ProjectMetadataChanger, ProjectNameResolver):
@@ -555,6 +634,10 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(health_router)
     application.include_router(create_session_router(authenticate))
     application.include_router(create_project_grant_router(authenticate, _open_grant_change))
+    application.include_router(
+        create_organization_access_router(authenticate, _open_my_organization_access)
+    )
+    application.include_router(create_project_creation_router(authenticate, _open_project_creator))
     application.include_router(
         create_project_metadata_router(
             authenticate,

@@ -12,3 +12,4 @@ export { cases } from "../../src/conformance/cases.ts";
 import "./discovery.ts";
 
 import "./project-metadata.ts";
+import "./project-creation.ts";

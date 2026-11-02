@@ -20,9 +20,23 @@ A local change saves its domain effects, revision, audit and original outcome to
 
 ## Concrete HTTP contract draft
 
-**Status:** accepted product boundaries and documented transport drafts. Only the existing human-session, consent and supported use-only grant operations are implemented. Other named models and routes remain unimplemented design contracts. Native backend OpenAPI remains authoritative for delivered symbols.
+**Status:** accepted product boundaries and documented transport drafts. Human-session, consent, Project metadata, the supported use-only grant, own Organization access and ordinary Project creation are implemented. Other named models and routes remain design contracts. Native backend OpenAPI remains authoritative for delivered symbols. The implemented creation routes use human cookie or Hydra bearer authentication, without an application-key subsystem.
 
 For example, Alice sets SupportBot's `query` assignment on Support's Pipeline with `canGrant: false` and the reviewed access revision. If the response is lost, her same idempotency key recovers that original assignment result under current authority. Removing that assignment returns a removal result, not `canGrant: false`: the latter still permits use. If SupportBot is subsequently given another grant, replay of Alice's old removal cannot remove it again.
+
+<a id="ordinary-project-creation"></a>
+
+### Implemented ordinary Project creation
+
+Alice already belongs to the installation and wants a separate Production Project. `GET /v1/my-organization-access` returns her actual Organization ID, principal ID, current Organization Access revision and stored Organization grants. The read requires current admitted-human eligibility, not `create-projects`. It can return an empty array. It takes no principal selector and reveals no other person's grants or installation inventory.
+
+`POST /v1/projects` requires current human `create-projects` on that Organization. [The request model](../../../../apps/backend/src/inframeld_backend/access/http/requests/project_creation_request.py) takes `organizationId`, `expectedAccessRevision`, `name` and `displayName`. The revision is the reviewed Organization revision, not a Project metadata revision. A successful creation leaves the Organization revision unchanged and returns HTTP `201`. The new Project starts at Access revision `1` and metadata revision `0`.
+
+The service commits the Project, creator membership, [eighteen explicit initial assignments](actions-and-initial-grants.md#initial-project-grants), audit and original outcome together. Name conflicts and stale fresh-write revisions leave no partial creation. Cookie writes require trusted Origin and `X-Inframeld-CSRF: 1`. Both routes return `Cache-Control: no-store`. Creation uses the existing single idempotency header and bounded JSON contract.
+
+The [creation response](../../../../apps/backend/src/inframeld_backend/access/http/responses/project_creation_response.py) contains the original operation identity/deadline, Organization/Project IDs, submitted names, initial Project revisions and `initialGrants`. This receipt is immutable history, not present permissions or metadata. Exact replay requires current eligibility and `create-projects`, then returns the original receipt before checking a fresh-write expected revision. Replay neither restores removed grants nor reverses later renames. Preserve the original key and complete request after uncertain output.
+
+[The user guide](../../../../apps/docs/src/app/guides/create-project/page.mdx) gives the supported API/client task. There is no CLI creation command, starter provisioning or RAG resource creation in this operation. [Human qualification #313](https://github.com/matejpalenik/inframeld/issues/313) remains unready for handoff until the chosen supported authentication procedure and disposable setup/cleanup are complete. Provider fixtures do not supply user credentials. First-use/setup qualification remains #185 and metadata-repair qualification remains #298.
 
 <a id="credential-and-response-profiles"></a>
 

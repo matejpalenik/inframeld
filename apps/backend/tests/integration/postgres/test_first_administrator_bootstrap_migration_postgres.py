@@ -111,8 +111,7 @@ async def test_retained_claim_refuses_downgrade_without_losing_original_typed_re
         command.downgrade(config, "0015_artifact_allocation")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0016_first_administrator"
+            await session.scalar(select(AlembicVersionRow.version_num)) == "0017_project_creation"
         )
         receipt = await session.get(
             FirstAdministratorBootstrapReceiptRow, original.installation_id.value

@@ -41,16 +41,22 @@ __all__ = [
     "HumanOAuthScope",
     "InProgressOperationLookupResponse",
     "InframeldDiscoveryResponse",
+    "InitialProjectGrantResponse",
     "JobStatus",
     "Jobreference",
     "KnownJobReferenceResponse",
+    "MyOrganizationAccessResponse",
     "OAuthConsentDecision",
     "OperationLookupAuthorityFamily",
     "OperationLookupAuthorityRequest",
     "OperationLookupResponse",
     "OriginalOperationLookupRequest",
+    "OwnOrganizationGrantResponse",
     "PathInner",
     "ProblemDetails",
+    "ProjectCreationRequest",
+    "ProjectCreationResponse",
+    "ProjectGrantTargetResponse",
     "ProjectMetadataChangeResponse",
     "ProjectMetadataResponse",
     "ProjectMetadataUpdateRequest",
@@ -94,16 +100,22 @@ from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentR
 from inframeld_sdk.models.human_o_auth_scope import HumanOAuthScope as HumanOAuthScope
 from inframeld_sdk.models.in_progress_operation_lookup_response import InProgressOperationLookupResponse as InProgressOperationLookupResponse
 from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
+from inframeld_sdk.models.initial_project_grant_response import InitialProjectGrantResponse as InitialProjectGrantResponse
 from inframeld_sdk.models.job_status import JobStatus as JobStatus
 from inframeld_sdk.models.jobreference import Jobreference as Jobreference
 from inframeld_sdk.models.known_job_reference_response import KnownJobReferenceResponse as KnownJobReferenceResponse
+from inframeld_sdk.models.my_organization_access_response import MyOrganizationAccessResponse as MyOrganizationAccessResponse
 from inframeld_sdk.models.o_auth_consent_decision import OAuthConsentDecision as OAuthConsentDecision
 from inframeld_sdk.models.operation_lookup_authority_family import OperationLookupAuthorityFamily as OperationLookupAuthorityFamily
 from inframeld_sdk.models.operation_lookup_authority_request import OperationLookupAuthorityRequest as OperationLookupAuthorityRequest
 from inframeld_sdk.models.operation_lookup_response import OperationLookupResponse as OperationLookupResponse
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest as OriginalOperationLookupRequest
+from inframeld_sdk.models.own_organization_grant_response import OwnOrganizationGrantResponse as OwnOrganizationGrantResponse
 from inframeld_sdk.models.path_inner import PathInner as PathInner
 from inframeld_sdk.models.problem_details import ProblemDetails as ProblemDetails
+from inframeld_sdk.models.project_creation_request import ProjectCreationRequest as ProjectCreationRequest
+from inframeld_sdk.models.project_creation_response import ProjectCreationResponse as ProjectCreationResponse
+from inframeld_sdk.models.project_grant_target_response import ProjectGrantTargetResponse as ProjectGrantTargetResponse
 from inframeld_sdk.models.project_metadata_change_response import ProjectMetadataChangeResponse as ProjectMetadataChangeResponse
 from inframeld_sdk.models.project_metadata_response import ProjectMetadataResponse as ProjectMetadataResponse
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest as ProjectMetadataUpdateRequest

@@ -31,6 +31,26 @@ problems!(
     GetCurrentSessionApiError::Status403,
     GetCurrentSessionApiError::Status503
 );
+problems!(
+    GetMyOrganizationAccessApiError,
+    GetMyOrganizationAccessApiError::Status400,
+    GetMyOrganizationAccessApiError::Status401,
+    GetMyOrganizationAccessApiError::Status403,
+    GetMyOrganizationAccessApiError::Status404,
+    GetMyOrganizationAccessApiError::Status503
+);
+problems!(
+    CreateProjectApiError,
+    CreateProjectApiError::Status400,
+    CreateProjectApiError::Status401,
+    CreateProjectApiError::Status403,
+    CreateProjectApiError::Status404,
+    CreateProjectApiError::Status409,
+    CreateProjectApiError::Status413,
+    CreateProjectApiError::Status415,
+    CreateProjectApiError::Status422,
+    CreateProjectApiError::Status503
+);
 problems!(GetHealthApiError, GetHealthApiError::Status500);
 problems!(
     GetDeletionStatusApiError,

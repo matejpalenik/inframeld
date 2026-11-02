@@ -60,6 +60,7 @@ Choose the row matching the task. Workflow, contract and architecture views are 
 
 | Task | Direct reference |
 | --- | --- |
+| Create an additional Project or inspect own Organization permissions | [Actions and initial Project grants](references/actions-and-initial-grants.md#initial-project-grants) and [implemented creation transport](references/grant-contracts.md#ordinary-project-creation). The own-access read and atomic eighteen-grant creation are implemented. The supported account-to-API procedure and human acceptance remain unfinished under [#313](https://github.com/matejpalenik/inframeld/issues/313). |
 | Project naming, metadata authority or first-grant repair | [Approved Project metadata decision](references/decision-project-metadata-authority.md), accepted on 2026-10-30. Project metadata and the narrow [authority-repair consumer](references/host-maintenance.md#project-metadata-authority-repair) are implemented. Human proof acquisition and deferred human acceptance remain unqualified. |
 | Actions and initial grants | [Actions and explicit initial grants](references/actions-and-initial-grants.md) |
 | Admission and invitations | [Admit humans and activate invitations](references/admission-and-invitations.md) |

@@ -1,7 +1,7 @@
 export const pageMetadata = {
   title: "Projects and access",
   description:
-    "Inspect a session, Project metadata, grants and account-site consent.",
+    "Inspect your access, create a Project, manage its metadata and review account-site consent.",
 }
 
 # Projects and access
@@ -13,6 +13,20 @@ These operations use current identity and authority. [Authentication](/api-refer
 <ApiOperation operationId="getCurrentSession" />
 
 Read the current principal context with a valid human credential. [HTTP and cURL](/clients/http#call-protected-operations) shows a complete request. Each SDK exposes this operation through its generated client.
+
+## Read your Organization access
+
+<ApiOperation operationId="getMyOrganizationAccess" />
+
+Read the actual admitted human's own Organization ID, principal ID, current Access revision and stored Organization grants. An eligible human without Organization grants receives `grants: []`. There is no principal selector, installation inventory or permission snapshot for a later action. [Create an additional Project](/guides/create-project#read-your-organization-access) explains how to use this read before creation.
+
+## Create an additional Project
+
+<ApiOperation operationId="createProject" />
+
+Require current human `create-projects` authority on the requested Organization, the reviewed Organization Access revision and one retained idempotency key. Save the Project, creator membership, eighteen explicit creator grants, audit and original result together. Creation leaves the Organization Access revision unchanged. The new Project starts at Access revision `1` and metadata revision `0`.
+
+The creation receipt's `initialGrants` describes the original assignments. Exact replay requires current authorization and returns that original result without restoring removed grants or reversing later renames. [The guide](/guides/create-project) covers the saved request, generated clients, current metadata and uncertain-result recovery. This operation creates no starter or RAG resources.
 
 ## Read Project metadata
 

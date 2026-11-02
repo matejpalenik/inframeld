@@ -274,6 +274,49 @@
         "title": "InframeldDiscoveryResponse",
         "type": "object"
       },
+      "InitialProjectGrantResponse": {
+        "properties": {
+          "actionId": {
+            "enum": [
+              "manage-project-members",
+              "create-access-groups",
+              "create-application-accounts",
+              "create-pipelines",
+              "create-deployments",
+              "manage-upload-defaults",
+              "delete-project",
+              "inspect-budget",
+              "manage-budget",
+              "manage-trace-policy",
+              "delete-trace-history",
+              "inspect-feedback",
+              "create-collections",
+              "create-sources",
+              "create-model-connections",
+              "create-processing-profiles",
+              "create-embedding-profiles",
+              "edit-project-metadata"
+            ],
+            "title": "Actionid",
+            "type": "string"
+          },
+          "canGrant": {
+            "const": true,
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ProjectGrantTargetResponse"
+          }
+        },
+        "required": [
+          "target",
+          "actionId",
+          "canGrant"
+        ],
+        "title": "InitialProjectGrantResponse",
+        "type": "object"
+      },
       "JobStatus": {
         "enum": [
           "queued",
@@ -300,6 +343,42 @@
           "jobId"
         ],
         "title": "KnownJobReferenceResponse",
+        "type": "object"
+      },
+      "MyOrganizationAccessResponse": {
+        "properties": {
+          "accessRevision": {
+            "maximum": 9.223372036854776e+18,
+            "minimum": 0.0,
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/OwnOrganizationGrantResponse"
+            },
+            "maxItems": 4,
+            "title": "Grants",
+            "type": "array"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "principalId": {
+            "format": "uuid",
+            "title": "Principalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organizationId",
+          "principalId",
+          "accessRevision",
+          "grants"
+        ],
+        "title": "MyOrganizationAccessResponse",
         "type": "object"
       },
       "OAuthConsentDecision": {
@@ -431,6 +510,30 @@
         "title": "OriginalOperationLookupRequest",
         "type": "object"
       },
+      "OwnOrganizationGrantResponse": {
+        "properties": {
+          "actionId": {
+            "enum": [
+              "admit-users",
+              "suspend-users",
+              "restore-users",
+              "create-projects"
+            ],
+            "title": "Actionid",
+            "type": "string"
+          },
+          "canGrant": {
+            "title": "Cangrant",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actionId",
+          "canGrant"
+        ],
+        "title": "OwnOrganizationGrantResponse",
+        "type": "object"
+      },
       "ProblemDetails": {
         "additionalProperties": false,
         "description": "Represent an Inframeld HTTP error using RFC 9457 Problem Details.\n\nAttributes:\n    type: Absolute problem URI; about:blank is used for generic HTTP errors.\n    title: Short public summary without occurrence-specific internal data.\n    status: Error status in the range 400 through 599.\n    detail: Safe public explanation selected by the HTTP adapter.\n    code: Stable public code; clients must tolerate unfamiliar future codes.\n    request_id: Correlation UUID serialized as requestId, never authorization.\n    errors: Optional bounded collection of already sanitized request issues.\n\nThe response builder enforces the selected definition's type/code/status\npairing and whether errors is appropriate. This model does not map Python\nexceptions, authenticate callers, authorize retries, or render tracebacks.\nServer-side extra fields are rejected; client parsers must still tolerate\nfuture RFC extension members.",
@@ -517,6 +620,127 @@
           "requestId"
         ],
         "title": "ProblemDetails",
+        "type": "object"
+      },
+      "ProjectCreationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Displayname",
+            "type": "string"
+          },
+          "expectedAccessRevision": {
+            "maximum": 9.223372036854776e+18,
+            "minimum": 0.0,
+            "title": "Expectedaccessrevision",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 63,
+            "minLength": 1,
+            "pattern": "^[a-z](?:[a-z0-9-]*[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organizationId",
+          "expectedAccessRevision",
+          "name",
+          "displayName"
+        ],
+        "title": "ProjectCreationRequest",
+        "type": "object"
+      },
+      "ProjectCreationResponse": {
+        "description": "Report original creation assignments, not a present permission snapshot.",
+        "properties": {
+          "accessRevision": {
+            "const": 1,
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "initialGrants": {
+            "items": {
+              "$ref": "#/components/schemas/InitialProjectGrantResponse"
+            },
+            "maxItems": 18,
+            "minItems": 18,
+            "title": "Initialgrants",
+            "type": "array"
+          },
+          "metadataRevision": {
+            "const": 0,
+            "title": "Metadatarevision",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "organizationId",
+          "projectId",
+          "name",
+          "displayName",
+          "accessRevision",
+          "metadataRevision",
+          "initialGrants"
+        ],
+        "title": "ProjectCreationResponse",
+        "type": "object"
+      },
+      "ProjectGrantTargetResponse": {
+        "properties": {
+          "kind": {
+            "const": "project",
+            "title": "Kind",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "projectId"
+        ],
+        "title": "ProjectGrantTargetResponse",
         "type": "object"
       },
       "ProjectMetadataChangeResponse": {
@@ -1353,6 +1577,101 @@
         ]
       }
     },
+    "/v1/my-organization-access": {
+      "get": {
+        "operationId": "getMyOrganizationAccess",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyOrganizationAccessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "HumanBearer": []
+          }
+        ],
+        "summary": "Own",
+        "tags": [
+          "access"
+        ]
+      }
+    },
     "/v1/oauth/consent": {
       "get": {
         "operationId": "inspectHumanOAuthConsent",
@@ -1679,6 +1998,165 @@
         "summary": "Lookup",
         "tags": [
           "operations"
+        ]
+      }
+    },
+    "/v1/projects": {
+      "post": {
+        "operationId": "createProject",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCreationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Operation conflicts with current state"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "HumanBearer": []
+          }
+        ],
+        "summary": "Create",
+        "tags": [
+          "access"
         ]
       }
     },
