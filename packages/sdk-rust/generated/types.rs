@@ -1879,28 +1879,42 @@ impl AsRef<str> for AcceptedOperationLookupResponseOutcome {
         self.as_str()
     }
 }
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
 pub enum AcceptedOperationLookupResponseJobReference {
+    UnknownJobReference(UnknownJobReference),
+    KnownJobReferenceResponse(KnownJobReferenceResponse),
+}
+///Keep the absence of a known job correlation closed on every generated client.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum UnknownJobReference {
     #[default]
     #[serde(rename = "unknown")]
     Unknown,
 }
-impl AcceptedOperationLookupResponseJobReference {
+impl UnknownJobReference {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Unknown => "unknown",
         }
     }
 }
-impl ::std::fmt::Display for AcceptedOperationLookupResponseJobReference {
+impl ::std::fmt::Display for UnknownJobReference {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
-impl AsRef<str> for AcceptedOperationLookupResponseJobReference {
+impl AsRef<str> for UnknownJobReference {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
+}
+///Identify original work without asserting its execution state or result.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct KnownJobReferenceResponse {
+    #[serde(rename = "jobId")]
+    pub job_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
 pub enum AcceptedOperationLookupResponseDispatch {

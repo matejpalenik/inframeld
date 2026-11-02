@@ -3,20 +3,6 @@
 import * as z from 'zod';
 
 /**
- * AcceptedOperationLookupResponse
- *
- * Confirm retained admission while making unknown dispatch and references explicit.
- */
-export const zAcceptedOperationLookupResponse = z.object({
-    admission: z.literal('confirmed'),
-    dispatch: z.literal('not_established'),
-    idempotencyExpiresAt: z.iso.datetime().nullable(),
-    jobReference: z.literal('unknown'),
-    operationId: z.string(),
-    outcome: z.literal('accepted_asynchronous')
-});
-
-/**
  * CompletedOperationLookupResponse
  *
  * Expose safe synchronous outcome metadata without replaying content.
@@ -100,6 +86,15 @@ export const zJobStatus = z.enum([
     'canceled',
     'recovery_required'
 ]);
+
+/**
+ * KnownJobReferenceResponse
+ *
+ * Identify original work without asserting its execution state or result.
+ */
+export const zKnownJobReferenceResponse = z.object({
+    jobId: z.uuid()
+});
 
 /**
  * OAuthConsentDecision
@@ -261,6 +256,30 @@ export const zRetainedDeletionStatusResponse = z.object({
     outcome: z.literal('retained'),
     physicalCleanupComplete: z.boolean().nullable(),
     retentionExpiresAt: z.iso.datetime().nullable()
+});
+
+/**
+ * UnknownJobReference
+ *
+ * Keep the absence of a known job correlation closed on every generated client.
+ */
+export const zUnknownJobReference = z.enum(['unknown']);
+
+/**
+ * AcceptedOperationLookupResponse
+ *
+ * Confirm retained admission while making unknown dispatch and references explicit.
+ */
+export const zAcceptedOperationLookupResponse = z.object({
+    admission: z.literal('confirmed'),
+    dispatch: z.literal('not_established'),
+    idempotencyExpiresAt: z.iso.datetime().nullable(),
+    jobReference: z.union([
+        zUnknownJobReference,
+        zKnownJobReferenceResponse
+    ]),
+    operationId: z.string(),
+    outcome: z.literal('accepted_asynchronous')
 });
 
 /**

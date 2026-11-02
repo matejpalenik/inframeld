@@ -242,7 +242,7 @@ A successful lookup returns HTTP `200`. Check `outcome` to decide what the respo
 | `outcome`               | What it means                                                                                                       | What to do next                                                                               |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `completed_synchronous` | The original operation completed. The record includes its operation ID, result classification, and original expiry. | Use the operation ID to investigate the original result. Lookup does not replay its contents. |
-| `accepted_asynchronous` | The original request was accepted. Its job reference is unknown and dispatch is not established by this record.     | Keep the operation ID. Do not treat this as evidence that a job started or finished.          |
+| `accepted_asynchronous` | The original request was accepted. Its job reference may be known or unknown. Dispatch is not established.          | Keep the operation ID and any job ID. Neither confirms that a job started or finished.        |
 | `in_progress`           | The original synchronous operation has not finished.                                                                | Keep its operation ID. A later lookup can observe the same original request.                  |
 | `recovery_required`     | The original operation requires recovery. The record does not establish asynchronous acceptance.                    | Keep the operation ID and ask the installation's operator to investigate.                     |
 | `unresolved`            | Lookup cannot establish an authoritative retained match.                                                            | Keep the original details and investigate. Do not assume the operation never happened.        |
@@ -263,6 +263,29 @@ For example, a completed response has this shape. The operation ID and expiry be
 </CodeGroup>
 
 `classification` describes the kind of completed result: `safe_result`, `issued_secret`, or `answer_receipt`. Lookup does not return the original secret, answer, or response body.
+
+For an original Project action accepted for background work, lookup may identify its job. This complete response is illustrative, with example IDs and expiry:
+
+<CodeGroup title="Illustrative accepted response">
+
+```json
+{
+  "outcome": "accepted_asynchronous",
+  "operationId": "example-background-operation",
+  "admission": "confirmed",
+  "jobReference": {
+    "jobId": "00000000-0000-4000-8000-000000000004"
+  },
+  "dispatch": "not_established",
+  "idempotencyExpiresAt": "2030-01-01T00:00:00Z"
+}
+```
+
+</CodeGroup>
+
+Keep `jobId` with the original operation ID and installation. It identifies the original work, but does not certify dispatch, execution state or completion. It grants no permission for a later job read, and a job-inspection endpoint is not available yet.
+
+If a permitted reference cannot be established, `jobReference` is the string `"unknown"` and the result still confirms acceptance. That does not mean the operation has no job or that nothing was dispatched. Lookup never creates work to fill a missing reference.
 
 An unresolved response contains only:
 

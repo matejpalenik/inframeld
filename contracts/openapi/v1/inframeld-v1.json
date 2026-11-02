@@ -28,9 +28,15 @@
             "title": "Idempotencyexpiresat"
           },
           "jobReference": {
-            "const": "unknown",
-            "title": "Jobreference",
-            "type": "string"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnknownJobReference"
+              },
+              {
+                "$ref": "#/components/schemas/KnownJobReferenceResponse"
+              }
+            ],
+            "title": "Jobreference"
           },
           "operationId": {
             "title": "Operationid",
@@ -279,6 +285,22 @@
         ],
         "title": "JobStatus",
         "type": "string"
+      },
+      "KnownJobReferenceResponse": {
+        "additionalProperties": false,
+        "description": "Identify original work without asserting its execution state or result.",
+        "properties": {
+          "jobId": {
+            "format": "uuid",
+            "title": "Jobid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "title": "KnownJobReferenceResponse",
+        "type": "object"
       },
       "OAuthConsentDecision": {
         "enum": [
@@ -937,6 +959,14 @@
         ],
         "title": "RetainedDeletionStatusResponse",
         "type": "object"
+      },
+      "UnknownJobReference": {
+        "description": "Keep the absence of a known job correlation closed on every generated client.",
+        "enum": [
+          "unknown"
+        ],
+        "title": "UnknownJobReference",
+        "type": "string"
       },
       "UnresolvedDeletionStatusResponse": {
         "additionalProperties": false,
