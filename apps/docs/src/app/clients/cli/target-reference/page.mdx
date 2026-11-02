@@ -6,7 +6,31 @@ export const pageMetadata = {
 
 # Target output reference
 
-Use [register and select a target](/guides/register-a-target) for the human workflow and [configuration](/clients/cli/configuration) for selection precedence. This reference covers the delivered machine observations.
+Use [register and select a target](/guides/register-a-target) for the human workflow and [configuration](/clients/cli/configuration) for selection precedence. This reference explains human preference-change views and the delivered machine observations.
+
+## Read terminal change views
+
+To compare the views below, use an installed CLI with `prod` and `dev` already registered, `prod` saved, and no `INFRAMELD_TARGET` override. Replace the labels with your prepared targets. Registration and trusted HTTPS setup belong to the linked human workflow.
+
+The first two commands only preview. The last saves the preference:
+
+<CodeGroup>
+
+```shell
+inframeld target use dev --dry-run
+inframeld target use dev --dry-run --plain
+inframeld target use dev
+```
+
+</CodeGroup>
+
+A preview shows **Current / Proposed** and saves nothing. A confirmed changed save shows **Before / Now** using the values observed under its writer lock. Preview does not reserve those values. To restore the prepared original preference after a confirmed change, use `inframeld target use prod`.
+
+On eligible terminal stdout, an unequal known old value is red with strikethrough and the new value is green. Green means **new**, not approved or successfully applied. The headers, field labels and `->` arrow stay neutral. Identical values, pairs containing an unknown value and unconfirmed saves stay neutral. Known unset is `not selected` in human text and `null` in the structured observation, distinct from unknown.
+
+`--plain`, `--no-color`, nonempty `NO_COLOR`, `TERM=dumb` and non-terminal stdout each disable styling. These controls win even if `CLICOLOR_FORCE=1` is set. Empty `NO_COLOR` alone does not disable it. `--no-input` controls prompts, not styling. JSON/JSONL, help and version output remain unstyled.
+
+An interrupted command can retain already-confirmed change facts. Read the outcome and follow the existing uncertainty/readback guidance rather than treating color as confirmation of success.
 
 ## Preference change records
 
