@@ -302,7 +302,7 @@ async def test_metadata_upgrade_preserves_retained_status_and_original_foundatio
             )
             await session.flush()
 
-        run_migrations(temporary_postgres_settings)
+        command.upgrade(config, "0014_project_metadata")
 
         async with database.session() as session, session.begin():
             binding = await session.get(
