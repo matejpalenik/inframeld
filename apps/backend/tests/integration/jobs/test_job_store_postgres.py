@@ -77,6 +77,7 @@ from inframeld_backend.shared.application.dtos.operation_admission_context_dto i
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
 )
+from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -413,12 +414,12 @@ async def test_authority_loss_commits_stop_without_publishing_late_checkpoint(
 ) -> None:
     admitted = await _admit(database)
     context = await _claim(database)
-    assert context is not None
+    assert context is not None and isinstance(context.binding, ProductJobBindingDTO)
     await _checkpoints(database, context, b"confirmed-first-unit")
     async with database.session() as session, session.begin():
         await session.execute(
             update(PrincipalRow)
-            .where(PrincipalRow.id == context.authority.principal_id.value)
+            .where(PrincipalRow.id == context.binding.authority.principal_id.value)
             .values(status=PrincipalStatus.SUSPENDED)
         )
     with pytest.raises(JobStoppedError):
@@ -434,7 +435,7 @@ async def test_authority_loss_commits_stop_without_publishing_late_checkpoint(
     async with database.session() as session, session.begin():
         await session.execute(
             update(PrincipalRow)
-            .where(PrincipalRow.id == context.authority.principal_id.value)
+            .where(PrincipalRow.id == context.binding.authority.principal_id.value)
             .values(status=PrincipalStatus.ACTIVE)
         )
     assert await _claim(database) is None
@@ -444,7 +445,7 @@ async def test_authority_loss_commits_stop_without_publishing_late_checkpoint(
 async def test_authority_loss_after_dispatch_preserves_uncertainty(database: Database) -> None:
     admitted = await _admit(database)
     context = await _claim(database)
-    assert context is not None
+    assert context is not None and isinstance(context.binding, ProductJobBindingDTO)
     async with database.session() as session:
         operations = JobCheckpointService(
             SqlAlchemyTransactionManager(session),
@@ -455,7 +456,7 @@ async def test_authority_loss_after_dispatch_preserves_uncertainty(database: Dat
     async with database.session() as session, session.begin():
         await session.execute(
             update(PrincipalRow)
-            .where(PrincipalRow.id == context.authority.principal_id.value)
+            .where(PrincipalRow.id == context.binding.authority.principal_id.value)
             .values(status=PrincipalStatus.SUSPENDED)
         )
     with pytest.raises(JobStoppedError):
@@ -759,7 +760,7 @@ async def test_old_human_generation_stops_after_recovery_block_is_gone(database:
     request, authority, access = await _human_request(database)
     admission = await _human_admit(database, request, authority, access)
     context = await _claim(database)
-    assert context is not None
+    assert context is not None and isinstance(context.binding, ProductJobBindingDTO)
     async with database.session() as session, session.begin():
         await session.execute(update(HumanCredentialVersionRow).values(version=2))
         facts = await PostgresAdmittedWorkFactsReader(session).read(authority)
@@ -799,7 +800,12 @@ async def test_fresh_oauth_replay_preserves_original_admitted_generation(
     )
     async with database.session() as session:
         saved = await PostgresJobStore(session).find(first.operation_id)
-    assert saved is not None and saved.authority == authority and saved.status is JobStatus.QUEUED
+    assert (
+        saved is not None
+        and isinstance(saved.binding, ProductJobBindingDTO)
+        and saved.binding.authority == authority
+        and saved.status is JobStatus.QUEUED
+    )
 
 
 @pytest.mark.asyncio
@@ -882,7 +888,11 @@ async def test_full_eight_job_queue_still_accepts_cancellation(database: Databas
         await PostgresJobStore(session).request_cancel(admissions[0].job_id)
     assert await _claim(database) is None
     context = await _claim(database)
-    assert context is not None and context.job_id == admissions[1].job_id
+    assert (
+        context is not None
+        and isinstance(context.binding, ProductJobBindingDTO)
+        and context.job_id == admissions[1].job_id
+    )
     async with database.session() as session:
         assert await session.scalar(select(func.count()).select_from(DurableJobRow)) == 8
         first = await PostgresJobStore(session).find(admissions[0].operation_id)
@@ -895,7 +905,7 @@ async def test_terminal_success_cannot_be_requeued_by_attempt_retirement(
 ) -> None:
     admission = await _admit(database)
     context = await _claim(database)
-    assert context is not None
+    assert context is not None and isinstance(context.binding, ProductJobBindingDTO)
     async with database.session() as session, session.begin():
         await PostgresJobStore(session).finish(context, status=JobStatus.SUCCEEDED, reason=None)
     async with database.session() as session:
@@ -921,7 +931,7 @@ async def test_queued_snapshot_cannot_retire_a_later_retry(database: Database) -
         original = await PostgresJobStore(session).find(admission.operation_id)
     assert original is not None
     context = await _claim(database)
-    assert context is not None
+    assert context is not None and isinstance(context.binding, ProductJobBindingDTO)
     async with database.session() as session, session.begin():
         await session.execute(
             update(DurableJobRow)
@@ -1008,7 +1018,11 @@ async def test_legacy_ineligible_application_job_cannot_publish_a_checkpoint(
         await writer.mark_replayable(operation.operation_id, OperationReplayKind.ASYNC_JOB)
 
     context = await _claim(database)
-    assert context is not None and context.job_id == admitted.job_id
+    assert (
+        context is not None
+        and isinstance(context.binding, ProductJobBindingDTO)
+        and context.job_id == admitted.job_id
+    )
     with pytest.raises(JobStoppedError):
         await _checkpoints(database, context, b"forbidden-protected-result")
 
@@ -1046,7 +1060,11 @@ async def test_aged_unresolved_effect_replay_preserves_original_job_and_operatio
 
     first = await admit()
     context = await _claim(database)
-    assert context is not None and context.job_id == first.job_id
+    assert (
+        context is not None
+        and isinstance(context.binding, ProductJobBindingDTO)
+        and context.job_id == first.job_id
+    )
     async with database.session() as session, session.begin():
         await PostgresJobStore(session).begin_effect(context, "unresolved-paid-unit")
         await session.execute(

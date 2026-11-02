@@ -14,6 +14,7 @@ from inframeld_backend.bootstrap.application_worker_application_settings import 
 )
 from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
+from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
     DependencyUnavailableError,
@@ -99,7 +100,11 @@ async def _execute(
         log.info(
             "application_job_finished",
             job_id=str(context.job_id.value),
-            operation_id=context.operation_id.value,
+            **(
+                {"operation_id": context.binding.operation_id.value}
+                if isinstance(context.binding, ProductJobBindingDTO)
+                else {"cleanup_obligation_id": str(context.binding.obligation_id.value)}
+            ),
         )
     except (JobStoppedError, JobFenceLostError, JobWorkerStoppingError):
         log.info(

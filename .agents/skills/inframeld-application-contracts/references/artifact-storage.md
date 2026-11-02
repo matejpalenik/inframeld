@@ -6,6 +6,16 @@ Alice’s upload reaches object storage before its database reference is publish
 
 > **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
 
+## Implemented allocation and obligation persistence
+
+The internal [allocation service](../../../../apps/backend/src/inframeld_backend/shared/application/services/artifact_allocation_service.py) reserves an immutable attempt, local and remote byte allowances, the original abandoned-staging obligation, one cleanup queue slot and required audit in one transaction. [Migration 0015](../../../../apps/backend/migrations/versions/0015_artifact_allocation.py) adds their records above the delivered deletion-status and Project-metadata migrations. It preserves product job identity and replay while allowing a separately bound cleanup execution.
+
+Equivalent allocation retries recover the original reservation, obligation, cleanup JobId and fixed deadlines. A changed obligation identity, target, origin or request meaning cannot reuse that allocation. A business OperationId and its original RequestId are attribution, not a cleanup execution identity or an incoming credential. Staging that precedes business admission instead retains its exact server-owned attempt and original RequestId.
+
+Allocation applies the accepted byte and projected free-space limits to a supplied trusted [capacity observation](../../../../apps/backend/src/inframeld_backend/shared/application/dtos/artifact_capacity_dto.py). This component does not measure the host or configure storage. Dormant cleanup reserves queue capacity before private effects, but consumes neither an active slot nor an attempt before the original transfer deadline. The [job workflow](jobs-and-recovery.md#implemented-artifact-cleanup-binding) describes its current-fence and original-obligation checks.
+
+This foundation does not deliver artifact upload, verified readback, publication, a production cleanup handler, physical completion or reservation settlement. The ordinary worker still registers no handlers. Tests that supply trusted capacity or stored cleanup facts qualify those internal contracts only. SeaweedFS compatibility, late-write exclusion and physical chunk retirement remain unqualified, and issue #40 remains open. A terminal cleanup job cannot establish physical deletion or release its retained obligation and bytes.
+
 <a id="a-delayed-seaweedfs-upload-has-the-same-problem"></a>
 
 ### A delayed SeaweedFS upload has the same problem

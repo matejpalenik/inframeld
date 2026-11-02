@@ -26,6 +26,7 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
 from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
     OperationAdmissionContextDTO,
 )
+from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -132,7 +133,9 @@ class JobAdmissionService:
             saved = await self._jobs.find(operation.operation_id)
             if saved is None:
                 raise ConflictError("The accepted operation has no authoritative job binding.")
-            original = saved.authority
+            if not isinstance(saved.binding, ProductJobBindingDTO):
+                raise ConflictError("Product replay cannot return a cleanup execution.")
+            original = saved.binding.authority
             if (
                 original.principal_id != authority.principal_id
                 or original.installation_id != authority.installation_id
@@ -142,7 +145,7 @@ class JobAdmissionService:
                 or saved.payload != payload
             ):
                 raise ConflictError("The retry does not match the original admitted work.")
-            return JobAdmissionDTO(saved.job_id, saved.operation_id, False)
+            return JobAdmissionDTO(saved.job_id, saved.binding.operation_id, False)
         if not isinstance(operation, NewOperationReservationDTO):
             raise ConflictError("The original operation cannot admit new background work.")
         if (payload.kind, payload.version) not in self._supported_payloads:
