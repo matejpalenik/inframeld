@@ -35,7 +35,9 @@ test("highlights code with the documentation palette and preserves copyable sour
   assert.match(result.html, /var\(--shiki-token-string-expression\)/)
   assert.match(result.html, /(?:&lt;|&#x3C;)script(?:&gt;|>)/)
   assert.match(result.html, /(?:&amp;|&#x26;) text/)
-  assert.doesNotMatch(result.html, /<script>|<pre[ >]|<code[ >]/)
+  for (const tag of ["<script", "<pre", "<code"]) {
+    assert.equal(result.html.includes(tag), false)
+  }
 })
 
 test("renders unlabeled and plain-text code safely without nested code panels", async () => {
@@ -47,6 +49,8 @@ test("renders unlabeled and plain-text code safely without nested code panels", 
       result.html,
       /(?:&lt;|&#x3C;)example(?:&gt;|>) (?:&amp;|&#x26;) text/
     )
-    assert.doesNotMatch(result.html, /<example>|<pre[ >]|<code[ >]/)
+    for (const tag of ["<example", "<pre", "<code"]) {
+      assert.equal(result.html.includes(tag), false)
+    }
   }
 })
