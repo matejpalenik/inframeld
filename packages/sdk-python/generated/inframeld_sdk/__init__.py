@@ -42,6 +42,8 @@ __all__ = [
     "InProgressOperationLookupResponse",
     "InframeldDiscoveryResponse",
     "JobStatus",
+    "Jobreference",
+    "KnownJobReferenceResponse",
     "OAuthConsentDecision",
     "OperationLookupAuthorityFamily",
     "OperationLookupAuthorityRequest",
@@ -58,6 +60,7 @@ __all__ = [
     "ProtectedResourceMetadataResponse",
     "RecoveryRequiredOperationLookupResponse",
     "RetainedDeletionStatusResponse",
+    "UnknownJobReference",
     "UnresolvedDeletionStatusResponse",
     "UnresolvedOperationLookupResponse",
     "ValidationIssue",
@@ -92,6 +95,8 @@ from inframeld_sdk.models.human_o_auth_scope import HumanOAuthScope as HumanOAut
 from inframeld_sdk.models.in_progress_operation_lookup_response import InProgressOperationLookupResponse as InProgressOperationLookupResponse
 from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
 from inframeld_sdk.models.job_status import JobStatus as JobStatus
+from inframeld_sdk.models.jobreference import Jobreference as Jobreference
+from inframeld_sdk.models.known_job_reference_response import KnownJobReferenceResponse as KnownJobReferenceResponse
 from inframeld_sdk.models.o_auth_consent_decision import OAuthConsentDecision as OAuthConsentDecision
 from inframeld_sdk.models.operation_lookup_authority_family import OperationLookupAuthorityFamily as OperationLookupAuthorityFamily
 from inframeld_sdk.models.operation_lookup_authority_request import OperationLookupAuthorityRequest as OperationLookupAuthorityRequest
@@ -108,6 +113,7 @@ from inframeld_sdk.models.project_use_only_grant_response import ProjectUseOnlyG
 from inframeld_sdk.models.protected_resource_metadata_response import ProtectedResourceMetadataResponse as ProtectedResourceMetadataResponse
 from inframeld_sdk.models.recovery_required_operation_lookup_response import RecoveryRequiredOperationLookupResponse as RecoveryRequiredOperationLookupResponse
 from inframeld_sdk.models.retained_deletion_status_response import RetainedDeletionStatusResponse as RetainedDeletionStatusResponse
+from inframeld_sdk.models.unknown_job_reference import UnknownJobReference as UnknownJobReference
 from inframeld_sdk.models.unresolved_deletion_status_response import UnresolvedDeletionStatusResponse as UnresolvedDeletionStatusResponse
 from inframeld_sdk.models.unresolved_operation_lookup_response import UnresolvedOperationLookupResponse as UnresolvedOperationLookupResponse
 from inframeld_sdk.models.validation_issue import ValidationIssue as ValidationIssue

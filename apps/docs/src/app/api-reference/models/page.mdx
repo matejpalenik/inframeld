@@ -13,6 +13,8 @@ These views read the committed native schemas directly. Required presence, nulla
 
 ## AcceptedOperationLookupResponse
 
+Confirms original asynchronous admission with a known or explicitly unknown job reference. A known ID identifies the original work, while dispatch and current job state remain unestablished by this response. Later job inspection still requires its own interface and current authority.
+
 <ApiSchema name="AcceptedOperationLookupResponse" />
 
 <a id="CompletedOperationLookupResponse" />
@@ -74,6 +76,12 @@ These views read the committed native schemas directly. Required presence, nulla
 ## JobStatus
 
 <ApiSchema name="JobStatus" />
+
+<a id="KnownJobReferenceResponse" />
+
+## KnownJobReferenceResponse
+
+<ApiSchema name="KnownJobReferenceResponse" />
 
 <a id="OAuthConsentDecision" />
 
@@ -164,6 +172,12 @@ These views read the committed native schemas directly. Required presence, nulla
 ## RetainedDeletionStatusResponse
 
 <ApiSchema name="RetainedDeletionStatusResponse" />
+
+<a id="UnknownJobReference" />
+
+## UnknownJobReference
+
+<ApiSchema name="UnknownJobReference" />
 
 <a id="UnresolvedDeletionStatusResponse" />
 
