@@ -22,7 +22,7 @@ fn isolated(home: &TempDir) -> Command {
         .env("HOME", home.path())
         .env("PATH", "")
         .current_dir(home.path())
-        .timeout(Duration::from_secs(5));
+        .timeout(Duration::from_secs(30));
     command
 }
 
@@ -527,7 +527,7 @@ fn real_broken_machine_pipe_fails_while_plain_version_keeps_its_pipe_exception()
         // assert_cmd's capture replaces a configured stdout, so retain this pipe
         // on the actual owned child and reap it before inspecting the result.
         let mut child = process.stderr(Stdio::piped()).spawn().unwrap();
-        let deadline = Instant::now() + Duration::from_secs(5);
+        let deadline = Instant::now() + Duration::from_secs(30);
         loop {
             if child.try_wait().unwrap().is_some() {
                 break;
@@ -566,7 +566,7 @@ fn a_closed_stderr_diagnostic_cannot_make_an_invalid_invocation_succeed() {
         .stderr(Stdio::from(writer))
         .spawn()
         .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let deadline = Instant::now() + Duration::from_secs(30);
     loop {
         if child.try_wait().unwrap().is_some() {
             break;

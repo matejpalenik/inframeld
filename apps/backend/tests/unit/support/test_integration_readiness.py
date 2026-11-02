@@ -51,6 +51,7 @@ def test_readiness_message_names_status_and_only_pending_services() -> None:
     message = describe_readiness_failure(
         {"fixture"}, {"fixture": "HTTP 503", "ready": "connection failure"}
     )
+    assert "after 120 seconds" in message
     assert "fixture: HTTP 503" in message
     assert "ready:" not in message
 

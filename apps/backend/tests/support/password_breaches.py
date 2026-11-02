@@ -22,7 +22,7 @@ def create_client() -> httpx2.AsyncClient:
     return httpx2.AsyncClient(
         base_url=PASSWORD_BREACHES_URL,
         verify=ssl.create_default_context(cafile=str(TLS_CA_FILE)),
-        timeout=2,
+        timeout=5,
         trust_env=False,
     )
 

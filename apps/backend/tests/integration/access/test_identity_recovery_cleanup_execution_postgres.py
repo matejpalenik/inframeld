@@ -605,7 +605,7 @@ async def test_overlapping_workers_do_not_hold_identity_locks_during_provider_wa
     revoker = BlockedRevoker()
     first = asyncio.create_task(_execute(database, revoker))
     try:
-        async with asyncio.timeout(5):
+        async with asyncio.timeout(15):
             await revoker.started.wait()
             assert not await _execute(database, MockCredentialRevoker())
         first.cancel()

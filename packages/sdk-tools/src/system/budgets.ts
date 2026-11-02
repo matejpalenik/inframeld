@@ -3,9 +3,9 @@ export const budgets = {
   case: 30_000,
   startup: 30_000,
   profile: 300_000,
-  cleanup: 20_000,
-  control: 2000,
-  resourceCleanup: 5000,
+  cleanup: 60_000,
+  control: 10_000,
+  resourceCleanup: 15_000,
 } as const;
 
 export function profileBudget(

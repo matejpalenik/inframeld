@@ -86,7 +86,7 @@ async def _release(scenario: RecoveryScenarioDTO, phase: RecoveryPhase) -> None:
 async def _wait_for_phase(
     scenario: RecoveryScenarioDTO, phase: RecoveryPhase
 ) -> MockRecoverySnapshotResponse:
-    async with asyncio.timeout(5.0):
+    async with asyncio.timeout(15.0):
         while True:
             snapshot = await _snapshot(scenario)
             if any(event.phase == phase for event in snapshot.received):

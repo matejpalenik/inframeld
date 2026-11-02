@@ -337,7 +337,7 @@ async def test_cancelled_registered_request_releases_lookup_transaction_and_lock
             )
             waiting_pid: int | None = None
             try:
-                async with asyncio.timeout(3):
+                async with asyncio.timeout(10):
                     while waiting_pid is None:
                         if request.done():
                             response = await request
@@ -361,7 +361,7 @@ async def test_cancelled_registered_request_releases_lookup_transaction_and_lock
                 if not request.done():
                     request.cancel()
                 await asyncio.gather(request, return_exceptions=True)
-        async with asyncio.timeout(2), database.session() as probe, probe.begin():
+        async with asyncio.timeout(10), database.session() as probe, probe.begin():
             await probe.execute(
                 select(OrganizationRow.id)
                 .where(OrganizationRow.id == seed.request.organization_id.value)

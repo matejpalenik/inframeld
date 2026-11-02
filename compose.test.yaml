@@ -13,7 +13,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U inframeld_test -d inframeld_test"]
       interval: 5s
       timeout: 5s
-      retries: 12
+      retries: 24
       start_period: 5s
 
   kratos-postgres:
@@ -28,7 +28,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U kratos_test -d kratos_test"]
       interval: 5s
       timeout: 5s
-      retries: 12
+      retries: 24
       start_period: 5s
 
   kratos-migrate:
@@ -173,7 +173,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U hydra_test -d hydra_test"]
       interval: 2s
       timeout: 5s
-      retries: 30
+      retries: 60
 
   hydra-migrate:
     image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
@@ -215,7 +215,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U hydra_lifetimes -d hydra_lifetimes"]
       interval: 2s
       timeout: 5s
-      retries: 30
+      retries: 60
 
   hydra-lifetimes-migrate:
     image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
@@ -285,7 +285,7 @@ services:
         ["CMD-SHELL", "pg_isready -U recovery_test -d recovery_delivery_test"]
       interval: 2s
       timeout: 2s
-      retries: 20
+      retries: 60
 
   recovery-migrate:
     image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
@@ -362,7 +362,7 @@ services:
         ]
       interval: 2s
       timeout: 2s
-      retries: 20
+      retries: 60
 
   recovery-execution-migrate:
     image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}

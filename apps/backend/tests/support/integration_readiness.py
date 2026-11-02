@@ -6,6 +6,8 @@ from pathlib import Path
 
 import httpx2
 
+READINESS_TIMEOUT_SECONDS = 120.0
+
 _RESTART = (
     "Restart the integration stack: ./scripts/dev-compose.sh test-services-down, "
     "then ./scripts/dev-compose.sh test-services-up, "
@@ -31,7 +33,7 @@ def classify_transport_failure(error: httpx2.TransportError) -> str:
 
 def describe_readiness_failure(pending: set[str], failures: dict[str, str]) -> str:
     details = ", ".join(f"{name}: {failures.get(name, 'not ready')}" for name in sorted(pending))
-    message = f"Test services not ready after 60 seconds: {details}"
+    message = f"Test services not ready after {READINESS_TIMEOUT_SECONDS:g} seconds: {details}"
     if any(failures.get(name, "").startswith("certificate") for name in pending):
         message += f". {_RESTART}"
     return message

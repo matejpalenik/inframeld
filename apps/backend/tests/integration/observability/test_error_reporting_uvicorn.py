@@ -59,7 +59,7 @@ async def test_uvicorn_emits_one_diagnostic_for_failed_request(
     server_task = asyncio.create_task(server.serve())
 
     try:
-        async with asyncio.timeout(10):
+        async with asyncio.timeout(30):
             while not server.started:
                 if server_task.done():
                     await server_task

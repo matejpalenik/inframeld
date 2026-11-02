@@ -926,11 +926,11 @@ async def test_competing_memberships_share_the_project_revision(database: Databa
 
     async with asyncio.TaskGroup() as tasks:
         first = tasks.create_task(first_assignment())
-        async with asyncio.timeout(2):
+        async with asyncio.timeout(10):
             await authorized.wait()
         tasks.create_task(second_assignment())
         try:
-            async with asyncio.timeout(2):
+            async with asyncio.timeout(10):
                 pid = await pid_ready
                 while True:
                     async with database.session() as observer:

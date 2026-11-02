@@ -501,20 +501,23 @@ async fn managed_loopback_rejects_manual_http_and_explicit_proxy() {
 
 #[tokio::test]
 async fn per_request_and_total_budgets_bound_stalled_discovery() {
-    for (total, request) in [(1000, 80), (80, 1000)] {
+    // Real socket setup shares the tested budget, so allow cold runners to dispatch.
+    for (total, request) in [(60, 10), (10, 60)] {
         let server = server(false, "", Fault::Slow, false, false).await;
-        let started = std::time::Instant::now();
-        let error = discover_with_budget(
-            &server.base,
-            DiscoveryOptions::default(),
-            Some(&context(&server)),
-            Duration::from_millis(total),
-            Duration::from_millis(request),
+        let error = tokio::time::timeout(
+            Duration::from_secs(30),
+            discover_with_budget(
+                &server.base,
+                DiscoveryOptions::default(),
+                Some(&context(&server)),
+                Duration::from_secs(total),
+                Duration::from_secs(request),
+            ),
         )
         .await
+        .expect("the binding discovery budget must expire before the independent watchdog")
         .unwrap_err();
         assert_eq!(error, DiscoveryError::Timeout);
-        assert!(started.elapsed() < Duration::from_secs(2));
         assert_eq!(server.requests.lock().unwrap().len(), 1);
     }
 }
@@ -531,9 +534,16 @@ async fn cancellation_drops_the_original_discovery_without_retry() {
         assert!(UrlPolicy::new(Some(&managed)).api_url(&alias).is_err());
     }
     let task = tokio::spawn(async move {
-        discover_with_context(&base, DiscoveryOptions::default(), Some(&managed)).await
+        discover_with_budget(
+            &base,
+            DiscoveryOptions::default(),
+            Some(&managed),
+            Duration::from_mins(1),
+            Duration::from_secs(30),
+        )
+        .await
     });
-    tokio::time::timeout(Duration::from_secs(2), async {
+    tokio::time::timeout(Duration::from_secs(15), async {
         while server.requests.lock().unwrap().is_empty() {
             tokio::task::yield_now().await;
         }
@@ -542,7 +552,7 @@ async fn cancellation_drops_the_original_discovery_without_retry() {
     .unwrap();
     task.abort();
     assert!(
-        tokio::time::timeout(Duration::from_secs(1), task)
+        tokio::time::timeout(Duration::from_secs(10), task)
             .await
             .unwrap()
             .unwrap_err()

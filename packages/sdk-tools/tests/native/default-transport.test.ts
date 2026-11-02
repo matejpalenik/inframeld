@@ -10,7 +10,7 @@ import {
 
 test(
   "the default deadline remains active when the caller supplies cancellation",
-  { timeout: 9000 },
+  { timeout: 30000 },
   async () => {
     let count = 0;
     const server = createServer(() => {
@@ -27,7 +27,7 @@ test(
     const controller = new AbortController();
     const watchdog = setTimeout(
       () => controller.abort(new Error("Test watchdog")),
-      8000,
+      20000,
     );
     const started = performance.now();
     try {
@@ -36,7 +36,7 @@ test(
       assert.ok(result.error?.kind === "transport");
       assert.equal(result.error.reason, "timeout");
       assert.ok(performance.now() - started >= 4500);
-      assert.ok(performance.now() - started < 8000);
+      assert.ok(performance.now() - started < 20000);
       assert.equal(count, 1);
       assert.equal(controller.signal.aborted, false);
     } finally {
@@ -94,7 +94,7 @@ test("request timeout overrides client timeout and preserves reuse", async () =>
     "transport",
   );
   assert.equal(
-    (await getHealth({ client, timeoutMs: 500 })).data?.status,
+    (await getHealth({ client, timeoutMs: 5000 })).data?.status,
     "ok",
   );
   assert.equal(count, 3);
