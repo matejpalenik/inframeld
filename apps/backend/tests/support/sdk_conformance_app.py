@@ -104,8 +104,8 @@ from inframeld_backend.access.http.routes.project_grant_routes import create_pro
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
 )
-from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
-    AcceptedAsyncOperationDTO,
+from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto import (
+    AcceptedOperationLookupDTO,
 )
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
@@ -147,6 +147,7 @@ from inframeld_backend.shared.application.queries.get_deletion_status_query impo
 from inframeld_backend.shared.application.queries.lookup_original_operation_query import (
     LookupOriginalOperationQuery,
 )
+from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
@@ -339,7 +340,7 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
         self, *, access: AccessContextDTO, query: LookupOriginalOperationQuery
     ) -> (
         CompletedSynchronousOperationDTO
-        | AcceptedAsyncOperationDTO
+        | AcceptedOperationLookupDTO
         | InProgressOperationDTO
         | RecoveryRequiredOperationDTO
         | UnresolvedOperationDTO
@@ -394,7 +395,14 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
                     operation, False, kind, datetime(2030, 1, 1, tzinfo=UTC)
                 )
             case "accepted":
-                return AcceptedAsyncOperationDTO(operation, False, None)
+                return AcceptedOperationLookupDTO(operation, None)
+            case "accepted-job" if (
+                query.expected_authority.family is OperationLookupAuthorityFamily.PROJECT_ACTION_USE
+                and query.requested_route == "/v1/original-project-operation"
+            ):
+                return AcceptedOperationLookupDTO(
+                    operation, None, JobId(UUID("00000000-0000-4000-8000-000000000008"))
+                )
             case "in-progress":
                 return InProgressOperationDTO(operation)
             case "recovery-required":

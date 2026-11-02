@@ -36,6 +36,34 @@ const accepted = {
   idempotencyExpiresAt: null,
 };
 
+sdkTest(
+  { id: "lookup-known-original-job", operation, outcome: "success" },
+  async ({ call }) => {
+    const body = {
+      ...input,
+      key: "accepted-job",
+      requestedRoute: "/v1/original-project-operation",
+      expectedAuthority: {
+        family: "project_action_use",
+        actionId: "create-access-groups",
+      },
+    };
+    const { observation, witness } = await call({
+      operation,
+      headers: bearer,
+      body,
+      timeout: 2000,
+    });
+    assert.deepEqual(assertSuccess(observation, 200), {
+      ...accepted,
+      jobReference: { jobId: "00000000-0000-4000-8000-000000000008" },
+    });
+    assertJsonBody(witness, body);
+    assert.deepEqual(headerValues(observation, "cache-control"), ["no-store"]);
+    assert.deepEqual(headerValues(observation, "location"), []);
+  },
+);
+
 for (const [id, key, expected] of [
   ["completed", input.key, completed],
   [
@@ -245,6 +273,9 @@ for (const [id, body] of [
     },
   ],
   ["claimed-known-reference", { ...accepted, jobReference: "known" }],
+  ["missing-known-id", { ...accepted, jobReference: {} }],
+  ["null-known-id", { ...accepted, jobReference: { jobId: null } }],
+  ["malformed-known-id", { ...accepted, jobReference: { jobId: "guessed" } }],
 ] as const) {
   sdkTest(
     { id: `lookup-rejects-${id}`, operation, outcome: "failure" },

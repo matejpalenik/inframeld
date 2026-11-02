@@ -199,7 +199,8 @@ async def test_organization_reader_finds_exact_original_null_project_binding(
             principal_id=access.actor_principal_id, query=query
         )
         assert result is not None
-        assert result.operation_id.value == operation
+        assert result.operation.operation_id.value == operation
+        assert result.job_id is None
 
 
 @pytest.mark.asyncio

@@ -25,7 +25,7 @@ export type AcceptedOperationLookupResponse = {
     /**
      * Jobreference
      */
-    jobReference: 'unknown';
+    jobReference: UnknownJobReference | KnownJobReferenceResponse;
     /**
      * Operationid
      */
@@ -178,6 +178,18 @@ export type InframeldDiscoveryResponse = {
  * JobStatus
  */
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'recovery_required';
+
+/**
+ * KnownJobReferenceResponse
+ *
+ * Identify original work without asserting its execution state or result.
+ */
+export type KnownJobReferenceResponse = {
+    /**
+     * Jobid
+     */
+    jobId: string;
+};
 
 /**
  * OAuthConsentDecision
@@ -603,6 +615,13 @@ export type RetainedDeletionStatusResponse = {
      */
     retentionExpiresAt: string | null;
 };
+
+/**
+ * UnknownJobReference
+ *
+ * Keep the absence of a known job correlation closed on every generated client.
+ */
+export type UnknownJobReference = 'unknown';
 
 /**
  * UnresolvedDeletionStatusResponse
