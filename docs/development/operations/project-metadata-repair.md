@@ -14,7 +14,7 @@ The recipient must already be an active admitted human and current member of the
 
 Review the exact Project UUID, recipient's Kratos identity UUID and current Project **Access revision** through protected operator records. The public metadata response's `metadataRevision` is a different revision and cannot substitute for this review.
 
-Apply schema `0014_project_metadata` explicitly through the [upgrade and migration procedure](upgrades.md#upgrades). Startup does not migrate or replace missing installation identity. Use compatible backend code and the original installation identity.
+Apply schema `0016_first_administrator` explicitly through the [upgrade and migration procedure](upgrades.md#upgrades). Startup does not migrate or replace missing installation identity. Use compatible backend code and the original installation identity.
 
 ## Configure the existing consumer
 
