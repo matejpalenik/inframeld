@@ -5,6 +5,9 @@ from functools import partial
 
 from fastapi import FastAPI
 
+from inframeld_backend.access.application.services.project_creation_fingerprint_service import (
+    ProjectCreationFingerprintService,
+)
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
 )
@@ -25,6 +28,12 @@ from inframeld_backend.access.http.routes.discovery_routes import create_discove
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
+from inframeld_backend.access.http.routes.organization_access_routes import (
+    create_organization_access_router,
+)
+from inframeld_backend.access.http.routes.project_creation_routes import (
+    create_project_creation_router,
+)
 from inframeld_backend.access.http.routes.project_grant_routes import (
     create_project_grant_router,
 )
@@ -39,9 +48,11 @@ from inframeld_backend.bootstrap.application_lifespan import application_lifespa
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
 from inframeld_backend.bootstrap.deletion_status_composition import open_deletion_status_lookup
+from inframeld_backend.bootstrap.organization_access_composition import open_my_organization_access
 from inframeld_backend.bootstrap.original_operation_lookup_composition import (
     open_original_operation_lookup,
 )
+from inframeld_backend.bootstrap.project_creation_composition import open_project_creation
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.bootstrap.project_metadata_composition import (
     open_project_metadata,
@@ -104,6 +115,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
         fingerprints = ProjectGrantChangeFingerprintService(request_fingerprints)
         metadata_fingerprints = ProjectMetadataFingerprintService(request_fingerprints)
+        creation_fingerprints = ProjectCreationFingerprintService(request_fingerprints)
 
         discovery = (
             InstallationDiscoveryResource(resolved_settings.discovery, resolved_settings.hydra)
@@ -144,6 +156,16 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
 
         application.include_router(create_session_router(human_session))
+        application.include_router(
+            create_organization_access_router(
+                human_session, partial(open_my_organization_access, database)
+            )
+        )
+        application.include_router(
+            create_project_creation_router(
+                human_session, partial(open_project_creation, database, creation_fingerprints)
+            )
+        )
         application.include_router(
             create_human_oauth_consent_router(
                 access.oauth_consent_handler,

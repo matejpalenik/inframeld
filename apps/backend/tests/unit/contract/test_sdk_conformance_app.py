@@ -3,6 +3,7 @@
 import base64
 
 from fastapi.testclient import TestClient
+from tests.support.project_creation_scenarios import INITIAL_ACTIONS
 from tests.support.sdk_conformance_app import create_sdk_conformance_app
 
 
@@ -547,3 +548,93 @@ def test_metadata_fixture_enforces_cookie_csrf_and_exact_name_validation() -> No
     assert denied.status_code == 403
     assert permitted.status_code == 200 and permitted.json()["name"] == "production"
     assert uppercase.status_code == 422
+
+
+def test_project_creation_fixture_serializes_own_access_and_original_receipt_with_exact_wire_input() -> (
+    None
+):
+    organization = "00000000-0000-4000-8000-000000000002"
+    project = "00000000-0000-4000-8000-000000000004"
+    headers = {"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-project-key"}
+    body = {
+        "organizationId": organization,
+        "expectedAccessRevision": 7,
+        "name": "new-support",
+        "displayName": "Support 🧭",
+    }
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/creation-wire", json={"calls": {"creation-wire": {"kind": "none"}}}
+        )
+        own = client.get("/v1/my-organization-access", headers=headers)
+        created = client.post(
+            "/v1/projects", headers=headers | {"X-SDK-Test": "creation-wire"}, json=body
+        )
+        repeated = client.post("/v1/projects", headers=headers, json=body)
+        witness = client.get("/sdk-control/cases/creation-wire").json()["observations"][
+            "creation-wire"
+        ]
+
+    assert own.status_code == 200
+    assert own.json() == {
+        "organizationId": organization,
+        "principalId": "00000000-0000-4000-8000-000000000001",
+        "accessRevision": 7,
+        "grants": [{"actionId": "create-projects", "canGrant": False}],
+    }
+    assert created.status_code == repeated.status_code == 201
+    assert (
+        created.json()
+        == repeated.json()
+        == {
+            "operationId": "sdk-project-creation",
+            "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
+            "organizationId": organization,
+            "projectId": project,
+            "name": "new-support",
+            "displayName": "Support 🧭",
+            "accessRevision": 1,
+            "metadataRevision": 0,
+            "initialGrants": [
+                {
+                    "target": {"kind": "project", "projectId": project},
+                    "actionId": action,
+                    "canGrant": True,
+                }
+                for action in INITIAL_ACTIONS
+            ],
+        }
+    )
+    assert own.headers["cache-control"] == created.headers["cache-control"] == "no-store"
+    assert witness["jsonBody"] == body and witness["method"] == "POST"
+    assert witness["headers"]["idempotency-key"] == "sdk-project-key"
+
+
+def test_project_creation_fixture_keeps_cookie_csrf_and_strict_body_validation() -> None:
+    body = {
+        "organizationId": "00000000-0000-4000-8000-000000000002",
+        "expectedAccessRevision": 7,
+        "name": "new-support",
+        "displayName": "Support",
+    }
+    cookie = {"Cookie": "ory_kratos_session=sdk-cookie", "Idempotency-Key": "sdk-project-key"}
+    with TestClient(create_sdk_conformance_app()) as client:
+        denied = client.post("/v1/projects", headers=cookie, json=body)
+        allowed = client.post(
+            "/v1/projects",
+            headers=cookie | {"Origin": "https://account.test", "X-Inframeld-CSRF": "1"},
+            json=body,
+        )
+        unknown = client.post(
+            "/v1/projects",
+            headers={"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-project-key"},
+            json=body | {"canGrant": True},
+        )
+        boolean = client.post(
+            "/v1/projects",
+            headers={"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-project-key"},
+            json=body | {"expectedAccessRevision": True},
+        )
+    assert denied.status_code == 403
+    assert allowed.status_code == 201
+    assert unknown.status_code == boolean.status_code == 422
