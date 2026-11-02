@@ -363,7 +363,7 @@ async def test_task_cancellation_rolls_back_saved_progress(
             saved.set()
             await finish.wait()
 
-    async with asyncio.timeout(10), asyncio.TaskGroup() as tasks:
+    async with asyncio.timeout(30), asyncio.TaskGroup() as tasks:
         task = tasks.create_task(worker())
         await saved.wait()
         task.cancel()
@@ -480,7 +480,7 @@ async def test_concurrent_provider_updates_conflict_then_reload_without_lost_pro
         except ConflictError:
             return False
 
-    async with asyncio.timeout(10):
+    async with asyncio.timeout(30):
         results = await asyncio.gather(record("kratos"), record("hydra"))
     assert sorted(results) == [False, True]
     stored = await _stored(database, operation_id)

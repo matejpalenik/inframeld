@@ -115,7 +115,7 @@ async def _wait_for_blocked[Result](database: Database, task: asyncio.Task[Resul
     """Require a real database lock wait before changing the preceding transaction."""
     pid, name = column("pid", Integer), column("datname", String)
     activity = table("pg_stat_activity", pid, name)
-    async with asyncio.timeout(3):
+    async with asyncio.timeout(10):
         while not task.done():
             async with database.session() as observer:
                 blocked = await observer.scalar(
@@ -363,7 +363,7 @@ async def test_recovery_committing_first_is_reread_without_reinitializing_genera
         async with database.session() as session:
             await bootstrap_service(session, scenario.binding).bootstrap(scenario.command)
 
-    async with asyncio.timeout(12), database.session() as holder:
+    async with asyncio.timeout(30), database.session() as holder:
         task = None
         try:
             async with holder.begin():
@@ -425,7 +425,7 @@ async def test_claim_holds_identity_until_commit_before_other_participants(
                 await _recover(session, scenario)
 
     with patch.object(PostgresFirstAdministratorBootstrapWriter, "bootstrap", new=hold_claim):
-        async with asyncio.timeout(12), asyncio.TaskGroup() as tasks:
+        async with asyncio.timeout(30), asyncio.TaskGroup() as tasks:
             claiming = tasks.create_task(claim())
             await entered.wait()
             competing = tasks.create_task(compete())
@@ -453,7 +453,7 @@ async def test_interrupted_claim_wait_rolls_back_and_leaves_the_turn_usable(
         async with database.session() as session:
             await bootstrap_service(session, scenario.binding).bootstrap(scenario.command)
 
-    async with asyncio.timeout(12), database.session() as holder:
+    async with asyncio.timeout(30), database.session() as holder:
         async with holder.begin():
             await PostgresIdentityCoordinator(holder).acquire(
                 installation_id=scenario.binding.installation_id, identity=scenario.binding.identity

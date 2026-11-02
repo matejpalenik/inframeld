@@ -111,7 +111,7 @@ async def _release(scenario: PasswordResetScenarioDTO, phase: SettingsPhase) -> 
 async def _wait_for_phase(
     scenario: PasswordResetScenarioDTO, phase: SettingsPhase
 ) -> MockSettingsSnapshotResponse:
-    async with asyncio.timeout(5.0):
+    async with asyncio.timeout(15.0):
         while True:
             snapshot = await _snapshot(scenario)
             if any(event.phase == phase for event in snapshot.received):

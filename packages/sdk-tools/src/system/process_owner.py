@@ -186,7 +186,7 @@ def _clock() -> int:
 
 def _observation_deadlines(cutoff: int, now: int) -> tuple[int, int]:
     """Keep observation reads and their termination/wait inside the existing phase."""
-    deadline = min(cutoff, now + 1000)
+    deadline = min(cutoff, now + 5000)
     read_deadline = deadline - min(50, max(1, (deadline - now) // 4))
     return deadline, read_deadline
 
@@ -275,10 +275,11 @@ def observe_members(
 
 def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) -> str:
     """Finish owned signalling and reaping inside the first fixed cleanup budget."""
-    reserve = min(1000, max(1, cleanup_ms // 2))
+    reserve = min(5000, max(1, cleanup_ms // 2))
     term_deadline = deadline - reserve
     # Leave the end of the original allowance for the retained leader and terminal record.
-    final_deadline = deadline - min(50, max(1, cleanup_ms // 10))
+    terminal_reserve = min(1000 if cleanup_ms >= 1000 else 50, max(1, cleanup_ms // 10))
+    final_deadline = deadline - terminal_reserve
     if mode == "backend":
         term_deadline = min(term_deadline, _clock() + 1500)
     quiescent = False
@@ -349,7 +350,7 @@ class Control:
         self.sent += len(payload)
         if len(payload) > 16384 or self.sent > 65536:
             raise ValueError("Control output exceeded its byte budget.")
-        deadline = min(deadline, _clock() + 2000)
+        deadline = min(deadline, _clock() + 10000)
         remaining = memoryview(payload)
         while remaining:
             try:
@@ -422,7 +423,7 @@ def main() -> int:
     target: OwnedTarget | None = None
     request: StartRequest | None = None
     reason = "control-lost"
-    deadline = _clock() + 2000
+    deadline = _clock() + 10000
     cancelled = False
     stopping = False
     stop_received = False

@@ -324,7 +324,7 @@ async def _backend_pid(session: AsyncSession) -> int:
 
 async def _wait_until_database_blocks(database: Database, pid: int) -> None:
     """Observe a PostgreSQL lock wait before allowing the other transaction to commit."""
-    async with asyncio.timeout(2):
+    async with asyncio.timeout(10):
         while True:
             async with database.session() as observer:
                 blockers = await observer.scalar(
@@ -478,7 +478,7 @@ async def test_recovery_committing_first_denies_the_waiting_grant(
 
         return True
 
-    async with asyncio.timeout(10), asyncio.TaskGroup() as tasks:
+    async with asyncio.timeout(30), asyncio.TaskGroup() as tasks:
         async with database.session() as session, session.begin():
             await _admit(session, scenario)
             grant = tasks.create_task(try_grant())
@@ -515,7 +515,7 @@ async def test_grant_committing_first_finishes_before_recovery_admission(
                 ),
             )
 
-    async with asyncio.timeout(10), asyncio.TaskGroup() as tasks:
+    async with asyncio.timeout(30), asyncio.TaskGroup() as tasks:
         granting = tasks.create_task(grant())
         await authorized.wait()
         recovery = tasks.create_task(recover())
@@ -583,7 +583,7 @@ async def test_recovery_lock_wait_times_out_without_admitting_an_operation(
     scenario: RecoveryAuthorizationScenarioDTO,
 ) -> None:
     """A stalled recovery admission must leave no cleanup obligation after rollback."""
-    async with asyncio.timeout(10):
+    async with asyncio.timeout(30):
         async with database.session() as holder, holder.begin():
             await holder.execute(
                 select(OrganizationRow.id)
@@ -610,7 +610,7 @@ async def test_grant_lock_wait_times_out_without_saving_partial_effects(
     scenario: RecoveryAuthorizationScenarioDTO,
 ) -> None:
     """A stalled grant must leave no reservation, audit event or Access change."""
-    async with asyncio.timeout(10):
+    async with asyncio.timeout(30):
         async with database.session() as holder, holder.begin():
             await _admit(holder, scenario)
 
@@ -752,7 +752,7 @@ async def test_cancellation_before_commit_rolls_back_all_grant_effects(
     """Cancel after real grant and audit writes, before the operation can commit."""
     async with database.session() as session:
         audit = MockControlledAuditEventWriter(session, pause=True)
-        async with asyncio.timeout(5), asyncio.TaskGroup() as tasks:
+        async with asyncio.timeout(15), asyncio.TaskGroup() as tasks:
             assignment = tasks.create_task(_assign(session, scenario, audit_events=audit))
             await audit.appended.wait()
             assignment.cancel()

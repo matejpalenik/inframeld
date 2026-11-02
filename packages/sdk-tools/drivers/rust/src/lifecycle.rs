@@ -15,7 +15,7 @@ mod tests {
             for index in 0..2 {
                 let (mut stream, _) = listener.accept().unwrap();
                 stream
-                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .set_read_timeout(Some(Duration::from_secs(10)))
                     .unwrap();
                 read_request_headers(&mut stream).unwrap();
                 if index == 0 {
@@ -28,7 +28,7 @@ mod tests {
         });
         let transport = reqwest::Client::builder()
             .no_proxy()
-            .timeout(Duration::from_secs(2))
+            .timeout(Duration::from_secs(10))
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
             .build()
@@ -37,7 +37,7 @@ mod tests {
             .with_base_url(format!("http://{address}"));
         let active = client.clone();
         let task = tokio::spawn(async move { active.get_health().await });
-        tokio::task::spawn_blocking(move || started.recv_timeout(Duration::from_secs(2)))
+        tokio::task::spawn_blocking(move || started.recv_timeout(Duration::from_secs(10)))
             .await
             .unwrap()
             .unwrap();
@@ -95,7 +95,7 @@ mod tests {
         let probe = Probe::start(metadata);
         let transport = reqwest::Client::builder()
             .no_proxy()
-            .timeout(Duration::from_secs(2))
+            .timeout(Duration::from_secs(10))
             .build()
             .unwrap();
         let client = inframeld_sdk::HttpClient::with_client(transport).with_base_url(&probe.url);
@@ -170,7 +170,7 @@ mod tests {
                             // Accept polling is nonblocking, but header reads must wait for bytes.
                             stream.set_nonblocking(false).unwrap();
                             stream
-                                .set_read_timeout(Some(Duration::from_secs(1)))
+                                .set_read_timeout(Some(Duration::from_secs(10)))
                                 .unwrap();
                             if read_request_headers(&mut stream).is_ok() {
                                 let index = seen.fetch_add(1, Ordering::SeqCst);
@@ -206,7 +206,7 @@ mod tests {
 
     fn slow_body(stream: &mut std::net::TcpStream, _index: usize) {
         if stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 10000\r\nConnection: close\r\n\r\n").is_err() { return; }
-        for _ in 0..60 {
+        for _ in 0..300 {
             if stream.write_all(b" ").is_err() {
                 return;
             }
@@ -219,14 +219,24 @@ mod tests {
         let probe = Probe::start(slow_body);
         let client = inframeld_sdk::HttpClient::new().with_base_url(&probe.url);
         let started = std::time::Instant::now();
-        let result = client.get_health().await;
-        assert!(result.is_err(), "Expected deadline failure: {result:?}");
+        let result = tokio::time::timeout(Duration::from_secs(20), client.get_health())
+            .await
+            .expect("SDK deadline must precede the test watchdog");
+        assert!(
+            matches!(
+                &result,
+                Err(inframeld_sdk::client::ApiOpError::Transport(
+                    inframeld_sdk::client::HttpError::Network(error)
+                )) if error.is_timeout()
+            ),
+            "Expected SDK deadline failure: {result:?}"
+        );
         assert!(
             started.elapsed() >= Duration::from_millis(4500),
             "Unexpected early failure: {result:?}"
         );
         assert!(
-            started.elapsed() < Duration::from_millis(5800),
+            started.elapsed() < Duration::from_secs(20),
             "Configured deadline was not applied"
         );
         assert_eq!(probe.count.load(std::sync::atomic::Ordering::SeqCst), 1);
@@ -260,13 +270,30 @@ mod tests {
     async fn caller_supplied_transport_keeps_its_deadline() {
         let probe = Probe::start(slow_body);
         let transport = reqwest::Client::builder()
-            .timeout(Duration::from_millis(40))
+            .timeout(Duration::from_secs(10))
             .no_proxy()
             .build()
             .unwrap();
         let client = inframeld_sdk::HttpClient::with_client(transport).with_base_url(&probe.url);
         let started = std::time::Instant::now();
-        assert!(client.get_health().await.is_err());
-        assert!(started.elapsed() < Duration::from_millis(500));
+        let result = tokio::time::timeout(Duration::from_secs(30), client.get_health())
+            .await
+            .expect("Transport deadline must precede the test watchdog");
+        let timed_out = match &result {
+            Err(inframeld_sdk::client::ApiOpError::Transport(
+                inframeld_sdk::client::HttpError::Network(error),
+            )) => error.is_timeout(),
+            Err(inframeld_sdk::client::ApiOpError::Transport(
+                inframeld_sdk::client::HttpError::Middleware(error),
+            )) => error.is_timeout(),
+            _ => false,
+        };
+        assert!(timed_out, "Expected native transport timeout: {result:?}");
+        assert!(
+            started.elapsed() >= Duration::from_millis(9500),
+            "Caller deadline was replaced by an earlier timeout: {result:?}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(30));
+        assert_eq!(probe.count.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }

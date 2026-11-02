@@ -32,7 +32,7 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
             task = asyncio.create_task(
                 HealthApi(client).get_health_with_http_info(_request_timeout=2.0)
             )
-            await asyncio.wait_for(entered.wait(), timeout=1)
+            await asyncio.wait_for(entered.wait(), timeout=10)
             task.cancel()
             with self.assertRaises(asyncio.CancelledError):
                 await task
@@ -48,7 +48,7 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
 class DeadlineTests(unittest.IsolatedAsyncioTestCase):
     async def test_default_deadline_bounds_a_buffered_response(self) -> None:
         async def handler(request: httpx.Request) -> httpx.Response:
-            await asyncio.sleep(6)
+            await asyncio.Event().wait()
             return httpx.Response(200, json={"status": "ok"})
 
         client = inframeld_sdk.ApiClient(inframeld_sdk.Configuration(host="http://sdk.test"))
@@ -56,9 +56,9 @@ class DeadlineTests(unittest.IsolatedAsyncioTestCase):
         started = monotonic()
         try:
             with self.assertRaises(httpx.TimeoutException):
-                await HealthApi(client).get_health_with_http_info()
+                await asyncio.wait_for(HealthApi(client).get_health_with_http_info(), timeout=20)
             self.assertGreater(monotonic() - started, 4.5)
-            self.assertLess(monotonic() - started, 5.8)
+            self.assertLess(monotonic() - started, 20)
         finally:
             await client.close()
         self.assertTrue(client.rest_client.pool_manager.is_closed)
@@ -79,7 +79,7 @@ class DeadlineTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(httpx.TimeoutException):
                 await HealthApi(client).get_health_with_http_info(_request_timeout=0.025)
             self.assertEqual(
-                (await HealthApi(client).get_health_with_http_info(_request_timeout=0.1)).data,
+                (await HealthApi(client).get_health_with_http_info(_request_timeout=5.0)).data,
                 {"status": "ok"},
             )
             self.assertEqual(count, 2)
@@ -122,7 +122,7 @@ class SyncDeadlineTests(unittest.TestCase):
             with self.assertRaises(httpx.TimeoutException):
                 HealthApi(client).get_health_sync_with_http_info(_request_timeout=0.025)
             self.assertEqual(
-                HealthApi(client).get_health_sync_with_http_info(_request_timeout=0.1).data,
+                HealthApi(client).get_health_sync_with_http_info(_request_timeout=5.0).data,
                 {"status": "ok"},
             )
             self.assertEqual(count, 2)

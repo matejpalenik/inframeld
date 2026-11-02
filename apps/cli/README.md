@@ -103,6 +103,8 @@ The [discovery dependency assessment](../../docs/development/reports/server-disc
 
 ## Package without publishing
 
+CI downloads the pinned cargo-dist archive and checksum with a 10-second connection limit and a 60-second limit per transfer attempt. Transient download failures allow three retries within a 120-second retry window. An in-progress attempt retains its own transfer limit. The downloaded archive still requires checksum verification before extraction. Test assertions and checksum failures are not retried.
+
 Packaging helpers are the private Rust `xtask` crate and require no Python. Install the pinned tool with `cargo install --locked --version 0.33.0 cargo-dist`. A missing `dist` command means that tool must be installed and its bin directory put on PATH. From the repository root:
 
 ```sh

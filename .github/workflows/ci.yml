@@ -32,7 +32,7 @@ jobs:
   quality:
     name: Quality
     needs: changes
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     env:
@@ -198,7 +198,7 @@ jobs:
   backend:
     name: Backend foundation
     needs: [changes, quality]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:

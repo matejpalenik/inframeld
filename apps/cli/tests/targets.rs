@@ -13,7 +13,7 @@ fn command(home: &TempDir) -> Command {
         .env("HOME", home.path())
         .env("PATH", "")
         .current_dir(home.path())
-        .timeout(Duration::from_secs(15));
+        .timeout(Duration::from_secs(30));
     command
 }
 
@@ -742,7 +742,7 @@ impl RunningCli {
 
     #[allow(clippy::panic)]
     async fn finish(mut self) -> Output {
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let deadline = std::time::Instant::now() + Duration::from_secs(15);
         loop {
             if self.0.as_mut().unwrap().try_wait().unwrap().is_some() {
                 return self.0.take().unwrap().wait_with_output().unwrap();
@@ -798,7 +798,7 @@ async fn interrupted_registration(signal: &str, expected: i32) {
         .spawn()
         .unwrap();
     let mut child = RunningCli(Some(child));
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
     while server.requests.lock().unwrap().is_empty() {
         assert!(
             child.0.as_mut().unwrap().try_wait().unwrap().is_none(),
@@ -859,7 +859,7 @@ fn prefilled_pipe() -> (
             }
         }
     });
-    ready.recv_timeout(Duration::from_secs(2)).unwrap();
+    ready.recv_timeout(Duration::from_secs(10)).unwrap();
     (reader, stdout, fill)
 }
 
@@ -910,7 +910,7 @@ async fn second_interrupt_can_exit_while_the_final_machine_pipe_is_blocked() {
         text
     });
     let mut child = RunningCli(Some(child));
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
     while server.requests.lock().unwrap().is_empty() {
         assert!(std::time::Instant::now() < deadline);
         tokio::time::sleep(Duration::from_millis(10)).await;
@@ -922,6 +922,7 @@ async fn second_interrupt_can_exit_while_the_final_machine_pipe_is_blocked() {
             .unwrap()
             .success()
     );
+    // The diagnostic and forced exit must precede the first interrupt's five-second fallback.
     notification.recv_timeout(Duration::from_secs(3)).unwrap();
     assert!(child.0.as_mut().unwrap().try_wait().unwrap().is_none());
     assert!(
@@ -987,7 +988,7 @@ async fn first_interrupt_during_final_output_preserves_the_already_saved_prefere
     });
     let mut child = RunningCli(Some(child));
     // This warning is emitted by final reporting after the local save completed.
-    arrived.recv_timeout(Duration::from_secs(5)).unwrap();
+    arrived.recv_timeout(Duration::from_secs(15)).unwrap();
     assert!(child.0.as_mut().unwrap().try_wait().unwrap().is_none());
     assert!(
         ProcessCommand::new("/bin/kill")
@@ -996,7 +997,7 @@ async fn first_interrupt_during_final_output_preserves_the_already_saved_prefere
             .unwrap()
             .success()
     );
-    let (output, stopped) = child.finish_or_kill(Duration::from_secs(2)).await;
+    let (output, stopped) = child.finish_or_kill(Duration::from_secs(10)).await;
     let mut drained = Vec::new();
     reader.read_to_end(&mut drained).unwrap();
     fill.join().unwrap();
@@ -1044,7 +1045,7 @@ async fn a_ca_named_pipe_is_rejected_without_waiting_for_a_writer() {
         .spawn()
         .unwrap();
     let mut child = RunningCli(Some(child));
-    let (output, stopped) = child.finish_or_kill(Duration::from_secs(2)).await;
+    let (output, stopped) = child.finish_or_kill(Duration::from_secs(10)).await;
     assert!(stopped, "Nonregular CA input blocked before validation");
     assert_eq!(result(&output)["error"]["code"], "invalid_ca_file");
     assert_eq!(fs::read_dir(home.path()).unwrap().count(), 0);

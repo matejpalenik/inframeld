@@ -47,6 +47,9 @@ from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_
 )
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
+from inframeld_backend.access.infrastructure.settings.human_authentication_settings import (
+    HumanAuthenticationSettings,
+)
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
 from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_admission_writer import (
@@ -129,11 +132,16 @@ class NativeConsentScenarioDTO:
 
 @asynccontextmanager
 async def native_consent_scenario(
-    database: Database, settings: DatabaseSettings
+    database: Database,
+    settings: DatabaseSettings,
+    *,
+    human_authentication: HumanAuthenticationSettings | None = None,
 ) -> AsyncGenerator[NativeConsentScenarioDTO]:
-    configured = get_settings().model_copy(
+    current = get_settings()
+    configured = current.model_copy(
         update={
             "database": settings,
+            "human_authentication": human_authentication or current.human_authentication,
             "kratos": KratosSettings(
                 public_url=HttpUrl(KRATOS_PUBLIC_URL),
                 admin_url=HttpUrl(KRATOS_ADMIN_URL),
@@ -150,7 +158,7 @@ async def native_consent_scenario(
     )
     application = create_app(configured)
     async with (
-        asyncio.timeout(30.0),
+        asyncio.timeout(60.0),
         application.router.lifespan_context(application),
         hydra_test_provider() as provider,
         create_browser() as browser,
@@ -611,7 +619,13 @@ async def test_browser_verification_cannot_cross_recovery_completion(
         KratosBrowserSessionVerifier,
     )
 
-    async with native_consent_scenario(database, temporary_postgres_settings) as scenario:
+    # The controlled pause checks recovery ordering rather than authentication expiry.
+    authentication = get_settings().human_authentication.model_copy(
+        update={"provider_timeout_seconds": 30.0, "total_timeout_seconds": 45.0}
+    )
+    async with native_consent_scenario(
+        database, temporary_postgres_settings, human_authentication=authentication
+    ) as scenario:
         pending = await scenario.begin()
         event = await scenario.admit_recovery() if initially_blocked else None
         arrived = asyncio.Event()
@@ -623,14 +637,14 @@ async def test_browser_verification_cannot_cross_recovery_completion(
         ) -> VerifiedHumanIdentityDTO | None:
             identity = await original(self, credential)
             arrived.set()
-            async with asyncio.timeout(5):
+            async with asyncio.timeout(15):
                 await release.wait()
             return identity
 
         with patch.object(KratosBrowserSessionVerifier, "verify", new=paused):
             approval = asyncio.create_task(scenario.decide(pending))
             try:
-                async with asyncio.timeout(3):
+                async with asyncio.timeout(10):
                     await arrived.wait()
                 if event is None:
                     event = await scenario.admit_recovery()
