@@ -441,22 +441,23 @@ async def test_another_accessible_project_cannot_retarget_original_job(database:
             )
         )
         await session.flush()
-        session.add_all(
-            [
-                ProjectMembershipRow(
-                    project_id=another.value,
-                    principal_id=access.actor_principal_id.value,
-                    organization_id=query.organization_id.value,
-                    principal_kind=PrincipalKind.HUMAN,
-                ),
-                ProjectActionGrantRow(
-                    project_id=another.value,
-                    recipient_principal_id=access.actor_principal_id.value,
-                    recipient_kind=PrincipalKind.HUMAN,
-                    action=ACTION.value,
-                    can_grant=False,
-                ),
-            ]
+        session.add(
+            ProjectMembershipRow(
+                project_id=another.value,
+                principal_id=access.actor_principal_id.value,
+                organization_id=query.organization_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+        await session.flush()
+        session.add(
+            ProjectActionGrantRow(
+                project_id=another.value,
+                recipient_principal_id=access.actor_principal_id.value,
+                recipient_kind=PrincipalKind.HUMAN,
+                action=ACTION.value,
+                can_grant=False,
+            )
         )
     async with database.session() as session:
         service = OriginalOperationLookupService(
