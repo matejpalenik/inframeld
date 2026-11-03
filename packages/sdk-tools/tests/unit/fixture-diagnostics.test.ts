@@ -6,12 +6,19 @@ import {
   writeFile,
   lstat,
   realpath,
+  readFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, sep } from "node:path";
 import test from "node:test";
-import { artifacts } from "../../src/config.ts";
-import { withResources } from "../../src/system/process.ts";
+import type { TestEvent } from "node:test/reporters";
+import { artifacts, home } from "../../src/config.ts";
+import {
+  command,
+  hasConfirmedCleanup,
+  ProcessFailure,
+  withResources,
+} from "../../src/system/process.ts";
 import {
   publishFixtureDiagnostics,
   type FixtureClock,
@@ -24,6 +31,261 @@ import {
   observeFixtureController,
   acquireProtectedFixtureDirectory,
 } from "../native/fixtures/fixture-diagnostics.ts";
+import nativeTestReporter from "../native/fixtures/fixture-diagnostics.ts";
+
+const nativeCases = [
+  [
+    "driver.test.ts",
+    "the TypeScript driver rejects another runtime profile before SDK invocation",
+    "driver-profile",
+  ],
+  [
+    "lifecycle.test.ts",
+    "cancelling an active native Fetch call permits a subsequent client request",
+    "fetch-cancel",
+  ],
+  [
+    "lifecycle.test.ts",
+    "the same generated client is reusable after supported operation cancellation",
+    "client-reuse",
+  ],
+  [
+    "profile-resources.test.ts",
+    "startup cancellation closes a browser acquired before the fixture returns",
+    "startup-cancel",
+  ],
+  [
+    "profile-resources.test.ts",
+    "a stalled browser close is force-killed and remains a cleanup failure",
+    "stalled-close",
+  ],
+  [
+    "profile-resources.test.ts",
+    "an enclosing test-runner timeout drains a profile before killing survivors",
+    "profile-timeout",
+  ],
+  [
+    "profile-resources.test.ts",
+    "denied termination still permits bounded nonzero CLI exit",
+    "denied-exit",
+  ],
+] as const;
+
+function nativeFailure(
+  file: string,
+  name: string,
+  error = new Error("fake-private-marker"),
+): Extract<TestEvent, { type: "test:fail" }> {
+  return {
+    type: "test:fail",
+    data: {
+      file,
+      entryFile: file,
+      name,
+      nesting: 0,
+      parentId: undefined,
+      tags: [],
+      testId: 1,
+      testNumber: 1,
+      details: {
+        duration_ms: 0,
+        error: Object.assign(new Error("fake-private-marker"), {
+          cause: error,
+        }),
+      },
+    },
+  };
+}
+
+async function nativeReport(events: readonly TestEvent[]): Promise<string> {
+  let bytes = "";
+  for await (const part of nativeTestReporter(
+    (async function* () {
+      yield* events;
+    })(),
+  ))
+    bytes += part;
+  return bytes;
+}
+
+test("native reporter identifies the seven fixed cases without forwarding names or paths", async () => {
+  const bytes = await nativeReport(
+    nativeCases.map(([file, name]) =>
+      nativeFailure(join("/private/fake-private-marker", file), name),
+    ),
+  );
+  assert.deepEqual(
+    JSON.parse(bytes).map((row: { caseId: string }) => row.caseId),
+    nativeCases.map((row) => row[2]),
+  );
+  assert.ok(
+    !bytes.includes("fake-private-marker") && !bytes.includes(".test.ts"),
+  );
+});
+
+test("native reporter uses three fixed file fallbacks and a fixed unknown identity", async () => {
+  const bytes = await nativeReport(
+    [
+      "driver.test.ts",
+      "lifecycle.test.ts",
+      "profile-resources.test.ts",
+      "fake-private-marker.ts",
+    ].map((file) => nativeFailure(file, "fake-private-marker")),
+  );
+  assert.deepEqual(
+    JSON.parse(bytes).map((row: { caseId: string }) => row.caseId),
+    ["driver-file", "lifecycle-file", "profile-file", "native-unknown"],
+  );
+  assert.ok(!bytes.includes("fake-private-marker"));
+});
+
+test("native reporter ignores output and preserves wrapped error privacy without invoking getters", async () => {
+  let getters = 0;
+  const error = new AggregateError(
+    [new Error("fake-private-marker")],
+    "fake-private-marker",
+  );
+  Object.defineProperty(error, "cause", {
+    get() {
+      getters++;
+      throw new Error("fake-private-marker");
+    },
+  });
+  const bytes = await nativeReport([
+    nativeFailure("driver.test.ts", nativeCases[0][1], error),
+  ]);
+  assert.equal(JSON.parse(bytes)[0]?.category, "failed");
+  assert.equal(getters, 0);
+  assert.ok(!bytes.includes("fake-private-marker"));
+  assert.equal(
+    await nativeReport([
+      {
+        type: "test:stdout",
+        data: { file: "fake-private-marker", message: "fake-private-marker" },
+      },
+    ]),
+    "[]\n",
+  );
+});
+
+test("native reporter preserves iterator failure after publishing its bounded snapshot", async () => {
+  const failure = new Error("controlled iterator failure");
+  const iterator = nativeTestReporter(
+    (async function* (): AsyncGenerator<TestEvent> {
+      yield nativeFailure("driver.test.ts", nativeCases[0][1]);
+      throw failure;
+    })(),
+  );
+  const first = await iterator.next();
+  assert.equal(JSON.parse(first.value!)[0]?.caseId, "driver-profile");
+  await assert.rejects(iterator.next(), (error) => error === failure);
+});
+
+test("native reporter retains original failure when the existing byte or record bound refuses encoding", async () => {
+  const event = nativeFailure("driver.test.ts", nativeCases[0][1]);
+  const original = event.data.details.error;
+  const iterator = nativeTestReporter(
+    (async function* () {
+      for (let n = 0; n < 40; n++) yield event;
+    })(),
+  );
+  const first = await iterator.next();
+  assert.ok(Buffer.byteLength(first.value!) <= 4096);
+  assert.ok(
+    JSON.parse(first.value!).length > 0 &&
+      JSON.parse(first.value!).length <= 32,
+  );
+  await assert.rejects(
+    iterator.next(),
+    (error) =>
+      error instanceof AggregateError &&
+      error.errors[0] === original &&
+      error.errors.length === 2,
+  );
+});
+
+test(
+  "native reporter paired Node CLI produces private current evidence for pass and failure",
+  { timeout: 95000 },
+  async (context) => {
+    const work = await mkdtemp(join(tmpdir(), "sdk-native-reporter-"));
+    let cleanupConfirmed = true;
+    await withResources(
+      async () => {
+        for (const fails of [false, true]) {
+          const input = join(work, "driver.test.ts"),
+            destination = join(work, "controller-status.json"),
+            log = join(work, "controller.raw.log");
+          await writeFile(
+            input,
+            `import test from "node:test"; import assert from "node:assert/strict"; console.log("fake-private-marker"); test(${JSON.stringify(nativeCases[0][1])}, () => { assert.equal(${fails ? "1" : "0"}, 0, "fake-private-marker"); });\n`,
+            { mode: 0o600 },
+          );
+          await writeFile(destination, "stale", { mode: 0o600 });
+          await writeFile(log, "", { mode: 0o600 });
+          const began = performance.now();
+          let nonzero = false;
+          cleanupConfirmed = false;
+          try {
+            await command(
+              process.execPath,
+              [
+                "--require",
+                join(home, "node_modules/tsx/dist/loader.mjs"),
+                "--test",
+                "--test-reporter=spec",
+                "--test-reporter=" +
+                  join(home, "tests/native/fixtures/fixture-diagnostics.ts"),
+                "--test-reporter-destination=stdout",
+                "--test-reporter-destination=" + destination,
+                input,
+              ],
+              {
+                timeout: 30000,
+                cleanupTimeout: 15000,
+                env: { NODE_TEST_CONTEXT: undefined },
+                log,
+              },
+            );
+            cleanupConfirmed = true;
+          } catch (error) {
+            cleanupConfirmed = hasConfirmedCleanup(error);
+            if (!fails) throw error;
+            assert.ok(error instanceof ProcessFailure && cleanupConfirmed);
+            assert.match(error.message, /exited [1-9]/);
+            nonzero = true;
+          }
+          assert.equal(nonzero, fails);
+          context.diagnostic(
+            JSON.stringify({
+              expected: fails ? "nonzero" : "zero",
+              cleanupConfirmed,
+              milliseconds: performance.now() - began,
+            }),
+          );
+          const info = await lstat(destination),
+            bytes = await readFile(destination, "utf8"),
+            rows = JSON.parse(bytes);
+          assert.ok(info.isFile() && !info.isSymbolicLink());
+          assert.equal(info.mode & 0o777, 0o600);
+          assert.ok(
+            Buffer.byteLength(bytes) <= 4096 &&
+              !bytes.includes("fake-private-marker"),
+          );
+          assert.equal(rows.length, fails ? 1 : 0);
+          if (fails) assert.equal(rows[0]?.caseId, "driver-profile");
+        }
+      },
+      async () => {
+        assert.ok(
+          cleanupConfirmed,
+          "Retain temporary evidence when owned CLI cleanup is unconfirmed",
+        );
+        await rm(work, { recursive: true, force: true });
+      },
+    );
+  },
+);
 
 function publicationClock() {
   let time = 100;

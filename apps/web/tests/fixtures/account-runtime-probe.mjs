@@ -239,7 +239,8 @@ if (naturalDescendant) {
                 : 1
               : isBrowser && proof === "browser-failed"
                 ? 8
-                : !isBrowser && proof === "driver-failed"
+                : !isBrowser &&
+                    ["driver-failed", "driver-logs-failed"].includes(proof)
                   ? 7
                   : 0,
             Health: {
@@ -255,11 +256,22 @@ if (naturalDescendant) {
       )
     }
   } else if (args.includes("logs")) {
-    console.log(
-      args.at(-1) === denied
-        ? '{"schemaVersion":1,"error":{"kind":"denied","resourceCleanup":"not-needed","credentialCleanup":"not-needed"}}'
-        : '{"schemaVersion":1,"result":{}}'
-    )
+    const id = args.at(-1)
+    if (id === browser) console.log("controlled browser diagnostic")
+    else if (id === denied && proof === "denied-wrong-exit")
+      console.log("controlled denied diagnostic")
+    else if (
+      id === driver &&
+      ["driver-failed", "driver-logs-failed"].includes(proof)
+    ) {
+      console.log("controlled allowed diagnostic")
+      if (proof === "driver-logs-failed") process.exitCode = 43
+    } else
+      console.log(
+        id === denied
+          ? '{"schemaVersion":1,"error":{"kind":"denied","resourceCleanup":"not-needed","credentialCleanup":"not-needed"}}'
+          : '{"schemaVersion":1,"result":{}}'
+      )
   } else if (operation === "exec") {
     if (service === "browser-tests") {
       const profile = args.indexOf("--profile")

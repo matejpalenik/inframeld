@@ -117,6 +117,7 @@ type Options = {
     | "unhealthy"
     | "browser-failed"
     | "driver-failed"
+    | "driver-logs-failed"
     | "inspect-invalid"
     | "never-ready"
     | "stalled-terminal"
@@ -501,28 +502,101 @@ test(
   }
 )
 
-for (const [proof, expected, admitsDriver] of [
-  ["unhealthy", 1, false],
-  ["browser-failed", 1, false],
-  ["inspect-invalid", 1, false],
-  ["wrong-id", 1, false],
-  ["driver-failed", 7, true],
-  ["verify-failed", 25, true],
-  ["never-ready", 124, false],
-  ["stalled-terminal", 124, true],
-  ["denied-wrong-id", 1, false],
-  ["denied-host-net", 1, false],
-  ["denied-wrong-exit", 1, false],
-  ["denied-effects", 25, false],
-  ["denied-stalled", 124, false],
-  ["second-readiness-failed", 17, false],
-  ["lookup-zero", 1, false],
-  ["lookup-multiple", 1, false],
-  ["lookup-truncated", 1, false],
-  ["lookup-query-failed", 57, false],
-  ["lookup-wrong-project", 1, false],
-  ["lookup-wrong-service", 1, false],
-  ["lookup-reused-browser", 1, true],
+for (const [proof, expected, admitsDriver, classification, diagnostic] of [
+  ["unhealthy", 1, false, "recipient-proof: browser state rejected", "b"],
+  ["browser-failed", 1, false, "recipient-proof: browser state rejected", "b"],
+  [
+    "inspect-invalid",
+    1,
+    false,
+    "recipient-proof: inspection rejected",
+    undefined,
+  ],
+  [
+    "wrong-id",
+    1,
+    false,
+    "recipient-proof: inspect identity rejected",
+    undefined,
+  ],
+  ["driver-failed", 7, true, "recipient-proof: allowed exit rejected", "d"],
+  [
+    "driver-logs-failed",
+    7,
+    true,
+    "recipient-proof: allowed exit rejected",
+    "d",
+  ],
+  ["verify-failed", 25, true, undefined, undefined],
+  ["never-ready", 124, false, undefined, undefined],
+  ["stalled-terminal", 124, true, undefined, undefined],
+  [
+    "denied-wrong-id",
+    1,
+    false,
+    "recipient-proof: inspect identity rejected",
+    undefined,
+  ],
+  [
+    "denied-host-net",
+    1,
+    false,
+    "recipient-proof: inspect namespace rejected",
+    undefined,
+  ],
+  ["denied-wrong-exit", 1, false, "recipient-proof: denied exit rejected", "e"],
+  ["denied-effects", 25, false, undefined, undefined],
+  ["denied-stalled", 124, false, undefined, undefined],
+  [
+    "second-readiness-failed",
+    17,
+    false,
+    "recipient-proof: readiness rejected",
+    "b",
+  ],
+  ["lookup-zero", 1, false, "recipient-proof: selection rejected", undefined],
+  [
+    "lookup-multiple",
+    1,
+    false,
+    "recipient-proof: selection rejected",
+    undefined,
+  ],
+  [
+    "lookup-truncated",
+    1,
+    false,
+    "recipient-proof: selection rejected",
+    undefined,
+  ],
+  [
+    "lookup-query-failed",
+    57,
+    false,
+    "recipient-proof: selection rejected",
+    undefined,
+  ],
+  [
+    "lookup-wrong-project",
+    1,
+    false,
+    "recipient-proof: inspect scope rejected",
+    undefined,
+  ],
+  [
+    "lookup-wrong-service",
+    1,
+    false,
+    "recipient-proof: inspect scope rejected",
+    undefined,
+  ],
+  [
+    "lookup-reused-browser",
+    1,
+    true,
+    "recipient-proof: selection rejected",
+    undefined,
+  ],
 ] as const) {
   test(
     `recipient proof ${proof} cannot report success and still reconciles its owned phase`,
@@ -533,7 +607,7 @@ for (const [proof, expected, admitsDriver] of [
           proof,
           budget: proof === "never-ready" || proof === "denied-stalled" ? 3 : 5,
         },
-        async ({ child, directory }) => {
+        async ({ child, directory, output }) => {
           assert.equal(await completion(child, 12_000), expected)
           const events = (
             await readFile(join(directory, "events.jsonl"), "utf8")
@@ -559,6 +633,41 @@ for (const [proof, expected, admitsDriver] of [
             events.filter((event) => event.kind === "down").length,
             1
           )
+          if (classification) {
+            const initial = `${classification} (status ${expected})`
+            assert.ok(output().includes(initial), output())
+            const logs = events.filter((event) => event.args[0] === "logs")
+            if (diagnostic) {
+              const retained = logs.filter(
+                (event) => event.args.at(-1) === diagnostic.repeat(64)
+              )
+              assert.equal(retained.length, 1)
+              assert.ok(
+                events.indexOf(retained[0]) <
+                  events.findIndex((event) => event.kind === "down")
+              )
+              const role =
+                diagnostic === "b"
+                  ? "browser"
+                  : diagnostic === "e"
+                    ? "denied"
+                    : "allowed"
+              assert.ok(
+                output().indexOf(`controlled ${role} diagnostic`) >
+                  output().indexOf(initial)
+              )
+            } else {
+              assert.equal(logs.length, Number(admitsDriver))
+              if (admitsDriver)
+                assert.equal(logs[0].args.at(-1), "e".repeat(64))
+            }
+            assert.doesNotMatch(output(), /(?:b{64}|d{64}|e{64}|f{64})/)
+            assert.doesNotMatch(output(), /"HostConfig"|"NetworkMode"/)
+          }
+          if (proof === "driver-logs-failed")
+            assert.ok(
+              output().includes("recipient-proof: diagnostic logs unavailable")
+            )
           for (const entry of await processes(directory))
             await assertStopped(entry.pid)
           assert.equal(await exists(join(directory, "fuse-fired")), false)
