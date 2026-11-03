@@ -16,6 +16,7 @@ from sqlalchemy.pool import NullPool
 
 from inframeld_backend.bootstrap.application_settings import get_settings
 from tests.support.integration_readiness import (
+    READINESS_TIMEOUT_SECONDS,
     check_fixture_certificate_expiry,
     classify_transport_failure,
     describe_readiness_failure,
@@ -140,15 +141,15 @@ async def _wait_for_services() -> None:
     pending = {"postgres", "password-breaches", *endpoints, *key_endpoints}
     engine = create_async_engine(
         database_url(settings),
-        connect_args={"connect_timeout": 2},
+        connect_args={"connect_timeout": 5},
         poolclass=NullPool,
         hide_parameters=True,
     )
     try:
         async with (
-            httpx2.AsyncClient(timeout=2.0, trust_env=False) as client,
+            httpx2.AsyncClient(timeout=5.0, trust_env=False) as client,
             create_password_breaches_client() as breach_client,
-            asyncio.timeout(60.0),
+            asyncio.timeout(READINESS_TIMEOUT_SECONDS),
             asyncio.TaskGroup() as tasks,
         ):
             tasks.create_task(_wait_for_database(engine, pending, failures))

@@ -10,11 +10,11 @@ Complete human sign-in, fresh proof, protected repair and rename acceptance is d
 
 Host/container-exec authority authorizes repair. The recipient's token identifies the human receiving the exact responsibility. It does not supply operator authority. Use the verified managed backend and an independently controlled installation record, not an API-reported identity, target label, email or Docker context as host proof.
 
-The recipient must already be an active admitted human and current member of the active Project. The exact action must have no active eligible human grantor. Unavailable facts cannot establish that it is stranded. Repair creates neither a principal nor membership, a Project or a starter. The eighteen-action creator contract remains selected provisioning behavior for its owning creation/starter work, not automatic assignment by this repair.
+The recipient must already be an active admitted human and current member of the active Project. The exact action must have no active eligible human grantor. Unavailable facts cannot establish that it is stranded. Repair creates neither a principal nor membership, a Project or a starter. [Ordinary Project creation](../../../apps/docs/src/app/guides/create-project/page.mdx) implements the separate eighteen-action creator assignment. Private starter provisioning remains unfinished. This repair does not seed those eighteen grants or backfill existing Projects.
 
 Review the exact Project UUID, recipient's Kratos identity UUID and current Project **Access revision** through protected operator records. The public metadata response's `metadataRevision` is a different revision and cannot substitute for this review.
 
-Apply the current schema `0015_artifact_allocation` explicitly through the [upgrade and migration procedure](upgrades.md#upgrades). Migration `0014_project_metadata` introduced metadata and this narrow repair. Startup does not migrate or replace missing installation identity. Use compatible backend code and the original installation identity.
+Apply schema `0018_spending_accounting` explicitly through the [upgrade and migration procedure](upgrades.md#upgrades). Migration `0014_project_metadata` introduced metadata and this narrow repair. Startup does not migrate or replace missing installation identity. Use compatible backend code and the original installation identity.
 
 ## Configure the existing consumer
 

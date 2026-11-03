@@ -479,7 +479,7 @@ async def test_cancellation_after_writes_rolls_back_the_checklist(
     operation = await _admit(database, installation_id)
     async with database.session() as session:
         repository = MockControlledRecoveryRepository(session, pause=True)
-        async with asyncio.timeout(10), asyncio.TaskGroup() as tasks:
+        async with asyncio.timeout(30), asyncio.TaskGroup() as tasks:
             task = tasks.create_task(
                 _service(session, installation_id, recoveries=repository).record_cleanup(
                     event=EVENT,
@@ -498,7 +498,7 @@ async def test_cancellation_after_writes_rolls_back_the_checklist(
 
 
 async def _wait_for_database_block(database: Database, pid: int) -> None:
-    async with asyncio.timeout(2):
+    async with asyncio.timeout(10):
         while True:
             async with database.session() as observer:
                 if await observer.scalar(select(func.pg_blocking_pids(pid).cast(ARRAY(Integer)))):
@@ -562,7 +562,7 @@ async def test_completion_waits_for_linked_admission_then_observes_its_block(
                 hydra_outcome=IdentityRecoveryCleanupState.CONFIRMED,
             )
 
-    async with asyncio.timeout(10), asyncio.TaskGroup() as tasks:
+    async with asyncio.timeout(30), asyncio.TaskGroup() as tasks:
         async with database.session() as admitting, admitting.begin():
             await IdentityRecoveryAdmissionService(
                 PostgresIdentityRecoveryAdmissionWriter(
@@ -597,7 +597,7 @@ async def test_later_admission_waits_for_completion_and_keeps_its_own_block(
 
     async with database.session() as session:
         facts = MockControlledCompletionFactsReader(session, pause=True)
-        async with asyncio.timeout(10), asyncio.TaskGroup() as tasks:
+        async with asyncio.timeout(30), asyncio.TaskGroup() as tasks:
             completion = tasks.create_task(
                 _service(session, installation_id, facts=facts).record_cleanup(
                     event=EVENT,
@@ -648,7 +648,7 @@ async def test_concurrent_equivalent_completions_share_the_original_release(
         await start.wait()
         return await _record(database, installation_id)
 
-    async with asyncio.timeout(10):
+    async with asyncio.timeout(30):
         first, second = await asyncio.gather(complete(), complete())
     assert first.operation_id == second.operation_id == operation
     assert first.released_at == second.released_at

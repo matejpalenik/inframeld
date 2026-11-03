@@ -1,0 +1,21 @@
+export const pageMetadata = {
+  title: "Automate tasks and recover operations",
+  description: "Use machine output and inspect retained outcomes safely.",
+}
+
+# Automate tasks and recover operations
+
+Build automation around explicit outputs and retained operation identity. A lost response can leave an operation's effects uncertain.
+
+## Choose a task
+
+- [Use CLI JSON output and exit codes](/clients/cli/automation).
+- [Check whether an original request was accepted](/guides/recover-original-request).
+- [Read retained deletion status](/guides/read-deletion-status).
+- [Preview a target preference change](/guides/register-a-target#inspect-and-select-the-target).
+
+## Keep recovery tied to the original action
+
+Retain the original installation, scope, method, canonical route and request key before a write. Reuse the documented original-operation path after an uncertain result. Generating another key can create a different operation.
+
+An `unresolved` lookup result supplies no proof that the original action failed. Current permission and the endpoint's disclosure policy still apply. [Operations, results and errors](/api-reference/operations) defines these observation boundaries.

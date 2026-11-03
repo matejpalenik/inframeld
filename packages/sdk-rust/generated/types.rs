@@ -194,6 +194,28 @@ impl AsRef<str> for ProjectUseOnlyGrantRequestActionId {
         self.as_str()
     }
 }
+///Report original creation assignments, not a present permission snapshot.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectCreationResponse {
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minItems=18, maxItems=18
+    #[serde(rename = "initialGrants")]
+    pub initial_grants: Vec<InitialProjectGrantResponse>,
+    #[serde(rename = "metadataRevision")]
+    pub metadata_revision: i64,
+    pub name: String,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
 /**Represent an Inframeld HTTP error using RFC 9457 Problem Details.
 
 Attributes:
@@ -1247,6 +1269,168 @@ impl AsRef<str> for OperationLookupAuthorityFamily {
         self.as_str()
     }
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MyOrganizationAccessResponse {
+    ///Constraint: minimum=0, maximum=9223372036854775807
+    #[serde(rename = "accessRevision")]
+    pub access_revision: u64,
+    ///Constraint: maxItems=4
+    pub grants: Vec<OwnOrganizationGrantResponse>,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OwnOrganizationGrantResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: OwnOrganizationGrantResponseActionId,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum OwnOrganizationGrantResponseActionId {
+    #[default]
+    #[serde(rename = "admit-users")]
+    AdmitUsers,
+    #[serde(rename = "suspend-users")]
+    SuspendUsers,
+    #[serde(rename = "restore-users")]
+    RestoreUsers,
+    #[serde(rename = "create-projects")]
+    CreateProjects,
+}
+impl OwnOrganizationGrantResponseActionId {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::AdmitUsers => "admit-users",
+            Self::SuspendUsers => "suspend-users",
+            Self::RestoreUsers => "restore-users",
+            Self::CreateProjects => "create-projects",
+        }
+    }
+}
+impl ::std::fmt::Display for OwnOrganizationGrantResponseActionId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for OwnOrganizationGrantResponseActionId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InitialProjectGrantResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: InitialProjectGrantResponseActionId,
+    #[serde(rename = "canGrant")]
+    pub can_grant: BooleanConstant<true>,
+    pub target: ProjectGrantTargetResponse,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectGrantTargetResponse {
+    pub kind: ProjectGrantTargetResponseKind,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ProjectGrantTargetResponseKind {
+    #[default]
+    #[serde(rename = "project")]
+    Project,
+}
+impl ProjectGrantTargetResponseKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Project => "project",
+        }
+    }
+}
+impl ::std::fmt::Display for ProjectGrantTargetResponseKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ProjectGrantTargetResponseKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InitialProjectGrantResponseActionId {
+    #[default]
+    #[serde(rename = "manage-project-members")]
+    ManageProjectMembers,
+    #[serde(rename = "create-access-groups")]
+    CreateAccessGroups,
+    #[serde(rename = "create-application-accounts")]
+    CreateApplicationAccounts,
+    #[serde(rename = "create-pipelines")]
+    CreatePipelines,
+    #[serde(rename = "create-deployments")]
+    CreateDeployments,
+    #[serde(rename = "manage-upload-defaults")]
+    ManageUploadDefaults,
+    #[serde(rename = "delete-project")]
+    DeleteProject,
+    #[serde(rename = "inspect-budget")]
+    InspectBudget,
+    #[serde(rename = "manage-budget")]
+    ManageBudget,
+    #[serde(rename = "manage-trace-policy")]
+    ManageTracePolicy,
+    #[serde(rename = "delete-trace-history")]
+    DeleteTraceHistory,
+    #[serde(rename = "inspect-feedback")]
+    InspectFeedback,
+    #[serde(rename = "create-collections")]
+    CreateCollections,
+    #[serde(rename = "create-sources")]
+    CreateSources,
+    #[serde(rename = "create-model-connections")]
+    CreateModelConnections,
+    #[serde(rename = "create-processing-profiles")]
+    CreateProcessingProfiles,
+    #[serde(rename = "create-embedding-profiles")]
+    CreateEmbeddingProfiles,
+    #[serde(rename = "edit-project-metadata")]
+    EditProjectMetadata,
+}
+impl InitialProjectGrantResponseActionId {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ManageProjectMembers => "manage-project-members",
+            Self::CreateAccessGroups => "create-access-groups",
+            Self::CreateApplicationAccounts => "create-application-accounts",
+            Self::CreatePipelines => "create-pipelines",
+            Self::CreateDeployments => "create-deployments",
+            Self::ManageUploadDefaults => "manage-upload-defaults",
+            Self::DeleteProject => "delete-project",
+            Self::InspectBudget => "inspect-budget",
+            Self::ManageBudget => "manage-budget",
+            Self::ManageTracePolicy => "manage-trace-policy",
+            Self::DeleteTraceHistory => "delete-trace-history",
+            Self::InspectFeedback => "inspect-feedback",
+            Self::CreateCollections => "create-collections",
+            Self::CreateSources => "create-sources",
+            Self::CreateModelConnections => "create-model-connections",
+            Self::CreateProcessingProfiles => "create-processing-profiles",
+            Self::CreateEmbeddingProfiles => "create-embedding-profiles",
+            Self::EditProjectMetadata => "edit-project-metadata",
+        }
+    }
+}
+impl ::std::fmt::Display for InitialProjectGrantResponseActionId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InitialProjectGrantResponseActionId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
 ///Bind the fixed CLI profile to the persistent public installation identity.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InframeldDiscoveryResponse {
@@ -1879,28 +2063,42 @@ impl AsRef<str> for AcceptedOperationLookupResponseOutcome {
         self.as_str()
     }
 }
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
 pub enum AcceptedOperationLookupResponseJobReference {
+    UnknownJobReference(UnknownJobReference),
+    KnownJobReferenceResponse(KnownJobReferenceResponse),
+}
+///Keep the absence of a known job correlation closed on every generated client.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum UnknownJobReference {
     #[default]
     #[serde(rename = "unknown")]
     Unknown,
 }
-impl AcceptedOperationLookupResponseJobReference {
+impl UnknownJobReference {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Unknown => "unknown",
         }
     }
 }
-impl ::std::fmt::Display for AcceptedOperationLookupResponseJobReference {
+impl ::std::fmt::Display for UnknownJobReference {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
-impl AsRef<str> for AcceptedOperationLookupResponseJobReference {
+impl AsRef<str> for UnknownJobReference {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
+}
+///Identify original work without asserting its execution state or result.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct KnownJobReferenceResponse {
+    #[serde(rename = "jobId")]
+    pub job_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
 pub enum AcceptedOperationLookupResponseDispatch {
@@ -1964,6 +2162,19 @@ pub struct GetHealthResponse {
 pub struct HumanOAuthConsentDecisionResponse {
     #[serde(rename = "redirectTo")]
     pub redirect_to: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectCreationRequest {
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    ///Constraint: minimum=0, maximum=9223372036854775807
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: u64,
+    ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
+    pub name: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectMetadataChangeResponse {

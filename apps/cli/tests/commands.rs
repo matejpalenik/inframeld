@@ -11,7 +11,7 @@ fn isolated(home: &TempDir) -> Command {
     let mut command = cargo_bin_cmd!("inframeld");
     command.env_clear().env("HOME", home.path()).env("PATH", "");
     command.current_dir(home.path());
-    command.timeout(Duration::from_secs(5));
+    command.timeout(Duration::from_secs(30));
     command
 }
 

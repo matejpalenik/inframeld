@@ -7,6 +7,7 @@ import socket
 import subprocess
 import time
 import unittest
+from collections.abc import Iterator
 from types import SimpleNamespace
 from typing import cast
 from unittest.mock import ANY, Mock, call, patch
@@ -106,6 +107,23 @@ class RetainedOwnershipTests(unittest.TestCase):
 
 
 class ControlDocumentTests(unittest.TestCase):
+    def test_control_send_tolerates_scheduler_delay_within_original_deadline(self) -> None:
+        clock = Mock(return_value=0)
+        with patch("os.set_blocking"):
+            control = Control(123)
+
+        def wait(*_arguments: object) -> tuple[list[int], list[int], list[int]]:
+            clock.return_value = 3000
+            return [], [123], []
+
+        with (
+            patch("src.system.process_owner._clock", clock),
+            patch("os.write", side_effect=[BlockingIOError(), BlockingIOError(), 4096]),
+            patch("select.select", side_effect=wait),
+        ):
+            control.send({"type": "ready"}, 8000)
+        self.assertEqual(clock(), 3000)
+
     def test_finish_consumes_only_the_remaining_stop_then_clean_eof(self) -> None:
         stop = b'{"version":1,"type":"stop","reason":"cancel","deadline":9}\n'
         for received in (False, True):
@@ -293,6 +311,70 @@ class ControlDocumentTests(unittest.TestCase):
 
 
 class GroupObservationTests(unittest.TestCase):
+    def test_forced_cleanup_keeps_time_for_a_slow_final_observation(self) -> None:
+        target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+        clock = Mock(return_value=0)
+
+        def observe(_target: OwnedTarget, cutoff: int, phase: str) -> bool:
+            self.assertLessEqual(cutoff, 10000)
+            if phase != "kill":
+                return True
+            clock.return_value += 1500
+            if clock() >= cutoff:
+                raise TimeoutError
+            return False
+
+        def sleep(seconds: float) -> None:
+            clock.return_value += round(seconds * 1000)
+
+        with (
+            patch("src.system.process_owner._clock", clock),
+            patch("src.system.process_owner.observe_members", side_effect=observe),
+            patch("time.sleep", side_effect=sleep),
+            patch("os.waitid", return_value=SimpleNamespace(si_status=0, si_code=1)),
+            patch("os.waitpid", return_value=(123, 0)),
+            patch("os.killpg"),
+        ):
+            self.assertEqual(stop_target(target, 10000, 10000, "command"), "quiescent")
+        self.assertEqual(target.errors, [])
+        self.assertTrue(target.reaped)
+        self.assertLess(clock(), 10000)
+
+    def test_slow_observation_uses_available_cleanup_time_without_extending_it(self) -> None:
+        for cutoff, succeeds in ((5000, True), (1000, False)):
+            with self.subTest(cutoff=cutoff):
+                target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
+                clock = Mock(return_value=0)
+                observation = Mock()
+                observation.stdout.fileno.return_value = 456
+                observation.wait.return_value = 0
+                observation.poll.return_value = 0
+                reads = iter((b"123 123 Z\n", b""))
+
+                def read(
+                    _fd: int,
+                    _maximum: int,
+                    *,
+                    sample_clock: Mock = clock,
+                    samples: Iterator[bytes] = reads,
+                ) -> bytes:
+                    sample_clock.return_value = 1500
+                    return next(samples)
+
+                with (
+                    patch("subprocess.Popen", return_value=observation),
+                    patch("src.system.process_owner._clock", clock),
+                    patch("os.set_blocking"),
+                    patch("select.select", return_value=([observation.stdout], [], [])),
+                    patch("os.read", side_effect=read),
+                ):
+                    if succeeds:
+                        self.assertFalse(observe_members(target, cutoff))
+                        self.assertEqual(target.errors, [])
+                    else:
+                        with self.assertRaises(TimeoutError):
+                            observe_members(target, cutoff)
+
     def test_first_observer_diagnostic_identifies_step_without_replacing_exception(self) -> None:
         for step, failure, category in (
             ("spawn", OSError("private"), "os"),

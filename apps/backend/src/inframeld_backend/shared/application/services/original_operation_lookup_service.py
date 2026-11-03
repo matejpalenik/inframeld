@@ -4,8 +4,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.protocols.operation_lookup_authorizer import (
     OperationLookupAuthorizer,
 )
-from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
-    AcceptedAsyncOperationDTO,
+from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto import (
+    AcceptedOperationLookupDTO,
 )
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
@@ -49,7 +49,7 @@ class OriginalOperationLookupService(OriginalOperationLookup):
         self, *, access: AccessContextDTO, query: LookupOriginalOperationQuery
     ) -> (
         CompletedSynchronousOperationDTO
-        | AcceptedAsyncOperationDTO
+        | AcceptedOperationLookupDTO
         | InProgressOperationDTO
         | RecoveryRequiredOperationDTO
         | UnresolvedOperationDTO
@@ -64,9 +64,10 @@ class OriginalOperationLookupService(OriginalOperationLookup):
         ):
             raise RuntimeError("Lookup authorization returned a different scope.")
 
-        stored = await self._reader.read(principal_id=access.actor_principal_id, query=query)
-        if stored is None:
+        record = await self._reader.read(principal_id=access.actor_principal_id, query=query)
+        if record is None:
             return UnresolvedOperationDTO()
+        stored = record.operation
         if stored.created:
             raise DependencyUnavailableError()
 
@@ -83,7 +84,7 @@ class OriginalOperationLookupService(OriginalOperationLookup):
         if stored.state is not OperationReservationState.REPLAYABLE:
             raise DependencyUnavailableError()
         if stored.replay_kind is OperationReplayKind.ASYNC_JOB:
-            return AcceptedAsyncOperationDTO(stored.operation_id, False, stored.expires_at)
+            return AcceptedOperationLookupDTO(stored.operation_id, stored.expires_at, record.job_id)
         if (
             stored.replay_kind is OperationReplayKind.SAFE_RESULT
             or stored.replay_kind is OperationReplayKind.ISSUED_SECRET

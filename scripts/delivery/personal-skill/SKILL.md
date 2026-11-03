@@ -30,10 +30,11 @@ A live request must authorize the batch, participants and relevant implementatio
 ## Preserve the essential boundaries
 
 - Give each worker a small useful outcome, acceptance, exclusions, owned paths/contracts and maintained checks. Clear ownership once, then allow routine scoped implementation and isolated tests without per-command acknowledgments.
-- The repository coordinator reference owns dependency review, parallel versus serial scheduling, blocked checkpoints and completion-first recovery. The native worker ceiling does not apply to this pilot.
+- The repository coordinator reference owns epic focus, issue completion, dependency review, parallel versus serial scheduling, blocked checkpoints and recovery. The native worker ceiling does not apply to this pilot.
 - The coordinator allocates shared resources and may designate one worker to execute a frozen revision's maintained integration operation. Observe exit and cleanup before release. Reviewers remain read-only.
 - Use repository-owned behavioral tests and documented workspace commands. Bound diagnostics and harness repairs under Testing. Preserve independent implementation review and material plan review. Do not grow private qualification controllers.
 - Use the common `references/discovered-defects.md` policy for incidental bugs. The coordinator may publish clear defect reports under actual issue-creation authority, while preserving the finite implementation scope and this pilot's human-only merges. A new issue does not reset repair attempts.
 - Follow the repository gates reference for supporting PRs, evidence, three unsuccessful remediation cycles and host limits. Delivery never authorizes host/VM repair. Only the coordinator may make its single permitted existing-machine start/restart attempt. Failed or unconfirmed recovery, recurrence or deeper repair stops affected runtime work.
+- Apply the repository's human-testing deferral under actual publication authority. Keep deferred human work distinct from implementation acceptance and preserve this pilot's human-only merges and requested completion outcome.
 
 Runtime records stay outside checkouts under `/Users/matej/.codex/delivery-runs/inframeld/`. The coordinator adapter owns the personal record shape. A native Goal requires an explicit human request and an actual client capability. This pilot does not require per-worker Goals. No active batch or Goal is created by installing the adapter.

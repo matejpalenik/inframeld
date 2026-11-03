@@ -95,6 +95,15 @@ pub async fn observe(
                 .await
         ),
         "getCurrentSession" => observed!(client.get_current_session().await),
+        "getMyOrganizationAccess" => observed!(client.get_my_organization_access().await),
+        "createProject" => observed!(
+            client
+                .create_project(
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
         "inspectHumanOAuthConsent" => observed!(
             client
                 .inspect_human_o_auth_consent(

@@ -12,7 +12,9 @@ The private xtask owns CLI packaging and qualification. Local commands and CI us
 
 ## Manual feature verification
 
-For every new or changed user-facing CLI feature, add a short manual verification recipe to its existing developer guide and link it in the implementation handoff. Explain the user's goal, prerequisites and working directory, then give copyable commands with expected output or exit status. Include a relevant rejection case, any state changes and necessary cleanup. Exercise human and machine output when those modes are implemented. Keep setup proportional to the feature and use disposable resources for checks that change state.
+During authorized automated backlog delivery, [Delivery's closure policy](../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md#separate-implementation-and-human-acceptance) permits deferring the manual recipe, its engineering dry run and human execution to the feature's published linked qualification issue. Record the outstanding work and owners using [Testing's guidance](../../.agents/skills/inframeld-testing/references/human-qualification.md#defer-human-work-during-automated-delivery). Applicable user documentation and required automated checks remain part of implementation acceptance.
+
+For every new or changed user-facing CLI feature whose manual work is not deferred, add a short manual verification recipe to its existing developer guide and link it in the implementation handoff. Complete deferred recipes before human handoff. Explain the user's goal, prerequisites and working directory, then give copyable commands with expected output or exit status. Include a relevant rejection case, any state changes and necessary cleanup. Exercise human and machine output when those modes are implemented. Keep setup proportional to the feature and use disposable resources for checks that change state.
 
 Run the recipe when the required environment is available and report what was actually observed. Otherwise name the missing prerequisite. Automated tests complement this walkthrough and must not be presented as manual user verification.
 

@@ -1,0 +1,91 @@
+export const pageMetadata = {
+  title: "Target output reference",
+  description:
+    "Interpret structured target changes, previews and uncertain local saves.",
+}
+
+# Target output reference
+
+Use [register and select a target](/guides/register-a-target) for the human workflow and [configuration](/clients/cli/configuration) for selection precedence. This reference explains human preference-change views and the delivered machine observations.
+
+## Read terminal change views
+
+To compare the views below, use an installed CLI with `prod` and `dev` already registered, `prod` saved, and no `INFRAMELD_TARGET` override. Replace the labels with your prepared targets. Registration and trusted HTTPS setup belong to the linked human workflow.
+
+The first two commands only preview. The last saves the preference:
+
+<CodeGroup>
+
+```shell
+inframeld target use dev --dry-run
+inframeld target use dev --dry-run --plain
+inframeld target use dev
+```
+
+</CodeGroup>
+
+A preview shows **Current / Proposed** and saves nothing. A confirmed changed save shows **Before / Now** using the values observed under its writer lock. Preview does not reserve those values. To restore the prepared original preference after a confirmed change, use `inframeld target use prod`.
+
+On eligible terminal stdout, an unequal known old value is red with strikethrough and the new value is green. Green means **new**, not approved or successfully applied. The headers, field labels and `->` arrow stay neutral. Identical values, pairs containing an unknown value and unconfirmed saves stay neutral. Known unset is `not selected` in human text and `null` in the structured observation, distinct from unknown.
+
+`--plain`, `--no-color`, nonempty `NO_COLOR`, `TERM=dumb` and non-terminal stdout each disable styling. These controls win even if `CLICOLOR_FORCE=1` is set. Empty `NO_COLOR` alone does not disable it. `--no-input` controls prompts, not styling. JSON/JSONL, help and version output remain unstyled.
+
+An interrupted command can retain already-confirmed change facts. Read the outcome and follow the existing uncertainty/readback guidance rather than treating color as confirmation of success.
+
+## Preference change records
+
+Add `--json` for structured observations. This is an illustrative `data.changes` entry for proposing `dev` when no preference is saved, not a captured result:
+
+<CodeGroup>
+
+```json
+{
+  "kind": "proposed",
+  "resource": { "kind": "targetPreference" },
+  "fields": [
+    {
+      "field": "savedTarget",
+      "before": { "known": true, "value": null },
+      "after": { "known": true, "value": "dev" }
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+Here `known: true` with `value: null` means an observed unset preference. It does not mean an unknown value. The preview's `effectiveTarget` and `source` describe the current selection, not the proposed preference.
+
+## Inspect cached data and preview actions
+
+For a structured cached inspection, run:
+
+<CodeGroup>
+
+```shell
+inframeld target show --target dev --json --no-input
+```
+
+</CodeGroup>
+
+Check the process status and final `outcome`. Successful inspection has `data.verification: "savedBinding"`, and `data.source` identifies `flag`, `environment` or `saved`. Registration instead reports `discoveryValidated`, describing that registration attempt. Warnings remain separate from success and may also appear on stderr.
+
+Choose `--jsonl` instead of `--json` for one final result record. These target commands emit no progress records. Help remains plain text. The [CLI output guide](/clients/cli/version-reference#choose-a-final-jsonl-record) explains the shared final-record wrapper. `--plain` and `--no-color` affect presentation, while `--no-input` prevents interaction. These commands do not prompt or launch a browser.
+
+Preview registration without contacting the server or saving a target:
+
+<CodeGroup>
+
+```shell
+inframeld target add dev --url https://api.dev.example.com --dry-run --json
+```
+
+</CodeGroup>
+
+Dry-run validates arguments and transport inputs and reads the local registry. If CA files were supplied, it reads and validates them too. Its plan describes intended effects. It does not validate remote metadata or prove that executing registration will succeed. Dry-run for `use` or `show` also reads local state and performs no network call or preference write.
+
+Registration preview lists `publicApiIdentity` and `httpRequestMetadata` as intended outgoing network categories. These describe execution, not data sent by preview. Its destinations include the local registry and supplied API identity. Issuer-metadata and signing-key-set destinations remain unknown until discovery. An explicit proxy appears as an additional known destination. Unknown destinations have `known: false` and no `value`, rather than a guessed issuer URL.
+
+Preference and inspection previews list no outgoing network data and only the local registry as a destination. Plans retain `remoteVerification: "notPerformed"` and identify unresolved facts such as an unperformed save or unverified remote health. They expose no credential or CA contents. An unresolved environment override is reported separately from a proposed saved preference.
+
+An unconfirmed save is not evidence of rollback. Follow the [readback procedure](/guides/register-a-target#recover-from-a-failure) before deciding whether to save again.

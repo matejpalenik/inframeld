@@ -1,0 +1,33 @@
+export const pageMetadata = {
+  title: "Monitoring and troubleshooting",
+  description:
+    "Check a running environment and retain useful safe diagnostics.",
+}
+
+# Monitoring and troubleshooting
+
+Start by identifying the exact environment, executable and failed operation. Preserve the original request identity when its effects are uncertain.
+
+## Check the API
+
+<CodeGroup>
+
+```shell
+curl --fail-with-body --silent --show-error --max-time 5   "$INFRAMELD_URL/health"
+```
+
+</CodeGroup>
+
+A successful response includes `"status": "ok"`. This is the delivered health operation. Inspect the relevant database, provider and storage checks for the workflow you are actually running.
+
+## Check the client and connection
+
+[Inspect the CLI version](/guides/inspect-cli-version) and [show the saved target](/clients/cli/configuration). Cached target data identifies the saved registration. Network errors need the actual URL, certificate configuration and safe error category from the failed request.
+
+## Investigate an uncertain result
+
+Use [original-operation lookup](/guides/recover-original-request) or [retained deletion status](/guides/read-deletion-status) where the operation supplies those interfaces. Avoid submitting a second write to discover whether the first one worked.
+
+## Report a problem
+
+Keep version, platform, safe request/operation identifiers, expected behavior and the observed error. Redact tokens, cookies, consent challenges, provider credentials and private content. [Support](/changelog-and-support) explains what to include.

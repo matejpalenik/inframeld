@@ -5,31 +5,33 @@ description: Write and review plain-language Inframeld user documentation and su
 
 # Document a useful Inframeld outcome
 
-Alice submits an access change and loses the response. A useful guide helps her find the retained result, understand what it establishes and choose a safe next step. Begin with that task before explaining the machinery behind it. Assume basic programming and terminal knowledge, but no prior knowledge of Inframeld.
+Alice opens the documentation to install Inframeld or use an existing installation. Help her choose that path before introducing advanced recovery or machine output. Assume basic programming and terminal knowledge, with no prior Inframeld knowledge.
 
-Accepted domain references own behavior, inspected code owns implemented interfaces and native generated OpenAPI owns delivered HTTP shapes. Documentation explains these sources. It does not introduce new product contracts. Read only the owning workflow needed for the feature, then inspect exact interfaces before writing commands, fields, installation instructions or supported credential claims.
+Accepted domain references own behavior, inspected code owns implemented interfaces and native generated OpenAPI owns delivered HTTP shapes. Read the relevant owning workflow and exact interfaces before claiming support for a command, field, credential or installation. Documentation explains the product without introducing contracts or turning accepted design into delivered functionality.
 
-## Choose the page and evidence
+## Place the page
 
-Establish the reader, useful outcome, supported interface and exclusions from the authorized feature brief. Use [page patterns](references/page-patterns.md) to choose a tutorial, task guide, explanation or reference. An approved brief and reusable page pattern authorize routine composition. Do not request a new outline approval for every page. Raise material product or scope decisions, rather than inventing an answer.
+For new pages, moves and navigation changes, read [site structure](references/site-structure.md). Its approved hierarchy is mandatory: Get started, Product, Guides, CLI and SDKs, API reference, Self-hosting, and Changelog and support. Keep the defined labels and order. Detailed tasks belong under the appropriate entry, with shared setup in one canonical location. Preserve useful routes and anchors.
 
-For prose and explanatory flow, read [writing style](references/writing-style.md). For runnable snippets, language tabs and Protocol components, read [examples and MDX](references/examples-and-mdx.md). The [source observations](references/source-observations.md) explain the editorial evidence and its limits. They are our analysis, not an official OpenAI style manual.
+Establish the reader, useful outcome, page purpose, supported interface and navigation location from the authorized brief. Use [page patterns](references/page-patterns.md) to choose a tutorial, task guide, explanation or reference. Adapt headings to the task. A short version check needs neither a setup catalogue nor a troubleshooting manual. An approved brief and pattern authorize routine composition without another outline approval. Raise material scope or product decisions.
 
-## Write and verify
+Read [writing style](references/writing-style.md) for prose and [examples and MDX](references/examples-and-mdx.md) for snippets, API views and rendering. [Source observations](references/source-observations.md) record editorial evidence and its limits, rather than an official OpenAI style manual.
 
-1. State what the reader can accomplish. Put necessary setup and current permissions before the first action.
-2. Show the smallest supported path to a useful result. Explain the result immediately after the action that produces it.
-3. Add failures where they affect a decision. Preserve uncertainty, partial effects, current authorization and documented retry rules. A timeout or unresolved lookup does not establish that nothing happened.
-4. Add relevant alternatives and links after the main path. Keep internal component design in developer guidance.
-5. Reconcile every public claim with the final implementation revision. Distinguish implemented behavior, accepted design and pending qualification.
-6. Run `pnpm check:docs`, which includes the documentation build. Execute copyable examples against controlled fixtures when possible. A successful MDX build does not prove an HTTP request or provider action works. Report unavailable checks honestly.
+## Write the useful path
 
-Use [documentation maintenance](../../../docs/development/documentation-maintenance.md) for owning references, navigation and source changes. Avoid duplicating an exact schema already generated from OpenAPI. Do not promise commands, published SDK packages, application credentials or deployments that the inspected implementation does not provide.
+1. Lead with what the reader can accomplish. Explain what an action does. Add a negative statement only when it changes a decision, prevents harm or corrects a likely misunderstanding.
+2. Put necessary permissions, inputs and environment setup before the action. Link shared client setup. Include a prerequisites section only when it has useful requirements.
+3. Show the smallest supported path and explain its result beside the action. Human CLI guides start with ordinary output. Put JSON, exit codes and automation contracts in their focused reference.
+4. Offer CLI, cURL, Python, TypeScript and Rust alternatives where each interface actually supports the task. Keep identifiers, permissions and outcomes equivalent. Local version/configuration tasks need no fictional HTTP alternatives. Supply imports, lifecycle, created filenames and run commands for complete programs.
+5. Preserve meaningful failures, current authorization, partial effects and retry rules. A timeout or unresolved lookup does not establish that nothing happened. Put conditions next to the action they constrain.
+6. Reconcile claims with the final implementation revision. For an approved section whose capability is unfinished, give an honest availability page with a useful explanation and supported next steps. Never fill it with speculative commands, empty TODO tabs or public delivery logs.
 
-## Coordinate edits
+Keep internal component design in developer guidance. Use original examples and no semicolons or em dashes in prose. Avoid competing schema tables or handwritten clients. The API reference reads the committed native contract through the maintained views. New delivered operations need a reference location and applicable examples.
 
-In a delivery run, follow the [assignment protocol](../inframeld-backlog-delivery/references/assignment-protocol.md) for checkout binding, trusted instructions and check/resource ownership. The worker owns Git operations. The documentation writer edits only the explicitly allocated user documentation paths and returns a manifest, implementation revision, source evidence and checks to that worker. Shared navigation has one named owner. Do not stage, commit, rebase or push from a writer assignment.
+## Verify and hand off
 
-A user-visible change needs the relevant new or updated explanation and example. An internal-only change can record why no user page changes are needed. Preserve stable routes and anchors, use original Inframeld examples and remove template product claims. Apply the common prose rule of no semicolons or em dashes.
+Run `pnpm check:docs`, including link/operation coverage checks and the production build. Check the reader path, navigation, code tabs, copy controls and narrow-screen layout. Execute copyable examples against controlled fixtures when possible. Report source checks, executed examples and unavailable visual/runtime checks separately. An MDX build proves neither a protected request nor a complete sign-in journey.
 
-For a human-facing feature, prepare clear steps for its linked [human-qualification issue](../inframeld-testing/references/human-qualification.md) within the allocated documentation work. Use the real commands, inputs, expected results and cleanup, linking shared setup from its maintained guide. The worker verifies the procedure and the coordinator publishes the issue. Writing the steps or building MDX does not establish engineering execution or human acceptance.
+Use [documentation maintenance](../../../docs/development/documentation-maintenance.md) for owning sources. A user-visible change needs the relevant explanation and example. For a human-facing feature, prepare its linked [human-qualification procedure](../inframeld-testing/references/human-qualification.md) with commands, inputs, expected results and cleanup. The worker verifies the procedure and the coordinator publishes the issue. Writing it does not establish human acceptance.
+
+During delivery, follow the [assignment protocol](../inframeld-backlog-delivery/references/assignment-protocol.md). Edit only allocated documentation paths and return a manifest, implementation revision, evidence and checks. The worker owns Git operations. A writer assignment does not authorize staging, committing or pushing. Shared navigation has one named owner.

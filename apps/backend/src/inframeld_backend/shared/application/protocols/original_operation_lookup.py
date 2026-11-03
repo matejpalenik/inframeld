@@ -2,8 +2,8 @@ from abc import abstractmethod
 from typing import Protocol
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
-    AcceptedAsyncOperationDTO,
+from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto import (
+    AcceptedOperationLookupDTO,
 )
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
@@ -30,7 +30,7 @@ class OriginalOperationLookup(Protocol):
         self, *, access: AccessContextDTO, query: LookupOriginalOperationQuery
     ) -> (
         CompletedSynchronousOperationDTO
-        | AcceptedAsyncOperationDTO
+        | AcceptedOperationLookupDTO
         | InProgressOperationDTO
         | RecoveryRequiredOperationDTO
         | UnresolvedOperationDTO

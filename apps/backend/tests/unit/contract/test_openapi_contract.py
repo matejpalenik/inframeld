@@ -400,3 +400,68 @@ def test_metadata_patch_declares_its_actual_framing_problems() -> None:
         assert operation["responses"][status]["content"] == {
             "application/problem+json": {"schema": {"$ref": "#/components/schemas/ProblemDetails"}}
         }
+
+
+def test_project_creation_contract_keeps_strict_input_and_exact_original_grant_receipt() -> None:
+    schema = create_app().openapi()
+    components = schema["components"]["schemas"]
+    request = components["ProjectCreationRequest"]
+    assert request["additionalProperties"] is False
+    assert set(request["required"]) == {
+        "organizationId",
+        "expectedAccessRevision",
+        "name",
+        "displayName",
+    }
+    assert request["properties"]["name"]["maxLength"] == 63
+    assert request["properties"]["displayName"]["maxLength"] == 128
+    revision = request["properties"]["expectedAccessRevision"]
+    assert revision["type"] == "integer" and revision["minimum"] == 0
+    assert revision["maximum"] == float(2**63 - 1)
+    response = components["ProjectCreationResponse"]
+    assert set(response["required"]) == {
+        "operationId",
+        "idempotencyExpiresAt",
+        "organizationId",
+        "projectId",
+        "name",
+        "displayName",
+        "accessRevision",
+        "metadataRevision",
+        "initialGrants",
+    }
+    assert response["properties"]["accessRevision"]["const"] == 1
+    assert response["properties"]["metadataRevision"]["const"] == 0
+    grants = response["properties"]["initialGrants"]
+    assert grants["minItems"] == grants["maxItems"] == 18
+    assert components["InitialProjectGrantResponse"]["properties"]["canGrant"]["const"] is True
+    assert len(components["InitialProjectGrantResponse"]["properties"]["actionId"]["enum"]) == 18
+    assert components["ProjectGrantTargetResponse"]["properties"]["kind"]["const"] == "project"
+    operation = schema["paths"]["/v1/projects"]["post"]
+    assert operation["operationId"] == "createProject"
+    assert operation["responses"]["201"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ProjectCreationResponse"
+    }
+    for status in ("400", "401", "403", "404", "409", "413", "415", "422", "503"):
+        assert set(operation["responses"][status]["content"]) == {"application/problem+json"}
+
+
+def test_own_organization_contract_exposes_only_bounded_supported_assignments() -> None:
+    schema = create_app().openapi()
+    operation = schema["paths"]["/v1/my-organization-access"]["get"]
+    assert operation["operationId"] == "getMyOrganizationAccess"
+    response = schema["components"]["schemas"]["MyOrganizationAccessResponse"]
+    assert set(response["required"]) == {
+        "organizationId",
+        "principalId",
+        "accessRevision",
+        "grants",
+    }
+    assert response["properties"]["grants"]["maxItems"] == 4
+    grants = schema["components"]["schemas"]["OwnOrganizationGrantResponse"]
+    assert set(grants["properties"]["actionId"]["enum"]) == {
+        "admit-users",
+        "suspend-users",
+        "restore-users",
+        "create-projects",
+    }

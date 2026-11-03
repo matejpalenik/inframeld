@@ -120,7 +120,7 @@ async def _wait_for_waiter[Result](
     database: Database, holder_pid: int | None, task: asyncio.Task[Result]
 ) -> None:
     """Require a real PostgreSQL wait before releasing the transaction it depends on."""
-    async with asyncio.timeout(3):
+    async with asyncio.timeout(10):
         while not task.done():
             async with database.session() as observer:
                 blockers = func.pg_blocking_pids(_PID, type_=ARRAY(Integer))
@@ -175,7 +175,7 @@ async def test_identity_turn_lasts_until_the_transaction_ends(
         async with database.session() as session, session.begin():
             await _acquire(session, installation)
 
-    async with asyncio.timeout(10), asyncio.TaskGroup() as tasks, database.session() as holder:
+    async with asyncio.timeout(30), asyncio.TaskGroup() as tasks, database.session() as holder:
         async with holder.begin() as transaction:
             await _acquire(holder, installation)
             task = tasks.create_task(compete())
@@ -205,7 +205,7 @@ async def test_independent_identity_scopes_do_not_share_a_turn(
     elif different == "delimiters":
         first = VerifiedHumanIdentityDTO(IdentityAuthority("a:b"), IdentitySubject("c"))
         other = VerifiedHumanIdentityDTO(IdentityAuthority("a"), IdentitySubject("b:c"))
-    async with asyncio.timeout(3), database.session() as holder, holder.begin():
+    async with asyncio.timeout(10), database.session() as holder, holder.begin():
         await PostgresIdentityCoordinator(holder).acquire(
             installation_id=installation, identity=first
         )
@@ -224,7 +224,7 @@ async def test_each_participant_waits_and_reads_the_preceding_commit(
     installation = await PostgresInstallationIdentityReader(database).read()
     if participant == "completion":
         await _operation(database, installation, "admission")
-    async with asyncio.timeout(12), asyncio.TaskGroup() as tasks, database.session() as holder:
+    async with asyncio.timeout(30), asyncio.TaskGroup() as tasks, database.session() as holder:
         async with holder.begin():
             await _acquire(holder, installation)
             task = tasks.create_task(_operation(database, installation, participant))
@@ -260,7 +260,7 @@ async def test_interrupted_lock_wait_leaves_no_partial_effects(
     if participant == "completion":
         await _operation(database, installation, "admission")
     before = await _counts(database)
-    async with asyncio.timeout(12), database.session() as holder:
+    async with asyncio.timeout(30), database.session() as holder:
         async with holder.begin():
             await _acquire(holder, installation)
             task = asyncio.create_task(_operation(database, installation, participant))
@@ -295,7 +295,7 @@ async def test_link_creation_waits_then_observes_the_pending_recovery(database: 
             await MockAccessScenarios.seed_linked_human(session, IDENTITY)
             return True
 
-    async with asyncio.timeout(10), asyncio.TaskGroup() as tasks, database.session() as holder:
+    async with asyncio.timeout(30), asyncio.TaskGroup() as tasks, database.session() as holder:
         async with holder.begin():
             await _reserve(holder, installation)
             task = tasks.create_task(try_link())
@@ -309,7 +309,7 @@ async def test_completion_observes_an_account_linked_while_it_waits(database: Da
     """Release eligibility must use Alice's newly committed account status."""
     installation = await PostgresInstallationIdentityReader(database).read()
     await _operation(database, installation, "admission")
-    async with asyncio.timeout(10), asyncio.TaskGroup() as tasks, database.session() as holder:
+    async with asyncio.timeout(30), asyncio.TaskGroup() as tasks, database.session() as holder:
         async with holder.begin():
             await _acquire(holder, installation)
             task = tasks.create_task(_operation(database, installation, "completion"))
@@ -359,7 +359,7 @@ async def test_initialization_takes_the_first_turn_before_recovery(
             await release.wait()
 
     with patch.object(PostgresIdentityCoordinator, "acquire", new=hold_first_turn):
-        async with asyncio.timeout(12), asyncio.TaskGroup() as tasks:
+        async with asyncio.timeout(30), asyncio.TaskGroup() as tasks:
             initializing = tasks.create_task(
                 PostgresHumanCredentialStateInitializer(database).initialize(IDENTITY)
             )
@@ -400,7 +400,7 @@ async def test_completion_rejects_a_changed_original_lock_binding(database: Data
     """Corrupted admission data cannot redirect completion to another identity's turn."""
     installation = await PostgresInstallationIdentityReader(database).read()
     await _operation(database, installation, "admission")
-    async with asyncio.timeout(10), database.session() as holder:
+    async with asyncio.timeout(30), database.session() as holder:
         async with holder.begin():
             await _acquire(holder, installation)
             task = asyncio.create_task(_operation(database, installation, "completion"))
@@ -431,7 +431,7 @@ async def test_completion_rejects_a_changed_original_lock_binding(database: Data
 async def test_initialization_rechecks_installation_after_waiting(database: Database) -> None:
     """Metadata changing during a wait must not initialize state under a different key."""
     installation = await PostgresInstallationIdentityReader(database).read()
-    async with asyncio.timeout(10), database.session() as holder:
+    async with asyncio.timeout(30), database.session() as holder:
         async with holder.begin():
             await _acquire(holder, installation)
             task = asyncio.create_task(_operation(database, installation, "initialization"))

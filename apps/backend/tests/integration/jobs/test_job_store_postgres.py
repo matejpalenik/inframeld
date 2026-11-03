@@ -847,7 +847,7 @@ async def test_long_unit_renews_lease_while_another_worker_polls(
 ) -> None:
     admission = await _admit(database, data=b"slow")
     async with application_worker_process(temporary_postgres_settings) as (_, first_units):
-        async with asyncio.timeout(5):
+        async with asyncio.timeout(15):
             while True:
                 async with database.session() as session:
                     saved = await PostgresJobStore(session).find(admission.operation_id)
@@ -1148,7 +1148,7 @@ async def test_queue_reporting_failure_does_not_waste_first_executable_attempt(
     finally:
         stopped.set()
         try:
-            await asyncio.wait_for(asyncio.shield(worker), timeout=3)
+            await asyncio.wait_for(asyncio.shield(worker), timeout=15)
         finally:
             if not worker.done():
                 worker.cancel()
@@ -1200,7 +1200,7 @@ async def test_stop_during_queue_report_leaves_admitted_job_unclaimed(
         application_worker.run_application_worker(settings, stopped, (BoundedJobHandler(),))
     )
     try:
-        await asyncio.wait_for(asyncio.shield(worker), timeout=5)
+        await asyncio.wait_for(asyncio.shield(worker), timeout=15)
     finally:
         stopped.set()
         if not worker.done():

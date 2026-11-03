@@ -1,7 +1,7 @@
 //! Own offline argument intent, bounded final reporting and process-outcome meaning.
 
 use std::{
-    ffi::OsString,
+    ffi::{OsStr, OsString},
     io::{self, Write},
 };
 
@@ -171,6 +171,7 @@ struct FinalRecord<'a, T> {
 /// update public local bindings and contact credential-free installation discovery.
 /// Dry-run describes the selected operation without its network or write effects.
 /// No invocation loads credentials or starts installation services.
+/// The caller supplies terminal capability for this same output destination.
 ///
 /// # Errors
 /// Returns plain-channel I/O failures for the executable's existing pipe policy.
@@ -179,6 +180,7 @@ pub fn run(
     arguments: impl IntoIterator<Item = impl Into<OsString> + Clone>,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
+    stdout_is_terminal: bool,
 ) -> io::Result<u8> {
     let mut arguments: Vec<OsString> = arguments.into_iter().map(Into::into).collect();
     // The process label is not a command operand or safe diagnostic content.
@@ -223,11 +225,19 @@ pub fn run(
         help: false,
         conflict: false,
     };
+    let no_color = std::env::var_os("NO_COLOR");
+    let term = std::env::var_os("TERM");
+    let styled = human_styling(
+        &parsed,
+        stdout_is_terminal,
+        no_color.as_deref(),
+        term.as_deref(),
+    );
     match parsed.command {
         Some(Command::Target(arguments)) => {
             let execution =
                 target_commands::run(arguments, parsed.target.as_deref(), parsed.dry_run, stderr);
-            report_target(selected, &execution, stdout, stderr)
+            report_target(selected, &execution, styled, stdout, stderr)
         }
         Some(Command::Version) if parsed.dry_run => success(
             selected,
@@ -248,6 +258,21 @@ pub fn run(
         }
         None => report_help(&arguments, stdout, stderr),
     }
+}
+
+fn human_styling(
+    arguments: &Arguments,
+    stdout_is_terminal: bool,
+    no_color: Option<&OsStr>,
+    term: Option<&OsStr>,
+) -> bool {
+    stdout_is_terminal
+        && !arguments.json
+        && !arguments.jsonl
+        && !arguments.plain
+        && !arguments.no_color
+        && no_color.is_none_or(OsStr::is_empty)
+        && term != Some(OsStr::new("dumb"))
 }
 
 fn report_help(
@@ -301,11 +326,12 @@ fn report_help(
 fn report_target(
     intent: Intent,
     execution: &target_commands::Execution,
+    styled: bool,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> io::Result<u8> {
     let report = &execution.report;
-    let human = report.human();
+    let human = report.human(styled);
     for warning in &report.warnings {
         let _ = writeln!(stderr, "warning: {}", warning.message);
     }
@@ -432,9 +458,52 @@ fn machine<T: Serialize>(
 
 #[cfg(test)]
 mod tests {
-    use std::io::{self, Write};
+    use std::{
+        ffi::OsStr,
+        io::{self, Write},
+    };
 
-    use super::{STDOUT_LIMIT, plain};
+    use clap::Parser as _;
+
+    use super::{Arguments, STDOUT_LIMIT, human_styling, plain};
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn styling_requires_the_supplied_terminal_and_respects_every_plain_veto() {
+        for (flags, terminal, no_color, term, expected) in [
+            (&[][..], true, None, Some("xterm-256color"), true),
+            (&[][..], true, None, None, true),
+            (&[][..], true, Some(""), Some("xterm"), true),
+            (&["--dry-run"][..], true, None, Some("xterm"), true),
+            (&["--no-input"][..], true, None, Some("xterm"), true),
+            (&[][..], false, None, Some("xterm"), false),
+            (&[][..], true, Some("1"), Some("xterm"), false),
+            (&[][..], true, Some(" "), Some("xterm"), false),
+            (&[][..], true, None, Some("dumb"), false),
+            (&["--plain"][..], true, None, Some("xterm"), false),
+            (&["--no-color"][..], true, None, Some("xterm"), false),
+            (&["--json"][..], true, None, Some("xterm"), false),
+            (&["--jsonl"][..], true, None, Some("xterm"), false),
+        ] {
+            let arguments = Arguments::try_parse_from(
+                ["inframeld"]
+                    .into_iter()
+                    .chain(flags.iter().copied())
+                    .chain(["target", "use", "dev"]),
+            )
+            .expect("The test supplies a valid target invocation.");
+            assert_eq!(
+                human_styling(
+                    &arguments,
+                    terminal,
+                    no_color.map(OsStr::new),
+                    term.map(OsStr::new)
+                ),
+                expected,
+                "flags={flags:?}, terminal={terminal}, no_color={no_color:?}, term={term:?}",
+            );
+        }
+    }
 
     #[derive(Debug)]
     enum DiagnosticFailure {

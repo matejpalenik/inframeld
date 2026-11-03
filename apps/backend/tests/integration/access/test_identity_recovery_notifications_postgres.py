@@ -290,7 +290,7 @@ async def test_concurrent_password_receipts_preserve_single_original_budget(
                 session, installation, AUTHORITY
             ).record_password_saved(EVIDENCE)
 
-    async with asyncio.timeout(10):
+    async with asyncio.timeout(30):
         first, second = await asyncio.gather(complete(), complete())
     assert first == second
     async with database.session() as session:

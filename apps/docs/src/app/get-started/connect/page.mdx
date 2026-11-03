@@ -1,0 +1,34 @@
+export const pageMetadata = {
+  title: "Connect and sign in",
+  description: "Use an existing account and configure a CLI target.",
+}
+
+# Connect and sign in
+
+Use the backend URL and HTTPS account-site URL supplied by your installation operator. You also need an existing account and its configured password or email-code method.
+
+## Sign in through the account site
+
+For an account site such as `https://accounts.example.com`:
+
+1. Open `https://accounts.example.com/login`.
+2. Choose **Use your password** or **Use an email code** and complete the provider's form. Email-code sign-in needs delivery to your configured email address.
+3. Follow the displayed error if a password or code is rejected. For an expired flow, choose **Sign in** to begin a fresh flow.
+
+Your browser must trust the site's TLS certificate. If the installation requires a factor or interaction this preview cannot complete, ask the operator for a supported path. Required factors remain required.
+
+## Review a consent request
+
+When a supported client opens a consent page, check the account and installation shown before approving. **Cancel** rejects the request. Remembering a new approval starts unchecked. If a decision's outcome is uncertain, stop and follow the original client's recovery instructions rather than submitting it again.
+
+Keep flow URLs, cookies and codes private. They can remain in browser history.
+
+## Configure a terminal target
+
+[Register the backend URL](/guides/register-a-target) as a local CLI target. Target registration saves connection information. The delivered target commands do not sign in or save a human login. [CLI setup](/clients/cli/setup) lists the current capability boundary.
+
+## Sign out of the browser
+
+Open `https://accounts.example.com/logout` and activate **Sign out of browser**. Opening the page alone does not end the session. Browser sign-out and CLI credentials have separate lifecycles.
+
+For protected API operations, follow [authentication](/api-reference#authentication). For account creation, recovery and account management, use the operator's supported procedure for your installation.

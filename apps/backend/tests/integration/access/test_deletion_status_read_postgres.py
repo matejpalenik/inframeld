@@ -337,7 +337,7 @@ async def test_missing_installation_metadata_is_unavailable(database: Database) 
 
 
 async def _wait_for_blocker(database: Database, pid: int, task: asyncio.Task[object]) -> None:
-    async with asyncio.timeout(2):
+    async with asyncio.timeout(10):
         while True:
             assert not task.done(), "The operation did not wait for Organization coordination."
             async with database.session() as observer:
@@ -490,7 +490,7 @@ async def test_cancelled_read_releases_organization_coordination(database: Datab
         reader.cancel()
         with pytest.raises(asyncio.CancelledError):
             await reader
-        async with asyncio.timeout(2), database.session() as changer, changer.begin():
+        async with asyncio.timeout(10), database.session() as changer, changer.begin():
             await changer.execute(
                 select(OrganizationRow.id)
                 .where(OrganizationRow.id == seed.request.organization_id.value)

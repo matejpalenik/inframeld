@@ -355,7 +355,7 @@ test("pure browser owner client loss never supplies successful completion", asyn
   link.lost();
   await assert.rejects(acquiring, /owner.*lost|closed/i);
   await assert.rejects(client.completion, /owner.*lost|closed/i);
-  h.clock.advance(5001);
+  h.clock.advance(15001);
   await browserTicks();
   assert.equal(h.owner.snapshot().cases[0]?.held, true);
   assert.equal(h.clock.timers.size, 0);
@@ -492,6 +492,36 @@ test("pure browser owner supervisor stops the worker and browser concurrently on
   assert.equal(h.clock.timers.size, 0);
 });
 
+test("pure browser owner admits separate startup and cleanup windows", async () => {
+  const h = browserHarness("stalled-close");
+  h.send({
+    type: "hello",
+    nonce: "owned-run",
+    role: "supervisor",
+    caseId: "stalled-close",
+  });
+  await browserTicks();
+  h.send({
+    type: "arm",
+    readyAt: 50,
+    sent: 50,
+    workDeadline: 30050,
+    assertDeadline: 60050,
+  });
+  await browserTicks();
+  try {
+    assert.equal(
+      h.disconnected(),
+      false,
+      "A 30-second startup must leave its separate cleanup window available",
+    );
+  } finally {
+    h.end();
+    h.clock.advance(60001);
+    await browserTicks();
+  }
+});
+
 test("pure browser owner keeps the original close window usable for profile kill", async () => {
   const h = browserHarness("stalled-close"),
     link = clientLink(h);
@@ -499,22 +529,24 @@ test("pure browser owner keeps the original close window usable for profile kill
     caseId: "stalled-close",
     nonce: "owned-run",
     clock: h.clock,
-    workDeadline: 1100,
-    assertDeadline: 30100,
+    workDeadline: 30100,
+    assertDeadline: 60100,
     channel: link.channel,
   });
   try {
     const acquiring = client.launch({
       channel: "chromium",
       headless: true,
-      timeout: 1000,
+      timeout: 30000,
     });
+    await browserTicks();
+    h.clock.advance(25000);
     h.launched.resolve(h.lease);
     const api = await acquiring;
     const closing = api.close();
     void closing.catch(() => {});
     await browserTicks();
-    const deadline = h.clock.now() + 2500;
+    const deadline = h.clock.now() + 7500;
     const timers = [...h.clock.timers].filter(
       ([, timer]) => timer.at === deadline,
     );
@@ -562,7 +594,7 @@ test("pure browser owner keeps the original close window usable for profile kill
     h.kill.resolve();
     h.closed.resolve();
     client.end();
-    h.clock.advance(5001);
+    h.clock.advance(15001);
     await browserTicks();
   }
 });
@@ -673,7 +705,7 @@ test("pure browser owner maps fractional monotonic clocks without early emergenc
   h.clock.advance(0.02);
   await browserTicks();
   assert.equal(h.owner.snapshot().cases[0]?.emergency, true);
-  h.clock.advance(5001);
+  h.clock.advance(15001);
   await browserTicks();
   assert.equal(h.owner.snapshot().cases[0]?.held, true);
 });
@@ -714,7 +746,7 @@ test("pure browser owner does not start report IO after the worker stop budget e
   await browserTicks();
   controller.abort(new Error("first bounded worker stop"));
   await browserTicks();
-  h.clock.advance(10001);
+  h.clock.advance(30001);
   await browserTicks();
   await assert.rejects(running, /cleanup failed/);
   assert.equal(reports, 0);
@@ -910,7 +942,7 @@ test("pure browser owner refuses completion evidence before the case is armed", 
 
 test("pure browser owner accepts only the injected close error without hiding other cleanup failures", () => {
   for (const message of [
-    "Operation exceeded its 2500ms deadline",
+    "Operation exceeded its 7500ms deadline",
     "close-deadline",
   ]) {
     const expected = new Error(message);
@@ -1066,13 +1098,13 @@ test("pure browser owner retains late acquisition and one recovery deadline", as
     h.end();
     await browserTicks();
     const deadline = h.owner.snapshot().cases[0]?.recoveryDeadline;
-    assert.equal(deadline, 5100);
+    assert.equal(deadline, 15100);
     h.end();
-    const stopping = h.owner.stop(9000);
+    const stopping = h.owner.stop(19000);
     void stopping.catch(() => {});
     await browserTicks();
     assert.equal(h.owner.snapshot().cases[0]?.recoveryDeadline, deadline);
-    h.clock.advance(expired ? 5001 : 1000);
+    h.clock.advance(expired ? 15001 : 1000);
     await browserTicks();
     h.launched.resolve(h.lease);
     await browserTicks();
@@ -1137,7 +1169,7 @@ test("pure browser owner preserves unknown acquisition and bounded control failu
     role: "supervisor",
     caseId: "startup-cancel",
   });
-  blocked.clock.advance(2001);
+  blocked.clock.advance(10001);
   await browserTicks();
   assert.equal(blocked.disconnected(), true);
   assert.ok(blocked.owner.snapshot().errors.includes("control-deadline"));

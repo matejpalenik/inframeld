@@ -1,0 +1,21 @@
+export const pageMetadata = {
+  title: "Documents, versions and collections",
+  description:
+    "Understand immutable source versions and exact collection membership.",
+}
+
+# Documents, versions and collections
+
+A document represents a source you want to use as knowledge. A version captures a particular set of source bytes. A collection selects exact document versions for a workflow.
+
+For example, a collection can contain handbook A version 1 and handbook B version 1. Replacing B creates a new version. A new collection selection can use B version 2 while the older selection remains identifiable.
+
+## Update and erase
+
+Updating a source and erasing its content serve different needs. An update supplies new knowledge. Erasure blocks current access and publication before physical cleanup completes. Historical identity does not promise that erased bytes stay available.
+
+## Prepare for search
+
+Processing turns admitted source content into passages and search representations. Compatible unchanged inputs may be reused. [Models, processing and search](/product/models-and-search) explains the next stage.
+
+The current preview's public API does not yet expose document upload, collection management or source synchronization. [Add and manage knowledge](/guides/knowledge) tracks the user-facing entry point as those workflows become available.

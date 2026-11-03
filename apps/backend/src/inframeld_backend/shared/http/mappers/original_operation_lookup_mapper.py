@@ -1,8 +1,8 @@
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
-    AcceptedAsyncOperationDTO,
+from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto import (
+    AcceptedOperationLookupDTO,
 )
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
@@ -24,6 +24,7 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
     OperationLookupAuthority,
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.http.enums.unknown_job_reference import UnknownJobReference
 from inframeld_backend.shared.http.requests.original_operation_lookup_request import (
     OriginalOperationLookupRequest,
 )
@@ -35,6 +36,9 @@ from inframeld_backend.shared.http.responses.completed_operation_lookup_response
 )
 from inframeld_backend.shared.http.responses.in_progress_operation_lookup_response import (
     InProgressOperationLookupResponse,
+)
+from inframeld_backend.shared.http.responses.known_job_reference_response import (
+    KnownJobReferenceResponse,
 )
 from inframeld_backend.shared.http.responses.recovery_required_operation_lookup_response import (
     RecoveryRequiredOperationLookupResponse,
@@ -65,7 +69,7 @@ class OriginalOperationLookupMapper:
     @staticmethod
     def to_response(
         result: CompletedSynchronousOperationDTO
-        | AcceptedAsyncOperationDTO
+        | AcceptedOperationLookupDTO
         | InProgressOperationDTO
         | RecoveryRequiredOperationDTO
         | UnresolvedOperationDTO,
@@ -78,11 +82,13 @@ class OriginalOperationLookupMapper:
                     classification=result.replay_kind.value,
                     idempotencyExpiresAt=result.expires_at,
                 )
-            case AcceptedAsyncOperationDTO():
+            case AcceptedOperationLookupDTO():
                 return AcceptedOperationLookupResponse(
                     outcome="accepted_asynchronous",
                     admission="confirmed",
-                    jobReference="unknown",
+                    jobReference=KnownJobReferenceResponse(jobId=result.job_id.value)
+                    if result.job_id is not None
+                    else UnknownJobReference.UNKNOWN,
                     dispatch="not_established",
                     operationId=result.operation_id.value,
                     idempotencyExpiresAt=result.expires_at,

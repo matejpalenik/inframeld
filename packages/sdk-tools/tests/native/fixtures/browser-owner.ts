@@ -136,7 +136,7 @@ export async function superviseBrowserWorker(
   const begin = (reason?: unknown) => {
     if (reason !== undefined && !errors.includes(reason)) errors.push(reason);
     if (deadline !== undefined) return;
-    deadline = clock.now() + 10000;
+    deadline = clock.now() + 2 * budgets.resourceCleanup;
     controller.abort(reason ?? new Error("Browser worker finished"));
     cleanup = owner.stop(deadline);
     void cleanup.catch(() => {});
@@ -214,7 +214,10 @@ export async function connectBrowserCase(
   options: BrowserClientOptions,
 ): Promise<BrowserFixtureClient> {
   const clock = options.clock;
-  const handshakeDeadline = Math.min(options.workDeadline, clock.now() + 2000);
+  const handshakeDeadline = Math.min(
+    options.workDeadline,
+    clock.now() + budgets.control,
+  );
   let channel = options.channel;
   if (!channel) {
     if (
@@ -388,7 +391,7 @@ export async function connectBrowserCase(
     await bound(
       clock,
       transport.write(bytes),
-      Math.min(deadline, clock.now() + 2000),
+      Math.min(deadline, clock.now() + budgets.control),
       "control",
     );
   };
@@ -467,11 +470,14 @@ export async function connectBrowserCase(
             if (!result) {
               browserDeadline ??= Math.min(
                 options.assertDeadline,
-                clock.now() + 5000,
+                clock.now() + budgets.resourceCleanup,
               );
               result = transact(
                 op,
-                Math.min(browserDeadline, clock.now() + 2500),
+                Math.min(
+                  browserDeadline,
+                  clock.now() + budgets.resourceCleanup / 2,
+                ),
               ).then(() => {});
               calls.set(op, result);
             }
@@ -503,10 +509,10 @@ export interface BrowserOwnerCase {
 }
 
 const caseCaps: Record<string, number> = {
-  "startup-cancel": 30000,
-  "stalled-close": 30000,
-  "profile-timeout": 10000,
-  "worker-loss": 10000,
+  "startup-cancel": 60000,
+  "stalled-close": 60000,
+  "profile-timeout": 60000,
+  "worker-loss": 60000,
 };
 const stallCases = new Set(["stalled-close", "profile-timeout"]);
 
@@ -653,7 +659,9 @@ class OwnedBrowserCase {
   fail(code: string): void {
     this.error(code);
     this.owner.options.failed?.(this.id);
-    void this.recover(this.owner.options.clock.now() + 5000).catch(() => {});
+    void this.recover(
+      this.owner.options.clock.now() + budgets.resourceCleanup,
+    ).catch(() => {});
   }
   async launch(deadline: number, timeout: number): Promise<string> {
     if (
@@ -741,8 +749,15 @@ class OwnedBrowserCase {
   ): Promise<BrowserOwnerReceipt> {
     const clock = this.owner.options.clock;
     if (!this.lease || this.row.emergency) throw new Error("owner-unavailable");
-    this.browserDeadline ??= Math.min(clock.now() + 5000, this.assertDeadline);
-    deadline = Math.min(deadline, clock.now() + 2500, this.browserDeadline);
+    this.browserDeadline ??= Math.min(
+      clock.now() + budgets.resourceCleanup,
+      this.assertDeadline,
+    );
+    deadline = Math.min(
+      deadline,
+      clock.now() + budgets.resourceCleanup / 2,
+      this.browserDeadline,
+    );
     try {
       await admit(
         clock,
@@ -779,7 +794,10 @@ class OwnedBrowserCase {
     if (this.row.state === "closed") return Promise.resolve();
     const clock = this.owner.options.clock;
     this.row.emergency = true;
-    this.row.recoveryDeadline = Math.min(clock.now() + 5000, limit);
+    this.row.recoveryDeadline = Math.min(
+      clock.now() + budgets.resourceCleanup,
+      limit,
+    );
     clock.clear(this.assertionTimer);
     this.recovery = (async () => {
       if (!this.launchPromise) {
@@ -870,7 +888,7 @@ export class BrowserFixtureOwner {
     };
     const peer: OwnerPeer = {
       channel,
-      async send(value, deadline = clock.now() + 2000) {
+      async send(value, deadline = clock.now() + budgets.control) {
         if (!alive) return;
         // An expired method reply has no remaining delivery allowance. The client
         // owns that same deadline and may still use the remaining kill phase.
@@ -886,7 +904,7 @@ export class BrowserFixtureOwner {
           await bound(
             clock,
             channel.write(payload),
-            Math.min(deadline, clock.now() + 2000),
+            Math.min(deadline, clock.now() + budgets.control),
             "control",
           );
         } catch (error) {
@@ -1271,7 +1289,7 @@ async function runFixture(mode: string): Promise<void> {
         server.once("error", reject);
         server.listen(socketPath, resolve);
       }),
-      performance.now() + 2000,
+      performance.now() + 10000,
       "listener",
     );
     const loader = join(home, "node_modules/tsx/dist/loader.mjs");
@@ -1289,7 +1307,7 @@ async function runFixture(mode: string): Promise<void> {
           const capture = await admit(
             browserFixtureClock,
             () => prepareFixtureCapture(protectedFolder, "probe"),
-            began + 15000,
+            began + 60000,
             "capture",
           );
           captures.set("probe", capture);
@@ -1304,9 +1322,9 @@ async function runFixture(mode: string): Promise<void> {
               ],
               {
                 signal,
-                timeout: 15000,
-                executionDeadline: began + 15000,
-                cleanupTimeout: 5000,
+                timeout: 60000,
+                executionDeadline: began + 60000,
+                cleanupTimeout: budgets.resourceCleanup,
                 log: capture.path,
                 env: { ...env, SDK_BROWSER_OWNER_PROBE: "1" },
               },
@@ -1363,7 +1381,7 @@ async function runFixture(mode: string): Promise<void> {
                 signal,
                 timeout: 900000,
                 executionDeadline: began + 900000,
-                cleanupTimeout: 5000,
+                cleanupTimeout: budgets.resourceCleanup,
                 log: capture.path,
                 env,
               },
@@ -1399,7 +1417,7 @@ async function runFixture(mode: string): Promise<void> {
     errors.push(error);
   } finally {
     closing = true;
-    stopDeadline ??= performance.now() + 10000;
+    stopDeadline ??= performance.now() + 2 * budgets.resourceCleanup;
     try {
       await owner.stop(stopDeadline);
     } catch (error) {

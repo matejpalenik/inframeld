@@ -1,0 +1,59 @@
+export const pageMetadata = {
+  title: "Install the CLI",
+  description: "Install an explicit CLI archive or build the current source.",
+}
+
+# Install the CLI
+
+Install a CLI archive supplied for your platform, or build the current source. The archive and checksum must come from the same explicit artifact set. This preview does not provide a universal release installer or registry download command.
+
+## Install a supplied archive
+
+Choose the archive your maintainer supplied for your OS and architecture. Verify its checksum before extracting it. For an Apple Silicon archive on macOS:
+
+<CodeGroup>
+
+```shell
+shasum -a 256 -c inframeld-cli-aarch64-apple-darwin.tar.xz.sha256
+tar -xf inframeld-cli-aarch64-apple-darwin.tar.xz
+```
+
+</CodeGroup>
+
+On Linux use `sha256sum -c` with the matching checksum file. Read the [CLI packaging instructions](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#install-and-remove-a-packaged-executable) for available artifact names and verified platform limits.
+
+From the extracted directory, choose a user-local destination:
+
+<CodeGroup>
+
+```shell
+cli_bin_dir="$HOME/.local/bin"
+mkdir -p "$cli_bin_dir"
+(test ! -e "$cli_bin_dir/inframeld" && install -m 755 inframeld "$cli_bin_dir/inframeld")
+export PATH="$cli_bin_dir:$PATH"
+inframeld --version
+```
+
+</CodeGroup>
+
+The installation command refuses to overwrite an existing executable. If one exists, check its origin before deliberately replacing it. The PATH change above affects this shell. Configure your shell's startup file separately if you want it to persist.
+
+## Build from source
+
+From an Inframeld checkout with the pinned toolchain:
+
+<CodeGroup>
+
+```shell
+mise install
+mise exec -- cargo build --locked -p inframeld-cli
+./target/debug/inframeld --version
+```
+
+</CodeGroup>
+
+Use `./target/debug/inframeld` in place of `inframeld` until you install that binary on PATH.
+
+## Continue
+
+Open [CLI setup](/clients/cli/setup), [check the build information](/guides/inspect-cli-version), or [register a target](/guides/register-a-target). Keep the artifact's origin and version when reporting a problem.

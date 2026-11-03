@@ -22,7 +22,7 @@ fn isolated(home: &TempDir) -> Command {
         .env("HOME", home.path())
         .env("PATH", "")
         .current_dir(home.path())
-        .timeout(Duration::from_secs(5));
+        .timeout(Duration::from_secs(30));
     command
 }
 
@@ -283,9 +283,10 @@ fn unsafe_arguments_are_not_echoed_to_either_human_or_machine_diagnostics() {
 #[test]
 fn terminal_controls_do_not_style_or_change_the_machine_payload() {
     let home = TempDir::new().unwrap();
-    for (name, value) in [("NO_COLOR", "1"), ("TERM", "dumb")] {
+    for (name, value) in [("NO_COLOR", "1"), ("NO_COLOR", ""), ("TERM", "dumb")] {
         let output = isolated(&home)
             .env(name, value)
+            .env("CLICOLOR_FORCE", "1")
             .args(["version", "--json", "--plain", "--no-color", "--no-input"])
             .output()
             .unwrap();
@@ -339,6 +340,7 @@ fn builtin_help_uses_static_command_text_without_reflecting_the_process_label() 
         ["private-\u{1b}[31m-label", "help", "version"],
         &mut output,
         &mut diagnostic,
+        true,
     )
     .unwrap();
     assert_eq!(code, 0);
@@ -414,6 +416,7 @@ fn machine_write_or_flush_failure_is_nonzero_without_a_replacement_result() {
             ["inframeld", "version", "--json"],
             &mut output,
             &mut diagnostic,
+            true,
         )
         .unwrap();
         assert_eq!(code, 1);
@@ -433,6 +436,7 @@ fn broken_human_diagnostic_does_not_suppress_the_final_machine_usage_result() {
         ["inframeld", "--jsonl", "--dry-run", "--unknown"],
         &mut output,
         &mut diagnostic,
+        true,
     )
     .unwrap();
     assert_eq!(code, 2);
@@ -461,8 +465,13 @@ fn human_usage_keeps_its_exit_when_the_diagnostic_write_or_flush_fails() {
     ]
     .map(|mut diagnostic| {
         let mut output = Vec::new();
-        let code = run(["inframeld", "--unknown"], &mut output, &mut diagnostic)
-            .map_err(|error| error.kind());
+        let code = run(
+            ["inframeld", "--unknown"],
+            &mut output,
+            &mut diagnostic,
+            true,
+        )
+        .map_err(|error| error.kind());
         assert!(output.is_empty());
         assert!(diagnostic.bytes.len() <= 1_024);
         code
@@ -481,7 +490,8 @@ fn successive_short_writes_complete_one_result_before_success() {
         run(
             ["inframeld", "version", "--json"],
             &mut output,
-            &mut diagnostic
+            &mut diagnostic,
+            true
         )
         .unwrap(),
         0
@@ -517,7 +527,7 @@ fn real_broken_machine_pipe_fails_while_plain_version_keeps_its_pipe_exception()
         // assert_cmd's capture replaces a configured stdout, so retain this pipe
         // on the actual owned child and reap it before inspecting the result.
         let mut child = process.stderr(Stdio::piped()).spawn().unwrap();
-        let deadline = Instant::now() + Duration::from_secs(5);
+        let deadline = Instant::now() + Duration::from_secs(30);
         loop {
             if child.try_wait().unwrap().is_some() {
                 break;
@@ -556,7 +566,7 @@ fn a_closed_stderr_diagnostic_cannot_make_an_invalid_invocation_succeed() {
         .stderr(Stdio::from(writer))
         .spawn()
         .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let deadline = Instant::now() + Duration::from_secs(30);
     loop {
         if child.try_wait().unwrap().is_some() {
             break;

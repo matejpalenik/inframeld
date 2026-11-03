@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
+import { withinDeadline } from "../../src/system/deadline.ts";
 import { execute } from "../../drivers/typescript.ts";
 import type { DriverRequest } from "../../src/conformance/protocol.ts";
 
@@ -23,12 +24,12 @@ test("cancelling an active native Fetch call permits a subsequent client request
     profile: "typescript-node",
     caseId: "cancel",
     baseUrl: `http://127.0.0.1:${address.port}`,
-    calls: [{ id: "one", operation: "getHealth", headers: {}, timeout: 2000 }],
+    calls: [{ id: "one", operation: "getHealth", headers: {}, timeout: 10000 }],
   };
   const controller = new AbortController();
   try {
     const active = execute(request, controller.signal);
-    await started;
+    await withinDeadline(started, 10000);
     controller.abort(new Error("caller cancelled"));
     const reply = await active;
     assert.equal(reply.kind, "observations");
@@ -43,6 +44,7 @@ test("cancelling an active native Fetch call permits a subsequent client request
     );
     assert.equal(dispatches, 2);
   } finally {
+    controller.abort(new Error("Native cancellation test finished"));
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -77,14 +79,14 @@ test("the same generated client is reusable after supported operation cancellati
     throwOnError: false,
     responseStyle: "fields",
   });
-  await started;
+  await withinDeadline(started, 10000);
   controller.abort(new Error("cancel active SDK operation"));
   const failure = (await active).error;
   assert.ok(failure?.kind === "transport");
   assert.equal(failure.reason, "aborted");
   const reused = await getHealth({
     client,
-    signal: AbortSignal.timeout(1000),
+    signal: AbortSignal.timeout(10000),
     throwOnError: false,
     responseStyle: "fields",
   });

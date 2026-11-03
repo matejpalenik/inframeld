@@ -40,12 +40,14 @@ Access checks the expected guard from current facts before reservation history i
 | HTTP 200 outcome | Meaning |
 | --- | --- |
 | `completed_synchronous` | Retained completion metadata, original operation ID, safe classification and unchanged expiry |
-| `accepted_asynchronous` | Original admission is confirmed, with job reference explicitly unknown and dispatch not established |
+| `accepted_asynchronous` | Original admission is confirmed, with a known or explicitly unknown job reference and dispatch not established |
 | `in_progress` | The original synchronous operation remains unfinished |
 | `recovery_required` | The original operation requires recovery without an established asynchronous admission |
 | `unresolved` | No retained authoritative match can be established |
 
-Unresolved has exactly one field, `outcome`. It does not explain whether history was absent, expired, insufficiently bound or mismatched. It does not establish that nothing happened. A retained asynchronous admission remains accepted regardless of a later job state. The public lookup response still reports an unknown job reference and supplies no job URL or current progress.
+Unresolved has exactly one field, `outcome`. It does not explain whether history was absent, expired, insufficiently bound or mismatched. It does not establish that nothing happened. A retained asynchronous admission remains accepted regardless of a later job state. The public lookup response returns `jobReference` as either `"unknown"` or a strict object such as `{"jobId": "00000000-0000-4000-8000-000000000004"}`. A known ID identifies that original work, but `dispatch` remains `not_established`. It establishes no execution state, progress, result content or permission to inspect the job later. This component supplies no job-inspection endpoint or CLI command.
+
+For the delivered Project action-use path, the reference is disclosed only after current lookup authorization and an exact original ordinary product-job binding. Missing or malformed optional job data leaves admission confirmed with an unknown reference. It does not turn a non-authoritative original record into a match or hide a malformed original outcome or database failure. Cleanup-origin attribution cannot supply an ordinary product Job ID.
 
 Invalid input, missing/rejected authentication, hidden scope, denied current authority and unavailable dependencies remain safe problem responses. A timeout or disconnect is a failed observation. Neither Unresolved nor a failed observation authorizes resubmission, a replacement operation or a provider call. Repeated successful reads preserve the original expiry.
 

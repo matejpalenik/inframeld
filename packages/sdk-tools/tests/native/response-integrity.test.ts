@@ -6,7 +6,7 @@ import {
   zOperationLookupResponse,
 } from "../../../sdk-typescript/generated/zod.gen.js";
 
-test("original lookup requires an authority guard and retains explicit unknown job fields", () => {
+test("original lookup requires a guard and strict known or unknown job references", () => {
   const input = {
     installationId: "00000000-0000-4000-8000-000000000001",
     organizationId: "00000000-0000-4000-8000-000000000002",
@@ -41,6 +41,26 @@ test("original lookup requires an authority guard and retains explicit unknown j
     idempotencyExpiresAt: null,
   };
   assert.deepEqual(zOperationLookupResponse.parse(accepted), accepted);
+  const known = {
+    ...accepted,
+    jobReference: { jobId: "00000000-0000-4000-8000-000000000008" },
+  };
+  assert.deepEqual(zOperationLookupResponse.parse(known), known);
+  for (const jobReference of [{}, { jobId: null }, { jobId: "guessed-job" }]) {
+    assert.equal(
+      zOperationLookupResponse.safeParse({ ...accepted, jobReference }).success,
+      false,
+    );
+  }
+  // This is the generated Zod model's projection, not the HTTP client's raw
+  // data policy for unknown keys.
+  assert.deepEqual(
+    zOperationLookupResponse.parse({
+      ...accepted,
+      jobReference: { ...known.jobReference, state: "running" },
+    }),
+    known,
+  );
   for (const field of [
     "outcome",
     "jobReference",

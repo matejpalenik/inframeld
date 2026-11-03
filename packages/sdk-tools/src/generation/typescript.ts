@@ -1,5 +1,5 @@
 import { mkdir, symlink, realpath, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { sourceInputs, typescriptParserInputs } from "./source.ts";
 import { preparePatchedSource } from "./patched-source.ts";
@@ -38,9 +38,12 @@ export async function prepareTypescript(): Promise<string> {
     installedParser.lastIndexOf("/node_modules/") + "/node_modules".length,
   );
   await symlink(parserDependencies, join(parserSource, "node_modules"), "dir");
-  // Private links replace only the selected parser, never installed dependencies.
+  // Private links select the patched parser and legacy compiler API without changing installed dependencies.
   const local = join(source, "node_modules");
   await mkdir(local, { recursive: true });
+  const compilerApi = dirname(
+    fileURLToPath(import.meta.resolve("typescript-compiler-api/package.json")),
+  );
   for (const entry of await readdir(dependencies)) {
     if (entry === "@hey-api") {
       await mkdir(join(local, entry), { recursive: true });
@@ -50,7 +53,12 @@ export async function prepareTypescript(): Promise<string> {
           join(local, entry, name),
           "dir",
         );
-    } else await symlink(join(dependencies, entry), join(local, entry), "dir");
+    } else
+      await symlink(
+        entry === "typescript" ? compilerApi : join(dependencies, entry),
+        join(local, entry),
+        "dir",
+      );
   }
   return source;
 }

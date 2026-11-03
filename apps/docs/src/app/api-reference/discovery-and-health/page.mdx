@@ -1,0 +1,99 @@
+export const pageMetadata = {
+  title: "Discovery and health",
+  description: "Inspect public service metadata and the health response.",
+}
+
+# Discovery and health
+
+Use health for a first connectivity request and protected-resource metadata for the configured resource identity. Discovery metadata is input to the trusted authentication workflow, rather than a credential.
+
+## Check health
+
+<ApiOperation operationId="getHealth" />
+
+The successful body includes a status value. [HTTP](/clients/http#make-your-first-request), [Python](/clients/python#make-a-first-request), [TypeScript](/clients/typescript#make-a-first-request) and [Rust](/clients/rust#make-a-first-request) provide complete equivalent examples.
+
+Choose one alternative after the corresponding [client setup](/clients/http). Set `INFRAMELD_URL` to your backend URL. The SDK programs below are complete files: `health.py`, `health.ts` or `src/main.rs`. Run them as described on the corresponding client page.
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --fail-with-body --silent --show-error --max-time 5 "$INFRAMELD_URL/health"
+```
+
+```python
+import asyncio
+import os
+
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.health_api import HealthApi
+
+
+async def main() -> None:
+    client = ApiClient(Configuration(host=os.environ["INFRAMELD_URL"]))
+    try:
+        response = await HealthApi(client).get_health_with_http_info()
+        print(response.data["status"])
+    finally:
+        await client.close()
+
+
+asyncio.run(main())
+```
+
+```typescript
+import { createClient, getHealth } from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+if (!baseUrl) throw new Error("Set INFRAMELD_URL")
+
+const client = createClient({ baseUrl })
+const result = await getHealth({ client })
+if (result.error) throw new Error("The health request failed")
+console.log(result.data.status)
+```
+
+```rust
+use inframeld_sdk::HttpClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let client = HttpClient::new().with_base_url(base_url);
+    let response = client.get_health().await?;
+    println!("{}", serde_json::to_string_pretty(&response.body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+## Inspect root resource metadata
+
+<ApiOperation operationId="getProtectedResourceMetadata" />
+
+<CodeGroup>
+
+```shell
+curl --fail-with-body --silent --show-error --max-time 5   "$INFRAMELD_URL/.well-known/oauth-protected-resource"
+```
+
+</CodeGroup>
+
+The configured resource and authorization-server identity must match the trusted installation. An unavailable/configured-off discovery endpoint has its declared response rather than an inferred default issuer.
+
+## Inspect path resource metadata
+
+<ApiOperation operationId="getProtectedResourceMetadataForPath" />
+
+Supply the encoded relative resource path. Preserve slash separators and existing percent escapes as the contract requires. For a `v1/session` resource path:
+
+<CodeGroup>
+
+```shell
+curl --fail-with-body --silent --show-error --max-time 5   "$INFRAMELD_URL/.well-known/oauth-protected-resource/v1/session"
+```
+
+</CodeGroup>
+
+Use [target registration](/guides/register-a-target) for the CLI's delivered identity-checking procedure.

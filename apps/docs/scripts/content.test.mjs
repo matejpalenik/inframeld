@@ -56,6 +56,39 @@ test("checks navigation destinations even when no page links to them", async (t)
   )
 })
 
+test("checks child navigation destinations", async (t) => {
+  const root = await fixture(t, { "": "# Home", cli: "# CLI" })
+  const navigation = [
+    { links: [{ href: "/cli", children: [{ href: "/missing" }] }] },
+  ]
+  assert.match(
+    (await validateContent(root, navigation)).join("\n"),
+    /navigation.*\/missing.*route/
+  )
+})
+
+test("reports unknown API references and undocumented delivered operations", async (t) => {
+  const root = await fixture(t, {
+    "": '# Reference\n\n<ApiOperation operationId="missing" />',
+  })
+  const contract = {
+    paths: { "/health": { get: { operationId: "getHealth" } } },
+  }
+  const errors = (await validateContent(root, [], contract)).join("\n")
+  assert.match(errors, /missing.*unknown API operation/)
+  assert.match(errors, /getHealth.*not documented/)
+})
+
+test("accepts documentation of every delivered API operation", async (t) => {
+  const root = await fixture(t, {
+    "": '# Reference\n\n<ApiOperation operationId="getHealth" />',
+  })
+  const contract = {
+    paths: { "/health": { get: { operationId: "getHealth" } } },
+  }
+  assert.deepEqual(await validateContent(root, [], contract), [])
+})
+
 test("reports invalid MDX rather than silently skipping its links", async (t) => {
   const root = await fixture(t, { "": "# Home\n\n<Note>Unclosed" })
   assert.match((await validateContent(root)).join("\n"), /MDX/)
