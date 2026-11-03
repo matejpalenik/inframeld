@@ -257,6 +257,10 @@ jobs:
           # This single-stage image needs only the final image's cache layers.
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,version=2,scope=inframeld-integration-linux-amd64,mode=min,ignore-error=true,timeout=2m' || '' }}
 
+      - name: Prepare pinned SeaweedFS image
+        if: needs.changes.outputs.integration == 'true'
+        run: docker compose -p inframeld-test -f compose.test.yaml pull --policy always seaweedfs
+
       - name: Run backend integration tests with PostgreSQL, Kratos and Hydra
         if: needs.changes.outputs.integration == 'true'
         id: integration
