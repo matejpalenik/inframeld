@@ -14,7 +14,37 @@ from types import SimpleNamespace
 from typing import cast
 from unittest.mock import Mock, patch
 
-from run_account_ui import AccountUIRunner, _executable_members, _Phase
+from run_account_ui import (
+    AccountUIRunner,
+    _executable_members,
+    _has_development_build_space,
+    _Phase,
+)
+
+
+class DevelopmentBuildStorageTests(unittest.TestCase):
+    def test_absolute_floor_checks_each_filesystem_without_an_extra_allowance(self) -> None:
+        floor = 20 * 1024**3
+        for host, engine, admitted in (
+            (floor, floor, True),
+            (floor - 1, floor, False),
+            (floor, floor - 1, False),
+            (floor + 8 * 1024**3, floor, True),
+        ):
+            with self.subTest(host=host, engine=engine):
+                self.assertEqual(_has_development_build_space(host, engine), admitted)
+
+    def test_missing_available_space_never_admits_a_build(self) -> None:
+        floor = 20 * 1024**3
+        for host, engine in ((None, floor), (floor, None), (None, None)):
+            with self.subTest(host=host, engine=engine):
+                self.assertFalse(_has_development_build_space(host, engine))
+
+    def test_large_filesystems_do_not_require_a_percentage_reserve(self) -> None:
+        available = 20 * 1024**3
+        total = 1000 * 1024**3
+        self.assertLess(available / total, 0.20)
+        self.assertTrue(_has_development_build_space(available, available))
 
 
 class RetainedOwnershipTests(unittest.TestCase):

@@ -13,6 +13,17 @@ from pathlib import Path
 from types import FrameType
 
 
+def _has_development_build_space(
+    host_available_bytes: int | None, engine_available_bytes: int | None
+) -> bool:
+    """Require 20 GiB on both filesystems, including the 8 GiB build allowance."""
+    minimum_available_bytes = 20 * 1024**3
+    return all(
+        isinstance(available, int) and available >= minimum_available_bytes
+        for available in (host_available_bytes, engine_available_bytes)
+    )
+
+
 @dataclass
 class _Phase:
     """Keep the immediate leader waitable until its final possible group signal."""

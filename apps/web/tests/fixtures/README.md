@@ -4,6 +4,8 @@ This fixture runs the production account app and backend with real Kratos/Hydra 
 
 Only the coordinator may launch the graph under an exclusive native qualification grant. Run the following command from the repository root in the pinned toolchain environment, with Bash, host Python 3.13 and an available Docker engine and Compose command. The repository selects Python 3.13.12. The host must provide POSIX `waitid` with `WNOWAIT`, process-group signalling and `ps`. Image builds need access to the pinned container images, locked package and Git dependencies, and the pinned Chromium download. The web image installs its own Node and pnpm, so the wrapper does not require them on the host.
 
+Before admitting a development source build, the coordinator requires at least 20 GiB (`21474836480` available bytes) on both the container engine's storage filesystem and its host backing filesystem. This includes the 8 GiB build allowance, leaving 12 GiB after that allowance. Admission uses fresh observations and refuses missing space facts. Filesystem size and free-space percentages do not change this development floor. Production capacity planning retains its own requirements.
+
 Before launch, reserve `172.30.82.0/24` and verify that it does not overlap another network. No other account fixture may use that subnet during this run. The volume comparison covers the selected runtime's full volume-name inventory, so unexplained changes from other activity also require reconciliation under the exclusive runtime grant. The wrapper defaults to Docker:
 
 ```bash
