@@ -21,7 +21,7 @@ This historical decision selected seventeen Project actions. ADR-0124 adds `edit
 
 Seed the seventeen named Project actions and the fixed human creator assignments for each resource in [the initial-assignment contract](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#initial-assignments). Pipeline creation assigns thirteen actions; Deployment creation assigns seven, including `feedback:write`. Source, Collection, connection, immutable profile and application-account assignments are separately enumerated.
 
-All creator assignments are ordinary can-use-and-grant records committed with creation and audit. They do not grant document membership or authority on another resource. Private starter provisioning retains its separate admission boundary and explicit ordinary-resource initialization, without Organization Create projects authority.
+All creator assignments are ordinary can-use-and-grant records committed with creation and audit. They do not grant document membership or authority on another resource. Private starter provisioning is a separate operation after human admission under [ADR-0126](ADR-0126-separate-human-admission-from-private-starter-provisioning.md). It retains explicit ordinary-resource initialization without Organization Create projects authority.
 
 ## Consequences
 
