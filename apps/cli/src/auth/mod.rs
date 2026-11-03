@@ -202,6 +202,7 @@ fn run_example(prepared: &PreparedInvocation, mut browser: impl BrowserLauncher)
         let (value,ordinary_exit)=match result {
             Ok(result)=>{
                 let success=fully_confirmed(&result);
+                let _ = write_diagnostics(&result, &mut std::io::stderr().lock());
                 (serde_json::json!({"schemaVersion":1,"result":result}),u8::from(!success))
             },
             Err(error)=>{
@@ -222,6 +223,39 @@ fn fully_confirmed(outcome: &RepairOutcome) -> bool {
         && outcome.maintenance.failure.is_none()
         && outcome.credential_cleanup == CleanupStatus::Confirmed
 }
+/// Observe only fixed fields at the existing reporting boundary.
+fn write_diagnostics(
+    outcome: &RepairOutcome,
+    output: &mut impl std::io::Write,
+) -> std::io::Result<()> {
+    if fully_confirmed(outcome)
+        || matches!(outcome.maintenance.effect, MaintenanceEffect::NotStarted)
+    {
+        return Ok(());
+    }
+    let reply = if let Some(code) = outcome.maintenance.backend_error {
+        code.to_string()
+    } else if matches!(
+        outcome.maintenance.effect,
+        MaintenanceEffect::Committed { .. }
+    ) {
+        "receipt".into()
+    } else {
+        "unavailable".into()
+    };
+    // Closed spellings and u8 statuses bound both lines below 512 bytes.
+    // A diagnostic writer failure cannot replace the original result.
+    writeln!(
+        output,
+        "recipient-proof: maintenance child={} reply={reply}",
+        outcome.maintenance.child_status
+    )?;
+    writeln!(
+        output,
+        "recipient-proof: revocation access={} refresh={}",
+        outcome.credential_observations.access, outcome.credential_observations.refresh
+    )
+}
 fn emit_json(value: &serde_json::Value) -> bool {
     let mut output = std::io::stdout().lock();
     if serde_json::to_writer(&mut output, value).is_err() || output.write_all(b"\n").is_err() {
@@ -240,4 +274,70 @@ fn startup_failure() -> ExitCode {
     let _ =
         emit_json(&serde_json::json!({"schemaVersion":1,"error":{"kind":"startup-unavailable"}}));
     ExitCode::from(1)
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::flow::{CredentialObservations, RevocationObservation};
+    use super::maintenance_handoff::{ChildStatus, HandoffFailure, HandoffOutcome};
+    use super::recipient_proof::MaintenanceErrorCode;
+    use super::*;
+
+    fn failed_outcome() -> RepairOutcome {
+        RepairOutcome {
+            maintenance: HandoffOutcome {
+                effect: MaintenanceEffect::Unknown {
+                    operation_id: "protected-operation-sentinel".into(),
+                },
+                process_cleanup: CleanupStatus::Confirmed,
+                failure: Some(HandoffFailure::Exit),
+                child_status: ChildStatus::Exited(7),
+                backend_error: Some(MaintenanceErrorCode::StaleRevision),
+            },
+            credential_cleanup: CleanupStatus::Unconfirmed,
+            credential_observations: CredentialObservations {
+                access: RevocationObservation::ProviderRejected,
+                refresh: RevocationObservation::NotIssued,
+            },
+        }
+    }
+
+    #[test]
+    fn recipient_diagnostic_outer_adapter_emits_only_two_bounded_fixed_lines() {
+        let result = failed_outcome();
+        let mut output = Vec::new();
+        write_diagnostics(&result, &mut output).unwrap();
+        assert!(output.len() <= 512);
+        let text = String::from_utf8(output).unwrap();
+        assert_eq!(text.lines().count(), 2);
+        assert!(text.contains("child=exit-7 reply=stale_revision"));
+        assert!(text.contains("access=provider-rejected refresh=not-issued"));
+        assert!(!text.contains("protected-operation-sentinel"));
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json.as_object().unwrap().len(), 2);
+        assert_eq!(json["maintenance"].as_object().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn recipient_diagnostic_outer_adapter_suppresses_unlaunched_and_successful_results() {
+        let mut result = failed_outcome();
+        result.maintenance.effect = MaintenanceEffect::NotStarted;
+        let mut output = Vec::new();
+        write_diagnostics(&result, &mut output).unwrap();
+        assert!(output.is_empty());
+        let receipt = serde_json::from_value(serde_json::json!({
+            "schemaVersion":1,"mode":"repair-stranded-authority","operationId":"original-operation",
+            "installationId":"00000000-0000-0000-0000-000000000001",
+            "principalId":"00000000-0000-0000-0000-00000000000a","accessRevision":5,"outcome":"repaired",
+            "responsibility":{"kind":"action-grantor","target":{"kind":"project","projectId":"00000000-0000-0000-0000-000000000003"},"actionId":"edit-project-metadata"}
+        })).unwrap();
+        result.maintenance.effect = MaintenanceEffect::Committed {
+            receipt: Box::new(receipt),
+        };
+        result.maintenance.failure = None;
+        result.credential_cleanup = CleanupStatus::Confirmed;
+        write_diagnostics(&result, &mut output).unwrap();
+        assert!(output.is_empty());
+    }
 }

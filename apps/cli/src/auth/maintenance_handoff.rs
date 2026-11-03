@@ -16,7 +16,9 @@ use zeroize::Zeroizing;
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
-use super::recipient_proof::{RecipientProof, RepairReceipt, RepairRequest};
+use super::recipient_proof::{
+    InvalidReceipt, MaintenanceErrorCode, RecipientProof, RepairReceipt, RepairRequest,
+};
 
 /// A trusted host's direct argv descriptor, separate from the recipient's proof.
 #[derive(Deserialize)]
@@ -158,6 +160,33 @@ pub struct HandoffOutcome {
     pub process_cleanup: CleanupStatus,
     /// A transport failure may accompany an already proven commit.
     pub failure: Option<HandoffFailure>,
+    /// Passive direct-child evidence does not replace an original receipt.
+    #[serde(skip)]
+    pub child_status: ChildStatus,
+    /// A strictly bound backend code is diagnostic, not proof of rollback.
+    #[serde(skip)]
+    pub backend_error: Option<MaintenanceErrorCode>,
+}
+
+/// Preserve the retained wait observation without inventing a status for missing evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChildStatus {
+    /// No authoritative child status was observed.
+    Unobserved,
+    /// The direct child exited normally with this bounded status.
+    Exited(u8),
+    /// The direct child terminated under this observed signal.
+    Signaled(u8),
+}
+
+impl std::fmt::Display for ChildStatus {
+    fn fmt(&self, output: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unobserved => output.write_str("unobserved"),
+            Self::Exited(code) => write!(output, "exit-{code}"),
+            Self::Signaled(signal) => write!(output, "signal-{signal}"),
+        }
+    }
 }
 
 /// Submit a verified recipient proof once through protected host stdin.
@@ -228,6 +257,8 @@ async fn handoff_with_budgets(
         effect: MaintenanceEffect::NotStarted,
         process_cleanup: CleanupStatus::NotNeeded,
         failure: Some(failure),
+        child_status: ChildStatus::Unobserved,
+        backend_error: None,
     };
     if proof.installation_id != request.expected_installation_id
         || proof.identity_id != request.expected_identity_id
@@ -270,13 +301,16 @@ async fn handoff_with_budgets(
         }
     };
     let confirmed = process.finalize(budgets.term, budgets.kill).await;
-    let receipt = if process.stdout.complete && !process.stdout.overflow && !process.stdout.failed {
-        request
-            .validate_receipt(&process.stdout.bytes, proof.principal_id)
-            .ok()
-    } else {
-        None
-    };
+    let (receipt, backend_error) =
+        if process.stdout.complete && !process.stdout.overflow && !process.stdout.failed {
+            match request.validate_receipt(&process.stdout.bytes, proof.principal_id) {
+                Ok(receipt) => (Some(receipt), None),
+                Err(InvalidReceipt::Backend { code }) => (None, Some(code)),
+                Err(InvalidReceipt::Unavailable) => (None, None),
+            }
+        } else {
+            (None, None)
+        };
     let effect = if let Some(receipt) = receipt {
         MaintenanceEffect::Committed {
             receipt: Box::new(receipt),
@@ -297,6 +331,8 @@ async fn handoff_with_budgets(
             CleanupStatus::Unconfirmed
         },
         failure,
+        child_status: process.anchor.outcome,
+        backend_error,
     }
 }
 
@@ -304,6 +340,7 @@ async fn handoff_with_budgets(
 struct ProcessAnchor {
     pid: Option<Pid>,
     observed: Option<bool>,
+    outcome: ChildStatus,
     ownership: LeaderOwnership,
     group_owned: bool,
 }
@@ -340,6 +377,17 @@ impl ProcessAnchor {
     ) -> Result<Option<bool>, HandoffFailure> {
         match observation {
             Ok(Some(status)) => {
+                self.outcome = status
+                    .exit_status()
+                    .and_then(|value| u8::try_from(value).ok())
+                    .map(ChildStatus::Exited)
+                    .or_else(|| {
+                        status
+                            .terminating_signal()
+                            .and_then(|value| u8::try_from(value).ok())
+                            .map(ChildStatus::Signaled)
+                    })
+                    .unwrap_or(ChildStatus::Unobserved);
                 let success = status.exited() && status.exit_status() == Some(0);
                 self.observed = Some(success);
                 Ok(Some(success))
@@ -487,6 +535,7 @@ impl OwnedProcess {
             anchor: ProcessAnchor {
                 pid,
                 observed: None,
+                outcome: ChildStatus::Unobserved,
                 ownership: if pid.is_some() {
                     LeaderOwnership::Retained
                 } else {
@@ -1432,6 +1481,7 @@ assert request['authorizationUrl']=='https://identity.test/authorize?state=synth
         let mut anchor = ProcessAnchor {
             pid: None,
             observed: None,
+            outcome: ChildStatus::Unobserved,
             ownership: LeaderOwnership::Retained,
             group_owned: true,
         };
@@ -1666,5 +1716,93 @@ time.sleep(30)
             .unwrap()
             .unwrap();
         assert_eq!(remaining, b"protecte");
+    }
+
+    #[tokio::test]
+    async fn recipient_diagnostic_retains_bound_error_and_actual_child_exit_without_raw_output() {
+        let (_directory, execution) = scripted(
+            "print(json.dumps({'schemaVersion':1,'operationId':request['operationId'],'code':'stale_revision'}))\nsys.stderr.write('protected-stderr-sentinel')\nsys.exit(7)",
+            false,
+        );
+        let result = handoff(
+            &execution,
+            &intent(),
+            &proof(),
+            Instant::now() + Duration::from_secs(3),
+            std::future::pending(),
+        )
+        .await;
+        assert_eq!(result.process_cleanup, CleanupStatus::Confirmed);
+        assert_eq!(result.failure, Some(HandoffFailure::Exit));
+        assert!(
+            matches!(&result.effect, MaintenanceEffect::Unknown { operation_id } if operation_id=="original-operation")
+        );
+        assert_eq!(result.child_status, ChildStatus::Exited(7));
+        assert_eq!(
+            result.backend_error,
+            Some(MaintenanceErrorCode::StaleRevision)
+        );
+        assert!(!format!("{result:?}").contains("protected-stderr-sentinel"));
+        assert!(
+            !serde_json::to_string(&result)
+                .unwrap()
+                .contains("childStatus")
+        );
+    }
+
+    #[tokio::test]
+    async fn recipient_diagnostic_distinguishes_signal_from_an_exit_code() {
+        let (_directory, execution) = scripted(
+            "import os, signal\nos.kill(os.getpid(), signal.SIGTERM)",
+            false,
+        );
+        let result = handoff(
+            &execution,
+            &intent(),
+            &proof(),
+            Instant::now() + Duration::from_secs(3),
+            std::future::pending(),
+        )
+        .await;
+        assert_eq!(result.process_cleanup, CleanupStatus::Confirmed);
+        assert_eq!(result.failure, Some(HandoffFailure::Exit));
+        assert_eq!(result.child_status, ChildStatus::Signaled(15));
+        assert_eq!(result.backend_error, None);
+    }
+
+    #[tokio::test]
+    async fn recipient_diagnostic_keeps_timeout_as_original_cause_after_finalizer_signal() {
+        let (_directory, execution) = scripted("import time\ntime.sleep(30)", false);
+        let result = handoff_with_budgets(
+            &execution,
+            &intent(),
+            &proof(),
+            Instant::now() + Duration::from_secs(3),
+            std::future::pending(),
+            short_budgets(),
+        )
+        .await;
+        assert_eq!(result.process_cleanup, CleanupStatus::Confirmed);
+        assert_eq!(result.failure, Some(HandoffFailure::TimedOut));
+        assert_eq!(result.child_status, ChildStatus::Signaled(15));
+        assert!(matches!(result.effect, MaintenanceEffect::Unknown { .. }));
+    }
+
+    #[tokio::test]
+    async fn recipient_diagnostic_keeps_committed_receipt_despite_later_nonzero_exit() {
+        let (_directory, execution) = scripted("sys.exit(7)", true);
+        let result = handoff(
+            &execution,
+            &intent(),
+            &proof(),
+            Instant::now() + Duration::from_secs(3),
+            std::future::pending(),
+        )
+        .await;
+        assert_eq!(result.process_cleanup, CleanupStatus::Confirmed);
+        assert_eq!(result.failure, Some(HandoffFailure::Exit));
+        assert!(matches!(result.effect, MaintenanceEffect::Committed { .. }));
+        assert_eq!(result.child_status, ChildStatus::Exited(7));
+        assert_eq!(result.backend_error, None);
     }
 }

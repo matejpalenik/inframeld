@@ -106,8 +106,72 @@ enum RepairOutcome {
 
 /// A response without a matching after-commit receipt cannot prove completion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[error("The maintenance response did not prove the original operation's outcome.")]
-pub struct InvalidReceipt;
+pub enum InvalidReceipt {
+    /// The response supplied no recognized result bound to the original request.
+    #[error("The maintenance response did not prove the original operation's outcome.")]
+    Unavailable,
+    /// A bound backend error remains diagnostic, never proof of rollback.
+    #[error("The maintenance response did not prove the original operation's outcome.")]
+    Backend {
+        /// Closed repair-consumer code, excluding upstream text.
+        code: MaintenanceErrorCode,
+    },
+}
+
+/// Existing repair-consumer codes disclose no provider text or credential bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MaintenanceErrorCode {
+    /// The protected request was invalid.
+    InvalidInput,
+    /// Current recipient proof could not be verified.
+    InvalidIdentityProof,
+    /// The recipient was not currently eligible.
+    IdentityIneligible,
+    /// The expected installation did not match.
+    InstallationMismatch,
+    /// The reviewed Access revision was stale.
+    StaleRevision,
+    /// The operation ID already described another request.
+    IdempotencyKeyReused,
+    /// The reviewed responsibility was not stranded.
+    ResponsibilityNotStranded,
+    /// A required dependency was unavailable.
+    DependencyUnavailable,
+    /// The consumer could not complete its ordinary error classification.
+    UnexpectedError,
+}
+
+impl std::fmt::Display for MaintenanceErrorCode {
+    fn fmt(&self, output: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        output.write_str(match self {
+            Self::InvalidInput => "invalid_input",
+            Self::InvalidIdentityProof => "invalid_identity_proof",
+            Self::IdentityIneligible => "identity_ineligible",
+            Self::InstallationMismatch => "installation_mismatch",
+            Self::StaleRevision => "stale_revision",
+            Self::IdempotencyKeyReused => "idempotency_key_reused",
+            Self::ResponsibilityNotStranded => "responsibility_not_stranded",
+            Self::DependencyUnavailable => "dependency_unavailable",
+            Self::UnexpectedError => "unexpected_error",
+        })
+    }
+}
+
+// Both shapes use the existing bounded decoder. An error is not receipt evidence.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum MaintenanceReply {
+    Receipt(RepairReceipt),
+    Error(MaintenanceErrorReply),
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MaintenanceErrorReply {
+    schema_version: u8,
+    operation_id: String,
+    code: MaintenanceErrorCode,
+}
 
 impl RepairRequest {
     /// Read exactly one bounded request, excluding bootstrap and supplied proof.
@@ -140,9 +204,22 @@ impl RepairRequest {
         principal_id: Uuid,
     ) -> Result<RepairReceipt, InvalidReceipt> {
         if bytes.len() > 65_536 {
-            return Err(InvalidReceipt);
+            return Err(InvalidReceipt::Unavailable);
         }
-        let receipt: RepairReceipt = serde_json::from_slice(bytes).map_err(|_| InvalidReceipt)?;
+        let reply: MaintenanceReply =
+            serde_json::from_slice(bytes).map_err(|_| InvalidReceipt::Unavailable)?;
+        let receipt = match reply {
+            MaintenanceReply::Receipt(receipt) => receipt,
+            MaintenanceReply::Error(error) => {
+                return Err(
+                    if error.schema_version == 1 && error.operation_id == self.operation_id {
+                        InvalidReceipt::Backend { code: error.code }
+                    } else {
+                        InvalidReceipt::Unavailable
+                    },
+                );
+            }
+        };
         if receipt.schema_version != 1
             || receipt.operation_id != self.operation_id
             || receipt.installation_id != self.expected_installation_id
@@ -150,7 +227,7 @@ impl RepairRequest {
             || Some(receipt.access_revision) != self.expected_access_revision.checked_add(1)
             || receipt.responsibility != self.responsibility
         {
-            return Err(InvalidReceipt);
+            return Err(InvalidReceipt::Unavailable);
         }
         Ok(receipt)
     }
@@ -302,6 +379,78 @@ mod tests {
             request
                 .validate_receipt(duplicate.as_bytes(), principal)
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn recipient_diagnostic_accepts_only_existing_codes_bound_to_the_original_operation() {
+        let request = RepairRequest::parse(&serde_json::to_vec(&request()).unwrap()).unwrap();
+        for (code, expected) in [
+            ("invalid_input", MaintenanceErrorCode::InvalidInput),
+            (
+                "invalid_identity_proof",
+                MaintenanceErrorCode::InvalidIdentityProof,
+            ),
+            (
+                "identity_ineligible",
+                MaintenanceErrorCode::IdentityIneligible,
+            ),
+            (
+                "installation_mismatch",
+                MaintenanceErrorCode::InstallationMismatch,
+            ),
+            ("stale_revision", MaintenanceErrorCode::StaleRevision),
+            (
+                "idempotency_key_reused",
+                MaintenanceErrorCode::IdempotencyKeyReused,
+            ),
+            (
+                "responsibility_not_stranded",
+                MaintenanceErrorCode::ResponsibilityNotStranded,
+            ),
+            (
+                "dependency_unavailable",
+                MaintenanceErrorCode::DependencyUnavailable,
+            ),
+            ("unexpected_error", MaintenanceErrorCode::UnexpectedError),
+        ] {
+            let reply = serde_json::to_vec(&serde_json::json!({
+                "schemaVersion":1,"operationId":request.operation_id(),"code":code
+            }))
+            .unwrap();
+            assert_eq!(
+                request.validate_receipt(&reply, Uuid::from_u128(10)).err(),
+                Some(InvalidReceipt::Backend { code: expected })
+            );
+        }
+    }
+
+    #[test]
+    fn recipient_diagnostic_unbound_or_untrusted_replies_remain_unavailable() {
+        let request = RepairRequest::parse(&serde_json::to_vec(&request()).unwrap()).unwrap();
+        for reply in [
+            r#"{"schemaVersion":1,"code":"invalid_input"}"#,
+            r#"{"schemaVersion":1,"operationId":"other-protected-sentinel","code":"stale_revision"}"#,
+            r#"{"schemaVersion":true,"operationId":" reviewed-operation ","code":"invalid_input"}"#,
+            r#"{"schemaVersion":1.0,"operationId":" reviewed-operation ","code":"invalid_input"}"#,
+            r#"{"schemaVersion":1,"operationId":" reviewed-operation ","code":"protected-provider-sentinel"}"#,
+            r#"{"schemaVersion":1,"operationId":" reviewed-operation ","code":"stale_revision","code":"invalid_input"}"#,
+            r#"{"schemaVersion":1,"operationId":" reviewed-operation ","code":"stale_revision","detail":"protected-provider-sentinel"}"#,
+            r#"{"schemaVersion":1,"operationId":" reviewed-operation ","code":"stale_revision"}{}"#,
+            "protected-provider-sentinel",
+        ] {
+            let error = request
+                .validate_receipt(reply.as_bytes(), Uuid::from_u128(10))
+                .unwrap_err();
+            assert_eq!(error, InvalidReceipt::Unavailable);
+            assert!(!format!("{error:?} {error}").contains("protected-"));
+        }
+        let oversized = vec![b'x'; 65_537];
+        assert_eq!(
+            request
+                .validate_receipt(&oversized, Uuid::from_u128(10))
+                .err(),
+            Some(InvalidReceipt::Unavailable)
         );
     }
 }

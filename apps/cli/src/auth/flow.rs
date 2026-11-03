@@ -20,7 +20,7 @@ use crate::discovery::{DiscoveryOptions, discover};
 use super::{
     callback::{CallbackListener, CallbackResponse},
     recipient_proof::{RecipientProof, RepairRequest},
-    transport::AuthTransport,
+    transport::{AuthTransport, TransportError},
 };
 
 use super::maintenance_handoff::{CleanupStatus, ExecutionSpec, HandoffOutcome};
@@ -238,6 +238,63 @@ pub struct RepairOutcome {
     pub maintenance: HandoffOutcome,
     /// Standard public revocation of only the newly issued credential set.
     pub credential_cleanup: CleanupStatus,
+    /// Passive per-credential observations never authorize another request.
+    #[serde(skip)]
+    pub credential_observations: CredentialObservations,
+}
+
+/// Fixed observations retain no protected provider response or token bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevocationObservation {
+    /// This invocation issued no credential of this kind.
+    NotIssued,
+    /// The shared cleanup budget ended before this request began.
+    NotAttempted,
+    /// The existing revocation request completed successfully.
+    Confirmed,
+    /// The maintained library could not construct the request.
+    InvalidRequest,
+    /// The frozen endpoint policy rejected the request.
+    EndpointRejected,
+    /// The protected transport did not complete.
+    TransportFailed,
+    /// The protected endpoint redirected.
+    RedirectRejected,
+    /// The protected response exceeded its existing bound.
+    ResponseTooLarge,
+    /// The provider returned a typed error response.
+    ProviderRejected,
+    /// The provider response could not be interpreted.
+    InvalidResponse,
+    /// The shared cleanup budget expired during this request.
+    TimedOut,
+}
+
+/// Observe access and refresh revocation independently under one shared budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CredentialObservations {
+    /// Cleanup of this invocation's newly issued access credential.
+    pub access: RevocationObservation,
+    /// Cleanup of an unexpected refresh credential, if one was issued.
+    pub refresh: RevocationObservation,
+}
+
+impl std::fmt::Display for RevocationObservation {
+    fn fmt(&self, output: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        output.write_str(match self {
+            Self::NotIssued => "not-issued",
+            Self::NotAttempted => "not-attempted",
+            Self::Confirmed => "confirmed",
+            Self::InvalidRequest => "invalid-request",
+            Self::EndpointRejected => "endpoint-rejected",
+            Self::TransportFailed => "transport-failed",
+            Self::RedirectRejected => "redirect-rejected",
+            Self::ResponseTooLarge => "response-too-large",
+            Self::ProviderRejected => "provider-rejected",
+            Self::InvalidResponse => "invalid-response",
+            Self::TimedOut => "timed-out",
+        })
+    }
 }
 
 /// Acquire fresh proof for one already-admitted recipient and submit repair once.
@@ -309,11 +366,11 @@ pub async fn repair(
     .map_err(|kind| failure(kind, CleanupStatus::Unconfirmed))?
     .map_err(|_| failure(FailureKind::Exchange, CleanupStatus::Unconfirmed))?;
     if tokens.refresh_token().is_some() {
-        let cleanup = revoke_new(&oidc, &transport, &tokens).await;
+        let (cleanup, _) = revoke_new(&oidc, &transport, &tokens).await;
         return Err(failure(FailureKind::UnexpectedRefresh, cleanup));
     }
     if validate_identity(&oidc, &tokens, &nonce, host).is_err() {
-        let cleanup = revoke_new(&oidc, &transport, &tokens).await;
+        let (cleanup, _) = revoke_new(&oidc, &transport, &tokens).await;
         return Err(failure(FailureKind::Identity, cleanup));
     }
     let principal = match within(
@@ -329,7 +386,7 @@ pub async fn repair(
                 Err(kind) => kind,
                 _ => FailureKind::Session,
             };
-            let cleanup = revoke_new(&oidc, &transport, &tokens).await;
+            let (cleanup, _) = revoke_new(&oidc, &transport, &tokens).await;
             return Err(failure(kind, cleanup));
         }
     };
@@ -347,10 +404,12 @@ pub async fn repair(
         cancellation.as_mut(),
     )
     .await;
-    let credential_cleanup = revoke_new(&oidc, &transport, &tokens).await;
+    let (credential_cleanup, credential_observations) =
+        revoke_new(&oidc, &transport, &tokens).await;
     Ok(RepairOutcome {
         maintenance,
         credential_cleanup,
+        credential_observations,
     })
 }
 
@@ -548,34 +607,67 @@ async fn revoke_new(
     client: &AuthorizationClient,
     transport: &AuthTransport,
     tokens: &CoreTokenResponse,
-) -> CleanupStatus {
-    let revoking = async {
-        let refresh_confirmed = if let Some(refresh) = tokens.refresh_token() {
-            match client.revoke_token(CoreRevocableToken::RefreshToken(refresh.clone())) {
-                Ok(request) => request.request_async(transport).await.is_ok(),
-                Err(_) => false,
-            }
+) -> (CleanupStatus, CredentialObservations) {
+    let classify = |result| match result {
+        Ok(()) => RevocationObservation::Confirmed,
+        Err(openidconnect::RequestTokenError::Request(error)) => match error {
+            TransportError::Endpoint => RevocationObservation::EndpointRejected,
+            TransportError::Transport => RevocationObservation::TransportFailed,
+            TransportError::Redirect => RevocationObservation::RedirectRejected,
+            TransportError::ResponseTooLarge => RevocationObservation::ResponseTooLarge,
+            TransportError::Session => RevocationObservation::InvalidResponse,
+        },
+        Err(openidconnect::RequestTokenError::ServerResponse(_)) => {
+            RevocationObservation::ProviderRejected
+        }
+        Err(
+            openidconnect::RequestTokenError::Parse(_, _)
+            | openidconnect::RequestTokenError::Other(_),
+        ) => RevocationObservation::InvalidResponse,
+    };
+    let mut observations = CredentialObservations {
+        access: RevocationObservation::NotAttempted,
+        refresh: if tokens.refresh_token().is_some() {
+            RevocationObservation::NotAttempted
         } else {
-            true
-        };
-        // A rejected refresh revocation must not skip the independent access
-        // credential cleanup while the same finite cleanup budget remains.
-        let access_confirmed = match client.revoke_token(CoreRevocableToken::AccessToken(
+            RevocationObservation::NotIssued
+        },
+    };
+    let revoking = async {
+        if let Some(refresh) = tokens.refresh_token() {
+            observations.refresh = RevocationObservation::TimedOut;
+            observations.refresh =
+                match client.revoke_token(CoreRevocableToken::RefreshToken(refresh.clone())) {
+                    Ok(request) => classify(request.request_async(transport).await),
+                    Err(_) => RevocationObservation::InvalidRequest,
+                };
+        }
+        // Refresh failure does not skip access. Both waits share the original budget.
+        observations.access = RevocationObservation::TimedOut;
+        observations.access = match client.revoke_token(CoreRevocableToken::AccessToken(
             tokens.access_token().clone(),
         )) {
-            Ok(request) => request.request_async(transport).await.is_ok(),
-            Err(_) => false,
+            Ok(request) => classify(request.request_async(transport).await),
+            Err(_) => RevocationObservation::InvalidRequest,
         };
-        refresh_confirmed && access_confirmed
     };
-    if matches!(
-        tokio::time::timeout(Duration::from_secs(5), revoking).await,
-        Ok(true)
-    ) {
-        CleanupStatus::Confirmed
-    } else {
-        CleanupStatus::Unconfirmed
-    }
+    let finished = tokio::time::timeout(Duration::from_secs(5), revoking)
+        .await
+        .is_ok();
+    let confirmed = finished
+        && observations.access == RevocationObservation::Confirmed
+        && matches!(
+            observations.refresh,
+            RevocationObservation::Confirmed | RevocationObservation::NotIssued
+        );
+    (
+        if confirmed {
+            CleanupStatus::Confirmed
+        } else {
+            CleanupStatus::Unconfirmed
+        },
+        observations,
+    )
 }
 
 #[cfg(test)]

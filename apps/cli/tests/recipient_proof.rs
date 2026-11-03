@@ -48,6 +48,12 @@ enum ProviderBehavior {
     Expired,
     WrongSignature,
     RefreshRevocationRejected,
+    AccessRevocationRejected,
+    AccessRevocationRedirect,
+    AccessRevocationOversize,
+    AccessRevocationInvalid,
+    AccessRevocationStalled,
+    SlowRefreshRevocationRejected,
     SessionDenied,
     SessionRedirect,
     SessionOversize,
@@ -79,8 +85,23 @@ async fn response(request: Request<Incoming>, state: &Mutex<State>) -> Response<
         .await
         .unwrap()
         .to_bytes();
+    let delay = {
+        let mut state = state.lock().unwrap();
+        *state.calls.entry(path.clone()).or_default() += 1;
+        if path == "/issuer/revoke" {
+            match state.behavior {
+                ProviderBehavior::AccessRevocationStalled => Some(Duration::from_secs(6)),
+                ProviderBehavior::SlowRefreshRevocationRejected => Some(Duration::from_secs(3)),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    };
+    if let Some(delay) = delay {
+        tokio::time::sleep(delay).await;
+    }
     let mut state = state.lock().unwrap();
-    *state.calls.entry(path.clone()).or_default() += 1;
     let mut status = 200;
     let mut location = None;
     let payload = match path.as_str() {
@@ -209,7 +230,8 @@ async fn response(request: Request<Incoming>, state: &Mutex<State>) -> Response<
             .unwrap();
             let mut payload = serde_json::json!({"access_token":"synthetic-access-token","token_type":"Bearer","expires_in":60,"scope":"openid inframeld:api","id_token":token});
             match behavior {
-                ProviderBehavior::RefreshRevocationRejected => {
+                ProviderBehavior::RefreshRevocationRejected
+                | ProviderBehavior::SlowRefreshRevocationRejected => {
                     payload["refresh_token"] = serde_json::json!("synthetic-refresh-token");
                 }
                 ProviderBehavior::TokenOversize => {
@@ -261,16 +283,39 @@ async fn response(request: Request<Incoming>, state: &Mutex<State>) -> Response<
                 status = 500;
             }
             state.revoked.push(token);
-            serde_json::json!({})
+            match state.behavior {
+                ProviderBehavior::AccessRevocationRejected => {
+                    status = 400;
+                    serde_json::json!({"error":"invalid_request","error_description":"protected-provider-sentinel"})
+                }
+                ProviderBehavior::AccessRevocationRedirect => {
+                    status = 302;
+                    location = Some(format!("{}unexpected", state.issuer));
+                    serde_json::json!({})
+                }
+                ProviderBehavior::AccessRevocationOversize => {
+                    serde_json::json!({"padding":"protected-provider-sentinel".repeat(4000)})
+                }
+                ProviderBehavior::AccessRevocationInvalid => {
+                    status = 400;
+                    serde_json::json!({})
+                }
+                _ => serde_json::json!({}),
+            }
         }
         _ => {
             status = 404;
             serde_json::json!({})
         }
     };
-    let mut response = Response::new(Full::new(Bytes::from(
-        serde_json::to_vec(&payload).unwrap(),
-    )));
+    let bytes = if path == "/issuer/revoke"
+        && matches!(state.behavior, ProviderBehavior::AccessRevocationInvalid)
+    {
+        b"protected-provider-sentinel".to_vec()
+    } else {
+        serde_json::to_vec(&payload).unwrap()
+    };
+    let mut response = Response::new(Full::new(Bytes::from(bytes)));
     *response.status_mut() = http::StatusCode::from_u16(status).unwrap();
     response.headers_mut().insert(
         http::header::CONTENT_TYPE,
@@ -873,4 +918,118 @@ async fn invalid_or_bootstrap_or_misbound_intent_is_rejected_before_discovery_or
         assert!(provider.state.lock().unwrap().calls.is_empty());
     }
     provider.finish().await;
+}
+
+#[tokio::test]
+async fn recipient_diagnostic_retains_fixed_revocation_categories_without_provider_text() {
+    use inframeld_cli::auth::flow::RevocationObservation;
+    for (behavior, expected) in [
+        (
+            ProviderBehavior::AccessRevocationRejected,
+            RevocationObservation::ProviderRejected,
+        ),
+        (
+            ProviderBehavior::AccessRevocationRedirect,
+            RevocationObservation::RedirectRejected,
+        ),
+        (
+            ProviderBehavior::AccessRevocationOversize,
+            RevocationObservation::ResponseTooLarge,
+        ),
+        (
+            ProviderBehavior::AccessRevocationInvalid,
+            RevocationObservation::InvalidResponse,
+        ),
+    ] {
+        let provider = Provider::start().await;
+        provider.state.lock().unwrap().behavior = behavior;
+        let (_directory, execution) = execution();
+        let result = repair(
+            &provider.host(),
+            &request(),
+            &execution,
+            &mut browser(&provider),
+            std::future::pending(),
+        )
+        .await;
+        let calls = provider.state.lock().unwrap().calls.clone();
+        provider.finish().await;
+        let result = result.unwrap();
+        assert!(matches!(
+            result.maintenance.effect,
+            MaintenanceEffect::Committed { .. }
+        ));
+        assert_eq!(result.credential_cleanup, CleanupStatus::Unconfirmed);
+        assert_eq!(result.credential_observations.access, expected);
+        assert_eq!(
+            result.credential_observations.refresh,
+            RevocationObservation::NotIssued
+        );
+        assert_eq!(calls.get("/issuer/revoke"), Some(&1));
+        assert!(!calls.keys().any(|path| path.ends_with("/unexpected")));
+        assert!(!format!("{result:?}").contains("protected-provider-sentinel"));
+    }
+}
+
+#[tokio::test]
+async fn recipient_diagnostic_timeout_retains_the_committed_effect_and_inflight_revocation() {
+    use inframeld_cli::auth::flow::RevocationObservation;
+    let provider = Provider::start().await;
+    provider.state.lock().unwrap().behavior = ProviderBehavior::AccessRevocationStalled;
+    let (_directory, execution) = execution();
+    let started = Instant::now();
+    let result = repair(
+        &provider.host(),
+        &request(),
+        &execution,
+        &mut browser(&provider),
+        std::future::pending(),
+    )
+    .await;
+    let elapsed = started.elapsed();
+    let calls = provider.state.lock().unwrap().calls.clone();
+    provider.finish().await;
+    let result = result.unwrap();
+    assert!(elapsed >= Duration::from_secs(5) && elapsed < Duration::from_secs(6));
+    assert!(matches!(
+        result.maintenance.effect,
+        MaintenanceEffect::Committed { .. }
+    ));
+    assert_eq!(result.credential_cleanup, CleanupStatus::Unconfirmed);
+    // The existing transport also has a five-second bound. Retain whichever
+    // typed observation wins that boundary, without inventing a timeout cause.
+    assert!(matches!(
+        result.credential_observations.access,
+        RevocationObservation::TimedOut | RevocationObservation::TransportFailed
+    ));
+    assert_eq!(
+        result.credential_observations.refresh,
+        RevocationObservation::NotIssued
+    );
+    assert_eq!(calls.get("/issuer/revoke"), Some(&1));
+}
+
+#[tokio::test]
+async fn recipient_diagnostic_refresh_rejection_does_not_restart_the_shared_cleanup_clock() {
+    use inframeld_cli::auth::flow::FailureKind;
+    let provider = Provider::start().await;
+    provider.state.lock().unwrap().behavior = ProviderBehavior::SlowRefreshRevocationRejected;
+    let (_directory, execution) = execution();
+    let started = Instant::now();
+    let result = repair(
+        &provider.host(),
+        &request(),
+        &execution,
+        &mut browser(&provider),
+        std::future::pending(),
+    )
+    .await;
+    let elapsed = started.elapsed();
+    let calls = provider.state.lock().unwrap().calls.clone();
+    provider.finish().await;
+    let error = result.unwrap_err();
+    assert_eq!(error.kind, FailureKind::UnexpectedRefresh);
+    assert_eq!(error.credential_cleanup, CleanupStatus::Unconfirmed);
+    assert_eq!(calls.get("/issuer/revoke"), Some(&2));
+    assert!(elapsed >= Duration::from_secs(5) && elapsed < Duration::from_secs(6));
 }
