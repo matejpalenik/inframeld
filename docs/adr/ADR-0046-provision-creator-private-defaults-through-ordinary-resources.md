@@ -1,8 +1,10 @@
 # ADR-0046: Provision creator-private defaults through ordinary resources
 
-Status: Accepted
+**Status:** Partially superseded by [ADR-0126](ADR-0126-separate-human-admission-from-private-starter-provisioning.md)
 
 **Date:** 2026-09-19
+
+ADR-0126 replaces the coupling between human admission and private starter creation. The original rationale below is retained. Private starters remain required ordinary resources, with unchanged explicit grants and first-administrator authority.
 
 ## Context and Problem Statement
 

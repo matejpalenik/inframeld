@@ -16,18 +16,21 @@ Accepted [PD-ACCESS-06](../../inframeld-access-models/references/decision-setup-
 
 The server operator controls a one-time claim on an already initialized installation that establishes the first verified human's explicit permissions. The first arbitrary public signup never becomes an administrator. This claim gives neither unrestricted UI authority nor host access. Kratos verifies identity, while Access separately controls admission, suspension, restoration, and project creation.
 
-The [private first-administrator consumer](../../inframeld-access-models/references/host-maintenance.md#first-administrator-bootstrap-consumer) is now executable in the backend. It verifies raw current proof before local admission and atomically creates the first Organization/principal/link, four explicit Organization use-and-grant assignments and original receipt. It creates no starter resources, changes no model configuration and makes no model call. PostgreSQL/provider/installed-command/migration qualification remains pending. A supported proof producer for an unadmitted human and the complete first-use CLI/setup journey are still unavailable, so the setup and starter flow below remains accepted design. Human first-install acceptance stays with [#185](https://github.com/matejpalenik/inframeld/issues/185), not the already-admitted repair journey in #298.
+The [private first-administrator consumer](../../inframeld-access-models/references/host-maintenance.md#first-administrator-bootstrap-consumer) is now executable in the backend. It verifies raw current proof before local admission and atomically creates the first Organization/principal/link, four explicit Organization use-and-grant assignments and original receipt. It creates no starter resources, changes no model configuration and makes no model call. A supported proof producer for an unadmitted human and the complete first-use CLI/setup journey are still unavailable, so the setup and starter flow below remains accepted design. Human first-install acceptance stays with [#185](https://github.com/matejpalenik/inframeld/issues/185), not the already-admitted repair journey in #298.
 
-The selected provisioning design gives each admitted human a private starter project, group, collection, processing preset, and Pipeline. The person is explicitly both member and manager of the group and receives the required setup and administration permissions, including Delete project. This setup neither requires nor grants Create projects. Other people's starters are separate, and installation administrators have no document-reading bypass.
+After human admission, a separate required provisioning operation creates the admitted human's private starter project, group, collection, processing preset, and Pipeline. [ADR-0126](../../../../docs/adr/ADR-0126-separate-human-admission-from-private-starter-provisioning.md) separates these operations. Successful admission creates no starter resources, and its replay never provisions or repairs them. The person is explicitly both member and manager of the group and receives the required setup and administration permissions, including Delete project. This setup neither requires nor grants Create projects. Other people's starters are separate, and installation administrators have no document-reading bypass.
 
 Permissions name individual Pipelines and Deployments. Before the first Deployment exists, Alice needs Create Deployment, Build, permission for the underlying change, and access to its inputs. Creation saves the ready initial version and creator grants together, including Manage releases. Later releases need Manage releases on that Deployment. No placeholder Deployment or separate first-release permission is needed.
 
 ```mermaid
 ---
-title: "Accepted first-use journey, complete product delivery pending"
+title: "Accepted admission and separate starter journey, delivery pending"
 ---
 flowchart TD
-    Human[Verified admitted Alice] --> Defaults[Private ordinary resources]
+    Alice["Current Alice: admit-users"] --> Admission["Admit verified Bob"]
+    Bob["Bob's verified Kratos identity"] --> Admission
+    Admission --> Admitted["Bob admitted, no starter resources"]
+    Admitted --> Defaults["Separate resumable private-starter operation"]
     Defaults --> Models[Configure real model roles]
     Models --> Batch[Complete authorized upload batch]
     Batch --> Build[Ordinary build and verification]
@@ -35,7 +38,7 @@ flowchart TD
     Release --> Query[Normal default-route query]
 ```
 
-The arrows show successive steps within the application. Each step uses its existing domain and ordinary permission checks.
+The arrows show the accepted ordinary-human journey after Alice is authorized to admit Bob. Admission completes before the separate starter operation. Each later step uses its existing domain and ordinary permission checks. The first-administrator host claim described above retains its own authority.
 
 <a id="human-login"></a>
 
@@ -59,7 +62,7 @@ Local setup first obtains a verified Ory identity, keeping issued tokens transie
 
 Invoke a narrow maintenance operation inside the verified managed backend using existing host/container authority. Bind it to the installation, not a target named `local` or whichever Docker context happens to be selected. Send any credential through protected stdin/IPC, never argv, environment or logs. The operation independently verifies the identity evidence through trusted Ory integration, then atomically saves the identity link, scoped grants and audit event. Repeating the original completed claim for the same identity returns its recorded result without recreating removed grants. A competing different identity fails. The [Access maintenance contract](../../inframeld-access-models/references/host-maintenance.md) requires expected immutable installation identity, protected bounded input and exact reviewed request state. The four organization grants remain separate from the eighteen additional-Project grants.
 
-No public claim endpoint, shared claim password, browser host authority or Docker socket mounted in the backend is introduced. Remote first setup requires the equivalent operator action on the server. Ordinary remote login supplies no SSH or maintenance authority. [The accepted maintenance contract](../../inframeld-access-models/references/host-maintenance.md#maintenance) names `inframeld-maintenance` and limits its protected versioned JSON request to 64 KiB. The [version 1 maintenance draft](../../inframeld-access-models/references/host-maintenance.md#maintenance-wire) uses the CLI's transient Hydra human access token, independently introspected with current Kratos identity checks. It specifies proof, installation-identity initialization and input/output models for final review. Host execution authorizes the claim. The token identifies its recipient. Implement and qualify bootstrap/identity verification. After the claim, normal admission must still succeed before the CLI reports a usable saved login.
+No public claim endpoint, shared claim password, browser host authority or Docker socket mounted in the backend is introduced. Remote first setup requires the equivalent operator action on the server. Ordinary remote login supplies no SSH or maintenance authority. [The accepted maintenance contract](../../inframeld-access-models/references/host-maintenance.md#maintenance) names `inframeld-maintenance` and limits its protected versioned JSON request to 64 KiB. The [version 1 maintenance draft](../../inframeld-access-models/references/host-maintenance.md#maintenance-wire) uses the CLI's transient Hydra human access token, independently introspected with current Kratos identity checks. It specifies proof, installation-identity initialization and input/output models for final review. Host execution authorizes the claim. The token identifies its recipient. The backend claim consumer is delivered. Its supported unadmitted-human proof producer remains unfinished. After the claim, current account eligibility and secure credential saving must succeed before the CLI reports a usable saved login.
 
 <a id="guided-setup-entry"></a>
 
@@ -71,7 +74,7 @@ Setup guides an unconfigured or partly configured project to its first functioni
 
 An explicit or saved unfinished project resumes its missing steps using current backend state and normal operation recovery. A ready project reports readiness and ordinary next commands without recreating a Pipeline, replaying a configuration wizard or making another paid demonstration query. An unavailable/inaccessible project fails without substituting a starter or treating denial as incomplete setup.
 
-For a first-time user without a project selection, offer **Your starter project** as the recommended choice and **A new project** as the advanced choice. Do not add a generic existing-project picker or an experience-level question. Existing unfinished work remains reachable through explicit/saved context. Selecting the starter reuses it. Creating another project requires ordinary Create projects authority and leaves the starter untouched. Remembering context requires visible agreement and obeys [selection rules](../../inframeld-application-contracts/references/cli-targets-and-accounts.md#cli-context).
+For a first-time user without a project selection, offer **Your starter project** as the recommended choice and **A new project** as the advanced choice. Do not add a generic existing-project picker or an experience-level question. Existing unfinished work remains reachable through explicit/saved context. Selecting the starter runs or resumes its separate provisioning operation for the admitted principal. Respect saved deliberate removal instead of treating it as unfinished provisioning. Creating another project requires ordinary Create projects authority and leaves the starter untouched. Choosing another project does not mark missing required starter provisioning complete. Remembering context requires visible agreement and obeys [selection rules](../../inframeld-application-contracts/references/cli-targets-and-accounts.md#cli-context).
 
 The New project choice calls ordinary project creation, not the private-starter provisioner. Creation saves the project, creator membership and [eighteen explicit initial Project-action grants](../../inframeld-access-models/references/actions-and-initial-grants.md#initial-project-grants) together. It does not provision a Pipeline or start model work. Setup then continues as separate steps. A naming conflict or denied permission saves no partial project. A lost response is reconciled before retry. If Alice stops after successful creation, her new project remains and later setup resumes it without duplication. CLI project management exposes the same operation outside setup.
 
@@ -101,11 +104,11 @@ The optional naming prompt starts from the persisted Display name. Keeping it is
 
 ### Make provisioning safe to repeat
 
-**Implementation boundary:** #120 records the approved eighteenth Project creator assignment. Its dependent code phase must implement existing-Project metadata authorization and restricted first-grant repair. Automatic assignment by ordinary Project creation remains #223. Private-starter creation and its eighteen assignments remain #27. These provisioners are selected design, not implemented guarantees. Membership/departure work in #224 must preserve the new exact responsibility.
+**Implementation boundary:** Project metadata authorization, restricted first-grant repair and ordinary Project creation with eighteen explicit assignments are implemented. Ordinary human admission and separate private-starter creation remain unfinished under #27. The required unadmitted-human proof producer and complete first-use journey are also unfinished, with human acceptance unperformed under [#185](https://github.com/matejpalenik/inframeld/issues/185). Membership/departure work in #224 must preserve the exact creator responsibilities.
 
-Provisioning remains human-only in v1, including setup and first-Deployment creation. Use the [eighteen Project actions and fixed resource creator assignments](../../inframeld-access-models/references/actions-and-initial-grants.md#initial-assignments) through the ordinary owners. Starter admission does not require or grant Organization `create-projects`. Existing Projects/resources receive no automatic backfill. Applications may update already provisioned resources with eligible grants. Permitted revisions, Documents and cases are workflow output rather than resource provisioning.
+Provisioning remains human-only in v1, including setup and first-Deployment creation. Use the [eighteen Project actions and fixed resource creator assignments](../../inframeld-access-models/references/actions-and-initial-grants.md#initial-assignments) through the ordinary owners. Private starter provisioning does not require or grant Organization `create-projects`. Existing Projects/resources receive no automatic backfill. Applications may update already provisioned resources with eligible grants. Permitted revisions, Documents and cases are workflow output rather than resource provisioning.
 
-After Kratos verifies Alice, save her starter setup in one short PostgreSQL transaction. This includes both group membership and management, the other setup records, the access change number, and audit. Either all are saved or none are. Follow the [member-plus-manager rule](../../inframeld-access-models/references/memberships-groups-and-handover.md#group-managers). A unique ownership-and-purpose key can be:
+After human admission has completed, save the separate starter setup in one short PostgreSQL transaction. This includes both group membership and management, the other setup records, the access change number, and audit. Either all are saved or none are. Follow the [member-plus-manager rule](../../inframeld-access-models/references/memberships-groups-and-handover.md#group-managers). A unique ownership-and-purpose key can be:
 
 ```text
 (organization, verified human principal, starter)
@@ -175,7 +178,8 @@ Private defaults and reversible modes are settled. Selector fields, timing assum
 
 | Decision | Rationale |
 | --- | --- |
-| [ADR-0046](../../../../docs/adr/ADR-0046-provision-creator-private-defaults-through-ordinary-resources.md) | Provision creator-private defaults through ordinary resources. |
+| [ADR-0126](../../../../docs/adr/ADR-0126-separate-human-admission-from-private-starter-provisioning.md) | Separate human admission from required, resumable private starter provisioning. |
+| [ADR-0046](../../../../docs/adr/ADR-0046-provision-creator-private-defaults-through-ordinary-resources.md) | Retain private defaults as ordinary resources. Its admission/provisioning coupling is superseded by ADR-0126. |
 | [ADR-0049](../../../../docs/adr/ADR-0049-require-group-managers-to-be-ordinary-members.md) | Record the creator as both member and manager of the private group. |
 | [ADR-0047](../../../../docs/adr/ADR-0047-support-reversible-publication-modes-per-deployment.md) | Support reversible publication modes per Deployment. |
 | [ADR-0050](../../../../docs/adr/ADR-0050-make-model-preflight-optional-and-record-runtime-validation.md) | Allow optional model preflight and validation through successful real use. |
