@@ -28,6 +28,14 @@ Require current human `create-projects` authority on the requested Organization,
 
 The creation receipt's `initialGrants` describes the original assignments. Exact replay requires current authorization and returns that original result without restoring removed grants or reversing later renames. [The guide](/guides/create-project) covers the saved request, generated clients, current metadata and uncertain-result recovery. This operation creates no starter or RAG resources.
 
+## Read Project members
+
+<ApiOperation operationId="listProjectMembers" />
+
+Require a currently eligible human, current Project membership and permission to use `manage-project-members`. Permission to delegate that action is unnecessary. [List Project members](/guides/list-project-members) shows the same read through cURL and the generated clients.
+
+Request one page with default `limit: 25`, range 1–100, and an optional unchanged `cursor`. The response reports the current Project `accessRevision`, safe stored-member items and a nullable `nextCursor`. Inactive stored memberships remain in the list. There are no emails, grants or totals. Every page checks current authority and scope. A cursor is not a snapshot or permission token, and a denied read is not an empty result. No body or idempotency key applies to this GET.
+
 ## Read Project metadata
 
 <ApiOperation operationId="getProjectMetadata" />

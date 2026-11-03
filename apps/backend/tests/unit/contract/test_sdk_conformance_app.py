@@ -1,10 +1,75 @@
 """Qualify the isolated HTTP fixture before SDKs consume it."""
 
 import base64
+from urllib.parse import parse_qs
 
 from fastapi.testclient import TestClient
 from tests.support.project_creation_scenarios import INITIAL_ACTIONS
 from tests.support.sdk_conformance_app import create_sdk_conformance_app
+
+
+def test_project_members_fixture_uses_real_router_service_and_one_explicit_page_per_request() -> (
+    None
+):
+    project = "00000000-0000-4000-8000-000000000003"
+    headers = {"Authorization": "Bearer sdk-human", "X-SDK-Test": "members-wire"}
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/members-wire", json={"calls": {"members-wire": {"kind": "none"}}}
+        )
+        first = client.get(f"/v1/projects/{project}/members?limit=1", headers=headers)
+        assert first.status_code == 200
+        first_body = first.json()
+        assert first_body["projectId"] == project and first_body["accessRevision"] == 12
+        assert len(first_body["items"]) == 1
+        assert first_body["items"][0] == {
+            "principalId": "00000000-0000-4000-8000-000000000001",
+            "displayName": "SDK Human",
+            "kind": "human",
+        }
+        assert isinstance(first_body["nextCursor"], str)
+        second = client.get(
+            f"/v1/projects/{project}/members",
+            params={"limit": 2, "cursor": first_body["nextCursor"]},
+            headers=headers,
+        )
+        witness = client.get("/sdk-control/cases/members-wire").json()["observations"][
+            "members-wire"
+        ]
+    assert second.status_code == 200
+    assert second.json()["items"] == [
+        {
+            "principalId": "00000000-0000-4000-8000-000000000005",
+            "displayName": "Stored application",
+            "kind": "application",
+        },
+        {
+            "principalId": "00000000-0000-4000-8000-000000000006",
+            "displayName": "Legacy\nmember 🧭",
+            "kind": "human",
+        },
+    ]
+    assert second.json()["nextCursor"] is None
+    assert first.headers["cache-control"] == second.headers["cache-control"] == "no-store"
+    assert witness["method"] == "GET" and witness["path"] == f"/v1/projects/{project}/members"
+    assert parse_qs(witness["query"]) == {"limit": ["2"], "cursor": [first_body["nextCursor"]]}
+    assert "idempotency-key" not in witness["headers"] and not witness["csrf"]
+
+
+def test_project_members_fixture_cookie_read_needs_no_write_headers_and_rejects_bad_cursor() -> (
+    None
+):
+    path = "/v1/projects/00000000-0000-4000-8000-000000000003/members"
+    headers = {"Cookie": "ory_kratos_session=sdk-cookie"}
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.get(path, headers=headers)
+        assert response.status_code == 200 and len(response.json()["items"]) == 3
+        assert response.json()["nextCursor"] is None
+        invalid = client.get(path, params={"cursor": "malformed_cursor"}, headers=headers)
+        missing = client.get(path.replace("000000000003", "000000000099"), headers=headers)
+    assert invalid.status_code == 422 and invalid.json()["code"] == "invalid_input"
+    assert missing.status_code == 404 and missing.json()["code"] == "resource_not_found"
+    assert invalid.headers["cache-control"] == missing.headers["cache-control"] == "no-store"
 
 
 def test_response_variants_preserve_status_and_representation_pairs() -> None:

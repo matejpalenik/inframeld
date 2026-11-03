@@ -53,6 +53,15 @@ problems!(
 );
 problems!(GetHealthApiError, GetHealthApiError::Status500);
 problems!(
+    ListProjectMembersApiError,
+    ListProjectMembersApiError::Status400,
+    ListProjectMembersApiError::Status401,
+    ListProjectMembersApiError::Status403,
+    ListProjectMembersApiError::Status404,
+    ListProjectMembersApiError::Status422,
+    ListProjectMembersApiError::Status503
+);
+problems!(
     GetDeletionStatusApiError,
     GetDeletionStatusApiError::Status400,
     GetDeletionStatusApiError::Status401,

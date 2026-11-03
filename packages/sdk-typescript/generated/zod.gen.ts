@@ -172,6 +172,13 @@ export const zMyOrganizationAccessResponse = z.object({
 });
 
 /**
+ * PrincipalKind
+ *
+ * Distinguish local human actors from application accounts.
+ */
+export const zPrincipalKind = z.enum(['human', 'application']);
+
+/**
  * ProjectCreationRequest
  */
 export const zProjectCreationRequest = z.object({
@@ -250,6 +257,25 @@ export const zProjectCreationResponse = z.object({
     name: z.string(),
     operationId: z.string(),
     organizationId: z.uuid(),
+    projectId: z.uuid()
+});
+
+/**
+ * ProjectMemberResponse
+ */
+export const zProjectMemberResponse = z.object({
+    displayName: z.string(),
+    kind: zPrincipalKind,
+    principalId: z.uuid()
+});
+
+/**
+ * ProjectMembersPageResponse
+ */
+export const zProjectMembersPageResponse = z.object({
+    accessRevision: z.int().gte(0),
+    items: z.array(zProjectMemberResponse),
+    nextCursor: z.string().nullable(),
     projectId: z.uuid()
 });
 
@@ -941,6 +967,55 @@ export const zAssignProjectUseOnlyGrant503Representation0Response = zProblemDeta
  * Successful Response
  */
 export const zAssignProjectUseOnlyGrantResponse = zProjectUseOnlyGrantResponse;
+
+export const zListProjectMembersPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zListProjectMembersQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListProjectMembers200Representation0Response = zProjectMembersPageResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListProjectMembers400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListProjectMembers401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListProjectMembers403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListProjectMembers404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListProjectMembers422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListProjectMembers503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListProjectMembersResponse = zProjectMembersPageResponse;
 
 export const zGetProjectMetadataPath = z.object({
     project_id: z.uuid()
