@@ -178,7 +178,7 @@ recipient_proof_stack() {
         read -r browser_state browser_code health <<<"${snapshot}"
         [[ "${browser_state}" == running ]] || return 1
         readiness=0
-        "${account_compose[@]}" exec -T browser-tests node -e '
+        "${account_compose[@]}" --profile qualification exec -T browser-tests node -e '
 const fs = require("node:fs");
 try { if (!fs.lstatSync("/run/account-proof/allow-ready").isFile()) process.exit(1); }
 catch (error) { process.exit(error.code === "ENOENT" ? 10 : 1); }

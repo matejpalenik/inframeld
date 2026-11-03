@@ -104,7 +104,12 @@ compose() {
 }
 
 test_compose() {
-    PODMAN_COMPOSE_WARNING_LOGS=false "${compose_command[@]}" -p inframeld-test -f "${test_compose_file}" "$@"
+    local test_tmpfs_owner_options="uid=10001,gid=10001"
+    if [[ "${container_command}" == podman ]]; then
+        test_tmpfs_owner_options="U,notmpcopyup"
+    fi
+    INFRAMELD_TEST_TMPFS_OWNER_OPTIONS="${test_tmpfs_owner_options}" \
+        PODMAN_COMPOSE_WARNING_LOGS=false "${compose_command[@]}" -p inframeld-test -f "${test_compose_file}" "$@"
 }
 
 wait_for_postgres() {
@@ -376,7 +381,7 @@ case "${command_name}" in
             test_compose build integration-tests
         fi
         test_compose run --rm --no-deps -T test-tls-init
-        test_compose up -d postgres mailpit mock-oidc password-breaches recovery-hooks kratos kratos-expiring hydra hydra-lifetimes recovery-callbacks kratos-recovery recovery-execution-callbacks kratos-recovery-execution
+        test_compose up -d postgres mailpit mock-oidc password-breaches seaweedfs recovery-hooks kratos kratos-expiring hydra hydra-lifetimes recovery-callbacks kratos-recovery recovery-execution-callbacks kratos-recovery-execution
         trap - EXIT
         ;;
     test-run)

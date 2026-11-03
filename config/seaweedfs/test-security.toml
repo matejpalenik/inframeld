@@ -1,0 +1,18 @@
+# Disposable internal fixture keys, never installation credentials.
+[jwt.signing]
+key = "inframeld-test-volume-write-only"
+expires_after_seconds = 10
+
+[jwt.filer_signing]
+key = "inframeld-test-filer-write-only"
+expires_after_seconds = 10
+
+[jwt.filer_signing.read]
+key = "inframeld-test-filer-read-only"
+expires_after_seconds = 10
+
+[access]
+ui = false
+
+[filer.expose_directory_metadata]
+enabled = false

@@ -261,14 +261,17 @@ if (naturalDescendant) {
         : '{"schemaVersion":1,"result":{}}'
     )
   } else if (operation === "exec") {
-    if (service === "browser-tests")
+    if (service === "browser-tests") {
+      const profile = args.indexOf("--profile")
       process.exitCode =
-        proof === "second-readiness-failed"
-          ? 17
-          : state.negativeVerified
-            ? 0
-            : 10
-    else if (args.includes("verify-denied-result")) {
+        profile < 0 || args[profile + 1] !== "qualification"
+          ? 1
+          : proof === "second-readiness-failed"
+            ? 17
+            : state.negativeVerified
+              ? 0
+              : 10
+    } else if (args.includes("verify-denied-result")) {
       if (proof === "denied-effects") process.exitCode = 25
       else state.negativeVerified = true
     } else process.exitCode = proof === "verify-failed" ? 25 : 0
