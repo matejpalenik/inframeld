@@ -10,6 +10,12 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join, sep } from "node:path";
 import test from "node:test";
+import { artifacts } from "../../src/config.ts";
+import { withResources } from "../../src/system/process.ts";
+import {
+  publishFixtureDiagnostics,
+  type FixtureClock,
+} from "../native/fixtures/browser-owner.ts";
 import {
   fixtureDiagnostic,
   fixtureCaptureMetadata,
@@ -18,6 +24,137 @@ import {
   observeFixtureController,
   acquireProtectedFixtureDirectory,
 } from "../native/fixtures/fixture-diagnostics.ts";
+
+function publicationClock() {
+  let time = 100;
+  const clock: FixtureClock = {
+    now: () => time,
+    set: () => 0,
+    clear() {},
+  };
+  return { clock, expire: () => (time = 200) };
+}
+
+test("owner diagnostics publishes both safe destinations", async (context) => {
+  const diagnostics = new FixtureDiagnostics("broker"),
+    { clock } = publicationClock(),
+    destinations: string[] = [];
+  diagnostics.note({
+    phase: "native-controller",
+    category: "failed",
+    status: 1,
+  });
+  context.mock.method(diagnostics, "write", async (folder: string) => {
+    destinations.push(folder);
+  });
+  await publishFixtureDiagnostics(diagnostics, "/private/status", 200, clock);
+  assert.deepEqual(destinations, ["/private/status", artifacts]);
+});
+
+test("owner diagnostics refuses expired writes before their effects", async (context) => {
+  for (const deadline of [99, 100]) {
+    const diagnostics = new FixtureDiagnostics("assertion"),
+      { clock } = publicationClock();
+    let writes = 0;
+    context.mock.method(diagnostics, "write", async () => {
+      writes++;
+    });
+    await assert.rejects(
+      publishFixtureDiagnostics(
+        diagnostics,
+        "/private/status",
+        deadline,
+        clock,
+      ),
+      (error) => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 2);
+        for (const failure of error.errors)
+          assert.match(String(failure), /report-deadline/);
+        return true;
+      },
+    );
+    assert.equal(writes, 0);
+  }
+});
+
+test("owner diagnostics still publishes ordinary status after private failure", async (context) => {
+  const diagnostics = new FixtureDiagnostics("assertion"),
+    { clock } = publicationClock(),
+    destinations: string[] = [],
+    failure = new Error("controlled private publication failure");
+  context.mock.method(diagnostics, "write", async (folder: string) => {
+    destinations.push(folder);
+    if (folder === "/private/status") throw failure;
+  });
+  await assert.rejects(
+    publishFixtureDiagnostics(diagnostics, "/private/status", 200, clock),
+    (error) => error === failure,
+  );
+  assert.deepEqual(destinations, ["/private/status", artifacts]);
+});
+
+test("owner diagnostics retains both destination failures", async (context) => {
+  const diagnostics = new FixtureDiagnostics("worker"),
+    { clock } = publicationClock(),
+    privateFailure = new Error("controlled private publication failure"),
+    ordinaryFailure = new Error("controlled ordinary publication failure");
+  context.mock.method(diagnostics, "write", async (folder: string) => {
+    throw folder === "/private/status" ? privateFailure : ordinaryFailure;
+  });
+  await assert.rejects(
+    publishFixtureDiagnostics(diagnostics, "/private/status", 200, clock),
+    (error) => {
+      assert.ok(error instanceof AggregateError);
+      assert.deepEqual(error.errors, [privateFailure, ordinaryFailure]);
+      return true;
+    },
+  );
+});
+
+test("owner diagnostics never starts its second write after allowance exhaustion", async (context) => {
+  const diagnostics = new FixtureDiagnostics("worker"),
+    { clock, expire } = publicationClock(),
+    destinations: string[] = [];
+  context.mock.method(diagnostics, "write", async (folder: string) => {
+    destinations.push(folder);
+    expire();
+  });
+  await assert.rejects(
+    publishFixtureDiagnostics(diagnostics, "/private/status", 200, clock),
+    (error) => {
+      assert.ok(error instanceof AggregateError);
+      for (const failure of error.errors)
+        assert.match(String(failure), /report-deadline/);
+      return true;
+    },
+  );
+  assert.deepEqual(destinations, ["/private/status"]);
+});
+
+test("owner diagnostics preserves an initiating error alongside publication failure", async (context) => {
+  const diagnostics = new FixtureDiagnostics("worker"),
+    { clock } = publicationClock(),
+    primary = new Error("controlled initiating failure"),
+    publication = new Error("controlled publication failure");
+  context.mock.method(diagnostics, "write", async (folder: string) => {
+    if (folder === "/private/status") throw publication;
+  });
+  await assert.rejects(
+    withResources(
+      async () => {
+        throw primary;
+      },
+      () =>
+        publishFixtureDiagnostics(diagnostics, "/private/status", 200, clock),
+    ),
+    (error) => {
+      assert.ok(error instanceof AggregateError);
+      assert.deepEqual(error.errors, [primary, publication]);
+      return true;
+    },
+  );
+});
 
 test("fixed native failure details never forward original messages or nested secrets", () => {
   const original = new Error("secret ws://capability/private");
