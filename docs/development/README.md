@@ -16,7 +16,7 @@ Start the backend, learn one workflow and follow its owner when you need details
 | Investigate a failure safely | [Debugging](guides/debugging.md) |
 | Add a backend behavior | [Worked contributor guide](guides/adding-a-backend-feature.md) |
 | Name or rename an existing Project | [Project naming guide](../../apps/docs/src/app/guides/name-and-rename-project/page.mdx) |
-| Understand restricted metadata-authority repair | [Conditional operator consumer](operations/project-metadata-repair.md), with its unmet proof-acquisition prerequisite |
+| Understand restricted metadata-authority repair | [Operator consumer](operations/project-metadata-repair.md) and [transient proof example](guides/recipient-proof.md), with native and human qualification pending |
 | Find an HTTP field, logical record or database constraint | [Contracts and data](guides/contracts-and-data.md) |
 | Consume or maintain the Rust SDK and generator patches | [Rust SDK skill](../../.agents/skills/inframeld-rust-sdk/SKILL.md) and [workspace runbook](../../packages/sdk-tools/README.md) |
 | Extend shared SDK coverage or maintain generator inputs | [SDKs skill](../../.agents/skills/inframeld-sdks/SKILL.md) |

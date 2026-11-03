@@ -24,6 +24,7 @@ appendFileSync(
 const globalVolumes =
   args[0] === "volume" && args[1] === "ls" && !args.includes("--filter")
 const startup = process.env.ACCOUNT_PROBE_STARTUP === "true"
+const proof = process.env.ACCOUNT_PROBE_PROOF ?? ""
 const operationIndex = args.findIndex((arg) =>
   ["up", "run", "exec"].includes(arg)
 )
@@ -93,6 +94,139 @@ if (naturalDescendant) {
     String(process.pid)
   )
   setInterval(() => {}, 1_000)
+} else if (
+  proof &&
+  (args.includes("inspect") ||
+    args.includes("logs") ||
+    (args.includes("ps") &&
+      ["browser-tests", "proof-driver", "proof-denied-driver"].includes(
+        args.at(-1)
+      )) ||
+    (operation === "up" &&
+      ["browser-tests", "proof-driver", "proof-denied-driver"].includes(
+        service
+      )) ||
+    (operation === "exec" &&
+      (args.includes("verify-proof-result") ||
+        args.includes("verify-denied-result") ||
+        service === "browser-tests")))
+) {
+  // Closed observations for the existing owner's combined flow. No engine is called.
+  const stateFile = join(directory, "proof-state.json")
+  let state = {
+    browser: false,
+    denied: false,
+    negativeVerified: false,
+    driver: false,
+    observations: 0,
+  }
+  try {
+    state = JSON.parse(readFileSync(stateFile, "utf8"))
+  } catch {}
+  const browser = "b".repeat(64)
+  const driver = "d".repeat(64)
+  const denied = "e".repeat(64)
+  if (operation === "up") {
+    if (service === "browser-tests") state.browser = true
+    else if (service === "proof-denied-driver") state.denied = true
+    else state.driver = true
+  } else if (args.includes("ps")) {
+    console.log(
+      args.at(-1) === "browser-tests"
+        ? browser
+        : args.at(-1) === "proof-denied-driver"
+          ? denied
+          : driver
+    )
+  } else if (args.includes("inspect")) {
+    state.observations += 1
+    if (proof === "inspect-invalid") console.log("not-json")
+    else {
+      const id = args.at(-1)
+      const isBrowser = id === browser
+      const isDenied = id === denied
+      const status =
+        (isDenied && proof !== "denied-stalled") ||
+        (isBrowser && proof === "browser-failed")
+          ? "exited"
+          : state.driver && proof !== "stalled-terminal"
+            ? "exited"
+            : "running"
+      console.log(
+        JSON.stringify({
+          Id:
+            proof === "wrong-id" || (isDenied && proof === "denied-wrong-id")
+              ? "f".repeat(64)
+              : id,
+          Config: {
+            User: "10001:10001",
+            Labels: {
+              "com.docker.compose.project":
+                process.env.INFRAMELD_ACCOUNT_WEB_IMAGE.slice(
+                  "localhost/".length,
+                  -"-web:check".length
+                ),
+              "com.docker.compose.service": isBrowser
+                ? "browser-tests"
+                : isDenied
+                  ? "proof-denied-driver"
+                  : "proof-driver",
+            },
+          },
+          HostConfig: {
+            Privileged: false,
+            Init: true,
+            PidMode: "",
+            NetworkMode:
+              isDenied && proof === "denied-host-net"
+                ? "host"
+                : isBrowser
+                  ? "account-private"
+                  : `container:${browser}`,
+          },
+          State: {
+            Status: status,
+            ExitCode: isDenied
+              ? proof === "denied-wrong-exit"
+                ? 0
+                : 1
+              : isBrowser && proof === "browser-failed"
+                ? 8
+                : !isBrowser && proof === "driver-failed"
+                  ? 7
+                  : 0,
+            Health: {
+              Status:
+                proof === "unhealthy"
+                  ? "unhealthy"
+                  : proof === "never-ready"
+                    ? "starting"
+                    : "healthy",
+            },
+          },
+        })
+      )
+    }
+  } else if (args.includes("logs")) {
+    console.log(
+      args.at(-1) === denied
+        ? '{"schemaVersion":1,"error":{"kind":"denied","resourceCleanup":"not-needed","credentialCleanup":"not-needed"}}'
+        : '{"schemaVersion":1,"result":{}}'
+    )
+  } else if (operation === "exec") {
+    if (service === "browser-tests")
+      process.exitCode =
+        proof === "second-readiness-failed"
+          ? 17
+          : state.negativeVerified
+            ? 0
+            : 10
+    else if (args.includes("verify-denied-result")) {
+      if (proof === "denied-effects") process.exitCode = 25
+      else state.negativeVerified = true
+    } else process.exitCode = proof === "verify-failed" ? 25 : 0
+  }
+  if (!args.includes("logs")) writeFileSync(stateFile, JSON.stringify(state))
 } else if (startup && operation) {
   // Model fresh fixture lifetimes and socket-only temporary Postgres startup.
   // This state machine never opens a network connection or invokes a provider.

@@ -2,9 +2,9 @@
 
 The backend implements a narrow host-authorized repair for an existing Project whose `edit-project-metadata` grantor responsibility is stranded. This runbook describes that consumer and its failure/replay behavior.
 
-**The proof-acquisition prerequisite is currently unmet in the shipped product.** There is no documented, qualified entry point for an operator to acquire the required fresh human Hydra proof. The stock CLI exposes no login command, and the complete client/account-UI acquisition journey remains unqualified. OAuth client provisioning does not sign in a human. This is not a complete usable first-grant walkthrough. The consumer applies only when a separately qualified producer supplies current proof. Proposed client/UI work and private provider tests do not satisfy that prerequisite.
+**Native proof-acquisition qualification remains pending.** The [shared transient proof capability and source-built example](../guides/recipient-proof.md) are implemented for an already-admitted recipient. They verify the generated current-session response and hand fresh proof directly to this consumer through protected stdin. Controlled coverage is not native provider/browser/combined qualification. The stock CLI still exposes no login command, and client provisioning does not sign in a human. This is not a complete qualified first-grant walkthrough. A qualified producer must supply current proof before the operator journey can be treated as ready.
 
-Complete human sign-in, fresh proof, protected repair and rename acceptance is deferred to [human operator qualification (#298)](https://github.com/matejpalenik/inframeld/issues/298). The acquisition prerequisites remain [#82](https://github.com/matejpalenik/inframeld/issues/82) and [#160](https://github.com/matejpalenik/inframeld/issues/160). This deferral does not make the operator walkthrough usable. Server proof verification, current authorization, protected stdin, replay safety and backend, SDK and CI qualification remain required.
+Complete human sign-in, fresh proof, protected repair and rename acceptance is deferred to [human operator qualification (#298)](https://github.com/matejpalenik/inframeld/issues/298). The supporting existing-human account UI is delivered through [#82](https://github.com/matejpalenik/inframeld/issues/82). Transient acquisition and its remaining qualification belong to [#160](https://github.com/matejpalenik/inframeld/issues/160). This deferral does not make the operator walkthrough usable. Server proof verification, current authorization, protected stdin, replay safety and backend, SDK and CI qualification remain required.
 
 ## Establish the authority and reviewed state
 
@@ -14,7 +14,7 @@ The recipient must already be an active admitted human and current member of the
 
 Review the exact Project UUID, recipient's Kratos identity UUID and current Project **Access revision** through protected operator records. The public metadata response's `metadataRevision` is a different revision and cannot substitute for this review.
 
-Apply schema `0014_project_metadata` explicitly through the [upgrade and migration procedure](upgrades.md#upgrades). Startup does not migrate or replace missing installation identity. Use compatible backend code and the original installation identity.
+Apply the current schema `0015_artifact_allocation` explicitly through the [upgrade and migration procedure](upgrades.md#upgrades). Migration `0014_project_metadata` introduced metadata and this narrow repair. Startup does not migrate or replace missing installation identity. Use compatible backend code and the original installation identity.
 
 ## Configure the existing consumer
 
@@ -65,4 +65,4 @@ Controlled failed operations use exit `1` and a safe JSON code, with the origina
 
 Every invocation verifies current proof and recipient eligibility. A matching completed receipt is returned before fresh-write stranded/revision checks. Replay after grant removal returns that original receipt without restoring the grant. Changed mode, target, reviewed revision, attribution, reason or recipient conflicts. Neither replay nor possession of the receipt grants new authority.
 
-Read the [metadata authority decision](../../../.agents/skills/inframeld-access-models/references/decision-project-metadata-authority.md) and [host-maintenance contract](../../../.agents/skills/inframeld-access-models/references/host-maintenance.md#project-metadata-authority-repair) for the accepted boundary. [Local setup](../getting-started/local-setup.md#configure-the-cli-client) distinguishes official client provisioning from the still-missing interactive acquisition journey.
+Read the [metadata authority decision](../../../.agents/skills/inframeld-access-models/references/decision-project-metadata-authority.md) and [host-maintenance contract](../../../.agents/skills/inframeld-access-models/references/host-maintenance.md#project-metadata-authority-repair) for the accepted boundary. [Local setup](../getting-started/local-setup.md#configure-the-cli-client) distinguishes official client provisioning from transient acquisition and its pending combined qualification.

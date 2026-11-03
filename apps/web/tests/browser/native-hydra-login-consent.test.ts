@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto"
-import { readFile } from "node:fs/promises"
+import { lstat, readFile, rmdir, unlink, writeFile } from "node:fs/promises"
 import { test } from "node:test"
 import { createClient, inspectHumanOAuthConsent } from "@inframeld/sdk"
 import { chromium } from "playwright"
@@ -16,10 +16,176 @@ import {
   origin,
   passwordLogin,
   requestCode,
+  readRecipientBridge,
   session,
   submitCode,
 } from "./support"
 import type { NativeDecisionCallback, NativePhase } from "./support"
+
+let deniedNavigationComplete = false
+if (process.env.INFRAMELD_ACCOUNT_PROOF_MODE === "1") {
+  for (const decision of ["deny", "allow"] as const) {
+    test(
+      `recipient-proof ${decision} uses the source-built Rust callback and production consent`,
+      { timeout: 90_000 },
+      async (context) => {
+        if (decision === "allow" && !deniedNavigationComplete) {
+          context.skip("The explicit denial prerequisite failed.")
+          return
+        }
+        const parent =
+          decision === "deny"
+            ? "/run/account-proof/denied-bridge"
+            : "/run/account-proof/bridge"
+        const marker = `/run/account-proof/${decision}-ready`
+        const socket = `${parent}/browser.sock`
+        const browser = await chromium
+          .launch({ channel: "chromium", headless: true })
+          .catch((error) => {
+            throw nativeFailure("browser-launch", error)
+          })
+        let phase: NativePhase = "browser-context"
+        let primary: Error | undefined
+        let marked = false
+        try {
+          if (!browser.version().startsWith("156."))
+            throw nativeInvariant("browser-version")
+          const page = await (
+            await browser.newContext({ ignoreHTTPSErrors: false })
+          ).newPage()
+          phase = "recipient-bridge"
+          await writeFile(marker, "READY1\n", { flag: "wx", mode: 0o600 })
+          marked = true
+          const event = await readRecipientBridge(
+            socket,
+            performance.now() + 30_000
+          )
+          const authorization = new URL(event.authorizationUrl)
+          const callback = new URL(event.callbackUri)
+          const path = `/oauth/callback/${createHash("sha256").update(event.issuer, "utf8").digest("hex")}`
+          if (
+            event.issuer !== `${issuerOrigin}/` ||
+            authorization.origin !== issuerOrigin ||
+            authorization.pathname !== "/oauth2/auth" ||
+            authorization.searchParams.get("client_id") !== "inframeld-cli" ||
+            authorization.searchParams.get("redirect_uri") !==
+              event.callbackUri ||
+            authorization.searchParams.get("code_challenge_method") !==
+              "S256" ||
+            callback.protocol !== "http:" ||
+            callback.hostname !== "127.0.0.1" ||
+            !callback.port ||
+            callback.pathname !== path ||
+            callback.search ||
+            callback.hash ||
+            callback.username ||
+            callback.password
+          )
+            throw nativeInvariant(phase)
+          phase = "authorization-navigation"
+          await page.goto(event.authorizationUrl, { waitUntil: "networkidle" })
+          phase = "login"
+          const fixture = await human()
+          await passwordLogin(page, fixture)
+          phase = "consent-page"
+          await page.waitForURL(
+            (url) => url.origin === origin && url.pathname === "/consent",
+            { timeout: 15_000 }
+          )
+          if (
+            !(await page
+              .getByText(fixture.subject, { exact: true })
+              .isVisible())
+          )
+            throw nativeInvariant("consent-subject")
+          phase = decision === "deny" ? "recipient-denial" : "recipient-allow"
+          const response = page.waitForResponse(
+            (value) => {
+              const url = new URL(value.url())
+              return (
+                url.origin === callback.origin &&
+                url.pathname === callback.pathname &&
+                value.request().isNavigationRequest()
+              )
+            },
+            { timeout: 15_000 }
+          )
+          const decided = page.waitForResponse(
+            (value) => {
+              const url = new URL(value.url())
+              return (
+                url.origin === origin &&
+                url.pathname === "/v1/oauth/consent" &&
+                value.request().method() === "POST"
+              )
+            },
+            { timeout: 15_000 }
+          )
+          const [received, sent] = await Promise.all([
+            response,
+            decided,
+            page
+              .getByRole("button", {
+                name: decision === "allow" ? "Allow CLI access" : "Cancel",
+                exact: true,
+              })
+              .click(),
+          ])
+          if (sent.status() !== 200)
+            throw nativeFailure(phase, undefined, { httpStatus: sent.status() })
+          if (received.status() !== 200)
+            throw nativeFailure(phase, undefined, {
+              httpStatus: received.status(),
+            })
+        } catch (error) {
+          primary = nativeFailure(phase, error)
+        } finally {
+          const cleanup: Error[] = []
+          try {
+            await browser.close()
+          } catch (error) {
+            cleanup.push(nativeFailure("browser-close", error))
+          }
+          if (marked) {
+            try {
+              await unlink(marker)
+            } catch (error) {
+              cleanup.push(nativeFailure("recipient-bridge", error))
+            }
+          }
+          try {
+            let exists = true
+            try {
+              await lstat(socket)
+            } catch (error) {
+              if (
+                error instanceof Error &&
+                "code" in error &&
+                error.code === "ENOENT"
+              )
+                exists = false
+              else throw error
+            }
+            if (exists) throw nativeInvariant("recipient-bridge")
+            await rmdir(parent)
+          } catch (error) {
+            cleanup.push(nativeFailure("recipient-bridge", error))
+          }
+          if (cleanup.length) {
+            const combined = new AggregateError(
+              [...(primary ? [primary] : []), ...cleanup],
+              "Recipient proof or owned browser cleanup failed."
+            )
+            combined.stack = combined.message
+            throw combined
+          }
+        }
+        if (primary) throw primary
+        if (decision === "deny") deniedNavigationComplete = true
+      }
+    )
+  }
+}
 
 type NavigationFixture = {
   clientId: string

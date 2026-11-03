@@ -87,7 +87,7 @@ Application, Kratos and Hydra databases use three separate named volumes, preser
 
 ## Run the ordinary application worker
 
-After applying schema `0014_project_metadata`, start the worker from the same checkout as the API, with the development database still running:
+After applying the current schema `0015_artifact_allocation`, start the worker from the same checkout as the API, with the development database still running:
 
 ```bash
 mise exec -- uv run --project apps/backend --locked --env-file apps/backend/.env python -m inframeld_backend.application_worker
@@ -209,7 +209,7 @@ PostgreSQL is exposed to the host only at:
 
 Inside Compose, PostgreSQL uses port `5432`, Kratos public/admin use `http://kratos:4433`/`4434` and Hydra public/admin use `http://hydra:4444`/`4445`. The backend uses private verification endpoints while retaining the public Hydra issuer `http://127.0.0.1:14444/` and canonical API audience `http://127.0.0.1:8001`. Both host and container API use authority `kratos:local`. Provider migrations finish before their services start.
 
-The development Kratos config enables password registration, login, and code-based recovery. Kratos sends development email to Mailpit. View captured messages at `http://127.0.0.1:18024`. Its self-service UI URLs are placeholders until browser pages are implemented. Mailpit is for local development. An operator deployment needs its own SMTP configuration. Deployment-level OIDC sign-in is not configured by this Compose setup.
+The development Kratos config enables password registration, login, and code-based recovery. Kratos sends development email to Mailpit. View captured messages at `http://127.0.0.1:18024`. The default HTTP graph retains placeholder self-service UI URLs. The separately delivered existing-human account pages use the [private HTTPS profile](../../../apps/web/README.md#https-reference-profile). Mailpit is for local development. An operator deployment needs its own SMTP configuration. Deployment-level OIDC sign-in is not configured by this Compose setup.
 
 For company sign-in, use [optional identity integration](../guides/identity-integration.md). The default stack above does not configure an OIDC provider.
 
@@ -399,13 +399,13 @@ Read [testing](../guides/testing.md) next. For accepted production boundaries, s
 
 The backend supports metadata reads by permanent Project ID, exact Name resolution and atomic Name/Display-name changes for an existing Project. Changes require current human-only `edit-project-metadata` authority and a reviewed metadata revision. [Name and rename an existing Project](../../../apps/docs/src/app/guides/name-and-rename-project/page.mdx) gives the HTTP/generated-client path. It does not create Projects or allocate creator grants.
 
-The backend-only maintenance command also consumes the narrow `repair-stranded-authority` request for that exact action. [Project metadata authority repair](../operations/project-metadata-repair.md) records its protected input, additional configuration and safe receipt/replay behavior. Its fresh human proof prerequisite lacks a qualified client/account-UI acquisition journey, so it is not a complete first-grant walkthrough. `pnpm dev:oauth:configure` registers the client and does not acquire that proof.
+The backend-only maintenance command also consumes the narrow `repair-stranded-authority` request for that exact action. [Project metadata authority repair](../operations/project-metadata-repair.md) records its protected input, additional configuration and safe receipt/replay behavior. The [source-built transient proof example](../guides/recipient-proof.md) implements acquisition and direct protected-stdin handoff for an already-admitted recipient. Native combined and human qualification remain pending, so this is not a complete qualified first-grant walkthrough. `pnpm dev:oauth:configure` registers the client and does not acquire proof.
 
 <a id="private-recovery-callbacks"></a>
 
 ## Private recovery callbacks
 
-The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the supported head, currently `0014_project_metadata`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
+The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the supported head, currently `0015_artifact_allocation`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
 
 Supply a dedicated 32 to 256 byte printable ASCII key through `INFRAMELD_RECOVERY_KEY_HOST_FILE`. The mounted regular file must be readable by the container's runtime UID 10001, with mode 0400 or 0600 as seen inside the container. Compose file-backed secrets do not reliably remap host ownership. Provision the correct runtime ownership rather than making the file group/world-readable. Do not reuse an API, database or fingerprint secret.
 
@@ -421,7 +421,7 @@ For rotation, configure a current file plus optional retiring file and `INFRAMEL
 
 Alice remains blocked after Hydra rejects cleanup or a run exhausts its budget. Fix the provider/configuration problem first. A trusted deployment operator can then authorize one additional twelve-attempt, one-hour run of the original recovery. This is a local container command with no network endpoint. Keep container-exec and database credentials restricted to operators.
 
-Apply the supported schema `0014_project_metadata` deliberately before starting the updated backend, callbacks or worker. Migration `0008_host_maintenance_receipts` introduced the maintenance receipt. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
+Apply the supported schema `0015_artifact_allocation` deliberately before starting the updated backend, callbacks or worker. Migration `0008_host_maintenance_receipts` introduced the maintenance receipt. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
 
 Obtain the expected installation UUID from your protected installation record and the original recovery operation ID from protected recovery records. Replace the placeholders below. Choose a unique operator request ID and retain the exact request privately until its outcome is known. Supply attribution and the repair reason, without passwords, cookies or tokens.
 

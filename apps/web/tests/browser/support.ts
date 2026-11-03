@@ -1,6 +1,8 @@
-import { readFile } from "node:fs/promises"
+import { lstat, readFile } from "node:fs/promises"
 import { createServer } from "node:http"
+import { createConnection } from "node:net"
 import type { Socket } from "node:net"
+import { dirname } from "node:path"
 import { setTimeout } from "node:timers/promises"
 import { Configuration, FrontendApi, ResponseError } from "@ory/client-fetch"
 import { createClient, getCurrentSession } from "@inframeld/sdk"
@@ -14,6 +16,9 @@ const nativePhases = [
   "browser-close",
   "browser-version",
   "fixture",
+  "recipient-bridge",
+  "recipient-denial",
+  "recipient-allow",
   "authorization-navigation",
   "login",
   "consent-page",
@@ -387,6 +392,118 @@ export async function decisionCallback(
 
 export const origin = "https://inframeld.account.test:8443"
 export const issuerOrigin = "https://hydra.account.test:8443"
+
+export type RecipientReady = {
+  schemaVersion: 1
+  type: "authorization-ready"
+  authorizationUrl: string
+  issuer: string
+  callbackUri: string
+}
+
+export async function readRecipientBridge(
+  path: string,
+  deadline: number
+): Promise<RecipientReady> {
+  const parent = await lstat(dirname(path))
+  if (
+    !parent.isDirectory() ||
+    parent.uid !== process.getuid?.() ||
+    (parent.mode & 0o777) !== 0o700
+  )
+    throw nativeInvariant("recipient-bridge")
+  while (true) {
+    if (performance.now() >= deadline) throw nativeInvariant("recipient-bridge")
+    try {
+      const socket = await lstat(path)
+      if (
+        !socket.isSocket() ||
+        socket.uid !== process.getuid?.() ||
+        (socket.mode & 0o777) !== 0o600
+      )
+        throw nativeInvariant("recipient-bridge")
+      break
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !("code" in error) ||
+        error.code !== "ENOENT"
+      )
+        throw nativeFailure("recipient-bridge", error)
+      await setTimeout(Math.min(25, Math.max(0, deadline - performance.now())))
+    }
+  }
+  return new Promise<RecipientReady>((resolve, reject) => {
+    const stream = createConnection(path)
+    const readDeadline = Math.min(deadline, performance.now() + 5_000)
+    const chunks: Buffer[] = []
+    let length = 0
+    let finished = false
+    let ready: RecipientReady | undefined
+    let failure: Error | undefined
+    let timer: ReturnType<typeof globalThis.setTimeout>
+    const finish = (error?: unknown) => {
+      if (finished) return
+      finished = true
+      failure =
+        error === undefined
+          ? undefined
+          : nativeFailure("recipient-bridge", error)
+      stream.destroy()
+    }
+    const expired = () => {
+      if (finished) return
+      const remaining = readDeadline - performance.now()
+      if (remaining > 0)
+        timer = globalThis.setTimeout(expired, Math.ceil(remaining))
+      else finish(nativeInvariant("recipient-bridge"))
+    }
+    timer = globalThis.setTimeout(
+      expired,
+      Math.max(0, Math.ceil(readDeadline - performance.now()))
+    )
+    stream.on("data", (chunk: Buffer) => {
+      length += chunk.length
+      if (length > 128 * 1024) finish(nativeInvariant("recipient-bridge"))
+      else chunks.push(chunk)
+    })
+    stream.once("error", finish)
+    stream.once("end", () => {
+      if (finished) return
+      try {
+        if (performance.now() >= readDeadline)
+          throw nativeInvariant("recipient-bridge")
+        const raw = new TextDecoder("utf-8", { fatal: true }).decode(
+          Buffer.concat(chunks)
+        )
+        const value = JSON.parse(raw) as RecipientReady
+        if (
+          !raw.endsWith("\n") ||
+          !value ||
+          typeof value !== "object" ||
+          Object.keys(value).sort().join(",") !==
+            "authorizationUrl,callbackUri,issuer,schemaVersion,type" ||
+          value.schemaVersion !== 1 ||
+          value.type !== "authorization-ready" ||
+          typeof value.authorizationUrl !== "string" ||
+          typeof value.issuer !== "string" ||
+          typeof value.callbackUri !== "string"
+        )
+          throw nativeInvariant("recipient-bridge")
+        ready = value
+        finish()
+      } catch (error) {
+        finish(error)
+      }
+    })
+    stream.once("close", () => {
+      globalThis.clearTimeout(timer)
+      if (failure) reject(failure)
+      else if (ready) resolve(ready)
+      else reject(nativeInvariant("recipient-bridge"))
+    })
+  })
+}
 export type FixtureHuman = { subject: string; email: string; password: string }
 export async function human(): Promise<FixtureHuman> {
   return JSON.parse(

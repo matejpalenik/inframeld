@@ -22,6 +22,7 @@ def main() -> None:
         Path("/run/account-identity"),
         Path("/run/account-secrets"),
         Path("/run/account-fixture"),
+        Path("/run/account-proof"),
     )
     if os.geteuid() != 0:
         raise RuntimeError("Disposable volume initialization requires container root.")
@@ -34,6 +35,8 @@ def main() -> None:
     os.setgroups([])
     os.setgid(10001)
     os.setuid(10001)
+    Path("/run/account-proof/bridge").mkdir(mode=0o700)
+    Path("/run/account-proof/denied-bridge").mkdir(mode=0o700)
 
     now = datetime.now(UTC)
     ca = trustme.CA()
@@ -44,7 +47,11 @@ def main() -> None:
         not_after=now + timedelta(hours=24),
     )
     write(directories[0] / "ca.pem", ca.cert_pem.bytes(), 0o644)
-    write(directories[0] / "expires.txt", (now + timedelta(hours=24)).isoformat().encode(), 0o644)
+    write(
+        directories[0] / "expires.txt",
+        (now + timedelta(hours=24)).isoformat().encode(),
+        0o644,
+    )
     write(directories[1] / "server.key", leaf.private_key_pem.bytes(), 0o600)
     write(
         directories[1] / "server.pem",

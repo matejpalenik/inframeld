@@ -649,3 +649,15 @@ async fn verified_https_discovery_supports_an_explicit_connect_proxy() {
     assert_eq!(server.requests.lock().unwrap().len(), 3);
     assert!(!proxy.requests.lock().unwrap().is_empty());
 }
+
+#[test]
+fn issuer_response_capability_preserves_advertisement_and_rejects_malformed_values() {
+    use super::ProviderExtensions;
+    let extensions: ProviderExtensions =
+        serde_json::from_str(r#"{"authorization_response_iss_parameter_supported":true}"#).unwrap();
+    assert!(extensions.authorization_response_iss_parameter_supported);
+    for invalid in ["null", "1", "\"true\""] {
+        let json = format!("{{\"authorization_response_iss_parameter_supported\":{invalid}}}");
+        assert!(serde_json::from_str::<ProviderExtensions>(&json).is_err());
+    }
+}

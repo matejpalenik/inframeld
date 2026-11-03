@@ -1,6 +1,8 @@
 """Check retained ownership with syscall controls and finite private children."""
 
+import json
 import os
+import runpy
 import signal
 import subprocess
 import sys
@@ -34,7 +36,10 @@ class RetainedOwnershipTests(unittest.TestCase):
 
     def test_natural_exit_retains_leader_and_status(self) -> None:
         phase = self.phase()
-        with patch("os.waitid", return_value=self.exited()) as observe, patch("os.waitpid") as reap:
+        with (
+            patch("os.waitid", return_value=self.exited()) as observe,
+            patch("os.waitpid") as reap,
+        ):
             self.assertTrue(phase.observe())
         observe.assert_called_once_with(os.P_PID, 123, os.WEXITED | os.WNOHANG | os.WNOWAIT)
         reap.assert_not_called()
@@ -85,7 +90,10 @@ class RetainedOwnershipTests(unittest.TestCase):
 
     def test_denied_signal_is_a_failure(self) -> None:
         phase = self.phase()
-        with patch("os.waitid", return_value=None), patch("os.killpg", side_effect=PermissionError):
+        with (
+            patch("os.waitid", return_value=None),
+            patch("os.killpg", side_effect=PermissionError),
+        ):
             self.assertFalse(phase.signal_group(signal.SIGTERM))
         self.assertIn("group-signal-failed", phase.errors)
 
@@ -180,7 +188,10 @@ class PhaseCompletionTests(unittest.TestCase):
     def test_lost_identity_stops_escalation_and_never_confirms_cleanup(self) -> None:
         phase = self.exited_phase()
         runner = self.runner()
-        with patch("os.waitid", side_effect=ChildProcessError), patch("os.killpg") as send:
+        with (
+            patch("os.waitid", side_effect=ChildProcessError),
+            patch("os.killpg") as send,
+        ):
             self.assertFalse(runner._stop_phase(phase))
         send.assert_not_called()
         self.assertFalse(phase.owned)
@@ -204,7 +215,8 @@ class PhaseCompletionTests(unittest.TestCase):
         with (
             patch("time.monotonic", side_effect=lambda: clock[0]),
             patch(
-                "time.sleep", side_effect=lambda seconds: clock.__setitem__(0, clock[0] + seconds)
+                "time.sleep",
+                side_effect=lambda seconds: clock.__setitem__(0, clock[0] + seconds),
             ),
             patch("os.waitid", return_value=RetainedOwnershipTests().exited()),
             patch("os.waitpid", return_value=(123, 7 << 8)),
@@ -213,7 +225,8 @@ class PhaseCompletionTests(unittest.TestCase):
         ):
             self.assertTrue(runner._stop_phase(phase))
         self.assertEqual(
-            [call.args[1] for call in send.call_args_list], [signal.SIGTERM, signal.SIGKILL]
+            [call.args[1] for call in send.call_args_list],
+            [signal.SIGTERM, signal.SIGKILL],
         )
         self.assertEqual(observations[0], 2)
 
@@ -241,7 +254,9 @@ class PhaseCompletionTests(unittest.TestCase):
             self.assertEqual(runner._run_phase("controlled", ["unused"], 1), 143)
         stopped.assert_called_once()
 
-    def test_parent_finalizer_shield_does_not_make_execed_child_ignore_term(self) -> None:
+    def test_parent_finalizer_shield_does_not_make_execed_child_ignore_term(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory(prefix="account-default-term-") as name:
             runner = AccountUIRunner(
                 Path(name), directory=Path(name), term_seconds=0.2, kill_seconds=0.2
@@ -296,7 +311,8 @@ class BoundedObservationTests(unittest.TestCase):
             patch("os.set_blocking"),
             patch("os.read", side_effect=chunks),
             patch(
-                "select.select", return_value=([child.stdout], [], []) if ready else ([], [], [])
+                "select.select",
+                return_value=([child.stdout], [], []) if ready else ([], [], []),
             ),
         ):
             return runner._members(phase, time.monotonic() + 1)
@@ -305,7 +321,11 @@ class BoundedObservationTests(unittest.TestCase):
         self.assertFalse(self.sample([b"123 123 Z\n", b""]))
 
     def test_incomplete_or_nonzero_observation_is_unknown(self) -> None:
-        for chunks, code in (([b""], 0), ([b"broken\n", b""], 0), ([b"123 123 Z\n", b""], 3)):
+        for chunks, code in (
+            ([b""], 0),
+            ([b"broken\n", b""], 0),
+            ([b"123 123 Z\n", b""], 3),
+        ):
             with self.subTest(chunks=chunks), self.assertRaises(ValueError):
                 self.sample(chunks, code=code)
 
@@ -360,7 +380,8 @@ class ObserverSetupTests(unittest.TestCase):
                             runner._members(phase, time.monotonic() + 1)
                         self.assertIs(caught.exception, primary)
                         self.assertIsNotNone(
-                            child.returncode, "Setup failure left an admitted observer unreaped"
+                            child.returncode,
+                            "Setup failure left an admitted observer unreaped",
                         )
                         stopped.assert_called_once()
                         if cleanup_failure:
@@ -414,6 +435,140 @@ class ReapedChildPortabilityTests(unittest.TestCase):
 
     def test_absent_tmpdir_does_not_choose_child_cwd(self) -> None:
         self.check_override(missing=False)
+
+
+class ProofInputTests(unittest.TestCase):
+    def test_denial_requires_the_exact_complete_production_error(self):
+        validator = self.functions()["validate_denied_result"]
+        denied = {
+            "schemaVersion": 1,
+            "error": {
+                "kind": "denied",
+                "resourceCleanup": "not-needed",
+                "credentialCleanup": "not-needed",
+            },
+        }
+        self.assertIsNone(validator(json.dumps(denied).encode()))
+        for key, value in [
+            ("kind", "exchange"),
+            ("resourceCleanup", "unconfirmed"),
+            ("credentialCleanup", "confirmed"),
+        ]:
+            changed = json.loads(json.dumps(denied))
+            changed["error"][key] = value
+            with self.assertRaises(ValueError):
+                validator(json.dumps(changed).encode())
+        for raw in [
+            b'{"schemaVersion":1,"error":{"kind":"denied"}}',
+            json.dumps(denied).encode() + b"{}",
+            b"x" * 65_537,
+            b'{"schemaVersion":1,"schemaVersion":1,"error":{"kind":"denied","resourceCleanup":"not-needed","credentialCleanup":"not-needed"}}',
+        ]:
+            with self.assertRaises(ValueError):
+                validator(raw)
+
+    def functions(self):
+        return runpy.run_path(
+            str(Path(__file__).resolve().parents[1] / "apps/web/tests/fixtures/backend.py")
+        )
+
+    def intent(self):
+        return {
+            "schemaVersion": 1,
+            "mode": "repair-stranded-authority",
+            "expectedInstallationId": "00000000-0000-0000-0000-000000000001",
+            "operationId": "native-recipient-proof",
+            "operatorLabel": "Private native fixture",
+            "reason": "Restore reviewed metadata authority",
+            "expectedAccessRevision": 0,
+            "expectedIdentityId": "00000000-0000-0000-0000-000000000002",
+            "responsibility": {
+                "kind": "action-grantor",
+                "target": {
+                    "kind": "project",
+                    "projectId": "00000000-0000-0000-0000-000000000003",
+                },
+                "actionId": "edit-project-metadata",
+            },
+        }
+
+    def result(self):
+        request = self.intent()
+        receipt = {
+            "schemaVersion": 1,
+            "mode": request["mode"],
+            "operationId": request["operationId"],
+            "installationId": request["expectedInstallationId"],
+            "principalId": "00000000-0000-0000-0000-000000000004",
+            "accessRevision": 1,
+            "outcome": "repaired",
+            "responsibility": request["responsibility"],
+        }
+        return {
+            "schemaVersion": 1,
+            "result": {
+                "maintenance": {
+                    "effect": {"status": "committed", "receipt": receipt},
+                    "processCleanup": "confirmed",
+                    "failure": None,
+                },
+                "credentialCleanup": "confirmed",
+            },
+        }
+
+    def test_private_inputs_are_proof_free_and_retain_exact_reviewed_intent(self):
+        from uuid import UUID
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "driver-private"
+            self.functions()["write_proof_inputs"](
+                directory,
+                installation_id=UUID(int=1),
+                identity_id=UUID(int=2),
+                principal_id=UUID(int=4),
+                project_id=UUID(int=3),
+                certificate_authority="public-fixture-ca",
+                environment={"INFRAMELD_DATABASE__PASSWORD": "private-fixture-password"},
+            )
+            self.assertTrue((directory / "request.json").is_file())
+            self.assertEqual(json.loads((directory / "request.json").read_text()), self.intent())
+            self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+            for item in directory.iterdir():
+                self.assertEqual(item.stat().st_mode & 0o777, 0o600)
+                self.assertNotIn("identityProof", item.read_text())
+            self.assertNotIn("private-fixture-password", (directory / "host.json").read_text())
+
+    def test_only_original_bound_receipt_with_both_cleanup_facts_can_pass(self):
+        from uuid import UUID
+
+        result = self.result()
+        validator = self.functions()["validate_proof_result"]
+        self.assertEqual(
+            validator(json.dumps(result).encode(), self.intent(), UUID(int=4)),
+            result["result"]["maintenance"]["effect"]["receipt"],
+        )
+        for field, value in [
+            ("operationId", "replacement"),
+            ("accessRevision", 2),
+            ("mode", "bootstrap-first-administrator"),
+            ("principalId", str(UUID(int=99))),
+        ]:
+            changed = self.result()
+            changed["result"]["maintenance"]["effect"]["receipt"][field] = value
+            with self.assertRaises(ValueError):
+                validator(json.dumps(changed).encode(), self.intent(), UUID(int=4))
+        for field in ["processCleanup", "credentialCleanup"]:
+            changed = self.result()
+            target = (
+                changed["result"]["maintenance"] if field == "processCleanup" else changed["result"]
+            )
+            target[field] = "unconfirmed"
+            with self.assertRaises(ValueError):
+                validator(json.dumps(changed).encode(), self.intent(), UUID(int=4))
+        changed = self.result()
+        changed["accessToken"] = "synthetic-secret"
+        with self.assertRaises(ValueError):
+            validator(json.dumps(changed).encode(), self.intent(), UUID(int=4))
 
 
 if __name__ == "__main__":

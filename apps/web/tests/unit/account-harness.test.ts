@@ -14,10 +14,70 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { setTimeout } from "node:timers/promises"
 import { test } from "node:test"
+import { createServer } from "node:net"
+import { chmod } from "node:fs/promises"
+import { readRecipientBridge } from "../browser/support"
 const wrapper = resolve("../../scripts/test-account-ui.sh")
 const fixture = resolve("tests/fixtures/account-runtime-probe.mjs")
 const runner = resolve("../../scripts/run_account_ui.py")
 const ownershipTests = resolve("../../scripts/test_account_ui.py")
+
+test(
+  "the private recipient peer reads exactly one bounded event and closes after malformed input",
+  { timeout: 8_000 },
+  async () => {
+    for (const valid of [true, false]) {
+      const directory = await mkdtemp(join(tmpdir(), "recipient-peer-test-"))
+      const path = join(directory, "event.sock")
+      const sockets = new Set<import("node:net").Socket>()
+      const server = createServer((socket) => {
+        sockets.add(socket)
+        socket.once("close", () => sockets.delete(socket))
+        socket.end(
+          valid
+            ? JSON.stringify({
+                schemaVersion: 1,
+                type: "authorization-ready",
+                authorizationUrl: "https://hydra.account.test:8443/oauth2/auth",
+                issuer: "https://hydra.account.test:8443/",
+                callbackUri: "http://127.0.0.1:12345/oauth/callback/example",
+              }) + "\n"
+            : "{}\n{}\n"
+        )
+      })
+      await new Promise<void>((done, reject) => {
+        server.once("error", reject)
+        server.listen(path, done)
+      })
+      await chmod(path, 0o600)
+      try {
+        if (valid)
+          assert.equal(
+            (await readRecipientBridge(path, performance.now() + 1_000)).type,
+            "authorization-ready"
+          )
+        else
+          await assert.rejects(
+            readRecipientBridge(path, performance.now() + 1_000)
+          )
+      } finally {
+        for (const socket of sockets) socket.destroy()
+        await new Promise<void>((done, reject) => {
+          const timer = globalThis.setTimeout(
+            () => reject(new Error("Private peer cleanup exceeded its bound.")),
+            1_000
+          )
+          server.close((error) => {
+            globalThis.clearTimeout(timer)
+            if (error) reject(error)
+            else done()
+          })
+        })
+        await rm(directory, { recursive: true })
+      }
+    }
+  }
+)
 const program = String.raw`
 import os, runpy, sys
 from pathlib import Path
@@ -28,7 +88,8 @@ class Probe(Runner):
         self.volume_baseline_complete = True
         (self.directory / "volumes-before.txt").write_text("original-a\noriginal-b\n")
         startup = os.environ["ACCOUNT_PROBE_STARTUP"] == "true"
-        command = self._shell("startup_stack") if startup else ["docker", "probe-phase"]
+        proof = os.environ.get("ACCOUNT_PROBE_PROOF", "")
+        command = self._shell("recipient_proof_stack") if proof else self._shell("startup_stack") if startup else ["docker", "probe-phase"]
         status = self._run_phase("startup" if startup else "probe", command,
                                  float(os.environ["ACCOUNT_PROBE_BUDGET"]))
         self.qualification_complete = status == 0
@@ -51,6 +112,22 @@ type Options = {
   startupHang?: string
   volumeInventory?: "leak" | "missing" | "partial" | "fail" | "hang"
   baseline?: "partial" | "fail" | "sort-fail"
+  proof?:
+    | "success"
+    | "unhealthy"
+    | "browser-failed"
+    | "driver-failed"
+    | "inspect-invalid"
+    | "never-ready"
+    | "stalled-terminal"
+    | "wrong-id"
+    | "verify-failed"
+    | "denied-wrong-id"
+    | "denied-host-net"
+    | "denied-wrong-exit"
+    | "denied-effects"
+    | "denied-stalled"
+    | "second-readiness-failed"
 }
 async function exists(path: string) {
   try {
@@ -150,7 +227,7 @@ async function probe(
   const child = spawn(
     options.main ? "bash" : "python3",
     options.main
-      ? [wrapper, "--login-only"]
+      ? [wrapper, options.proof ? "--recipient-proof" : "--login-only"]
       : ["-B", "-c", program, runner, directory],
     {
       detached: true,
@@ -163,6 +240,7 @@ async function probe(
         ACCOUNT_PROBE_DIRECTORY: directory,
         ACCOUNT_PROBE_MAIN: String(options.main ?? false),
         ACCOUNT_PROBE_STARTUP: String(options.startup ?? false),
+        ACCOUNT_PROBE_PROOF: options.proof ?? "",
         ACCOUNT_PROBE_STARTUP_FAIL: options.startupFail ?? "",
         ACCOUNT_PROBE_STARTUP_HANG: options.startupHang ?? "",
         ACCOUNT_PROBE_BASELINE: options.baseline ?? "",
@@ -204,6 +282,63 @@ async function probe(
     else console.error(`Controlled account fixture retained: ${directory}`)
   }
 }
+test(
+  "reading recipient proof logs preserves formatted coordination state byte for byte",
+  { timeout: 10_000 },
+  async (context) => {
+    const directory = await mkdtemp(join(tmpdir(), "account-log-state-test-"))
+    let child: ChildProcess | undefined
+    context.after(async () => {
+      if (child) {
+        if (child.exitCode === null && child.signalCode === null)
+          child.kill("SIGTERM")
+        await completion(child, 5_000)
+        child = undefined
+      }
+      for (const entry of await processes(directory))
+        await assertStopped(entry.pid)
+      assert.equal(await exists(join(directory, "fuse-fired")), false)
+      await rm(directory, { recursive: true })
+    })
+    const state =
+      JSON.stringify(
+        {
+          browser: true,
+          denied: true,
+          negativeVerified: true,
+          driver: false,
+          observations: 2,
+        },
+        null,
+        2
+      ) + "\n"
+    const statePath = join(directory, "proof-state.json")
+    await writeFile(statePath, state, { mode: 0o600 })
+    child = spawn(process.execPath, [fixture, "logs", "e".repeat(64)], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        ACCOUNT_PROBE_DIRECTORY: directory,
+        ACCOUNT_PROBE_PROOF: "success",
+      },
+    })
+    let output = ""
+    let errors = ""
+    child.stdout?.on("data", (value: Buffer) => {
+      output += value.toString()
+    })
+    child.stderr?.on("data", (value: Buffer) => {
+      errors += value.toString()
+    })
+    assert.equal(await completion(child, 5_000), 0)
+    assert.equal(
+      output,
+      '{"schemaVersion":1,"error":{"kind":"denied","resourceCleanup":"not-needed","credentialCleanup":"not-needed"}}\n'
+    )
+    assert.equal(errors, "")
+    assert.equal(await readFile(statePath, "utf8"), state)
+  }
+)
 test(
   "TERM-ignoring active engine and descendant are killed and reaped before cleanup finishes",
   { timeout: 18_000 },
@@ -288,6 +423,133 @@ for (const status of [7, 130, 143]) {
           .map((line) => JSON.parse(line) as { kind: string })
         assert.equal(events.filter((event) => event.kind === "down").length, 1)
       })
+    }
+  )
+}
+
+test(
+  "recipient proof waits for browser readiness, both terminals and receipt verification before success",
+  { timeout: 12_000 },
+  async () => {
+    await probe(
+      { proof: "success", budget: 5 },
+      async ({ child, directory }) => {
+        assert.equal(await completion(child, 10_000), 0)
+        const events = (await readFile(join(directory, "events.jsonl"), "utf8"))
+          .trim()
+          .split("\n")
+          .map((line) => JSON.parse(line) as { kind: string; args: string[] })
+        assert.equal(
+          events.filter(
+            (event) =>
+              event.args.includes("proof-driver") && event.args.includes("up")
+          ).length,
+          1
+        )
+        const deniedStart = events.findIndex(
+          (event) =>
+            event.args.includes("proof-denied-driver") &&
+            event.args.includes("up")
+        )
+        const deniedVerified = events.findIndex((event) =>
+          event.args.includes("verify-denied-result")
+        )
+        const allowedStart = events.findIndex(
+          (event) =>
+            event.args.includes("proof-driver") && event.args.includes("up")
+        )
+        assert.ok(
+          deniedStart >= 0 &&
+            deniedVerified > deniedStart &&
+            allowedStart > deniedVerified
+        )
+        assert.ok(
+          events.some((event) => event.args.includes("verify-proof-result"))
+        )
+        assert.equal(events.filter((event) => event.kind === "down").length, 1)
+        for (const entry of await processes(directory))
+          await assertStopped(entry.pid)
+        assert.equal(await exists(join(directory, "fuse-fired")), false)
+      }
+    )
+  }
+)
+
+test(
+  "the maintained recipient-proof mode prepares and owns the complete fixed workflow",
+  { timeout: 15_000 },
+  async () => {
+    await probe(
+      { main: true, proof: "success" },
+      async ({ child, directory }) => {
+        assert.equal(await completion(child, 12_000), 0)
+        const events = await readFile(join(directory, "events.jsonl"), "utf8")
+        assert.match(events, /proof-driver/)
+        assert.match(events, /verify-proof-result/)
+        for (const entry of await processes(directory))
+          await assertStopped(entry.pid)
+        assert.equal(await exists(join(directory, "fuse-fired")), false)
+      }
+    )
+  }
+)
+
+for (const [proof, expected, admitsDriver] of [
+  ["unhealthy", 1, false],
+  ["browser-failed", 1, false],
+  ["inspect-invalid", 1, false],
+  ["wrong-id", 1, false],
+  ["driver-failed", 7, true],
+  ["verify-failed", 25, true],
+  ["never-ready", 124, false],
+  ["stalled-terminal", 124, true],
+  ["denied-wrong-id", 1, false],
+  ["denied-host-net", 1, false],
+  ["denied-wrong-exit", 1, false],
+  ["denied-effects", 25, false],
+  ["denied-stalled", 124, false],
+  ["second-readiness-failed", 17, false],
+] as const) {
+  test(
+    `recipient proof ${proof} cannot report success and still reconciles its owned phase`,
+    { timeout: 15_000 },
+    async () => {
+      await probe(
+        {
+          proof,
+          budget: proof === "never-ready" || proof === "denied-stalled" ? 3 : 5,
+        },
+        async ({ child, directory }) => {
+          assert.equal(await completion(child, 12_000), expected)
+          const events = (
+            await readFile(join(directory, "events.jsonl"), "utf8")
+          )
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as { kind: string; args: string[] })
+          assert.equal(
+            events.filter(
+              (event) =>
+                event.args.includes("proof-driver") && event.args.includes("up")
+            ).length,
+            Number(admitsDriver)
+          )
+          if (proof !== "verify-failed")
+            assert.equal(
+              events.some((event) =>
+                event.args.includes("verify-proof-result")
+              ),
+              false
+            )
+          assert.equal(
+            events.filter((event) => event.kind === "down").length,
+            1
+          )
+          for (const entry of await processes(directory))
+            await assertStopped(entry.pid)
+          assert.equal(await exists(join(directory, "fuse-fired")), false)
+        }
+      )
     }
   )
 }
