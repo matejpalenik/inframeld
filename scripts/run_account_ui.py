@@ -475,7 +475,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
                 self.directory = Path(tempfile.mkdtemp(prefix="inframeld-account-ui-"))
             else:
                 self.directory.mkdir(mode=0o700)
-            self.project = self.directory.name.lower()
+            self.project = self.directory.name.lower().replace("_", "-")
             try:
                 self._write_context("incomplete")
                 status = self._work()

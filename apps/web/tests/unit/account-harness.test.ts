@@ -95,8 +95,12 @@ class Probe(Runner):
         self.qualification_complete = status == 0
         return status
 root = Path(sys.argv[1]).resolve().parents[1]
-raise SystemExit(Probe(root, directory=Path(sys.argv[2]) / "retained",
-                      cleanup_work_seconds=2).run(["--login-only"]))
+basename = os.environ.get("ACCOUNT_PROBE_BASENAME", "retained")
+Owner = Runner if os.environ.get("ACCOUNT_PROBE_MAIN") == "true" else Probe
+raise SystemExit(Owner(root, directory=Path(sys.argv[2]) / basename,
+                      cleanup_work_seconds=2).run(["--recipient-proof"] if
+                      os.environ.get("ACCOUNT_PROBE_MAIN") == "true" and
+                      os.environ.get("ACCOUNT_PROBE_PROOF") else ["--login-only"]))
 `
 
 type Options = {
@@ -107,6 +111,7 @@ type Options = {
   cleanupStatus?: number
   budget?: number
   main?: boolean
+  basename?: string
   startup?: boolean
   startupFail?: string
   startupHang?: string
@@ -221,7 +226,24 @@ async function probe(
   await mkdir(bin)
   await writeFile(
     join(bin, "docker"),
-    `#!${process.execPath}\n${await readFile(fixture, "utf8")}`,
+    `#!${process.execPath}\n${
+      options.basename
+        ? String.raw`
+if (process.argv.includes("build")) {
+  const images = ["BACKEND", "WEB", "PROOF"].map(
+    name => process.env["INFRAMELD_ACCOUNT_" + name + "_IMAGE"]
+  )
+  appendFileSync(join(process.env.ACCOUNT_PROBE_DIRECTORY, "events.jsonl"),
+    JSON.stringify({ kind: "image-build", images,
+      context: process.env.INFRAMELD_ACCOUNT_WEB_CONTEXT }) + "\n")
+  if (images.some(image => !/^localhost\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*:check$/.test(image))) {
+    console.error("Owned image reference rejected")
+    process.exit(125)
+  }
+}
+`
+        : ""
+    }${await readFile(fixture, "utf8")}`,
     { mode: 0o700 }
   )
   if (options.baseline === "sort-fail")
@@ -233,8 +255,8 @@ async function probe(
       }
     )
   const child = spawn(
-    options.main ? "bash" : "python3",
-    options.main
+    options.main && !options.basename ? "bash" : "python3",
+    options.main && !options.basename
       ? [wrapper, options.proof ? "--recipient-proof" : "--login-only"]
       : ["-B", "-c", program, runner, directory],
     {
@@ -247,6 +269,7 @@ async function probe(
         INFRAMELD_CONTAINER_RUNTIME: "docker",
         ACCOUNT_PROBE_DIRECTORY: directory,
         ACCOUNT_PROBE_MAIN: String(options.main ?? false),
+        ACCOUNT_PROBE_BASENAME: options.basename ?? "retained",
         ACCOUNT_PROBE_STARTUP: String(options.startup ?? false),
         ACCOUNT_PROBE_PROOF: options.proof ?? "",
         ACCOUNT_PROBE_STARTUP_FAIL: options.startupFail ?? "",
@@ -484,16 +507,71 @@ test(
 )
 
 test(
-  "the maintained recipient-proof mode prepares and owns the complete fixed workflow",
+  "the maintained recipient-proof mode owns valid image tags for a mixed-separator temporary basename",
   { timeout: 15_000 },
   async () => {
     await probe(
-      { main: true, proof: "success" },
+      {
+        main: true,
+        proof: "success",
+        basename: "inframeld-account-ui-_660m7cn",
+      },
       async ({ child, directory }) => {
         assert.equal(await completion(child, 12_000), 0)
-        const events = await readFile(join(directory, "events.jsonl"), "utf8")
-        assert.match(events, /proof-driver/)
-        assert.match(events, /verify-proof-result/)
+        const project = "inframeld-account-ui--660m7cn"
+        const events = (await readFile(join(directory, "events.jsonl"), "utf8"))
+          .trim()
+          .split("\n")
+          .map(
+            (line) =>
+              JSON.parse(line) as {
+                kind: string
+                args?: string[]
+                images?: string[]
+                context?: string
+              }
+          )
+        const builds = events.filter((event) => event.kind === "image-build")
+        assert.equal(builds.length, 2)
+        for (const build of builds) {
+          assert.deepEqual(
+            build.images,
+            ["backend", "web", "proof"].map(
+              (service) => `localhost/${project}-${service}:check`
+            )
+          )
+          assert.equal(
+            build.context,
+            join(directory, "inframeld-account-ui-_660m7cn", "web-context")
+          )
+        }
+        const calls = events.flatMap((event) =>
+          event.args ? [event.args] : []
+        )
+        for (const args of calls.filter(
+          (args) => args[0] === "compose" && args.includes("-p")
+        ))
+          assert.equal(args[args.indexOf("-p") + 1], project)
+        for (const label of [
+          "com.docker.compose.project",
+          "io.podman.compose.project",
+        ])
+          assert.ok(
+            calls.some((args) => args.includes(`label=${label}=${project}`))
+          )
+        for (const service of ["backend", "web", "proof"])
+          assert.ok(
+            calls.some((args) =>
+              args.includes(`reference=localhost/${project}-${service}:check`)
+            )
+          )
+        assert.ok(calls.some((args) => args.includes("verify-denied-result")))
+        assert.ok(calls.some((args) => args.includes("verify-proof-result")))
+        assert.equal(events.filter((event) => event.kind === "down").length, 1)
+        assert.equal(
+          await exists(join(directory, "inframeld-account-ui-_660m7cn")),
+          false
+        )
         for (const entry of await processes(directory))
           await assertStopped(entry.pid)
         assert.equal(await exists(join(directory, "fuse-fired")), false)
