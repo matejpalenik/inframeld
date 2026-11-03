@@ -1,0 +1,82 @@
+export const pageMetadata = {
+  title: "Install Inframeld",
+  description: "Run the supported development environment from the repository.",
+}
+
+# Install Inframeld
+
+Run the current developer preview from the repository. You need Git, the repository's [mise toolchain manager](https://mise.jdx.dev/) and a working Docker/Compose environment for the development database.
+
+<Note>
+  This is a development installation. A packaged, qualified production release
+  is not available from this checkout. Use [requirements and deployment
+  configuration](/self-hosting) when assessing a hosted environment.
+</Note>
+
+## Get the source and tools
+
+Run in your terminal:
+
+<CodeGroup>
+
+```shell
+git clone https://github.com/matejpalenik/inframeld.git
+cd inframeld
+mise install
+mise exec -- pnpm install --frozen-lockfile
+mise exec -- uv sync --project apps/backend --locked
+```
+
+</CodeGroup>
+
+Keep subsequent commands in this repository root. The committed `mise.toml` and lockfiles select the tool versions and dependencies.
+
+## Configure and start the development environment
+
+For a new checkout, copy the example backend configuration. Keep an existing environment file on subsequent setups:
+
+<CodeGroup>
+
+```shell
+cp apps/backend/.env.example apps/backend/.env
+```
+
+</CodeGroup>
+
+Before starting, [provision the required fingerprint key](https://github.com/matejpalenik/inframeld/blob/main/docs/development/getting-started/local-setup.md#idempotency-fingerprint-key) and set its absolute path as `INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE` in `apps/backend/.env`. Follow the maintained macOS or Linux procedure, which creates a private 32-byte file and refuses to overwrite an existing key. Keep that exact key for the lifetime of retained requests and include it in protected backups.
+
+Provider-container settings use a separate repository-root `.env`, based on the root `.env.example`. Create it only when absent. It is separate from the host backend configuration above. Both files stay ignored by Git.
+
+Then start the dependencies, apply migrations and run the host API:
+
+<CodeGroup>
+
+```shell
+mise exec -- pnpm dev:db
+mise exec -- pnpm --filter @inframeld/backend migrate
+mise exec -- pnpm --filter @inframeld/backend dev
+```
+
+</CodeGroup>
+
+The migration command changes the configured database. Use the new local development database for this procedure. Review the environment file before pointing it at any existing data.
+
+The backend is available at `http://127.0.0.1:8000`. This terminal owns the API process. Account-provider configuration is a separate step from starting the host API. Use the [account setup instructions](https://github.com/matejpalenik/inframeld/blob/main/apps/web/README.md) before developing the separate account app.
+
+## Check the backend
+
+From a second terminal:
+
+<CodeGroup>
+
+```shell
+curl --fail-with-body --silent --show-error http://127.0.0.1:8000/health
+```
+
+</CodeGroup>
+
+A successful response includes `"status": "ok"`. This establishes that the health operation responded. Use the [monitoring guide](/self-hosting/monitoring) for the rest of your environment's checks.
+
+Continue with [the CLI](/get-started/install-cli) or a [client integration](/clients/http). The [backend development instructions](https://github.com/matejpalenik/inframeld/blob/main/apps/backend/README.md) own additional Compose configuration and shutdown commands.
+
+When finished, stop the foreground API with Ctrl-C and run `mise exec -- pnpm dev:db:down` from the checkout to stop the development services. This preserves their named data volumes.

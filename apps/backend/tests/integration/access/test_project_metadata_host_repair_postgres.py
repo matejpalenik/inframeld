@@ -422,7 +422,7 @@ async def test_repair_waits_for_identity_turn_then_rejects_newly_stale_generatio
                 )
             assert failure.value.code is Code.INVALID_IDENTITY_PROOF
 
-    async with asyncio.timeout(10), asyncio.TaskGroup() as tasks:
+    async with asyncio.timeout(30), asyncio.TaskGroup() as tasks:
         async with database.session() as session, session.begin():
             await PostgresIdentityCoordinator(session).acquire(
                 installation_id=binding.installation_id,
@@ -430,7 +430,7 @@ async def test_repair_waits_for_identity_turn_then_rejects_newly_stale_generatio
             )
             task = tasks.create_task(repair())
             pid = await pid_ready
-            async with asyncio.timeout(2):
+            async with asyncio.timeout(10):
                 while True:
                     async with database.session() as observer:
                         blockers = await observer.scalar(

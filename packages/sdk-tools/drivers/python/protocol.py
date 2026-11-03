@@ -9,6 +9,8 @@ Operation: TypeAlias = Literal[
     "getProtectedResourceMetadataForPath",
     "getHealth",
     "getCurrentSession",
+    "getMyOrganizationAccess",
+    "createProject",
     "inspectHumanOAuthConsent",
     "decideHumanOAuthConsent",
     "assignProjectUseOnlyGrant",

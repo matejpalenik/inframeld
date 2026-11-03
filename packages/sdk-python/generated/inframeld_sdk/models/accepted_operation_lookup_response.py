@@ -20,6 +20,7 @@ import json
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 from typing import Any, ClassVar, Dict, Optional
+from inframeld_sdk.models.jobreference import Jobreference
 from typing import Optional, Set
 from typing_extensions import Self
 from pydantic_core import to_jsonable_python
@@ -32,7 +33,7 @@ class AcceptedOperationLookupResponse(BaseModel):
     admission: StrictStr
     dispatch: StrictStr
     idempotency_expires_at: Optional[datetime] = Field(alias="idempotencyExpiresAt")
-    job_reference: StrictStr = Field(alias="jobReference")
+    job_reference: Jobreference = Field(alias="jobReference")
     operation_id: StrictStr = Field(alias="operationId")
     outcome: StrictStr
     __properties: ClassVar[List[str]] = ["admission", "dispatch", "idempotencyExpiresAt", "jobReference", "operationId", "outcome"]
@@ -67,13 +68,6 @@ class AcceptedOperationLookupResponse(BaseModel):
         """Reject a supplied null without treating an omitted field as supplied."""
         if value is None:
             raise ValueError("jobReference cannot be null")
-        return value
-
-    @field_validator('job_reference')
-    def job_reference_validate_enum(cls, value):
-        """Validates the enum"""
-        if value not in set(['unknown']):
-            raise ValueError("must be one of enum values ('unknown')")
         return value
     @field_validator('operation_id', mode='before')
     def operation_id_reject_explicit_null(cls, value):
@@ -135,6 +129,9 @@ class AcceptedOperationLookupResponse(BaseModel):
             exclude_none=True,
             exclude_unset=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of job_reference
+        if self.job_reference:
+            _dict['jobReference'] = self.job_reference.to_dict()
         # set to None if idempotency_expires_at (nullable) is None
         # and model_fields_set contains the field
         if self.idempotency_expires_at is None and "idempotency_expires_at" in self.model_fields_set:
@@ -155,7 +152,7 @@ class AcceptedOperationLookupResponse(BaseModel):
             "admission": obj.get("admission"),
             "dispatch": obj.get("dispatch"),
             "idempotencyExpiresAt": obj.get("idempotencyExpiresAt"),
-            "jobReference": obj.get("jobReference"),
+            "jobReference": Jobreference.from_dict(obj["jobReference"]) if obj.get("jobReference") is not None else None,
             "operationId": obj.get("operationId"),
             "outcome": obj.get("outcome")
         }.items() if key in obj})

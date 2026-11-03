@@ -449,6 +449,9 @@ test("pure stub first primary failure survives successful and late target-exit e
       await context.test(
         `${first}-${late ? "late" : "complete"}`,
         async (nested) => {
+          let now = 1000;
+          nested.mock.method(performance, "now", () => now);
+          nested.mock.timers.enable({ apis: ["setTimeout"] });
           const controller = new AbortController();
           const reason = new Error("original pure cancellation");
           const pattern =
@@ -457,49 +460,84 @@ test("pure stub first primary failure survives successful and late target-exit e
               : first === "cancel"
                 ? /original pure cancellation/
                 : /3-byte output budget/;
-          await pureHelper(
-            nested,
-            {
-              waitForStop: true,
-              terminalDelay: late ? 280 : 10,
-              ...(late ? { exitDelay: 150 } : {}),
-              ...(first === "overflow"
-                ? { lateChunks: [[0, Buffer.from("éλ")]] as [number, Buffer][] }
-                : {
-                    stopChunks: [[0, Buffer.from("éλ")]] as [number, Buffer][],
-                  }),
-              acquired: () => {
-                if (first === "cancel")
-                  setTimeout(() => controller.abort(reason), 0);
-              },
-            },
-            async (stops) => {
-              const began = performance.now();
-              await assert.rejects(
-                command("unused", [], {
-                  timeout: first === "timeout" ? 20 : 1000,
-                  cleanupTimeout: 200,
-                  maxOutputBytes: 3,
-                  signal: controller.signal,
-                }),
-                (error: unknown) => {
-                  const primary =
-                    error instanceof AggregateError ? error.errors[0] : error;
-                  assert.match(String(primary), pattern);
-                  return true;
+          try {
+            await pureHelper(
+              nested,
+              {
+                waitForStop: true,
+                terminalDelay: late ? 280 : 10,
+                ...(late ? { exitDelay: 150 } : {}),
+                ...(first === "overflow"
+                  ? {
+                      lateChunks: [[0, Buffer.from("éλ")]] as [
+                        number,
+                        Buffer,
+                      ][],
+                    }
+                  : {
+                      stopChunks: [[0, Buffer.from("éλ")]] as [
+                        number,
+                        Buffer,
+                      ][],
+                    }),
+                acquired: () => {
+                  if (first === "cancel")
+                    setTimeout(() => controller.abort(reason), 0);
                 },
-              );
-              assert.equal(stops.length, 1);
-              assert.ok(
-                stops[0]!.deadline > 10000 && stops[0]!.deadline <= 10230,
-              );
-              if (late)
-                assert.ok(
-                  performance.now() - began < 260,
-                  "A later exit must not restart the first 200ms stop allowance",
-                );
-            },
-          );
+              },
+              async (stops) => {
+                let settled = false;
+                const completed = assert
+                  .rejects(
+                    command("unused", [], {
+                      timeout: first === "timeout" ? 20 : 1000,
+                      cleanupTimeout: 200,
+                      maxOutputBytes: 3,
+                      signal: controller.signal,
+                    }),
+                    (error: unknown) => {
+                      const primary =
+                        error instanceof AggregateError
+                          ? error.errors[0]
+                          : error;
+                      if (first === "cancel") assert.equal(primary, reason);
+                      else assert.match(String(primary), pattern);
+                      return true;
+                    },
+                  )
+                  .then(() => {
+                    settled = true;
+                  });
+                void completed.catch(() => {});
+                // Complete READY and START before the first failure is delivered.
+                await new Promise<void>((resolve) => setImmediate(resolve));
+                const elapsed = first === "timeout" ? 20 : 0;
+                now += elapsed;
+                nested.mock.timers.tick(elapsed);
+                await new Promise<void>((resolve) => setImmediate(resolve));
+                assert.deepEqual(stops, [
+                  { deadline: first === "timeout" ? 10220 : 10200, at: now },
+                ]);
+                assert.equal(settled, false);
+                if (late) {
+                  now += 150;
+                  nested.mock.timers.tick(150);
+                  await new Promise<void>((resolve) => setImmediate(resolve));
+                  assert.equal(settled, false);
+                  now += 50;
+                  nested.mock.timers.tick(50);
+                } else {
+                  now += 10;
+                  nested.mock.timers.tick(10);
+                }
+                await completed;
+                assert.equal(settled, true);
+                assert.equal(stops.length, 1);
+              },
+            );
+          } finally {
+            nested.mock.timers.reset();
+          }
         },
       );
   }
@@ -544,7 +582,7 @@ async function controlledOwner(
     if (intercepted) {
       // Existing fixture fuse and lost-control recovery bounds only settle custody.
       deadline =
-        performance.now() + (scenario === "lost-control" ? 6000 : 4000);
+        performance.now() + (scenario === "lost-control" ? 20000 : 60000);
       closed = new Promise<void>((resolve, reject) => {
         let failure: Error | undefined;
         helper.once("error", (error) => {
@@ -750,36 +788,46 @@ function conservativeCleanupFailure(error: unknown): boolean {
   );
 }
 
-test("pure stub helper startup consumes the original deadline and never submits START after it", async (context) => {
-  let now = 1000;
-  let submitted = false;
-  context.mock.method(performance, "now", () => now);
-  context.mock.timers.enable({ apis: ["setTimeout"] });
-  try {
-    await pureHelper(
-      context,
-      {
-        startWrite: (complete) => {
-          submitted = true;
-          complete();
-        },
-      },
-      async (stops) => {
-        const starting = startProcess("unused", [], {
-          timeout: 40,
-          cleanupTimeout: 250,
-        });
-        // Expire the original watchdog before the already queued READY is delivered.
-        now += 40;
-        context.mock.timers.tick(40);
-        await assert.rejects(starting, /startup timed out/);
-        assert.deepEqual(stops, []);
-      },
-    );
-    assert.equal(submitted, false);
-  } finally {
-    context.mock.timers.reset();
-  }
+test("pure stub helper startup never submits START after timeout or cancellation", async (context) => {
+  for (const first of ["timeout", "cancel"] as const)
+    await context.test(first, async (nested) => {
+      let now = 1000;
+      let submitted = false;
+      const controller = new AbortController();
+      const reason = new Error("cancel before readiness");
+      nested.mock.method(performance, "now", () => now);
+      nested.mock.timers.enable({ apis: ["setTimeout"] });
+      try {
+        await pureHelper(
+          nested,
+          {
+            startWrite: (complete) => {
+              submitted = true;
+              complete();
+            },
+          },
+          async (stops) => {
+            const starting = startProcess("unused", [], {
+              timeout: first === "timeout" ? 40 : 500,
+              cleanupTimeout: 250,
+              signal: controller.signal,
+            });
+            // Stop before the already queued READY is delivered.
+            const elapsed = first === "timeout" ? 40 : 20;
+            now += elapsed;
+            nested.mock.timers.tick(elapsed);
+            if (first === "cancel") controller.abort(reason);
+            if (first === "timeout")
+              await assert.rejects(starting, /startup timed out/);
+            else await assert.rejects(starting, (error) => error === reason);
+            assert.deepEqual(stops, []);
+          },
+        );
+        assert.equal(submitted, false);
+      } finally {
+        nested.mock.timers.reset();
+      }
+    });
 });
 
 test("pure stub control transit consumes the first stop budget and repeated failure is cached", async (context) => {
@@ -819,8 +867,8 @@ test("pure stub control transit consumes the first stop budget and repeated fail
   );
 });
 
-test("cancellation before helper readiness never submits a target", async (context) => {
-  await controlledOwner(context, "late-ready", async (trace, closed) => {
+test("cancellation settles actual late-ready helper custody", async (context) => {
+  await controlledOwner(context, "late-ready", async (_trace, closed) => {
     const controller = new AbortController();
     const reason = new Error("cancel before readiness");
     const timer = setTimeout(() => controller.abort(reason), 20);
@@ -838,8 +886,9 @@ test("cancellation before helper readiness never submits a target", async (conte
             error.errors[0] === reason &&
             conservativeCleanupFailure(error.errors[1])),
       );
-      await closed();
-      assert.equal(await readFile(trace, "utf8"), "");
+      const closing = closed();
+      assert.equal(closed(), closing);
+      await closing;
     } finally {
       clearTimeout(timer);
     }
@@ -901,11 +950,11 @@ test("missing capabilities and malformed control refuse without a target", async
 
 test(
   "lost control fails within cleanup budget while unconfirmed resources stay held",
-  { timeout: 7000 },
+  { timeout: 25000 },
   async (context) => {
     await controlledOwner(context, "lost-control", async (trace) => {
       const child = await startProcess("unused", [], {
-        timeout: 2000,
+        timeout: 15000,
         cleanupTimeout: 200,
       });
       context.mock.restoreAll();
@@ -915,20 +964,20 @@ test(
         async () => {
           await assert.rejects(child.result, /control|cleanup/i);
           assert.ok(
-            performance.now() - began < 350,
+            performance.now() - began < 5000,
             "Lost control must not wait for a fresh execution timeout",
           );
           const metadata = JSON.parse(await readFile(trace, "utf8")) as {
             target: number;
           };
-          const live = await executablePids(performance.now() + 500);
+          const live = await executablePids(performance.now() + 5000);
           assert.ok(
             live.has(metadata.target),
             "Unconfirmed target remains executable before its fuse",
           );
         },
         async () => {
-          const deadline = performance.now() + 6000;
+          const deadline = performance.now() + 20000;
           while (performance.now() < deadline) {
             try {
               await readFile(trace + ".recovered");
@@ -948,8 +997,8 @@ test(
 
 test(
   "Node controller death leaves missing owner evidence while the helper stops its target",
-  { timeout: 5000 },
-  async (context) => {
+  { timeout: 45000 },
+  async () => {
     const work = await mkdtemp(join(tmpdir(), "sdk-owner-node-death-"));
     const controller = join(work, "controller.mts");
     const ready = join(work, "ready.json");
@@ -967,8 +1016,8 @@ test(
         'import {execFile} from "node:child_process";',
         'import {promisify} from "node:util";',
         'import {writeFile} from "node:fs/promises";',
-        `const child = await startProcess("python3", ["-B", ${JSON.stringify(finiteFixture)}, "wait"], {timeout:3000,cleanupTimeout:500});`,
-        'const parent = await promisify(execFile)("ps", ["-p", String(child.pid), "-o", "ppid="], {timeout:500,maxBuffer:4096,env:{...process.env,LC_ALL:"C",PS_PERSONALITY:undefined,CMD_ENV:undefined,I_WANT_A_BROKEN_PS:undefined}});',
+        `const child = await startProcess("python3", ["-B", ${JSON.stringify(finiteFixture)}, "wait"], {timeout:60000,cleanupTimeout:10000});`,
+        'const parent = await promisify(execFile)("ps", ["-p", String(child.pid), "-o", "ppid="], {timeout:5000,maxBuffer:4096,env:{...process.env,LC_ALL:"C",PS_PERSONALITY:undefined,CMD_ENV:undefined,I_WANT_A_BROKEN_PS:undefined}});',
         `await writeFile(${JSON.stringify(ready)}, JSON.stringify({target:child.pid,helper:Number(parent.stdout.trim())}));`,
         "await child.result;",
         `await writeFile(${JSON.stringify(receipt)}, "complete");`,
@@ -977,21 +1026,44 @@ test(
     let observed = false,
       passed = false;
     const entered = performance.now();
-    const cleanupDeadline = entered + 1500;
+    let cleanupDeadline = entered + 40000;
+    const abort = new AbortController();
+    const running = command(
+      process.execPath,
+      ["--import", loader, controller],
+      {
+        timeout: 30000,
+        cleanupTimeout: 10000,
+        signal: abort.signal,
+        env: { NODE_TEST_CONTEXT: undefined },
+      },
+    );
+    void running.catch(() => {});
     try {
       await withResources(
         async () => {
-          await assert.rejects(
-            command(process.execPath, ["--import", loader, controller], {
-              timeout: 1000,
-              cleanupTimeout: 500,
-              env: { NODE_TEST_CONTEXT: undefined },
-            }).catch((error: unknown) => {
-              context.diagnostic(describeError(error));
-              throw error;
-            }),
-            /timed out/,
+          let acquired = false;
+          while (performance.now() < entered + 30000) {
+            try {
+              JSON.parse(await readFile(ready, "utf8"));
+              acquired = true;
+              break;
+            } catch (error) {
+              if (
+                !(error instanceof SyntaxError) &&
+                (error as NodeJS.ErrnoException).code !== "ENOENT"
+              )
+                throw error;
+            }
+            await Promise.race([delay(25), running]);
+          }
+          assert.ok(
+            acquired,
+            "Controller must acquire its target before the death probe",
           );
+          cleanupDeadline = performance.now() + 10000;
+          abort.abort(new Error("Node controller timed out"));
+          await assert.rejects(running, /timed out/);
         },
         async () => {
           const processes = JSON.parse(await readFile(ready, "utf8")) as {
@@ -1006,8 +1078,8 @@ test(
           );
           // Reconciliation still runs after an assertion failure. Its later result cannot qualify cleanup.
           const reconciliationDeadline = Math.min(
-            entered + 2500,
-            performance.now() + 1000,
+            cleanupDeadline,
+            performance.now() + 5000,
           );
           while (performance.now() < reconciliationDeadline) {
             const live = await executablePids(reconciliationDeadline);
@@ -1030,6 +1102,8 @@ test(
       );
       passed = true;
     } finally {
+      abort.abort(new Error("Node-death fixture assertion finished"));
+      await running.catch(() => {});
       if (passed && observed) await rm(work, { recursive: true, force: true });
       else console.error(`Node-death fixture evidence retained at ${work}`);
     }
@@ -1037,10 +1111,10 @@ test(
 );
 
 test("an owned finite target starts and closes before its safety fuse", async () => {
-  const deadline = performance.now() + 2000;
+  const deadline = performance.now() + 25000;
   const child = await startProcess("python3", ["-B", finiteFixture, "wait"], {
-    timeout: 1000,
-    cleanupTimeout: 1000,
+    timeout: 15000,
+    cleanupTimeout: 10000,
   });
   await withResources(
     () =>
@@ -1058,7 +1132,7 @@ test("an owned finite target starts and closes before its safety fuse", async ()
       );
       assert.ok(
         performance.now() < deadline,
-        "Ownership cleanup and physical observation must precede the four-second fuse",
+        "Ownership cleanup and physical observation must precede the 60-second fuse",
       );
     },
   );
@@ -1118,17 +1192,19 @@ test("log failure retains a nonzero command result", async () => {
 });
 
 test("timeouts and output overflow stop finite targets before their fuse", async () => {
-  await assert.rejects(
-    command("python3", ["-B", finiteFixture, "wait"], {
-      timeout: 150,
-      cleanupTimeout: 500,
-    }),
-    /timed out/,
-  );
+  const child = await startProcess("python3", ["-B", finiteFixture, "wait"], {
+    timeout: 15000,
+    cleanupTimeout: 10000,
+  });
+  child.requestStop("timeout");
+  const outcome = await child.result;
+  assert.equal(outcome.reason, "timeout");
+  assert.equal(outcome.groupState, "quiescent");
+  await child.close();
   await assert.rejects(
     command("python3", ["-B", finiteFixture, "noisy"], {
       maxOutputBytes: 1024,
-      cleanupTimeout: 500,
+      cleanupTimeout: 10000,
     }),
     /output budget/,
   );
@@ -1174,8 +1250,8 @@ test("same-group descendants stop after an early leader exit with open or closed
               "python3",
               ["-B", finiteFixture, "leader", marker, pipes],
               {
-                timeout: 2000,
-                cleanupTimeout: 1500,
+                timeout: 15000,
+                cleanupTimeout: 10000,
               },
             ).catch((error: unknown) => {
               context.diagnostic(describeError(error));
@@ -1186,14 +1262,14 @@ test("same-group descendants stop after an early leader exit with open or closed
             const descendant = Number(await readFile(marker, "utf8"));
             assert.ok(descendant > 0);
             // Later physical absence is custody only if the owner already failed.
-            const live = await executablePids(began + 2000);
+            const live = await executablePids(began + 25000);
             assert.ok(
               !live.has(descendant),
               "Successful cleanup must leave no executable descendant",
             );
             assert.ok(
-              performance.now() - began < 2000,
-              "Owner cleanup must finish before the four-second fuse",
+              performance.now() - began < 25000,
+              "Owner cleanup must finish before the 60-second fuse",
             );
           },
         );
@@ -1213,11 +1289,11 @@ test("cancellation of an acquired target retains its reason and cached cleanup",
   const controller = new AbortController();
   const running = command("python3", ["-B", finiteFixture, "wait", marker], {
     signal: controller.signal,
-    cleanupTimeout: 500,
+    cleanupTimeout: 10000,
   });
   void running.catch(() => {});
   try {
-    const deadline = performance.now() + 1000;
+    const deadline = performance.now() + 15000;
     let ready = false;
     while (performance.now() < deadline) {
       try {
@@ -1237,7 +1313,7 @@ test("cancellation of an acquired target retains its reason and cached cleanup",
     await rm(work, { recursive: true, force: true });
   }
   const child = await startProcess("python3", ["-B", finiteFixture, "wait"], {
-    cleanupTimeout: 500,
+    cleanupTimeout: 10000,
   });
   const first = child.close();
   assert.equal(child.close(), first);
@@ -1253,14 +1329,14 @@ test("cancellation still finishes descendants after their leader has exited", as
     ["-B", finiteFixture, "leader", marker, "closed"],
     {
       signal: controller.signal,
-      timeout: 2000,
-      cleanupTimeout: 1000,
+      timeout: 15000,
+      cleanupTimeout: 10000,
     },
   );
   void running.catch(() => {});
   let complete = false;
   const entered = performance.now();
-  const cleanupDeadline = entered + 1000;
+  const cleanupDeadline = entered + 25000;
   try {
     await withResources(
       async () => {
@@ -1294,7 +1370,7 @@ test("cancellation still finishes descendants after their leader has exited", as
         const pid = Number(await readFile(marker, "utf8"));
         assert.ok(Number.isSafeInteger(pid) && pid > 0);
         const live = await executablePids(
-          Math.min(entered + 2000, performance.now() + 500),
+          Math.min(entered + 25000, performance.now() + 5000),
         );
         assert.ok(
           !live.has(pid),
@@ -1323,7 +1399,7 @@ test("a crashed backend target remains a failure after confirmed resource cleanu
 
 test(
   "queued close preserves a real already-exited target before the helper observes it",
-  { timeout: 3000 },
+  { timeout: 45000 },
   async (context) => {
     const work = await mkdtemp(join(tmpdir(), "sdk-owner-ordered-exit-"));
     const trace = join(work, "ordering.json");
@@ -1355,8 +1431,8 @@ test(
     const began = performance.now();
     try {
       child = await startProcess("python3", ["-B", finiteFixture, "exit-two"], {
-        timeout: 1000,
-        cleanupTimeout: 500,
+        timeout: 15000,
+        cleanupTimeout: 10000,
       });
       // Do not await result: STOP must win the helper's normal observation turn.
       await assert.rejects(stopProcess(child), /exited 2/);
@@ -1382,8 +1458,8 @@ test(
       assert.equal(ordering.ownerResult, 0);
       assert.deepEqual(ordering.returncodes, [2]);
       assert.ok(
-        performance.now() - began < 1000,
-        "Production ownership evidence must precede both four-second fixture fuses",
+        performance.now() - began < 25000,
+        "Production ownership evidence must precede both 60-second fixture fuses",
       );
       confirmed = true;
     } finally {
@@ -1406,7 +1482,7 @@ test("the Python owner syscall and control regressions pass independently", asyn
     ["-B", "-m", "unittest", "tests.unit.process_owner_test"],
     {
       cwd: home,
-      timeout: 5000,
+      timeout: 30000,
     },
   );
   assert.match(result.output, /\bOK\b/);

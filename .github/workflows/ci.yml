@@ -32,7 +32,7 @@ jobs:
   quality:
     name: Quality
     needs: changes
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     env:
@@ -83,7 +83,7 @@ jobs:
         run: cp apps/backend/.env.test.example apps/backend/.env.test
       - name: Set up uv
         if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.delivery == 'true'
-        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
@@ -198,7 +198,7 @@ jobs:
   backend:
     name: Backend foundation
     needs: [changes, quality]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:

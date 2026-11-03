@@ -1,0 +1,34 @@
+export const pageMetadata = {
+  title: "Operations, results and errors",
+  description: "Inspect original requests and retained deletion observations.",
+}
+
+# Operations, results and errors
+
+Use these readers to observe retained facts about the original action. They do not dispatch the original write again.
+
+## Look up an original operation
+
+<ApiOperation operationId="lookupOriginalOperation" />
+
+Retain the original installation, Organization/Project, method, canonical route, request key and authority guard. The server checks current authority before searching retained history. [Original-request lookup](/guides/recover-original-request) supplies equivalent cURL and SDK examples.
+
+## Read retained deletion status
+
+<ApiOperation operationId="getDeletionStatus" />
+
+Supply the original operation ID as `operationId`. The initiating human can receive the allowed retained observations under the endpoint's current authentication, eligibility and disclosure contract. [The deletion-status guide](/guides/read-deletion-status) explains what each result establishes.
+
+## Errors and uncertain effects
+
+Declared errors use the operation's documented response models. Authentication, current authority, validation, conflicts and unavailable dependencies are different failure conditions. Read the actual status and typed body together.
+
+A transport or decoding failure may leave a write's effects unknown. A successful lookup can still return `outcome: "unresolved"`. That result does not prove no record or effect exists. Reuse the original recovery context rather than generating a new write key.
+
+## Revisions and idempotency
+
+Review the appropriate revision before a guarded change. Project metadata revision and Project Access revision are distinct. Keep an idempotency key bound to the original meaning, scope and body. Do not reset established replay or retention deadlines through retries.
+
+## SDK failure handling
+
+Python keeps detailed HTTP results and exceptions, TypeScript discriminates validated API errors from decode/transport failures, and Rust keeps typed response/error metadata. The [client pages](/clients/cli) link to their setup and examples. Preserve failure context without logging secrets or automatically issuing another request.

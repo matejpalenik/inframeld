@@ -97,6 +97,8 @@ export async function consumeTypescript(
       "NodeNext",
       "--target",
       "ES2022",
+      "--types",
+      "node",
       "--typeRoots",
       join(home, "node_modules/@types"),
       join(external, "main.ts"),

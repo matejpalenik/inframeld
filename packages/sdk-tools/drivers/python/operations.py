@@ -13,6 +13,7 @@ from inframeld_sdk.api.health_api import HealthApi
 from inframeld_sdk.api.operations_api import OperationsApi
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
+from inframeld_sdk.models.project_creation_request import ProjectCreationRequest
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest
 from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest
 from inframeld_sdk_fixtures.api.default_api import DefaultApi
@@ -169,6 +170,36 @@ async def assign_grant_async(clients: Clients, call: Call) -> NativeResponse:
         project_use_only_grant_request=grant_body(call),
         _request_timeout=call.timeout / 1000,
         _headers=call.headers,
+    )
+
+
+def organization_access_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_my_organization_access_sync_with_http_info(
+        _headers=call.headers, _request_timeout=call.timeout / 1000
+    )
+
+
+async def organization_access_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_my_organization_access_with_http_info(
+        _headers=call.headers, _request_timeout=call.timeout / 1000
+    )
+
+
+def create_project_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).create_project_sync_with_http_info(
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_creation_request=ProjectCreationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def create_project_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).create_project_with_http_info(
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_creation_request=ProjectCreationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
     )
 
 
@@ -402,6 +433,8 @@ async def fallback_async(clients: Clients, call: Call) -> NativeResponse:
 
 
 BINDINGS: dict[Operation, Binding] = {
+    "getMyOrganizationAccess": Binding(organization_access_sync, organization_access_async),
+    "createProject": Binding(create_project_sync, create_project_async),
     "getProtectedResourceMetadata": Binding(discovery_sync, discovery_async),
     "getProtectedResourceMetadataForPath": Binding(discovery_path_sync, discovery_path_async),
     "contractFixtureVariants": Binding(variants_sync, variants_async),

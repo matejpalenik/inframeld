@@ -1,0 +1,36 @@
+export const pageMetadata = {
+  title: "Overview and authentication",
+  description:
+    "Use the delivered public HTTP contract and supported authentication.",
+}
+
+# Overview and authentication
+
+The public Inframeld API uses JSON over HTTP. Remote installations use their operator-supplied HTTPS backend URL. The reference below reads the committed native OpenAPI 3.1 contract directly.
+
+## Find an operation
+
+- [Discovery and health](/api-reference/discovery-and-health).
+- [Projects and access](/api-reference/projects-and-access), including current session and account-site consent.
+- [Operations, results and errors](/api-reference/operations).
+- [Request and response models](/api-reference/models).
+
+Document, search, Pipeline, evaluation and release API entries describe availability until their public operations are delivered. The [complete OpenAPI document](https://github.com/matejpalenik/inframeld/blob/main/contracts/openapi/v1/inframeld-v1.json) is the contract source.
+
+## Authentication
+
+The health and resource-metadata discovery operations are public within their configured availability. Protected application operations require a currently accepted human credential and current scope/action authority.
+
+For bearer requests, use an actual Inframeld human access token accepted by that installation. Set `INFRAMELD_TOKEN` through your local secret-handling procedure. The browser account site maintains a Kratos session cookie. Browser writes also follow the installation's CSRF/Origin contract. SDK construction does not sign you in or create a credential.
+
+This preview has no generic API-key creation page or complete saved CLI-login procedure. Use the access path actually supplied by your installation operator. Start with [health](/clients/http#make-your-first-request) when no protected credential is available.
+
+## Requests and responses
+
+Use the exact method, canonical route and input names for the operation. Send `Content-Type: application/json` for JSON request bodies. Required idempotency headers and expected revisions protect the specific reviewed write.
+
+An omitted field and an explicit `null` can have different meanings. [Model schemas](/api-reference/models) retain those distinctions. Response wrappers also differ between SDKs while preserving the same HTTP operation and typed body.
+
+## Errors and uncertain effects
+
+See [operations and errors](/api-reference/operations#errors-and-uncertain-effects). A network/decode failure or an `unresolved` observation does not prove a prior write failed. Retain its original identity and recovery context.

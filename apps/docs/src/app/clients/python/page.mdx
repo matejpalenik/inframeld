@@ -1,0 +1,63 @@
+export const pageMetadata = {
+  title: "Python SDK",
+  description: "Install the source package and make a typed request.",
+}
+
+# Python SDK
+
+Use the generated `inframeld_sdk` client to call the public API with typed models and inspectable HTTP results. This preview distributes its SDK through the source repository.
+
+## Install from a checkout
+
+Create or activate a virtual environment in your example project. Set `INFRAMELD_SOURCE` to the absolute path of your Inframeld checkout, then install the package:
+
+<CodeGroup>
+
+```shell
+python3 -m venv .venv
+.venv/bin/python -m pip install "$INFRAMELD_SOURCE/packages/sdk-python"
+```
+
+</CodeGroup>
+
+These shell paths are for macOS/Linux. Package requirements are declared in the [SDK metadata](https://github.com/matejpalenik/inframeld/blob/main/packages/sdk-python/pyproject.toml). The distribution is named `inframeld-sdk` and imports as `inframeld_sdk`.
+
+## Make a first request
+
+Set `INFRAMELD_URL` to your backend URL. Save this complete example as `health.py` in your example project:
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.health_api import HealthApi
+
+
+async def main() -> None:
+    client = ApiClient(Configuration(host=os.environ["INFRAMELD_URL"]))
+    try:
+        response = await HealthApi(client).get_health_with_http_info()
+        print(response.data["status"])
+    finally:
+        await client.close()
+
+
+asyncio.run(main())
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python health.py`. A successful request prints `ok`.
+
+## Use protected operations
+
+For a current human token, pass `_headers={"Authorization": "Bearer " + os.environ["INFRAMELD_TOKEN"]}` to the generated operation. [Authentication](/api-reference#authentication) explains the credential boundary. [Project metadata](/guides/name-and-rename-project) and [operation lookup](/guides/recover-original-request) provide complete request examples.
+
+## Inspect results and close resources
+
+Detailed methods return `data`, `status_code`, headers and raw response context. Generated Pydantic models preserve field presence and native response validation. Inspect available `ApiException` context on failure. HTTP 200 alone does not override a decoding error.
+
+Use the asynchronous lifecycle above. The generated synchronous bridge has its own close-loop requirements, documented in the [SDK usage guide](https://github.com/matejpalenik/inframeld/blob/main/.agents/skills/inframeld-python-sdk/references/usage-and-maintenance.md#sync-and-async-lifecycle). Keep uncertain-write recovery tied to the original operation rather than automatically resending it.

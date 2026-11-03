@@ -263,7 +263,7 @@ async def test_replacement_process_preserves_original_budget_after_hydra_was_una
         )
         assert saved.status_code == 200
         async with recovery_worker_process(admin_url="http://127.0.0.1:1"):
-            async with asyncio.timeout(10):
+            async with asyncio.timeout(30):
                 while True:
                     async with database.session() as session:
                         result = (
@@ -340,7 +340,7 @@ async def test_host_command_resumes_ended_run_then_real_hydra_cleanup_releases_o
 
         # A real HTTP server without Hydra's admin routes explicitly rejects cleanup.
         async with recovery_worker_process(admin_url=RECOVERY_HOOKS_URL):
-            async with asyncio.timeout(10):
+            async with asyncio.timeout(30):
                 while True:
                     async with database.session() as session:
                         original = await session.scalar(

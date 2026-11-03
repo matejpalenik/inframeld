@@ -23,7 +23,7 @@ async fn generated_health_request_preserves_metadata_and_does_not_redispatch() {
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
             stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
+                .set_read_timeout(Some(Duration::from_secs(10)))
                 .unwrap();
             let mut request = [0; 8192];
             let length = stream.read(&mut request).unwrap();

@@ -16,7 +16,9 @@ This guide uses a Project grant: Alice submitted a request to grant Bob access, 
   because lookup cannot confirm the result.
 </Note>
 
-## Before you begin
+<a id="before-you-begin" />
+
+## Keep the original request context
 
 You need:
 
@@ -29,16 +31,22 @@ The authority guard describes the permission associated with the original operat
 
 For these examples, set the following variables in your shell. Replace both values with the backend URL and credential supplied for your installation. Use a URL without a trailing slash.
 
+<CodeGroup>
+
 ```shell
 export INFRAMELD_URL='https://YOUR_INFRAMELD_BACKEND'
 export INFRAMELD_TOKEN='YOUR_HUMAN_BEARER_TOKEN'
 ```
 
-SDK examples require a local build of the [Python](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-python#build-and-use-locally), [TypeScript](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-typescript#build-and-use-locally), or [Rust](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-rust#build-and-use-locally) SDK. Follow the linked package instructions to build and install it in a separate example project. The SDKs are not published to package registries. There is no CLI lookup command yet.
+</CodeGroup>
+
+For an SDK alternative, follow the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) setup in a separate example project. These examples use the delivered HTTP operations. [CLI command reference](/clients/cli/commands) lists available CLI tasks.
 
 ## Prepare the lookup
 
 Save the following as `original-request.json` in your example project's working directory. Replace the illustrative UUIDs and key with the original values. Do not generate a new key for lookup.
+
+<CodeGroup>
 
 ```json
 {
@@ -54,6 +62,8 @@ Save the following as `original-request.json` in your example project's working 
   }
 }
 ```
+
+</CodeGroup>
 
 Use the original method and canonical route template exactly. For this grant, `requestedRoute` contains `{project_id}`, not the Project's UUID. The original idempotency key belongs in the JSON body.
 
@@ -77,15 +87,17 @@ Choose one example below. Each reads `original-request.json`, authenticates the 
 
 <CodeGroup>
 
-```shell
+```shell {{ title: "cURL" }}
 curl --silent --show-error --fail-with-body \
   --max-time 5 \
   --request POST \
   --url "$INFRAMELD_URL/v1/operations/lookup" \
-  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header @- \
   --header 'Content-Type: application/json' \
   --header 'Accept: application/json' \
-  --data-binary @original-request.json
+  --data-binary @original-request.json <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
 ```
 
 ```python
@@ -230,12 +242,14 @@ A successful lookup returns HTTP `200`. Check `outcome` to decide what the respo
 | `outcome`               | What it means                                                                                                       | What to do next                                                                               |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `completed_synchronous` | The original operation completed. The record includes its operation ID, result classification, and original expiry. | Use the operation ID to investigate the original result. Lookup does not replay its contents. |
-| `accepted_asynchronous` | The original request was accepted. Its job reference is unknown and dispatch is not established by this record.     | Keep the operation ID. Do not treat this as evidence that a job started or finished.          |
+| `accepted_asynchronous` | The original request was accepted. Its job reference may be known or unknown. Dispatch is not established.          | Keep the operation ID and any job ID. Neither confirms that a job started or finished.        |
 | `in_progress`           | The original synchronous operation has not finished.                                                                | Keep its operation ID. A later lookup can observe the same original request.                  |
 | `recovery_required`     | The original operation requires recovery. The record does not establish asynchronous acceptance.                    | Keep the operation ID and ask the installation's operator to investigate.                     |
 | `unresolved`            | Lookup cannot establish an authoritative retained match.                                                            | Keep the original details and investigate. Do not assume the operation never happened.        |
 
 For example, a completed response has this shape. The operation ID and expiry below are illustrative:
+
+<CodeGroup>
 
 ```json
 {
@@ -246,15 +260,44 @@ For example, a completed response has this shape. The operation ID and expiry be
 }
 ```
 
+</CodeGroup>
+
 `classification` describes the kind of completed result: `safe_result`, `issued_secret`, or `answer_receipt`. Lookup does not return the original secret, answer, or response body.
 
+For an original Project action accepted for background work, lookup may identify its job. This complete response is illustrative, with example IDs and expiry:
+
+<CodeGroup title="Illustrative accepted response">
+
+```json
+{
+  "outcome": "accepted_asynchronous",
+  "operationId": "example-background-operation",
+  "admission": "confirmed",
+  "jobReference": {
+    "jobId": "00000000-0000-4000-8000-000000000004"
+  },
+  "dispatch": "not_established",
+  "idempotencyExpiresAt": "2030-01-01T00:00:00Z"
+}
+```
+
+</CodeGroup>
+
+Keep `jobId` with the original operation ID and installation. It identifies the original work, but does not certify dispatch, execution state or completion. It grants no permission for a later job read, and a job-inspection endpoint is not available yet.
+
+If a permitted reference cannot be established, `jobReference` is the string `"unknown"` and the result still confirms acceptance. That does not mean the operation has no job or that nothing was dispatched. Lookup never creates work to fill a missing reference.
+
 An unresolved response contains only:
+
+<CodeGroup>
 
 ```json
 {
   "outcome": "unresolved"
 }
 ```
+
+</CodeGroup>
 
 It does not say whether history was absent, expired, or did not match the full original identity. Repeating a successful lookup does not extend the original record's expiry. An accepted asynchronous result remains a statement about original acceptance, even if the job later changes state. Lookup does not provide a job URL or current job progress.
 

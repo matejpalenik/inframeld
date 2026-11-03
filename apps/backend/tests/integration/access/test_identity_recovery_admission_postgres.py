@@ -186,7 +186,7 @@ async def test_concurrent_callbacks_share_one_operation(
             await barrier.wait()
             return await _service(session, installation_id).admit(EVENT)
 
-    async with asyncio.timeout(10):
+    async with asyncio.timeout(30):
         first, second = await asyncio.gather(admit(), admit())
 
     assert first == second

@@ -90,12 +90,15 @@ const missingLookupGuard: Pick<
 > = {};
 const unknownLookupJob: Pick<AcceptedOperationLookupResponse, "jobReference"> =
   { jobReference: "unknown" };
+const knownLookupJob: Pick<AcceptedOperationLookupResponse, "jobReference"> = {
+  jobReference: { jobId: "00000000-0000-4000-8000-000000000008" },
+};
 const guessedLookupJob: Pick<AcceptedOperationLookupResponse, "jobReference"> =
   {
-    // @ts-expect-error The original job reference remains unknown.
+    // @ts-expect-error A known reference requires its typed identifier object.
     jobReference: "known",
   };
-void [missingLookupGuard, unknownLookupJob, guessedLookupJob];
+void [missingLookupGuard, unknownLookupJob, knownLookupJob, guessedLookupJob];
 
 import type {
   ProjectMetadataUpdateRequest,

@@ -1,0 +1,22 @@
+export const pageMetadata = {
+  title: "Deployments and releases",
+  description: "Understand which prepared version serves application traffic.",
+}
+
+# Deployments and releases
+
+A Deployment selects the prepared Pipeline version that serves application traffic. This lets you develop changes without immediately replacing the version your customers use.
+
+## Automatic and manual publication
+
+Automatic updates still require the underlying change rights, build requirements and release authority. Manual releases let an authorized person choose publication, canary progression or rollback. Switching modes invalidates old publication authority rather than reviving a stale job later.
+
+## Release, health and quality
+
+Readiness establishes that a version completed preparation. Current health describes dependencies now. Evaluation describes observed quality. Publication authority determines whether a version may receive traffic. These are separate facts.
+
+## Roll back deliberately
+
+Rollback selects an eligible version under current authority. It does not restore permission to erased content or remove the need to check current availability.
+
+The public release API and CLI remain in development. See [publish, update and roll back](/guides/publish-and-rollback) for availability and [upgrades](/self-hosting/upgrades) for installation changes.

@@ -12,6 +12,8 @@ export const operations = [
   "getProtectedResourceMetadataForPath",
   "getHealth",
   "getCurrentSession",
+  "getMyOrganizationAccess",
+  "createProject",
   "inspectHumanOAuthConsent",
   "decideHumanOAuthConsent",
   "assignProjectUseOnlyGrant",

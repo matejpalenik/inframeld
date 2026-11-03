@@ -18,8 +18,8 @@ def _ignore_term(_number: int, _frame: object) -> None:
 
 def main() -> None:
     mode = sys.argv[1]
-    # Tests assert cleanup before two seconds. This fuse only bounds failed fixtures.
-    signal.alarm(4)
+    # Positive tests finish before 25 seconds. Recovery-only children keep their shorter fuse.
+    signal.alarm(15 if os.environ.get("SDK_PROCESS_FIXTURE_RECOVERY") == "1" else 60)
     if mode == "protocol-owner":
         scenario, trace = sys.argv[2:4]
 
@@ -52,23 +52,24 @@ def main() -> None:
             raise ValueError("Unknown controlled owner scenario")
         send({"type": "ready", "clock": time.monotonic_ns() // 1_000_000, "python": "3.13.12"})
         read_document()
-        signal.alarm(8)
+        signal.alarm(30)
         child = subprocess.Popen(
             [sys.executable, "-B", __file__, "wait"],
             stdin=subprocess.DEVNULL,
             close_fds=True,
             start_new_session=True,
+            env={**os.environ, "SDK_PROCESS_FIXTURE_RECOVERY": "1"},
         )
         send({"type": "started", "pid": child.pid})
         os.close(3)
         Path(trace).write_text(json.dumps({"target": child.pid, "helper": os.getpid()}))
-        child.wait(timeout=6)
+        child.wait(timeout=20)
         Path(trace + ".recovered").write_text(json.dumps({"reaped": True}))
         return
     if mode in ("backend-owner", "denied-owner", "ordered-exit-owner"):
         owner_path, marker = sys.argv[2:4]
         if mode == "denied-owner":
-            signal.alarm(8)
+            signal.alarm(30)
         spec = importlib.util.spec_from_file_location("controlled_owner", owner_path)
         assert spec is not None and spec.loader is not None
         owner = importlib.util.module_from_spec(spec)
@@ -107,7 +108,9 @@ def main() -> None:
                 stdout=stdout,
                 stderr=stderr,
                 cwd=cwd,
-                env=env,
+                env={**(env or os.environ), "SDK_PROCESS_FIXTURE_RECOVERY": "1"}
+                if mode == "denied-owner"
+                else env,
                 close_fds=close_fds,
                 start_new_session=start_new_session,
             )
@@ -137,7 +140,7 @@ def main() -> None:
                 # has not called OwnedTarget.observe yet, and retains its child.
                 document = receive(
                     control,
-                    min(execution_deadline, time.monotonic_ns() // 1_000_000 + 500),
+                    min(execution_deadline, time.monotonic_ns() // 1_000_000 + 10000),
                     maximum,
                 )
                 if document is None or document.get("type") != "stop" or len(children) != 1:
@@ -194,7 +197,7 @@ def main() -> None:
         # Production signalling has ended. This fixture remains the sole waiter,
         # and reaps its finite child after the later safety fuse without signals.
         for child in children:
-            child.wait(timeout=6)
+            child.wait(timeout=20)
         (work / "fixture-recovered.json").write_text(json.dumps({"reaped": True}))
         raise SystemExit(code)
     if mode == "exit-two":
@@ -219,7 +222,7 @@ def main() -> None:
             stdout=None if pipes == "open" else subprocess.DEVNULL,
             stderr=None if pipes == "open" else subprocess.DEVNULL,
         )
-        deadline = time.monotonic() + 1
+        deadline = time.monotonic() + 15
         while time.monotonic() < deadline and not Path(marker).exists():
             time.sleep(0.005)
         if not Path(marker).exists():

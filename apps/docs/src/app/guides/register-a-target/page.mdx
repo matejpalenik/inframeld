@@ -1,16 +1,18 @@
 export const pageMetadata = {
   title: "Register and select a target",
   description:
-    "Save a trusted HTTPS installation connection, choose a local default and inspect its cached identity without signing in.",
+    "Save an installation connection, choose a local default and inspect its cached identity.",
 }
 
 # Register and select a target
 
 Save your development installation as `dev` so you can refer to it by a short local label. A target records an installation connection. Registering or selecting one does not sign you in, select a Project or grant access.
 
-## Before you begin
+<a id="before-you-begin" />
 
-Use an `inframeld` executable that includes `target add`, `target use`, `target show` and their preference change views, available on your shell's `PATH`. The [CLI README](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#build-and-check-from-source) explains source builds and [archive installation](https://github.com/matejpalenik/inframeld/blob/main/apps/cli/README.md#install-and-remove-a-packaged-executable). An older executable may reject these commands. This guide does not establish a published release or additional platform support.
+## Get your installation URL
+
+[Install the CLI](/get-started/install-cli) if it is not available in your shell.
 
 Ask the installation operator for its exact public HTTPS API URL. The installation must already publish compatible discovery metadata and have its official OAuth client configured. Use that API identity, including any path or trailing slash, rather than an account page, arbitrary API route or private administration address. The example `https://api.dev.example.com` must be replaced with your operator's value.
 
@@ -75,28 +77,6 @@ inframeld target use dev --dry-run
 
 **Current / Proposed** compares the currently saved preference with `dev`. It does not save or reserve that change. A displayed `not selected` means the registry currently has no saved preference. A proposal equal to the current value is marked `unchanged` and remains a preview.
 
-Add `--json` for structured observations. This is an illustrative `data.changes` entry for proposing `dev` when no preference is saved, not a captured result:
-
-<CodeGroup>
-
-```json
-{
-  "kind": "proposed",
-  "resource": { "kind": "targetPreference" },
-  "fields": [
-    {
-      "field": "savedTarget",
-      "before": { "known": true, "value": null },
-      "after": { "known": true, "value": "dev" }
-    }
-  ]
-}
-```
-
-</CodeGroup>
-
-Here `known: true` with `value: null` means an observed unset preference. It does not mean an unknown value. The preview's `effectiveTarget` and `source` describe the current selection, not the proposed preference.
-
 Save `dev` as your local preference, then inspect the effective choice:
 
 <CodeGroup>
@@ -126,35 +106,7 @@ If `INFRAMELD_TARGET` is set, `use` still saves your requested preference but wa
 
 ## Use structured output or preview a change
 
-For a structured cached inspection, run:
-
-<CodeGroup>
-
-```shell
-inframeld target show --target dev --json --no-input
-```
-
-</CodeGroup>
-
-Check the process status and final `outcome`. Successful inspection has `data.verification: "savedBinding"`, and `data.source` identifies `flag`, `environment` or `saved`. Registration instead reports `discoveryValidated`, describing that registration attempt. Warnings remain separate from success and may also appear on stderr.
-
-Choose `--jsonl` instead of `--json` for one final result record. These target commands emit no progress records. Help remains plain text. The [CLI output guide](/guides/inspect-cli-version#choose-a-final-jsonl-record) explains the shared final-record wrapper. `--plain` and `--no-color` affect presentation, while `--no-input` prevents interaction. These commands do not prompt or launch a browser.
-
-Preview registration without contacting the server or saving a target:
-
-<CodeGroup>
-
-```shell
-inframeld target add dev --url https://api.dev.example.com --dry-run --json
-```
-
-</CodeGroup>
-
-Dry-run validates arguments and transport inputs and reads the local registry. If CA files were supplied, it reads and validates them too. Its plan describes intended effects. It does not validate remote metadata or prove that executing registration will succeed. Dry-run for `use` or `show` also reads local state and performs no network call or preference write.
-
-Registration preview lists `publicApiIdentity` and `httpRequestMetadata` as intended outgoing network categories. These describe execution, not data sent by preview. Its destinations include the local registry and supplied API identity. Issuer-metadata and signing-key-set destinations remain unknown until discovery. An explicit proxy appears as an additional known destination. Unknown destinations have `known: false` and no `value`, rather than a guessed issuer URL.
-
-Preference and inspection previews list no outgoing network data and only the local registry as a destination. Plans retain `remoteVerification: "notPerformed"` and identify unresolved facts such as an unperformed save or unverified remote health. They expose no credential or CA contents. An unresolved environment override is reported separately from a proposed saved preference.
+Add `--json` or `--jsonl` for automation. Use the [target output reference](/clients/cli/target-reference) for exact change records, dry-run observations and uncertain-save fields. [CLI automation](/clients/cli/automation) explains how to consume final output.
 
 ## Recover from a failure
 

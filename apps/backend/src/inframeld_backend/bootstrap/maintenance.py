@@ -11,6 +11,9 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from structlog.contextvars import bound_contextvars
 
+from inframeld_backend.access.application.commands.bootstrap_first_administrator_command import (
+    BootstrapFirstAdministratorCommand,
+)
 from inframeld_backend.access.application.commands.repair_project_metadata_authority_command import (
     RepairProjectMetadataAuthorityCommand,
 )
@@ -19,6 +22,9 @@ from inframeld_backend.access.application.commands.resume_identity_recovery_clea
 )
 from inframeld_backend.access.application.enums.recovery_maintenance_error_code import (
     RecoveryMaintenanceErrorCode,
+)
+from inframeld_backend.access.application.errors.first_administrator_bootstrap_error import (
+    FirstAdministratorBootstrapError,
 )
 from inframeld_backend.access.application.errors.project_metadata_maintenance_error import (
     ProjectMetadataMaintenanceError,
@@ -49,6 +55,12 @@ from inframeld_backend.access.infrastructure.resources.sqlalchemy_recovery_trans
 from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_cleanup_resume_writer import (
     PostgresIdentityRecoveryCleanupResumeWriter,
 )
+from inframeld_backend.bootstrap.first_administrator_bootstrap_composition import (
+    execute_first_administrator_bootstrap,
+)
+from inframeld_backend.bootstrap.first_administrator_bootstrap_settings import (
+    FirstAdministratorBootstrapSettings,
+)
 from inframeld_backend.bootstrap.maintenance_application_settings import (
     MaintenanceApplicationSettings,
 )
@@ -74,9 +86,17 @@ from inframeld_backend.shared.infrastructure.resources.database import Database
 
 
 async def _execute(
-    command: ResumeIdentityRecoveryCleanupCommand | RepairProjectMetadataAuthorityCommand,
+    command: (
+        ResumeIdentityRecoveryCleanupCommand
+        | RepairProjectMetadataAuthorityCommand
+        | BootstrapFirstAdministratorCommand
+    ),
     settings: MaintenanceApplicationSettings,
 ) -> dict[str, object]:
+    if isinstance(command, BootstrapFirstAdministratorCommand):
+        if not isinstance(settings, FirstAdministratorBootstrapSettings):
+            raise RuntimeError("The first-administrator configuration is missing.")
+        return await execute_first_administrator_bootstrap(command, settings)
     if isinstance(command, RepairProjectMetadataAuthorityCommand):
         if not isinstance(settings, ProjectMetadataMaintenanceSettings):
             raise RuntimeError("The metadata repair configuration is missing.")
@@ -126,11 +146,12 @@ def main(arguments: Sequence[str] | None = None) -> int:
             raise ValueError("Unsupported arguments.")
         command = MaintenanceCli.read(sys.stdin.buffer)
         error["operationId"] = command.operation_id.value
-        settings = (
-            ProjectMetadataMaintenanceSettings.model_validate({})
-            if isinstance(command, RepairProjectMetadataAuthorityCommand)
-            else MaintenanceApplicationSettings.model_validate({})
-        )
+        if isinstance(command, BootstrapFirstAdministratorCommand):
+            settings = FirstAdministratorBootstrapSettings.model_validate({})
+        elif isinstance(command, RepairProjectMetadataAuthorityCommand):
+            settings = ProjectMetadataMaintenanceSettings.model_validate({})
+        else:
+            settings = MaintenanceApplicationSettings.model_validate({})
     except (RecoveryMaintenanceInputError, ProjectMetadataMaintenanceInputError) as failure:
         if failure.operation_id is not None:
             error["operationId"] = failure.operation_id.value
@@ -141,7 +162,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
     configure_logging(level=settings.log_level, log_format=settings.log_format, stream=sys.stderr)
     try:
         response = asyncio.run(_execute(command, settings))
-    except (RecoveryMaintenanceError, ProjectMetadataMaintenanceError) as failure:
+    except (
+        RecoveryMaintenanceError,
+        ProjectMetadataMaintenanceError,
+        FirstAdministratorBootstrapError,
+    ) as failure:
         code = failure.code.value
     except (
         DependencyUnavailableError,

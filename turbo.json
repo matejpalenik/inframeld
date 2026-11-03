@@ -18,7 +18,14 @@
     },
     "lint": {},
     "typecheck": {},
+    "@inframeld/web#typecheck": {
+      "dependsOn": ["@inframeld/sdk#build"]
+    },
     "test": {
+      "env": ["INFRAMELD_*"]
+    },
+    "@inframeld/web#test": {
+      "dependsOn": ["@inframeld/sdk#build"],
       "env": ["INFRAMELD_*"]
     },
     "format": {},

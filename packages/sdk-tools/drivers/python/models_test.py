@@ -160,15 +160,42 @@ class GeneratedModelTests(unittest.TestCase):
             "dispatch": "not_established",
             "idempotencyExpiresAt": None,
         }
-        model = inframeld_sdk.AcceptedOperationLookupResponse.model_validate(source)
+        model = inframeld_sdk.AcceptedOperationLookupResponse.from_dict(source)
+        self.assertIsNotNone(model)
+        assert model is not None
         self.assertEqual(body_value(model), source)
+        known = source | {"jobReference": {"jobId": "00000000-0000-4000-8000-000000000008"}}
+        model = inframeld_sdk.AcceptedOperationLookupResponse.from_dict(known)
+        self.assertIsNotNone(model)
+        assert model is not None
+        self.assertEqual(body_value(model), known)
+        for reference in [
+            {},
+            {"jobId": None},
+            {"jobId": "guessed-job"},
+        ]:
+            with self.subTest(reference=reference), self.assertRaises(ValueError):
+                inframeld_sdk.AcceptedOperationLookupResponse.from_dict(
+                    source | {"jobReference": reference}
+                )
+        projected = inframeld_sdk.AcceptedOperationLookupResponse.from_dict(
+            source
+            | {
+                "jobReference": {
+                    "jobId": "00000000-0000-4000-8000-000000000008",
+                    "state": "running",
+                }
+            }
+        )
+        assert projected is not None
+        self.assertEqual(body_value(projected), known)
         for field in ["outcome", "admission", "jobReference", "dispatch", "idempotencyExpiresAt"]:
             invalid = dict(source)
             invalid.pop(field)
             with self.subTest(field=field), self.assertRaises(ValueError):
-                inframeld_sdk.AcceptedOperationLookupResponse.model_validate(invalid)
+                inframeld_sdk.AcceptedOperationLookupResponse.from_dict(invalid)
         with self.assertRaises(ValueError):
-            inframeld_sdk.AcceptedOperationLookupResponse.model_validate(
+            inframeld_sdk.AcceptedOperationLookupResponse.from_dict(
                 source | {"jobReference": "known"}
             )
 

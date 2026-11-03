@@ -1,0 +1,27 @@
+export const pageMetadata = {
+  title: "Backup and restore",
+  description:
+    "Understand the backup boundary and current procedure availability.",
+}
+
+# Backup and restore
+
+Protect authoritative application state and source artifacts as a coherent installation. PostgreSQL metadata and artifact storage must agree about the objects being restored. Search vectors are derived data with their own readiness requirements.
+
+<Note>
+  A complete supported backup/restore procedure has not been qualified for this
+  preview. Do not treat a database dump alone as a verified installation
+  restore.
+</Note>
+
+## Define what a restore must preserve
+
+Include application identities and permissions, retained operation meaning, artifact ownership, deployment selection and relevant provider state. Credentials and encryption material need their own protected recovery procedure. Restoring bytes does not establish that dependent indexes are ready or that old publication work is authorized.
+
+## Verify recovery before relying on it
+
+A useful rehearsal restores into an isolated environment, checks application and artifact consistency, confirms current access and examines pending work before serving traffic. It preserves the original operation's uncertainty rather than blindly dispatching it again.
+
+The maintained [backup procedure](https://github.com/matejpalenik/inframeld/blob/main/docs/development/operations/backups.md) specifies the coherent stopped-state inventory, protected keys, off-host completion and retention. The [restore procedure](https://github.com/matejpalenik/inframeld/blob/main/docs/development/operations/restore.md) covers recovery and reconciliation of newer security restrictions. These record the accepted procedure and its qualification limits. Preserve both identity services and the same fingerprint key alongside application data.
+
+Use a disposable development environment while the complete supported release is being delivered. Read [upgrades and compatibility](/self-hosting/upgrades) before changing stored representations, and [monitoring](/self-hosting/monitoring) for safe diagnostic information.

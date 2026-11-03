@@ -19,8 +19,8 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
-    AcceptedAsyncOperationDTO,
+from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto import (
+    AcceptedOperationLookupDTO,
 )
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
@@ -30,6 +30,9 @@ from inframeld_backend.shared.application.dtos.in_progress_operation_dto import 
 )
 from inframeld_backend.shared.application.dtos.operation_reservation_result_dto import (
     OperationReservationResultDTO,
+)
+from inframeld_backend.shared.application.dtos.original_operation_lookup_record_dto import (
+    OriginalOperationLookupRecordDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
@@ -61,6 +64,7 @@ from inframeld_backend.shared.application.services.original_operation_lookup_ser
     OriginalOperationLookupService,
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
     OperationLookupAuthority,
@@ -94,6 +98,7 @@ class MockLookupAuthorizer(OperationLookupAuthorizer):
         self.events = events
         self.failure: Exception | None = None
         self.scope = OperationLookupAuthorizationDTO(QUERY.organization_id, QUERY.project_id)
+        self.query = QUERY
 
     @override
     async def require_authorization(
@@ -101,7 +106,7 @@ class MockLookupAuthorizer(OperationLookupAuthorizer):
     ) -> OperationLookupAuthorizationDTO:
         self.events.append("authorize")
         assert access == ACCESS
-        assert request == QUERY
+        assert request == self.query
         if self.failure is not None:
             raise self.failure
         return self.scope
@@ -112,17 +117,47 @@ class MockLookupReader(OperationLookupReader):
         self.events = events
         self.saved = saved
         self.failure: Exception | None = None
+        self.job_id: JobId | None = None
+        self.query = QUERY
 
     @override
     async def read(
         self, *, principal_id: PrincipalId, query: LookupOriginalOperationQuery
-    ) -> OperationReservationResultDTO | None:
+    ) -> OriginalOperationLookupRecordDTO | None:
         self.events.append("read")
         assert principal_id == ACCESS.actor_principal_id
-        assert query == QUERY
+        assert query == self.query
         if self.failure is not None:
             raise self.failure
-        return self.saved
+        return (
+            OriginalOperationLookupRecordDTO(self.saved, self.job_id)
+            if self.saved is not None
+            else None
+        )
+
+
+@pytest.mark.asyncio
+async def test_lookup_preserves_established_job_reference_without_execution_facts() -> None:
+    events: list[str] = []
+    query = replace(
+        QUERY,
+        requested_route="/v1/original-project-operation",
+        expected_authority=OperationLookupAuthority(
+            OperationLookupAuthorityFamily.PROJECT_ACTION_USE, QUERY.expected_authority.action_id
+        ),
+    )
+    authorizer = MockLookupAuthorizer(events)
+    authorizer.query = query
+    reader = MockLookupReader(
+        events, replace(SAVED, replay_kind=OperationReplayKind.ASYNC_JOB, expires_at=None)
+    )
+    reader.job_id = JobId(UUID(int=8))
+    reader.query = query
+    result = await OriginalOperationLookupService(authorizer, reader).lookup(
+        access=ACCESS, query=query
+    )
+    assert result == AcceptedOperationLookupDTO(SAVED.operation_id, None, reader.job_id)
+    assert events == ["authorize", "read"]
 
 
 @pytest.mark.asyncio
@@ -164,11 +199,11 @@ async def test_denial_precedes_search_for_every_history(
         ),
         (
             replace(SAVED, replay_kind=OperationReplayKind.ASYNC_JOB, expires_at=None),
-            AcceptedAsyncOperationDTO(SAVED.operation_id, False, None),
+            AcceptedOperationLookupDTO(SAVED.operation_id, None),
         ),
         (
             replace(SAVED, replay_kind=OperationReplayKind.ASYNC_JOB),
-            AcceptedAsyncOperationDTO(SAVED.operation_id, False, EXPIRY),
+            AcceptedOperationLookupDTO(SAVED.operation_id, EXPIRY),
         ),
         (
             replace(

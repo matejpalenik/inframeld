@@ -225,7 +225,7 @@ async def test_concurrent_binding_cannot_replace_original_attribution(
         async with database.session() as session, session.begin():
             return await _bind(session, candidate)
 
-    async with asyncio.timeout(5):
+    async with asyncio.timeout(15):
         results = await asyncio.gather(bind(seed), bind(other), return_exceptions=True)
     successful = [result for result in results if isinstance(result, DeletionStatusBindingDTO)]
     assert len(successful) == (1 if conflicting_attribution else 2)

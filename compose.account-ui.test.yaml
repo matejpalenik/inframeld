@@ -1,0 +1,274 @@
+# Isolated account UI qualification. The coordinator owns runtime allocation and execution.
+x-backend: &backend
+  image: ${INFRAMELD_ACCOUNT_BACKEND_IMAGE:?Use scripts/test-account-ui.sh}
+  build:
+    context: .
+    dockerfile: apps/backend/Dockerfile.integration
+  user: "10001:10001"
+  read_only: true
+  tmpfs: [/tmp]
+  environment: &backend-env
+    PYTHONPATH: /workspace/apps/backend/src:/workspace/apps/backend
+    INFRAMELD_ENVIRONMENT: local
+    INFRAMELD_LOG_LEVEL: WARNING
+    INFRAMELD_DATABASE__HOST: postgres
+    INFRAMELD_DATABASE__NAME: account_ui_test
+    INFRAMELD_DATABASE__USER: account_test
+    INFRAMELD_DATABASE__PASSWORD: account-test-only
+    INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE: /run/account-secrets/fingerprint.key
+    INFRAMELD_KRATOS__PUBLIC_URL: http://kratos:4433
+    INFRAMELD_KRATOS__ADMIN_URL: http://kratos:4434
+    INFRAMELD_KRATOS__AUTHORITY: kratos:account-ui-test
+    INFRAMELD_HYDRA__ADMIN_URL: http://hydra:4445
+    INFRAMELD_HYDRA__PUBLIC_URL: https://hydra.account.test:8443
+    INFRAMELD_HYDRA__ISSUER: https://hydra.account.test:8443/
+    INFRAMELD_HYDRA__API_AUDIENCE: https://inframeld.account.test:8443
+    INFRAMELD_DISCOVERY__PUBLIC_API_URL: https://inframeld.account.test:8443
+    INFRAMELD_DISCOVERY__TRANSPORT_PROFILE: https
+    INFRAMELD_CSRF__TRUSTED_ORIGINS: '["https://inframeld.account.test:8443"]'
+  volumes: &backend-volumes
+    - ./apps/backend/src:/workspace/apps/backend/src:ro
+    - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+    - ./apps/backend/migrations:/workspace/apps/backend/migrations:ro
+    - ./apps/backend/alembic.ini:/workspace/apps/backend/alembic.ini:ro
+    - ./apps/web/tests/fixtures:/fixture:ro
+    - account-secrets:/run/account-secrets:ro
+    - account-fixture:/run/account-fixture:ro
+  entrypoint: [python, /fixture/backend.py]
+
+x-web: &web
+  image: ${INFRAMELD_ACCOUNT_WEB_IMAGE:?Use scripts/test-account-ui.sh}
+  build:
+    context: ${INFRAMELD_ACCOUNT_WEB_CONTEXT:?Use scripts/test-account-ui.sh}
+    dockerfile: apps/web/tests/fixtures/Dockerfile
+  user: "10001:10001"
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: account_ui_test
+      POSTGRES_USER: account_test
+      POSTGRES_PASSWORD: account-test-only
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U account_test -d account_ui_test]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  kratos-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: kratos_test
+      POSTGRES_USER: kratos_test
+      POSTGRES_PASSWORD: kratos-test-only
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U kratos_test -d kratos_test]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  hydra-postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: hydra_test
+      POSTGRES_USER: hydra_test
+      POSTGRES_PASSWORD: hydra-test-only
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U hydra_test -d hydra_test]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  account-tls-init:
+    <<: *backend
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - ./apps/web/tests/fixtures:/fixture:ro
+      - account-trust:/run/account-trust
+      - account-identity:/run/account-identity
+      - account-secrets:/run/account-secrets
+      - account-fixture:/run/account-fixture
+    entrypoint: [python, /fixture/generate_tls.py]
+  breach-tls-init:
+    <<: *backend
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+      - breach-trust:/run/inframeld-test-tls/trust
+      - breach-identity:/run/inframeld-test-tls/identity
+    entrypoint: [python, -m, tests.support.generate_test_tls]
+  password-breaches:
+    <<: *backend
+    volumes:
+      - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+      - breach-identity:/run/inframeld-test-tls/identity:ro
+    entrypoint:
+      [
+        python,
+        -m,
+        uvicorn,
+        "tests.support.password_breaches:app",
+        --host,
+        0.0.0.0,
+        --port,
+        "8443",
+        --ssl-keyfile,
+        /run/inframeld-test-tls/identity/server.key,
+        --ssl-certfile,
+        /run/inframeld-test-tls/identity/server.pem,
+        --no-access-log,
+        --log-level,
+        warning,
+      ]
+    depends_on:
+      breach-tls-init: { condition: service_completed_successfully }
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.31.1
+    environment:
+      MP_SMTP_TLS_CERT: sans:mailpit
+      MP_SMTP_TLS_KEY: sans:mailpit
+      MP_SMTP_REQUIRE_STARTTLS: "true"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+  kratos-migrate:
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
+    volumes:
+      - ./apps/web/tests/fixtures:/etc/account:ro
+      - breach-trust:/run/inframeld-test-tls/trust:ro
+      - kratos-migrate-home:/home/ory
+      - kratos-migrate-sqlite:/var/lib/sqlite
+    command: [-c, /etc/account/kratos.yaml, migrate, sql, up, -e, --yes]
+    depends_on:
+      kratos-postgres: { condition: service_healthy }
+  kratos:
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
+    volumes:
+      - ./apps/web/tests/fixtures:/etc/account:ro
+      - breach-trust:/run/inframeld-test-tls/trust:ro
+      - kratos-home:/home/ory
+      - kratos-sqlite:/var/lib/sqlite
+    environment:
+      SSL_CERT_FILE: /run/inframeld-test-tls/trust/ca.pem
+    command: [serve, -c, /etc/account/kratos.yaml, --watch-courier]
+    depends_on:
+      kratos-migrate: { condition: service_completed_successfully }
+      password-breaches: { condition: service_started }
+      mailpit: { condition: service_started }
+      hydra: { condition: service_started }
+  hydra-migrate:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    volumes: [./apps/web/tests/fixtures/hydra.yaml:/etc/account/hydra.yaml:ro]
+    command: [-c, /etc/account/hydra.yaml, migrate, sql, up, -e, --yes]
+    depends_on:
+      hydra-postgres: { condition: service_healthy }
+  hydra:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    volumes: [./apps/web/tests/fixtures/hydra.yaml:/etc/account/hydra.yaml:ro]
+    command: [serve, all, --sqa-opt-out, -c, /etc/account/hydra.yaml]
+    depends_on:
+      hydra-migrate: { condition: service_completed_successfully }
+  migrate:
+    <<: *backend
+    command: [migrate]
+    depends_on:
+      postgres: { condition: service_healthy }
+      account-tls-init: { condition: service_completed_successfully }
+  oauth-client-setup:
+    <<: *backend
+    entrypoint: [python, -m, inframeld_backend.provision_oauth_client]
+    depends_on:
+      hydra: { condition: service_started }
+  identity-setup:
+    <<: *web
+    volumes: [account-fixture:/run/account-fixture]
+    command: [node, --import, tsx, tests/fixtures/seed_identity.ts]
+    depends_on:
+      kratos: { condition: service_started }
+      account-tls-init: { condition: service_completed_successfully }
+  seed:
+    <<: *backend
+    command: [seed]
+    volumes:
+      - ./apps/backend/src:/workspace/apps/backend/src:ro
+      - ./apps/backend/tests:/workspace/apps/backend/tests:ro
+      - ./apps/backend/migrations:/workspace/apps/backend/migrations:ro
+      - ./apps/backend/alembic.ini:/workspace/apps/backend/alembic.ini:ro
+      - ./apps/web/tests/fixtures:/fixture:ro
+      - account-secrets:/run/account-secrets:ro
+      - account-fixture:/run/account-fixture
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      identity-setup: { condition: service_completed_successfully }
+      oauth-client-setup: { condition: service_completed_successfully }
+  backend:
+    <<: *backend
+    command: [serve]
+    depends_on:
+      seed: { condition: service_completed_successfully }
+      oauth-client-setup: { condition: service_completed_successfully }
+  web:
+    <<: *web
+    environment:
+      INFRAMELD_ACCOUNT_PUBLIC_ORIGIN: https://inframeld.account.test:8443
+      INFRAMELD_ACCOUNT_HYDRA_ORIGIN: https://hydra.account.test:8443
+      INFRAMELD_ACCOUNT_API_INTERNAL_URL: http://backend:8000
+      INFRAMELD_ACCOUNT_KRATOS_INTERNAL_URL: http://kratos:4433
+    command: [node, node_modules/next/dist/bin/next, start, --hostname, 0.0.0.0]
+  gateway:
+    image: docker.io/library/caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    user: "10001:10001"
+    read_only: true
+    tmpfs: ["/config:mode=1777", "/data:mode=1777"]
+    environment:
+      XDG_CONFIG_HOME: /config/inframeld
+      XDG_DATA_HOME: /data/inframeld
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        test "$$(id -u):$$(id -g)" = "10001:10001"
+        umask 077
+        mkdir /config/inframeld /data/inframeld
+        test "$$(stat -c '%u:%g:%a' /config/inframeld)" = "10001:10001:700"
+        test "$$(stat -c '%u:%g:%a' /data/inframeld)" = "10001:10001:700"
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    volumes:
+      - ./apps/web/tests/fixtures/Caddyfile:/etc/caddy/Caddyfile:ro
+      - account-identity:/run/account-tls:ro
+    networks:
+      default:
+        ipv4_address: 172.30.82.2
+        aliases: [inframeld.account.test, hydra.account.test]
+    depends_on:
+      account-tls-init: { condition: service_completed_successfully }
+      backend: { condition: service_started }
+      web: { condition: service_started }
+  browser-tests:
+    <<: *web
+    profiles: [qualification]
+    init: true
+    shm_size: 256m
+    volumes:
+      - account-trust:/run/account-trust:ro
+      - account-fixture:/run/account-fixture:ro
+    entrypoint: [bash, tests/fixtures/browser-entrypoint.sh]
+    depends_on:
+      gateway: { condition: service_started }
+
+networks:
+  default:
+    internal: true
+    ipam:
+      config: [{ subnet: 172.30.82.0/24, ip_range: 172.30.82.128/25 }]
+volumes:
+  account-trust:
+  account-identity:
+  account-secrets:
+  account-fixture:
+  breach-trust:
+  breach-identity:
+  kratos-migrate-home:
+  kratos-migrate-sqlite:
+  kratos-home:
+  kratos-sqlite:

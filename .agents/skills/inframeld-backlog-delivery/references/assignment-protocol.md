@@ -12,7 +12,9 @@ Read root and applicable directory instructions. Code work follows Coding Standa
 
 ## Use one short assignment brief
 
-The brief identifies the issue and current acceptance, useful delivered behavior, a few acceptance examples, exclusions, branch/base, owned paths and contracts, dependencies, verification commands, permitted actions and handoff recipient. State whether the result completes the issue or is a supporting capability. A plan review identifies its plan revision, with implementation-only evidence N/A.
+The brief identifies the issue and current acceptance, useful delivered behavior, a few acceptance examples, exclusions, branch/base, owned paths and contracts, dependencies, verification commands, permitted actions and handoff recipient. State its relation to the focused epic and whether the result completes implementation acceptance or is a supporting capability. For a split, name remaining implementation and its next action or unblock condition. Link any deferred human qualification under the existing closure policy. Keep this in the brief, without new helper fields or a second record. A plan review identifies its plan revision, with implementation-only evidence N/A.
+
+For material cross-component or security-sensitive work, use [Testing's case-planning guidance](../../inframeld-testing/references/test-strategy.md#choose-cases-from-ownership-and-failures) to include the relevant rejection cases and required real boundaries in those same acceptance examples.
 
 Keep the [prerequisite check](coordinator.md#check-prerequisites-before-assignment) in this same brief, not a second record:
 

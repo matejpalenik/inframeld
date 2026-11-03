@@ -6,15 +6,19 @@ export const pageMetadata = {
 
 # Name and rename an existing Project
 
-Give an existing Project a command-friendly Name, or change its display label, while scripts and saved relationships keep using the same permanent ID. This guide uses the HTTP API and generated SDKs. There is no CLI naming or Project creation command.
+Give an existing Project a command-friendly Name, or change its display label, while scripts and saved relationships keep using the same permanent ID. Use the HTTP API or a generated SDK for this task.
 
-## Before you begin
+<a id="before-you-begin" />
+
+## Prepare your Project and permission
 
 You need the backend URL, an existing Project UUID and a current human credential for that installation. Reads require current Project visibility and membership. Changes also require the exact human-only `edit-project-metadata` permission on that Project. A Name or a remembered ID supplies no authority.
 
 These examples assume you already have a human bearer token. The repository does not yet provide a complete, qualified login/account-UI journey for acquiring one. Configuring the OAuth client alone does not sign you in. Existing Projects receive no automatic metadata grant. Read the [conditional operator prerequisites](https://github.com/matejpalenik/inframeld/blob/main/docs/development/operations/project-metadata-repair.md) before considering host repair.
 
 Set these variables in the terminal where you will run the examples. Replace the URL, token and Project ID with your installation's values. Use a URL without a trailing slash. Keep the key with the original request file before sending a change.
+
+<CodeGroup>
 
 ```shell
 export INFRAMELD_URL='https://YOUR_INFRAMELD_BACKEND'
@@ -23,19 +27,27 @@ export PROJECT_ID='00000000-0000-4000-8000-000000000003'
 export PROJECT_METADATA_KEY='project-support-name-1'
 ```
 
-SDK alternatives require the locally built [Python](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-python#build-and-use-locally), [TypeScript](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-typescript#build-and-use-locally), or [Rust](https://github.com/matejpalenik/inframeld/tree/main/packages/sdk-rust#build-and-use-locally) package in a separate example project. The SDKs are not published to package registries.
+</CodeGroup>
+
+For an SDK alternative, follow the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) setup in a separate example project. These examples use the delivered HTTP operations. [CLI command reference](/clients/cli/commands) lists available CLI tasks.
 
 ## Read the current metadata
 
 Run this command from your example project's working directory:
 
-```shell
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
 curl --silent --show-error --fail-with-body \
   --max-time 5 \
   --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/metadata" \
-  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
-  --header 'Accept: application/json'
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
 ```
+
+</CodeGroup>
 
 A successful read returns `projectId`, `organizationId`, `name`, `displayName` and `metadataRevision`. Keep the permanent `projectId` for later requests. A `null` Name means that no selector has been allocated yet. It does not make the Project inaccessible by ID.
 
@@ -51,12 +63,16 @@ Suggestions are previews only. A label such as Équipe Support can suggest `equi
 
 Save the following as the complete new file `project-name-change.json` in your example project. This allocates `support` while preserving the stored label:
 
+<CodeGroup>
+
 ```json
 {
   "expectedMetadataRevision": 0,
   "name": "support"
 }
 ```
+
+</CodeGroup>
 
 Omitting `displayName` preserves it exactly, even if a legacy label is long, blank or contains controls. Do not copy an invalid legacy label back as a replacement. Omitted `name` likewise preserves the current selector. Explicit `null` cannot clear either field, and a request must replace at least one field.
 
@@ -66,16 +82,18 @@ Choose one alternative. Each sends the same saved file and request key to `PATCH
 
 <CodeGroup>
 
-```shell
+```shell {{ title: "cURL" }}
 curl --silent --show-error --fail-with-body \
   --max-time 5 \
   --request PATCH \
   --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/metadata" \
-  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header @- \
   --header "Idempotency-Key: $PROJECT_METADATA_KEY" \
   --header 'Content-Type: application/json' \
   --header 'Accept: application/json' \
-  --data-binary @project-name-change.json
+  --data-binary @project-name-change.json <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
 ```
 
 ```python
@@ -230,19 +248,27 @@ A replay returns the original change result. Another authorized change may have 
 
 After allocation succeeds, resolve the exact Name:
 
-```shell
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
 curl --silent --show-error --fail-with-body \
   --max-time 5 \
   --url "$INFRAMELD_URL/v1/projects/by-name/support" \
-  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
-  --header 'Accept: application/json'
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
 ```
+
+</CodeGroup>
 
 The response contains the same permanent Project ID and currently permitted metadata. Save the ID for durable references. Display labels never select a Project. Resolution stays within the authenticated installation and Organization, with current visibility checks.
 
 ## Rename or replace the label
 
 For a distinct, reviewed change, read the current metadata again. Save the complete new file `project-rename.json` below, replacing `1` with the revision you reviewed. Choose a new request key for this new operation:
+
+<CodeGroup>
 
 ```json
 {
@@ -252,19 +278,27 @@ For a distinct, reviewed change, read the current metadata again. Save the compl
 }
 ```
 
+</CodeGroup>
+
 Send it from the same example directory:
 
-```shell
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
 curl --silent --show-error --fail-with-body \
   --max-time 5 \
   --request PATCH \
   --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/metadata" \
-  --header "Authorization: Bearer $INFRAMELD_TOKEN" \
+  --header @- \
   --header 'Idempotency-Key: project-support-rename-1' \
   --header 'Content-Type: application/json' \
   --header 'Accept: application/json' \
-  --data-binary @project-rename.json
+  --data-binary @project-rename.json <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
 ```
+
+</CodeGroup>
 
 Name and Display name change atomically. A collision, stale revision, invalid replacement or revoked authority changes neither field. Both labels and Names can change while the Project ID and stored relationships remain fixed.
 

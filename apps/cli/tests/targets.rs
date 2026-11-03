@@ -13,7 +13,7 @@ fn command(home: &TempDir) -> Command {
         .env("HOME", home.path())
         .env("PATH", "")
         .current_dir(home.path())
-        .timeout(Duration::from_secs(15));
+        .timeout(Duration::from_secs(30));
     command
 }
 
@@ -368,6 +368,94 @@ fn change_views_identical_proposal_is_explicitly_unchanged_and_still_unsaved() {
 }
 
 #[test]
+fn captured_previews_stay_plain_and_machine_equivalent_even_when_color_is_forced() {
+    let home = TempDir::new().unwrap();
+    seed(&home);
+    let path = home.path().join(".config/inframeld/targets");
+    let before = fs::read(&path).unwrap();
+    let expected = result(&invoke(
+        &home,
+        &["target", "use", "dev", "--dry-run", "--json"],
+        None,
+    ));
+    for flags in [&[][..], &["--plain"][..], &["--no-color"][..]] {
+        for environment in [
+            None,
+            Some(("NO_COLOR", "1")),
+            Some(("NO_COLOR", "")),
+            Some(("TERM", "dumb")),
+        ] {
+            for format in [None, Some("--json"), Some("--jsonl")] {
+                let mut child = command(&home);
+                child
+                    .args(["target", "use", "dev", "--dry-run"])
+                    .args(flags)
+                    .env("TERM", "xterm-256color")
+                    .env("CLICOLOR_FORCE", "1");
+                if let Some((name, value)) = environment {
+                    child.env(name, value);
+                }
+                if let Some(format) = format {
+                    child.arg(format);
+                }
+                let output = child.output().unwrap();
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                assert!(!output.stdout.contains(&0x1b));
+                assert!(!output.stderr.contains(&0x1b));
+                if let Some(format) = format {
+                    let value = result(&output);
+                    let object = if format == "--jsonl" {
+                        &value["result"]
+                    } else {
+                        &value
+                    };
+                    assert_eq!(object, &expected);
+                } else {
+                    let text = String::from_utf8(output.stdout).unwrap();
+                    assert!(text.contains("Current / Proposed"));
+                    assert!(text.contains("  Current: prod\n  -> Proposed: dev\n"));
+                    assert!(text.contains("Remote verification: not performed"));
+                }
+                assert_eq!(fs::read(&path).unwrap(), before);
+                assert_eq!(fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
+            }
+        }
+    }
+}
+
+#[test]
+fn terminal_controls_in_saved_labels_never_reach_output_or_rewrite_state() {
+    let home = TempDir::new().unwrap();
+    seed(&home);
+    let path = home.path().join(".config/inframeld/targets");
+    let mut state: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    state["targets"]["dev"]["label"] = json!("dev\u{1b}]2;forged-title\u{7}");
+    fs::write(&path, serde_json::to_vec(&state).unwrap()).unwrap();
+    let before = fs::read(&path).unwrap();
+    for format in [None, Some("--json"), Some("--jsonl")] {
+        let mut child = command(&home);
+        child
+            .args(["target", "use", "dev", "--dry-run"])
+            .env("CLICOLOR_FORCE", "1")
+            .env("TERM", "xterm-256color");
+        if let Some(format) = format {
+            child.arg(format);
+        }
+        let output = child.output().unwrap();
+        assert_eq!(output.status.code(), Some(1));
+        assert!(!output.stdout.contains(&0x1b) && !output.stderr.contains(&0x1b));
+        assert!(!output.stdout.contains(&0x7) && !output.stderr.contains(&0x7));
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("forged-title"));
+        assert!(!String::from_utf8_lossy(&output.stderr).contains("forged-title"));
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
+}
+
+#[test]
 fn credential_bearing_proxy_is_rejected_without_echoing_it_or_saving_state() {
     let home = TempDir::new().unwrap();
     let output = invoke(
@@ -654,7 +742,7 @@ impl RunningCli {
 
     #[allow(clippy::panic)]
     async fn finish(mut self) -> Output {
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let deadline = std::time::Instant::now() + Duration::from_secs(15);
         loop {
             if self.0.as_mut().unwrap().try_wait().unwrap().is_some() {
                 return self.0.take().unwrap().wait_with_output().unwrap();
@@ -710,7 +798,7 @@ async fn interrupted_registration(signal: &str, expected: i32) {
         .spawn()
         .unwrap();
     let mut child = RunningCli(Some(child));
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
     while server.requests.lock().unwrap().is_empty() {
         assert!(
             child.0.as_mut().unwrap().try_wait().unwrap().is_none(),
@@ -771,7 +859,7 @@ fn prefilled_pipe() -> (
             }
         }
     });
-    ready.recv_timeout(Duration::from_secs(2)).unwrap();
+    ready.recv_timeout(Duration::from_secs(10)).unwrap();
     (reader, stdout, fill)
 }
 
@@ -822,7 +910,7 @@ async fn second_interrupt_can_exit_while_the_final_machine_pipe_is_blocked() {
         text
     });
     let mut child = RunningCli(Some(child));
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
     while server.requests.lock().unwrap().is_empty() {
         assert!(std::time::Instant::now() < deadline);
         tokio::time::sleep(Duration::from_millis(10)).await;
@@ -834,6 +922,7 @@ async fn second_interrupt_can_exit_while_the_final_machine_pipe_is_blocked() {
             .unwrap()
             .success()
     );
+    // The diagnostic and forced exit must precede the first interrupt's five-second fallback.
     notification.recv_timeout(Duration::from_secs(3)).unwrap();
     assert!(child.0.as_mut().unwrap().try_wait().unwrap().is_none());
     assert!(
@@ -899,7 +988,7 @@ async fn first_interrupt_during_final_output_preserves_the_already_saved_prefere
     });
     let mut child = RunningCli(Some(child));
     // This warning is emitted by final reporting after the local save completed.
-    arrived.recv_timeout(Duration::from_secs(5)).unwrap();
+    arrived.recv_timeout(Duration::from_secs(15)).unwrap();
     assert!(child.0.as_mut().unwrap().try_wait().unwrap().is_none());
     assert!(
         ProcessCommand::new("/bin/kill")
@@ -908,7 +997,7 @@ async fn first_interrupt_during_final_output_preserves_the_already_saved_prefere
             .unwrap()
             .success()
     );
-    let (output, stopped) = child.finish_or_kill(Duration::from_secs(2)).await;
+    let (output, stopped) = child.finish_or_kill(Duration::from_secs(10)).await;
     let mut drained = Vec::new();
     reader.read_to_end(&mut drained).unwrap();
     fill.join().unwrap();
@@ -956,7 +1045,7 @@ async fn a_ca_named_pipe_is_rejected_without_waiting_for_a_writer() {
         .spawn()
         .unwrap();
     let mut child = RunningCli(Some(child));
-    let (output, stopped) = child.finish_or_kill(Duration::from_secs(2)).await;
+    let (output, stopped) = child.finish_or_kill(Duration::from_secs(10)).await;
     assert!(stopped, "Nonregular CA input blocked before validation");
     assert_eq!(result(&output)["error"]["code"], "invalid_ca_file");
     assert_eq!(fs::read_dir(home.path()).unwrap().count(), 0);

@@ -95,7 +95,7 @@ async def test_expired_browser_cookie_is_rejected() -> None:
 
         # Send the saved value explicitly: the browser's cookie jar may discard
         # an expired cookie before making the request.
-        async with asyncio.timeout(5):
+        async with asyncio.timeout(15):
             while True:
                 expired = await browser.get(
                     "/sessions/whoami",

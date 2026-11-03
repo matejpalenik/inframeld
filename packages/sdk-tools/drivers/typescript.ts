@@ -77,6 +77,17 @@ const calls = {
     sdk.getHealth(options(client, call)),
   getCurrentSession: (client: Client, call: SdkCall) =>
     sdk.getCurrentSession(options(client, call)),
+  getMyOrganizationAccess: (client: Client, call: SdkCall) =>
+    sdk.getMyOrganizationAccess(options(client, call)),
+  createProject: (client: Client, call: SdkCall) =>
+    sdk.createProject({
+      ...options(client, call),
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.CreateProjectData["body"],
+    }),
   inspectHumanOAuthConsent: (client: Client, call: SdkCall) =>
     sdk.inspectHumanOAuthConsent({
       ...options(client, call),

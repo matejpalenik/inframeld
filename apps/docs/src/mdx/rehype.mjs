@@ -2,7 +2,8 @@ import { slugifyWithCounter } from "@sindresorhus/slugify"
 import * as acorn from "acorn"
 import { toString } from "mdast-util-to-string"
 import { mdxAnnotations } from "mdx-annotations"
-import shiki from "shiki"
+import { createHighlighter } from "shiki"
+import { createCssVariablesTheme } from "shiki/core"
 import { visit } from "unist-util-visit"
 
 function rehypeParseCodeBlocks() {
@@ -17,36 +18,46 @@ function rehypeParseCodeBlocks() {
   }
 }
 
-let highlighter
+let highlighterPromise
 
 function rehypeShiki() {
   return async (tree) => {
-    highlighter =
-      highlighter ?? (await shiki.getHighlighter({ theme: "css-variables" }))
+    const highlighter = await (highlighterPromise ??= createHighlighter({
+      themes: [createCssVariablesTheme()],
+      langs: [],
+    }))
+    const blocks = []
 
     visit(tree, "element", (node) => {
       if (node.tagName === "pre" && node.children[0]?.tagName === "code") {
-        let codeNode = node.children[0]
-        let textNode = codeNode.children[0]
-
-        node.properties.code = textNode.value
-
-        if (node.properties.language) {
-          let tokens = highlighter.codeToThemedTokens(
-            textNode.value,
-            node.properties.language
-          )
-
-          textNode.value = shiki.renderToHtml(tokens, {
-            elements: {
-              pre: ({ children }) => children,
-              code: ({ children }) => children,
-              line: ({ children }) => `<span>${children}</span>`,
-            },
-          })
-        }
+        blocks.push(node)
       }
     })
+
+    for (const node of blocks) {
+      const textNode = node.children[0].children[0]
+      const language = node.properties.language
+
+      node.properties.code = textNode.value
+
+      if (language) {
+        if (!["text", "txt", "plaintext"].includes(language)) {
+          await highlighter.loadLanguage(language)
+        }
+
+        textNode.value = highlighter.codeToHtml(textNode.value, {
+          lang: language,
+          theme: "css-variables",
+          transformers: [
+            {
+              root(root) {
+                root.children = this.code.children
+              },
+            },
+          ],
+        })
+      }
+    }
   }
 }
 

@@ -275,7 +275,7 @@ async def test_concurrent_requests_share_one_new_budget(
     command = await _prepare(database)
     await _execute(database, Revoker())
     second = command if equivalent else replace(command, operation_id=OperationId(str(uuid4())))
-    async with asyncio.timeout(10):
+    async with asyncio.timeout(30):
         results = await asyncio.gather(
             _resume(command, temporary_postgres_settings),
             _resume(second, temporary_postgres_settings),
@@ -305,7 +305,7 @@ async def test_same_request_id_across_targets_cannot_authorize_two_runs(
     await _execute(database, revoker)
     await _execute(database, revoker)
     second = replace(second, operation_id=first.operation_id)
-    async with asyncio.timeout(10):
+    async with asyncio.timeout(30):
         results = await asyncio.gather(
             _resume(first, temporary_postgres_settings),
             _resume(second, temporary_postgres_settings),

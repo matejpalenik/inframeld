@@ -10,17 +10,25 @@ assignees: ""
 and .agents/skills/inframeld-testing/references/human-qualification.md.
 Replace these instructions with feature-specific content before publication.
 If a capability or command is unavailable, explain the exact gap and its owner.
-Do not invent runnable instructions or hand an incomplete procedure to a human. -->
+For deferred testing, replace not-yet-ready sections with named outstanding work
+and its owner. Complete them before human handoff. Do not invent runnable
+instructions or hand an incomplete procedure to a human. -->
 
 ## Outcome
 
 Describe what the person should accomplish and why, using a small example. Link the feature issue and relevant implementation PRs. State what this qualification covers and excludes.
 
+## Deferred human work and timing
+
+For automated backlog delivery, identify the human observations deferred to pre-v1 testing. Link available implementation/artifact references and automated evidence. Name the owner and prerequisites for remaining manual setup, artifact selection, procedure preparation and its engineering dry run. Those manual tasks may remain pending when implementation closes under the delivery policy.
+
+Keep this issue open until actual accepted human results exist. An incomplete procedure is not ready for human handoff. Missing product behavior and required automated checks remain with their owning implementation or automated-qualification issues.
+
 ## Prerequisites and starting state
 
 Identify the required capabilities and their owning issues or delivered PRs. Use native GitHub blockers for unresolved implementation prerequisites.
 
-Specify:
+Before human handoff, specify:
 
 - Exact backend, UI and client artifacts to test.
 - Supported platform and browser where relevant.
@@ -39,7 +47,7 @@ If something is unavailable, name the missing capability and engineering owner. 
 - [ ] An engineer followed the complete procedure successfully and recorded the artifacts and result.
 - [ ] Known limitations and required human observations are explicit.
 
-An engineering dry run does not replace human acceptance. Leave unavailable items unchecked and explain their owner. No placeholder procedure is ready.
+An engineering dry run does not replace human acceptance. These readiness items may remain pending during automated implementation delivery. Leave unavailable items unchecked and explain their owner. Complete them before human handoff. No placeholder procedure is ready.
 
 ## Test procedure
 

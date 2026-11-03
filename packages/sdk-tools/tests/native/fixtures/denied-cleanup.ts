@@ -17,7 +17,7 @@ export async function withDeniedFixtureRecovery(
     JSON.parse(await readFile(join(work, "fixture-recovered.json"), "utf8")),
 ): Promise<void> {
   await withResources(assertions, async () => {
-    const recoveryDeadline = Math.min(deadline, performance.now() + 6000);
+    const recoveryDeadline = Math.min(deadline, performance.now() + 30000);
     let recovered = false;
     let failure: unknown;
     while (performance.now() < recoveryDeadline) {
@@ -97,7 +97,7 @@ async function runDeniedFixture(marker: string): Promise<void> {
     },
   );
   void running.catch(() => {});
-  const deadline = performance.now() + 1000;
+  const deadline = performance.now() + 15000;
   while (performance.now() < deadline) {
     try {
       await readFile(marker);

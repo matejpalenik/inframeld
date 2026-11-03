@@ -1,0 +1,72 @@
+export const pageMetadata = {
+  title: "Rust SDK",
+  description: "Use the generated crate from a local source checkout.",
+}
+
+# Rust SDK
+
+Use the generated `inframeld-sdk` crate for public HTTP operations and typed response models. The crate is unpublished in this preview, so use a path dependency to your checkout.
+
+## Set up an example project
+
+Create a Rust project with the toolchain selected by Inframeld's `mise.toml`:
+
+<CodeGroup>
+
+```shell
+cargo new inframeld-example
+cd inframeld-example
+```
+
+</CodeGroup>
+
+Replace the project's `Cargo.toml` with this complete file, using your checkout's absolute path for the SDK dependency:
+
+<CodeGroup>
+
+```toml
+[package]
+name = "inframeld-example"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+inframeld-sdk = { path = "/absolute/path/to/inframeld/packages/sdk-rust" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+serde_json = "1"
+```
+
+</CodeGroup>
+
+## Make a first request
+
+Set `INFRAMELD_URL` to your backend URL. Save this complete file as `src/main.rs`:
+
+<CodeGroup>
+
+```rust
+use inframeld_sdk::HttpClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let client = HttpClient::new().with_base_url(base_url);
+    let response = client.get_health().await?;
+    println!("{}", serde_json::to_string_pretty(&response.body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `cargo run` from the example project. A successful response contains `"status": "ok"`.
+
+## Use protected operations
+
+For a current human token, derive a configured client with `.with_header("Authorization", format!("Bearer {token}"))`. Use the generated method for the operation. [Project metadata](/guides/name-and-rename-project) and [operation lookup](/guides/recover-original-request) show full examples.
+
+## Inspect responses and failures
+
+Success keeps `status`, `headers` and typed `body` together. Some operations return an enum for multiple response shapes. HTTP errors retain available typed problems and raw response context. Transport failures may have no response. A timeout does not authorize another dispatch.
+
+The default client uses bounded requests with redirects and automatic retries disabled. Custom transport settings change those defaults. [Operations and errors](/api-reference/operations) explains safe recovery.

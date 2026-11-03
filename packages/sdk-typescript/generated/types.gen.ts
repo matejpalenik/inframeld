@@ -25,7 +25,7 @@ export type AcceptedOperationLookupResponse = {
     /**
      * Jobreference
      */
-    jobReference: 'unknown';
+    jobReference: UnknownJobReference | KnownJobReferenceResponse;
     /**
      * Operationid
      */
@@ -175,9 +175,58 @@ export type InframeldDiscoveryResponse = {
 };
 
 /**
+ * InitialProjectGrantResponse
+ */
+export type InitialProjectGrantResponse = {
+    /**
+     * Actionid
+     */
+    actionId: 'manage-project-members' | 'create-access-groups' | 'create-application-accounts' | 'create-pipelines' | 'create-deployments' | 'manage-upload-defaults' | 'delete-project' | 'inspect-budget' | 'manage-budget' | 'manage-trace-policy' | 'delete-trace-history' | 'inspect-feedback' | 'create-collections' | 'create-sources' | 'create-model-connections' | 'create-processing-profiles' | 'create-embedding-profiles' | 'edit-project-metadata';
+    /**
+     * Cangrant
+     */
+    canGrant: true;
+    target: ProjectGrantTargetResponse;
+};
+
+/**
  * JobStatus
  */
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'recovery_required';
+
+/**
+ * KnownJobReferenceResponse
+ *
+ * Identify original work without asserting its execution state or result.
+ */
+export type KnownJobReferenceResponse = {
+    /**
+     * Jobid
+     */
+    jobId: string;
+};
+
+/**
+ * MyOrganizationAccessResponse
+ */
+export type MyOrganizationAccessResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Grants
+     */
+    grants: Array<OwnOrganizationGrantResponse>;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+};
 
 /**
  * OAuthConsentDecision
@@ -243,6 +292,20 @@ export type OriginalOperationLookupRequest = {
      * Requestedroute
      */
     requestedRoute: string;
+};
+
+/**
+ * OwnOrganizationGrantResponse
+ */
+export type OwnOrganizationGrantResponse = {
+    /**
+     * Actionid
+     */
+    actionId: 'admit-users' | 'suspend-users' | 'restore-users' | 'create-projects';
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
 };
 
 /**
@@ -314,6 +377,105 @@ export type ProblemDetails = {
      * Primary RFC 9457 problem-type URI.
      */
     type: string;
+};
+
+/**
+ * ProjectCreationRequest
+ */
+export type ProjectCreationRequest = {
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+};
+
+/**
+ * ProjectCreationResponse
+ *
+ * Report original creation assignments, not a present permission snapshot.
+ */
+export type ProjectCreationResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: 1;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Initialgrants
+     */
+    initialGrants: [
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse,
+        InitialProjectGrantResponse
+    ];
+    /**
+     * Metadatarevision
+     */
+    metadataRevision: 0;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * ProjectGrantTargetResponse
+ */
+export type ProjectGrantTargetResponse = {
+    /**
+     * Kind
+     */
+    kind: 'project';
+    /**
+     * Projectid
+     */
+    projectId: string;
 };
 
 /**
@@ -605,6 +767,13 @@ export type RetainedDeletionStatusResponse = {
 };
 
 /**
+ * UnknownJobReference
+ *
+ * Keep the absence of a known job correlation closed on every generated client.
+ */
+export type UnknownJobReference = 'unknown';
+
+/**
  * UnresolvedDeletionStatusResponse
  *
  * Report no authoritative permitted observation without echoing hidden history.
@@ -837,6 +1006,47 @@ export type GetDeletionStatusResponses = {
 
 export type GetDeletionStatusResponse = GetDeletionStatusResponses[keyof GetDeletionStatusResponses];
 
+export type GetMyOrganizationAccessData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/my-organization-access';
+};
+
+export type GetMyOrganizationAccessErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetMyOrganizationAccessError = GetMyOrganizationAccessErrors[keyof GetMyOrganizationAccessErrors];
+
+export type GetMyOrganizationAccessResponses = {
+    /**
+     * Successful Response
+     */
+    200: MyOrganizationAccessResponse;
+};
+
+export type GetMyOrganizationAccessResponse = GetMyOrganizationAccessResponses[keyof GetMyOrganizationAccessResponses];
+
 export type InspectHumanOAuthConsentData = {
     body?: never;
     path?: never;
@@ -984,6 +1194,69 @@ export type LookupOriginalOperationResponses = {
 };
 
 export type LookupOriginalOperationResponse = LookupOriginalOperationResponses[keyof LookupOriginalOperationResponses];
+
+export type CreateProjectData = {
+    body: ProjectCreationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/projects';
+};
+
+export type CreateProjectErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type CreateProjectError = CreateProjectErrors[keyof CreateProjectErrors];
+
+export type CreateProjectResponses = {
+    /**
+     * Successful Response
+     */
+    201: ProjectCreationResponse;
+};
+
+export type CreateProjectResponse = CreateProjectResponses[keyof CreateProjectResponses];
 
 export type ResolveProjectNameData = {
     body?: never;

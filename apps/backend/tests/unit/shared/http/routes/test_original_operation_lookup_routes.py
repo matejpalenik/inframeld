@@ -26,8 +26,8 @@ from inframeld_backend.access.http.dependencies.csrf_protection_dependency impor
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
-from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
-    AcceptedAsyncOperationDTO,
+from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto import (
+    AcceptedOperationLookupDTO,
 )
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
@@ -53,6 +53,7 @@ from inframeld_backend.shared.application.protocols.original_operation_lookup im
 from inframeld_backend.shared.application.queries.lookup_original_operation_query import (
     LookupOriginalOperationQuery,
 )
+from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
 from inframeld_backend.shared.http.middleware.request_context_middleware import (
@@ -91,7 +92,7 @@ class MockOriginalLookup(OriginalOperationLookup):
     def __init__(self) -> None:
         self.result: (
             CompletedSynchronousOperationDTO
-            | AcceptedAsyncOperationDTO
+            | AcceptedOperationLookupDTO
             | InProgressOperationDTO
             | RecoveryRequiredOperationDTO
             | UnresolvedOperationDTO
@@ -104,7 +105,7 @@ class MockOriginalLookup(OriginalOperationLookup):
         self, *, access: AccessContextDTO, query: LookupOriginalOperationQuery
     ) -> (
         CompletedSynchronousOperationDTO
-        | AcceptedAsyncOperationDTO
+        | AcceptedOperationLookupDTO
         | InProgressOperationDTO
         | RecoveryRequiredOperationDTO
         | UnresolvedOperationDTO
@@ -148,14 +149,14 @@ def client_for(service: MockOriginalLookup) -> TestClient:
             ),
             "completed_synchronous",
         ),
-        (AcceptedAsyncOperationDTO(OPERATION, False, None), "accepted_asynchronous"),
+        (AcceptedOperationLookupDTO(OPERATION, None), "accepted_asynchronous"),
         (InProgressOperationDTO(OPERATION), "in_progress"),
         (RecoveryRequiredOperationDTO(OPERATION), "recovery_required"),
     ],
 )
 def test_permitted_alternatives_preserve_original_identity(
     result: CompletedSynchronousOperationDTO
-    | AcceptedAsyncOperationDTO
+    | AcceptedOperationLookupDTO
     | InProgressOperationDTO
     | RecoveryRequiredOperationDTO
     | UnresolvedOperationDTO,
@@ -179,6 +180,30 @@ def test_permitted_alternatives_preserve_original_identity(
         assert response.json() == {"outcome": "unresolved"}
     else:
         assert response.json()["operationId"] == OPERATION.value
+
+
+def test_known_reference_is_bounded_readback_with_no_dispatch_or_job_details() -> None:
+    service = MockOriginalLookup()
+    job_id = JobId(UUID(int=8))
+    service.result = AcceptedOperationLookupDTO(OPERATION, None, job_id)
+    body = BODY | {
+        "requestedRoute": "/v1/original-project-operation",
+        "expectedAuthority": {"family": "project_action_use", "actionId": "create-access-groups"},
+    }
+    with client_for(service) as client:
+        response = client.post("/v1/operations/lookup", json=body, headers=HEADERS)
+    assert response.status_code == 200
+    assert response.json() == {
+        "outcome": "accepted_asynchronous",
+        "operationId": OPERATION.value,
+        "admission": "confirmed",
+        "jobReference": {"jobId": str(job_id.value)},
+        "dispatch": "not_established",
+        "idempotencyExpiresAt": None,
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert "location" not in response.headers
+    assert len(service.queries) == 1
 
 
 @pytest.mark.parametrize(

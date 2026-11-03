@@ -10,6 +10,21 @@ A human-facing feature changes a supported product user, operator or API/SDK dev
 
 Every human-facing feature in an active or new delivery has one linked qualification issue. Reuse an open issue for the same delivery rather than one per PR or retry. If a previous accepted delivery's issue is closed and a relevant new feature change needs qualification, create a focused follow-up preserving the prior results. Do not cite an older pass as acceptance of changed artifacts. This rule does not automatically reopen closed issues or authorize a bulk historical backfill. Automated tests remain responsible for meaningful product, contract and integration coverage.
 
+## Defer human work during automated delivery
+
+Automated backlog delivery prefers scheduling human testing before v1 release under [Delivery's closure policy](../../inframeld-backlog-delivery/references/gates-and-recovery.md#separate-implementation-and-human-acceptance). Manual walkthrough preparation and its engineering dry run may also remain pending. They are requirements for later human handoff, not implementation closure. An explicit request for earlier human acceptance still applies.
+
+Before implementation closure, create or reuse the feature's published linked qualification issue. Its deferred record identifies:
+
+- The feature and implementation PRs, available artifact references and automated evidence.
+- The human outcomes and important alternatives still to observe, with pre-v1 testing timing.
+- Missing manual setup, procedure, artifact selection or dry-run work, with responsible owners and concrete prerequisites.
+- Its current preparation and execution limits, leaving unperformed readiness items unchecked and human cases Not run.
+
+A deferred issue can describe these gaps without runnable commands. Replace template instructions with concrete known facts and named outstanding work, rather than guessed invocations or unexplained placeholders. Complete the procedure below before assigning it to a person. Reuse one issue across the feature's PRs and link shared setup instead of creating a manual test per component.
+
+Track missing product implementation in its owning implementation issue. The human ticket may depend on that capability, but its creation does not complete it or replace required automated qualification. Delivery owns which issue may close and when the automated engineering Goal is complete. This reference owns later human readiness and results.
+
 ## Prepare the procedure before asking a human
 
 Open the qualification issue during feature planning when publication is authorized. At that point it can explain missing prerequisites and engineering work without pretending the procedure is ready. Replace template instructions before publishing. Use a concrete statement such as "The supported proof-handoff command is unavailable until the acquisition capability in #160 is delivered" instead of an unexplained placeholder or guessed command. Native blockers remain authoritative for unresolved implementation dependencies.
@@ -26,13 +41,13 @@ The worker or an assigned engineer follows the entire procedure under the task's
 
 Add the cancellation, rejection and recovery paths that change a person's next decision. Give each distinct workflow its own case and initial state. Avoid a large unexplained list such as "verify replay, fencing and scope." Explain what the tester does, what they should observe and what must remain unchanged.
 
-Distinguish existing automated evidence from the observations assigned to the human. Keep required security and data-integrity checks enforced. Do not silently replace an already required manual case with a test-suite link. If the acceptance allocation should change, resolve it through the existing scope/decision process. A failed security check, unresolved cleanup or missing implementation is not deferrable merely by labelling it human testing.
+Distinguish existing automated evidence from the observations assigned to the human. Keep required security and data-integrity checks enforced. Deferring a manual case retains it for later human execution, rather than replacing it with a test-suite link. Changes beyond Delivery's standing human-testing deferral follow the existing scope/decision process. A failed security check, unresolved cleanup or missing implementation is not deferrable merely by labelling it human testing.
 
 Human acceptance checks the supported experience as well as the outcome. Ask whether account/installation choices are clear, instructions are sufficient, errors give a useful next step and cancellation leaves understandable state. It complements automated coverage rather than repeating every unit case manually or proving all possible behavior correct.
 
 ## Worked example: the #120/#298 boundary
 
-In the [#120](https://github.com/matejpalenik/inframeld/issues/120) and [#298](https://github.com/matejpalenik/inframeld/issues/298) situation, the Project metadata repair consumer and the supported human proof-acquisition journey were different capabilities. The maintainer explicitly deferred the complete operator journey while retaining the backend's authorization, provider, persistence, replay and generated-client requirements. That decision is not a general permission to defer other features.
+In the [#120](https://github.com/matejpalenik/inframeld/issues/120) and [#298](https://github.com/matejpalenik/inframeld/issues/298) situation, the Project metadata repair consumer and the supported human proof-acquisition journey were different capabilities. The maintainer explicitly deferred the complete operator journey while retaining the backend's authorization, provider, persistence, replay and generated-client requirements. That historical decision preserves its own scope. The current standing human-testing deferral comes from Delivery's closure policy, not an inference that missing product capabilities are complete.
 
 Assume a similar consumer is delivered but its proof producer is not. The qualification issue explains the dependency and remains with engineering. It does not tell a person to obtain a token by unspecified means or invent a login command. A meaningful main case has these observations:
 

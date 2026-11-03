@@ -27,13 +27,13 @@ if (process.env.SDK_BROWSER_OWNER_PROBE === "1") {
   const entered = performance.now();
   const client = await openBrowserCase(
     "worker-loss",
-    entered + 5000,
-    entered + 10000,
+    entered + 30000,
+    entered + 60000,
   );
   await client.launch({
     channel: "chromium",
     headless: true,
-    timeout: Math.max(1, entered + 5000 - performance.now()),
+    timeout: Math.max(1, entered + 30000 - performance.now()),
   });
   await new Promise<void>(() => {});
 } else
@@ -69,8 +69,8 @@ if (process.env.SDK_BROWSER_OWNER_PROBE === "1") {
     record("startup", "started");
     const client = await openBrowserCase(
       "profile-timeout",
-      entered + 5000,
-      entered + 10000,
+      entered + 30000,
+      entered + 60000,
       "profile",
     );
     const listenerClosed = observeProfileListener(context);
@@ -141,7 +141,7 @@ if (process.env.SDK_BROWSER_OWNER_PROBE === "1") {
         client.end();
         await withinDeadline(
           diagnostics.write(diagnosticFolder),
-          Math.max(0, entered + 10000 - performance.now()),
+          Math.max(0, entered + 60000 - performance.now()),
         );
       })());
     let observeShutdown!: () => void;

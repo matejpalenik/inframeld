@@ -1,0 +1,143 @@
+export const pageMetadata = {
+  title: "Give a Project member permission to create access groups",
+  description:
+    "Assign the delivered use-only action with a reviewed Access revision.",
+}
+
+# Give a Project member permission to create access groups
+
+Alice wants Bob to create access groups in Support. The delivered grant operation can give him use-only `create-access-groups` permission on that Project. It preserves Alice's original operation identity if the response is lost.
+
+## Prepare the exact change
+
+You need the installation URL, a current human bearer credential, the permanent Project ID, Bob's principal UUID and the reviewed Project Access revision. Alice needs current Project membership, visibility and use-and-grant authority for `create-access-groups`. Bob must be eligible for the assignment. An ID supplies no permission.
+
+Get those existing identifiers and the current Access revision through your installation's supported administration procedure. This preview has no general member-directory or Access-revision inspection command. The metadata revision returned by Project metadata is a different value.
+
+Use [HTTP setup](/clients/http) or the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) setup. In your example project, set `INFRAMELD_URL`, `INFRAMELD_TOKEN`, `PROJECT_ID` and `PROJECT_GRANT_KEY` through your normal local configuration. The key is an original, nonblank request key of at most 128 characters. Keep it with the request before dispatch.
+
+Save this complete file as `grant.json`. Replace the example recipient and revision with the reviewed values:
+
+<CodeGroup>
+
+```json
+{
+  "recipientPrincipalId": "00000000-0000-4000-8000-000000000004",
+  "actionId": "create-access-groups",
+  "expectedAccessRevision": 0
+}
+```
+
+</CodeGroup>
+
+## Assign the permission
+
+Choose one alternative. Every example sends the same saved request and key. The Python, TypeScript and Rust blocks are complete programs, saved as `grant.py`, `grant.ts` and `src/main.rs` respectively. Run them using the corresponding client setup page.
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --fail-with-body --silent --show-error --max-time 5 \
+  --request POST \
+  --header @- \
+  --header "Idempotency-Key: $PROJECT_GRANT_KEY" \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @grant.json \
+  "$INFRAMELD_URL/v1/projects/$PROJECT_ID/grants" <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+```python
+import asyncio
+import os
+from pathlib import Path
+from uuid import UUID
+
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest
+
+
+async def main() -> None:
+    request = ProjectUseOnlyGrantRequest.model_validate_json(Path("grant.json").read_text())
+    async with ApiClient(Configuration(host=os.environ["INFRAMELD_URL"])) as client:
+        response = await AccessApi(client).assign_project_use_only_grant_with_http_info(
+            project_id=UUID(os.environ["PROJECT_ID"]),
+            idempotency_key=os.environ["PROJECT_GRANT_KEY"],
+            project_use_only_grant_request=request,
+            _headers={"Authorization": "Bearer " + os.environ["INFRAMELD_TOKEN"]},
+            _request_timeout=5.0,
+        )
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import { readFile } from "node:fs/promises"
+import {
+  assignProjectUseOnlyGrant,
+  createClient,
+  type ProjectUseOnlyGrantRequest,
+} from "@inframeld/sdk"
+
+const { INFRAMELD_URL, INFRAMELD_TOKEN, PROJECT_ID, PROJECT_GRANT_KEY } =
+  process.env
+if (!INFRAMELD_URL || !INFRAMELD_TOKEN || !PROJECT_ID || !PROJECT_GRANT_KEY) {
+  throw new Error(
+    "Set the installation, token, Project and original request key"
+  )
+}
+const body: ProjectUseOnlyGrantRequest = JSON.parse(
+  await readFile("grant.json", "utf8")
+)
+const result = await assignProjectUseOnlyGrant({
+  client: createClient({ baseUrl: INFRAMELD_URL, timeoutMs: 5000 }),
+  path: { project_id: PROJECT_ID },
+  headers: {
+    Authorization: `Bearer ${INFRAMELD_TOKEN}`,
+    "Idempotency-Key": PROJECT_GRANT_KEY,
+  },
+  body,
+})
+if (result.error)
+  throw new Error(
+    "Grant did not produce a usable result. Keep the original request."
+  )
+console.log(JSON.stringify(result.data, null, 2))
+```
+
+```rust
+use inframeld_sdk::{HttpClient, ProjectUseOnlyGrantRequest};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let project_id = std::env::var("PROJECT_ID")?;
+    let key = std::env::var("PROJECT_GRANT_KEY")?;
+    let request: ProjectUseOnlyGrantRequest = serde_json::from_str(&std::fs::read_to_string("grant.json")?)?;
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+    let response = client.assign_project_use_only_grant(project_id, key, request).await?;
+    println!("{}", serde_json::to_string_pretty(&response.body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+A completed result identifies the retained operation, recipient, action and committed Access revision. Use the [native operation and model](/api-reference/projects-and-access#assign-a-use-only-grant) for exact fields. This action permits use of `create-access-groups`. It does not let Bob grant the permission onward.
+
+## Handle a stale revision or lost result
+
+A new request with a stale Access revision is rejected. Review current state and the intended change before deciding on another request. An identical original request can recover its retained result under current authority, without applying a second grant.
+
+For a timeout or unusable response, keep `grant.json`, the original key, installation and scope. Use [original-request lookup](/guides/recover-original-request), whose grant example uses the same canonical route and `project_grant_read` authority guard. An unresolved lookup does not establish failure and is not permission to generate a fresh key and repeat the change.
+
+This walkthrough creates a real permission assignment. General grant removal is outside this delivered endpoint. Use a designated test Project or your operator's supported access-management procedure before running it as an experiment.

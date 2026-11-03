@@ -2,7 +2,7 @@
 
 Alice already has a Kratos identity. Bob invites her into Inframeld, and she accepts while password recovery begins. Access must give account creation and recovery a common turn before a local account exists. Otherwise each could act on a picture taken before the other's change.
 
-> **Status:** accepted design under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md), resolving [PD-ACCESS-04](decision-recovery-first-admission.md). The shared coordinator is implemented for recovery admission, recovery completion and credential-state initialization. First-admission and invitation-activation integration remain work for #27/#119. Existing organization/project coordination remains implemented at its recorded scope.
+> **Status:** accepted design under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md), resolving [PD-ACCESS-04](decision-recovery-first-admission.md). The shared coordinator is implemented for recovery admission, recovery completion, credential-state initialization and the private first-administrator bootstrap consumer. Other first-admission and invitation-activation integration remain unfinished for #27/#119. Existing organization/project coordination remains implemented at its recorded scope.
 
 ## One turn for the verified identity
 
@@ -12,7 +12,8 @@ All participants must derive the same stable namespaced lock key across API and 
 
 | Participant | Local change protected by the identity turn |
 | --- | --- |
-| First admission, including invitation activation/provisioning | Recheck recovery, link the legitimate principal and commit the guarded local result. |
+| Other first admission, including invitation activation/provisioning | Recheck recovery, link the legitimate principal and commit the guarded local result. |
+| First-administrator bootstrap | After raw provider verification, take the identity turn, existing installation singleton and any existing Organization coordination, then reread current eligibility and pristine/claim facts. |
 | Recovery admission | Find any current local link and commit the original obligation, block and one credential-version advancement together. |
 | Recovery completion | Read the current optional local account and original obligation before applying release eligibility. |
 | Credential-state initialization | Create missing state only when permitted, without resetting existing state, creating an account or granting access. |
@@ -53,6 +54,8 @@ The key uses a versioned namespace and a canonical installation/authority/subjec
 
 Recovery completion first reads the original admission's subject only to select its lock. It then takes the identity and organization turns and reads fresh release facts, rejecting a changed original binding. Initialization reads installation metadata to select its turn, then rereads security state before any version write. Recovery admission takes its identity turn before resolving the current local link.
 
+The [bootstrap consumer](host-maintenance.md#first-administrator-bootstrap-consumer) now integrates the first-admission turn for its narrow pristine-installation claim. Raw Hydra proof and current Kratos identity are verified before any database check. A preliminary installation read validates the binding, then the identity turn precedes the installation singleton lock and any existing Organization lock. Fresh statements reread principal/link, generation/history, recovery and claim/business facts after waiting. Its five-second database stage does not receive new budgets for individual locks. Replay still checks current same-person eligibility and returns only the original receipt.
+
 Future first-admission adapters must call this same coordinator before organization/project locks or writes, then check recovery in a later statement. The controlled link-creation tests exercise this boundary. They do not implement invitation consumption, activation replay or its HTTP conflict response.
 
 ## Conflicts, retries and competing changes
@@ -69,11 +72,11 @@ Future first-admission adapters must call this same coordinator before organizat
 
 Include identity-lock waits in the existing bounded database stage rather than giving every lock a fresh budget. Existing recovery adapter deadlines remain five seconds and keep their current scope. They do not cover provider cleanup or final commit. Cancellation and failures propagate to the transaction owner. Uncertain commit communication still requires original-operation recovery.
 
-Ordinary authentication reads do not acquire this lock, and existing project-grant writes continue using their organization/project protocol. First admission must still check the invitation issuer's current authority, exact assignments and recipient eligibility. The lock supplies none of those permissions.
+Ordinary authentication reads do not acquire this lock, and existing project-grant writes continue using their organization/project protocol. Invitation-based first admission must still check the invitation issuer's current authority, exact assignments and recipient eligibility. The lock supplies none of those permissions.
 
 ## Implementation boundary and sources
 
-Recovery admission and completion now take identity coordination before their existing organization locks. The independent initializer uses the same identity turn and retains its history checks and database constraints. [Coordinator tests](../../../../apps/backend/tests/integration/access/test_identity_coordination_postgres.py) cover actual waits, fresh observations, initialization in both orders, rollback, cancellation and bounded failure. Complete invitation activation and its simultaneous-first-activation scenarios remain deferred to #27/#119.
+Recovery admission and completion now take identity coordination before their existing organization locks. The independent initializer uses the same identity turn and retains its history checks and database constraints. [Coordinator tests](../../../../apps/backend/tests/integration/access/test_identity_coordination_postgres.py) cover actual waits, fresh observations, initialization in both orders, rollback, cancellation and bounded failure. The bootstrap PostgreSQL/provider/installed-command/migration cases are authored but unrun locally and remain mandatory CI qualification. Complete invitation activation and its simultaneous-first-activation scenarios remain unfinished under #119. The broader #27 first-setup journey is not delivered by this private consumer.
 
 - [Invitation workflow](admission-and-invitations.md#invitations), [invitation transport rules](invitation-contracts.md) and [existing Access write coordination](grant-administration.md#how-the-database-gives-each-change-its-turn).
 - [Credential and recovery records](credential-and-recovery-records.md), [local completion](recovery-completion.md#recovery-completion-workflow) and [remaining production-evidence questions](decision-recovery-production-completion.md).

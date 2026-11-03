@@ -3,20 +3,6 @@
 import * as z from 'zod';
 
 /**
- * AcceptedOperationLookupResponse
- *
- * Confirm retained admission while making unknown dispatch and references explicit.
- */
-export const zAcceptedOperationLookupResponse = z.object({
-    admission: z.literal('confirmed'),
-    dispatch: z.literal('not_established'),
-    idempotencyExpiresAt: z.iso.datetime().nullable(),
-    jobReference: z.literal('unknown'),
-    operationId: z.string(),
-    outcome: z.literal('accepted_asynchronous')
-});
-
-/**
  * CompletedOperationLookupResponse
  *
  * Expose safe synchronous outcome metadata without replaying content.
@@ -102,6 +88,15 @@ export const zJobStatus = z.enum([
 ]);
 
 /**
+ * KnownJobReferenceResponse
+ *
+ * Identify original work without asserting its execution state or result.
+ */
+export const zKnownJobReferenceResponse = z.object({
+    jobId: z.uuid()
+});
+
+/**
  * OAuthConsentDecision
  */
 export const zOAuthConsentDecision = z.enum(['allow', 'deny']);
@@ -151,6 +146,111 @@ export const zOriginalOperationLookupRequest = z.object({
     organizationId: z.uuid(),
     projectId: z.uuid().nullable(),
     requestedRoute: z.string().min(1)
+});
+
+/**
+ * OwnOrganizationGrantResponse
+ */
+export const zOwnOrganizationGrantResponse = z.object({
+    actionId: z.enum([
+        'admit-users',
+        'suspend-users',
+        'restore-users',
+        'create-projects'
+    ]),
+    canGrant: z.boolean()
+});
+
+/**
+ * MyOrganizationAccessResponse
+ */
+export const zMyOrganizationAccessResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9223372036854776000),
+    grants: z.array(zOwnOrganizationGrantResponse).max(4),
+    organizationId: z.uuid(),
+    principalId: z.uuid()
+});
+
+/**
+ * ProjectCreationRequest
+ */
+export const zProjectCreationRequest = z.object({
+    displayName: z.string().min(1).max(128),
+    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000),
+    name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/),
+    organizationId: z.uuid()
+});
+
+/**
+ * ProjectGrantTargetResponse
+ */
+export const zProjectGrantTargetResponse = z.object({
+    kind: z.literal('project'),
+    projectId: z.uuid()
+});
+
+/**
+ * InitialProjectGrantResponse
+ */
+export const zInitialProjectGrantResponse = z.object({
+    actionId: z.enum([
+        'manage-project-members',
+        'create-access-groups',
+        'create-application-accounts',
+        'create-pipelines',
+        'create-deployments',
+        'manage-upload-defaults',
+        'delete-project',
+        'inspect-budget',
+        'manage-budget',
+        'manage-trace-policy',
+        'delete-trace-history',
+        'inspect-feedback',
+        'create-collections',
+        'create-sources',
+        'create-model-connections',
+        'create-processing-profiles',
+        'create-embedding-profiles',
+        'edit-project-metadata'
+    ]),
+    canGrant: z.literal(true),
+    target: zProjectGrantTargetResponse
+});
+
+/**
+ * ProjectCreationResponse
+ *
+ * Report original creation assignments, not a present permission snapshot.
+ */
+export const zProjectCreationResponse = z.object({
+    accessRevision: z.literal(1),
+    displayName: z.string(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    initialGrants: z.tuple([
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse,
+        zInitialProjectGrantResponse
+    ]),
+    metadataRevision: z.literal(0),
+    name: z.string(),
+    operationId: z.string(),
+    organizationId: z.uuid(),
+    projectId: z.uuid()
 });
 
 /**
@@ -261,6 +361,30 @@ export const zRetainedDeletionStatusResponse = z.object({
     outcome: z.literal('retained'),
     physicalCleanupComplete: z.boolean().nullable(),
     retentionExpiresAt: z.iso.datetime().nullable()
+});
+
+/**
+ * UnknownJobReference
+ *
+ * Keep the absence of a known job correlation closed on every generated client.
+ */
+export const zUnknownJobReference = z.enum(['unknown']);
+
+/**
+ * AcceptedOperationLookupResponse
+ *
+ * Confirm retained admission while making unknown dispatch and references explicit.
+ */
+export const zAcceptedOperationLookupResponse = z.object({
+    admission: z.literal('confirmed'),
+    dispatch: z.literal('not_established'),
+    idempotencyExpiresAt: z.iso.datetime().nullable(),
+    jobReference: z.union([
+        zUnknownJobReference,
+        zKnownJobReferenceResponse
+    ]),
+    operationId: z.string(),
+    outcome: z.literal('accepted_asynchronous')
 });
 
 /**
@@ -480,6 +604,41 @@ export const zGetDeletionStatus503Representation0Response = zProblemDetails;
  */
 export const zGetDeletionStatusResponse = zDeletionStatusResponse;
 
+/**
+ * Successful Response
+ */
+export const zGetMyOrganizationAccess200Representation0Response = zMyOrganizationAccessResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetMyOrganizationAccess400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetMyOrganizationAccess401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetMyOrganizationAccess403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zGetMyOrganizationAccess404Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetMyOrganizationAccess503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetMyOrganizationAccessResponse = zMyOrganizationAccessResponse;
+
 export const zInspectHumanOAuthConsentQuery = z.object({
     consent_challenge: z.string().min(1)
 });
@@ -617,6 +776,67 @@ export const zLookupOriginalOperation503Representation0Response = zProblemDetail
  * Successful Response
  */
 export const zLookupOriginalOperationResponse = zOperationLookupResponse;
+
+export const zCreateProjectBody = zProjectCreationRequest;
+
+export const zCreateProjectHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+/**
+ * Successful Response
+ */
+export const zCreateProject201Representation0Response = zProjectCreationResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zCreateProject400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zCreateProject401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zCreateProject403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zCreateProject404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zCreateProject409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zCreateProject413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zCreateProject415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zCreateProject422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zCreateProject503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zCreateProjectResponse = zProjectCreationResponse;
 
 export const zResolveProjectNamePath = z.object({
     name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/)

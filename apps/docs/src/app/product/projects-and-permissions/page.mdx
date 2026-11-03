@@ -1,0 +1,24 @@
+export const pageMetadata = {
+  title: "Projects, people and permissions",
+  description: "Understand Project identity, membership and scoped authority.",
+}
+
+# Projects, people and permissions
+
+A Project groups related resources and access decisions. For example, the Support Project can hold a team's handbook and Pipelines while another Project remains private to its owner.
+
+## Identity and names
+
+The Project ID is permanent. Its name is an exact selector, such as `support`. Its display name is the label people see, such as **Customer Support**. Renaming a Project preserves its ID.
+
+## Membership and permission
+
+Authentication identifies a person. Admission permits product use. Project membership and specific action grants control what that person can inspect or change. Installation administration supplies no general document-reading bypass.
+
+Changing permissions can affect the information returned by a later read. Historical records do not restore removed authority.
+
+<a id="work-with-an-existing-project" />
+
+## Work with Projects
+
+Use the HTTP API or a generated SDK to [create an additional Project](/guides/create-project) with creator membership and eighteen explicit, removable permissions on that Project. The API can also [read and change metadata](/guides/name-and-rename-project), resolve an exact name, and assign the supported use-only grant. See [Projects and access](/api-reference/projects-and-access) for the delivered contracts. Private-starter provisioning remains unfinished. The complete supported account-to-API procedure and human acceptance remain unfinished under [qualification #313](https://github.com/matejpalenik/inframeld/issues/313).
