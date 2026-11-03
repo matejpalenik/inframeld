@@ -10,7 +10,7 @@ The shared capability and example entry points are implemented. Controlled check
 - Independently verify the managed installation, exact public HTTPS API and issuer, official `inframeld-cli` registration and intended Kratos identity. Preserve the issuer's spelling and trailing slash. Discovery is a comparison against these trusted facts, not authority to choose them.
 - Keep Hydra administration private and trusted. The honest server must not register another issuer's callback or permit attacker-controlled registration or alternative approval. Provisioning alone cannot certify these deployment conditions.
 - Alice must already be an active admitted human and a member of the Project. Review the exact Project UUID and its current **Access revision**, which is different from `metadataRevision`.
-- Run compatible backend code at schema `0015_artifact_allocation`, with its original installation identity and database/provider/fingerprint-key configuration. Schema `0014_project_metadata` introduced the repair consumer. Follow the [consumer runbook](../operations/project-metadata-repair.md) for server setup and authority checks.
+- Run compatible backend code using the [consumer runbook's backend setup and authority checks](../operations/project-metadata-repair.md#establish-the-authority-and-reviewed-state), with its original installation identity and database/provider/fingerprint-key configuration. Migration `0014_project_metadata` introduced the repair consumer.
 - Have independently trusted host/container-exec authority for that backend. Browser consent or a target label cannot supply it.
 
 ## Prepare three proof-free files
