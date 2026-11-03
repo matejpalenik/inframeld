@@ -26,7 +26,7 @@ Choose focused regression checks first, then applicable integration and final CI
 
 Request shared integration access with the worktree, frozen revision, maintained command and resources. The coordinator may designate you as executor. Once granted, run that operation and its documented cleanup without requesting permission for each internal step. Freeze the tested source until completion and cleanup are reconciled. Never infer a free stack from silence or elapsed time. Private worktree outputs need no shared-resource grant unless another task actually uses them.
 
-Classify failures before changing unrelated code. Follow the [bounded remediation policy](gates-and-recovery.md#classify-failures-and-bound-remediation). Never repair the host or Podman machine. Request only the coordinator's permitted recovery under the [host boundary](gates-and-recovery.md#keep-delivery-out-of-host-repair).
+Classify failures before changing unrelated code. Follow the [progress-based remediation policy](gates-and-recovery.md#classify-failures-and-bound-remediation). Continue routine scoped source, test, setup and CI corrections within its allowance. Request the independent reassessment and shared-resource grants from the coordinator, rather than asking the human after each failure. Preserve original deadlines and confirmed cleanup between bounded runs. Never repair the host or Podman machine. Request only the coordinator's permitted recovery under the [host boundary](gates-and-recovery.md#keep-delivery-out-of-host-repair).
 
 ## Keep documentation and review proportional
 
