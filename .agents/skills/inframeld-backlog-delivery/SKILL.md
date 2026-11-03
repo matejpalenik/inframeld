@@ -5,7 +5,7 @@ description: Coordinate an authorized Inframeld backlog through native workers, 
 
 # Deliver useful changes through a bounded backlog
 
-Alice has a CLI output change ready for review while browser login waits for a prerequisite. The coordinator finishes the independent PR and schedules the shared integration stack for one executor at a time. A busy worker pool is not the outcome. Useful, reviewed capabilities reaching main are the outcome.
+Alice has a CLI output change ready for review while browser login waits for a prerequisite. The coordinator finishes the independent PR and schedules the shared integration stack for one executor at a time. Prefer useful, reviewed capabilities that complete issue acceptance within the focused epic. Agent occupancy and PR counts do not establish completion.
 
 This skill owns Inframeld's common delivery policy and the native main-chat workflow. The personal `inframeld-delivery` adapter uses the common references with its explicit separate-chat mode. Loading either skill grants no implementation, messaging, Goal or GitHub authority. Preserve the actual launch's finite scope, sandbox, paid-call restrictions, production boundaries and merge policy.
 
@@ -26,11 +26,11 @@ The native main chat holds the one explicitly requested Goal. Workers and specia
 
 ## Keep the assignment small and the worker autonomous
 
-Assign the smallest coherent useful capability with acceptance examples, exclusions, owned paths/contracts, real dependencies and maintained verification commands. It may complete an issue or form an explicitly reviewed supporting PR. Never claim partial work completes the larger feature.
+Prefer completing existing implementation issues within a focused epic, following developer priorities and verified dependencies. Preserve useful supporting PRs and independent parallel work under [coordinator scheduling](references/coordinator.md#prefer-epic-completion-without-serializing-the-backlog). Assign a small coherent capability with acceptance examples, exclusions, owned paths/contracts, real dependencies and maintained verification commands. Never claim partial implementation completes the larger feature.
 
 Before assignment, [check the concrete prerequisites](references/coordinator.md#check-prerequisites-before-assignment) for behavior, verification and the human journey against delivered capabilities. Finish a missing prerequisite first or choose independent work. Only an explicitly accepted component boundary may proceed without a capability that the complete journey needs.
 
-Every human-facing feature needs one linked human-qualification issue under actual publication authority. Reuse the same feature's issue across its PRs. Plan it early, then complete and dry-run its real procedure before human handoff. A tracking issue neither delivers missing implementation nor establishes human acceptance. [Testing](../inframeld-testing/references/human-qualification.md) owns the procedure and template.
+Every human-facing feature needs one linked human-qualification issue under actual publication authority. Reuse it across the feature's PRs. During automated backlog delivery, prefer deferring human testing, manual procedure preparation and its dry run to pre-v1 qualification under the [closure policy](references/gates-and-recovery.md#separate-implementation-and-human-acceptance). Publish the tracking issue before implementation closure. Complete the supported procedure before human handoff. [Testing](../inframeld-testing/references/human-qualification.md) owns its contents and execution evidence.
 
 The coordinator clears ownership once. Workers then make routine scoped edits, write behavioral tests and run isolated checks without per-command acknowledgments. Independently review plans for material architecture, security, public-contract, persistence or shared-harness changes. Every delivered implementation still receives independent review. Resolve triggered human decisions before dependent work.
 
