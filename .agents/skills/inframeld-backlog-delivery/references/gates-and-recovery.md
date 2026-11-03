@@ -18,7 +18,7 @@ P0 stops delivery and P1 must be fixed. Required P2 work blocks merge unless the
 
 Bind each accepted risk to its originating review role, exact review reference and finding ID as well as the revision. Reviewers can reuse short finding IDs, so one acceptance cannot waive another reviewer's concern. Finding IDs must be unique within a single review receipt.
 
-Revalidate current issue acceptance before merge. A changed issue body, updated blocker or material acceptance change invalidates the affected readiness claim. A foundation can close its own scoped issue when acceptance is met. It cannot close a complete feature issue merely because another issue might later connect it to an executable journey.
+Revalidate current issue acceptance before merge. A changed issue body, updated blocker or material acceptance change invalidates the affected readiness claim. A foundation can close its own scoped issue when acceptance is met. A complete feature needs its promised implementation, with only human-testing work eligible for the tracked deferral below.
 
 ### Separate implementation and human acceptance
 
@@ -27,12 +27,19 @@ For a human-facing feature, confirm the linked qualification issue exists and co
 | Conclusion | Required evidence |
 | --- | --- |
 | Implementation accepted | The agreed implementation boundary, current independent reviews and required automated checks are satisfied |
+| Human testing deferred | A published, linked qualification issue records the remaining human observations, preparation gaps, owners and pre-v1 testing timing |
 | Ready for human qualification | Required capabilities exist in the selected artifacts and the complete supported procedure has an observed successful engineering dry run |
 | Human accepted | A person performed the required cases and recorded accepted results against identified artifacts |
 
-A code PR can merge when its own accepted boundary and actual gates are satisfied. A promised complete journey still depends on its real producers and interfaces. Creating a qualification issue does not deliver those prerequisites, waive a finding or supply an acceptance deferral. A feature issue whose acceptance includes the complete experience stays open until the required acceptance exists, unless the human explicitly accepts a narrower boundary or deferral. Preserve already recorded decisions without requesting them again. A properly scoped foundation issue may close while the broader journey remains tracked separately.
+A code PR can merge when its accepted boundary and actual gates are satisfied. During authorized automated backlog delivery, prefer deferring human execution, manual walkthrough preparation and its engineering dry run to pre-v1 qualification. This is standing delivery policy, without another approval for each feature. Honor an explicit launch requirement to perform human acceptance sooner.
 
-Do not infer human acceptance from a worker's dry run, browser automation or a green integration suite. Close the qualification issue only after actual accepted human results cover its required scope. Record code merged and human acceptance pending separately in delivery summaries. A deferred journey is not verified. Goal completion follows its actual authorized outcome and recorded deferrals, not the existence of follow-up tickets.
+An implementation issue may close after its promised implementation, applicable user documentation, independent reviews, required automated qualification and observed merge are complete, provided its remaining human work is recorded in a published linked qualification issue. Reuse the same feature's issue. [Testing](../../inframeld-testing/references/human-qualification.md#defer-human-work-during-automated-delivery) owns the minimum deferred contents. An unfinished manual procedure or unrun manual dry run does not block this closure. A draft ticket without publication does not satisfy tracking, and missing publication authority must be reported before closure.
+
+Missing product capabilities, failed required checks, unresolved material findings and uncertain cleanup remain implementation blockers. A mock or a human-testing ticket cannot replace required database, provider, security or SDK evidence. A supporting PR with implementation remaining leaves its feature issue open under the supporting-PR gates. Preserve acceptance and evidence in issue history, explicitly identifying only the human portion as deferred.
+
+For a qualification issue containing both automated and human obligations, finish its required automated work before closing it and transfer only the human portion to the linked human-qualification issue. Keep purely human-qualification issues open until their actual accepted results exist. Do not replace one unexecuted human ticket with another to manufacture completion.
+
+Do not infer human acceptance from a worker's dry run, browser automation or a green integration suite. Automated backlog Goals may complete their engineering scope with human work explicitly deferred and tracked under this policy. Report implementation complete and human acceptance pending separately. Unfinished implementation and automated qualification remain outstanding, and engineering completion is not v1 release readiness.
 
 Qualification can become runnable once the relevant PR/artifacts are delivered, without waiting for the implementation issue to close. Do not create mutual blocking edges between that issue and its qualification ticket. Native blockers identify missing prerequisite capabilities. Existing closure criteria and explicit scope decisions preserve full-feature acceptance without inventing another state system.
 

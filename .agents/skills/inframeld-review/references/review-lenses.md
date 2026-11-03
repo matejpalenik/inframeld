@@ -90,7 +90,7 @@ Try to follow the documented setup, invocation, failure explanation and recovery
 
 For lifecycle changes, inspect startup failure, shutdown, cancellation, timeouts and partial effects. Review persistent versus disposable state, compatibility, upgrades and rollback where the change affects them. Diagnostics should distinguish a failed observation from a completed action and avoid exposing protected input. Observability should answer actual operational questions rather than create another telemetry platform.
 
-Check the manual verification recipe required by [CLI guidance](../../../../apps/cli/AGENTS.md#manual-feature-verification) for user-facing CLI work. Record whether it was run and its prerequisites. For library-only delivery, explain what users can inspect today and what remains unexposed. Documentation should make honest developer use possible without treating automated tests as a manual journey.
+Check the manual verification recipe or its recorded automated-delivery deferral under [CLI guidance](../../../../apps/cli/AGENTS.md#manual-feature-verification) for user-facing CLI work. Record what was prepared or run and what remains with the linked qualification issue. Complete deferred manual work before human handoff, without making it an implementation-closure gate when Delivery's deferral conditions are met. For library-only delivery, explain what users can inspect today and what remains unexposed. Documentation should make honest developer use possible without treating automated tests as a manual journey.
 
 ## Sources for proportionality
 
