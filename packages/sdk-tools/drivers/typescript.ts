@@ -63,6 +63,12 @@ const calls = {
       ...options(client, call),
       path: call.path as { project_id: string },
     }),
+  listProjectMembers: (client: Client, call: SdkCall) =>
+    sdk.listProjectMembers({
+      ...options(client, call),
+      path: call.path as { project_id: string },
+      query: call.query as sdk.ListProjectMembersData["query"],
+    }),
   updateProjectMetadata: (client: Client, call: SdkCall) =>
     sdk.updateProjectMetadata({
       ...options(client, call),

@@ -39,6 +39,12 @@ from inframeld_backend.access.application.dtos.created_project_dto import Create
 from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto import (
     HumanOAuthConsentDetailsDTO,
 )
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
+from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
+    HumanOAuthCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.my_organization_access_dto import (
     MyOrganizationAccessDTO,
 )
@@ -48,8 +54,13 @@ from inframeld_backend.access.application.dtos.oauth_consent_continuation_dto im
 from inframeld_backend.access.application.dtos.organization_action_grant_dto import (
     OrganizationActionGrantDTO,
 )
+from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_creation_result_dto import (
     ProjectCreationResultDTO,
+)
+from inframeld_backend.access.application.dtos.project_member_dto import ProjectMemberDTO
+from inframeld_backend.access.application.dtos.project_members_page_facts_dto import (
+    ProjectMembersPageFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_metadata_change_result_dto import (
     ProjectMetadataChangeResultDTO,
@@ -76,6 +87,9 @@ from inframeld_backend.access.application.protocols.my_organization_access_reade
 )
 from inframeld_backend.access.application.protocols.project_creator import ProjectCreator
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
+from inframeld_backend.access.application.protocols.project_members_facts_reader import (
+    ProjectMembersFactsReader,
+)
 from inframeld_backend.access.application.protocols.project_metadata_changer import (
     ProjectMetadataChanger,
 )
@@ -92,6 +106,9 @@ from inframeld_backend.access.application.queries.inspect_human_oauth_consent_qu
 from inframeld_backend.access.application.queries.resolve_project_name_query import (
     ResolveProjectNameQuery,
 )
+from inframeld_backend.access.application.services.project_members_service import (
+    ProjectMembersService,
+)
 from inframeld_backend.access.application.value_objects.browser_session_credential import (
     BrowserSessionCredential,
 )
@@ -99,10 +116,17 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
     HumanAccessTokenCredential,
 )
 from inframeld_backend.access.application.value_objects.oauth_client_id import OAuthClientId
+from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.human_oauth_scope import HumanOAuthScope
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.policies.project_creation_policy import ProjectCreationPolicy
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -126,6 +150,9 @@ from inframeld_backend.access.http.routes.project_creation_routes import (
     create_project_creation_router,
 )
 from inframeld_backend.access.http.routes.project_grant_routes import create_project_grant_router
+from inframeld_backend.access.http.routes.project_members_routes import (
+    create_project_members_router,
+)
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
 )
@@ -335,6 +362,68 @@ async def _open_my_organization_access() -> AsyncGenerator[MyOrganizationAccessR
 @asynccontextmanager
 async def _open_project_creator() -> AsyncGenerator[ProjectCreator]:
     yield MockSDKProjectCreator()
+
+
+class MockSDKProjectMembersFacts(ProjectMembersFactsReader):
+    """Supply controlled observations, without a database or supported admission claim."""
+
+    @override
+    async def read_page(
+        self,
+        *,
+        access: AccessContextDTO,
+        project_id: ProjectId,
+        after: PrincipalId | None,
+        limit: int,
+    ) -> ProjectMembersPageFactsDTO | None:
+        if project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
+            return None
+        organization = OrganizationId(UUID("00000000-0000-4000-8000-000000000002"))
+        members = (
+            ProjectMemberDTO(PRINCIPAL, "SDK Human", PrincipalKind.HUMAN),
+            ProjectMemberDTO(
+                PrincipalId(UUID("00000000-0000-4000-8000-000000000005")),
+                "Stored application",
+                PrincipalKind.APPLICATION,
+            ),
+            ProjectMemberDTO(
+                PrincipalId(UUID("00000000-0000-4000-8000-000000000006")),
+                "Legacy\nmember 🧭",
+                PrincipalKind.HUMAN,
+            ),
+        )
+        bounded = tuple(
+            member
+            for member in members
+            if after is None or member.principal_id.value.int > after.value.int
+        )[: limit + 1]
+        return ProjectMembersPageFactsDTO(
+            InstallationId(UUID(int=123)),
+            organization,
+            project_id,
+            12,
+            ProjectActionFactsDTO(
+                Principal(
+                    access.actor_principal_id,
+                    organization,
+                    PrincipalKind.HUMAN,
+                    PrincipalStatus.ACTIVE,
+                ),
+                False,
+                HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+                if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+                else None,
+                ProjectStatus.ACTIVE,
+                True,
+                True,
+            ),
+            bounded,
+        )
+
+
+@asynccontextmanager
+async def _open_project_members() -> AsyncGenerator[ProjectMembersService]:
+    yield ProjectMembersService(MockSDKProjectMembersFacts())
 
 
 class MockSDKProjectMetadata(ProjectMetadataReader, ProjectMetadataChanger, ProjectNameResolver):
@@ -638,6 +727,7 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
         create_organization_access_router(authenticate, _open_my_organization_access)
     )
     application.include_router(create_project_creation_router(authenticate, _open_project_creator))
+    application.include_router(create_project_members_router(authenticate, _open_project_members))
     application.include_router(
         create_project_metadata_router(
             authenticate,
