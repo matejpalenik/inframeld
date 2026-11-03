@@ -24,7 +24,7 @@ Before `PUT`, the caller must durably record unresolved-write evidence. For Alic
 
 This supporting component excludes local staging ports and resources. Production composition with capacity allocation, conditional publication and cleanup, crash settlement, server late-write exclusion and positive physical-retirement proof remain unfinished in #40. The ordinary worker still registers no handlers. These are implementation and automated-qualification gaps, not deferred human acceptance. The internal adapter exposes no public upload API, SDK or command.
 
-The [private SeaweedFS tests](../../../../docs/development/guides/testing.md#private-seaweedfs-artifact-checks) describe the native cases and their limits. Native execution is not yet qualified. The production projected free-space policy remains 20%. The development test budget in that runbook does not change production admission policy.
+The [private SeaweedFS tests](../../../../docs/development/guides/testing.md#private-seaweedfs-artifact-checks) describe the native cases and their limits. Bounded live-instance S3 protocol and complete readback coverage has been exercised through the private Podman fixture. Docker and other platform checks remain required. The production projected free-space policy remains 20%. The development test budget in that runbook does not change production admission policy.
 
 <a id="a-delayed-seaweedfs-upload-has-the-same-problem"></a>
 
