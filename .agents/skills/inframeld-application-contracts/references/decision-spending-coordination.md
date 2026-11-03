@@ -1,6 +1,6 @@
 # PD-CONTRACTS-02: Coordinate budget policy, reservations and uncertain settlement
 
-**Status:** ACCEPTED on 2026-10-29 in [ADR-0105](../../../../docs/adr/ADR-0105-coordinate-exact-spending-reservations-and-uncertain-settlement.md). Implementation and qualification remain pending.
+**Status:** ACCEPTED on 2026-10-29 in [ADR-0105](../../../../docs/adr/ADR-0105-coordinate-exact-spending-reservations-and-uncertain-settlement.md). The internal job-backed accounting and Project policy foundation is implemented and qualified with controlled PostgreSQL evidence. Provider pricing/normalization, actual dispatch, synchronous model-call integration and public/client journeys remain pending.
 
 **Owner:** `inframeld-application-contracts`
 
@@ -23,7 +23,7 @@ The developer explicitly approved all three model-calls, provider-secrets and sp
 
 Alice lowers a monthly limit while two workers reserve model calls. One call times out after it may have been billed. Bob raises the limit later. The update must not erase consumed spending, free an unknown hold or restart the failed work automatically.
 
-The spending rules are accepted. The original analysis identified policy/reservation concurrency, conservative bounds and ledger/recovery contracts as unfinished. The approved resolution below now selects their logical contract, with implementation and evidence still pending. Independent “remaining budget” reads can let concurrent calls spend the same allowance.
+The spending rules are accepted. The original analysis identified policy/reservation concurrency, conservative bounds and ledger/recovery contracts as unfinished. The approved resolution below selects their full logical contract. The internal foundation implements the accounting/policy subset, while provider and product-workflow evidence remain unfinished. Independent “remaining budget” reads can let concurrent calls spend the same allowance.
 
 ## Accepted context and evidence
 
@@ -71,9 +71,11 @@ Load neighboring decisions only under these conditions:
 
 ## Implementation and required evidence
 
-These are required cases and evidence, not recorded passing tests.
+The [internal implementation boundary](spending-and-accounting.md#implemented-internal-accounting) is qualified through its unit and PostgreSQL scenarios, including reader/writer reservation coordination, policy edits, exact rounding, duplicate settlement, unquantified obligations, captured months, coherent projections, guarded policy replay, evidence-backed resolution and rollback. Concurrency claims retain the [specific SQL and service-race boundaries](spending-and-accounting.md#implemented-internal-accounting), rather than qualifying two simultaneously admitted product workloads or provider dispatch. The [accounting](../../../../apps/backend/tests/integration/spending/test_spending_accounting_postgres.py), [policy](../../../../apps/backend/tests/integration/spending/test_project_spending_policy_postgres.py), [recovery](../../../../apps/backend/tests/integration/spending/test_spending_recovery_postgres.py) and [migration](../../../../apps/backend/tests/integration/postgres/test_spending_accounting_migration_postgres.py) scenarios own those checks. Controlled evidence does not establish authentic provider facts or invoice accuracy.
 
-Competing reservations/edits, the last available allowance, rounding at the accounting quantum, concurrent duplicate settlement, missing usage, late evidence, period changes, lower limits below existing costs, unsupported price bounds, uncapped unknown pricing and explicit continuation. Prove actual supported bounds without claiming invoice-level accuracy.
+Workload accounting requires the original admitted job attempt. `approve_accounting` is financial approval only. Recognized lost-fence evidence can remain pending without financial application. Human reconciliation explicitly binds one pending item to retained authoritative evidence and preserves the original financial and resolution receipts. Applying a charge and resolving every pending marker are separate actions. These implementation details narrow this supporting component, not the accepted synchronous or full-dispatch scope.
+
+Actual supported pricing/billable bounds, provider usage and outcome normalization, credential resolution, uncertain ModelGateway dispatch, synchronous model calls, explicit product continuation and public policy/client/import journeys still need their owning implementation and qualification. Both #123 and #190 remain open. No public accounting schema or executable human procedure is delivered by this foundation.
 
 ## Sources and finalization
 
