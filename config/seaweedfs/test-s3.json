@@ -1,0 +1,28 @@
+{
+  "identities": [
+    {
+      "name": "artifact-bootstrap",
+      "credentials": [
+        {
+          "accessKey": "inframeld-artifact-bootstrap",
+          "secretKey": "inframeld-artifact-bootstrap-test-only"
+        }
+      ],
+      "actions": ["Admin:inframeld-artifact-test"]
+    },
+    {
+      "name": "artifact-client",
+      "credentials": [
+        {
+          "accessKey": "inframeld-artifact-client",
+          "secretKey": "inframeld-artifact-client-test-only"
+        }
+      ],
+      "actions": [
+        "Read:inframeld-artifact-test",
+        "Write:inframeld-artifact-test",
+        "List:inframeld-artifact-test"
+      ]
+    }
+  ]
+}

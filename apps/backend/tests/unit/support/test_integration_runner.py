@@ -2,7 +2,15 @@ import asyncio
 
 import httpx2
 import pytest
-from tests.support.integration_runner import wait_for_http, wait_for_hydra_signing_keys
+from botocore.stub import ANY, Stubber
+from tests.support.integration_runner import (
+    wait_for_artifact_storage,
+    wait_for_http,
+    wait_for_hydra_signing_keys,
+)
+from tests.support.seaweedfs_fixture import BUCKET, create_client, storage_settings
+
+from inframeld_backend.shared.infrastructure.resources.s3_artifact_store import S3ArtifactStore
 
 
 @pytest.mark.asyncio
@@ -115,6 +123,37 @@ async def test_readiness_retains_safe_status_until_success() -> None:
         await wait_for_http(client, "fixture", "https://fixture/health", pending, failures)
     assert not pending
     assert not failures
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [403, 503])
+async def test_artifact_readiness_requires_a_confirmed_observation(status: int) -> None:
+    pending = {"artifact-storage"}
+    failures: dict[str, str] = {}
+    client = create_client()
+    store = S3ArtifactStore(storage_settings(), client=client)
+    try:
+        with Stubber(client) as stub:
+            parameters = {"Bucket": BUCKET, "Key": ANY}
+            stub.add_client_error(
+                "head_object",
+                "AccessDenied",
+                http_status_code=status,
+                service_message="private-upstream-text",
+                expected_params=parameters,
+            )
+            stub.add_client_error(
+                "head_object",
+                "NoSuchKey",
+                http_status_code=404,
+                expected_params=parameters,
+            )
+            async with asyncio.timeout(5):
+                await wait_for_artifact_storage(store, pending, failures)
+            stub.assert_no_pending_responses()
+        assert not pending and not failures
+    finally:
+        await store.close()
 
 
 @pytest.mark.asyncio

@@ -15,6 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from inframeld_backend.bootstrap.application_settings import get_settings
+from inframeld_backend.shared.application.errors.artifact_errors import (
+    ArtifactStoreUnavailableError,
+)
+from inframeld_backend.shared.application.protocols.artifact_store import ArtifactStore
+from inframeld_backend.shared.infrastructure.resources.s3_artifact_store import S3ArtifactStore
 from tests.support.integration_readiness import (
     READINESS_TIMEOUT_SECONDS,
     check_fixture_certificate_expiry,
@@ -38,6 +43,7 @@ from tests.support.integration_services import (
 )
 from tests.support.password_breaches import create_client as create_password_breaches_client
 from tests.support.postgres import database_url
+from tests.support.seaweedfs_fixture import new_attempt, storage_settings
 
 
 async def _wait_for_database(
@@ -77,6 +83,23 @@ async def wait_for_http(
                 return
             if failures is not None:
                 failures[name] = f"HTTP {response.status_code}"
+        await asyncio.sleep(0.25)
+
+
+async def wait_for_artifact_storage(
+    store: ArtifactStore, pending: set[str], failures: dict[str, str]
+) -> None:
+    """Wait for a trusted TLS observation, without asserting content or durability."""
+    probe = new_attempt(b"")
+    while True:
+        try:
+            await store.head(probe.scope, probe.attempt_id)
+        except ArtifactStoreUnavailableError:
+            failures["artifact-storage"] = "storage observation unavailable"
+        else:
+            pending.remove("artifact-storage")
+            failures.pop("artifact-storage", None)
+            return
         await asyncio.sleep(0.25)
 
 
@@ -138,7 +161,8 @@ async def _wait_for_services() -> None:
         "hydra-signing-keys": HYDRA_PUBLIC_URL,
         "hydra-lifetimes-signing-keys": LIFETIME_HYDRA_PUBLIC_URL,
     }
-    pending = {"postgres", "password-breaches", *endpoints, *key_endpoints}
+    pending = {"postgres", "password-breaches", "artifact-storage", *endpoints, *key_endpoints}
+    artifacts = S3ArtifactStore(storage_settings())
     engine = create_async_engine(
         database_url(settings),
         connect_args={"connect_timeout": 5},
@@ -153,6 +177,7 @@ async def _wait_for_services() -> None:
             asyncio.TaskGroup() as tasks,
         ):
             tasks.create_task(_wait_for_database(engine, pending, failures))
+            tasks.create_task(wait_for_artifact_storage(artifacts, pending, failures))
             tasks.create_task(
                 wait_for_http(
                     breach_client,
@@ -171,7 +196,10 @@ async def _wait_for_services() -> None:
     except TimeoutError:
         raise RuntimeError(describe_readiness_failure(pending, failures)) from None
     finally:
-        await engine.dispose()
+        try:
+            await artifacts.close()
+        finally:
+            await engine.dispose()
     print("Integration services are ready on the private Compose network.", flush=True)
 
 

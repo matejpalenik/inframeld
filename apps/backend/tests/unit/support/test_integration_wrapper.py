@@ -26,10 +26,12 @@ with (root / "calls").open("a") as output:
 print("output:" + phase, flush=True)
 print("error:" + phase, file=sys.stderr, flush=True)
 if phase == "test-services-up":
+    time.sleep(configuration.get("startup_sleep", 0))
     if configuration.get("startup_status"):
         raise SystemExit(configuration["startup_status"])
     active = configuration.get("blocked_phase") == "startup"
 elif phase == "test-run":
+    time.sleep(configuration.get("test_sleep", 0))
     assert sys.stdin.read() == ""
     active = configuration.get("blocked_phase") == "test"
 else:
@@ -72,7 +74,8 @@ class ProbeRunner(namespace["IntegrationRunner"]):
     def record(self, event):
         with (root / "ownership").open("a") as output:
             output.write(json.dumps(event) + "\n")
-raise SystemExit(ProbeRunner(root, cleanup_work_seconds=0.2, term_seconds=0.2, kill_seconds=0.2).run(sys.argv[2:]))
+configuration = json.loads((root / "fixture.json").read_text())
+raise SystemExit(ProbeRunner(root, normal_work_seconds=configuration.get("normal_seconds"), cleanup_work_seconds=0.2, term_seconds=0.2, kill_seconds=0.2).run(sys.argv[2:]))
 """
 
 
@@ -164,6 +167,7 @@ def launch(
     public: bool = False,
     between: bool = False,
     program: str | None = None,
+    normal_budget: str | None = None,
 ) -> Generator[Probe]:
     root = tmp_path / "private repository"
     (root / "scripts").mkdir(parents=True)
@@ -180,6 +184,9 @@ def launch(
     if between:
         (root / "between").touch()
     environment = dict(os.environ)
+    environment.pop("INFRAMELD_TEST_NORMAL_WORK_SECONDS", None)
+    if normal_budget is not None:
+        environment["INFRAMELD_TEST_NORMAL_WORK_SECONDS"] = normal_budget
     environment["PATH"] = str(Path(sys.executable).parent) + os.pathsep + environment["PATH"]
     environment["WRAPPER_FIXTURE_VALUE"] = "kept value with spaces"
     arguments = (
@@ -471,3 +478,59 @@ raise SystemExit(runner(root, cleanup_work_seconds=1.0, term_seconds=0.2, kill_s
         assert status == 143, errors
         phases = [event["phase"] for event in probe.calls()]
         assert "test-run" not in phases and phases.count("test-services-down") == 1
+
+
+@pytest.mark.parametrize(
+    "startup_sleep,test_sleep,normal_seconds,tests_started",
+    [
+        (0.8, 0, 0.3, False),
+        (0.8, 1.5, 2, True),
+    ],
+)
+def test_normal_work_has_one_deadline_before_independent_cleanup(
+    tmp_path: Path,
+    startup_sleep: float,
+    test_sleep: float,
+    normal_seconds: float,
+    tests_started: bool,
+) -> None:
+    with launch(
+        tmp_path,
+        {
+            "startup_sleep": startup_sleep,
+            "test_sleep": test_sleep,
+            "normal_seconds": normal_seconds,
+        },
+    ) as probe:
+        status, _, errors = probe.finish()
+        assert status == 1, errors
+        phases = [event["phase"] for event in probe.calls()]
+        assert ("test-run" in phases) is tests_started
+        assert phases.count("test-services-down") == 1
+        assert "normal work budget" in errors
+
+
+@pytest.mark.parametrize("value", ["", "bad", "0", "-1", "nan", "inf", "-inf"])
+def test_invalid_public_normal_budget_stops_before_any_phase(tmp_path: Path, value: str) -> None:
+    with launch(tmp_path, {}, public=True, normal_budget=value) as probe:
+        status, _, errors = probe.finish()
+        assert status == 2, errors
+        assert probe.calls() == []
+        assert "INFRAMELD_TEST_NORMAL_WORK_SECONDS" in errors
+
+
+def test_public_normal_budget_expires_before_single_independent_cleanup(tmp_path: Path) -> None:
+    with launch(
+        tmp_path,
+        {"startup_sleep": 0.8, "test_sleep": 1.5},
+        public=True,
+        normal_budget="2",
+    ) as probe:
+        status, _, errors = probe.finish()
+        assert status == 1, errors
+        assert [event["phase"] for event in probe.calls()] == [
+            "test-services-up",
+            "test-run",
+            "test-services-down",
+        ]
+        assert "normal work budget" in errors

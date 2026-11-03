@@ -1,0 +1,6 @@
+[filer.options]
+recursive_delete = false
+
+[leveldb2]
+enabled = true
+dir = "/data/filer"

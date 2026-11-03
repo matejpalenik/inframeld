@@ -427,6 +427,49 @@ services:
       recovery-execution-callbacks:
         condition: service_started
 
+  seaweedfs:
+    image: docker.io/chrislusf/seaweedfs@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+    pull_policy: never
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    mem_limit: 2g
+    cpus: 2
+    working_dir: /data
+    tmpfs:
+      - /data:rw,nosuid,nodev,noexec,size=268435456,mode=0700,${INFRAMELD_TEST_TMPFS_OWNER_OPTIONS:-uid=10001,gid=10001}
+      - /tmp:rw,nosuid,nodev,noexec,size=16777216,mode=0700,${INFRAMELD_TEST_TMPFS_OWNER_OPTIONS:-uid=10001,gid=10001}
+    volumes:
+      - ./config/seaweedfs/test-filer.toml:/etc/seaweedfs/filer.toml:ro
+      - ./config/seaweedfs/test-security.toml:/etc/seaweedfs/security.toml:ro
+      - ./config/seaweedfs/test-s3.json:/etc/seaweedfs/s3.json:ro
+      - inframeld_test_tls_identity:/run/inframeld-test-tls/identity:ro
+    networks: [artifact-storage]
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        umask 077
+        test -z "$$(ls -A /data)"
+        mkdir /data/master /data/volumes /data/filer
+        exec /usr/bin/weed -logtostderr=true server \
+          -dir=/data/volumes -master.dir=/data/master \
+          -volume.max=8 -master.volumeSizeLimitMB=64 \
+          -master.defaultReplication=000 -filer.defaultReplicaPlacement=000 \
+          -master.peers= -master.telemetry=false -master.volumePreallocate=false \
+          -filer -s3 -sftp=false -webdav=false -iam=false \
+          -mq.broker=false -mq.agent=false \
+          -s3.port=8333 -s3.port.https=0 -s3.ip.bind=0.0.0.0 \
+          -s3.port.grpc=18333 \
+          -s3.cert.file=/run/inframeld-test-tls/identity/server.pem \
+          -s3.key.file=/run/inframeld-test-tls/identity/server.key \
+          -s3.config=/etc/seaweedfs/s3.json \
+          -s3.iam=false -s3.port.iceberg=0 -s3.port.lance=0 \
+          -s3.autoCreateBucket=false -s3.allowDeleteBucketNotEmpty=false \
+          -s3.concurrentFileUploadLimit=2 -s3.concurrentUploadLimitMB=16 \
+          -filer.disableDirListing=true -filer.exposeDirectoryData=false \
+          -debug=false -metricsPort=0 -ip=127.0.0.1 -ip.bind=127.0.0.1
+
   integration-tests:
     image: ${INFRAMELD_INTEGRATION_IMAGE:-localhost/inframeld-integration-tests:local}
     pull_policy: never
@@ -438,6 +481,7 @@ services:
       INFRAMELD_RUN_DB_INTEGRATION: "1"
       INFRAMELD_RUN_KRATOS_INTEGRATION: "1"
       INFRAMELD_RUN_HYDRA_INTEGRATION: "1"
+      INFRAMELD_RUN_ARTIFACT_INTEGRATION: "1"
       INFRAMELD_DATABASE__HOST: postgres
       INFRAMELD_DATABASE__PORT: "5432"
       INFRAMELD_KRATOS__PUBLIC_URL: http://kratos:4433
@@ -455,8 +499,14 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    networks: [default, artifact-storage]
     entrypoint: ["python", "-m", "tests.support.integration_runner"]
     command: ["tests/integration"]
+
+networks:
+  default: {}
+  artifact-storage:
+    internal: true
 
 volumes:
   inframeld_test_tls_trust:

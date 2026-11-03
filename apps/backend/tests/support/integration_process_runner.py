@@ -1,5 +1,6 @@
 """Run the serial private integration lifecycle while retaining phase-process ownership."""
 
+import math
 import os
 import signal
 import subprocess
@@ -43,11 +44,18 @@ class IntegrationRunner:
         self,
         repository_root: Path,
         *,
+        normal_work_seconds: float | None = None,
         cleanup_work_seconds: float = 60,
         term_seconds: float = 5,
         kill_seconds: float = 5,
     ) -> None:
+        if normal_work_seconds is not None and (
+            not math.isfinite(normal_work_seconds) or normal_work_seconds <= 0
+        ):
+            raise ValueError("The normal work budget must be finite and positive.")
         self._root = repository_root
+        self._normal_work_seconds = normal_work_seconds
+        self._normal_deadline: float | None = None
         self._cleanup_work_seconds = cleanup_work_seconds
         self._term_seconds = term_seconds
         self._kill_seconds = kill_seconds
@@ -73,6 +81,11 @@ class IntegrationRunner:
             )
             return 2
 
+        self._normal_deadline = (
+            time.monotonic() + self._normal_work_seconds
+            if self._normal_work_seconds is not None
+            else None
+        )
         previous = {
             number: signal.getsignal(number)
             for number in (signal.SIGCHLD, signal.SIGINT, signal.SIGTERM)
@@ -111,7 +124,12 @@ class IntegrationRunner:
     def _run_phase(self, name: str, arguments: list[str], *, cleanup: bool = False) -> int:
         if not cleanup and self._cancelled:
             return self._cancelled
-        deadline = time.monotonic() + self._cleanup_work_seconds if cleanup else None
+        deadline = (
+            time.monotonic() + self._cleanup_work_seconds if cleanup else self._normal_deadline
+        )
+        if deadline is not None and not cleanup and time.monotonic() >= deadline:
+            print("Integration normal work budget expired.", file=sys.stderr)
+            return 1
         try:
             child = subprocess.Popen(
                 [str(self._root / "scripts/dev-compose.sh"), name, *arguments],
@@ -129,15 +147,19 @@ class IntegrationRunner:
                 break
             if deadline is not None and time.monotonic() >= deadline:
                 timed_out = True
-                print(
-                    "Integration cleanup exceeded its work budget. Cleanup may be incomplete.",
-                    file=sys.stderr,
+                message = (
+                    "Integration cleanup exceeded its work budget. Cleanup may be incomplete."
+                    if cleanup
+                    else "Integration normal work budget expired."
                 )
+                print(message, file=sys.stderr)
                 break
             time.sleep(0.02)
         stopped = self._stop_phase(phase)
         status = self._cancelled if not cleanup and self._cancelled else phase.status
         if timed_out or not stopped:
+            if timed_out and not cleanup and not self._cancelled:
+                return 1
             return status if status else 1
         return status if status is not None else 1
 
@@ -242,5 +264,19 @@ class IntegrationRunner:
         return True
 
 
+def main() -> int:
+    value = os.environ.get("INFRAMELD_TEST_NORMAL_WORK_SECONDS")
+    try:
+        budget = float(value) if value is not None else None
+        runner = IntegrationRunner(Path(__file__).resolve().parents[4], normal_work_seconds=budget)
+    except ValueError:
+        print(
+            "INFRAMELD_TEST_NORMAL_WORK_SECONDS must be a finite positive number.",
+            file=sys.stderr,
+        )
+        return 2
+    return runner.run(sys.argv[1:])
+
+
 if __name__ == "__main__":
-    raise SystemExit(IntegrationRunner(Path(__file__).resolve().parents[4]).run(sys.argv[1:]))
+    raise SystemExit(main())
