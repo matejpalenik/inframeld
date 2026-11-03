@@ -6,7 +6,7 @@ The shared execution engine is implemented. Its default production handler regis
 
 ## Prepare the database and configuration
 
-Run commands from the repository root. Complete [local setup](../getting-started/local-setup.md), including locked backend dependencies and the explicit migration step. The worker and API must use compatible code and the same application database at schema `0017_project_creation`.
+Run commands from the repository root. Complete [local setup](../getting-started/local-setup.md), including locked backend dependencies and the explicit migration step. The worker and API must use compatible code and the same application database at schema `0018_spending_accounting`.
 
 The existing operator-controlled migration command is:
 
