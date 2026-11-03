@@ -76,6 +76,8 @@ The coordinator may grant a frozen revision's complete integration operation to 
 
 Use normal hooks, independent review and current required CI. A coherent commit or PR need not wait for final CI that can only run after pushing. The [gate policy](../../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md) owns findings, advisory CodeRabbit, supporting PRs and serial expected-head merges. Never bypass hooks/protections or restart CodeRabbit to force a review. A supporting PR leaves remaining issue acceptance open. Observe actual main and refresh affected work after merging.
 
+At issue-selection checkpoints, show the coordinator's [compact status table](../../../.agents/skills/inframeld-backlog-delivery/references/coordinator.md#report-once-at-an-issue-selection-checkpoint) with current work, relevant blockers, immediate candidates and recent issue completions. Its fixed statuses and issue-reference cells make the decision easy to scan. Ordinary progress messages stay brief. This chat view adds no helper state, GitHub fields or reporting tool.
+
 ## Adopt revised guidance in an active run
 
 An overloaded run should temporarily stop opening new implementation assignments. This is a scheduling checkpoint, not a request to pause the Goal or kill commands. Let safe active operations finish and reconcile ownership first.
@@ -100,6 +102,8 @@ Before substantive workflow edits, define a few must-pass outcomes. Validate fro
 
 | Raw situation | Expected behavior |
 | --- | --- |
+| A coordinator selects new work after a supporting PR merges, with other active and blocked issues | Emit one selection table with remaining acceptance, verified epic/downstream references and fixed statuses. A partial merge is not Done. |
+| A worker reports a passing unit test, CI remains queued, or a turn resumes without a new selection | Use a short event update when useful. Do not repeat the table or invent a selection checkpoint. |
 | A promised operator journey requires an unfinished login/proof producer | Deliver the required capability first or select independent work. Start a component only under its explicit independent acceptance boundary. |
 | A producer issue is open, but its required capability has a qualified merged PR | Inspect that increment and reassess the broad blocker without claiming the entire producer issue complete. |
 | A human-facing feature has no qualification issue, or already has one for the same delivery | Create under actual authority or reuse the existing issue. Without publication authority, retain a draft and report the handoff gap. |
