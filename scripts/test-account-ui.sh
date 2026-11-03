@@ -125,11 +125,24 @@ print(status, code, health)
 ' "${account_project}" "$1" "$2" "$3"
 }
 
+account_service_container_id() {
+    local service="$1" label observed identities=""
+    for label in io.podman.compose.project com.docker.compose.project; do
+        observed="$("${account_runtime}" ps -aq --no-trunc \
+            --filter "label=${label}=${account_project}" \
+            --filter "label=com.docker.compose.service=${service}")" || return "$?"
+        identities+=$'\n'"${observed}"
+    done
+    observed="$(printf '%s\n' "${identities}" | LC_ALL=C sort -u | sed '/^$/d')" || return "$?"
+    [[ "${observed}" =~ ^[0-9a-f]{64}$ ]] || return 1
+    printf '%s\n' "${observed}"
+}
+
 recipient_proof_stack() {
     local browser_id denied_id driver_id snapshot browser_state browser_code health driver_state driver_code readiness
     # One original 300-second phase owns both explicit attempts and all three containers.
     "${account_compose[@]}" --profile qualification up -d --no-deps --no-build browser-tests || return "$?"
-    browser_id="$("${account_compose[@]}" --profile qualification ps -aq browser-tests)" || return "$?"
+    browser_id="$(account_service_container_id browser-tests)" || return "$?"
     [[ "${browser_id}" =~ ^[0-9a-f]{64}$ ]] || return 1
     while true; do
         snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${browser_id}" |
@@ -140,7 +153,7 @@ recipient_proof_stack() {
         sleep 0.05 || return "$?"
     done
     "${account_compose[@]}" --profile qualification up -d --no-deps --no-build proof-denied-driver || return "$?"
-    denied_id="$("${account_compose[@]}" --profile qualification ps -aq proof-denied-driver)" || return "$?"
+    denied_id="$(account_service_container_id proof-denied-driver)" || return "$?"
     [[ "${denied_id}" =~ ^[0-9a-f]{64}$ && "${denied_id}" != "${browser_id}" ]] || return 1
     while true; do
         snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${denied_id}" |
@@ -177,7 +190,7 @@ catch (error) { process.exit(error.code === "ENOENT" ? 10 : 1); }
         esac
     done
     "${account_compose[@]}" --profile qualification up -d --no-deps --no-build proof-driver || return "$?"
-    driver_id="$("${account_compose[@]}" --profile qualification ps -aq proof-driver)" || return "$?"
+    driver_id="$(account_service_container_id proof-driver)" || return "$?"
     [[ "${driver_id}" =~ ^[0-9a-f]{64}$ && "${driver_id}" != "${browser_id}" && "${driver_id}" != "${denied_id}" ]] || return 1
     while true; do
         snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${driver_id}" |

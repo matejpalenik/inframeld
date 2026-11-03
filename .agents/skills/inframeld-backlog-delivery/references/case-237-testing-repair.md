@@ -46,7 +46,7 @@ Before adding another correction, ask whether the original acceptance gap is shr
 
 Reconsider the complete solution against main when replacement code needs substantial new fixes or supervision infrastructure. Preserve safety and required evidence while simplifying or splitting. Do not increase deadlines, accept emergency cleanup as normal success, waive a required finding or change host configuration merely to finish.
 
-Follow the existing cumulative three-cycle and one-shot restrictions. Moving the repair to a new issue, worker, worktree or stage does not reset them. Another approval should choose a concrete repair or delivery boundary with a stopping point, rather than authorize an unchanged repetition.
+The recorded run used cumulative three-cycle and one-shot restrictions. Current work follows the [progress-based remediation policy](gates-and-recovery.md#classify-failures-and-bound-remediation), including its adoption rules for broader human authorization. Preserve that history across issues, workers, worktrees and stages. Use independent reassessment to continue meaningful scoped repairs without another approval for each failure. Repeated unchanged trials still do not establish progress.
 
 The outcome to seek is a useful, independently reviewed tooling PR with its own passing checks, followed by feature delivery. Until that happens, additional tests, receipts or high scores for a narrow patch are activity, rather than proof that the full delivery is converging.
 

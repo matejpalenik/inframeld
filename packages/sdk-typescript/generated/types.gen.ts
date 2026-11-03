@@ -309,6 +309,13 @@ export type OwnOrganizationGrantResponse = {
 };
 
 /**
+ * PrincipalKind
+ *
+ * Distinguish local human actors from application accounts.
+ */
+export type PrincipalKind = 'human' | 'application';
+
+/**
  * ProblemDetails
  *
  * Represent an Inframeld HTTP error using RFC 9457 Problem Details.
@@ -472,6 +479,43 @@ export type ProjectGrantTargetResponse = {
      * Kind
      */
     kind: 'project';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * ProjectMemberResponse
+ */
+export type ProjectMemberResponse = {
+    /**
+     * Displayname
+     */
+    displayName: string;
+    kind: PrincipalKind;
+    /**
+     * Principalid
+     */
+    principalId: string;
+};
+
+/**
+ * ProjectMembersPageResponse
+ */
+export type ProjectMembersPageResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Items
+     */
+    items: Array<ProjectMemberResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
     /**
      * Projectid
      */
@@ -1373,6 +1417,65 @@ export type AssignProjectUseOnlyGrantResponses = {
 };
 
 export type AssignProjectUseOnlyGrantResponse = AssignProjectUseOnlyGrantResponses[keyof AssignProjectUseOnlyGrantResponses];
+
+export type ListProjectMembersData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/members';
+};
+
+export type ListProjectMembersErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListProjectMembersError = ListProjectMembersErrors[keyof ListProjectMembersErrors];
+
+export type ListProjectMembersResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectMembersPageResponse;
+};
+
+export type ListProjectMembersResponse = ListProjectMembersResponses[keyof ListProjectMembersResponses];
 
 export type GetProjectMetadataData = {
     body?: never;

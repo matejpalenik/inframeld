@@ -33,6 +33,17 @@ const operands = args
   .slice(operationIndex + 1)
   .filter((arg) => !arg.startsWith("-"))
 const service = operands[0]
+const proofServices = ["browser-tests", "proof-driver", "proof-denied-driver"]
+const lookupService =
+  args[0] === "ps"
+    ? args
+        .find((arg) => arg.startsWith("label=com.docker.compose.service="))
+        ?.slice("label=com.docker.compose.service=".length)
+    : undefined
+const unsupportedComposeLookup =
+  args[0] === "compose" &&
+  args.includes("ps") &&
+  proofServices.includes(args.at(-1))
 const startupHang =
   startup &&
   operation === "run" &&
@@ -94,14 +105,14 @@ if (naturalDescendant) {
     String(process.pid)
   )
   setInterval(() => {}, 1_000)
+} else if (proof && unsupportedComposeLookup) {
+  // Podman Compose 1.5 rejects service operands for ps before querying the engine.
+  process.exitCode = 2
 } else if (
   proof &&
   (args.includes("inspect") ||
     args.includes("logs") ||
-    (args.includes("ps") &&
-      ["browser-tests", "proof-driver", "proof-denied-driver"].includes(
-        args.at(-1)
-      )) ||
+    proofServices.includes(lookupService) ||
     (operation === "up" &&
       ["browser-tests", "proof-driver", "proof-denied-driver"].includes(
         service
@@ -130,14 +141,45 @@ if (naturalDescendant) {
     if (service === "browser-tests") state.browser = true
     else if (service === "proof-denied-driver") state.denied = true
     else state.driver = true
-  } else if (args.includes("ps")) {
-    console.log(
-      args.at(-1) === "browser-tests"
-        ? browser
-        : args.at(-1) === "proof-denied-driver"
-          ? denied
-          : driver
+  } else if (lookupService) {
+    const project = process.env.INFRAMELD_ACCOUNT_WEB_IMAGE.slice(
+      "localhost/".length,
+      -"-web:check".length
     )
+    const projectLabel = args.find(
+      (arg) =>
+        arg.startsWith("label=com.docker.compose.project=") ||
+        arg.startsWith("label=io.podman.compose.project=")
+    )
+    if (
+      !args.includes("--no-trunc") ||
+      ![
+        `label=com.docker.compose.project=${project}`,
+        `label=io.podman.compose.project=${project}`,
+      ].includes(projectLabel)
+    )
+      process.exitCode = 58
+    else if (
+      proof === "lookup-query-failed" &&
+      projectLabel.startsWith("label=com.docker.compose.project=")
+    )
+      process.exitCode = 57
+    else {
+      const id =
+        lookupService === "browser-tests"
+          ? browser
+          : lookupService === "proof-denied-driver"
+            ? denied
+            : driver
+      if (proof === "lookup-multiple") console.log(`${id}\n${"f".repeat(64)}`)
+      else if (proof === "lookup-truncated") console.log(id.slice(0, 12))
+      else if (
+        proof === "lookup-reused-browser" &&
+        lookupService === "proof-driver"
+      )
+        console.log(browser)
+      else if (proof !== "lookup-zero") console.log(id)
+    }
   } else if (args.includes("inspect")) {
     state.observations += 1
     if (proof === "inspect-invalid") console.log("not-json")
@@ -162,15 +204,20 @@ if (naturalDescendant) {
             User: "10001:10001",
             Labels: {
               "com.docker.compose.project":
-                process.env.INFRAMELD_ACCOUNT_WEB_IMAGE.slice(
-                  "localhost/".length,
-                  -"-web:check".length
-                ),
-              "com.docker.compose.service": isBrowser
-                ? "browser-tests"
-                : isDenied
-                  ? "proof-denied-driver"
-                  : "proof-driver",
+                proof === "lookup-wrong-project"
+                  ? "another-project"
+                  : process.env.INFRAMELD_ACCOUNT_WEB_IMAGE.slice(
+                      "localhost/".length,
+                      -"-web:check".length
+                    ),
+              "com.docker.compose.service":
+                proof === "lookup-wrong-service"
+                  ? "another-service"
+                  : isBrowser
+                    ? "browser-tests"
+                    : isDenied
+                      ? "proof-denied-driver"
+                      : "proof-driver",
             },
           },
           HostConfig: {

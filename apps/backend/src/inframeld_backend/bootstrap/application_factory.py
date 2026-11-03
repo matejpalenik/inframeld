@@ -37,6 +37,9 @@ from inframeld_backend.access.http.routes.project_creation_routes import (
 from inframeld_backend.access.http.routes.project_grant_routes import (
     create_project_grant_router,
 )
+from inframeld_backend.access.http.routes.project_members_routes import (
+    create_project_members_router,
+)
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
 )
@@ -54,6 +57,7 @@ from inframeld_backend.bootstrap.original_operation_lookup_composition import (
 )
 from inframeld_backend.bootstrap.project_creation_composition import open_project_creation
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
+from inframeld_backend.bootstrap.project_members_composition import open_project_members
 from inframeld_backend.bootstrap.project_metadata_composition import (
     open_project_metadata,
     open_project_name_resolution,
@@ -165,6 +169,9 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             create_project_creation_router(
                 human_session, partial(open_project_creation, database, creation_fingerprints)
             )
+        )
+        application.include_router(
+            create_project_members_router(human_session, partial(open_project_members, database))
         )
         application.include_router(
             create_human_oauth_consent_router(

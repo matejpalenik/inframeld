@@ -14,6 +14,7 @@ export const operations = [
   "getCurrentSession",
   "getMyOrganizationAccess",
   "createProject",
+  "listProjectMembers",
   "inspectHumanOAuthConsent",
   "decideHumanOAuthConsent",
   "assignProjectUseOnlyGrant",

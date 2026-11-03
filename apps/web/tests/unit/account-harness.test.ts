@@ -128,6 +128,13 @@ type Options = {
     | "denied-effects"
     | "denied-stalled"
     | "second-readiness-failed"
+    | "lookup-zero"
+    | "lookup-multiple"
+    | "lookup-truncated"
+    | "lookup-query-failed"
+    | "lookup-wrong-project"
+    | "lookup-wrong-service"
+    | "lookup-reused-browser"
 }
 async function exists(path: string) {
   try {
@@ -509,6 +516,13 @@ for (const [proof, expected, admitsDriver] of [
   ["denied-effects", 25, false],
   ["denied-stalled", 124, false],
   ["second-readiness-failed", 17, false],
+  ["lookup-zero", 1, false],
+  ["lookup-multiple", 1, false],
+  ["lookup-truncated", 1, false],
+  ["lookup-query-failed", 57, false],
+  ["lookup-wrong-project", 1, false],
+  ["lookup-wrong-service", 1, false],
+  ["lookup-reused-browser", 1, true],
 ] as const) {
   test(
     `recipient proof ${proof} cannot report success and still reconciles its owned phase`,

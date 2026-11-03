@@ -13,12 +13,13 @@ import {
   observeProfileListener,
   expectedStalledCloseFailure,
   stalledCloseMessages,
+  publishFixtureDiagnostics,
 } from "./browser-owner.ts";
 import {
   FixtureDiagnostics,
   fixtureDiagnostic,
 } from "./fixture-diagnostics.ts";
-import { withinDeadline } from "../../../src/system/deadline.ts";
+import { withResources } from "../../../src/system/process.ts";
 
 const { chromium } = await import("playwright");
 installInterruptHandlers();
@@ -88,62 +89,70 @@ if (process.env.SDK_BROWSER_OWNER_PROBE === "1") {
     );
     let finalizing: Promise<void> | undefined;
     const finalize = () =>
-      (finalizing ??= (async () => {
-        let cleanupError: string | undefined;
-        let expectedGracefulFailure = false;
-        let cleanupDetails: string[] = [];
-        try {
-          const closing = fixture.close();
-          record("finalize-started", "started");
-          await closing;
-          record("fixture-close-settled", "passed");
-        } catch (error) {
-          expectedGracefulFailure = expectedStalledCloseFailure(error);
-          cleanupError = expectedGracefulFailure
-            ? "expected-close-deadline"
-            : "profile-cleanup-failed";
-          cleanupDetails = expectedGracefulFailure
-            ? [
-                stalledCloseMessages.find(
-                  (message) =>
-                    String((error as AggregateError).errors[0]) === message,
-                )!,
-              ]
-            : ["profile-cleanup-failed"];
-          record(
-            "fixture-close-settled",
-            expectedGracefulFailure ? "expected-close-deadline" : "failed",
-            error,
+      (finalizing ??= withResources(
+        async () => {
+          let cleanupError: string | undefined;
+          let expectedGracefulFailure = false;
+          let cleanupDetails: string[] = [];
+          try {
+            const closing = fixture.close();
+            record("finalize-started", "started");
+            await closing;
+            record("fixture-close-settled", "passed");
+          } catch (error) {
+            expectedGracefulFailure = expectedStalledCloseFailure(error);
+            cleanupError = expectedGracefulFailure
+              ? "expected-close-deadline"
+              : "profile-cleanup-failed";
+            cleanupDetails = expectedGracefulFailure
+              ? [
+                  stalledCloseMessages.find(
+                    (message) =>
+                      String((error as AggregateError).errors[0]) === message,
+                  )!,
+                ]
+              : ["profile-cleanup-failed"];
+            record(
+              "fixture-close-settled",
+              expectedGracefulFailure ? "expected-close-deadline" : "failed",
+              error,
+            );
+          }
+          const backend = await fixture.backend.cleanup;
+          record("backend-outcome-settled", "passed");
+          const owner = await client.completion;
+          record("browser-receipt-settled", "passed");
+          const listener = listenerClosed();
+          await writeFile(
+            join(work, "cleanup.json"),
+            JSON.stringify({
+              backend,
+              owner,
+              browser:
+                owner.origin === "profile" &&
+                owner.fulfilled &&
+                owner.closeObserved,
+              listener,
+              profileComplete: listener,
+              cleanupError,
+              expectedGracefulFailure,
+              cleanupDetails,
+            }),
           );
-        }
-        const backend = await fixture.backend.cleanup;
-        record("backend-outcome-settled", "passed");
-        const owner = await client.completion;
-        record("browser-receipt-settled", "passed");
-        const listener = listenerClosed();
-        await writeFile(
-          join(work, "cleanup.json"),
-          JSON.stringify({
-            backend,
-            owner,
-            browser:
-              owner.origin === "profile" &&
-              owner.fulfilled &&
-              owner.closeObserved,
-            listener,
-            profileComplete: listener,
-            cleanupError,
-            expectedGracefulFailure,
-            cleanupDetails,
-          }),
-        );
-        record("cleanup-report-written", "passed");
-        client.end();
-        await withinDeadline(
-          diagnostics.write(diagnosticFolder),
-          Math.max(0, entered + 60000 - performance.now()),
-        );
-      })());
+          record("cleanup-report-written", "passed");
+        },
+        async () => {
+          await withResources(
+            async () => client.end(),
+            () =>
+              publishFixtureDiagnostics(
+                diagnostics,
+                diagnosticFolder,
+                entered + 60000,
+              ),
+          );
+        },
+      ));
     let observeShutdown!: () => void;
     const shutdownObserved = new Promise<void>((resolve) => {
       observeShutdown = resolve;

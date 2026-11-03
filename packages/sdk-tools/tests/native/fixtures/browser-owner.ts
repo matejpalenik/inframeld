@@ -179,6 +179,34 @@ export async function superviseBrowserWorker(
     throw new AggregateError(errors, "Browser worker and cleanup failed");
 }
 
+/** Preserve bounded safe status in private and ordinary diagnostic destinations. */
+export async function publishFixtureDiagnostics(
+  diagnostics: FixtureDiagnostics,
+  protectedFolder: string,
+  deadline: number,
+  clock: FixtureClock = browserFixtureClock,
+): Promise<void> {
+  const errors: unknown[] = [];
+  try {
+    await admit(
+      clock,
+      () => diagnostics.write(protectedFolder),
+      deadline,
+      "report",
+    );
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    await admit(clock, () => diagnostics.write(artifacts), deadline, "report");
+  } catch (error) {
+    errors.push(error);
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length)
+    throw new AggregateError(errors, "Fixture diagnostic publication failed");
+}
+
 function waiting<T>() {
   let resolve!: (value: T) => void, reject!: (error: unknown) => void;
   const promise = new Promise<T>((yes, no) => {
@@ -1430,6 +1458,11 @@ async function runFixture(mode: string): Promise<void> {
         stopDeadline,
         "report",
       ).catch((error: unknown) => errors.push(error));
+      await publishFixtureDiagnostics(
+        diagnostics,
+        protectedFolder,
+        stopDeadline,
+      ).catch((error: unknown) => errors.push(error));
       process.stderr.write(
         fixtureDiagnostic({
           phase: "fixture-terminal",
@@ -1462,37 +1495,48 @@ async function runFixture(mode: string): Promise<void> {
         stopDeadline,
         "report",
       );
-      for (const [slot, capture] of captures) {
+    } catch (error) {
+      errors.push(error);
+    }
+    for (const [slot, capture] of captures) {
+      try {
+        const metadata = await admit(
+          browserFixtureClock,
+          () => capture.check(),
+          stopDeadline,
+          "capture",
+        );
+        diagnostics.note({
+          phase: slot === "probe" ? "probe-controller" : "native-controller",
+          category: "capture-checked",
+          slot,
+          ...metadata,
+          status: null,
+        });
+      } catch (error) {
+        errors.push(error);
         try {
-          const metadata = await admit(
-            browserFixtureClock,
-            () => capture.check(),
-            stopDeadline,
-            "capture",
-          );
-          diagnostics.note({
-            phase: slot === "probe" ? "probe-controller" : "native-controller",
-            category: "capture-checked",
-            slot,
-            ...metadata,
-            status: null,
-          });
-        } catch (error) {
-          errors.push(error);
           diagnostics.note({
             phase: slot === "probe" ? "probe-controller" : "native-controller",
             category: "capture-invalid",
             slot,
             status: null,
           });
+        } catch (diagnostic) {
+          errors.push(diagnostic);
         }
       }
-      await admit(
-        browserFixtureClock,
-        () => diagnostics.write(protectedFolder),
+    }
+    try {
+      await publishFixtureDiagnostics(
+        diagnostics,
+        protectedFolder,
         stopDeadline,
-        "report",
       );
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
       await admit(
         browserFixtureClock,
         () =>

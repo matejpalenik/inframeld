@@ -131,6 +131,12 @@ Confirms original asynchronous admission with a known or explicitly unknown job 
 
 <ApiSchema name="OwnOrganizationGrantResponse" />
 
+<a id="PrincipalKind" />
+
+## PrincipalKind
+
+<ApiSchema name="PrincipalKind" />
+
 <a id="ProblemDetails" />
 
 ## ProblemDetails
@@ -156,6 +162,20 @@ Records the original names, Project revisions and eighteen initial assignments. 
 ## ProjectGrantTargetResponse
 
 <ApiSchema name="ProjectGrantTargetResponse" />
+
+<a id="ProjectMemberResponse" />
+
+## ProjectMemberResponse
+
+<ApiSchema name="ProjectMemberResponse" />
+
+<a id="ProjectMembersPageResponse" />
+
+## ProjectMembersPageResponse
+
+A bounded page of stored memberships and the current Project Access revision. A non-null cursor continues within the same scope, with fresh authorization on each page. [The guide](/guides/list-project-members) explains the result and its limits.
+
+<ApiSchema name="ProjectMembersPageResponse" />
 
 <a id="ProjectMetadataChangeResponse" />
 

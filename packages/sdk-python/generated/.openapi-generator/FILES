@@ -31,10 +31,13 @@ inframeld_sdk/models/operation_lookup_response.py
 inframeld_sdk/models/original_operation_lookup_request.py
 inframeld_sdk/models/own_organization_grant_response.py
 inframeld_sdk/models/path_inner.py
+inframeld_sdk/models/principal_kind.py
 inframeld_sdk/models/problem_details.py
 inframeld_sdk/models/project_creation_request.py
 inframeld_sdk/models/project_creation_response.py
 inframeld_sdk/models/project_grant_target_response.py
+inframeld_sdk/models/project_member_response.py
+inframeld_sdk/models/project_members_page_response.py
 inframeld_sdk/models/project_metadata_change_response.py
 inframeld_sdk/models/project_metadata_response.py
 inframeld_sdk/models/project_metadata_update_request.py
