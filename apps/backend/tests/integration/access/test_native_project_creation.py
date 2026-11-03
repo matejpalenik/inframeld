@@ -141,6 +141,15 @@ async def test_first_administrator_cookie_creation_and_bearer_original_replay_us
             first = client.post("/v1/projects", json=body, headers=headers)
             assert first.status_code == 201, "Native cookie creation failed."
             original = first.json()
+            members_path = f"/v1/projects/{original['projectId']}/members"
+            cookie_members = client.get(members_path)
+            assert cookie_members.status_code == 200, "Native cookie membership read failed."
+            assert cookie_members.json()["projectId"] == original["projectId"]
+            assert cookie_members.json()["accessRevision"] == 1
+            assert cookie_members.json()["nextCursor"] is None
+            assert len(cookie_members.json()["items"]) == 1
+            assert cookie_members.json()["items"][0]["principalId"] == principal
+            assert cookie_members.headers["cache-control"] == "no-store"
             assert original["initialGrants"] == [
                 {
                     "target": {"kind": "project", "projectId": original["projectId"]},
@@ -156,6 +165,10 @@ async def test_first_administrator_cookie_creation_and_bearer_original_replay_us
             }
             own_bearer = client.get("/v1/my-organization-access", headers=bearer)
             assert own_bearer.status_code == 200 and own_bearer.json() == own.json()
+            bearer_members = client.get(members_path, headers=bearer)
+            assert bearer_members.status_code == 200
+            assert bearer_members.json() == cookie_members.json()
+            assert bearer_members.headers["cache-control"] == "no-store"
             replay = client.post("/v1/projects", json=body, headers=bearer)
             assert replay.status_code == 201 and replay.json() == original
             assert replay.headers["cache-control"] == first.headers["cache-control"] == "no-store"
@@ -239,8 +252,14 @@ async def test_first_administrator_cookie_creation_and_bearer_original_replay_us
                 )
             assert await provider.token_is_active(tokens.access_token)
             stale_read = client.get("/v1/my-organization-access", headers=bearer)
+            stale_members = client.get(members_path, headers=bearer)
             stale_replay = client.post("/v1/projects", json=body, headers=bearer)
-            assert stale_read.status_code == stale_replay.status_code == 401
+            assert (
+                stale_read.status_code
+                == stale_replay.status_code
+                == stale_members.status_code
+                == 401
+            )
             assert (
                 stale_read.headers["cache-control"]
                 == stale_replay.headers["cache-control"]

@@ -12,13 +12,16 @@ All participants must derive the same stable namespaced lock key across API and 
 
 | Participant | Local change protected by the identity turn |
 | --- | --- |
-| Other first admission, including invitation activation/provisioning | Recheck recovery, link the legitimate principal and commit the guarded local result. |
+| Ordinary human admission | Recheck recovery and current `admit-users` authority, then atomically save the legitimate principal/link, admission, audit and original result. No starter resources. |
+| Invitation activation | Recheck recovery, link the legitimate principal and commit the guarded invitation consumption, intended assignments and original result. |
 | First-administrator bootstrap | After raw provider verification, take the identity turn, existing installation singleton and any existing Organization coordination, then reread current eligibility and pristine/claim facts. |
 | Recovery admission | Find any current local link and commit the original obligation, block and one credential-version advancement together. |
 | Recovery completion | Read the current optional local account and original obligation before applying release eligibility. |
 | Credential-state initialization | Create missing state only when permitted, without resetting existing state, creating an account or granting access. |
 
 The lock is not held from recovery admission until cleanup finishes. Each database operation has its own short transaction. Other participating operations can take their turns between those transactions, while the durable recovery block remains effective.
+
+[ADR-0126](../../../../docs/adr/ADR-0126-separate-human-admission-from-private-starter-provisioning.md) separates ordinary human admission from private starter provisioning. The identity turn protects admission's own local result. It does not invoke or repair starters. A later principal/purpose starter operation follows its own atomic workflow, and admission replay returns only the original admission result.
 
 ## Follow the protected database step
 
@@ -76,7 +79,7 @@ Ordinary authentication reads do not acquire this lock, and existing project-gra
 
 ## Implementation boundary and sources
 
-Recovery admission and completion now take identity coordination before their existing organization locks. The independent initializer uses the same identity turn and retains its history checks and database constraints. [Coordinator tests](../../../../apps/backend/tests/integration/access/test_identity_coordination_postgres.py) cover actual waits, fresh observations, initialization in both orders, rollback, cancellation and bounded failure. The bootstrap PostgreSQL/provider/installed-command/migration cases are authored but unrun locally and remain mandatory CI qualification. Complete invitation activation and its simultaneous-first-activation scenarios remain unfinished under #119. The broader #27 first-setup journey is not delivered by this private consumer.
+Recovery admission and completion now take identity coordination before their existing organization locks. The independent initializer uses the same identity turn and retains its history checks and database constraints. [Coordinator tests](../../../../apps/backend/tests/integration/access/test_identity_coordination_postgres.py) cover actual waits, fresh observations, initialization in both orders, rollback, cancellation and bounded failure. The [maintenance workflow](host-maintenance.md#first-administrator-bootstrap-consumer) owns the delivered bootstrap consumer and its qualification boundary. Complete invitation activation and its simultaneous-first-activation scenarios remain unfinished under #119. The broader #27 first-setup journey is not delivered by this private consumer.
 
 - [Invitation workflow](admission-and-invitations.md#invitations), [invitation transport rules](invitation-contracts.md) and [existing Access write coordination](grant-administration.md#how-the-database-gives-each-change-its-turn).
 - [Credential and recovery records](credential-and-recovery-records.md), [local completion](recovery-completion.md#recovery-completion-workflow) and [remaining production-evidence questions](decision-recovery-production-completion.md).

@@ -46,6 +46,18 @@ The implemented human services are `HumanSessionAuthenticationService` and `Huma
 
 Current operation checks use focused authorizers and policies. `PrincipalAccessEvaluationService` interprets authentication evidence against current facts. `ActionAuthorizationService` and `ProjectGrantAuthorizationService` coordinate their specific decisions. Neither a typed ID nor an `AccessContextDTO` proves current authority.
 
+<a id="read-project-members-from-current-facts"></a>
+
+## Read Project members from current facts
+
+Alice created Support and wants to inspect its stored memberships. The registered `GET /v1/projects/{project_id}/members` route calls [ProjectMembersService](../../../../apps/backend/src/inframeld_backend/access/application/services/project_members_service.py). The service requires a currently eligible human, current Project membership and permission to use `manage-project-members`. Delegation authority is not required. Human cookie and Hydra bearer authentication retain their ordinary current-credential checks.
+
+The [PostgreSQL facts reader](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_project_members_facts_reader.py) observes caller eligibility facts, Project state/revision, membership, the exact action assignment and a bounded member page in one statement. It scopes stored rows before position and limit, retaining the authorization header even for an empty continuation. The service interprets the same facts before returning member data. This is a focused read capability, not another grant writer or authorization framework.
+
+The read returns stored human/application relationships, including inactive members, in principal-ID order. It exposes only stable principal IDs, display names and kinds, plus the Project ID, current Access revision and continuation. Its [endpoint-owned cursor](../../../../apps/backend/src/inframeld_backend/access/application/value_objects/project_members_cursor.py) binds the installation, Organization, Project and order position. The unsigned encoding carries no authority, expiry or snapshot guarantee. Each page obtains fresh facts and authorization. [The membership workflow](memberships-groups-and-handover.md#read-stored-project-members) owns the contract and failures.
+
+Only the read is implemented by this supporting component. Add/remove, ordinary departure and safe handover remain unfinished in #224. The [user guide](../../../../apps/docs/src/app/guides/list-project-members/page.mdx) assumes an existing accepted human credential. [Human qualification #319](https://github.com/matejpalenik/inframeld/issues/319) remains unready until supported setup and the relevant procedures exist.
+
 <a id="follow-the-implemented-grant-operation"></a>
 
 ## Follow the implemented grant operation

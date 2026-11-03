@@ -39,6 +39,12 @@ Existing Projects support `GET /v1/projects/{project_id}/metadata`, `PATCH /v1/p
 
 Schema `0014_project_metadata` preserves existing `projects.name` text as the legacy label and adds a separate nullable selector. [Restricted metadata-authority repair](../../docs/development/operations/project-metadata-repair.md) consumes protected stdin through `inframeld-maintenance`, with real identity verification and original receipts. Its proof-acquisition prerequisite lacks a qualified UI/client journey, so this does not establish an end-to-end first-grant walkthrough. [Ordinary Project creation](../docs/src/app/guides/create-project/page.mdx) through HTTP or a generated SDK saves all eighteen explicit creator assignments with the Project, creator membership, audit and original result. Private-starter provisioning remains unfinished under #27, and the complete supported account-to-API procedure and human acceptance remain unfinished under [#313](https://github.com/matejpalenik/inframeld/issues/313).
 
+## Project membership read
+
+`GET /v1/projects/{project_id}/members` returns one bounded page of stored memberships under current human eligibility, Project membership and permission to use `manage-project-members`. Delegation authority is not required. [List Project members](../docs/src/app/guides/list-project-members/page.mdx) explains HTTP/generated-client use, page size, opaque continuation and per-page authorization/revision. Stored inactive memberships remain visible to the authorized reader, without emails, grants or totals. This read uses existing schema and does not add or remove members.
+
+The initial real starting case is the creator's membership from ordinary Project creation. Full membership mutation and safe handover remain unfinished in #224. [Human qualification #319](https://github.com/matejpalenik/inframeld/issues/319) needs a supported authentication/setup procedure and later multi-member preparation. Backend and generated-client tests do not establish that human journey.
+
 ## Ordinary application worker
 
 `python -m inframeld_backend.application_worker` starts the shared PostgreSQL-backed worker without an HTTP listener. Development Compose exposes it through the opt-in `jobs` profile. Its default production handler registry is empty, and there is no generic job API or CLI. [Run the ordinary application worker](../../docs/development/operations/application-jobs.md) covers explicit schema migration, environment loading, settings, events and safe shutdown.

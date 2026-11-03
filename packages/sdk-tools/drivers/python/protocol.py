@@ -11,6 +11,7 @@ Operation: TypeAlias = Literal[
     "getCurrentSession",
     "getMyOrganizationAccess",
     "createProject",
+    "listProjectMembers",
     "inspectHumanOAuthConsent",
     "decideHumanOAuthConsent",
     "assignProjectUseOnlyGrant",

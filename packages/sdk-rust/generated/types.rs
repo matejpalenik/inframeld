@@ -194,6 +194,55 @@ impl AsRef<str> for ProjectUseOnlyGrantRequestActionId {
         self.as_str()
     }
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectMembersPageResponse {
+    ///Constraint: minimum=0
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub items: Vec<ProjectMemberResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectMemberResponse {
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    pub kind: PrincipalKind,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+}
+///Distinguish local human actors from application accounts.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum PrincipalKind {
+    #[default]
+    #[serde(rename = "human")]
+    Human,
+    #[serde(rename = "application")]
+    Application,
+}
+impl PrincipalKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Human => "human",
+            Self::Application => "application",
+        }
+    }
+}
+impl ::std::fmt::Display for PrincipalKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for PrincipalKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
 ///Report original creation assignments, not a present permission snapshot.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectCreationResponse {

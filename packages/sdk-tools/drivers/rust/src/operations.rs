@@ -96,6 +96,20 @@ pub async fn observe(
         ),
         "getCurrentSession" => observed!(client.get_current_session().await),
         "getMyOrganizationAccess" => observed!(client.get_my_organization_access().await),
+        "listProjectMembers" => {
+            let query = request.query.as_ref();
+            observed!(
+                client
+                    .list_project_members(
+                        request.path.as_ref().unwrap()["project_id"]
+                            .as_str()
+                            .unwrap(),
+                        query.and_then(|value| value["limit"].as_i64()),
+                        query.and_then(|value| value["cursor"].as_str())
+                    )
+                    .await
+            )
+        }
         "createProject" => observed!(
             client
                 .create_project(

@@ -56,6 +56,7 @@ def test_openapi_contract_matches_application() -> None:
         ("/v1/projects/{project_id}/grants", "post"),
         ("/v1/operations/lookup", "post"),
         ("/v1/projects/{project_id}/metadata", "get"),
+        ("/v1/projects/{project_id}/members", "get"),
         ("/v1/projects/{project_id}/metadata", "patch"),
         ("/v1/projects/by-name/{name}", "get"),
     ],
@@ -123,6 +124,32 @@ def test_schema_fixture_preserves_native_field_semantics() -> None:
         "string",
         "integer",
     }
+
+
+def test_project_members_native_contract_is_one_bounded_page_with_explicit_continuation() -> None:
+    schema = create_app().openapi()
+    operation = schema["paths"]["/v1/projects/{project_id}/members"]["get"]
+    assert operation["operationId"] == "listProjectMembers"
+    assert "requestBody" not in operation
+    parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
+    assert set(parameters) == {"project_id", "limit", "cursor"}
+    assert parameters["project_id"]["schema"]["format"] == "uuid"
+    limit = parameters["limit"]["schema"]
+    assert (limit["default"], limit["minimum"], limit["maximum"]) == (25, 1, 100)
+    cursor = parameters["cursor"]["schema"]["anyOf"][0]
+    assert (cursor["minLength"], cursor["maxLength"]) == (1, 1024)
+    page = schema["components"]["schemas"]["ProjectMembersPageResponse"]
+    assert set(page["required"]) == {"projectId", "accessRevision", "items", "nextCursor"}
+    assert set(page["properties"]) == set(page["required"])
+    assert {choice["type"] for choice in page["properties"]["nextCursor"]["anyOf"]} == {
+        "string",
+        "null",
+    }
+    member = schema["components"]["schemas"]["ProjectMemberResponse"]
+    assert set(member["required"]) == {"principalId", "displayName", "kind"}
+    assert set(member["properties"]) == set(member["required"])
+    for status in ("401", "403", "404", "422", "503"):
+        assert set(operation["responses"][status]["content"]) == {"application/problem+json"}
 
 
 def test_schema_fixture_preserves_multipart_uploads() -> None:

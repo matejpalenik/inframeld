@@ -1,12 +1,30 @@
 # Admit humans and activate invitations
 
-Alice invites Bob into Support and intends to make him a member of SupportKnowledge. Bob proves his own identity. The invitation describes intended access, but cannot promise that Alice will still be authorized when he activates it.
+In the accepted workflow, Alice admits Bob to the installation without creating his starter resources. An invitation can additionally describe intended memberships and grants, but cannot promise that Alice will still be authorized when Bob activates it.
 
 ## Identity, admission and assignments
 
 Kratos verifies a human identity. Access links its trusted provider authority and subject to a stable local principal. Local admission permits entry into the installation. Project membership, group membership and exact action grants are separate relationships. Matching email alone never joins identities or grants rights.
 
 An invitation is a revocable, single-use intent, not an identity proof or an unrestricted invitation role. It can admit Bob and carry explicit assignments. It does not automatically make him an installation administrator. Private starter provisioning and the first-administrator host claim have their own [first-use workflow](../../inframeld-architecture/references/first-use-and-private-defaults.md) and [fixed initial grants](actions-and-initial-grants.md).
+
+<a id="ordinary-human-admission"></a>
+
+## Admit a human without provisioning starters
+
+**Accepted design:** [ADR-0126](../../../../docs/adr/ADR-0126-separate-human-admission-from-private-starter-provisioning.md), approved on 2026-11-03, separates ordinary human admission from required private starter provisioning. This ordinary admission operation is not yet implemented or qualified.
+
+Alice must be a currently eligible human with permission to use `admit-users` for the installation's Organization. Authorize Alice's current use of `admit-users` in a preliminary transaction, then close it before the private Kratos lookup for Bob. Access then verifies Bob's real Kratos identity and its exact trusted provider authority and subject. A typed email, an OAuth consent result or a caller-supplied local identity cannot replace that verification. All provider I/O stays outside local database transactions.
+
+In the final transaction, take [Bob's identity turn](identity-admission-coordination.md), then an exclusive Organization turn. Reread current authority, recovery, admission, exact identity-binding and Organization Access-revision facts before saving. Commit Bob's principal/link, local admission, required audit and original result together. A conflict or failed check leaves no partial admission or duplicate identity. Admission neither creates starter resources nor assigns implicit `create-projects` authority. It cannot restore a suspended human or clear a recovery block.
+
+Only fresh `201` new-principal admission, after the reviewed Organization revision and current eligibility checks, may initialize an absent [human credential version](credential-and-recovery-records.md#human-credential-version-records) at 1 when no history exists. Preserve an existing generation. Missing version state with history fails closed. A fresh `200` already-admitted result changes no business or credential state and does not advance the Organization Access revision. It commits exactly one required no-change audit with the original no-change outcome and completion.
+
+Before replaying a completed business receipt, recheck both Alice's current `admit-users` authority and Bob's exact current provider identity, local-principal binding and recovery admissibility. Current suspension, provider inactivation or a pending/unreleased recovery block rejects business-receipt replay. Completed recovery history alone does not deny replay. This differs from [generic original-operation metadata lookup](../../inframeld-application-contracts/references/operation-recovery-contracts.md#original-request-lookup), which retains its own disclosure contract.
+
+If the response is lost, return the original business result only after those current checks. Replay never initializes credential state, restores admission or rights, provisions or repairs resources, or adds another audit. A completed admission remains completed if later starter provisioning fails.
+
+The first-use journey still requires the separate [private-starter operation](../../inframeld-architecture/references/first-use-and-private-defaults.md#make-provisioning-safe-to-repeat). That operation retains its principal/purpose identity, atomic ordinary resources and explicit creator grants. Its completion and deliberate-removal state govern later setup. Admission alone is not setup readiness. The first-administrator host claim and invitation activation retain their existing authority and outcomes.
 
 <a id="invitations"></a> <a id="single-use-invitations-with-current-authority"></a>
 
@@ -46,7 +64,7 @@ Retain the original identity, issuer, target bindings, intended effects, expiry/
 
 ## Implementation status and reading routes
 
-The invitation lifecycle and documented transport draft are accepted at their stated status. They do not establish implemented invitation routes, a production account UI or qualified concurrent first admission.
+Ordinary admission under ADR-0126 and the invitation lifecycle are accepted at their stated status. They do not establish implemented admission or invitation routes, generated client methods or qualified concurrent first admission. The invitation transport draft remains separate from the new ordinary-admission operation. Full #27 still includes the unadmitted-human proof producer, private starters and usable first setup. Human acceptance remains unperformed under [#185](https://github.com/matejpalenik/inframeld/issues/185).
 
 For exact inputs, route symbols, limits and response alternatives, read [Invitation contracts](invitation-contracts.md). For a target's exact fields, read [Grant targets](grant-target-contract.md). For existing membership or delegation changes, read [Grant administration](grant-administration.md) and [Memberships and handover](memberships-groups-and-handover.md).
 

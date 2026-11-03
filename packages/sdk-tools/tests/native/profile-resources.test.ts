@@ -23,6 +23,7 @@ import {
   observeProfileListener,
   expectedStalledCloseFailure,
   stalledCloseMessages,
+  publishFixtureDiagnostics,
 } from "./fixtures/browser-owner.ts";
 import {
   FixtureDiagnostics,
@@ -374,9 +375,10 @@ test(
           }
         }
         try {
-          await withinDeadline(
-            diagnostics.write(protectedFolder),
-            Math.max(0, entered + 50000 - performance.now()),
+          await publishFixtureDiagnostics(
+            diagnostics,
+            protectedFolder,
+            entered + 50000,
           );
         } catch (error) {
           errors.push(error);

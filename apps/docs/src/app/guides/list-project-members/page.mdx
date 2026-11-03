@@ -1,0 +1,243 @@
+export const pageMetadata = {
+  title: "List Project members",
+  description:
+    "Read stored Project memberships one page at a time under current authority.",
+}
+
+# List Project members
+
+Read the stored memberships of a Project you manage. Each result identifies a person or application account by its permanent principal ID, display name and kind. Use the HTTP API or a generated SDK to request one bounded page.
+
+## Prepare your Project and permission
+
+You need the backend URL, a permanent Project ID and a current human credential accepted by that installation. You must be a currently eligible Project member with permission to use `manage-project-members` on that Project. Permission to delegate that action is not required. Project membership alone is insufficient.
+
+For the smallest starting case, use a Project you [created through the ordinary API](/guides/create-project). Keep its returned `projectId`. Creation gives you membership and the required action among its eighteen initial assignments. No second person is needed to inspect your own newly created Project's membership.
+
+These examples assume `INFRAMELD_URL` and `INFRAMELD_TOKEN` are already set through the shared [HTTP setup](/clients/http#call-protected-operations), using an existing valid human bearer token. A complete supported account-to-API setup procedure remains unfinished. Browser sign-in alone does not supply a terminal bearer token. [Human qualification #319](https://github.com/matejpalenik/inframeld/issues/319) remains unready for handoff until the chosen interface's setup and procedure are prepared. It can reuse the shared preparation tracked by #313 without requiring that issue's separate acceptance to be complete.
+
+Replace the example UUID below with your actual Project ID. Start without a continuation cursor:
+
+<CodeGroup>
+
+```shell
+export PROJECT_ID='00000000-0000-4000-8000-000000000003'
+unset MEMBERS_CURSOR
+```
+
+</CodeGroup>
+
+For an SDK alternative, follow the source-package setup for [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) in a separate example project. There is no delivered CLI membership-list command or browser membership control.
+
+## Read one page
+
+Choose one alternative. Each requests up to 25 stored memberships. The default is 25, and `limit` accepts integers from 1 to 100. No request body or idempotency key is needed.
+
+Save the Python program as `list_project_members.py`, the TypeScript program as `list-project-members.ts`, or the Rust program as `src/main.rs` in its example project:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get --data-urlencode 'limit=25' \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/members" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+```python
+import asyncio
+import os
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+
+
+async def main() -> None:
+    configuration = Configuration(host=os.environ["INFRAMELD_URL"])
+    async with ApiClient(configuration) as client:
+        try:
+            response = await AccessApi(client).list_project_members_with_http_info(
+                project_id=UUID(os.environ["PROJECT_ID"]),
+                limit=25,
+                cursor=os.environ.get("MEMBERS_CURSOR"),
+                _headers={
+                    "Authorization": f"Bearer {os.environ['INFRAMELD_TOKEN']}"
+                },
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            print(f"Membership read failed: HTTP {error.status}")
+            print(error.body)
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("No usable membership response.")
+            raise SystemExit(1) from error
+
+        print(f"HTTP {response.status_code}")
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import { createClient, listProjectMembers } from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const cursor = process.env.MEMBERS_CURSOR
+if (!baseUrl || !token || !projectId) {
+  throw new Error("Set INFRAMELD_URL, INFRAMELD_TOKEN and PROJECT_ID")
+}
+
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const result = await listProjectMembers({
+  client,
+  path: { project_id: projectId },
+  query: { limit: 25, ...(cursor === undefined ? {} : { cursor }) },
+  headers: { Authorization: `Bearer ${token}` },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error) {
+  console.error("Membership read failed:", result.error.kind)
+  console.error("HTTP status:", result.response?.status)
+  if (result.error.kind === "api") {
+    console.error(result.error.body)
+  } else {
+    console.error(result.error.message)
+  }
+  process.exitCode = 1
+} else if (result.data) {
+  console.log("HTTP", result.response?.status)
+  console.log(JSON.stringify(result.data, null, 2))
+} else {
+  throw new Error("No usable membership response")
+}
+```
+
+```rust
+use inframeld_sdk::HttpClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let project_id = std::env::var("PROJECT_ID")?;
+    let cursor = match std::env::var("MEMBERS_CURSOR") {
+        Ok(value) => Some(value),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(error) => return Err(error.into()),
+    };
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    match client
+        .list_project_members(project_id, Some(25), cursor.as_deref())
+        .await
+    {
+        Ok(response) => {
+            println!("HTTP {}", response.status);
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+        }
+        Err(error) => {
+            if let Some(context) = error.api() {
+                eprintln!("Membership read failed: HTTP {}", context.status);
+                eprintln!("{}", context.body);
+            } else {
+                eprintln!("No usable membership response: {error}");
+            }
+            return Err(error.into());
+        }
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python list_project_members.py`, `node list-project-members.ts` with Node 26 in the ESM project, or `cargo run` in the Cargo project. The shared client pages supply the dependency and runtime configuration.
+
+## Interpret the page
+
+HTTP `200` returns `projectId`, the current Project `accessRevision`, `items` and `nextCursor`. Each item contains only `principalId`, `displayName` and `kind`, which is `human` or `application`. Results use ascending principal-ID order. Display names are labels and need not be unique.
+
+For a newly created Project with only its creator, this illustrative response shows one stored human membership. Your actual IDs, display name and revision come from your installation:
+
+<CodeGroup>
+
+```json
+{
+  "projectId": "00000000-0000-4000-8000-000000000003",
+  "accessRevision": 1,
+  "items": [
+    {
+      "principalId": "00000000-0000-4000-8000-000000000002",
+      "displayName": "Alice",
+      "kind": "human"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+</CodeGroup>
+
+Compare the creator's `principalId` with the current [session response](/api-reference/projects-and-access#inspect-your-session). Reading does not change membership or advance the Project Access revision.
+
+The list retains stored memberships of inactive people and application accounts. Presence does not establish that an account can currently act. The response contains no email addresses, action grants, group memberships or total count. It is neither a complete account directory nor a permission report.
+
+## Continue only when another page exists
+
+A non-null `nextCursor` identifies the next page. Pass the complete value unchanged as `cursor` on the same installation and Project. It is an opaque position bound to this endpoint's scope and order, not authorization. Do not decode, edit or construct it.
+
+When a response supplies a non-null cursor, set `MEMBERS_CURSOR` to that returned string. The SDK programs above read this variable and request that one next page. With cURL, use:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --data-urlencode 'limit=25' \
+  --data-urlencode "cursor=$MEMBERS_CURSOR" \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/members" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A null `nextCursor` means no further page was found for that read. Omit the cursor for a new first-page request rather than sending an empty string. These examples never fetch every page automatically.
+
+Each page checks current identity, membership and action authority, and reports the revision observed for that page. The cursor does not freeze the list or preserve an earlier permission. Concurrent membership changes can affect later pages, including an empty continuation page. If a later request fails, earlier pages are partial observations, not a completed inventory.
+
+The one-creator starting case normally ends on its first page. A supported multi-member human starting state remains unavailable. Synthetic membership rows used in engineering tests are not a setup procedure.
+
+## Handle a failed read
+
+| Result                                       | Meaning and next action                                                                                                                                          |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`                                        | Correct malformed or competing authentication. Use one supported credential family.                                                                              |
+| `401`                                        | Supply a currently accepted human credential for this installation. Application keys cannot authenticate this human operation.                                   |
+| `403`                                        | Current eligibility or permission to use `manage-project-members` is insufficient. A cursor supplies no authority.                                               |
+| `404`                                        | The Project is missing, hidden or unavailable to the caller. A remembered ID does not grant visibility.                                                          |
+| `422`                                        | Check the Project ID, page limit and unchanged cursor. Empty, malformed or incompatible cursors, duplicate/unknown query fields and request bodies are rejected. |
+| `503`, transport failure or decoding failure | A usable page could not be established. Keep any earlier pages identified as partial and resolve the failure before continuing.                                  |
+
+A failed or denied read is not an empty success. SDKs retain available response context, and an HTTP success status alone does not override a decoding failure. Browser-cookie reads use the installation's actual cookie/Origin configuration. This GET does not need a cookie-write CSRF header. Avoid tracing credentials or retaining raw cursors in diagnostic logs.
+
+Adding or removing members and safe departure/handover remain separate unfinished work in #224. [Qualification #319](https://github.com/matejpalenik/inframeld/issues/319) retains those human cases as well as the initial read. This guide does not establish that the complete journey has been accepted.
