@@ -504,6 +504,7 @@ services:
     command: ["tests/integration"]
 
 networks:
+  default: {}
   artifact-storage:
     internal: true
 
