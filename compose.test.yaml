@@ -438,8 +438,8 @@ services:
     cpus: 2
     working_dir: /data
     tmpfs:
-      - /data:rw,nosuid,nodev,noexec,size=268435456,mode=0700,uid=10001,gid=10001
-      - /tmp:rw,nosuid,nodev,noexec,size=16777216,mode=0700,uid=10001,gid=10001
+      - /data:rw,nosuid,nodev,noexec,size=268435456,mode=0700,${INFRAMELD_TEST_TMPFS_OWNER_OPTIONS:-uid=10001,gid=10001}
+      - /tmp:rw,nosuid,nodev,noexec,size=16777216,mode=0700,${INFRAMELD_TEST_TMPFS_OWNER_OPTIONS:-uid=10001,gid=10001}
     volumes:
       - ./config/seaweedfs/test-filer.toml:/etc/seaweedfs/filer.toml:ro
       - ./config/seaweedfs/test-security.toml:/etc/seaweedfs/security.toml:ro

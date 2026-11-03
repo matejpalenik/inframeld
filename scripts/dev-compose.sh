@@ -104,7 +104,12 @@ compose() {
 }
 
 test_compose() {
-    PODMAN_COMPOSE_WARNING_LOGS=false "${compose_command[@]}" -p inframeld-test -f "${test_compose_file}" "$@"
+    local test_tmpfs_owner_options="uid=10001,gid=10001"
+    if [[ "${container_command}" == podman ]]; then
+        test_tmpfs_owner_options="U,notmpcopyup"
+    fi
+    INFRAMELD_TEST_TMPFS_OWNER_OPTIONS="${test_tmpfs_owner_options}" \
+        PODMAN_COMPOSE_WARNING_LOGS=false "${compose_command[@]}" -p inframeld-test -f "${test_compose_file}" "$@"
 }
 
 wait_for_postgres() {
