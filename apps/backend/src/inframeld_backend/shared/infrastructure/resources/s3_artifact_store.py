@@ -137,7 +137,7 @@ class S3ArtifactStore(ArtifactStore):
                         cleanup=lambda _: body.close(),
                         deadline=deadline,
                     )
-                except _ReadInterruptedError:
+                except (_ReadInterruptedError, asyncio.CancelledError):
                     deferred_close = True
                     raise
                 if not chunk:
@@ -309,7 +309,7 @@ class S3ArtifactStore(ArtifactStore):
         try:
             async with asyncio.timeout(budget):
                 await asyncio.shield(task)
-        except (TimeoutError, asyncio.CancelledError):
+        except (TimeoutError, asyncio.CancelledError) as error:
             abandoned = True
             if task.done() and cleanup is not None:
                 cleanup(result[0] if result else None)
@@ -317,6 +317,8 @@ class S3ArtifactStore(ArtifactStore):
                 raise ArtifactWriteOutcomeUnknownError(
                     "The original storage write outcome is unknown."
                 ) from None
+            if isinstance(error, asyncio.CancelledError):
+                raise
             raise _ReadInterruptedError("The storage observation could not be confirmed.") from None
         except (BotoCoreError, ClientError, OSError):
             if mutating:

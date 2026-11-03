@@ -363,7 +363,7 @@ async def test_canceled_observation_closes_even_a_late_native_response(
     try:
         assert await asyncio.to_thread(entered.wait, 1)
         work.cancel()
-        with pytest.raises(ArtifactStoreUnavailableError):
+        with pytest.raises(asyncio.CancelledError):
             await work
         release.set()
         await store.close()
@@ -371,6 +371,72 @@ async def test_canceled_observation_closes_even_a_late_native_response(
     finally:
         release.set()
         await asyncio.gather(work, return_exceptions=True)
+        await stream.aclose()
+        await store.close()
+
+
+@pytest.mark.asyncio
+async def test_canceled_body_read_keeps_drain_ownership_until_native_read_finishes(
+    tmp_path: Path, client: S3Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entered, release, finished = threading.Event(), threading.Event(), threading.Event()
+    raw = BytesIO(b"abc")
+    body = StreamingBody(raw, 3)
+    reads: list[int | None] = []
+    results: list[bytes] = []
+    gets: list[int] = []
+    closures: list[bool] = []
+    original_read, original_close = body.read, body.close
+
+    def get_body(*, Bucket: str, Key: str) -> GetObjectOutputTypeDef:
+        assert Bucket == "private-artifacts" and Key == KEY
+        gets.append(1)
+        # Model only the concrete SDK response fields consumed by this fixture.
+        return cast(GetObjectOutputTypeDef, {"Body": body, "ContentLength": 3})
+
+    def delayed_read(amt: int | None = None) -> bytes:
+        reads.append(amt)
+        entered.set()
+        try:
+            assert release.wait(2)
+            result = original_read(amt)
+            results.append(result)
+            return result
+        finally:
+            finished.set()
+
+    def close_body() -> None:
+        closures.append(finished.is_set())
+        original_close()
+
+    monkeypatch.setattr(client, "get_object", get_body)
+    monkeypatch.setattr(body, "read", delayed_read)
+    monkeypatch.setattr(body, "close", close_body)
+    store = S3ArtifactStore(settings(tmp_path), client=client)
+    stream = store.read(ATTEMPT)
+    work = asyncio.create_task(anext(stream))
+    closing: asyncio.Task[None] | None = None
+    try:
+        assert await asyncio.to_thread(entered.wait, 1)
+        work.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await work
+        assert not raw.closed and closures == []
+
+        closing = asyncio.create_task(store.close())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert not closing.done() and not raw.closed
+
+        release.set()
+        await asyncio.wait_for(closing, 1)
+        assert raw.closed and closures == [True]
+        assert gets == [1] and reads == [65536] and results == [b"abc"]
+    finally:
+        release.set()
+        await asyncio.gather(work, return_exceptions=True)
+        if closing is not None:
+            await asyncio.gather(closing, return_exceptions=True)
         await stream.aclose()
         await store.close()
 
