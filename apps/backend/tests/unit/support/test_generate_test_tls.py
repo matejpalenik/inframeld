@@ -46,12 +46,13 @@ async def _connect(port: int, ca: Path, hostname: str = "password-breaches") -> 
 
 
 @pytest.mark.asyncio
-async def test_generated_identity_allows_verified_tls(tmp_path: Path) -> None:
+@pytest.mark.parametrize("hostname", ["password-breaches", "seaweedfs"])
+async def test_generated_identity_allows_verified_tls(tmp_path: Path, hostname: str) -> None:
     trust, identity = tmp_path / "trust", tmp_path / "identity"
     generate_certificates(trust, identity)
 
     async with _tls_server(identity) as port:
-        assert await _connect(port, trust) == b"ready"
+        assert await _connect(port, trust, hostname) == b"ready"
 
 
 @pytest.mark.asyncio
@@ -108,7 +109,7 @@ def test_exports_only_required_material_with_restricted_key_access(tmp_path: Pat
 
     certificate = x509.load_pem_x509_certificate((identity / "server.pem").read_bytes())
     names = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
-    assert names.get_values_for_type(x509.DNSName) == ["password-breaches"]
+    assert names.get_values_for_type(x509.DNSName) == ["password-breaches", "seaweedfs"]
     assert (
         abs((certificate.not_valid_before_utc - (now - timedelta(minutes=5))).total_seconds()) < 1
     )
