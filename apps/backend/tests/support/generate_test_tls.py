@@ -23,6 +23,7 @@ def generate_certificates(
     ca = trustme.CA()
     server = ca.issue_cert(
         "password-breaches",
+        "seaweedfs",
         not_before=issued_at - timedelta(minutes=5),
         not_after=issued_at + timedelta(hours=24),
     )
@@ -63,7 +64,7 @@ def main() -> None:
     os.setuid(10001)
 
     generate_certificates(TLS_TRUST_DIRECTORY, TLS_IDENTITY_DIRECTORY)
-    print("Disposable TLS material generated for password-breaches.")
+    print("Disposable TLS material generated for private integration services.")
 
 
 if __name__ == "__main__":

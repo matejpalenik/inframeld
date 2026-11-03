@@ -166,6 +166,24 @@ podman compose -p inframeld-test -f compose.test.yaml logs kratos hydra
 
 Use `docker compose` for logs when `INFRAMELD_CONTAINER_RUNTIME=docker` selects Docker. Each `test-run` performs readiness checks and migrations before pytest. The public wrapper accepts the same optional pytest arguments and handles cleanup automatically, for example `pnpm test:integration tests/integration/kratos`.
 
+<a id="private-seaweedfs-artifact-checks"></a>
+
+### Private SeaweedFS artifact checks
+
+Use the private artifact fixture to check the internal S3 adapter and complete readback verification. It supports the later #40/#41 upload journey without exposing a public upload interface. No separate human walkthrough applies to this component. Production publication, capacity and cleanup composition, crash settlement, server late-write exclusion and positive physical-retirement proof remain unfinished in #40.
+
+For this development test, require **20 GiB available on both the host checkout filesystem and the container-engine storage filesystem**. The 20 GiB threshold already includes the existing 8 GiB build allowance. No development percentage floor applies. Production's 20% projected free-space policy is unchanged. Check current availability before the authorized run.
+
+The [private Compose graph](../../../compose.test.yaml) uses one pinned SeaweedFS image with `pull_policy: never`. Resolve its exact manifest index in the local cache before startup. Cache presence is a setup prerequisite, not evidence that the server is compatible. Source and runtime gates must be satisfied before running this command from the repository root:
+
+```bash
+INFRAMELD_TEST_NORMAL_WORK_SECONDS=900 mise exec -- pnpm test:integration tests/integration/artifacts/test_native_s3_artifact_store.py --maxfail=1
+```
+
+The fixture has no host ports and uses the internal test network and private TLS. It runs as UID 10001 with a read-only root and empty capabilities. Data and temporary files use mode-0700 tmpfs mounts bounded to 256 MiB and 16 MiB respectively. It has no named data volume. The existing TLS initializer prepares certificates only. This invocation sets one shared 900-second deadline across startup and tests through the existing integration process owner. Omitting the environment variable preserves the ordinary full-suite policy. The existing 60-second cleanup budget and five-second TERM and KILL grace periods are unchanged.
+
+The native cases are intended to check conditional `PUT`, complete SHA-256/length readback, `HEAD`, scoped `LIST`, exact `DELETE`, conflicts, bad readback, CA trust, rejected credentials and a controlled lost response reconciled against the original object. Native execution has not yet run. A passing run would qualify only the cases actually executed. This ephemeral fixture does not prove durable restart, a server write finishing after deletion or physical chunk retirement. A `DELETE` acknowledgment or absent `HEAD` cannot release retained physical reservations. The [artifact reference](../../../.agents/skills/inframeld-application-contracts/references/artifact-storage.md#internal-s3-adapter-and-verification) owns those limits.
+
 ### Serial integration workflow
 
 The shell entrypoint delegates to the standard-library [host Python phase runner](../../../apps/backend/tests/support/integration_process_runner.py), which owns one automatic run from startup through teardown. Use the repository's Python 3.13 toolchain. If `waitid` with `WNOWAIT` is unavailable, the runner exits `2` before startup with a toolchain instruction. Manual start, test and stop commands remain available for debugging, without reservations or worktree restrictions. Stop the current run before starting another local integration command. CI executes its integration steps sequentially on its job's isolated GitHub-hosted runner. No parallel pytest workers or shared-stack coordination are configured.

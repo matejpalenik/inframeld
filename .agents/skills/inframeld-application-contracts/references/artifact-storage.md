@@ -14,7 +14,17 @@ Equivalent allocation retries recover the original reservation, obligation, clea
 
 Allocation applies the accepted byte and projected free-space limits to a supplied trusted [capacity observation](../../../../apps/backend/src/inframeld_backend/shared/application/dtos/artifact_capacity_dto.py). This component does not measure the host or configure storage. Dormant cleanup reserves queue capacity before private effects, but consumes neither an active slot nor an attempt before the original transfer deadline. The [job workflow](jobs-and-recovery.md#implemented-artifact-cleanup-binding) describes its current-fence and original-obligation checks.
 
-This foundation does not deliver artifact upload, verified readback, publication, a production cleanup handler, physical completion or reservation settlement. The ordinary worker still registers no handlers. Tests that supply trusted capacity or stored cleanup facts qualify those internal contracts only. SeaweedFS compatibility, late-write exclusion and physical chunk retirement remain unqualified, and issue #40 remains open. A terminal cleanup job cannot establish physical deletion or release its retained obligation and bytes.
+This allocation foundation does not itself perform object I/O or settle reservations. Tests that supply trusted capacity or stored cleanup facts qualify those internal contracts only. A terminal cleanup job cannot establish physical deletion or release its retained obligation and bytes.
+
+## Internal S3 adapter and verification
+
+The internal [storage contract](../../../../apps/backend/src/inframeld_backend/shared/application/protocols/artifact_store.py) separates object I/O from admission and publication. Its [S3 adapter](../../../../apps/backend/src/inframeld_backend/shared/infrastructure/resources/s3_artifact_store.py) conditionally creates the original attempt's immutable object, streams reads, inspects exact objects, lists one bounded scope and deletes an exact object. The [verification service](../../../../apps/backend/src/inframeld_backend/shared/application/services/artifact_verification_service.py) compares the complete readback's byte length and SHA-256 with the original trusted expectation. Object metadata and `ETag` alone cannot establish that match.
+
+Before `PUT`, the caller must durably record unresolved-write evidence. For Alice's upload, a conflict or lost write acknowledgment retains the original attempt and key. Read back that same object before deciding whether its bytes match. Neither a client timeout nor drained client calls prove that a server-side write can no longer finish. Successful verification establishes byte integrity, not current publication authority or reservation settlement.
+
+This supporting component excludes local staging ports and resources. Production composition with capacity allocation, conditional publication and cleanup, crash settlement, server late-write exclusion and positive physical-retirement proof remain unfinished in #40. The ordinary worker still registers no handlers. These are implementation and automated-qualification gaps, not deferred human acceptance. The internal adapter exposes no public upload API, SDK or command.
+
+The [private SeaweedFS tests](../../../../docs/development/guides/testing.md#private-seaweedfs-artifact-checks) describe the native cases and their limits. Native execution is not yet qualified. The production projected free-space policy remains 20%. The development test budget in that runbook does not change production admission policy.
 
 <a id="a-delayed-seaweedfs-upload-has-the-same-problem"></a>
 

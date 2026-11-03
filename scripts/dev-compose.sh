@@ -376,7 +376,7 @@ case "${command_name}" in
             test_compose build integration-tests
         fi
         test_compose run --rm --no-deps -T test-tls-init
-        test_compose up -d postgres mailpit mock-oidc password-breaches recovery-hooks kratos kratos-expiring hydra hydra-lifetimes recovery-callbacks kratos-recovery recovery-execution-callbacks kratos-recovery-execution
+        test_compose up -d postgres mailpit mock-oidc password-breaches seaweedfs recovery-hooks kratos kratos-expiring hydra hydra-lifetimes recovery-callbacks kratos-recovery recovery-execution-callbacks kratos-recovery-execution
         trap - EXIT
         ;;
     test-run)

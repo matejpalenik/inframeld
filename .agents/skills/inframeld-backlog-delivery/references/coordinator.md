@@ -107,7 +107,52 @@ Use short event messages for changed ownership, blocked decisions, review reques
 
 Follow [gates and recovery](gates-and-recovery.md), including current evidence, failure classification, serial expected-head merges and the host boundary. After an observed merge, notify affected workers of actual main and changed contracts. Rebase only at safe checkpoints and refresh affected evidence. Do not merge several PRs against stale main.
 
-At meaningful checkpoints, report the focused epic, shipped capabilities, the next issue expected to close and its remaining acceptance. Identify the next useful PR, exact remaining gate, owner of the next action and any human decision. Explain why work outside the focus is proceeding and distinguish supporting merges from completed issues and deferred human acceptance. Keep this in the ordinary progress update. An illustrative update is: "The next useful PR is issuer-specific client registration. Focused tests pass. The host-suite run is blocked by execution permissions, and its executor is obtaining the permitted access. Account-page work continues independently." This explains what can ship and what will unblock it without requiring the reader to reconstruct command transcripts.
+Keep ordinary progress updates short: report a meaningful result, changed gate, next action or needed decision. Use the table below only when selecting or replanning issue work. A subprocess result, PR push, routine review update or unchanged status poll does not trigger it.
+
+### Report once at an issue-selection checkpoint
+
+Show one compact Markdown table when choosing the initial batch, assigning or resuming an issue, or reconsidering eligible work after a confirmed completion, supporting merge or changed blocker. This includes a selection decision to wait rather than dispatch. Combine related choices into one checkpoint update. A completion without a new selection decision needs only a short event message, then appears in the next selection table. Never repeat the table each turn or solely because time passed.
+
+Precede it with one line naming the focused epic, next expected issue closure and selected next issue or reason for no assignment. Use verified issue references, or state that no next closure is established. Include all active issues, parked blockers still relevant to this run, the immediate candidates being considered and issues completed since the previous selection checkpoint. Include deferred human qualification when it explains an implementation closure. Keep one row per issue, active work first. Do not copy the entire backlog, retain an ever-growing completed list or add a reporting ledger.
+
+Use these columns and values:
+
+| Column | Allowed content |
+| --- | --- |
+| Issue | An existing `#N` issue reference, linked where practical. A PR is evidence, not an issue row. |
+| Epic | Verified parent epic `#N` and short name. Use `(No Epic)` if none exists or `(Unverified)` if the relationship has not been established. Do not guess from the title. |
+| Deliverable | A short description of the issue's promised capability. |
+| Status | Exactly one label from the status table below. These are chat labels, not new helper stages or GitHub fields. |
+| Completion unblocks | Only verified downstream issue references such as `#905, #906`, optionally linked, or exactly `(No Issue)` when no downstream issue is identified. Put an untracked benefit in Selection reason, not in this cell. Never invent a dependency or list the epic merely because this issue belongs to it. |
+| Blockers | `None`, or concrete issue references and unmet conditions, a required decision, environment failure or missing evidence. Mark an unverified condition explicitly. Normal review/CI queueing and waiting for assignment capacity are not blockers. |
+| Next action / owner | The concrete next step and actual responsible worker, reviewer, coordinator or human. Use `Unassigned` when no owner exists and `None` only for completed work needing no follow-up. Include the remaining acceptance and useful PR reference when a supporting increment has merged. |
+| Selection reason | A brief reason for selecting, continuing, waiting or deferring. Explain work outside the focused epic here. |
+
+Use `(No Issue)` for an untracked capability or when no verified downstream issue is known. It does not assert that completion has no benefit. If relevant dependency evidence is unknown, name that uncertainty in Blockers or Next action rather than presenting it as verified.
+
+| Status | Meaning |
+| --- | --- |
+| Backlog | Authorized future candidate whose readiness has not yet been established. |
+| Ready | Prerequisites are verified and work awaits assignment capacity. |
+| In progress | Implementation or remaining issue acceptance is being worked on. A merged supporting PR alone does not make the issue Done. |
+| In review | The current delivery boundary awaits independent review. |
+| In validation | Required automated checks or the final merge gate are pending. |
+| Blocked | A concrete unmet prerequisite, decision, failure or evidence gap prevents the next step. Use this single label for stalled work too, with its condition and unblock action. |
+| Deferred | Deliberately scheduled for later, including published pre-v1 human qualification. Distinguish that choice from an implementation blocker. |
+| Done | Full implementation acceptance, actual merge and issue closure are verified under the existing closure policy. Pure human qualification needs accepted human results before Done. |
+
+Do not introduce aliases such as Stalled, Partial delivery or Checks running. Record partial delivery and the remaining acceptance in Next action. Deferred human acceptance stays visible on its own linked issue, while the implementation issue may be Done under the existing policy. Unknown evidence cannot justify Ready or Done.
+
+For example, these fictional rows show a selection after a supporting read PR merges:
+
+| Issue | Epic | Deliverable | Status | Completion unblocks | Blockers | Next action / owner | Selection reason |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| #901 | #900 Access | Member administration | In progress | #905 | None | Read PR #950 merged. Finish add/remove acceptance / Worker A | Finish the focused issue |
+| #904 | #900 Access | Own permission inspection | Ready | (No Issue) | None | Assign at the next safe handoff / Coordinator | Independent focus work |
+| #905 | #900 Access | Safe departure | Blocked | (No Issue) | #901: membership changes must be delivered | Resume after #901's required capability merges / Coordinator | Preserve its checkpoint |
+| #911 | #900 Access | Human Access qualification | Deferred | (No Issue) | None | Prepare walkthrough and execute before v1 / Engineering, then human tester | Published human work stays tracked |
+
+Derive this view from existing issue, PR, assignment and evidence observations. It does not create assignments, change dependencies, expand scope, reset retries or modify either delivery mode's capacity or merge authority. The [Kanban Guide](https://kanbanguides.org/the-kanban-guide#defining-and-visualizing-the-workflow) supports explicit workflow states chosen for their context. This table is a small reporting view, not an additional project-management system.
 
 Use existing observations to notice time to useful PR/merge, review/integration waiting, repeated checks without new evidence, harness versus feature work and avoidable approval requests. Do not build a metrics service or treat test, agent or receipt counts as delivery goals.
 
