@@ -2,10 +2,101 @@
 import { chmod, mkdtemp, open, rm, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { basename, join } from "node:path";
+import type { TestEvent } from "node:test/reporters";
 import { withResources } from "../../../src/system/process.ts";
 import { describeError } from "../../../src/workflows/stages.ts";
 
-export type FixtureDiagnosticScope = "broker" | "assertion" | "worker";
+export type FixtureDiagnosticScope =
+  "broker" | "assertion" | "worker" | "controller";
+
+/** Publish only fixed native test identities. Node retains test execution and output ownership. */
+export default async function* nativeTestReporter(
+  source: AsyncIterable<TestEvent>,
+): AsyncGenerator<string> {
+  const inventory = [
+    {
+      file: "driver.test.ts",
+      fallback: "driver-file",
+      tests: [
+        [
+          "the TypeScript driver rejects another runtime profile before SDK invocation",
+          "driver-profile",
+        ],
+      ],
+    },
+    {
+      file: "lifecycle.test.ts",
+      fallback: "lifecycle-file",
+      tests: [
+        [
+          "cancelling an active native Fetch call permits a subsequent client request",
+          "fetch-cancel",
+        ],
+        [
+          "the same generated client is reusable after supported operation cancellation",
+          "client-reuse",
+        ],
+      ],
+    },
+    {
+      file: "profile-resources.test.ts",
+      fallback: "profile-file",
+      tests: [
+        [
+          "startup cancellation closes a browser acquired before the fixture returns",
+          "startup-cancel",
+        ],
+        [
+          "a stalled browser close is force-killed and remains a cleanup failure",
+          "stalled-close",
+        ],
+        [
+          "an enclosing test-runner timeout drains a profile before killing survivors",
+          "profile-timeout",
+        ],
+        [
+          "denied termination still permits bounded nonzero CLI exit",
+          "denied-exit",
+        ],
+      ],
+    },
+  ] as const;
+  const diagnostics = new FixtureDiagnostics("controller");
+  let failed = false,
+    failure: unknown;
+  try {
+    for await (const event of source) {
+      if (event.type !== "test:fail") continue;
+      const data = event.data;
+      const file = inventory.find(
+        (row) => row.file === basename(data.entryFile ?? data.file ?? ""),
+      );
+      const caseId =
+        file?.tests.find(([name]) => name === data.name)?.[1] ??
+        file?.fallback ??
+        "native-unknown";
+      try {
+        diagnostics.note({
+          phase: "native-controller",
+          category: "failed",
+          status: null,
+          caseId,
+          failure: data.details.error,
+        });
+      } catch (error) {
+        throw new AggregateError(
+          [data.details.error, error],
+          "Native test diagnostic encoding failed",
+        );
+      }
+    }
+  } catch (error) {
+    failed = true;
+    failure = error;
+  }
+  yield diagnostics.snapshot();
+  if (failed) throw failure;
+}
 export type FixtureCaptureSlot = "probe" | "controller" | "timeout";
 export interface FixtureCaptureMetadata {
   bytes: number;
@@ -131,6 +222,14 @@ export function fixtureDiagnostic(value: unknown): string {
               "startup-cancel",
               "stalled-close",
               "profile-timeout",
+              "driver-profile",
+              "fetch-cancel",
+              "client-reuse",
+              "denied-exit",
+              "driver-file",
+              "lifecycle-file",
+              "profile-file",
+              "native-unknown",
             ];
     if (typeof row[key] !== "string" || !choices.includes(row[key]))
       return invalid();

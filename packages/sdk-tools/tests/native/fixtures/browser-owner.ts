@@ -1,6 +1,7 @@
 /** Keep native browser cleanup authority outside the test workers it observes. */
 import type { BrowserServer } from "playwright";
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, open, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import type { Socket } from "node:net";
 import type { TestContext } from "node:test";
@@ -9,7 +10,7 @@ import { syncBuiltinESMExports } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { artifacts, cache, home } from "../../../src/config.ts";
-import { command } from "../../../src/system/process.ts";
+import { command, withResources } from "../../../src/system/process.ts";
 import { budgets } from "../../../src/system/budgets.ts";
 import {
   FixtureDiagnostics,
@@ -1396,13 +1397,46 @@ async function runFixture(mode: string): Promise<void> {
             "capture",
           );
           captures.set("controller", capture);
+          const statusPath = join(artifacts, "controller-status.json");
+          await admit(
+            browserFixtureClock,
+            async () => {
+              await mkdir(artifacts, { recursive: true });
+              const status = await open(
+                statusPath,
+                constants.O_CREAT |
+                  constants.O_TRUNC |
+                  constants.O_WRONLY |
+                  constants.O_NOFOLLOW |
+                  constants.O_NONBLOCK,
+                0o600,
+              );
+              await withResources(
+                async () => {
+                  if (!(await status.stat()).isFile())
+                    throw new Error(
+                      "Invalid native controller diagnostic destination",
+                    );
+                  await status.chmod(0o600);
+                },
+                () => status.close(),
+              );
+            },
+            began + 900000,
+            "report",
+          );
           await observeFixtureController(diagnostics, "native-controller", () =>
             command(
               process.execPath,
               [
-                "--import",
+                "--require",
                 loader,
                 "--test",
+                "--test-reporter=spec",
+                "--test-reporter=" +
+                  join(home, "tests/native/fixtures/fixture-diagnostics.ts"),
+                "--test-reporter-destination=stdout",
+                "--test-reporter-destination=" + statusPath,
                 ...files.map((file) => join(home, "tests/native", file)),
               ],
               {

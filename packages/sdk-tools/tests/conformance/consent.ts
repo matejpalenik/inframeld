@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { sdkTest } from "../../src/conformance/cases.ts";
+import { budgets } from "../../src/system/budgets.ts";
 import {
   assertSuccess,
   assertJsonBody,
@@ -19,7 +20,7 @@ sdkTest(
       operation: "decideHumanOAuthConsent",
       headers: { ...cookie, Origin: origin, "X-Inframeld-CSRF": "1" },
       body: input,
-      timeout: 2000,
+      timeout: budgets.case,
     });
     assert.equal(
       assertSuccess(observation, 200).redirectTo,
