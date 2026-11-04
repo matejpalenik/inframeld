@@ -209,7 +209,7 @@ PostgreSQL is exposed to the host only at:
 
 Inside Compose, PostgreSQL uses port `5432`, Kratos public/admin use `http://kratos:4433`/`4434` and Hydra public/admin use `http://hydra:4444`/`4445`. The backend uses private verification endpoints while retaining the public Hydra issuer `http://127.0.0.1:14444/` and canonical API audience `http://127.0.0.1:8001`. Both host and container API use authority `kratos:local`. Provider migrations finish before their services start.
 
-The development Kratos config enables password registration, login, and code-based recovery. Kratos sends development email to Mailpit. View captured messages at `http://127.0.0.1:18024`. Its self-service UI URLs are placeholders until browser pages are implemented. Mailpit is for local development. An operator deployment needs its own SMTP configuration. Deployment-level OIDC sign-in is not configured by this Compose setup.
+The development Kratos config enables password registration, login, and code-based recovery. Kratos sends development email to Mailpit. View captured messages at `http://127.0.0.1:18024`. The default HTTP graph retains placeholder self-service UI URLs. The separately delivered existing-human account pages use the [private HTTPS profile](../../../apps/web/README.md#https-reference-profile). Mailpit is for local development. An operator deployment needs its own SMTP configuration. Deployment-level OIDC sign-in is not configured by this Compose setup.
 
 For company sign-in, use [optional identity integration](../guides/identity-integration.md). The default stack above does not configure an OIDC provider.
 
@@ -407,7 +407,7 @@ This operation creates no starter or RAG resources and needs no host recipient p
 
 The backend supports metadata reads by permanent Project ID, exact Name resolution and atomic Name/Display-name changes for an existing Project. Changes require current human-only `edit-project-metadata` authority and a reviewed metadata revision. [Name and rename an existing Project](../../../apps/docs/src/app/guides/name-and-rename-project/page.mdx) gives the HTTP/generated-client path. It does not create Projects or allocate creator grants.
 
-The backend-only maintenance command also consumes the narrow `repair-stranded-authority` request for that exact action. [Project metadata authority repair](../operations/project-metadata-repair.md) records its protected input, additional configuration and safe receipt/replay behavior. Its fresh human proof prerequisite lacks a qualified client/account-UI acquisition journey, so it is not a complete first-grant walkthrough. `pnpm dev:oauth:configure` registers the client and does not acquire that proof.
+The backend-only maintenance command also consumes the narrow `repair-stranded-authority` request for that exact action. [Project metadata authority repair](../operations/project-metadata-repair.md) records its protected input, additional configuration and safe receipt/replay behavior. The [source-built transient proof example](../guides/recipient-proof.md) implements acquisition and direct protected-stdin handoff for an already-admitted recipient. Native combined and human qualification remain pending, so this is not a complete qualified first-grant walkthrough. `pnpm dev:oauth:configure` registers the client and does not acquire proof.
 
 <a id="private-recovery-callbacks"></a>
 

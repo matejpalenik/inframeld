@@ -13,6 +13,17 @@ from pathlib import Path
 from types import FrameType
 
 
+def _has_development_build_space(
+    host_available_bytes: int | None, engine_available_bytes: int | None
+) -> bool:
+    """Require 20 GiB on both filesystems, including the 8 GiB build allowance."""
+    minimum_available_bytes = 20 * 1024**3
+    return all(
+        isinstance(available, int) and available >= minimum_available_bytes
+        for available in (host_available_bytes, engine_available_bytes)
+    )
+
+
 @dataclass
 class _Phase:
     """Keep the immediate leader waitable until its final possible group signal."""
@@ -95,6 +106,7 @@ class AccountUIRunner:
         self._unresolved: list[subprocess.Popen[bytes]] = []
         self.runtime = os.environ.get("INFRAMELD_CONTAINER_RUNTIME", "docker")
         self.project = ""
+        self.recipient_proof = False
 
     def _stop_phase(self, phase: _Phase) -> bool:
         valid = True
@@ -233,10 +245,18 @@ class AccountUIRunner:
             "INFRAMELD_ACCOUNT_BACKEND_IMAGE": f"localhost/{self.project}-backend:check",
             "INFRAMELD_ACCOUNT_WEB_IMAGE": f"localhost/{self.project}-web:check",
             "INFRAMELD_ACCOUNT_WEB_CONTEXT": str(self.directory / "web-context"),
+            "INFRAMELD_ACCOUNT_PROOF_IMAGE": f"localhost/{self.project}-proof:check",
+            "INFRAMELD_ACCOUNT_PROOF_CONTEXT": str(self.directory / "proof-context"),
+            "INFRAMELD_ACCOUNT_PROOF_MODE": "1" if self.recipient_proof else "0",
         }
 
     def _run_phase(
-        self, name: str, arguments: list[str], work_seconds: float, *, cleanup: bool = False
+        self,
+        name: str,
+        arguments: list[str],
+        work_seconds: float,
+        *,
+        cleanup: bool = False,
     ) -> int:
         if self.cancelled and not cleanup:
             return self.cancelled
@@ -291,7 +311,14 @@ class AccountUIRunner:
                 output.close()
 
     def _shell(self, name: str) -> list[str]:
-        if name not in {"runtime_preflight", "startup_stack", "cleanup_stack"}:
+        if name not in {
+            "runtime_preflight",
+            "startup_stack",
+            "cleanup_stack",
+            "recipient_proof_stack",
+            "prepare_contexts",
+            "build_stack",
+        }:
             raise ValueError("Unknown private account phase.")
         assert self.directory is not None
         program = """source "$1"
@@ -302,6 +329,8 @@ account_project="$3"
 account_runtime="$4"
 account_compose_file="$5"
 volume_baseline_complete="$6"
+account_python="$8"
+account_root="$9"
 account_compose=("$account_runtime" compose -p "$account_project" -f "$account_compose_file")
 "$7"
 """
@@ -317,6 +346,8 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             str(self.root / "compose.account-ui.test.yaml"),
             str(self.volume_baseline_complete).lower(),
             name,
+            sys.executable,
+            str(self.root),
         ]
 
     def _work(self) -> int:
@@ -324,7 +355,9 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
         commands = [
             (
                 "prepare",
-                [
+                self._shell("prepare_contexts")
+                if self.recipient_proof
+                else [
                     sys.executable,
                     str(self.root / "apps/web/tests/fixtures/prepare_build_context.py"),
                     str(self.root),
@@ -336,7 +369,9 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             ("compose-version", [self.runtime, "compose", "version"], 30),
             (
                 "build",
-                [
+                self._shell("build_stack")
+                if self.recipient_proof
+                else [
                     self.runtime,
                     "compose",
                     "-p",
@@ -352,7 +387,9 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             ("startup", self._shell("startup_stack"), 180),
             (
                 "browser",
-                [
+                self._shell("recipient_proof_stack")
+                if self.recipient_proof
+                else [
                     self.runtime,
                     "compose",
                     "-p",
@@ -392,18 +429,23 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             "volume_baseline_complete": str(self.volume_baseline_complete).lower(),
             "cleanup": cleanup_state,
         }
+        if self.recipient_proof:
+            values.update(
+                proof_image=environment["INFRAMELD_ACCOUNT_PROOF_IMAGE"],
+                proof_context=environment["INFRAMELD_ACCOUNT_PROOF_CONTEXT"],
+            )
         (self.directory / "context.txt").write_text(
             "".join(f"{key}={value}\n" for key, value in values.items())
         )
 
     def run(self, arguments: list[str]) -> int:
-        if arguments != ["--login-only"]:
+        if arguments not in (["--login-only"], ["--recipient-proof"]):
             print(
-                "Usage: scripts/test-account-ui.sh --login-only\n"
-                "Combined Rust recipient-proof qualification requires its separately recorded driver handoff.",
+                "Usage: scripts/test-account-ui.sh --login-only | --recipient-proof",
                 file=sys.stderr,
             )
             return 2
+        self.recipient_proof = arguments == ["--recipient-proof"]
         supported = sys.version_info >= (3, 13) and all(
             hasattr(os, name)
             for name in ("waitid", "WNOWAIT", "P_PID", "WEXITED", "WNOHANG", "killpg")
@@ -433,7 +475,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
                 self.directory = Path(tempfile.mkdtemp(prefix="inframeld-account-ui-"))
             else:
                 self.directory.mkdir(mode=0o700)
-            self.project = self.directory.name.lower()
+            self.project = self.directory.name.lower().replace("_", "-")
             try:
                 self._write_context("incomplete")
                 status = self._work()
@@ -477,7 +519,9 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
                         status = 1
                     else:
                         print(
-                            "Native account navigation checks passed. Cleanup confirmed. "
+                            "Native recipient-proof checks passed. Cleanup confirmed."
+                            if self.recipient_proof
+                            else "Native account navigation checks passed. Cleanup confirmed. "
                             "Combined Rust recipient-proof qualification is still pending."
                         )
                 if status:

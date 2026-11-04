@@ -11,6 +11,7 @@ x-backend: &backend
     PYTHONPATH: /workspace/apps/backend/src:/workspace/apps/backend
     INFRAMELD_ENVIRONMENT: local
     INFRAMELD_LOG_LEVEL: WARNING
+    INFRAMELD_ACCOUNT_PROOF_MODE: ${INFRAMELD_ACCOUNT_PROOF_MODE:-0}
     INFRAMELD_DATABASE__HOST: postgres
     INFRAMELD_DATABASE__NAME: account_ui_test
     INFRAMELD_DATABASE__USER: account_test
@@ -90,6 +91,7 @@ services:
       - account-identity:/run/account-identity
       - account-secrets:/run/account-secrets
       - account-fixture:/run/account-fixture
+      - account-proof-bridge:/run/account-proof
     entrypoint: [python, /fixture/generate_tls.py]
   breach-tls-init:
     <<: *backend
@@ -196,14 +198,16 @@ services:
       - ./apps/backend/migrations:/workspace/apps/backend/migrations:ro
       - ./apps/backend/alembic.ini:/workspace/apps/backend/alembic.ini:ro
       - ./apps/web/tests/fixtures:/fixture:ro
-      - account-secrets:/run/account-secrets:ro
+      - account-secrets:/run/account-secrets
       - account-fixture:/run/account-fixture
+      - account-trust:/run/account-trust:ro
     depends_on:
       migrate: { condition: service_completed_successfully }
       identity-setup: { condition: service_completed_successfully }
       oauth-client-setup: { condition: service_completed_successfully }
   backend:
     <<: *backend
+    init: true
     command: [serve]
     depends_on:
       seed: { condition: service_completed_successfully }
@@ -248,13 +252,70 @@ services:
     <<: *web
     profiles: [qualification]
     init: true
+    network_mode: service:backend
     shm_size: 256m
+    environment:
+      INFRAMELD_ACCOUNT_PROOF_MODE: ${INFRAMELD_ACCOUNT_PROOF_MODE:-0}
     volumes:
       - account-trust:/run/account-trust:ro
       - account-fixture:/run/account-fixture:ro
+      - account-proof-bridge:/run/account-proof
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "process.exit(process.env.INFRAMELD_ACCOUNT_PROOF_MODE === '1' && !require('node:fs').existsSync('/run/account-proof/deny-ready') && !require('node:fs').existsSync('/run/account-proof/allow-ready') ? 1 : 0)",
+        ]
+      interval: 1s
+      timeout: 2s
+      retries: 60
     entrypoint: [bash, tests/fixtures/browser-entrypoint.sh]
     depends_on:
       gateway: { condition: service_started }
+  proof-driver: &proof-driver
+    <<: *backend
+    profiles: [qualification]
+    image: ${INFRAMELD_ACCOUNT_PROOF_IMAGE:?Use scripts/test-account-ui.sh}
+    build:
+      context: ${INFRAMELD_ACCOUNT_PROOF_CONTEXT:?Use scripts/test-account-ui.sh}
+      dockerfile: apps/web/tests/fixtures/recipient-proof.Dockerfile
+      args:
+        ACCOUNT_BACKEND_IMAGE: ${INFRAMELD_ACCOUNT_BACKEND_IMAGE:?Use scripts/test-account-ui.sh}
+    init: true
+    network_mode: service:backend
+    environment:
+      <<: *backend-env
+      HTTPS_PROXY: http://127.0.0.1:1
+      HTTP_PROXY: http://127.0.0.1:1
+      ALL_PROXY: http://127.0.0.1:1
+      NO_PROXY: ""
+    volumes:
+      - ./apps/backend/src:/workspace/apps/backend/src:ro
+      - account-secrets:/run/account-secrets:ro
+      - account-proof-bridge:/run/account-proof
+    entrypoint: [/opt/account-proof/bin/recipient_proof_native_driver]
+    command:
+      - --host-context
+      - /run/account-secrets/recipient-proof/host.json
+      - --request
+      - /run/account-secrets/recipient-proof/request.json
+      - --exec-spec
+      - /run/account-secrets/recipient-proof/exec.json
+      - --browser-bridge
+      - /run/account-proof/bridge/browser.sock
+  proof-denied-driver:
+    <<: *proof-driver
+    command:
+      - --host-context
+      - /run/account-secrets/recipient-proof-denied/host.json
+      - --request
+      - /run/account-secrets/recipient-proof-denied/request.json
+      - --exec-spec
+      - /run/account-secrets/recipient-proof-denied/exec.json
+      - --browser-bridge
+      - /run/account-proof/denied-bridge/browser.sock
 
 networks:
   default:
@@ -266,6 +327,7 @@ volumes:
   account-identity:
   account-secrets:
   account-fixture:
+  account-proof-bridge:
   breach-trust:
   breach-identity:
   kratos-migrate-home:
