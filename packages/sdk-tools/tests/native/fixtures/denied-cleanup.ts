@@ -53,9 +53,12 @@ export async function withDeniedFixtureRecovery(
           status: null,
         }),
       );
-      throw new Error("Independent fixture cleanup remained unresolved", {
-        cause: failure,
-      });
+      throw Object.assign(
+        new Error("SDK_DENIED_INDEPENDENT_RECOVERY", {
+          cause: failure,
+        }),
+        { code: "SDK_DENIED_INDEPENDENT_RECOVERY" },
+      );
     }
     await rm(work, { recursive: true, force: true });
   });

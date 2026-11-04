@@ -405,70 +405,87 @@ test(
     const work = await mkdtemp(join(tmpdir(), "sdk-denied-exit-"));
     const marker = join(work, "pid");
     await withDeniedFixtureRecovery(work, testDeadline, async () => {
-      const began = performance.now();
-      await assert.rejects(
-        command(
-          process.execPath,
-          [
-            "--import",
-            join(home, "node_modules/tsx/dist/loader.mjs"),
-            join(home, "tests/native/fixtures/denied-cleanup.ts"),
-            marker,
-          ],
-          {
-            timeout: 45000,
-            cleanupTimeout: 100,
-            env: { NODE_TEST_CONTEXT: undefined },
-          },
-        ),
-        /exited 1/,
-      );
-      const uncertain = z
-        .object({
-          unknown: z.literal(true),
-          ownerResult: z.literal(1),
-          helper: z.number().int().positive(),
-          targets: z.array(z.number().int().positive()).min(1),
-        })
-        .parse(
-          JSON.parse(await readFile(join(work, "uncertain.json"), "utf8")),
-        );
-      const pid = Number(await readFile(marker, "utf8"));
-      const failures = z
-        .object({ primary: z.string(), cleanup: z.string() })
-        .parse(JSON.parse(await readFile(join(work, "failure.json"), "utf8")));
-      assert.match(failures.primary, /expected fixture cancellation/);
-      assert.match(failures.cleanup, /cleanup/i);
-      assert.ok(uncertain.targets.includes(pid));
-      assert.ok(
-        performance.now() - began < 45000,
-        "Incomplete outcome must fit the original execution allowance",
-      );
-      const observationEnvironment: NodeJS.ProcessEnv = {
-        ...process.env,
-        LC_ALL: "C",
-      };
-      for (const key of ["PS_PERSONALITY", "CMD_ENV", "I_WANT_A_BROKEN_PS"])
-        delete observationEnvironment[key];
-      const state = await promisify(execFile)(
-        "ps",
-        ["-A", "-o", "pid=,stat="],
-        {
-          env: observationEnvironment,
-          timeout: Math.max(
-            1,
-            Math.floor(Math.min(5000, began + 45000 - performance.now())),
+      let check = "SDK_DENIED_COMMAND_EXIT";
+      try {
+        const began = performance.now();
+        await assert.rejects(
+          command(
+            process.execPath,
+            [
+              "--import",
+              join(home, "node_modules/tsx/dist/loader.mjs"),
+              join(home, "tests/native/fixtures/denied-cleanup.ts"),
+              marker,
+            ],
+            {
+              timeout: 45000,
+              cleanupTimeout: 100,
+              env: { NODE_TEST_CONTEXT: undefined },
+            },
           ),
-          maxBuffer: 4 * 1024 * 1024,
-        },
-      );
-      assert.ok(
-        state.stdout.split("\n").some((row) => {
-          const [candidate, status] = row.trim().split(/\s+/);
-          return Number(candidate) === pid && status && !status.startsWith("Z");
-        }),
-        "The independent safety fuse must not satisfy the cleanup assertion",
-      );
+          /exited 1/,
+        );
+        check = "SDK_DENIED_RECEIPT";
+        const uncertain = z
+          .object({
+            unknown: z.literal(true),
+            ownerResult: z.literal(1),
+            helper: z.number().int().positive(),
+            targets: z.array(z.number().int().positive()).min(1),
+          })
+          .parse(
+            JSON.parse(await readFile(join(work, "uncertain.json"), "utf8")),
+          );
+        const pid = Number(await readFile(marker, "utf8"));
+        const failures = z
+          .object({ primary: z.string(), cleanup: z.string() })
+          .parse(
+            JSON.parse(await readFile(join(work, "failure.json"), "utf8")),
+          );
+        check = "SDK_DENIED_ORIGINAL_ERRORS";
+        assert.match(failures.primary, /expected fixture cancellation/);
+        assert.match(failures.cleanup, /cleanup/i);
+        check = "SDK_DENIED_RECEIPT";
+        assert.ok(uncertain.targets.includes(pid));
+        check = "SDK_DENIED_CLOCK_BUDGET";
+        assert.ok(
+          performance.now() - began < 45000,
+          "Incomplete outcome must fit the original execution allowance",
+        );
+        check = "SDK_DENIED_PS_OBSERVATION";
+        const observationEnvironment: NodeJS.ProcessEnv = {
+          ...process.env,
+          LC_ALL: "C",
+        };
+        for (const key of ["PS_PERSONALITY", "CMD_ENV", "I_WANT_A_BROKEN_PS"])
+          delete observationEnvironment[key];
+        const state = await promisify(execFile)(
+          "ps",
+          ["-A", "-o", "pid=,stat="],
+          {
+            env: observationEnvironment,
+            timeout: Math.max(
+              1,
+              Math.floor(Math.min(5000, began + 45000 - performance.now())),
+            ),
+            maxBuffer: 4 * 1024 * 1024,
+          },
+        );
+        check = "SDK_DENIED_TARGET_LIVE";
+        assert.ok(
+          state.stdout.split("\n").some((row) => {
+            const [candidate, status] = row.trim().split(/\s+/);
+            return (
+              Number(candidate) === pid && status && !status.startsWith("Z")
+            );
+          }),
+          "The independent safety fuse must not satisfy the cleanup assertion",
+        );
+      } catch (error) {
+        throw Object.assign(new Error(check, { cause: error }), {
+          code: check,
+        });
+      }
     });
   },
 );
