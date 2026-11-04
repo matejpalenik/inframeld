@@ -2248,6 +2248,44 @@ pub struct ProjectCreationRequest {
     #[serde(rename = "organizationId")]
     pub organization_id: uuid::Uuid,
 }
+///Report original removal, independently of a later rejoin.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectMembershipRemovalResponse {
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectMembershipRequest {
+    ///Constraint: minimum=0, maximum=9223372036854775807
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: u64,
+}
+///Report original bare membership, without restoring grants or later state.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectMembershipResponse {
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    pub member: BooleanConstant<true>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectMetadataChangeResponse {
     ///Stored presentation label, including retained legacy values.

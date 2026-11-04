@@ -62,6 +62,9 @@ __all__ = [
     "ProjectGrantTargetResponse",
     "ProjectMemberResponse",
     "ProjectMembersPageResponse",
+    "ProjectMembershipRemovalResponse",
+    "ProjectMembershipRequest",
+    "ProjectMembershipResponse",
     "ProjectMetadataChangeResponse",
     "ProjectMetadataResponse",
     "ProjectMetadataUpdateRequest",
@@ -126,6 +129,9 @@ from inframeld_sdk.models.project_creation_response import ProjectCreationRespon
 from inframeld_sdk.models.project_grant_target_response import ProjectGrantTargetResponse as ProjectGrantTargetResponse
 from inframeld_sdk.models.project_member_response import ProjectMemberResponse as ProjectMemberResponse
 from inframeld_sdk.models.project_members_page_response import ProjectMembersPageResponse as ProjectMembersPageResponse
+from inframeld_sdk.models.project_membership_removal_response import ProjectMembershipRemovalResponse as ProjectMembershipRemovalResponse
+from inframeld_sdk.models.project_membership_request import ProjectMembershipRequest as ProjectMembershipRequest
+from inframeld_sdk.models.project_membership_response import ProjectMembershipResponse as ProjectMembershipResponse
 from inframeld_sdk.models.project_metadata_change_response import ProjectMetadataChangeResponse as ProjectMetadataChangeResponse
 from inframeld_sdk.models.project_metadata_response import ProjectMetadataResponse as ProjectMetadataResponse
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest as ProjectMetadataUpdateRequest

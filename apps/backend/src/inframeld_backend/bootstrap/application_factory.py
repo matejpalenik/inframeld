@@ -15,6 +15,9 @@ from inframeld_backend.access.application.services.project_creation_fingerprint_
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
 )
+from inframeld_backend.access.application.services.project_membership_change_fingerprint_service import (
+    ProjectMembershipChangeFingerprintService,
+)
 from inframeld_backend.access.application.services.project_metadata_fingerprint_service import (
     ProjectMetadataFingerprintService,
 )
@@ -47,6 +50,9 @@ from inframeld_backend.access.http.routes.project_grant_routes import (
 from inframeld_backend.access.http.routes.project_members_routes import (
     create_project_members_router,
 )
+from inframeld_backend.access.http.routes.project_membership_routes import (
+    create_project_membership_router,
+)
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
 )
@@ -69,6 +75,9 @@ from inframeld_backend.bootstrap.original_operation_lookup_composition import (
 from inframeld_backend.bootstrap.project_creation_composition import open_project_creation
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.bootstrap.project_members_composition import open_project_members
+from inframeld_backend.bootstrap.project_membership_composition import (
+    open_project_membership_change,
+)
 from inframeld_backend.bootstrap.project_metadata_composition import (
     open_project_metadata,
     open_project_name_resolution,
@@ -132,6 +141,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         metadata_fingerprints = ProjectMetadataFingerprintService(request_fingerprints)
         creation_fingerprints = ProjectCreationFingerprintService(request_fingerprints)
         admission_fingerprints = HumanAdmissionFingerprintService(request_fingerprints)
+        membership_fingerprints = ProjectMembershipChangeFingerprintService(request_fingerprints)
         admission_authority = (
             resolved_settings.kratos.authority if resolved_settings.kratos is not None else None
         )
@@ -210,6 +220,12 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
         application.include_router(
             create_project_members_router(human_session, partial(open_project_members, database))
+        )
+        application.include_router(
+            create_project_membership_router(
+                human_session,
+                partial(open_project_membership_change, database, membership_fingerprints),
+            )
         )
         application.include_router(
             create_human_oauth_consent_router(

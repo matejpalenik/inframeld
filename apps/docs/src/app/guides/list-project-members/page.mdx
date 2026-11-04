@@ -225,7 +225,7 @@ A null `nextCursor` means no further page was found for that read. Omit the curs
 
 Each page checks current identity, membership and action authority, and reports the revision observed for that page. The cursor does not freeze the list or preserve an earlier permission. Concurrent membership changes can affect later pages, including an empty continuation page. If a later request fails, earlier pages are partial observations, not a completed inventory.
 
-The one-creator starting case normally ends on its first page. A supported multi-member human starting state remains unavailable. Synthetic membership rows used in engineering tests are not a setup procedure.
+The one-creator starting case normally ends on its first page. Use [ordinary membership changes](/guides/manage-project-members) to add an already-admitted eligible human when the required current authority and principal ID are available. A complete multi-page human preparation and acceptance procedure remains unperformed under #319. Synthetic membership rows used in engineering tests are not a setup procedure.
 
 ## Handle a failed read
 
@@ -240,4 +240,4 @@ The one-creator starting case normally ends on its first page. A supported multi
 
 A failed or denied read is not an empty success. SDKs retain available response context, and an HTTP success status alone does not override a decoding failure. Browser-cookie reads use the installation's actual cookie/Origin configuration. This GET does not need a cookie-write CSRF header. Avoid tracing credentials or retaining raw cursors in diagnostic logs.
 
-Adding or removing members and safe departure/handover remain separate unfinished work in #224. [Qualification #319](https://github.com/matejpalenik/inframeld/issues/319) retains those human cases as well as the initial read. This guide does not establish that the complete journey has been accepted.
+[Add and remove Project members](/guides/manage-project-members) covers human membership changes, scoped departure and the required responsibility guards. This read neither changes membership nor prepares a replacement grantor or group manager. [Qualification #319](https://github.com/matejpalenik/inframeld/issues/319) retains the read, membership and handover human cases and remains unready for handoff. This guide does not establish that the complete journey has been accepted.

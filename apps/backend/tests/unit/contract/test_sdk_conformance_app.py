@@ -10,6 +10,69 @@ from tests.support.sdk_conformance_app import create_sdk_conformance_app
 
 
 @pytest.mark.parametrize(
+    "method,principal,status,changed",
+    [
+        ("PUT", "00000000-0000-4000-8000-000000000004", 201, True),
+        ("PUT", "00000000-0000-4000-8000-000000000005", 200, False),
+        ("DELETE", "00000000-0000-4000-8000-000000000004", 200, True),
+        ("DELETE", "00000000-0000-4000-8000-000000000005", 200, False),
+    ],
+)
+def test_project_membership_fixture_preserves_bodyless_delete_query_and_original_receipt(
+    method: str, principal: str, status: int, changed: bool
+) -> None:
+    project = "00000000-0000-4000-8000-000000000003"
+    route = f"/v1/projects/{project}/members/{principal}"
+    headers = {
+        "Authorization": "Bearer sdk-human",
+        "Idempotency-Key": "sdk-membership-key",
+        "X-SDK-Test": "membership-wire",
+    }
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/membership-wire",
+            json={"calls": {"membership-wire": {"kind": "none"}}},
+        )
+        response = client.request(
+            method,
+            route,
+            headers=headers,
+            json={"expectedAccessRevision": 7} if method == "PUT" else None,
+            params={"expectedAccessRevision": 7} if method == "DELETE" else None,
+        )
+        assert response.status_code == status
+        body = response.json()
+        assert body["projectId"] == project and body["principalId"] == principal
+        assert body["changed"] is changed and body["accessRevision"] == 7 + int(changed)
+        assert body["member" if method == "PUT" else "removed"] is True
+        assert body["idempotencyExpiresAt"] == "2030-01-01T00:00:00Z"
+        witness = client.get("/sdk-control/cases/membership-wire").json()["observations"][
+            "membership-wire"
+        ]
+    assert response.headers["cache-control"] == "no-store"
+    assert witness["method"] == method and witness["path"] == route
+    assert witness["headers"]["idempotency-key"] == "sdk-membership-key"
+    if method == "DELETE":
+        assert parse_qs(witness["query"]) == {"expectedAccessRevision": ["7"]}
+        assert witness["rawBodyBase64"] == "" and "jsonBody" not in witness
+    else:
+        assert witness["jsonBody"] == {"expectedAccessRevision": 7} and witness["query"] == ""
+
+
+@pytest.mark.parametrize("query", ["", "expectedAccessRevision=7&expectedAccessRevision=8"])
+def test_project_membership_fixture_rejects_missing_or_duplicate_delete_revision(
+    query: str,
+) -> None:
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.delete(
+            "/v1/projects/00000000-0000-4000-8000-000000000003/members/00000000-0000-4000-8000-000000000004?"
+            + query,
+            headers={"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-membership-key"},
+        )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
     "identity,status,changed,revision",
     [
         ("00000000-0000-4000-8000-000000000004", 201, True, 8),

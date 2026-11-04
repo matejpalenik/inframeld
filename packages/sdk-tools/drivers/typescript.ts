@@ -34,6 +34,26 @@ const options = (client: Client, call: SdkCall, signal?: AbortSignal) => ({
 // Cast only the validated test-protocol input at the generated API boundary.
 // Request validation remains the generator's qualified policy, not a driver repair.
 const calls = {
+  addProjectMember: (client: Client, call: SdkCall) =>
+    sdk.addProjectMember({
+      ...options(client, call),
+      path: call.path as sdk.AddProjectMemberData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.AddProjectMemberData["body"],
+    }),
+  removeProjectMember: (client: Client, call: SdkCall) =>
+    sdk.removeProjectMember({
+      ...options(client, call),
+      path: call.path as sdk.RemoveProjectMemberData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.RemoveProjectMemberData["query"],
+    }),
   admitHuman: (client: Client, call: SdkCall) =>
     sdk.admitHuman({
       ...options(client, call),

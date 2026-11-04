@@ -302,6 +302,43 @@ export const zProjectMembersPageResponse = z.object({
 });
 
 /**
+ * ProjectMembershipRemovalResponse
+ *
+ * Report original removal, independently of a later rejoin.
+ */
+export const zProjectMembershipRemovalResponse = z.object({
+    accessRevision: z.int(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string(),
+    principalId: z.uuid(),
+    projectId: z.uuid(),
+    removed: z.literal(true)
+});
+
+/**
+ * ProjectMembershipRequest
+ */
+export const zProjectMembershipRequest = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000)
+});
+
+/**
+ * ProjectMembershipResponse
+ *
+ * Report original bare membership, without restoring grants or later state.
+ */
+export const zProjectMembershipResponse = z.object({
+    accessRevision: z.int(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    member: z.literal(true),
+    operationId: z.string(),
+    principalId: z.uuid(),
+    projectId: z.uuid()
+});
+
+/**
  * ProjectMetadataChangeResponse
  */
 export const zProjectMetadataChangeResponse = z.object({
@@ -1108,6 +1145,135 @@ export const zListProjectMembers503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zListProjectMembersResponse = zProjectMembersPageResponse;
+
+export const zRemoveProjectMemberHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRemoveProjectMemberPath = z.object({
+    project_id: z.uuid(),
+    principal_id: z.uuid()
+});
+
+export const zRemoveProjectMemberQuery = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000)
+});
+
+/**
+ * Successful Response
+ */
+export const zRemoveProjectMember200Representation0Response = zProjectMembershipRemovalResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRemoveProjectMember400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRemoveProjectMember401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRemoveProjectMember403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRemoveProjectMember404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zRemoveProjectMember409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRemoveProjectMember422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRemoveProjectMember503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRemoveProjectMemberResponse = zProjectMembershipRemovalResponse;
+
+export const zAddProjectMemberBody = zProjectMembershipRequest;
+
+export const zAddProjectMemberHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zAddProjectMemberPath = z.object({
+    project_id: z.uuid(),
+    principal_id: z.uuid()
+});
+
+/**
+ * Already a member.
+ */
+export const zAddProjectMember200Representation0Response = zProjectMembershipResponse;
+
+/**
+ * Successful Response
+ */
+export const zAddProjectMember201Representation0Response = zProjectMembershipResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zAddProjectMember400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zAddProjectMember401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zAddProjectMember403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zAddProjectMember404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zAddProjectMember409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zAddProjectMember413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zAddProjectMember415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zAddProjectMember422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zAddProjectMember503Representation0Response = zProblemDetails;
+
+/**
+ * Already a member.
+ */
+export const zAddProjectMemberResponse = zProjectMembershipResponse;
 
 export const zGetProjectMetadataPath = z.object({
     project_id: z.uuid()

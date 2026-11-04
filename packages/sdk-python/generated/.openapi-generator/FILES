@@ -40,6 +40,9 @@ inframeld_sdk/models/project_creation_response.py
 inframeld_sdk/models/project_grant_target_response.py
 inframeld_sdk/models/project_member_response.py
 inframeld_sdk/models/project_members_page_response.py
+inframeld_sdk/models/project_membership_removal_response.py
+inframeld_sdk/models/project_membership_request.py
+inframeld_sdk/models/project_membership_response.py
 inframeld_sdk/models/project_metadata_change_response.py
 inframeld_sdk/models/project_metadata_response.py
 inframeld_sdk/models/project_metadata_update_request.py

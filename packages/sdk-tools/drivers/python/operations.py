@@ -15,6 +15,7 @@ from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest
+from inframeld_sdk.models.project_membership_request import ProjectMembershipRequest
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest
 from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest
 from inframeld_sdk_fixtures.api.default_api import DefaultApi
@@ -219,6 +220,50 @@ async def create_project_async(clients: Clients, call: Call) -> NativeResponse:
     return await AccessApi(clients.production).create_project_with_http_info(
         idempotency_key=call.headers["Idempotency-Key"],
         project_creation_request=ProjectCreationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def project_member_add_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).add_project_member_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_membership_request=ProjectMembershipRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def project_member_add_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).add_project_member_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_membership_request=ProjectMembershipRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def project_member_remove_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).remove_project_member_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def project_member_remove_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).remove_project_member_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
         _headers=call.headers,
         _request_timeout=call.timeout / 1000,
     )
@@ -478,6 +523,8 @@ BINDINGS: dict[Operation, Binding] = {
     "getMyOrganizationAccess": Binding(organization_access_sync, organization_access_async),
     "createProject": Binding(create_project_sync, create_project_async),
     "listProjectMembers": Binding(project_members_sync, project_members_async),
+    "addProjectMember": Binding(project_member_add_sync, project_member_add_async),
+    "removeProjectMember": Binding(project_member_remove_sync, project_member_remove_async),
     "getProtectedResourceMetadata": Binding(discovery_sync, discovery_async),
     "getProtectedResourceMetadataForPath": Binding(discovery_path_sync, discovery_path_async),
     "contractFixtureVariants": Binding(variants_sync, variants_async),

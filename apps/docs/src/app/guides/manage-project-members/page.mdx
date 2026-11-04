@@ -1,0 +1,357 @@
+export const pageMetadata = {
+  title: "Add and remove Project members",
+  description:
+    "Change human Project membership with current authority and safe departure guards.",
+}
+
+# Add and remove Project members
+
+Alice adds Bob to Support so he can see the Project. Membership supplies no action grants or document access. Later, removing Bob clears the access he received within Support while preserving permissions he assigned to other people.
+
+## Review the people, Project and current revision
+
+Alice must be an eligible admitted human, a current Project member and able to use `manage-project-members` on that Project. Permission to delegate the action is unnecessary. Removing yourself requires the same authority and departure checks.
+
+Use the backend URL, permanent Project ID and current human credential described in [membership-read setup](/guides/list-project-members#prepare-your-project-and-permission). The cURL examples assume `INFRAMELD_URL` and `INFRAMELD_TOKEN` are already set through [HTTP setup](/clients/http#call-protected-operations). Browser sign-in does not produce a terminal bearer token. Complete account-to-API setup and [human qualification #319](https://github.com/matejpalenik/inframeld/issues/319) remain unfinished.
+
+Bob must already be admitted to the same installation and Organization. To add him, he must also be currently eligible. These operations accept humans, not application accounts, and do not perform installation admission.
+
+Obtain the inputs without substituting one kind of identity for another:
+
+- Use the Project ID returned by [ordinary Project creation](/guides/create-project), or your existing authorized Project context.
+- For a new member, Bob can read his own `/v1/session` under his current credentials and share only `principalId`. With the configured account origin, he can sign in at `/login` and open `/v1/session` in his own browser profile. This local principal ID is different from his Kratos identity UUID. For removal, use the exact human `principalId` from the [stored-member list](/guides/list-project-members).
+- Read the member list and review its `accessRevision`. This is the Project's Access revision, not its metadata revision. The server checks current authority and the reviewed revision again when saving.
+
+Replace these illustrative UUIDs and revision with your reviewed values. Choose and retain a unique add key with the exact inputs before sending:
+
+<CodeGroup>
+
+```shell
+export PROJECT_ID='00000000-0000-4000-8000-000000000003'
+export RECIPIENT_ID='00000000-0000-4000-8000-000000000002'
+export EXPECTED_ACCESS_REVISION='1'
+export ADD_MEMBER_KEY='replace-with-your-saved-unique-add-key'
+```
+
+</CodeGroup>
+
+Choose the cURL request or one of the [generated-client programs](#use-a-generated-client) for each reviewed operation.
+
+## Add bare membership
+
+This request uses `PUT /v1/projects/{project_id}/members/{principal_id}`. Its JSON body contains only the reviewed revision:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PUT \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/members/$RECIPIENT_ID" \
+  --header @- \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --data-binary "{\"expectedAccessRevision\":$EXPECTED_ACCESS_REVISION}" <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $ADD_MEMBER_KEY
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A fresh `201` with `member: true` and `changed: true` adds Bob and advances the Project Access revision once. A fresh `200` with `changed: false` means the eligible human is already a member and leaves that revision unchanged.
+
+Adding or rejoining creates only membership. It does not restore old action grants, group memberships or management roles. Bob still needs separately authorized assignments to perform actions or use documents.
+
+Keep the response's `operationId`, `idempotencyExpiresAt`, `projectId`, `principalId`, `accessRevision` and `changed` with the original request. They describe that operation, not Bob's current access.
+
+## Check responsibility before departure
+
+Removal cannot leave a responsibility without an eligible human. Before Bob leaves:
+
+- Each exact Project or application-account action he can grant needs another eligible human Project member who can grant that same action on that same target.
+- Each group he manages needs another eligible human who is both a member and manager of that group.
+- For a group's Add, Update or Delete documents action, an eligible human group member and manager can also supply the existing delegation alternative.
+
+An application, inactive human, suspended or recovery-blocked human does not supply the required replacement. Adding another Project member alone establishes none of these responsibilities.
+
+The endpoint never selects a replacement or appoints a manager. If a required replacement is missing, stop. The complete grant and group-manager administration procedures needed to establish it are separate work. Do not substitute a different recipient, host repair or repeated new keys to bypass the guard.
+
+## Remove the reviewed human
+
+Read the member list again and review its current Access revision. Replace the illustrative `2` below with that exact integer and choose a separate removal key. Keep the same Project and recipient IDs:
+
+<CodeGroup>
+
+```shell
+export EXPECTED_ACCESS_REVISION='2'
+export REMOVE_MEMBER_KEY='replace-with-your-saved-unique-removal-key'
+```
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request DELETE \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/members/$RECIPIENT_ID?expectedAccessRevision=$EXPECTED_ACCESS_REVISION" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $REMOVE_MEMBER_KEY
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+DELETE takes one `expectedAccessRevision` query value and no body. Stored inactive human members can be removed subject to the same departure guards.
+
+A fresh `200` with `removed: true` and `changed: true` removes Bob's Project membership, received Project/group/application-account action grants, and group membership/management within this Project. Those changes, the audit and original result commit together. The Project Access revision advances once, while Project metadata stays unchanged.
+
+Removal preserves Bob's installation admission, other Projects, Project-owned resources and grants he gave other recipients. It does not delete application accounts or their keys. If he is already absent, a fresh `200` with `changed: false` leaves the Access revision unchanged.
+
+## Use a generated client
+
+Use one program instead of the corresponding cURL request. Follow the source-package setup for [Python](/clients/python#install-from-a-checkout), [TypeScript](/clients/typescript#build-and-install-the-package) or [Rust](/clients/rust#set-up-an-example-project) in a separate example project. The Rust setup supplies the local SDK path, Tokio and Serde JSON dependencies. The TypeScript setup supplies the ESM project and locally built package.
+
+Keep the same reviewed URL, human credential, Project ID, recipient ID and Access revision. Select the add operation and its saved key before running your chosen program:
+
+<CodeGroup>
+
+```shell
+export MEMBERSHIP_CHANGE='add'
+export MEMBERSHIP_KEY="$ADD_MEMBER_KEY"
+```
+
+</CodeGroup>
+
+For removal, first complete the departure review and read the current revision as described above. Then select the removal operation and its saved key:
+
+<CodeGroup>
+
+```shell
+export MEMBERSHIP_CHANGE='remove'
+export MEMBERSHIP_KEY="$REMOVE_MEMBER_KEY"
+```
+
+</CodeGroup>
+
+For an exact replay, retain the original choice, revision and key. None of the programs retries automatically.
+
+Save the Python program as `manage_project_members.py`, the TypeScript program as `manage-project-members.ts`, or the Rust program as `src/main.rs`:
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.project_membership_request import ProjectMembershipRequest
+
+
+async def main() -> None:
+    change = os.environ["MEMBERSHIP_CHANGE"]
+    if change not in {"add", "remove"}:
+        raise ValueError("MEMBERSHIP_CHANGE must be add or remove")
+
+    project_id = UUID(os.environ["PROJECT_ID"])
+    principal_id = UUID(os.environ["RECIPIENT_ID"])
+    revision = int(os.environ["EXPECTED_ACCESS_REVISION"])
+    if not 0 <= revision <= 2**63 - 1:
+        raise ValueError("Review an exact nonnegative Project Access revision")
+
+    key = os.environ["MEMBERSHIP_KEY"]
+    headers = {"Authorization": f"Bearer {os.environ['INFRAMELD_TOKEN']}"}
+    configuration = Configuration(host=os.environ["INFRAMELD_URL"])
+    async with ApiClient(configuration) as client:
+        api = AccessApi(client)
+        try:
+            if change == "add":
+                response = await api.add_project_member_with_http_info(
+                    project_id=project_id,
+                    principal_id=principal_id,
+                    idempotency_key=key,
+                    project_membership_request=ProjectMembershipRequest(
+                        expectedAccessRevision=revision
+                    ),
+                    _headers=headers,
+                    _request_timeout=5.0,
+                )
+            else:
+                response = await api.remove_project_member_with_http_info(
+                    project_id=project_id,
+                    principal_id=principal_id,
+                    expected_access_revision=revision,
+                    idempotency_key=key,
+                    _headers=headers,
+                    _request_timeout=5.0,
+                )
+        except ApiException as error:
+            print(f"Membership change failed: HTTP {error.status}")
+            print("Keep the original request before deciding what to do next.")
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("No usable membership response. Keep the original request.")
+            raise SystemExit(1) from error
+
+        print(f"HTTP {response.status_code}")
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import {
+  addProjectMember,
+  createClient,
+  removeProjectMember,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const principalId = process.env.RECIPIENT_ID
+const key = process.env.MEMBERSHIP_KEY
+const change = process.env.MEMBERSHIP_CHANGE
+const revision = Number(process.env.EXPECTED_ACCESS_REVISION)
+
+if (
+  !baseUrl ||
+  !token ||
+  !projectId ||
+  !principalId ||
+  !key ||
+  (change !== "add" && change !== "remove") ||
+  !Number.isSafeInteger(revision) ||
+  revision < 0
+) {
+  throw new Error("Review the exact membership inputs and an add/remove choice")
+}
+
+const client = createClient({
+  baseUrl,
+  timeoutMs: 5000,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+const options = {
+  client,
+  path: { project_id: projectId, principal_id: principalId },
+  headers: {
+    Authorization: "Bearer " + token,
+    "Idempotency-Key": key,
+  },
+}
+const result =
+  change === "add"
+    ? await addProjectMember({
+        ...options,
+        body: { expectedAccessRevision: revision },
+      })
+    : await removeProjectMember({
+        ...options,
+        query: { expectedAccessRevision: revision },
+      })
+
+if (result.error !== undefined) {
+  console.error({
+    httpStatus: result.response?.status,
+    failureKind: result.error.kind,
+  })
+  if (result.error.kind === "api") {
+    console.error({
+      code: result.error.body.code,
+      requestId: result.error.body.requestId,
+    })
+  }
+  console.error("Keep the original request before deciding what to do next.")
+  process.exitCode = 1
+} else if (result.data !== undefined) {
+  console.info("HTTP", result.response?.status)
+  console.info(JSON.stringify(result.data, null, 2))
+} else {
+  throw new Error("No usable membership response. Keep the original request")
+}
+```
+
+```rust
+use std::env;
+
+use inframeld_sdk::{
+    client::{ApiOpError, HttpClient},
+    types::ProjectMembershipRequest,
+};
+
+/// Report available HTTP context without printing raw upstream content.
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
+    if let Some(context) = error.api() {
+        eprintln!("Membership change failed: HTTP {}", context.status);
+    } else {
+        eprintln!("No usable membership response.");
+    }
+    std::io::Error::other("Keep the original request before deciding what to do next")
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = env::var("INFRAMELD_URL")?;
+    let token = env::var("INFRAMELD_TOKEN")?;
+    let project_id = env::var("PROJECT_ID")?;
+    let principal_id = env::var("RECIPIENT_ID")?;
+    let key = env::var("MEMBERSHIP_KEY")?;
+    let change = env::var("MEMBERSHIP_CHANGE")?;
+    if change != "add" && change != "remove" {
+        return Err(std::io::Error::other("MEMBERSHIP_CHANGE must be add or remove").into());
+    }
+    let revision: u64 = env::var("EXPECTED_ACCESS_REVISION")?.parse()?;
+    let signed_revision = i64::try_from(revision)?;
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    let (status, body) = if change == "add" {
+        let response = client
+            .add_project_member(
+                &project_id,
+                &principal_id,
+                &key,
+                ProjectMembershipRequest {
+                    expected_access_revision: revision,
+                },
+            )
+            .await
+            .map_err(report_error)?;
+        (response.status, serde_json::to_value(response.body)?)
+    } else {
+        let response = client
+            .remove_project_member(&project_id, &principal_id, signed_revision, &key)
+            .await
+            .map_err(report_error)?;
+        (response.status, serde_json::to_value(response.body)?)
+    };
+    println!("HTTP {status}");
+    println!("{}", serde_json::to_string_pretty(&body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python manage_project_members.py`, `node manage-project-members.ts` with Node 26 in the ESM project, or `cargo run` in the Cargo project. On success, each prints the available HTTP status and validated original receipt. A failure exits unsuccessfully and preserves the need to reconcile the original request. The TypeScript program rejects revisions it cannot represent as exact safe integers rather than rounding them.
+
+## Preserve the original request after uncertainty
+
+After a timeout, cancellation, lost response or unusable response, keep the original installation, method, route, recipient, reviewed revision and idempotency key. Do not change the revision or choose a new key merely to retry an uncertain original operation.
+
+Exact replay requires Alice's current credentials, Project visibility, membership and `manage-project-members` authority. It returns the original status, result and expiry before applying fresh-change preconditions. Replaying an old add after removal does not add Bob again. Replaying an old removal after rejoin does not remove him again or restore old access. A successful self-departure can leave Alice without authority to read or replay that Project's result.
+
+[Generic original-request lookup](/guides/recover-original-request) is a separate metadata observation, not the membership receipt or continuing permission. A retained result is not guaranteed beyond `idempotencyExpiresAt`.
+
+A `409` can mean a stale revision, an ineligible add recipient, changed request meaning or an unsafe departure. Resolve the actual cause before choosing a new operation. A `401` or `403` requires current credential/authority review. A `404` does not disclose whether an inaccessible Project or recipient exists. Malformed requests can return `400` or `422`, with `413`/`415` for an oversized or wrong-media-type PUT. A `503` or unavailable response leaves the outcome needing reconciliation.
+
+See [the native membership operations](/api-reference/projects-and-access#add-a-project-member) for exact requests, responses and declared errors.
