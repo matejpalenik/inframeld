@@ -4,7 +4,7 @@
 
 Alice closes the CLI and returns tomorrow. Her saved login is bound to one installation and verified human. Refresh can replace credentials for that identity, but cannot switch accounts or revive a credential invalidated by recovery.
 
-> **Status:** the complete saved-login lifecycle below remains accepted behavior with unfinished implementation and qualification. The [repair-only transient proof capability](../../../../docs/development/guides/recipient-proof.md) is implemented separately. It verifies the generated current-session response, hands proof to protected maintenance stdin and revokes only its newly issued credentials. It saves no login and implements no ordinary refresh/logout or account selection. Native combined and human qualification remain pending. Existing Python types, generated OpenAPI and migrations own implemented shapes.
+> **Status:** the complete saved-login lifecycle below remains accepted behavior with unfinished implementation and qualification. The [repair-only transient proof capability](../../../../docs/development/guides/recipient-proof.md) is implemented separately. It verifies the generated current-session response, hands proof to protected maintenance stdin and revokes only its newly issued credentials. It saves no login and implements no ordinary refresh/logout or account selection. The [verification report](../../../../docs/development/reports/recipient-proof-verification.md) records selected native-driver coverage. Ordinary operator/system-browser and human qualification remain pending. Existing Python types, generated OpenAPI and migrations own implemented shapes.
 
 <a id="cli-login-transaction"></a>
 
