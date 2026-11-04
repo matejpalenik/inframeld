@@ -35,6 +35,8 @@ __all__ = [
     "CompletedOperationLookupResponse",
     "CurrentSessionResponse",
     "DeletionStatusResponse",
+    "HumanAdmissionRequest",
+    "HumanAdmissionResponse",
     "HumanOAuthConsentDecisionResponse",
     "HumanOAuthConsentDetailsResponse",
     "HumanOAuthConsentRequest",
@@ -97,6 +99,8 @@ from inframeld_sdk.models.accepted_operation_lookup_response import AcceptedOper
 from inframeld_sdk.models.completed_operation_lookup_response import CompletedOperationLookupResponse as CompletedOperationLookupResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse as CurrentSessionResponse
 from inframeld_sdk.models.deletion_status_response import DeletionStatusResponse as DeletionStatusResponse
+from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest as HumanAdmissionRequest
+from inframeld_sdk.models.human_admission_response import HumanAdmissionResponse as HumanAdmissionResponse
 from inframeld_sdk.models.human_o_auth_consent_decision_response import HumanOAuthConsentDecisionResponse as HumanOAuthConsentDecisionResponse
 from inframeld_sdk.models.human_o_auth_consent_details_response import HumanOAuthConsentDetailsResponse as HumanOAuthConsentDetailsResponse
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest as HumanOAuthConsentRequest

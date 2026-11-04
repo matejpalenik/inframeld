@@ -2,7 +2,7 @@
 
 Alice already has a Kratos identity. Bob invites her into Inframeld, and she accepts while password recovery begins. Access must give account creation and recovery a common turn before a local account exists. Otherwise each could act on a picture taken before the other's change.
 
-> **Status:** accepted design under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md), resolving [PD-ACCESS-04](decision-recovery-first-admission.md). The shared coordinator is implemented for recovery admission, recovery completion, credential-state initialization and the private first-administrator bootstrap consumer. Other first-admission and invitation-activation integration remain unfinished for #27/#119. Existing organization/project coordination remains implemented at its recorded scope.
+> **Status:** accepted design under [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md), resolving [PD-ACCESS-04](decision-recovery-first-admission.md). The shared coordinator is implemented for recovery admission, recovery completion, credential-state initialization, the private first-administrator bootstrap consumer and [ordinary human admission](admission-and-invitations.md#ordinary-human-admission). Invitation-activation integration remains unfinished under #119. Existing organization/project coordination remains implemented at its recorded scope.
 
 ## One turn for the verified identity
 

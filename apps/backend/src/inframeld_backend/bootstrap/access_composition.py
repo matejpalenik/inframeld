@@ -118,11 +118,8 @@ def create_access_components(
         kratos_admin_client: KratosApiClient | None = None
         hydra_client: HydraApiClient | None = None
 
-        if hydra_settings is not None:
-            admin_url = kratos_settings.admin_url
-            if admin_url is None:
-                raise ValueError("Hydra authentication requires the Kratos admin URL.")
-
+        admin_url = kratos_settings.admin_url
+        if admin_url is not None:
             kratos_admin_client = KratosApiClient(
                 KratosConfiguration(
                     host=str(admin_url).rstrip("/"),
@@ -131,6 +128,10 @@ def create_access_components(
                 )
             )
             provider_cleanup.callback(kratos_admin_client.rest_client.pool_manager.clear)
+
+        if hydra_settings is not None:
+            if kratos_admin_client is None:
+                raise ValueError("Hydra authentication requires the Kratos admin URL.")
 
             hydra_client = HydraApiClient(
                 HydraConfiguration(

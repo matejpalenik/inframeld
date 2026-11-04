@@ -15,6 +15,44 @@ CONTRACT_PATH = (
 )
 
 
+def test_human_admission_contract_preserves_original_receipt_and_current_human_scope() -> None:
+    schema = create_app().openapi()
+    operation = schema["paths"]["/v1/organizations/{organization_id}/human-admissions"]["post"]
+    assert operation["operationId"] == "admitHuman"
+    assert operation["security"] == [{"KratosSession": []}, {"HumanBearer": []}]
+    for status in ("200", "201"):
+        assert operation["responses"][status]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/HumanAdmissionResponse"
+        }
+    for status in ("400", "401", "403", "404", "409", "413", "415", "422", "503"):
+        assert "application/problem+json" in operation["responses"][status]["content"]
+    assert any(
+        item["name"] == "organization_id" and item["in"] == "path" and item["required"]
+        for item in operation["parameters"]
+    )
+    assert any(
+        item["name"] == "Idempotency-Key" and item["in"] == "header"
+        for item in operation["parameters"]
+    )
+    request = schema["components"]["schemas"]["HumanAdmissionRequest"]
+    assert request["additionalProperties"] is False
+    assert set(request["required"]) == {"identityId", "expectedAccessRevision"}
+    assert request["properties"]["identityId"]["format"] == "uuid"
+    assert request["properties"]["expectedAccessRevision"]["minimum"] == 0
+    assert request["properties"]["expectedAccessRevision"]["maximum"] == float(2**63 - 1)
+    response = schema["components"]["schemas"]["HumanAdmissionResponse"]
+    assert set(response["required"]) == {
+        "operationId",
+        "idempotencyExpiresAt",
+        "organizationId",
+        "principalId",
+        "accessRevision",
+        "changed",
+    }
+    assert response["properties"]["idempotencyExpiresAt"]["type"] == "string"
+    assert response["properties"]["idempotencyExpiresAt"]["format"] == "date-time"
+
+
 def test_openapi_contract_matches_application() -> None:
     """Prove the committed OpenAPI document matches the current application."""
 
