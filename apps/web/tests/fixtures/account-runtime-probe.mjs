@@ -128,6 +128,18 @@ if (naturalDescendant) {
         service === "browser-tests")))
 ) {
   // Closed observations for the existing owner's combined flow. No engine is called.
+  const project =
+    process.env.INFRAMELD_ACCOUNT_WEB_IMAGE ===
+    "localhost/inframeld-account-ui-probe-web:check"
+      ? "inframeld-account-ui-probe"
+      : process.env.INFRAMELD_ACCOUNT_WEB_IMAGE ===
+          "localhost/inframeld-account-ui--660m7cn-web:check"
+        ? "inframeld-account-ui--660m7cn"
+        : undefined
+  if ((lookupService || args.includes("inspect")) && !project) {
+    console.error("Controlled image binding rejected")
+    process.exit(59)
+  }
   const stateFile = join(directory, "proof-state.json")
   let state = {
     browser: false,
@@ -150,10 +162,6 @@ if (naturalDescendant) {
     else if (service === "proof-denied-driver") state.denied = true
     else state.driver = true
   } else if (lookupService) {
-    const project = process.env.INFRAMELD_ACCOUNT_WEB_IMAGE.slice(
-      "localhost/".length,
-      -"-web:check".length
-    )
     const projectLabel = args.find(
       (arg) =>
         arg.startsWith("label=com.docker.compose.project=") ||
@@ -239,12 +247,7 @@ if (naturalDescendant) {
             User: "10001:10001",
             Labels: {
               "com.docker.compose.project":
-                proof === "lookup-wrong-project"
-                  ? "another-project"
-                  : process.env.INFRAMELD_ACCOUNT_WEB_IMAGE.slice(
-                      "localhost/".length,
-                      -"-web:check".length
-                    ),
+                proof === "lookup-wrong-project" ? "another-project" : project,
               "com.docker.compose.service":
                 proof === "lookup-wrong-service"
                   ? "another-service"

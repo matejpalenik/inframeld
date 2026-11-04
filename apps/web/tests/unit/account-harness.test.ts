@@ -11,16 +11,25 @@ import {
   access,
 } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { setTimeout } from "node:timers/promises"
 import { test } from "node:test"
 import { createServer } from "node:net"
 import { chmod } from "node:fs/promises"
 import { readRecipientBridge } from "../browser/support"
-const wrapper = resolve("../../scripts/test-account-ui.sh")
-const fixture = resolve("tests/fixtures/account-runtime-probe.mjs")
-const runner = resolve("../../scripts/run_account_ui.py")
-const ownershipTests = resolve("../../scripts/test_account_ui.py")
+const wrapper = fileURLToPath(
+  new URL("../../../../scripts/test-account-ui.sh", import.meta.url)
+)
+const fixture = fileURLToPath(
+  new URL("../fixtures/account-runtime-probe.mjs", import.meta.url)
+)
+const runner = fileURLToPath(
+  new URL("../../../../scripts/run_account_ui.py", import.meta.url)
+)
+const ownershipTests = fileURLToPath(
+  new URL("../../../../scripts/test_account_ui.py", import.meta.url)
+)
 
 test(
   "the private recipient peer reads exactly one bounded event and closes after malformed input",
@@ -376,6 +385,78 @@ test(
     )
     assert.equal(errors, "")
     assert.equal(await readFile(statePath, "utf8"), state)
+  }
+)
+test(
+  "controlled inspection admits only recognized synthetic image bindings without reflecting rejected values",
+  { timeout: 8_000 },
+  async (context) => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "account-image-binding-test-")
+    )
+    let child: ChildProcess | undefined
+    context.after(async () => {
+      if (child) {
+        if (child.exitCode === null && child.signalCode === null)
+          child.kill("SIGTERM")
+        await completion(child, 5_000)
+      }
+      for (const entry of await processes(directory))
+        await assertStopped(entry.pid)
+      assert.equal(await exists(join(directory, "fuse-fired")), false)
+      await rm(directory, { recursive: true })
+    })
+    for (const [image, project] of [
+      ["localhost/inframeld-account-ui-private-sentinel-web:check", undefined],
+      [undefined, undefined],
+      [
+        "localhost/inframeld-account-ui-probe-web:check",
+        "inframeld-account-ui-probe",
+      ],
+      [
+        "localhost/inframeld-account-ui--660m7cn-web:check",
+        "inframeld-account-ui--660m7cn",
+      ],
+    ] as const) {
+      child = spawn(process.execPath, [fixture, "inspect", "a".repeat(64)], {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          ACCOUNT_PROBE_DIRECTORY: directory,
+          ACCOUNT_PROBE_PROOF: "success",
+          INFRAMELD_ACCOUNT_WEB_IMAGE: image,
+        },
+      })
+      let output = ""
+      let errors = ""
+      child.stdout?.on("data", (value: Buffer) => {
+        output += value.toString()
+      })
+      child.stderr?.on("data", (value: Buffer) => {
+        errors += value.toString()
+      })
+      const status = await completion(child, 5_000)
+      if (project === undefined) {
+        assert.equal(
+          output.includes("private-sentinel"),
+          false,
+          "Controlled inspection reflected an unrecognized image binding"
+        )
+        assert.equal(status, 59)
+        assert.equal(output, "")
+        assert.equal(errors, "Controlled image binding rejected\n")
+      } else {
+        assert.equal(status, 0)
+        assert.equal(errors, "")
+        const inspection = JSON.parse(output) as {
+          Config: { Labels: { "com.docker.compose.project": string } }
+        }
+        assert.equal(
+          inspection.Config.Labels["com.docker.compose.project"],
+          project
+        )
+      }
+    }
   }
 )
 test(
