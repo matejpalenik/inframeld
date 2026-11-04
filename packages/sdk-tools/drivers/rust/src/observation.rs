@@ -63,6 +63,28 @@ problems!(
     AdmitHumanApiError::Status422,
     AdmitHumanApiError::Status503
 );
+problems!(
+    AddProjectMemberApiError,
+    AddProjectMemberApiError::Status400,
+    AddProjectMemberApiError::Status401,
+    AddProjectMemberApiError::Status403,
+    AddProjectMemberApiError::Status404,
+    AddProjectMemberApiError::Status409,
+    AddProjectMemberApiError::Status413,
+    AddProjectMemberApiError::Status415,
+    AddProjectMemberApiError::Status422,
+    AddProjectMemberApiError::Status503
+);
+problems!(
+    RemoveProjectMemberApiError,
+    RemoveProjectMemberApiError::Status400,
+    RemoveProjectMemberApiError::Status401,
+    RemoveProjectMemberApiError::Status403,
+    RemoveProjectMemberApiError::Status404,
+    RemoveProjectMemberApiError::Status409,
+    RemoveProjectMemberApiError::Status422,
+    RemoveProjectMemberApiError::Status503
+);
 problems!(GetHealthApiError, GetHealthApiError::Status500);
 problems!(
     ListProjectMembersApiError,

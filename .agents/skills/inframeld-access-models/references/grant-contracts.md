@@ -20,7 +20,7 @@ A local change saves its domain effects, revision, audit and original outcome to
 
 ## Concrete HTTP contract draft
 
-**Status:** accepted product boundaries and documented transport drafts. Human-session, consent, Project metadata, the supported use-only grant, own Organization access and ordinary Project creation are implemented. Other named models and routes remain design contracts. Native backend OpenAPI remains authoritative for delivered symbols. The implemented creation routes use human cookie or Hydra bearer authentication, without an application-key subsystem.
+**Status:** accepted product boundaries and documented transport drafts. Human-session, consent, Project metadata, the supported use-only grant, own Organization access, ordinary Project creation and Project member list/add/remove are implemented. Other named models and routes remain design contracts. Native backend OpenAPI remains authoritative for delivered symbols. The implemented membership and creation routes use human cookie or Hydra bearer authentication, without an application-key subsystem.
 
 For example, Alice sets SupportBot's `query` assignment on Support's Pipeline with `canGrant: false` and the reviewed access revision. If the response is lost, her same idempotency key recovers that original assignment result under current authority. Removing that assignment returns a removal result, not `canGrant: false`: the latter still permits use. If SupportBot is subsequently given another grant, replay of Alice's old removal cannot remove it again.
 
@@ -37,6 +37,14 @@ The service commits the Project, creator membership, [eighteen explicit initial 
 The [creation response](../../../../apps/backend/src/inframeld_backend/access/http/responses/project_creation_response.py) contains the original operation identity/deadline, Organization/Project IDs, submitted names, initial Project revisions and `initialGrants`. This receipt is immutable history, not present permissions or metadata. Exact replay requires current eligibility and `create-projects`, then returns the original receipt before checking a fresh-write expected revision. Replay neither restores removed grants nor reverses later renames. Preserve the original key and complete request after uncertain output.
 
 [The user guide](../../../../apps/docs/src/app/guides/create-project/page.mdx) gives the supported API/client task. There is no CLI creation command, starter provisioning or RAG resource creation in this operation. [Human qualification #313](https://github.com/matejpalenik/inframeld/issues/313) remains unready for handoff until the chosen supported authentication procedure and disposable setup/cleanup are complete. Provider fixtures do not supply user credentials. First-use/setup qualification remains #185 and metadata-repair qualification remains #298.
+
+<a id="project-membership-changes"></a>
+
+### Implemented Project membership changes
+
+[`addProjectMember` and `removeProjectMember`](memberships-groups-and-handover.md#change-project-membership) share `/v1/projects/{project_id}/members/{principal_id}`. PUT uses `ProjectMembershipRequest` with only strict integer `expectedAccessRevision`. DELETE has no body and requires that same revision as one scalar query field. Reject duplicate or unknown query fields, unknown or duplicate JSON fields, boolean revisions and revisions outside the nonnegative signed-BIGINT range. PUT uses the bounded JSON and 413/415 profile. Both require one nonblank, at-most-128-character `Idempotency-Key`, ordinary human authentication and cookie-write CSRF where applicable.
+
+`ProjectMembershipResponse` and `ProjectMembershipRemovalResponse` contain the original `operationId`, `idempotencyExpiresAt`, `projectId`, `principalId`, `accessRevision`, `changed` and literal `member: true` or `removed: true`. Changed PUT is 201, unchanged PUT is 200 and DELETE is 200. The existing 400/401/403/404/409/422/503 problems apply. Every response is no-store. Current eligibility, Project visibility/membership and use of `manage-project-members` precede reservation and replay. Stale review is checked only for fresh work. The [original receipt](access-lifecycle-persistence.md#project-membership-original-results) preserves original status and outcome independently of a later membership change.
 
 <a id="credential-and-response-profiles"></a>
 

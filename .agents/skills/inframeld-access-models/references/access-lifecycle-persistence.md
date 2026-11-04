@@ -2,7 +2,7 @@
 
 Alice wants to stop managing SupportKnowledge but keep reading its documents. Demotion removes her management assignment while preserving ordinary membership. Removing membership, suspending Alice and deleting the group have different effects.
 
-**Status:** these are accepted lifecycle and persistence requirements. The manager-membership foreign key is implemented. That constraint does not establish implemented appointment, handover, departure, retirement or Project-deletion workflows. Exact database definitions remain in [Access persistence](access-persistence.md).
+**Status:** these are accepted lifecycle and persistence requirements. The manager-membership foreign key and guarded Project membership addition/removal are implemented. Group appointment, group-only departure, retirement and Project-deletion workflows retain their separate implementation status. Exact database definitions remain in [Access persistence](access-persistence.md).
 
 ## Apply one guarded write
 
@@ -27,7 +27,17 @@ When an authorized operation removes both, it checks handover and removes manage
 
 Creating a group, appointing a manager, or recovering a stranded group saves both assignments together. Demotion removes only management. Removing membership also removes management, and rejoining does not restore it. Save each change, scope revision, and audit event in the same protected Access transaction. See the [group workflow](memberships-groups-and-handover.md#group-managers).
 
-Suspension keeps both records but blocks their use. Foreign keys cannot prove that Alice is active, may make this change, or will leave another eligible manager. Application policy still checks those conditions. The initial migration implements the membership constraint, and the PostgreSQL constraint tests exercise it. The surrounding administration workflows remain to be implemented.
+Suspension keeps both records but blocks their use. Foreign keys cannot prove that Alice is active, may make this change, or will leave another eligible manager. Application policy still checks those conditions. The initial migration implements the membership constraint, and the PostgreSQL constraint tests exercise it. Project removal applies the manager-before-membership order, while separate group administration remains unfinished.
+
+<a id="project-membership-original-results"></a>
+
+## Keep original membership results after departure
+
+The [0020 receipt migration](../../../../apps/backend/migrations/versions/0020_project_membership.py) follows `0019_human_admission`. It adds only `project_membership_operation_results`, without changing the existing membership or grant tables. Its [typed row](../../../../apps/backend/src/inframeld_backend/access/infrastructure/rows/project_membership_operation_result_row.py) retains operation ID, installation/Organization/Project scope, actor and recipient principal IDs, add/remove kind, before/result Access revisions, changed flag and original HTTP status. Checks bind the revision delta and 201/200 status to the original effect.
+
+The receipt references the original scoped idempotency reservation, not a live Project membership. Reservation retention controls receipt lifetime and supplies the original expiry, method, concrete route and request fingerprint. Deleting that parent cascades only its receipt. Project/principal scope references restrict unrelated deletion. A downgrade refuses retained receipts and never reverses membership changes.
+
+The [result reader](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_project_membership_change_result_reader.py) requires the exact completed, replayable, unexpired parent binding and coherent receipt. Generic completed-operation metadata alone cannot replace a missing business result. Current authority is checked before this read. Replaying an old add or removal cannot reapply its effects after a later departure or rejoin.
 
 <a id="deletion-and-retention-behavior"></a>
 

@@ -1,6 +1,48 @@
 #[cfg(test)]
 mod tests {
     #[test]
+    fn revision_models_round_trip_signed_64_bit_maximum_and_reject_overflow() {
+        use inframeld_sdk::types::{
+            HumanAdmissionRequest, MyOrganizationAccessResponse, ProjectCreationRequest,
+            ProjectMembershipRequest, ProjectMetadataUpdateRequest,
+        };
+
+        fn check<Model: serde::de::DeserializeOwned + serde::Serialize>(
+            input: serde_json::Value,
+            field: &str,
+        ) {
+            for revision in [0, i64::MAX] {
+                let mut source = input.clone();
+                source[field] = serde_json::json!(revision);
+                let model: Model = serde_json::from_value(source.clone()).unwrap();
+                assert_eq!(serde_json::to_value(model).unwrap(), source);
+            }
+            let mut overflow = input;
+            overflow[field] = serde_json::json!(i64::MAX as u64 + 1);
+            assert!(serde_json::from_value::<Model>(overflow).is_err());
+        }
+
+        let identifier = "00000000-0000-4000-8000-000000000001";
+        check::<HumanAdmissionRequest>(
+            serde_json::json!({"identityId": identifier}),
+            "expectedAccessRevision",
+        );
+        check::<ProjectCreationRequest>(
+            serde_json::json!({"organizationId": identifier, "name": "support", "displayName": "Support"}),
+            "expectedAccessRevision",
+        );
+        check::<ProjectMembershipRequest>(serde_json::json!({}), "expectedAccessRevision");
+        check::<ProjectMetadataUpdateRequest>(
+            serde_json::json!({"name": "support"}),
+            "expectedMetadataRevision",
+        );
+        check::<MyOrganizationAccessResponse>(
+            serde_json::json!({"organizationId": identifier, "principalId": identifier, "grants": []}),
+            "accessRevision",
+        );
+    }
+
+    #[test]
     fn metadata_selector_change_preserves_omission_and_unicode_without_label_normalization() {
         use inframeld_sdk::types::ProjectMetadataUpdateRequest;
         let input = serde_json::json!({"expectedMetadataRevision": 0, "name": "production"});

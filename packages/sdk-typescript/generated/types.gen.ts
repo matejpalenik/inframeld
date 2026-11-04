@@ -569,6 +569,88 @@ export type ProjectMembersPageResponse = {
 };
 
 /**
+ * ProjectMembershipRemovalResponse
+ *
+ * Report original removal, independently of a later rejoin.
+ */
+export type ProjectMembershipRemovalResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
+ * ProjectMembershipRequest
+ */
+export type ProjectMembershipRequest = {
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * ProjectMembershipResponse
+ *
+ * Report original bare membership, without restoring grants or later state.
+ */
+export type ProjectMembershipResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Member
+     */
+    member: true;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
  * ProjectMetadataChangeResponse
  */
 export type ProjectMetadataChangeResponse = {
@@ -1594,6 +1676,151 @@ export type ListProjectMembersResponses = {
 };
 
 export type ListProjectMembersResponse = ListProjectMembersResponses[keyof ListProjectMembersResponses];
+
+export type RemoveProjectMemberData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Principal Id
+         */
+        principal_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}/members/{principal_id}';
+};
+
+export type RemoveProjectMemberErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveProjectMemberError = RemoveProjectMemberErrors[keyof RemoveProjectMemberErrors];
+
+export type RemoveProjectMemberResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectMembershipRemovalResponse;
+};
+
+export type RemoveProjectMemberResponse = RemoveProjectMemberResponses[keyof RemoveProjectMemberResponses];
+
+export type AddProjectMemberData = {
+    body: ProjectMembershipRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Principal Id
+         */
+        principal_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/members/{principal_id}';
+};
+
+export type AddProjectMemberErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type AddProjectMemberError = AddProjectMemberErrors[keyof AddProjectMemberErrors];
+
+export type AddProjectMemberResponses = {
+    /**
+     * Already a member.
+     */
+    200: ProjectMembershipResponse;
+    /**
+     * Successful Response
+     */
+    201: ProjectMembershipResponse;
+};
+
+export type AddProjectMemberResponse = AddProjectMemberResponses[keyof AddProjectMemberResponses];
 
 export type GetProjectMetadataData = {
     body?: never;

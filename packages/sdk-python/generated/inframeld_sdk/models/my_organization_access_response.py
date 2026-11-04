@@ -31,7 +31,7 @@ class MyOrganizationAccessResponse(BaseModel):
     """
     MyOrganizationAccessResponse
     """ # noqa: E501
-    access_revision: Annotated[int, Field(le=9223372036854776000, strict=True, ge=0)] = Field(alias="accessRevision")
+    access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)] = Field(alias="accessRevision")
     grants: Annotated[List[OwnOrganizationGrantResponse], Field(max_length=4)]
     organization_id: UUID = Field(alias="organizationId")
     principal_id: UUID = Field(alias="principalId")

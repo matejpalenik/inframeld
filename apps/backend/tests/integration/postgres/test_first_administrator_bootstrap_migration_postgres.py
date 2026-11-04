@@ -110,7 +110,9 @@ async def test_retained_claim_refuses_downgrade_without_losing_original_typed_re
     with pytest.raises(RuntimeError, match="Retained first-administrator claims"):
         command.downgrade(config, "0015_artifact_allocation")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0019_human_admission"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == "0020_project_membership"
+        )
         receipt = await session.get(
             FirstAdministratorBootstrapReceiptRow, original.installation_id.value
         )

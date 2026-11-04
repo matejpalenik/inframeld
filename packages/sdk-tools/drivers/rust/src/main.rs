@@ -17,6 +17,8 @@ const BINDINGS: &[&str] = &[
     "admitHuman",
     "createProject",
     "listProjectMembers",
+    "addProjectMember",
+    "removeProjectMember",
     "inspectHumanOAuthConsent",
     "decideHumanOAuthConsent",
     "assignProjectUseOnlyGrant",
@@ -79,6 +81,8 @@ async fn main() {
                 | "createProject"
                 | "admitHuman"
                 | "listProjectMembers"
+                | "addProjectMember"
+                | "removeProjectMember"
                 | "assignProjectUseOnlyGrant"
                 | "lookupOriginalOperation"
                 | "getDeletionStatus"
@@ -98,7 +102,12 @@ async fn main() {
         // This header is a generated operation argument, not a default header.
         if matches!(
             call.operation.as_str(),
-            "assignProjectUseOnlyGrant" | "updateProjectMetadata" | "createProject" | "admitHuman"
+            "assignProjectUseOnlyGrant"
+                | "updateProjectMetadata"
+                | "createProject"
+                | "admitHuman"
+                | "addProjectMember"
+                | "removeProjectMember"
         ) {
             additional_headers.remove("Idempotency-Key");
         }

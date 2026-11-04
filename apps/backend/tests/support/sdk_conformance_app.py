@@ -22,6 +22,9 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 
+from inframeld_backend.access.application.commands.add_project_member_command import (
+    AddProjectMemberCommand,
+)
 from inframeld_backend.access.application.commands.admit_human_command import AdmitHumanCommand
 from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
     AssignProjectUseOnlyGrantCommand,
@@ -31,6 +34,9 @@ from inframeld_backend.access.application.commands.create_project_command import
 )
 from inframeld_backend.access.application.commands.decide_human_oauth_consent_command import (
     DecideHumanOAuthConsentCommand,
+)
+from inframeld_backend.access.application.commands.remove_project_member_command import (
+    RemoveProjectMemberCommand,
 )
 from inframeld_backend.access.application.commands.update_project_metadata_command import (
     UpdateProjectMetadataCommand,
@@ -66,6 +72,9 @@ from inframeld_backend.access.application.dtos.project_member_dto import Project
 from inframeld_backend.access.application.dtos.project_members_page_facts_dto import (
     ProjectMembersPageFactsDTO,
 )
+from inframeld_backend.access.application.dtos.project_membership_change_result_dto import (
+    ProjectMembershipChangeResultDTO,
+)
 from inframeld_backend.access.application.dtos.project_metadata_change_result_dto import (
     ProjectMetadataChangeResultDTO,
 )
@@ -94,6 +103,9 @@ from inframeld_backend.access.application.protocols.project_creator import Proje
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
 from inframeld_backend.access.application.protocols.project_members_facts_reader import (
     ProjectMembersFactsReader,
+)
+from inframeld_backend.access.application.protocols.project_membership_changer import (
+    ProjectMembershipChanger,
 )
 from inframeld_backend.access.application.protocols.project_metadata_changer import (
     ProjectMetadataChanger,
@@ -161,6 +173,9 @@ from inframeld_backend.access.http.routes.project_grant_routes import create_pro
 from inframeld_backend.access.http.routes.project_members_routes import (
     create_project_members_router,
 )
+from inframeld_backend.access.http.routes.project_membership_routes import (
+    create_project_membership_router,
+)
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
 )
@@ -192,6 +207,7 @@ from inframeld_backend.shared.application.enums.operation_replay_kind import Ope
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     AuthenticationRequiredError,
+    ConflictError,
     DependencyUnavailableError,
     ResourceNotFoundError,
     StaleRevisionError,
@@ -412,6 +428,74 @@ class MockSDKHumanAdmitter(HumanAdmitter):
 @asynccontextmanager
 async def _open_human_admitter() -> AsyncGenerator[HumanAdmitter]:
     yield MockSDKHumanAdmitter()
+
+
+class MockSDKMembershipChanger(ProjectMembershipChanger):
+    """Supply typed wire outcomes, without simulating SQL, handover or retained history."""
+
+    @override
+    async def add_member(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: AddProjectMemberCommand,
+        context: OperationAdmissionContextDTO,
+    ) -> ProjectMembershipChangeResultDTO:
+        return self._outcome(access, command, context, "add")
+
+    @override
+    async def remove_member(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: RemoveProjectMemberCommand,
+        context: OperationAdmissionContextDTO,
+    ) -> ProjectMembershipChangeResultDTO:
+        return self._outcome(access, command, context, "remove")
+
+    @staticmethod
+    def _outcome(
+        access: AccessContextDTO,
+        command: AddProjectMemberCommand | RemoveProjectMemberCommand,
+        context: OperationAdmissionContextDTO,
+        kind: Literal["add", "remove"],
+    ) -> ProjectMembershipChangeResultDTO:
+        if command.project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
+            raise ResourceNotFoundError()
+        if command.principal_id.value == UUID("00000000-0000-4000-8000-000000000006"):
+            raise ConflictError("The departure requires an eligible replacement.")
+        if command.principal_id.value not in {
+            UUID("00000000-0000-4000-8000-000000000004"),
+            UUID("00000000-0000-4000-8000-000000000005"),
+        }:
+            raise ResourceNotFoundError()
+        if command.expected_access_revision != 7:
+            raise StaleRevisionError()
+        if context.key.value != "sdk-membership-key":
+            raise ValueError("The SDK changed the membership idempotency header.")
+        changed = command.principal_id.value != UUID("00000000-0000-4000-8000-000000000005")
+        return ProjectMembershipChangeResultDTO(
+            InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            command.project_id,
+            access.actor_principal_id,
+            command.principal_id,
+            kind,
+            8 if changed else 7,
+            changed,
+            201 if kind == "add" and changed else 200,
+            CompletedSynchronousOperationDTO(
+                OperationId("sdk-project-membership-" + kind),
+                True,
+                OperationReplayKind.SAFE_RESULT,
+                datetime(2030, 1, 1, tzinfo=UTC),
+            ),
+        )
+
+
+@asynccontextmanager
+async def _open_membership_changer() -> AsyncGenerator[ProjectMembershipChanger]:
+    yield MockSDKMembershipChanger()
 
 
 class MockSDKProjectMembersFacts(ProjectMembersFactsReader):
@@ -779,6 +863,9 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     )
     application.include_router(create_project_creation_router(authenticate, _open_project_creator))
     application.include_router(create_project_members_router(authenticate, _open_project_members))
+    application.include_router(
+        create_project_membership_router(authenticate, _open_membership_changer)
+    )
     application.include_router(
         create_project_metadata_router(
             authenticate,
