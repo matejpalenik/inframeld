@@ -437,6 +437,7 @@ def main() -> None:
             "inframeld_backend.main:app",
             host="0.0.0.0",
             port=8000,
+            proxy_headers=False,
             access_log=False,
             log_level="warning",
         )

@@ -33,7 +33,12 @@ const operands = args
   .slice(operationIndex + 1)
   .filter((arg) => !arg.startsWith("-"))
 const service = operands[0]
-const proofServices = ["browser-tests", "proof-driver", "proof-denied-driver"]
+const proofServices = [
+  "backend",
+  "browser-tests",
+  "proof-driver",
+  "proof-denied-driver",
+]
 const lookupService =
   args[0] === "ps"
     ? args
@@ -130,10 +135,13 @@ if (naturalDescendant) {
     negativeVerified: false,
     driver: false,
     observations: 0,
+    driverObservations: 0,
+    browserExitedWithDriverPending: false,
   }
   try {
     state = JSON.parse(readFileSync(stateFile, "utf8"))
   } catch {}
+  const backend = "a".repeat(64)
   const browser = "b".repeat(64)
   const driver = "d".repeat(64)
   const denied = "e".repeat(64)
@@ -166,11 +174,13 @@ if (naturalDescendant) {
       process.exitCode = 57
     else {
       const id =
-        lookupService === "browser-tests"
-          ? browser
-          : lookupService === "proof-denied-driver"
-            ? denied
-            : driver
+        lookupService === "backend"
+          ? backend
+          : lookupService === "browser-tests"
+            ? browser
+            : lookupService === "proof-denied-driver"
+              ? denied
+              : driver
       if (proof === "lookup-multiple") console.log(`${id}\n${"f".repeat(64)}`)
       else if (proof === "lookup-truncated") console.log(id.slice(0, 12))
       else if (
@@ -178,6 +188,11 @@ if (naturalDescendant) {
         lookupService === "proof-driver"
       )
         console.log(browser)
+      else if (
+        proof === "lookup-reused-backend" &&
+        lookupService === "browser-tests"
+      )
+        console.log(backend)
       else if (proof !== "lookup-zero") console.log(id)
     }
   } else if (args.includes("inspect")) {
@@ -185,19 +200,39 @@ if (naturalDescendant) {
     if (proof === "inspect-invalid") console.log("not-json")
     else {
       const id = args.at(-1)
+      const isBackend = id === backend
       const isBrowser = id === browser
       const isDenied = id === denied
-      const status =
-        (isDenied && proof !== "denied-stalled") ||
-        (isBrowser && proof === "browser-failed")
+      if (id === driver) state.driverObservations += 1
+      const status = isBackend
+        ? proof === "backend-stopped"
           ? "exited"
-          : state.driver && proof !== "stalled-terminal"
+          : "running"
+        : (isDenied && proof !== "denied-stalled") ||
+            (isBrowser && proof === "browser-failed")
+          ? "exited"
+          : state.driver &&
+              proof !== "stalled-terminal" &&
+              !(
+                id === driver &&
+                proof === "browser-exits-first" &&
+                state.driverObservations === 1
+              )
             ? "exited"
             : "running"
+      if (
+        isBrowser &&
+        proof === "browser-exits-first" &&
+        status === "exited" &&
+        state.driverObservations === 1
+      )
+        state.browserExitedWithDriverPending = true
       console.log(
         JSON.stringify({
           Id:
-            proof === "wrong-id" || (isDenied && proof === "denied-wrong-id")
+            proof === "wrong-id" ||
+            (isBackend && proof === "backend-wrong-id") ||
+            (isDenied && proof === "denied-wrong-id")
               ? "f".repeat(64)
               : id,
           Config: {
@@ -213,23 +248,29 @@ if (naturalDescendant) {
               "com.docker.compose.service":
                 proof === "lookup-wrong-service"
                   ? "another-service"
-                  : isBrowser
-                    ? "browser-tests"
-                    : isDenied
-                      ? "proof-denied-driver"
-                      : "proof-driver",
+                  : isBackend
+                    ? "backend"
+                    : isBrowser
+                      ? "browser-tests"
+                      : isDenied
+                        ? "proof-denied-driver"
+                        : "proof-driver",
             },
           },
           HostConfig: {
             Privileged: false,
-            Init: true,
-            PidMode: "",
+            Init: !(isBackend && proof === "backend-without-init"),
+            PidMode: isBackend && proof === "backend-host-pid" ? "host" : "",
             NetworkMode:
               isDenied && proof === "denied-host-net"
                 ? "host"
-                : isBrowser
+                : isBackend
                   ? "account-private"
-                  : `container:${browser}`,
+                  : isBrowser && proof === "browser-wrong-owner"
+                    ? `container:${"f".repeat(64)}`
+                    : id === driver && proof === "driver-browser-owner"
+                      ? `container:${browser}`
+                      : `container:${backend}`,
           },
           State: {
             Status: status,
@@ -239,13 +280,14 @@ if (naturalDescendant) {
                 : 1
               : isBrowser && proof === "browser-failed"
                 ? 8
-                : !isBrowser &&
+                : id === driver &&
                     ["driver-failed", "driver-logs-failed"].includes(proof)
                   ? 7
                   : 0,
             Health: {
-              Status:
-                proof === "unhealthy"
+              Status: isBackend
+                ? "absent"
+                : proof === "unhealthy"
                   ? "unhealthy"
                   : proof === "never-ready"
                     ? "starting"
@@ -257,7 +299,8 @@ if (naturalDescendant) {
     }
   } else if (args.includes("logs")) {
     const id = args.at(-1)
-    if (id === browser) console.log("controlled browser diagnostic")
+    if (id === backend) console.log("controlled backend diagnostic")
+    else if (id === browser) console.log("controlled browser diagnostic")
     else if (id === denied && proof === "denied-wrong-exit")
       console.log("controlled denied diagnostic")
     else if (

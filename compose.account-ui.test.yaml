@@ -207,6 +207,7 @@ services:
       oauth-client-setup: { condition: service_completed_successfully }
   backend:
     <<: *backend
+    init: true
     command: [serve]
     depends_on:
       seed: { condition: service_completed_successfully }
@@ -251,6 +252,7 @@ services:
     <<: *web
     profiles: [qualification]
     init: true
+    network_mode: service:backend
     shm_size: 256m
     environment:
       INFRAMELD_ACCOUNT_PROOF_MODE: ${INFRAMELD_ACCOUNT_PROOF_MODE:-0}
@@ -282,7 +284,7 @@ services:
       args:
         ACCOUNT_BACKEND_IMAGE: ${INFRAMELD_ACCOUNT_BACKEND_IMAGE:?Use scripts/test-account-ui.sh}
     init: true
-    network_mode: service:browser-tests
+    network_mode: service:backend
     environment:
       <<: *backend-env
       HTTPS_PROXY: http://127.0.0.1:1

@@ -107,7 +107,7 @@ import json, re, sys
 raw = sys.stdin.buffer.read(65537)
 if len(raw) > 65536: raise SystemExit("recipient-proof: inspect size rejected (status 1)")
 data = json.loads(raw)
-project, identity, service, browser = sys.argv[1:]
+project, identity, service, namespace_owner = sys.argv[1:]
 if not re.fullmatch("[0-9a-f]{64}", identity) or data.get("Id") != identity: raise SystemExit("recipient-proof: inspect identity rejected (status 1)")
 config, host, state = data["Config"], data["HostConfig"], data["State"]
 labels = config["Labels"]
@@ -116,7 +116,7 @@ for suffix, expected in (("project", project), ("service", service)):
     if not observed or any(value != expected for value in observed): raise SystemExit("recipient-proof: inspect scope rejected (status 1)")
 if config.get("User") != "10001:10001" or host.get("Privileged") is not False: raise SystemExit("recipient-proof: inspect user rejected (status 1)")
 if host.get("Init") is not True or host.get("PidMode") not in ("", "private"): raise SystemExit("recipient-proof: inspect process rejected (status 1)")
-if service in ("proof-driver", "proof-denied-driver") and host.get("NetworkMode") != "container:" + browser: raise SystemExit("recipient-proof: inspect namespace rejected (status 1)")
+if service in ("browser-tests", "proof-driver", "proof-denied-driver") and host.get("NetworkMode") != "container:" + namespace_owner: raise SystemExit("recipient-proof: inspect namespace rejected (status 1)")
 status, code = state.get("Status"), state.get("ExitCode")
 health = state.get("Health", {}).get("Status", "absent")
 if status not in ("created", "running", "exited", "dead") or type(code) is not int or not 0 <= code <= 255: raise SystemExit("recipient-proof: inspect state rejected (status 1)")
@@ -150,17 +150,29 @@ account_service_container_id() {
 }
 
 recipient_proof_stack() {
-    local browser_id denied_id driver_id snapshot browser_state browser_code health driver_state driver_code readiness
+    local backend_id browser_id denied_id driver_id snapshot browser_state browser_code health driver_state driver_code readiness
     # One original 300-second phase owns both explicit attempts and all three containers.
+    backend_id="$(account_service_container_id backend)" || return "$?"
+    snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${backend_id}" |
+        account_container_state "${backend_id}" backend "${backend_id}")" || {
+        printf 'recipient-proof: inspection rejected (status 1)\n' >&2
+        return 1
+    }
+    read -r browser_state browser_code health <<<"${snapshot}"
+    [[ "${browser_state}" == running ]] || {
+        printf 'recipient-proof: backend state rejected (status 1)\n' >&2
+        "${account_runtime}" logs "${backend_id}" >&2 || printf 'recipient-proof: diagnostic logs unavailable\n' >&2
+        return 1
+    }
     "${account_compose[@]}" --profile qualification up -d --no-deps --no-build browser-tests || return "$?"
     browser_id="$(account_service_container_id browser-tests)" || return "$?"
-    [[ "${browser_id}" =~ ^[0-9a-f]{64}$ ]] || {
+    [[ "${browser_id}" =~ ^[0-9a-f]{64}$ && "${browser_id}" != "${backend_id}" ]] || {
         printf 'recipient-proof: selection rejected (status 1)\n' >&2
         return 1
     }
     while true; do
         snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${browser_id}" |
-            account_container_state "${browser_id}" browser-tests "${browser_id}")" || {
+            account_container_state "${browser_id}" browser-tests "${backend_id}")" || {
             printf 'recipient-proof: inspection rejected (status 1)\n' >&2
             return 1
         }
@@ -175,19 +187,19 @@ recipient_proof_stack() {
     done
     "${account_compose[@]}" --profile qualification up -d --no-deps --no-build proof-denied-driver || return "$?"
     denied_id="$(account_service_container_id proof-denied-driver)" || return "$?"
-    [[ "${denied_id}" =~ ^[0-9a-f]{64}$ && "${denied_id}" != "${browser_id}" ]] || {
+    [[ "${denied_id}" =~ ^[0-9a-f]{64}$ && "${denied_id}" != "${browser_id}" && "${denied_id}" != "${backend_id}" ]] || {
         printf 'recipient-proof: selection rejected (status 1)\n' >&2
         return 1
     }
     while true; do
         snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${denied_id}" |
-            account_container_state "${denied_id}" proof-denied-driver "${browser_id}")" || {
+            account_container_state "${denied_id}" proof-denied-driver "${backend_id}")" || {
             printf 'recipient-proof: inspection rejected (status 1)\n' >&2
             return 1
         }
         read -r driver_state driver_code health <<<"${snapshot}"
         snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${browser_id}" |
-            account_container_state "${browser_id}" browser-tests "${browser_id}")" || {
+            account_container_state "${browser_id}" browser-tests "${backend_id}")" || {
             printf 'recipient-proof: inspection rejected (status 1)\n' >&2
             return 1
         }
@@ -217,7 +229,7 @@ recipient_proof_stack() {
         "${account_compose[@]}" exec -T backend python /fixture/backend.py verify-denied-result || return "$?"
     while true; do
         snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${browser_id}" |
-            account_container_state "${browser_id}" browser-tests "${browser_id}")" || {
+            account_container_state "${browser_id}" browser-tests "${backend_id}")" || {
             printf 'recipient-proof: inspection rejected (status 1)\n' >&2
             return 1
         }
@@ -244,13 +256,13 @@ catch (error) { process.exit(error.code === "ENOENT" ? 10 : 1); }
     done
     "${account_compose[@]}" --profile qualification up -d --no-deps --no-build proof-driver || return "$?"
     driver_id="$(account_service_container_id proof-driver)" || return "$?"
-    [[ "${driver_id}" =~ ^[0-9a-f]{64}$ && "${driver_id}" != "${browser_id}" && "${driver_id}" != "${denied_id}" ]] || {
+    [[ "${driver_id}" =~ ^[0-9a-f]{64}$ && "${driver_id}" != "${browser_id}" && "${driver_id}" != "${denied_id}" && "${driver_id}" != "${backend_id}" ]] || {
         printf 'recipient-proof: selection rejected (status 1)\n' >&2
         return 1
     }
     while true; do
         snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${driver_id}" |
-            account_container_state "${driver_id}" proof-driver "${browser_id}")" || {
+            account_container_state "${driver_id}" proof-driver "${backend_id}")" || {
             printf 'recipient-proof: inspection rejected (status 1)\n' >&2
             return 1
         }
@@ -266,7 +278,7 @@ catch (error) { process.exit(error.code === "ENOENT" ? 10 : 1); }
             return "${driver_code}"
         fi
         snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${browser_id}" |
-            account_container_state "${browser_id}" browser-tests "${browser_id}")" || {
+            account_container_state "${browser_id}" browser-tests "${backend_id}")" || {
             printf 'recipient-proof: inspection rejected (status 1)\n' >&2
             return 1
         }
@@ -285,7 +297,7 @@ catch (error) { process.exit(error.code === "ENOENT" ? 10 : 1); }
         sleep 0.05 || return "$?"
     done
     snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${denied_id}" |
-        account_container_state "${denied_id}" proof-denied-driver "${browser_id}")" || {
+        account_container_state "${denied_id}" proof-denied-driver "${backend_id}")" || {
         printf 'recipient-proof: inspection rejected (status 1)\n' >&2
         return 1
     }

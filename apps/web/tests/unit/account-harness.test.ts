@@ -119,6 +119,13 @@ type Options = {
   baseline?: "partial" | "fail" | "sort-fail"
   proof?:
     | "success"
+    | "browser-exits-first"
+    | "backend-wrong-id"
+    | "backend-stopped"
+    | "backend-without-init"
+    | "backend-host-pid"
+    | "browser-wrong-owner"
+    | "driver-browser-owner"
     | "unhealthy"
     | "browser-failed"
     | "driver-failed"
@@ -141,6 +148,7 @@ type Options = {
     | "lookup-wrong-project"
     | "lookup-wrong-service"
     | "lookup-reused-browser"
+    | "lookup-reused-backend"
 }
 async function exists(path: string) {
   try {
@@ -458,53 +466,82 @@ for (const status of [7, 130, 143]) {
   )
 }
 
-test(
-  "recipient proof waits for browser readiness, both terminals and receipt verification before success",
-  { timeout: 12_000 },
-  async () => {
-    await probe(
-      { proof: "success", budget: 5 },
-      async ({ child, directory }) => {
-        assert.equal(await completion(child, 10_000), 0)
-        const events = (await readFile(join(directory, "events.jsonl"), "utf8"))
-          .trim()
-          .split("\n")
-          .map((line) => JSON.parse(line) as { kind: string; args: string[] })
-        assert.equal(
-          events.filter(
+for (const proof of ["success", "browser-exits-first"] as const)
+  test(
+    proof === "success"
+      ? "recipient proof waits for browser readiness, both terminals and receipt verification before success"
+      : "recipient proof survives successful browser completion while the Allow driver remains pending",
+    { timeout: 12_000 },
+    async () => {
+      await probe(
+        { proof, budget: 5 },
+        async ({ child, directory, output }) => {
+          assert.equal(await completion(child, 10_000), 0, output())
+          const events = (
+            await readFile(join(directory, "events.jsonl"), "utf8")
+          )
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as { kind: string; args: string[] })
+          assert.equal(
+            events.filter(
+              (event) =>
+                event.args.includes("proof-driver") && event.args.includes("up")
+            ).length,
+            1
+          )
+          const deniedStart = events.findIndex(
+            (event) =>
+              event.args.includes("proof-denied-driver") &&
+              event.args.includes("up")
+          )
+          const deniedVerified = events.findIndex((event) =>
+            event.args.includes("verify-denied-result")
+          )
+          const allowedStart = events.findIndex(
             (event) =>
               event.args.includes("proof-driver") && event.args.includes("up")
-          ).length,
-          1
-        )
-        const deniedStart = events.findIndex(
-          (event) =>
-            event.args.includes("proof-denied-driver") &&
-            event.args.includes("up")
-        )
-        const deniedVerified = events.findIndex((event) =>
-          event.args.includes("verify-denied-result")
-        )
-        const allowedStart = events.findIndex(
-          (event) =>
-            event.args.includes("proof-driver") && event.args.includes("up")
-        )
-        assert.ok(
-          deniedStart >= 0 &&
-            deniedVerified > deniedStart &&
-            allowedStart > deniedVerified
-        )
-        assert.ok(
-          events.some((event) => event.args.includes("verify-proof-result"))
-        )
-        assert.equal(events.filter((event) => event.kind === "down").length, 1)
-        for (const entry of await processes(directory))
-          await assertStopped(entry.pid)
-        assert.equal(await exists(join(directory, "fuse-fired")), false)
-      }
-    )
-  }
-)
+          )
+          const ownerInspected = events.findIndex(
+            (event) =>
+              event.args[0] === "inspect" &&
+              event.args.at(-1) === "a".repeat(64)
+          )
+          const browserStart = events.findIndex(
+            (event) =>
+              event.args.includes("browser-tests") && event.args.includes("up")
+          )
+          assert.ok(
+            ownerInspected >= 0 &&
+              browserStart > ownerInspected &&
+              deniedStart > browserStart &&
+              deniedVerified > deniedStart &&
+              allowedStart > deniedVerified
+          )
+          if (proof === "browser-exits-first") {
+            const state = JSON.parse(
+              await readFile(join(directory, "proof-state.json"), "utf8")
+            ) as {
+              browserExitedWithDriverPending: boolean
+              driverObservations: number
+            }
+            assert.equal(state.browserExitedWithDriverPending, true)
+            assert.ok(state.driverObservations >= 2)
+          }
+          assert.ok(
+            events.some((event) => event.args.includes("verify-proof-result"))
+          )
+          assert.equal(
+            events.filter((event) => event.kind === "down").length,
+            1
+          )
+          for (const entry of await processes(directory))
+            await assertStopped(entry.pid)
+          assert.equal(await exists(join(directory, "fuse-fired")), false)
+        }
+      )
+    }
+  )
 
 test(
   "the maintained recipient-proof mode owns valid image tags for a mixed-separator temporary basename",
@@ -581,6 +618,49 @@ test(
 )
 
 for (const [proof, expected, admitsDriver, classification, diagnostic] of [
+  [
+    "backend-wrong-id",
+    1,
+    false,
+    "recipient-proof: inspect identity rejected",
+    undefined,
+  ],
+  ["backend-stopped", 1, false, "recipient-proof: backend state rejected", "a"],
+  [
+    "backend-without-init",
+    1,
+    false,
+    "recipient-proof: inspect process rejected",
+    undefined,
+  ],
+  [
+    "backend-host-pid",
+    1,
+    false,
+    "recipient-proof: inspect process rejected",
+    undefined,
+  ],
+  [
+    "browser-wrong-owner",
+    1,
+    false,
+    "recipient-proof: inspect namespace rejected",
+    undefined,
+  ],
+  [
+    "driver-browser-owner",
+    1,
+    true,
+    "recipient-proof: inspect namespace rejected",
+    undefined,
+  ],
+  [
+    "lookup-reused-backend",
+    1,
+    false,
+    "recipient-proof: selection rejected",
+    undefined,
+  ],
   ["unhealthy", 1, false, "recipient-proof: browser state rejected", "b"],
   ["browser-failed", 1, false, "recipient-proof: browser state rejected", "b"],
   [
@@ -725,11 +805,13 @@ for (const [proof, expected, admitsDriver, classification, diagnostic] of [
                   events.findIndex((event) => event.kind === "down")
               )
               const role =
-                diagnostic === "b"
-                  ? "browser"
-                  : diagnostic === "e"
-                    ? "denied"
-                    : "allowed"
+                diagnostic === "a"
+                  ? "backend"
+                  : diagnostic === "b"
+                    ? "browser"
+                    : diagnostic === "e"
+                      ? "denied"
+                      : "allowed"
               assert.ok(
                 output().indexOf(`controlled ${role} diagnostic`) >
                   output().indexOf(initial)
@@ -739,7 +821,7 @@ for (const [proof, expected, admitsDriver, classification, diagnostic] of [
               if (admitsDriver)
                 assert.equal(logs[0].args.at(-1), "e".repeat(64))
             }
-            assert.doesNotMatch(output(), /(?:b{64}|d{64}|e{64}|f{64})/)
+            assert.doesNotMatch(output(), /(?:a{64}|b{64}|d{64}|e{64}|f{64})/)
             assert.doesNotMatch(output(), /"HostConfig"|"NetworkMode"/)
           }
           if (proof === "driver-logs-failed")
