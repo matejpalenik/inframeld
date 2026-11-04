@@ -7,7 +7,7 @@ import httpx
 import inframeld_sdk
 import inframeld_sdk_fixtures
 from observations import NativeModel
-from pydantic import JsonValue, TypeAdapter
+from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
 
 Model = inframeld_sdk_fixtures.ContractFixturePayload | inframeld_sdk.ProjectUseOnlyGrantResponse
 _JSON_OBJECT = TypeAdapter(dict[str, JsonValue])
@@ -94,6 +94,42 @@ def _rejects_native_null() -> bool:
 
 
 class GeneratedModelTests(unittest.TestCase):
+    def test_revision_models_preserve_the_exact_signed_64_bit_bound(self) -> None:
+        identifier = "00000000-0000-4000-8000-000000000001"
+        cases: tuple[tuple[type[BaseModel], str, dict[str, JsonValue]], ...] = (
+            (
+                inframeld_sdk.HumanAdmissionRequest,
+                "expectedAccessRevision",
+                {"identityId": identifier},
+            ),
+            (
+                inframeld_sdk.ProjectCreationRequest,
+                "expectedAccessRevision",
+                {"organizationId": identifier, "name": "support", "displayName": "Support"},
+            ),
+            (inframeld_sdk.ProjectMembershipRequest, "expectedAccessRevision", {}),
+            (
+                inframeld_sdk.ProjectMetadataUpdateRequest,
+                "expectedMetadataRevision",
+                {"name": "support"},
+            ),
+            (
+                inframeld_sdk.MyOrganizationAccessResponse,
+                "accessRevision",
+                {"organizationId": identifier, "principalId": identifier, "grants": []},
+            ),
+        )
+        for model, field, other_fields in cases:
+            with self.subTest(model=model.__name__):
+                for revision in (0, 2**63 - 1):
+                    value = model.model_validate({**other_fields, field: revision})
+                    self.assertEqual(
+                        _JSON_OBJECT.validate_json(value.model_dump_json(by_alias=True))[field],
+                        revision,
+                    )
+                with self.assertRaises(ValidationError):
+                    model.model_validate({**other_fields, field: 2**63})
+
     def test_metadata_change_preserves_omission_and_counts_unicode_code_points(self) -> None:
         source: dict[str, JsonValue] = {"expectedMetadataRevision": 0, "name": "production"}
         model = inframeld_sdk.ProjectMetadataUpdateRequest.model_validate(source)

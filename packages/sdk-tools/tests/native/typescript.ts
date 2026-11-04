@@ -1,7 +1,63 @@
+import assert from "node:assert/strict";
 import type {
   ContractFixturePayload as Payload,
   ProblemDetails,
 } from "../../fixtures/typescript/generated/types.gen.js";
+import {
+  zHumanAdmissionRequest,
+  zMyOrganizationAccessResponse,
+  zProjectCreationRequest,
+  zProjectMembershipRequest,
+  zProjectMetadataUpdateRequest,
+} from "../../../sdk-typescript/generated/zod.gen.js";
+
+const revisionIdentifier = "00000000-0000-4000-8000-000000000001";
+const revisionModels = [
+  [
+    "expectedAccessRevision",
+    zHumanAdmissionRequest,
+    { identityId: revisionIdentifier },
+  ],
+  [
+    "expectedAccessRevision",
+    zProjectCreationRequest,
+    {
+      organizationId: revisionIdentifier,
+      name: "support",
+      displayName: "Support",
+    },
+  ],
+  ["expectedAccessRevision", zProjectMembershipRequest, {}],
+  [
+    "expectedMetadataRevision",
+    zProjectMetadataUpdateRequest,
+    { name: "support" },
+  ],
+  [
+    "accessRevision",
+    zMyOrganizationAccessResponse,
+    {
+      organizationId: revisionIdentifier,
+      principalId: revisionIdentifier,
+      grants: [],
+    },
+  ],
+] as const;
+for (const [field, schema, otherFields] of revisionModels) {
+  for (const revision of [0, Number.MAX_SAFE_INTEGER]) {
+    assert.equal(
+      schema.safeParse({ ...otherFields, [field]: revision }).success,
+      true,
+    );
+  }
+  for (const revision of [-1, Number.MAX_SAFE_INTEGER + 1, 1n]) {
+    assert.equal(
+      schema.safeParse({ ...otherFields, [field]: revision }).success,
+      false,
+    );
+  }
+}
+
 const valid: Payload = {
   required_name: "valid",
   required_nullable: null,

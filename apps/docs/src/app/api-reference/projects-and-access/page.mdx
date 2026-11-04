@@ -46,6 +46,24 @@ Require a currently eligible human, current Project membership and permission to
 
 Request one page with default `limit: 25`, range 1–100, and an optional unchanged `cursor`. The response reports the current Project `accessRevision`, safe stored-member items and a nullable `nextCursor`. Inactive stored memberships remain in the list. There are no emails, grants or totals. Every page checks current authority and scope. A cursor is not a snapshot or permission token, and a denied read is not an empty result. No body or idempotency key applies to this GET.
 
+## Add a Project member
+
+<ApiOperation operationId="addProjectMember" />
+
+Require a currently eligible human Project member with permission to use `manage-project-members`, one retained idempotency key and the reviewed Project Access revision. The recipient must be an eligible admitted human in the same Organization. The `ProjectMembershipRequest` JSON body contains `expectedAccessRevision`.
+
+A fresh `201` creates bare membership and advances the Project Access revision once. A fresh `200` reports existing membership without that advance. Neither grants actions, group membership or management. [Add and remove Project members](/guides/manage-project-members) explains the actual inputs and original-result recovery.
+
+## Remove a Project member
+
+<ApiOperation operationId="removeProjectMember" />
+
+Require the same current human Project authority and a retained idempotency key. DELETE accepts one `expectedAccessRevision` query value and no body. The exact human recipient may be inactive. Departure preserves the required eligible human grantors and group managers or conflicts atomically.
+
+A fresh `200` reports `removed: true` and whether membership changed. Actual removal clears only that recipient's membership and received Project/group/application-account action grants and group relationships within the Project, advancing its Access revision once. It preserves Project-owned resources, other Projects and grants issued to other people. Rejoin restores only membership.
+
+Exact replay requires the actor's current authority and returns the original status, receipt and expiry without repeating removal or restoring access. [Departure checks and recovery](/guides/manage-project-members#check-responsibility-before-departure) explain the guards, self-departure and uncertain outcomes.
+
 ## Read Project metadata
 
 <ApiOperation operationId="getProjectMetadata" />

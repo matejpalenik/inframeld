@@ -10,11 +10,45 @@ from functools import partial
 from typing import Any, cast
 
 from fastapi import FastAPI
+from pydantic import BaseModel
+from pydantic.json_schema import JsonSchemaMode
 
 from inframeld_backend.shared.http.definitions.problem_definition import ProblemDefinition
 from inframeld_backend.shared.http.responses.problem_details import ProblemDetails
 
 _PROBLEM_RESPONSE_MARKER = "x-inframeld-problem-response"
+
+
+def _restore_integer_bounds(
+    schema: dict[str, Any], model: type[BaseModel], *, mode: JsonSchemaMode
+) -> None:
+    """Preserve integer constraints rounded by FastAPI's OpenAPI schema model."""
+    source = model.model_json_schema(by_alias=True, mode=mode)
+    component = schema.get("components", {}).get("schemas", {}).get(model.__name__)
+    if not isinstance(component, dict):
+        raise ValueError("A configured integer-bound model has no native schema component.")
+    component = cast(dict[str, Any], component)
+
+    for name, source_property in source.get("properties", {}).items():
+        if source_property.get("type") != "integer":
+            continue
+
+        bounds = {
+            bound: value
+            for bound in ("minimum", "maximum")
+            if type(value := source_property.get(bound)) is int
+        }
+        if not bounds:
+            continue
+
+        target = component.get("properties", {}).get(name)
+        if not isinstance(target, dict):
+            raise ValueError("A configured integer bound has no matching native property.")
+        target = cast(dict[str, Any], target)
+        if target.get("type") != "integer":
+            raise ValueError("A configured integer bound has no matching native property.")
+
+        target.update(bounds)
 
 
 def problem_responses(
@@ -36,9 +70,16 @@ def problem_responses(
 
 def _openapi_with_problem_responses(
     original_openapi: Callable[[], dict[str, Any]],
+    validation_models: tuple[type[BaseModel], ...],
+    serialization_models: tuple[type[BaseModel], ...],
 ) -> dict[str, Any]:
-    """Generate the native schema and correct marked problem media types."""
+    """Correct exact model bounds and problem media types after native generation."""
     schema = original_openapi()
+
+    for model in validation_models:
+        _restore_integer_bounds(schema, model, mode="validation")
+    for model in serialization_models:
+        _restore_integer_bounds(schema, model, mode="serialization")
 
     for path_item in schema.get("paths", {}).values():
         for operation_value in path_item.values():
@@ -66,8 +107,13 @@ def _openapi_with_problem_responses(
     return schema
 
 
-def configure_problem_openapi(application: FastAPI) -> None:
-    """Install problem media-type correction while preserving native generation.
+def configure_problem_openapi(
+    application: FastAPI,
+    *,
+    validation_models: tuple[type[BaseModel], ...] = (),
+    serialization_models: tuple[type[BaseModel], ...] = (),
+) -> None:
+    """Preserve exact configured bounds and problem media types in native OpenAPI.
 
     Call once during application construction. The original bound method
     retains access to this application's configuration and schema cache.
@@ -76,4 +122,6 @@ def configure_problem_openapi(application: FastAPI) -> None:
     application.openapi = partial(
         _openapi_with_problem_responses,
         original_openapi,
+        validation_models,
+        serialization_models,
     )

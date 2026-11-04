@@ -18,7 +18,7 @@ import re  # noqa: F401
 import json
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, ClassVar, Dict, Optional
 from typing_extensions import Annotated
 from typing import Optional, Set
 from typing_extensions import Self
@@ -30,9 +30,8 @@ class ProjectMetadataUpdateRequest(BaseModel):
     Omitted fields preserve stored values. Explicit null never clears either field.
     """ # noqa: E501
     display_name: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=128)]] = Field(default=None, description="New label in Unicode code points. Omit to preserve even an unrestricted legacy label.", alias="displayName")
-    expected_metadata_revision: Annotated[int, Field(le=9223372036854776000, strict=True, ge=0)] = Field(description="Metadata revision reviewed for this exact change.", alias="expectedMetadataRevision")
+    expected_metadata_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)] = Field(description="Metadata revision reviewed for this exact change.", alias="expectedMetadataRevision")
     name: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=63)]] = Field(default=None, description="Explicit exact selector replacement. Omit to preserve the current selector.")
-    additional_properties: Dict[str, Any] = {}
     __properties: ClassVar[List[str]] = ["displayName", "expectedMetadataRevision", "name"]
     @field_validator('display_name', mode='before')
     def display_name_reject_explicit_null(cls, value):
@@ -93,10 +92,8 @@ class ProjectMetadataUpdateRequest(BaseModel):
         * `None` is only added to the output dict for nullable fields that
           were set at model initialization. Other fields with value `None`
           are ignored.
-        * Fields in `self.additional_properties` are added to the output dict.
         """
         excluded_fields: Set[str] = set([
-            "additional_properties",
         ])
 
         _dict = self.model_dump(
@@ -105,11 +102,6 @@ class ProjectMetadataUpdateRequest(BaseModel):
             exclude_none=True,
             exclude_unset=True,
         )
-        # puts key-value pairs in additional_properties in the top level
-        if self.additional_properties is not None:
-            for _key, _value in self.additional_properties.items():
-                _dict[_key] = _value
-
         return _dict
 
     @classmethod
@@ -126,11 +118,6 @@ class ProjectMetadataUpdateRequest(BaseModel):
             "expectedMetadataRevision": obj.get("expectedMetadataRevision"),
             "name": obj.get("name")
         }.items() if key in obj})
-        # store additional fields in additional_properties
-        for _key in obj.keys():
-            if _key not in cls.__properties:
-                _obj.additional_properties[_key] = obj.get(_key)
-
         return _obj
 
 

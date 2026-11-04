@@ -14,6 +14,7 @@ Use an existing Project's permanent ID to inspect or change its metadata. Curren
 - [Admit an existing human to the installation](/guides/admit-human).
 - [Create an additional Project with explicit initial permissions](/guides/create-project).
 - [List stored Project members](/guides/list-project-members).
+- [Add and remove human Project members](/guides/manage-project-members).
 - [Name and rename an existing Project](/guides/name-and-rename-project).
 - [Inspect the current session](/api-reference/projects-and-access#inspect-your-session).
 - [Assign the supported use-only grant](/api-reference/projects-and-access#assign-a-use-only-grant).
@@ -24,5 +25,7 @@ Use an existing Project's permanent ID to inspect or change its metadata. Curren
 Project names are exact selectors. IDs are permanent. Display names are labels. Read [Projects, people and permissions](/product/projects-and-permissions) for the distinction between sign-in, membership and action grants.
 
 Human admission uses current Organization `admit-users` authority and verifies the requested Kratos identity. It creates no Project membership, grants or starters. It is separate from first-administrator bootstrap and provider account registration.
+
+Membership changes use current Project `manage-project-members` authority. Adding an admitted human gives bare membership. Removal clears only that recipient's received access within the Project and preserves required human responsibilities. Rejoining restores no old grants or group roles. [The guide](/guides/manage-project-members) explains the current inputs, departure guards and original receipts.
 
 Project creation uses your current Organization `create-projects` permission. It creates an ordinary Project with its membership and eighteen initial assignments. Group administration and private-starter provisioning remain separate unfinished procedures. The [API reference](/api-reference/projects-and-access) lists the operations you can call today.
