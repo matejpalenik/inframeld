@@ -61,10 +61,14 @@ The issue numbers above are schema examples, not a current eligibility claim. `a
 
 ```sh
 python3 scripts/delivery/cli.py init --state /absolute/outside-checkouts/run/state.json --input init.json
-pnpm --silent delivery:status --state /absolute/outside-checkouts/run/state.json
+pnpm --silent delivery:status --state /absolute/outside-checkouts/run/state.json --summary
 ```
 
 Initialization never overwrites an existing run. `status` validates the complete record and does not write it. Fresh records use `schema_version: 1`, with repository and milestone identity, run and coordinator identity, finite `allowed_issues`, a monotonic `revision`, `assignments`, `resources`, and `merge_observations`. Supporting merge observations upgrade the state to version 2 as described below. Each new assignment has `claim_state: "active"` and a `history` array. Verified retirement changes its claim state to `retired` and stores its `retirement_receipt`. Records stay available for audit.
+
+Use `--summary` for ordinary `status` and `apply` output. It shows run identity and revision, current assignment bindings and blocker counts, occupied issues and resources, unfinished retired checkpoints, and uncertain issue or supporting merges. Merged owners keep their claims visible until verified retirement. The projection omits archived transitions, blocker bodies, evidence bodies, authorization references, resource tokens and diagnostic references. The coordinator supplies the next action from its current brief.
+
+For compatibility, omitting an output flag keeps the existing full JSON contract. `--full` explicitly requests that same output. Existing callers may continue reading their original fields while the coordinator adopts summary output at a safe checkpoint. Use `--full` and a local JSON filter when a specific issue or historical receipt needs inspection. Preserve the private record and its custody instead of retaining a full output copy after each routine update. Neither output mode changes state schemas, validation or the Python `StateStore` return contract.
 
 Apply a local update with the current revision:
 
@@ -72,10 +76,12 @@ Apply a local update with the current revision:
 python3 scripts/delivery/cli.py apply \
   --state /absolute/outside-checkouts/run/state.json \
   --run-id v1-run-1 --coordinator-id main-coordinator \
-  --expected-revision 0 --input claim.json
+  --expected-revision 0 --input claim.json --summary
 ```
 
 All mutations use an OS process lock, validate the full resulting record, and write through an fsynced temporary file and atomic replacement. A stale revision or mismatched identity rejects the update. Unknown `apply` fields reject the operation rather than being silently ignored. Re-read and reconcile after a rejected update. Do not retry it blindly. Claim ownership never expires with elapsed time. The run and coordinator IDs prevent accidental cross-run updates. They are not credentials or a security boundary against another process with filesystem access.
+
+An `apply --summary` response adds `applied`, containing the operation and its issue or resource name when supplied. It describes the exact state returned by that committed update, including a changed merged assignment being retired. A release identifies the resource and its now-unoccupied result. Inspect the private record or full output for its previous owner. A subsequent `status --summary` omits finished retired assignments. No second state read can replace the reported revision with a concurrent update's revision. A successful exit confirms the record update, while the coordinator still verifies the actual operation and resource state.
 
 The `apply` operation is a JSON object with one of these `op` values:
 

@@ -15,7 +15,7 @@ This skill owns the review process, scoring and report shape. [Coding Standards]
 
 ## Establish the review
 
-Resolve the requested files, change, branch or PR first. For a normal review of the current work, include staged, unstaged and relevant untracked files. Do not silently choose a Git base or rate unrelated repository code. For a repeated review, recheck the fixes and their affected callers, preserving the earlier scope unless new evidence requires expansion. State the scope and material omissions.
+Resolve the requested files, change, branch or PR first. For a normal review of the current work, include staged, unstaged and relevant untracked files. Do not silently choose a Git base or rate unrelated repository code. For a repeated review, use the [correction format](references/scoring-and-report.md#recheck-a-correction) to inspect changed inputs and affected callers. State the scope and material omissions.
 
 Identify the delivered user outcome, accepted constraints and invariants before judging the design. Read the actual implementation, its callers, tests and relevant owning guidance. Distinguish accepted contracts, pending proposals and delivered behavior. Ask only when missing scope or a material tradeoff cannot be resolved from the repository. A relevant pending decision can block dependent work, while an unrelated proposal cannot.
 
@@ -37,7 +37,7 @@ Respect accepted risk decisions unless changed evidence invalidates their assump
 
 ## Report the decision
 
-Use [scoring and the standard report](references/scoring-and-report.md). Put findings before the scorecard, then give the scope, important tradeoffs, evidence and next actions. Show an overall quality judgment and category ratings out of ten. Overengineering risk uses the opposite direction and must be labelled explicitly. Use N/A or Not assessed rather than inventing scores.
+Use [scoring and reporting](references/scoring-and-report.md) for substantive plan or implementation review. Preserve the nine categories, overall judgment and explicit direction of overengineering risk. A scoped correction review may reference the prior report and refresh only affected judgments under the correction format. Use N/A or Not assessed where evidence cannot support a rating.
 
 Separate commit readiness from merge/issue-closure readiness under the [Definition of Done](../../../docs/development/definition-of-done.md). Pending final-revision CI alone does not make a coherent change unfit to commit. A severe defect cannot be averaged away by high ratings elsewhere.
 

@@ -1524,6 +1524,317 @@ class CliTests(unittest.TestCase):
             self.assertEqual(path.stat().st_mtime_ns, before)
             self.assertFalse(result["merge_authorized_by_helper"])
 
+    def apply_arguments(
+        self, store: StateStore, revision: int, operation: dict[str, object]
+    ) -> list[str]:
+        path = store.path.parent / "operation.json"
+        path.write_text(json.dumps(operation))
+        return [
+            "apply",
+            "--state",
+            str(store.path),
+            "--input",
+            str(path),
+            "--run-id",
+            "trial",
+            "--coordinator-id",
+            "coordinator",
+            "--expected-revision",
+            str(revision),
+        ]
+
+    def test_summary_status_is_independent_of_history_and_preserves_the_record(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = StateTests()
+            store = runtime.make_store(directory)
+            state = runtime.apply(store, 0, runtime.claim(blockers=[82]))
+            _, before = self.invoke(["status", "--state", str(store.path), "--summary"])
+            assignment = object_value(
+                object_value(state["assignments"], "assignments")["125"], "assignment"
+            )
+            assignment["history"] = [
+                {
+                    "revision": 1,
+                    "operation": {"op": "revise"},
+                    "previous": {"private": "protected-raw-" * 180_000},
+                }
+            ]
+            assignment["evidence"] = {"private": "protected-receipt"}
+            assignment["blockers"] = [{"private": "protected-blocker"}]
+            store.path.write_text(json.dumps(state))
+            saved = store.path.read_bytes()
+            code, after = self.invoke(["status", "--state", str(store.path), "--summary"])
+            self.assertEqual(code, 0)
+            self.assertEqual(after["output"], "summary")
+            self.assertEqual(after, before)
+            self.assertLess(len(json.dumps(after)), 4_000)
+            self.assertEqual(store.path.read_bytes(), saved)
+            self.assertNotIn("protected", json.dumps(after))
+
+    def test_full_output_preserves_flagless_status_and_apply_contracts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = StateTests()
+            store = runtime.make_store(directory)
+            _, first = self.invoke(self.apply_arguments(store, 0, runtime.claim()))
+            self.assertEqual(first, store.read())
+            _, full = self.invoke(self.apply_arguments(store, 1, runtime.claim(158)) + ["--full"])
+            self.assertEqual(full, store.read())
+            _, legacy_status = self.invoke(["status", "--state", str(store.path)])
+            _, full_status = self.invoke(["status", "--state", str(store.path), "--full"])
+            self.assertEqual(full_status, legacy_status)
+            self.assertIn("authorization_reference", full_status)
+            self.assertIn(
+                "history",
+                object_value(
+                    object_value(full_status["assignments"], "assignments")["125"], "assignment"
+                ),
+            )
+
+    def test_summary_keeps_merged_claims_and_unfinished_retired_checkpoints(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = StateTests()
+            store = runtime.make_store(directory)
+            runtime.apply(store, 0, runtime.claim())
+            runtime.apply(store, 1, runtime.claim(158))
+            runtime.merged(store, 2)
+            runtime.apply(
+                store,
+                3,
+                {
+                    "op": "retire",
+                    "issue": 158,
+                    **runtime.binding(),
+                    "stop_cleanup": runtime.stop_cleanup(
+                        worker_id="worker-158",
+                        worktree="/synthetic/worktrees/158",
+                        branch="issue-158",
+                    ),
+                },
+            )
+            _, summary = self.invoke(["status", "--state", str(store.path), "--summary"])
+            assignments = object_value(summary["assignments"], "assignments")
+            self.assertEqual(summary["occupied_issues"], [125])
+            self.assertEqual(
+                object_value(assignments["125"], "assignment")["merge_state"], "merged"
+            )
+            self.assertEqual(
+                object_value(assignments["158"], "assignment")["claim_state"], "retired"
+            )
+            self.assertEqual(
+                object_value(assignments["158"], "assignment")["worktree"],
+                "/synthetic/worktrees/158",
+            )
+
+    def test_summary_keeps_uncertain_issue_and_supporting_merges_without_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = StateTests()
+            store = runtime.make_store(directory)
+            runtime.apply(store, 0, runtime.claim())
+            runtime.apply(store, 1, runtime.claim(158))
+            observation: dict[str, object] = {
+                "op": "observe_merge",
+                "issue": 125,
+                "pr": 273,
+                "status": "uncertain",
+                "head_sha": HEAD,
+                "source": "github",
+                "reference": "https://github.com/matejpalenik/inframeld/pull/273",
+                "observed_at": UPDATED,
+            }
+            state = runtime.apply(store, 2, observation)
+            # Schema 1 binds the observation to its issue by the enclosing key.
+            observations = object_value(state["merge_observations"], "merge observations")
+            del object_value(observations["125"], "observation")["issue"]
+            store.path.write_text(json.dumps(state))
+            code, legacy = self.invoke(["status", "--state", str(store.path), "--summary"])
+            self.assertEqual(code, 0)
+            self.assertIn("125", object_value(legacy["uncertain_merges"], "uncertain merges"))
+            runtime.apply(
+                store,
+                3,
+                {
+                    **observation,
+                    "op": "observe_prerequisite_merge",
+                    "issue": 158,
+                    "pr": 274,
+                    "reference": "https://github.com/matejpalenik/inframeld/pull/274",
+                    "base_sha": BASE,
+                    "issue_updated_at": UPDATED,
+                    "scope": "private receipt body",
+                    "assessment_reference": "protected:assessment",
+                },
+            )
+            _, summary = self.invoke(["status", "--state", str(store.path), "--summary"])
+            uncertain = object_value(summary["uncertain_merges"], "uncertain merges")
+            self.assertEqual(object_value(uncertain["125"], "uncertain merge")["pr"], 273)
+            supporting = object_value(
+                object_value(summary["assignments"], "assignments")["158"], "assignment"
+            )
+            self.assertEqual(
+                object_value(
+                    object_value(supporting["uncertain_prerequisites"], "prerequisites")["274"],
+                    "prerequisite",
+                )["status"],
+                "uncertain",
+            )
+            self.assertNotIn("protected", json.dumps(summary))
+            self.assertNotIn("private receipt body", json.dumps(summary))
+
+    def test_summary_reports_its_own_claim_when_another_update_lands(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = StateTests()
+            store = runtime.make_store(directory)
+            arguments = self.apply_arguments(store, 0, runtime.claim()) + ["--summary"]
+            apply = store.apply
+
+            def apply_then_advance(
+                *,
+                run_id: str,
+                coordinator_id: str,
+                expected_revision: int,
+                operation: dict[str, object],
+            ) -> dict[str, object]:
+                first = apply(
+                    run_id=run_id,
+                    coordinator_id=coordinator_id,
+                    expected_revision=expected_revision,
+                    operation=operation,
+                )
+                apply(
+                    run_id=run_id,
+                    coordinator_id=coordinator_id,
+                    expected_revision=1,
+                    operation=runtime.claim(158),
+                )
+                return first
+
+            with patch.object(StateStore, "apply", side_effect=apply_then_advance):
+                code, summary = self.invoke(arguments)
+            self.assertEqual(code, 0)
+            self.assertEqual(summary["revision"], 1)
+            self.assertEqual(summary["occupied_issues"], [125])
+            self.assertEqual(summary["applied"], {"op": "claim", "issue": 125})
+            saved = store.read()
+            self.assertEqual(saved["revision"], 2)
+            self.assertEqual(set(object_value(saved["assignments"], "assignments")), {"125", "158"})
+
+    def test_summary_release_identifies_resource_without_echoing_tokens(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = StateTests()
+            store = runtime.make_store(directory)
+            runtime.apply(store, 0, runtime.claim())
+            reserve: dict[str, object] = {
+                "op": "reserve",
+                "issue": 125,
+                "resource": "integration",
+                "token": "protected-token",
+                "head_sha": HEAD,
+                "operation": "test",
+                "reference": "protected:reservation",
+            }
+            _, summary = self.invoke(self.apply_arguments(store, 1, reserve) + ["--summary"])
+            resource = object_value(
+                object_value(summary["resources"], "resources")["integration"], "resource"
+            )
+            self.assertEqual(resource, {"issue": 125, "worker_id": "worker-125", "head_sha": HEAD})
+            self.assertNotIn("protected", json.dumps(summary))
+            _, summary = self.invoke(
+                self.apply_arguments(
+                    store,
+                    2,
+                    {
+                        "op": "release",
+                        "resource": "integration",
+                        "token": "protected-token",
+                        "head_sha": HEAD,
+                        "cleanup": "verified_clean",
+                        "reference": "protected:cleanup",
+                    },
+                )
+                + ["--summary"]
+            )
+            self.assertEqual(summary["revision"], 3)
+            self.assertEqual(summary["applied"], {"op": "release", "resource": "integration"})
+            self.assertEqual(summary["resources"], {})
+
+    def test_summary_retirement_returns_the_changed_merged_assignment(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = StateTests()
+            store = runtime.make_store(directory)
+            runtime.apply(store, 0, runtime.claim())
+            runtime.merged(store)
+            _, summary = self.invoke(
+                self.apply_arguments(
+                    store,
+                    2,
+                    {
+                        "op": "retire",
+                        "issue": 125,
+                        **runtime.binding(),
+                        "stop_cleanup": runtime.stop_cleanup(),
+                    },
+                )
+                + ["--summary"]
+            )
+            self.assertEqual(summary["applied"], {"op": "retire", "issue": 125})
+            self.assertEqual(
+                object_value(
+                    object_value(summary["assignments"], "assignments")["125"], "assignment"
+                )["claim_state"],
+                "retired",
+            )
+            _, status = self.invoke(["status", "--state", str(store.path), "--summary"])
+            self.assertEqual(status["assignments"], {})
+
+    def test_summary_rejects_bad_state_stale_updates_and_unknown_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = StateTests()
+            store = runtime.make_store(directory)
+            runtime.apply(store, 0, runtime.claim())
+            runtime.apply(
+                store,
+                1,
+                {
+                    "op": "reserve",
+                    "issue": 125,
+                    "resource": "integration",
+                    "token": "lease",
+                    "head_sha": HEAD,
+                    "operation": "test",
+                    "reference": "synthetic:reservation",
+                },
+            )
+            saved = store.path.read_bytes()
+            cases: list[tuple[int, dict[str, object]]] = [
+                (0, runtime.claim(158)),
+                (
+                    2,
+                    {
+                        "op": "release",
+                        "resource": "integration",
+                        "token": "lease",
+                        "head_sha": HEAD,
+                        "cleanup": "unknown",
+                        "reference": "synthetic:cleanup",
+                    },
+                ),
+            ]
+            for revision, operation in cases:
+                error = io.StringIO()
+                with self.subTest(operation=operation["op"]), redirect_stderr(error):
+                    code = run(self.apply_arguments(store, revision, operation) + ["--summary"])
+                self.assertEqual(code, 2)
+                self.assertEqual(json.loads(error.getvalue())["status"], "error")
+                self.assertEqual(store.path.read_bytes(), saved)
+            _, summary = self.invoke(["status", "--state", str(store.path), "--summary"])
+            self.assertIn("integration", object_value(summary["resources"], "resources"))
+            store.path.write_text("{}")
+            error = io.StringIO()
+            with redirect_stderr(error):
+                code = run(["status", "--state", str(store.path), "--summary"])
+            self.assertEqual(code, 2)
+            self.assertEqual(json.loads(error.getvalue())["status"], "error")
+
     def test_invalid_state_returns_bounded_json_error(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "missing.json"

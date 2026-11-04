@@ -2,7 +2,7 @@
 
 Alice deletes the Support Project. Ordinary membership can disappear during deletion, but she still needs to ask whether her original operation finished. [Issue #237](https://github.com/matejpalenik/inframeld/issues/237) permits that content-free read only for its currently eligible initiating human. It does not restore the Project or expose its contents.
 
-This is a historical case assembled on 2026-10-31 from inspected source and local delivery/review records. It describes the checkpoint before a completed tooling PR, rather than the issue's current status. Counts below are recorded evidence, not newly executed checks. The case teaches [discovery triage](discovered-defects.md). Domain policy remains with [operation recovery](../../inframeld-application-contracts/references/operation-recovery-contracts.md#deletion-status-inspection).
+This is a historical case assembled on 2026-10-31 from inspected source and local delivery/review records. The stages below describe an unfinished repair checkpoint. Later outcome, verified in the 2026-11-04 assessment, was [SDK repair #293](https://github.com/matejpalenik/inframeld/pull/293), a subsequent [startup-timing correction #296](https://github.com/matejpalenik/inframeld/pull/296), and [feature delivery #297](https://github.com/matejpalenik/inframeld/pull/297) closing #237. Counts below are historical evidence. The case teaches [discovery triage](discovered-defects.md). Domain policy remains with [operation recovery](../../inframeld-application-contracts/references/operation-recovery-contracts.md#deletion-status-inspection).
 
 ## What connected the feature to SDK testing
 
@@ -48,7 +48,7 @@ Reconsider the complete solution against main when replacement code needs substa
 
 The recorded run used cumulative three-cycle and one-shot restrictions. Current work follows the [progress-based remediation policy](gates-and-recovery.md#classify-failures-and-bound-remediation), including its adoption rules for broader human authorization. Preserve that history across issues, workers, worktrees and stages. Use independent reassessment to continue meaningful scoped repairs without another approval for each failure. Repeated unchanged trials still do not establish progress.
 
-The outcome to seek is a useful, independently reviewed tooling PR with its own passing checks, followed by feature delivery. Until that happens, additional tests, receipts or high scores for a narrow patch are activity, rather than proof that the full delivery is converging.
+Use the same finish condition in another repair: an independently reviewed tooling change with its required acceptance, followed by return to the feature and its own observed delivery. Distinguish diagnostic progress, a local fix, complete qualification and actual merge.
 
 ## Use the case to evaluate the skills
 
