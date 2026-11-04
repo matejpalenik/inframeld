@@ -118,8 +118,7 @@ impl LocalError {
     }
 
     fn body(self) -> ErrorBody {
-        ErrorBody {
-            source: "cli",
+        ErrorBody::Cli {
             code: self.code(),
             message: self.message().to_owned(),
         }
@@ -136,10 +135,15 @@ impl From<VersionError> for LocalError {
 }
 
 #[derive(Debug, Serialize)]
-struct ErrorBody {
-    source: &'static str,
-    code: &'static str,
-    message: String,
+#[serde(tag = "source", rename_all = "lowercase")]
+enum ErrorBody {
+    Cli {
+        code: &'static str,
+        message: String,
+    },
+    Backend {
+        problem: crate::discovery::DiscoveryProblem,
+    },
 }
 
 /// One typed final result is shared by version data and its explanation.
@@ -355,11 +359,18 @@ fn report_target(
         mode: intent.mode,
         outcome,
         data: report.data.as_ref(),
-        error: report.error.as_ref().map(|error| ErrorBody {
-            source: "cli",
-            code: error.code(),
-            message: error.to_string(),
-        }),
+        error: report
+            .error
+            .as_ref()
+            .map(|error| match error.backend_problem() {
+                Some(problem) => ErrorBody::Backend {
+                    problem: problem.clone(),
+                },
+                None => ErrorBody::Cli {
+                    code: error.code(),
+                    message: error.to_string(),
+                },
+            }),
         warnings: report.warnings.clone(),
     };
     machine(intent, &result, report.exit, stdout, stderr)

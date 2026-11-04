@@ -475,6 +475,13 @@ pub(crate) enum TargetError {
 }
 
 impl TargetError {
+    pub(crate) fn backend_problem(&self) -> Option<&crate::discovery::DiscoveryProblem> {
+        match self {
+            Self::Discovery(DiscoveryError::BackendProblem(problem)) => Some(problem),
+            _ => None,
+        }
+    }
+
     pub(crate) fn code(&self) -> &'static str {
         match self {
             Self::InvalidLabel => "invalid_target_label",
@@ -492,7 +499,9 @@ impl TargetError {
                 DiscoveryError::IdentityMismatch => "discovery_identity_mismatch",
                 DiscoveryError::InvalidMetadata => "discovery_invalid_metadata",
                 DiscoveryError::UnsupportedProfile => "discovery_unsupported_profile",
-                DiscoveryError::Unavailable => "discovery_unavailable",
+                DiscoveryError::Unavailable | DiscoveryError::BackendProblem(_) => {
+                    "discovery_unavailable"
+                }
                 DiscoveryError::Tls => "discovery_tls",
                 DiscoveryError::Redirect => "discovery_redirect",
                 DiscoveryError::ResponseTooLarge => "discovery_response_too_large",

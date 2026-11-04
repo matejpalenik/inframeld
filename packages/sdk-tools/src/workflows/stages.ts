@@ -14,6 +14,15 @@ export interface StageResult {
 
 /** Fixed classifications only. Original errors remain available to their owner. */
 export function describeError(error: unknown): string {
+  const deniedChecks = [
+    "SDK_DENIED_COMMAND_EXIT",
+    "SDK_DENIED_RECEIPT",
+    "SDK_DENIED_ORIGINAL_ERRORS",
+    "SDK_DENIED_CLOCK_BUDGET",
+    "SDK_DENIED_PS_OBSERVATION",
+    "SDK_DENIED_TARGET_LIVE",
+    "SDK_DENIED_INDEPENDENT_RECOVERY",
+  ];
   const seen = new Set<object>();
   let remaining = 16;
   const arrayValues = (value: unknown, maximum: number): unknown[] => {
@@ -33,30 +42,60 @@ export function describeError(error: unknown): string {
       result.push(Object.getOwnPropertyDescriptor(value, String(index))?.value);
     return result;
   };
-  const visit = (value: unknown, depth: number): object => {
+  const visit = (
+    value: unknown,
+    depth: number,
+    nodeFailure = false,
+  ): object => {
     if (depth > 4 || --remaining < 0) return { kind: "truncated" };
     try {
-      if (!(value instanceof Error)) return { kind: "unknown" };
+      if (!value || typeof value !== "object") return { kind: "unknown" };
+      const fields = Object.getOwnPropertyDescriptors(value);
+      const message = fields.message;
+      const fixedMessage =
+        nodeFailure &&
+        !Object.hasOwn(fields, "code") &&
+        message &&
+        "value" in message &&
+        typeof message.value === "string" &&
+        deniedChecks.includes(message.value)
+          ? message.value
+          : undefined;
+      const code: unknown = fixedMessage ?? fields.code?.value;
+      const wrappedByNode =
+        code === "ERR_TEST_FAILURE" &&
+        fields.failureType?.value === "testCodeFailure";
+      const deniedCheck =
+        typeof code === "string" && deniedChecks.includes(code);
+      const aggregate =
+        value instanceof AggregateError ||
+        (nodeFailure && Array.isArray(fields.errors?.value));
+      if (
+        !(value instanceof Error) &&
+        !wrappedByNode &&
+        !deniedCheck &&
+        !aggregate
+      )
+        return { kind: "unknown" };
       if (seen.has(value)) return { kind: "cycle" };
       seen.add(value);
-      const fields = Object.getOwnPropertyDescriptors(value);
       const detail: Record<string, unknown> = {
-        kind: value instanceof AggregateError ? "aggregate" : "error",
+        kind: aggregate ? "aggregate" : "error",
       };
-      const code: unknown = fields.code?.value;
       detail.code =
         typeof code === "string" &&
-        [
-          "EPIPE",
-          "ECONNRESET",
-          "ECONNABORTED",
-          "EIO",
-          "EBADF",
-          "ETIMEDOUT",
-          "ERR_STREAM_DESTROYED",
-          "ERR_STREAM_WRITE_AFTER_END",
-          "ERR_SOCKET_CLOSED",
-        ].includes(code)
+        (deniedCheck ||
+          [
+            "EPIPE",
+            "ECONNRESET",
+            "ECONNABORTED",
+            "EIO",
+            "EBADF",
+            "ETIMEDOUT",
+            "ERR_STREAM_DESTROYED",
+            "ERR_STREAM_WRITE_AFTER_END",
+            "ERR_SOCKET_CLOSED",
+          ].includes(code))
           ? code
           : "unknown";
       const syscall: unknown = fields.syscall?.value;
@@ -105,12 +144,16 @@ export function describeError(error: unknown): string {
         }
       }
       const nested: unknown = fields.errors?.value;
-      if (value instanceof AggregateError && Array.isArray(nested))
+      if (aggregate && Array.isArray(nested))
         detail.errors = arrayValues(nested, 4).map((entry: unknown) =>
-          visit(entry, depth + 1),
+          visit(entry, depth + 1, nodeFailure || wrappedByNode),
         );
       if ("value" in (fields.cause ?? {}))
-        detail.cause = visit(fields.cause!.value, depth + 1);
+        detail.cause = visit(
+          fields.cause!.value,
+          depth + 1,
+          nodeFailure || wrappedByNode,
+        );
       return detail;
     } catch {
       return { kind: "unknown" };

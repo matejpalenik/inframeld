@@ -71,6 +71,16 @@ const nativeCases = [
   ],
 ] as const;
 
+const deniedCheckCodes = [
+  "SDK_DENIED_COMMAND_EXIT",
+  "SDK_DENIED_RECEIPT",
+  "SDK_DENIED_ORIGINAL_ERRORS",
+  "SDK_DENIED_CLOCK_BUDGET",
+  "SDK_DENIED_PS_OBSERVATION",
+  "SDK_DENIED_TARGET_LIVE",
+  "SDK_DENIED_INDEPENDENT_RECOVERY",
+] as const;
+
 function nativeFailure(
   file: string,
   name: string,
@@ -181,6 +191,37 @@ test("native reporter preserves iterator failure after publishing its bounded sn
   await assert.rejects(iterator.next(), (error) => error === failure);
 });
 
+test("native reporter rejects unrecognized messages, getters and unwrapped class tokens", async () => {
+  const token = "SDK_DENIED_ORIGINAL_ERRORS";
+  let getters = 0;
+  const accessor = new Error("fake-private-marker");
+  Object.defineProperty(accessor, "message", {
+    get() {
+      getters++;
+      throw new Error("fake-private-marker");
+    },
+  });
+  for (const [error, wrapped] of [
+    [new Error(token), false],
+    [new Error("fake-private-marker"), true],
+    [Object.assign(new Error(token), { code: "fake-private-marker" }), true],
+    [accessor, true],
+  ] as const) {
+    const failure = wrapped
+      ? Object.assign(new Error("fake-private-marker"), {
+          code: "ERR_TEST_FAILURE",
+          failureType: "testCodeFailure",
+          cause: error,
+        })
+      : error;
+    const bytes = await nativeReport([
+      nativeFailure("profile-resources.test.ts", nativeCases[6][1], failure),
+    ]);
+    assert.ok(!bytes.includes(token) && !bytes.includes("fake-private-marker"));
+  }
+  assert.equal(getters, 0);
+});
+
 test("native reporter retains original failure when the existing byte or record bound refuses encoding", async () => {
   const event = nativeFailure("driver.test.ts", nativeCases[0][1]);
   const original = event.data.details.error;
@@ -213,12 +254,29 @@ test(
     await withResources(
       async () => {
         for (const fails of [false, true]) {
-          const input = join(work, "driver.test.ts"),
+          const input = join(work, "profile-resources.test.ts"),
             destination = join(work, "controller-status.json"),
             log = join(work, "controller.raw.log");
+          const testName = JSON.stringify(nativeCases[6][1]);
+          const checks = deniedCheckCodes.map(
+            (code) =>
+              `test(${testName}, () => { try { assert.equal(1, 0, "fake-private-marker"); } catch (error) { throw Object.assign(new Error(${JSON.stringify(code)}, { cause: error }), { code: ${JSON.stringify(code)} }); } });`,
+          );
           await writeFile(
             input,
-            `import test from "node:test"; import assert from "node:assert/strict"; console.log("fake-private-marker"); test(${JSON.stringify(nativeCases[0][1])}, () => { assert.equal(${fails ? "1" : "0"}, 0, "fake-private-marker"); });\n`,
+            [
+              'import test from "node:test"; import assert from "node:assert/strict"; console.log("fake-private-marker");',
+              ...(fails
+                ? [
+                    ...checks,
+                    `test(${testName}, () => { throw Object.assign(new Error("fake-private-marker"), { code: "fake-private-marker" }); });`,
+                    `test(${testName}, () => { throw new AggregateError([Object.assign(new Error("SDK_DENIED_ORIGINAL_ERRORS", { cause: new Error("fake-private-marker") }), { code: "SDK_DENIED_ORIGINAL_ERRORS" }), Object.assign(new Error("SDK_DENIED_INDEPENDENT_RECOVERY", { cause: new Error("fake-private-marker") }), { code: "SDK_DENIED_INDEPENDENT_RECOVERY" })], "fake-private-marker"); });`,
+                  ]
+                : [
+                    `test(${testName}, () => { assert.equal(0, 0, "fake-private-marker"); });`,
+                  ]),
+              "",
+            ].join("\n"),
             { mode: 0o600 },
           );
           await writeFile(destination, "stale", { mode: 0o600 });
@@ -270,10 +328,57 @@ test(
           assert.equal(info.mode & 0o777, 0o600);
           assert.ok(
             Buffer.byteLength(bytes) <= 4096 &&
-              !bytes.includes("fake-private-marker"),
+              !bytes.includes("fake-private-marker") &&
+              !bytes.includes(work) &&
+              !bytes.includes(".test.ts"),
           );
-          assert.equal(rows.length, fails ? 1 : 0);
-          if (fails) assert.equal(rows[0]?.caseId, "driver-profile");
+          assert.equal(rows.length, fails ? deniedCheckCodes.length + 2 : 0);
+          assert.ok(rows.length <= 32);
+          if (fails) {
+            assert.ok(
+              rows.every(
+                (row: { caseId: string }) => row.caseId === "denied-exit",
+              ),
+            );
+            for (const [index, code] of deniedCheckCodes.entries()) {
+              const failure = rows[index]?.failure;
+              const chain = [
+                failure,
+                failure?.cause,
+                failure?.cause?.cause,
+                failure?.cause?.cause?.cause,
+                failure?.cause?.cause?.cause?.cause,
+              ];
+              assert.ok(
+                chain.some((error) => error?.code === code),
+                code,
+              );
+            }
+
+            const unknown = JSON.stringify(
+              rows[deniedCheckCodes.length]?.failure,
+            );
+            assert.ok(unknown.includes('"unknown"'));
+            assert.ok(!unknown.includes("SDK_DENIED_"));
+
+            const failure = rows[deniedCheckCodes.length + 1]?.failure;
+            const aggregate = [
+              failure,
+              failure?.cause,
+              failure?.cause?.cause,
+              failure?.cause?.cause?.cause,
+              failure?.cause?.cause?.cause?.cause,
+            ].find((error) => error?.kind === "aggregate");
+            assert.equal(aggregate?.errors?.length, 2);
+            assert.equal(
+              aggregate.errors[0]?.code,
+              "SDK_DENIED_ORIGINAL_ERRORS",
+            );
+            assert.equal(
+              aggregate.errors[1]?.code,
+              "SDK_DENIED_INDEPENDENT_RECOVERY",
+            );
+          }
         }
       },
       async () => {

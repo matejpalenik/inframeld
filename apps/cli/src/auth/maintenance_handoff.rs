@@ -1330,22 +1330,40 @@ print(json.dumps({'schemaVersion':1,'mode':request['mode'],'operationId':request
     async fn stdout_and_stderr_overflow_remain_bounded_and_never_become_diagnostics() {
         for stream in ["stdout", "stderr"] {
             let (directory, execution) = scripted(
-                &format!("sys.{stream}.write('secret-output-sentinel'*4000)\nsys.{stream}.flush()"),
+                &format!(
+                    "import time\ntime.sleep(0.25)\nsys.{stream}.write('secret-output-sentinel'*4000)\nsys.{stream}.flush()"
+                ),
                 false,
             );
+            let mut budgets = short_budgets();
+            budgets.execution = Duration::from_secs(3);
             let result = handoff_with_budgets(
                 &execution,
                 &intent(),
                 &proof(),
                 Instant::now() + Duration::from_secs(3),
                 std::future::pending(),
-                short_budgets(),
+                budgets,
             )
             .await;
-            assert!(matches!(result.effect, MaintenanceEffect::Unknown { .. }));
-            assert_eq!(result.failure, Some(HandoffFailure::Output));
-            assert_eq!(result.process_cleanup, CleanupStatus::Confirmed);
-            assert!(!format!("{result:?}").contains("secret-output-sentinel"));
+            let context = format!(
+                "stream={stream} failure={:?} cleanup={:?} child_status={:?}",
+                result.failure, result.process_cleanup, result.child_status
+            );
+            assert!(
+                matches!(result.effect, MaintenanceEffect::Unknown { .. }),
+                "{context}"
+            );
+            assert_eq!(result.failure, Some(HandoffFailure::Output), "{context}");
+            assert_eq!(
+                result.process_cleanup,
+                CleanupStatus::Confirmed,
+                "{context}"
+            );
+            assert!(
+                !format!("{result:?}").contains("secret-output-sentinel"),
+                "{context}"
+            );
             drop(directory);
         }
     }

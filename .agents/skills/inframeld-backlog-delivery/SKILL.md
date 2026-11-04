@@ -1,55 +1,35 @@
 ---
 name: inframeld-backlog-delivery
-description: Coordinate an authorized Inframeld backlog through native workers, reviews and tested PRs, or rehearse that workflow read-only. Use for backlog orchestration and assigned delivery, not ordinary coding questions or standalone reviews.
+description: Coordinate authorized Inframeld backlog delivery or rehearse it read-only. Use for coordination and assigned delivery, not ordinary coding questions or standalone reviews.
 ---
 
-# Deliver useful changes through a bounded backlog
+# Finish useful capabilities within an authorized backlog
 
-Alice has a CLI output change ready for review while browser login waits for a prerequisite. The coordinator finishes the independent PR and schedules the shared integration stack for one executor at a time. Prefer useful, reviewed capabilities that complete issue acceptance within the focused epic. Agent occupancy and PR counts do not establish completion.
+Alice owns a membership issue whose next step needs verified identity admission. The coordinator delivers that prerequisite with a named consumer, then returns to membership. Useful supporting PRs retain their own acceptance while the finishing owner remains accountable for the issue's remaining behavior.
 
-This skill owns Inframeld's common delivery policy and the native main-chat workflow. The personal `inframeld-delivery` adapter uses the common references with its explicit separate-chat mode. Loading either skill grants no implementation, messaging, Goal or GitHub authority. Preserve the actual launch's finite scope, sandbox, paid-call restrictions, production boundaries and merge policy.
+This skill owns common delivery policy and the native main-chat workflow. The personal `inframeld-delivery` adapter uses the common references in its separate-chat mode. Loading guidance grants no implementation, messaging, Goal or GitHub authority. Preserve the actual launch's finite scope, model allocation, sandbox, paid-call restrictions, production boundaries and merge policy.
 
-## Select the role and reading route
+## Select the mode and reading route
 
-Every assigned role reads the [assignment protocol](references/assignment-protocol.md) for checkout binding, authority and handoffs. Then load only the procedure needed:
+Every assigned role reads the [assignment protocol](references/assignment-protocol.md) for checkout, authority, ownership and handoff. Load the relevant procedure:
 
 | Task | Read |
 | --- | --- |
-| Select work, resolve dependencies, limit parallelism or adopt an overloaded run | [Coordination and scheduling](references/coordinator.md) |
-| Prepare a human-facing feature's acceptance procedure | [Human qualification and its issue template](../inframeld-testing/references/human-qualification.md) |
-| Discover an incidental defect or decide whether a repair should block delivery | [Defect triage](references/discovered-defects.md), with the [historical #237 case](references/case-237-testing-repair.md) for an expanding test-runner repair |
-| Implement an assignment and test its behavior | [Worker delivery](references/worker.md) |
-| Schedule integration, assess evidence, recover or merge | [Gates and recovery](references/gates-and-recovery.md) |
-| Rehearse, launch, evaluate or install the personal adapter | [Delivery guide](../../../docs/development/guides/backlog-delivery.md) |
+| Select issues, validate prerequisites, assign owners or schedule parallel work | [Coordinator](references/coordinator.md) |
+| Implement and return a reviewed capability | [Worker](references/worker.md) |
+| Assess evidence, schedule shared execution, repair, merge or close | [Gates and recovery](references/gates-and-recovery.md) |
+| Classify an incidental defect or expanding tooling repair | [Defect triage](references/discovered-defects.md), with the dated [#237 case](references/case-237-testing-repair.md) when useful |
+| Prepare or assess human qualification | [Testing's human-qualification policy](../inframeld-testing/references/human-qualification.md) |
+| Launch, adopt guidance, rehearse or use the personal adapter | [Delivery guide](../../../docs/development/guides/backlog-delivery.md) |
 
-The native main chat holds the one explicitly requested Goal. Workers and specialists do not create their own Goals. Native roles are `inframeld_worker`, `inframeld_code_reviewer`, `inframeld_documentation_writer` and `inframeld_dx_reviewer`. Preserve the human-selected `gpt-6.1-sol` and `xhigh` settings. Verify actual role loading and effective runtime capacity rather than inferring them from TOML. The personal adapter retains its separate-chat permissions, two-worker ceiling and human-only merges. Do not mix operating modes.
+Native delivery has one human-requested Goal in the main chat and one coordinator writing run state and allocating shared resources. Workers and specialists create no Goals. Helpers record and assess observations. They neither authenticate evidence nor grant authority. The personal adapter retains its separate record, authorized participants, two-worker ceiling and human-only merges. Rehearsal permits proposed actions and read-only inspection.
 
-## Keep the assignment small and the worker autonomous
+## Keep useful safeguards with their owners
 
-Prefer completing existing implementation issues within a focused epic, following developer priorities and verified dependencies. Preserve useful supporting PRs and independent parallel work under [coordinator scheduling](references/coordinator.md#prefer-epic-completion-without-serializing-the-backlog). Assign a small coherent capability with acceptance examples, exclusions, owned paths/contracts, real dependencies and maintained verification commands. Never claim partial implementation completes the larger feature.
+The [coordinator](references/coordinator.md#prefer-epic-completion-without-serializing-the-backlog) owns completing issues, useful splits, prerequisites and capacity. The cleared brief permits routine scoped work. Shared contracts, generated outputs and integration have one named owner at a time.
 
-Before assignment, [check the concrete prerequisites](references/coordinator.md#check-prerequisites-before-assignment) for behavior, verification and the human journey against delivered capabilities. Finish a missing prerequisite first or choose independent work. Only an explicitly accepted component boundary may proceed without a capability that the complete journey needs.
+[Review](../inframeld-review/SKILL.md) owns independent assessment and the binding maintainability bar. [Coding Standards](../inframeld-coding-standards/SKILL.md) owns code guidance and behavioral TDD. [Testing](../inframeld-testing/references/isolation-and-evidence.md) owns maintained commands, diagnostics and harness boundaries. Read their applicable guidance for the assigned work.
 
-Every human-facing feature needs one linked human-qualification issue under actual publication authority. Reuse it across the feature's PRs. During automated backlog delivery, prefer deferring human testing, manual procedure preparation and its dry run to pre-v1 qualification under the [closure policy](references/gates-and-recovery.md#separate-implementation-and-human-acceptance). Publish the tracking issue before implementation closure. Complete the supported procedure before human handoff. [Testing](../inframeld-testing/references/human-qualification.md) owns its contents and execution evidence.
+[Gates and recovery](references/gates-and-recovery.md) owns evidence reuse, required checks, human-work deferral, progress-based repairs, process ownership and expected-head merges. Use its host-repair boundary and immediate stops whenever affected execution is unsafe or unauthorized. A supporting merge, green helper result or agent activity cannot establish whole-issue completion.
 
-The coordinator clears ownership once. Workers then make routine scoped edits, write behavioral tests and run isolated checks without per-command acknowledgments. Independently review plans for material architecture, security, public-contract, persistence or shared-harness changes. Every delivered implementation still receives independent review. Resolve triggered human decisions before dependent work.
-
-Parallelize verified independent work. Serialize overlapping contracts, shared outputs and integration execution. Ten implementation workers, two code reviewers, one documentation writer and one DX reviewer are native ceilings, not occupancy targets. Use fewer when review, integration or dependencies limit completion. Finish current qualified work before opening more assignments when queues grow.
-
-## Verify through maintained commands
-
-Use repository-owned behavioral unit and integration tests and documented workspace entry points. A temporary diagnostic answers one bounded question and remains partial evidence. Do not replace acceptance with private controllers, repeat variants without new evidence or grow a harness repair into a general framework. [Testing](../inframeld-testing/references/isolation-and-evidence.md) owns those boundaries.
-
-Classify discoveries before absorbing them. Publish clear incidental defect issues only under actual issue-creation authority. Logging a defect does not admit new implementation to the finite snapshot or waive a required check. Review the complete repair again when its scope grows or corrections stop converging.
-
-The coordinator alone writes run state and allocates shared resources. It may designate one worker to execute a frozen revision's maintained integration operation. Observe exit and cleanup before releasing that resource. Private worktree outputs and isolated tests need no new resource grant unless they collide with another owner. Helpers record and assess observations. They do not authorize actions or authenticate evidence.
-
-Delivery does not authorize host or Podman-machine repair. Only the coordinator may use the [single existing-machine start/restart exception](references/gates-and-recovery.md#keep-delivery-out-of-host-repair). Failed or unconfirmed recovery, recurrence or a need for deeper repair stops affected runtime work immediately.
-
-## Finish and report honestly
-
-At issue-selection checkpoints, use the coordinator's [compact status table](references/coordinator.md#report-once-at-an-issue-selection-checkpoint). Keep routine updates brief rather than repeating the table each turn.
-
-Follow the [ten-cycle, progress-based remediation policy](references/gates-and-recovery.md#classify-failures-and-bound-remediation). The third unsuccessful cycle triggers independent reassessment, not automatic human escalation. Continue scoped repairs while they measurably advance, preserving required findings and checks. Preserve current base/head binding while reusing unchanged evidence only after explicit revalidation. CodeRabbit remains advisory under its existing policy. Review's [maintainability bar](../inframeld-review/references/scoring-and-report.md#apply-the-maintainability-bar) is binding for plan and implementation readiness. Other ratings remain descriptive, not arithmetic merge gates.
-
-The coordinator performs authorized native merges serially with an expected-head guard and observes actual main afterward. Park blocked checkpoints and reuse safely released capacity for independent work. A Goal completes only when its authorized outcome is actually delivered and reconciled. Low usage, a pushed branch or a helper's readiness result does not establish completion.
+Use the coordinator's [selection view](references/coordinator.md#report-once-at-an-issue-selection-checkpoint) for meaningful changes of assignment. Report outcomes and next actions, with ordinary evidence references and protected raw diagnostics kept outside the conversation.
