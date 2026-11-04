@@ -2,7 +2,10 @@
 
 use std::time::Duration;
 
-use inframeld_sdk::HttpClient;
+use inframeld_sdk::{
+    HttpClient,
+    client::{GetProtectedResourceMetadataApiError, GetProtectedResourceMetadataForPathApiError},
+};
 use openidconnect::IssuerUrl;
 
 use super::{
@@ -66,12 +69,26 @@ async fn discover_inner(
     let metadata = if path.is_empty() {
         sdk.get_protected_resource_metadata()
             .await
-            .map_err(sdk_error)?
+            .map_err(|error| {
+                sdk_error(error, |problem| match problem {
+                    GetProtectedResourceMetadataApiError::Status404(problem)
+                    | GetProtectedResourceMetadataApiError::Status422(problem)
+                    | GetProtectedResourceMetadataApiError::Status503(problem) => Some(problem),
+                })
+            })?
             .body
     } else {
         sdk.get_protected_resource_metadata_for_path(path)
             .await
-            .map_err(sdk_error)?
+            .map_err(|error| {
+                sdk_error(error, |problem| match problem {
+                    GetProtectedResourceMetadataForPathApiError::Status404(problem)
+                    | GetProtectedResourceMetadataForPathApiError::Status422(problem)
+                    | GetProtectedResourceMetadataForPathApiError::Status503(problem) => {
+                        Some(problem)
+                    }
+                })
+            })?
             .body
     };
     validate_binding(&metadata, api_identity, managed)?;
