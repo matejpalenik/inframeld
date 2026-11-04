@@ -360,6 +360,19 @@ fn __pct_encode_path_segment(s: &str) -> String {
     }
     out
 }
+///Typed error responses for `admitHuman`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum AdmitHumanApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status413(ProblemDetails),
+    Status415(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
 ///Typed error responses for `assignProjectUseOnlyGrant`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum AssignProjectUseOnlyGrantApiError {
@@ -507,6 +520,12 @@ pub enum UpdateProjectMetadataApiError {
     Status422(ProblemDetails),
     Status503(ProblemDetails),
 }
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum AdmitHumanHttpResponseBody {
+    Status200Representation0(super::types::HumanAdmissionResponse),
+    Status201Representation1(super::types::HumanAdmissionResponse),
+}
 fn __json_response_representation(
     headers: &reqwest::header::HeaderMap,
     declared: &[&str],
@@ -540,6 +559,328 @@ fn __json_response_representation(
         .ok_or_else(|| format!("Unexpected response Content-Type {supplied}"))
 }
 impl HttpClient {
+    /// Admit
+    ///
+    /// `POST /v1/organizations/{organization_id}/human-admissions`
+    pub async fn admit_human(
+        &self,
+        organization_id: impl AsRef<str>,
+        idempotency_key: impl AsRef<str>,
+        request: HumanAdmissionRequest,
+    ) -> Result<
+        self::response::ApiResponse<self::AdmitHumanHttpResponseBody>,
+        ApiOpError<AdmitHumanApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/organizations/{}/human-admissions",
+            __pct_encode_path_segment(organization_id.as_ref()))
+        );
+        let mut req = self.http_client.post(request_url);
+        req = req
+            .body(serde_json::to_vec(&request).map_err(HttpError::serialization_error)?)
+            .header("content-type", "application/json");
+        req = req.header("Idempotency-Key", idempotency_key.as_ref());
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            req = req.header(name, value);
+        }
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 || status_code == 201u16 {
+            match (|| -> Result<AdmitHumanHttpResponseBody, String> {
+                if status_code == 200u16 {
+                    return match __json_response_representation(
+                        &headers,
+                        &["application/json"],
+                    )? {
+                        0usize => {
+                            serde_json::from_slice::<
+                                super::types::HumanAdmissionResponse,
+                            >(&raw_body)
+                                .map(AdmitHumanHttpResponseBody::Status200Representation0)
+                                .map_err(|error| error.to_string())
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                if status_code == 201u16 {
+                    return match __json_response_representation(
+                        &headers,
+                        &["application/json"],
+                    )? {
+                        0usize => {
+                            serde_json::from_slice::<
+                                super::types::HumanAdmissionResponse,
+                            >(&raw_body)
+                                .map(AdmitHumanHttpResponseBody::Status201Representation1)
+                                .map_err(|error| error.to_string())
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                Err("No declared JSON response matched the status".into())
+            })() {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200, 201",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<AdmitHumanApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(AdmitHumanApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(AdmitHumanApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(AdmitHumanApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(AdmitHumanApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(AdmitHumanApiError::Status409(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    413u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(AdmitHumanApiError::Status413(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    415u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(AdmitHumanApiError::Status415(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(AdmitHumanApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(AdmitHumanApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
     /// Assign Use Only
     ///
     /// `POST /v1/projects/{project_id}/grants`

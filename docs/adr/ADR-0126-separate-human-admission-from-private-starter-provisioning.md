@@ -29,7 +29,7 @@ Admission, starter records and runtime health do not establish setup readiness. 
 
 Admission can complete while Bob has no Project or starter resources. Setup must distinguish that state from completed provisioning and from deliberate removal. Separate original results make retries explicit without a distributed coordinator or a second permission model.
 
-This is accepted design, not an implementation or qualification claim. The private first-administrator consumer is delivered. Ordinary human admission, the supported unadmitted-human proof producer, private starter provisioning and the complete first-use journey remain unfinished under #27. Human acceptance remains unperformed under #185.
+This ADR records the accepted split. The private first-administrator consumer and ordinary human admission are implemented. The supported unadmitted-human proof producer, private starter provisioning and complete first-use journey remain unfinished under #27. Human acceptance remains unperformed under #185.
 
 ## Links
 

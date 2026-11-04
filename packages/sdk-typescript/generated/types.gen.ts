@@ -77,6 +77,52 @@ export type DeletionStatusResponse = ({
 } & UnresolvedDeletionStatusResponse);
 
 /**
+ * HumanAdmissionRequest
+ */
+export type HumanAdmissionRequest = {
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+    /**
+     * Identityid
+     */
+    identityId: string;
+};
+
+/**
+ * HumanAdmissionResponse
+ *
+ * Describe original admission, without promising starter or setup readiness.
+ */
+export type HumanAdmissionResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+};
+
+/**
  * HumanOAuthConsentDecisionResponse
  */
 export type HumanOAuthConsentDecisionResponse = {
@@ -1238,6 +1284,78 @@ export type LookupOriginalOperationResponses = {
 };
 
 export type LookupOriginalOperationResponse = LookupOriginalOperationResponses[keyof LookupOriginalOperationResponses];
+
+export type AdmitHumanData = {
+    body: HumanAdmissionRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Organization Id
+         */
+        organization_id: string;
+    };
+    query?: never;
+    url: '/v1/organizations/{organization_id}/human-admissions';
+};
+
+export type AdmitHumanErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type AdmitHumanError = AdmitHumanErrors[keyof AdmitHumanErrors];
+
+export type AdmitHumanResponses = {
+    /**
+     * Already admitted.
+     */
+    200: HumanAdmissionResponse;
+    /**
+     * Successful Response
+     */
+    201: HumanAdmissionResponse;
+};
+
+export type AdmitHumanResponse = AdmitHumanResponses[keyof AdmitHumanResponses];
 
 export type CreateProjectData = {
     body: ProjectCreationRequest;

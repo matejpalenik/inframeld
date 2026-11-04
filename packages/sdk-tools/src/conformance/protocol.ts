@@ -13,6 +13,7 @@ export const operations = [
   "getHealth",
   "getCurrentSession",
   "getMyOrganizationAccess",
+  "admitHuman",
   "createProject",
   "listProjectMembers",
   "inspectHumanOAuthConsent",

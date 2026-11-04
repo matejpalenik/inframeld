@@ -51,6 +51,18 @@ problems!(
     CreateProjectApiError::Status422,
     CreateProjectApiError::Status503
 );
+problems!(
+    AdmitHumanApiError,
+    AdmitHumanApiError::Status400,
+    AdmitHumanApiError::Status401,
+    AdmitHumanApiError::Status403,
+    AdmitHumanApiError::Status404,
+    AdmitHumanApiError::Status409,
+    AdmitHumanApiError::Status413,
+    AdmitHumanApiError::Status415,
+    AdmitHumanApiError::Status422,
+    AdmitHumanApiError::Status503
+);
 problems!(GetHealthApiError, GetHealthApiError::Status500);
 problems!(
     ListProjectMembersApiError,

@@ -2208,6 +2208,29 @@ pub struct GetHealthResponse {
     pub additional_properties: std::collections::BTreeMap<String, String>,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HumanAdmissionRequest {
+    ///Constraint: minimum=0, maximum=9223372036854775807
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: u64,
+    #[serde(rename = "identityId")]
+    pub identity_id: uuid::Uuid,
+}
+///Describe original admission, without promising starter or setup readiness.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HumanAdmissionResponse {
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HumanOAuthConsentDecisionResponse {
     #[serde(rename = "redirectTo")]
     pub redirect_to: String,

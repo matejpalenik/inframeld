@@ -26,6 +26,28 @@ export const zCurrentSessionResponse = z.object({
 });
 
 /**
+ * HumanAdmissionRequest
+ */
+export const zHumanAdmissionRequest = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000),
+    identityId: z.uuid()
+});
+
+/**
+ * HumanAdmissionResponse
+ *
+ * Describe original admission, without promising starter or setup readiness.
+ */
+export const zHumanAdmissionResponse = z.object({
+    accessRevision: z.int(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string(),
+    organizationId: z.uuid(),
+    principalId: z.uuid()
+});
+
+/**
  * HumanOAuthConsentDecisionResponse
  */
 export const zHumanOAuthConsentDecisionResponse = z.object({
@@ -802,6 +824,76 @@ export const zLookupOriginalOperation503Representation0Response = zProblemDetail
  * Successful Response
  */
 export const zLookupOriginalOperationResponse = zOperationLookupResponse;
+
+export const zAdmitHumanBody = zHumanAdmissionRequest;
+
+export const zAdmitHumanHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zAdmitHumanPath = z.object({
+    organization_id: z.uuid()
+});
+
+/**
+ * Already admitted.
+ */
+export const zAdmitHuman200Representation0Response = zHumanAdmissionResponse;
+
+/**
+ * Successful Response
+ */
+export const zAdmitHuman201Representation0Response = zHumanAdmissionResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zAdmitHuman400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zAdmitHuman401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zAdmitHuman403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zAdmitHuman404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zAdmitHuman409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zAdmitHuman413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zAdmitHuman415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zAdmitHuman422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zAdmitHuman503Representation0Response = zProblemDetails;
+
+/**
+ * Already admitted.
+ */
+export const zAdmitHumanResponse = zHumanAdmissionResponse;
 
 export const zCreateProjectBody = zProjectCreationRequest;
 

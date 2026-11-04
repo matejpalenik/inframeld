@@ -1,7 +1,7 @@
 export const pageMetadata = {
   title: "Projects and access",
   description:
-    "Inspect your access, create a Project, manage its metadata and review account-site consent.",
+    "Inspect access, admit a human, create and manage Projects, and review consent.",
 }
 
 # Projects and access
@@ -19,6 +19,16 @@ Read the current principal context with a valid human credential. [HTTP and cURL
 <ApiOperation operationId="getMyOrganizationAccess" />
 
 Read the actual admitted human's own Organization ID, principal ID, current Access revision and stored Organization grants. An eligible human without Organization grants receives `grants: []`. There is no principal selector, installation inventory or permission snapshot for a later action. [Create an additional Project](/guides/create-project#read-your-organization-access) explains how to use this read before creation.
+
+## Admit an existing human
+
+<ApiOperation operationId="admitHuman" />
+
+Require a currently eligible human with permission to use Organization `admit-users`, the reviewed Organization Access revision and one retained idempotency key. `identityId` identifies Bob's existing Kratos identity, not a local principal or an email address. [Admit an existing human](/guides/admit-human) shows the existing browser-session producers and generated TypeScript call.
+
+A fresh `201` returns `changed: true` and advances the Organization Access revision once. A fresh `200` returns `changed: false` for an already-admitted human without changing admission, credentials or that revision. Neither result grants Project membership, action permissions or starters. The response's `principalId` is the local Inframeld identity.
+
+Exact business replay requires Alice's current authority and Bob's current admissibility. It returns the original status, result and `idempotencyExpiresAt`, without reinitializing credentials, restoring rights or repeating provisioning or audit. Generic original-request metadata lookup has its own disclosure contract. [Keep the original request after uncertainty](/guides/admit-human#keep-the-original-request-after-uncertainty) explains recovery and relevant failures.
 
 ## Create an additional Project
 
