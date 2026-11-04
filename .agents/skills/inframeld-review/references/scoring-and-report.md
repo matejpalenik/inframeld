@@ -4,7 +4,7 @@ Alice needs to know whether to commit a feature, which risks deserve work now an
 
 ## Rate the reviewed implementation
 
-Use the same category order for a standard review. Scores assess the implementation against its current scope and standards. They do not rate the standards document itself unless requested.
+Use all nine categories in the same order for a substantive plan or implementation review. Scores assess the change against its current scope and standards. They do not rate the standards document itself unless requested.
 
 | Category | Main question |
 | --- | --- |
@@ -83,4 +83,10 @@ Use connected, plain prose and compact tables. A new reader should understand th
 
 Use the values **Ready**, **Changes needed**, or **Pending evidence** for each decision, with a one-sentence reason. Explicitly recorded risk acceptance can permit a bounded follow-up. High scores never override an unresolved serious defect or a failed required gate. Review is not permission to publish comments, mutate issues, commit, push or merge.
 
-For repeated reviews, verify the prior findings against the actual current revision. Mark them resolved, still present or unverified, then review the affected boundaries for regressions. Do not carry a resolved defect forward, assume the rest is correct from a small fix, inflate ratings without evidence, or restart a full audit when nothing material changed. Maintain stable criteria so the developer can compare conclusions meaningfully.
+## Recheck a correction
+
+For a narrow correction, reference the prior review and identify its reviewed revisions, the current base/head or plan revision, changed acceptance and the actual delta. Inspect that delta and its affected callers. Mark each prior material finding resolved, still present or unverified with the supporting source or result. Report new material findings, reused evidence with its applicability, missing checks and separate current commit/merge readiness.
+
+Carry forward unchanged category judgments by reference only after checking that their premises still hold. Refresh affected categories, confidence and the binding maintainability decision. A second nine-row report is unnecessary when the correction leaves the reviewed design and scope intact. Expand to a substantive whole-change review when architecture, acceptance or accumulated repair materially changes, or the earlier review did not cover the current delivery boundary.
+
+Keep criteria stable. A small fix does not establish that unrelated behavior is correct, and another review does not justify a higher rating or carrying a resolved defect forward.

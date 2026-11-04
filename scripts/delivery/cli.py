@@ -38,6 +38,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     status = subcommands.add_parser("status", help="Validate and summarize local runtime state")
     status.add_argument("--state", type=Path, required=True)
+    status_output = status.add_mutually_exclusive_group()
+    status_output.add_argument("--summary", action="store_true", help="Show current ownership only")
+    status_output.add_argument("--full", action="store_true", help="Show the full legacy record")
     initialize = subcommands.add_parser(
         "init", help="Initialize finite local scope, never launch workers"
     )
@@ -49,6 +52,11 @@ def _parser() -> argparse.ArgumentParser:
     apply.add_argument("--run-id", required=True)
     apply.add_argument("--coordinator-id", required=True)
     apply.add_argument("--expected-revision", type=int, required=True)
+    apply_output = apply.add_mutually_exclusive_group()
+    apply_output.add_argument(
+        "--summary", action="store_true", help="Show the applied change and ownership"
+    )
+    apply_output.add_argument("--full", action="store_true", help="Show the full legacy record")
     assess = subcommands.add_parser(
         "assess-merge", help="Assess evidence, never merge or authorize a merge"
     )
@@ -106,6 +114,103 @@ def _snapshot(value: dict[str, object]) -> None:
         raise ValueError("snapshot scope must exactly match the captured finite issue set")
 
 
+def _summary(
+    state: dict[str, object], operation: dict[str, object] | None = None
+) -> dict[str, object]:
+    """Project current coordination facts without copying receipts or historical captures."""
+    assignments = object_value(state["assignments"], "assignments")
+    affected_issue = operation.get("issue") if operation is not None else None
+
+    current: dict[str, object] = {}
+    for key, value in assignments.items():
+        assignment = object_value(value, "assignment")
+        if (
+            assignment.get("claim_state") == "retired"
+            and assignment["merge_state"] == "merged"
+            and assignment["issue"] != affected_issue
+        ):
+            continue
+        binding = {
+            field: assignment[field]
+            for field in (
+                "issue",
+                "worker_id",
+                "worktree",
+                "branch",
+                "paths",
+                "contracts",
+                "base_sha",
+                "head_sha",
+                "issue_updated_at",
+                "merge_state",
+                "required_checks",
+            )
+        }
+        binding["claim_state"] = assignment.get("claim_state", "active")
+        binding["blocker_count"] = len(list_value(assignment["blockers"], "blockers"))
+        binding["uncertain_prerequisites"] = {
+            pr: _merge_summary(object_value(observation, "supporting merge"))
+            for pr, observation in object_value(
+                assignment.get("prerequisite_merges", {}), "supporting merges"
+            ).items()
+            if object_value(observation, "supporting merge")["status"] == "uncertain"
+        }
+        current[key] = binding
+
+    resources: dict[str, object] = {}
+    for name, value in object_value(state["resources"], "resources").items():
+        resource = object_value(value, "resource")
+        owner = object_value(assignments[str(resource["issue"])], "assignment")
+        resources[name] = {
+            "issue": resource["issue"],
+            "worker_id": owner["worker_id"],
+            "head_sha": resource["head_sha"],
+        }
+    summary = {
+        field: state[field]
+        for field in (
+            "schema_version",
+            "repository",
+            "milestone",
+            "run_id",
+            "coordinator_id",
+            "mode",
+            "revision",
+        )
+    }
+    summary.update(
+        {
+            "output": "summary",
+            "assignments": current,
+            "occupied_issues": sorted(
+                integer_value(item["issue"], "issue", 1) for item in occupied_assignments(state)
+            ),
+            "resources": resources,
+            "uncertain_merges": {
+                key: _merge_summary(object_value(value, "merge observation"))
+                for key, value in object_value(
+                    state["merge_observations"], "merge observations"
+                ).items()
+                if object_value(value, "merge observation")["status"] == "uncertain"
+            },
+            "merge_authorized_by_helper": False,
+            "ownership_expires_automatically": False,
+            "uncertain_merges_require_github_reconciliation": True,
+        }
+    )
+    if operation is not None:
+        summary["applied"] = {
+            "op": operation["op"],
+            **({"issue": affected_issue} if affected_issue is not None else {}),
+            **({"resource": operation["resource"]} if "resource" in operation else {}),
+        }
+    return summary
+
+
+def _merge_summary(observation: dict[str, object]) -> dict[str, object]:
+    return {field: observation[field] for field in ("pr", "status", "head_sha")}
+
+
 def _execute(arguments: argparse.Namespace) -> dict[str, object]:
     command = cast("str", arguments.command)
     if command == "rehearse":
@@ -136,6 +241,8 @@ def _execute(arguments: argparse.Namespace) -> dict[str, object]:
     store = StateStore(path)
     if command == "status":
         state = store.read()
+        if arguments.summary:
+            return _summary(state)
         return {
             **state,
             "occupied_issues": sorted(
@@ -157,12 +264,14 @@ def _execute(arguments: argparse.Namespace) -> dict[str, object]:
             mode=string_value(source.get("mode", "rehearsal"), "mode"),
         )
     if command == "apply":
-        return store.apply(
+        operation = read_json(cast("Path", arguments.input))
+        state = store.apply(
             run_id=cast("str", arguments.run_id),
             coordinator_id=cast("str", arguments.coordinator_id),
             expected_revision=cast("int", arguments.expected_revision),
-            operation=read_json(cast("Path", arguments.input)),
+            operation=operation,
         )
+        return _summary(state, operation) if arguments.summary else state
     if command in ("assess-merge", "assess-prerequisite"):
         state = store.read()
         assignments = object_value(state["assignments"], "assignments")
