@@ -530,7 +530,20 @@ impl Drop for DiscoveryFixture {
     }
 }
 
-async fn discovery_fixture(stall: bool, invalid_provider_url: bool) -> DiscoveryFixture {
+/// Override only the anonymous metadata response, retaining the existing TLS server.
+#[derive(Clone)]
+struct MetadataReply {
+    status: u16,
+    media: &'static str,
+    request_id: Option<String>,
+    body: String,
+}
+
+async fn discovery_fixture(
+    stall: bool,
+    invalid_provider_url: bool,
+    reply: Option<MetadataReply>,
+) -> DiscoveryFixture {
     use std::sync::{Arc, Mutex};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
@@ -564,6 +577,7 @@ async fn discovery_fixture(stall: bool, invalid_provider_url: bool) -> Discovery
                 accepted = listener.accept() => {
                     let (socket, _) = accepted.unwrap();
                     let (base, observed, acceptor) = (base.clone(), observed.clone(), acceptor.clone());
+                    let reply = reply.clone();
                     children.spawn(async move {
                         let Ok(mut socket) = acceptor.accept(socket).await else { return };
                         let mut request = Vec::new();
@@ -577,6 +591,18 @@ async fn discovery_fixture(stall: bool, invalid_provider_url: bool) -> Discovery
                         let path = request.split_whitespace().nth(1).unwrap().to_owned();
                         observed.lock().unwrap().push(request);
                         if stall { std::future::pending::<()>().await; }
+                        if path.starts_with("/.well-known/oauth-protected-resource")
+                            && let Some(reply) = reply
+                        {
+                            let correlation = reply.request_id.map_or_else(String::new, |id|
+                                format!("X-Request-ID: {id}\r\n"));
+                            let response = format!(
+                                "HTTP/1.1 {} Test\r\nContent-Type: {}\r\n{correlation}X-Private-Extension: header-sentinel\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                                reply.status, reply.media, reply.body.len(), reply.body);
+                            let _ = socket.write_all(response.as_bytes()).await;
+                            let _ = socket.shutdown().await;
+                            return;
+                        }
                         let issuer = format!("{base}/issuer/");
                         let keys = if invalid_provider_url { format!("{issuer}keys?invalid") } else { format!("{issuer}keys") };
                         let body = match path.as_str() {
@@ -602,9 +628,331 @@ async fn discovery_fixture(stall: bool, invalid_provider_url: bool) -> Discovery
     }
 }
 
+fn discovery_problem(status: u16) -> Value {
+    json!({
+        "type":"https://docs.example.test/problems/future_discovery",
+        "title":"Discovery unavailable",
+        "status":status,
+        "detail":"Ask the operator to enable discovery.\nNo target was saved.\u{1b}[31m",
+        "code":"future_discovery",
+        "requestId":"97575c8b-e8f8-4ce7-84d7-2cb2ff4e143a"
+    })
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn backend_problems_keep_their_source_without_continuing_discovery_or_changing_state() {
+    for status in [404, 422, 503] {
+        let problem = discovery_problem(status);
+        let mut body = problem.clone();
+        body["privateExtension"] = json!("body-sentinel");
+        let server = discovery_fixture(
+            false,
+            false,
+            Some(MetadataReply {
+                status,
+                media: "application/problem+json; charset=utf-8",
+                request_id: problem["requestId"].as_str().map(str::to_owned),
+                body: body.to_string(),
+            }),
+        )
+        .await;
+        let home = TempDir::new().unwrap();
+        seed(&home);
+        let registry = home.path().join(".config/inframeld/targets");
+        let before = fs::read(&registry).unwrap();
+        let certificates = TempDir::new().unwrap();
+        let ca = certificates.path().join("operator.pem");
+        fs::write(&ca, &server.pem).unwrap();
+        for suffix in ["", "/api/v1"] {
+            let api = format!("{}{suffix}", server.url);
+            for mode in ["--plain", "--json", "--jsonl"] {
+                let output = invoke(
+                    &home,
+                    &[
+                        "target",
+                        "add",
+                        "new",
+                        "--url",
+                        &api,
+                        "--ca-cert",
+                        ca.to_str().unwrap(),
+                        mode,
+                        "--no-input",
+                    ],
+                    None,
+                );
+                assert_eq!(output.status.code(), Some(1));
+                let stderr = String::from_utf8(output.stderr.clone()).unwrap();
+                assert!(stderr.contains("Discovery unavailable"), "{stderr}");
+                assert!(stderr.contains("future_discovery"), "{stderr}");
+                assert!(stderr.contains("97575c8b-e8f8-4ce7-84d7-2cb2ff4e143a"));
+                assert!(!stderr.contains('\u{1b}') && !stderr.contains("saved.\n"));
+                if mode == "--plain" {
+                    assert!(output.stdout.is_empty());
+                } else {
+                    let object = result(&output);
+                    let object = if mode == "--jsonl" {
+                        &object["result"]
+                    } else {
+                        &object
+                    };
+                    assert_eq!(object["outcome"], "failed");
+                    assert_eq!(object["data"], Value::Null);
+                    assert_eq!(
+                        object["error"],
+                        json!({"source":"backend", "problem":problem})
+                    );
+                }
+                for sentinel in ["body-sentinel", "header-sentinel"] {
+                    assert!(!String::from_utf8_lossy(&output.stdout).contains(sentinel));
+                    assert!(!stderr.contains(sentinel));
+                }
+                assert_eq!(fs::read(&registry).unwrap(), before);
+            }
+        }
+        let requests = server.requests.lock().unwrap();
+        assert_eq!(requests.len(), 6);
+        for request in requests.iter() {
+            assert!(request.starts_with("GET /.well-known/oauth-protected-resource"));
+            let lower = request.to_ascii_lowercase();
+            assert!(!lower.contains("authorization:") && !lower.contains("cookie:"));
+        }
+        assert_eq!(fs::read_dir(registry.parent().unwrap()).unwrap().count(), 1);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn backend_problems_preserve_nullable_extensions_and_declared_character_limits() {
+    let mut bounded = discovery_problem(422);
+    bounded["title"] = json!("é".repeat(128));
+    bounded["detail"] = json!("é".repeat(512));
+    bounded["type"] = json!(format!("https://docs.example.test/{}", "a".repeat(2022)));
+    bounded["code"] = json!("a".repeat(64));
+    bounded["operationId"] = json!("operation".repeat(1024));
+    bounded["errors"] = json!([{"code":"a".repeat(64), "location":"body",
+        "message":"é".repeat(256), "path":["é".repeat(64), 0, "b", 1, "c", 2, "d", 3]}]);
+    // Unknown issue members must not become part of the CLI's stable projection either.
+    let mut with_extension = bounded.clone();
+    with_extension["errors"][0]["privateExtension"] = json!("nested-sentinel");
+    let mut explicit_null = discovery_problem(422);
+    explicit_null["errors"] = Value::Null;
+    explicit_null["operationId"] = Value::Null;
+    for (body, expected) in [
+        (discovery_problem(422), discovery_problem(422)),
+        (explicit_null.clone(), explicit_null),
+        (with_extension, bounded),
+    ] {
+        let server = discovery_fixture(
+            false,
+            false,
+            Some(MetadataReply {
+                status: 422,
+                media: "application/problem+json",
+                request_id: Some("97575C8B-E8F8-4CE7-84D7-2CB2FF4E143A".into()),
+                body: body.to_string(),
+            }),
+        )
+        .await;
+        let home = TempDir::new().unwrap();
+        let certificates = TempDir::new().unwrap();
+        let ca = certificates.path().join("operator.pem");
+        fs::write(&ca, &server.pem).unwrap();
+        let output = invoke(
+            &home,
+            &[
+                "target",
+                "add",
+                "new",
+                "--url",
+                &server.url,
+                "--ca-cert",
+                ca.to_str().unwrap(),
+                "--json",
+            ],
+            None,
+        );
+        assert_eq!(output.status.code(), Some(1));
+        assert_eq!(
+            result(&output)["error"],
+            json!({"source":"backend", "problem":expected})
+        );
+        assert_eq!(server.requests.lock().unwrap().len(), 1);
+        assert_eq!(fs::read_dir(home.path()).unwrap().count(), 0);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn backend_problems_reject_unenforced_bounds_and_response_correlation() {
+    let issue = json!({"code":"invalid_field", "location":"body", "message":"Check the field.", "path":["name"]});
+    let invalid = [
+        ("/code", json!("Uppercase")),
+        ("/code", json!("a".repeat(65))),
+        ("/title", json!("")),
+        ("/title", json!("é".repeat(129))),
+        ("/detail", json!("")),
+        ("/detail", json!("é".repeat(513))),
+        (
+            "/type",
+            json!(format!("https://docs.example.test/{}", "a".repeat(2048))),
+        ),
+        ("/operationId", json!("")),
+        ("/status", json!(503)),
+        ("/errors", json!(vec![issue.clone(); 21])),
+        ("/errors/0/code", json!("wrong-code")),
+        ("/errors/0/message", json!("")),
+        ("/errors/0/message", json!("é".repeat(257))),
+        ("/errors/0/path", json!(vec!["field"; 9])),
+        ("/errors/0/path", json!([-1])),
+        ("/errors/0/path", json!([""])),
+        ("/errors/0/path", json!(["é".repeat(65)])),
+    ];
+    for (field, value) in invalid {
+        let mut problem = discovery_problem(422);
+        problem["errors"] = json!([issue]);
+        problem["operationId"] = json!("original-operation");
+        *problem.pointer_mut(field).unwrap() = value;
+        let server = discovery_fixture(
+            false,
+            false,
+            Some(MetadataReply {
+                status: 422,
+                media: "application/problem+json",
+                request_id: problem["requestId"].as_str().map(str::to_owned),
+                body: problem.to_string(),
+            }),
+        )
+        .await;
+        assert_problem_fallback(&server, "discovery_invalid_metadata");
+    }
+    for request_id in [
+        None,
+        Some("not-a-uuid"),
+        Some("00000000-0000-0000-0000-000000000001"),
+        Some(
+            "97575c8b-e8f8-4ce7-84d7-2cb2ff4e143a\r\nX-Request-ID: 00000000-0000-0000-0000-000000000001",
+        ),
+    ] {
+        let server = discovery_fixture(
+            false,
+            false,
+            Some(MetadataReply {
+                status: 422,
+                media: "application/problem+json",
+                request_id: request_id.map(str::to_owned),
+                body: discovery_problem(422).to_string(),
+            }),
+        )
+        .await;
+        assert_problem_fallback(&server, "discovery_invalid_metadata");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn backend_problem_debug_does_not_disclose_public_response_text_as_a_cause() {
+    let server = discovery_fixture(
+        false,
+        false,
+        Some(MetadataReply {
+            status: 503,
+            media: "application/problem+json",
+            request_id: Some("97575c8b-e8f8-4ce7-84d7-2cb2ff4e143a".into()),
+            body: discovery_problem(503).to_string(),
+        }),
+    )
+    .await;
+    let error = inframeld_cli::discovery::discover(
+        &server.url,
+        inframeld_cli::discovery::DiscoveryOptions {
+            certificate_authorities: vec![
+                reqwest::Certificate::from_pem(server.pem.as_bytes()).unwrap(),
+            ],
+            proxy: None,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        inframeld_cli::discovery::DiscoveryError::BackendProblem(_)
+    ));
+    let debug = format!("{error:?}");
+    assert!(debug.contains("REDACTED"));
+    assert!(!debug.contains("future_discovery") && !debug.contains("Ask the operator"));
+    assert!(std::error::Error::source(&error).is_none());
+    assert_eq!(server.requests.lock().unwrap().len(), 1);
+}
+
+fn assert_problem_fallback(server: &DiscoveryFixture, code: &str) {
+    let home = TempDir::new().unwrap();
+    seed(&home);
+    let registry = home.path().join(".config/inframeld/targets");
+    let before = fs::read(&registry).unwrap();
+    let certificates = TempDir::new().unwrap();
+    let ca = certificates.path().join("operator.pem");
+    fs::write(&ca, &server.pem).unwrap();
+    let output = invoke(
+        &home,
+        &[
+            "target",
+            "add",
+            "new",
+            "--url",
+            &format!("{}/api/v1", server.url),
+            "--ca-cert",
+            ca.to_str().unwrap(),
+            "--json",
+        ],
+        None,
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(result(&output)["error"]["source"], "cli");
+    assert_eq!(result(&output)["error"]["code"], code);
+    assert!(result(&output)["error"].get("problem").is_none());
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("sentinel"));
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("sentinel"));
+    assert_eq!(fs::read(&registry).unwrap(), before);
+    assert_eq!(fs::read_dir(registry.parent().unwrap()).unwrap().count(), 1);
+    assert_eq!(server.requests.lock().unwrap().len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn untyped_or_undeclared_problem_bodies_remain_safe_local_failures() {
+    let mut extension = discovery_problem(422);
+    extension["privateExtension"] = json!("unparsed-sentinel");
+    let mut invalid_uuid = extension.clone();
+    invalid_uuid["requestId"] = json!("invalid-sentinel");
+    let mut invalid_location = extension.clone();
+    invalid_location["errors"] = json!([{"location":"provider-sentinel", "code":"invalid_field", "message":"Check.", "path":[]}]);
+    for (status, media, body) in [
+        (422, "application/json", extension.to_string()),
+        (422, "text/plain", extension.to_string()),
+        (401, "application/problem+json", extension.to_string()),
+        (422, "application/problem+json", "{unparsed-sentinel".into()),
+        (422, "application/problem+json", invalid_uuid.to_string()),
+        (
+            422,
+            "application/problem+json",
+            invalid_location.to_string(),
+        ),
+    ] {
+        let server = discovery_fixture(
+            false,
+            false,
+            Some(MetadataReply {
+                status,
+                media,
+                request_id: Some("97575c8b-e8f8-4ce7-84d7-2cb2ff4e143a".into()),
+                body,
+            }),
+        )
+        .await;
+        assert_problem_fallback(&server, "discovery_unavailable");
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn human_registration_preview_shows_known_destination_without_discovery_or_saving() {
-    let server = discovery_fixture(false, false).await;
+    let server = discovery_fixture(false, false, None).await;
     let home = TempDir::new().unwrap();
     let api = format!("{}/api/v1", server.url);
     let output = invoke(
@@ -623,7 +971,7 @@ async fn human_registration_preview_shows_known_destination_without_discovery_or
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn invalid_provider_url_after_dispatch_remains_an_operational_failure() {
-    let server = discovery_fixture(false, true).await;
+    let server = discovery_fixture(false, true, None).await;
     let home = TempDir::new().unwrap();
     let certificates = TempDir::new().unwrap();
     let ca = certificates.path().join("operator.pem");
@@ -651,7 +999,7 @@ async fn invalid_provider_url_after_dispatch_remains_an_operational_failure() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn public_https_registration_saves_only_the_validated_binding_then_selection_is_explicit() {
-    let server = discovery_fixture(false, false).await;
+    let server = discovery_fixture(false, false, None).await;
     let home = TempDir::new().unwrap();
     let certificates = TempDir::new().unwrap();
     let ca = certificates.path().join("operator.pem");
@@ -771,7 +1119,7 @@ impl Drop for RunningCli {
 
 async fn interrupted_registration(signal: &str, expected: i32) {
     use std::process::{Command as ProcessCommand, Stdio};
-    let server = discovery_fixture(true, false).await;
+    let server = discovery_fixture(true, false, None).await;
     let home = TempDir::new().unwrap();
     let certificates = TempDir::new().unwrap();
     let ca = certificates.path().join("operator.pem");
@@ -869,7 +1217,7 @@ async fn second_interrupt_can_exit_while_the_final_machine_pipe_is_blocked() {
         io::{BufRead, Read},
         process::{Command as ProcessCommand, Stdio},
     };
-    let server = discovery_fixture(true, false).await;
+    let server = discovery_fixture(true, false, None).await;
     let home = TempDir::new().unwrap();
     let certificates = TempDir::new().unwrap();
     let ca = certificates.path().join("operator.pem");
@@ -1053,7 +1401,7 @@ async fn a_ca_named_pipe_is_rejected_without_waiting_for_a_writer() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn concurrent_registration_and_selection_keep_both_local_effects() {
-    let server = discovery_fixture(false, false).await;
+    let server = discovery_fixture(false, false, None).await;
     let home = TempDir::new().unwrap();
     let certificates = TempDir::new().unwrap();
     let ca = certificates.path().join("operator.pem");

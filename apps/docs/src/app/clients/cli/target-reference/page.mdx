@@ -89,3 +89,9 @@ Registration preview lists `publicApiIdentity` and `httpRequestMetadata` as inte
 Preference and inspection previews list no outgoing network data and only the local registry as a destination. Plans retain `remoteVerification: "notPerformed"` and identify unresolved facts such as an unperformed save or unverified remote health. They expose no credential or CA contents. An unresolved environment override is reported separately from a proposed saved preference.
 
 An unconfirmed save is not evidence of rollback. Follow the [readback procedure](/guides/register-a-target#recover-from-a-failure) before deciding whether to save again.
+
+## Read registration failures
+
+For anonymous registration discovery, a declared `404`, `422` or `503` response with a valid Problem Details body has `error.source: "backend"` and `error.problem` in JSON/JSONL. Structured output preserves bounded diagnostic detail. Human stderr gives a concise explanation with control characters escaped, including the problem's code, status and request ID. Use structured output when you need the permitted detail. The backend label identifies the response's source. It does not confirm the installation's identity or grant permissions.
+
+Transport failures and responses with an undeclared status, wrong media type or malformed problem keep safe local errors (`error.source: "cli"`). These discovery failures exit `1`, save no target and leave the saved preference unchanged. Reporting a problem does not retry the request or send credentials. Registration dry-run still performs no network requests.
