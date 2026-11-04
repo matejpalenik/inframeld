@@ -4,7 +4,11 @@ from contextlib import ExitStack
 from functools import partial
 
 from fastapi import FastAPI
+from ory_kratos_client.api.identity_api import IdentityApi
 
+from inframeld_backend.access.application.services.human_admission_fingerprint_service import (
+    HumanAdmissionFingerprintService,
+)
 from inframeld_backend.access.application.services.project_creation_fingerprint_service import (
     ProjectCreationFingerprintService,
 )
@@ -25,6 +29,9 @@ from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
+from inframeld_backend.access.http.routes.human_admission_routes import (
+    create_human_admission_router,
+)
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
@@ -46,11 +53,15 @@ from inframeld_backend.access.http.routes.project_metadata_routes import (
 from inframeld_backend.access.infrastructure.resources.installation_discovery_resource import (
     InstallationDiscoveryResource,
 )
+from inframeld_backend.access.infrastructure.verifiers.kratos_human_identity_verifier import (
+    KratosHumanIdentityVerifier,
+)
 from inframeld_backend.bootstrap.access_composition import create_access_components
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
 from inframeld_backend.bootstrap.deletion_status_composition import open_deletion_status_lookup
+from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
 from inframeld_backend.bootstrap.organization_access_composition import open_my_organization_access
 from inframeld_backend.bootstrap.original_operation_lookup_composition import (
     open_original_operation_lookup,
@@ -120,6 +131,17 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         fingerprints = ProjectGrantChangeFingerprintService(request_fingerprints)
         metadata_fingerprints = ProjectMetadataFingerprintService(request_fingerprints)
         creation_fingerprints = ProjectCreationFingerprintService(request_fingerprints)
+        admission_fingerprints = HumanAdmissionFingerprintService(request_fingerprints)
+        admission_authority = (
+            resolved_settings.kratos.authority if resolved_settings.kratos is not None else None
+        )
+        admission_verifier = (
+            KratosHumanIdentityVerifier(
+                IdentityApi(access.kratos_admin_client), admission_authority
+            )
+            if access.kratos_admin_client is not None and admission_authority is not None
+            else None
+        )
 
         discovery = (
             InstallationDiscoveryResource(resolved_settings.discovery, resolved_settings.hydra)
@@ -160,6 +182,22 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
 
         application.include_router(create_session_router(human_session))
+        application.include_router(
+            create_human_admission_router(
+                human_session,
+                partial(
+                    open_human_admission,
+                    database,
+                    admission_fingerprints,
+                    admission_verifier,
+                    admission_authority,
+                    min(
+                        resolved_settings.human_authentication.provider_timeout_seconds,
+                        resolved_settings.human_authentication.total_timeout_seconds,
+                    ),
+                ),
+            )
+        )
         application.include_router(
             create_organization_access_router(
                 human_session, partial(open_my_organization_access, database)

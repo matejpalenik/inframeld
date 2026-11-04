@@ -21,12 +21,12 @@ rich-diagnostics = ["dep:miette"]
 [dependencies]
 rustls = { version = "0.23", default-features = false }
 percent-encoding = "2"
-openidconnect = { version = "=4.0.1", default-features = false }
+openidconnect = { version = "=4.0.1", default-features = false, features = ["timing-resistant-secret-traits"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream"] }
 futures-util = "0.3"
 http = "1"
 uuid = { version = "1", features = ["serde"] }
-tokio = { version = "1", features = ["time", "net", "rt-multi-thread", "signal", "macros"] }
+tokio = { version = "1", features = ["time", "net", "rt-multi-thread", "signal", "macros", "io-util", "process", "sync"] }
 tempfile = "3"
 anstream = "1"
 anstyle = "1"
@@ -41,6 +41,18 @@ url = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+sha2 = "=0.10.9"
+zeroize = "=1.9.1"
+hyper = { version = "=1.12.0", default-features = false, features = ["http1", "server"] }
+hyper-util = { version = "=0.1.21", default-features = false, features = ["tokio"] }
+http-body-util = "=0.1.5"
+bytes = "=1.12.1"
+webbrowser = { version = "=1.2.5", features = ["hardened"] }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "=0.31.3", features = ["signal", "process", "user", "fs"] }
+rustix = { version = "=1.1.6", features = ["process"] }
+
 [build-dependencies]
 serde_json = "1"
 
@@ -51,7 +63,7 @@ assert_cmd = "2.2"
 insta = { version = "1.49", features = ["filters", "json", "redactions"] }
 predicates = "3"
 tempfile = "3"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util", "test-util"] }
 
 [lints.rust]
 warnings = "deny"

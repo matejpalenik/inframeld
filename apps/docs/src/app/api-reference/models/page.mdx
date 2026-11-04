@@ -35,6 +35,22 @@ Confirms original asynchronous admission with a known or explicitly unknown job 
 
 <ApiSchema name="DeletionStatusResponse" />
 
+<a id="HumanAdmissionRequest" />
+
+## HumanAdmissionRequest
+
+Names the existing Kratos `identityId` and reviewed Organization Access revision. The provider identity UUID is distinct from either person's local `principalId`.
+
+<ApiSchema name="HumanAdmissionRequest" />
+
+<a id="HumanAdmissionResponse" />
+
+## HumanAdmissionResponse
+
+Records the original admission or no-change result, including the local `principalId` and retained-result expiry. It supplies no Project permission or setup-readiness guarantee.
+
+<ApiSchema name="HumanAdmissionResponse" />
+
 <a id="HumanOAuthConsentDecisionResponse" />
 
 ## HumanOAuthConsentDecisionResponse

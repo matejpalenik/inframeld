@@ -27,10 +27,23 @@ async function file(path: string, content: string) {
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, content)
 }
-async function run(source: string, destination: string) {
-  const child = spawn("python3", [helper, source, destination], {
-    stdio: ["ignore", "pipe", "pipe"],
-  })
+async function run(
+  source: string,
+  destination: string,
+  recipientProof = false
+) {
+  const child = spawn(
+    "python3",
+    [
+      helper,
+      source,
+      destination,
+      ...(recipientProof ? ["--recipient-proof"] : []),
+    ],
+    {
+      stdio: ["ignore", "pipe", "pipe"],
+    }
+  )
   let output = ""
   child.stdout.on("data", (value: Buffer) => {
     output += value.toString()
@@ -51,6 +64,56 @@ async function run(source: string, destination: string) {
   })
   return { code, output }
 }
+
+test("recipient-proof context copies current locked Rust sources while excluding host artifacts and secrets", async () => {
+  await scenario(async (source, destination) => {
+    for (const name of ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"])
+      await file(join(source, name), `public-${name}\n`)
+    for (const tree of [
+      "apps/cli",
+      "packages/sdk-rust",
+      "packages/sdk-tools/drivers/rust",
+      "packages/sdk-tools/fixtures/rust",
+      "packages/sdk-tools/fixtures/rust-capabilities",
+    ]) {
+      await file(join(source, tree, "Cargo.toml"), "public-crate\n")
+      await file(join(source, tree, "src/lib.rs"), "// current source\n")
+      await file(join(source, tree, ".env"), "private-context-test-secret")
+      await file(
+        join(source, tree, "target/debug/old-artifact"),
+        "old executable"
+      )
+    }
+    await file(
+      join(source, "apps/web/tests/fixtures/recipient-proof.Dockerfile"),
+      "FROM public-proof-build\n"
+    )
+    assert.equal((await run(source, destination, true)).code, 0)
+    assert.equal(await exists(join(destination, "Cargo.lock")), true)
+    assert.equal(await exists(join(destination, "apps/cli/src/lib.rs")), true)
+    assert.equal(
+      await exists(join(destination, "packages/sdk-rust/src/lib.rs")),
+      true
+    )
+    assert.equal(await exists(join(destination, "apps/cli/.env")), false)
+    assert.equal(await exists(join(destination, "apps/cli/target")), false)
+    assert.equal(
+      await exists(join(destination, "apps/web/lib/public.ts")),
+      false
+    )
+    assert.equal(
+      await exists(join(destination, "packages/sdk-typescript")),
+      false
+    )
+    assert.equal(
+      await readFile(
+        join(destination, "apps/web/tests/fixtures/recipient-proof.Dockerfile"),
+        "utf8"
+      ),
+      "FROM public-proof-build\n"
+    )
+  })
+})
 async function scenario(
   check: (source: string, destination: string, outside: string) => Promise<void>
 ) {

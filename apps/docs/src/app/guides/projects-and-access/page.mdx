@@ -11,6 +11,7 @@ Use an existing Project's permanent ID to inspect or change its metadata. Curren
 
 ## Choose a task
 
+- [Admit an existing human to the installation](/guides/admit-human).
 - [Create an additional Project with explicit initial permissions](/guides/create-project).
 - [List stored Project members](/guides/list-project-members).
 - [Name and rename an existing Project](/guides/name-and-rename-project).
@@ -21,5 +22,7 @@ Use an existing Project's permanent ID to inspect or change its metadata. Curren
 ## Understand access before changing it
 
 Project names are exact selectors. IDs are permanent. Display names are labels. Read [Projects, people and permissions](/product/projects-and-permissions) for the distinction between sign-in, membership and action grants.
+
+Human admission uses current Organization `admit-users` authority and verifies the requested Kratos identity. It creates no Project membership, grants or starters. It is separate from first-administrator bootstrap and provider account registration.
 
 Project creation uses your current Organization `create-projects` permission. It creates an ordinary Project with its membership and eighteen initial assignments. Group administration and private-starter provisioning remain separate unfinished procedures. The [API reference](/api-reference/projects-and-access) lists the operations you can call today.

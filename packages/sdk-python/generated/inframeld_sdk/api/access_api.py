@@ -20,6 +20,8 @@ from typing import Optional
 from typing_extensions import Annotated
 from uuid import UUID
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse
+from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
+from inframeld_sdk.models.human_admission_response import HumanAdmissionResponse
 from inframeld_sdk.models.human_o_auth_consent_decision_response import HumanOAuthConsentDecisionResponse
 from inframeld_sdk.models.human_o_auth_consent_details_response import HumanOAuthConsentDetailsResponse
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
@@ -53,6 +55,585 @@ class AccessApi:
         if api_client is None:
             api_client = ApiClient.get_default()
         self.api_client = api_client
+
+
+    @validate_call
+    async def admit_human(
+        self,
+        organization_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        human_admission_request: HumanAdmissionRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.HumanAdmissionResponse, response_models.HumanAdmissionResponse, ]:
+        """Admit
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param human_admission_request: (required)
+        :type human_admission_request: HumanAdmissionRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._admit_human_serialize(
+            organization_id=organization_id,
+            idempotency_key=idempotency_key,
+            human_admission_request=human_admission_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "HumanAdmissionResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "HumanAdmissionResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def admit_human_with_http_info(
+        self,
+        organization_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        human_admission_request: HumanAdmissionRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.HumanAdmissionResponse, response_models.HumanAdmissionResponse, ]]:
+        """Admit
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param human_admission_request: (required)
+        :type human_admission_request: HumanAdmissionRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._admit_human_serialize(
+            organization_id=organization_id,
+            idempotency_key=idempotency_key,
+            human_admission_request=human_admission_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "HumanAdmissionResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "HumanAdmissionResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def admit_human_without_preload_content(
+        self,
+        organization_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        human_admission_request: HumanAdmissionRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Admit
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param human_admission_request: (required)
+        :type human_admission_request: HumanAdmissionRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._admit_human_serialize(
+            organization_id=organization_id,
+            idempotency_key=idempotency_key,
+            human_admission_request=human_admission_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "HumanAdmissionResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "HumanAdmissionResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def admit_human_sync(
+        self,
+        organization_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        human_admission_request: HumanAdmissionRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.HumanAdmissionResponse, response_models.HumanAdmissionResponse, ]:
+        """Admit (synchronous)
+
+        Synchronous variant of :meth:`admit_human`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.admit_human(
+                organization_id=organization_id,
+                idempotency_key=idempotency_key,
+                human_admission_request=human_admission_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def admit_human_sync_with_http_info(
+        self,
+        organization_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        human_admission_request: HumanAdmissionRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.HumanAdmissionResponse, response_models.HumanAdmissionResponse, ]]:
+        """Admit (synchronous)
+
+        Synchronous variant of :meth:`admit_human_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.admit_human_with_http_info(
+                organization_id=organization_id,
+                idempotency_key=idempotency_key,
+                human_admission_request=human_admission_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def admit_human_sync_without_preload_content(
+        self,
+        organization_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        human_admission_request: HumanAdmissionRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Admit (synchronous)
+
+        Synchronous variant of :meth:`admit_human_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.admit_human_without_preload_content(
+                organization_id=organization_id,
+                idempotency_key=idempotency_key,
+                human_admission_request=human_admission_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _admit_human_serialize(
+        self,
+        organization_id,
+        idempotency_key,
+        human_admission_request,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if organization_id is not None:
+            _path_params['organization_id'] = organization_id
+        # process the query parameters
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+        if human_admission_request is not None:
+            _body_params = human_admission_request
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+        # set the HTTP header `Content-Type`
+        if _content_type:
+            _header_params['Content-Type'] = _content_type
+        else:
+            _default_content_type = (
+                self.api_client.select_header_content_type(
+                    [
+                        'application/json'
+                    ]
+                )
+            )
+            if _default_content_type is not None:
+                _header_params['Content-Type'] = _default_content_type
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='POST',
+            resource_path='/v1/organizations/{organization_id}/human-admissions',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
 
 
     @validate_call

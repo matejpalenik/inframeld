@@ -23,6 +23,9 @@ pub struct ProviderExtensions {
     /// Supported PKCE transforms. This profile requires S256.
     #[serde(default)]
     pub code_challenge_methods_supported: Vec<String>,
+    /// Whether authorization responses must carry the exact issuer.
+    #[serde(default)]
+    pub authorization_response_iss_parameter_supported: bool,
     /// Public selected-login revocation endpoint, when advertised.
     pub revocation_endpoint: Option<Url>,
 }
@@ -51,6 +54,20 @@ pub struct DiscoveryOptions {
     pub certificate_authorities: Vec<reqwest::Certificate>,
     /// An operator-selected proxy. Environment proxies are not used implicitly.
     pub proxy: Option<reqwest::Proxy>,
+}
+
+impl DiscoveryOptions {
+    /// Reuse discovery's exact HTTPS admission and frozen transport construction.
+    pub(crate) fn human_auth_client(
+        self,
+        api: &str,
+        issuer: &str,
+    ) -> Result<reqwest::Client, DiscoveryError> {
+        let policy = UrlPolicy::new(None);
+        policy.api_url(api)?;
+        policy.issuer_url(issuer)?;
+        super::oidc_transport::client(self, std::time::Duration::from_secs(5))
+    }
 }
 
 impl fmt::Debug for DiscoveryOptions {

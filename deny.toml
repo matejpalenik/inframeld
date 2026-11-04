@@ -4,11 +4,12 @@ all-features = true
 
 [advisories]
 unmaintained = "workspace"
-# Approved for public metadata discovery only. Reassess on dependency or crypto-use changes.
-# Assessment: docs/development/reports/server-discovery-verification.md#dependency-audit-assessment
+# Restricted to discovery and transient public-key verification, with no private-key use.
+# Assessments: docs/development/reports/server-discovery-verification.md#dependency-audit-assessment
+# and docs/development/reports/recipient-proof-verification.md
 ignore = [
-    { id = "RUSTSEC-2023-0071", reason = "openidconnect discovery only parses public metadata and keys. No private RSA keys, decryption or signing are used. Reassess before introducing private-key operations." },
-    { id = "RUSTSEC-2026-0387", reason = "openidconnect discovery only parses public metadata and keys. No secret-integer arithmetic is used. Reassess before introducing operations on cryptographic secrets." },
+    { id = "RUSTSEC-2023-0071", reason = "openidconnect discovery and transient ID-token verification use only public RSA keys, messages and signatures. No private RSA keys, signing or decryption. Reassess any dependency, algorithm or call-path change." },
+    { id = "RUSTSEC-2026-0387", reason = "openidconnect discovery and transient RSA/EC signature verification consume public keys, messages and signatures. PKCE/state/nonce do not use these affected secret-integer paths. Reassess any dependency, algorithm, key-source or call-path change." },
 ]
 
 [licenses]

@@ -11,6 +11,7 @@ from inframeld_sdk.api.access_api import AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi
 from inframeld_sdk.api.operations_api import OperationsApi
+from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest
@@ -182,6 +183,26 @@ def organization_access_sync(clients: Clients, call: Call) -> NativeResponse:
 async def organization_access_async(clients: Clients, call: Call) -> NativeResponse:
     return await AccessApi(clients.production).get_my_organization_access_with_http_info(
         _headers=call.headers, _request_timeout=call.timeout / 1000
+    )
+
+
+def human_admission_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).admit_human_sync_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        human_admission_request=HumanAdmissionRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def human_admission_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).admit_human_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        human_admission_request=HumanAdmissionRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
     )
 
 
@@ -453,6 +474,7 @@ async def fallback_async(clients: Clients, call: Call) -> NativeResponse:
 
 
 BINDINGS: dict[Operation, Binding] = {
+    "admitHuman": Binding(human_admission_sync, human_admission_async),
     "getMyOrganizationAccess": Binding(organization_access_sync, organization_access_async),
     "createProject": Binding(create_project_sync, create_project_async),
     "listProjectMembers": Binding(project_members_sync, project_members_async),

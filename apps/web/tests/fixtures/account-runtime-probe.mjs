@@ -24,6 +24,7 @@ appendFileSync(
 const globalVolumes =
   args[0] === "volume" && args[1] === "ls" && !args.includes("--filter")
 const startup = process.env.ACCOUNT_PROBE_STARTUP === "true"
+const proof = process.env.ACCOUNT_PROBE_PROOF ?? ""
 const operationIndex = args.findIndex((arg) =>
   ["up", "run", "exec"].includes(arg)
 )
@@ -32,6 +33,22 @@ const operands = args
   .slice(operationIndex + 1)
   .filter((arg) => !arg.startsWith("-"))
 const service = operands[0]
+const proofServices = [
+  "backend",
+  "browser-tests",
+  "proof-driver",
+  "proof-denied-driver",
+]
+const lookupService =
+  args[0] === "ps"
+    ? args
+        .find((arg) => arg.startsWith("label=com.docker.compose.service="))
+        ?.slice("label=com.docker.compose.service=".length)
+    : undefined
+const unsupportedComposeLookup =
+  args[0] === "compose" &&
+  args.includes("ps") &&
+  proofServices.includes(args.at(-1))
 const startupHang =
   startup &&
   operation === "run" &&
@@ -93,6 +110,231 @@ if (naturalDescendant) {
     String(process.pid)
   )
   setInterval(() => {}, 1_000)
+} else if (proof && unsupportedComposeLookup) {
+  // Podman Compose 1.5 rejects service operands for ps before querying the engine.
+  process.exitCode = 2
+} else if (
+  proof &&
+  (args.includes("inspect") ||
+    args.includes("logs") ||
+    proofServices.includes(lookupService) ||
+    (operation === "up" &&
+      ["browser-tests", "proof-driver", "proof-denied-driver"].includes(
+        service
+      )) ||
+    (operation === "exec" &&
+      (args.includes("verify-proof-result") ||
+        args.includes("verify-denied-result") ||
+        service === "browser-tests")))
+) {
+  // Closed observations for the existing owner's combined flow. No engine is called.
+  const project =
+    process.env.INFRAMELD_ACCOUNT_WEB_IMAGE ===
+    "localhost/inframeld-account-ui-probe-web:check"
+      ? "inframeld-account-ui-probe"
+      : process.env.INFRAMELD_ACCOUNT_WEB_IMAGE ===
+          "localhost/inframeld-account-ui--660m7cn-web:check"
+        ? "inframeld-account-ui--660m7cn"
+        : undefined
+  if ((lookupService || args.includes("inspect")) && !project) {
+    console.error("Controlled image binding rejected")
+    process.exit(59)
+  }
+  const stateFile = join(directory, "proof-state.json")
+  let state = {
+    browser: false,
+    denied: false,
+    negativeVerified: false,
+    driver: false,
+    observations: 0,
+    driverObservations: 0,
+    browserExitedWithDriverPending: false,
+  }
+  try {
+    state = JSON.parse(readFileSync(stateFile, "utf8"))
+  } catch {}
+  const backend = "a".repeat(64)
+  const browser = "b".repeat(64)
+  const driver = "d".repeat(64)
+  const denied = "e".repeat(64)
+  if (operation === "up") {
+    if (service === "browser-tests") state.browser = true
+    else if (service === "proof-denied-driver") state.denied = true
+    else state.driver = true
+  } else if (lookupService) {
+    const projectLabel = args.find(
+      (arg) =>
+        arg.startsWith("label=com.docker.compose.project=") ||
+        arg.startsWith("label=io.podman.compose.project=")
+    )
+    if (
+      !args.includes("--no-trunc") ||
+      ![
+        `label=com.docker.compose.project=${project}`,
+        `label=io.podman.compose.project=${project}`,
+      ].includes(projectLabel)
+    )
+      process.exitCode = 58
+    else if (
+      proof === "lookup-query-failed" &&
+      projectLabel.startsWith("label=com.docker.compose.project=")
+    )
+      process.exitCode = 57
+    else {
+      const id =
+        lookupService === "backend"
+          ? backend
+          : lookupService === "browser-tests"
+            ? browser
+            : lookupService === "proof-denied-driver"
+              ? denied
+              : driver
+      if (proof === "lookup-multiple") console.log(`${id}\n${"f".repeat(64)}`)
+      else if (proof === "lookup-truncated") console.log(id.slice(0, 12))
+      else if (
+        proof === "lookup-reused-browser" &&
+        lookupService === "proof-driver"
+      )
+        console.log(browser)
+      else if (
+        proof === "lookup-reused-backend" &&
+        lookupService === "browser-tests"
+      )
+        console.log(backend)
+      else if (proof !== "lookup-zero") console.log(id)
+    }
+  } else if (args.includes("inspect")) {
+    state.observations += 1
+    if (proof === "inspect-invalid") console.log("not-json")
+    else {
+      const id = args.at(-1)
+      const isBackend = id === backend
+      const isBrowser = id === browser
+      const isDenied = id === denied
+      if (id === driver) state.driverObservations += 1
+      const status = isBackend
+        ? proof === "backend-stopped"
+          ? "exited"
+          : "running"
+        : (isDenied && proof !== "denied-stalled") ||
+            (isBrowser && proof === "browser-failed")
+          ? "exited"
+          : state.driver &&
+              proof !== "stalled-terminal" &&
+              !(
+                id === driver &&
+                proof === "browser-exits-first" &&
+                state.driverObservations === 1
+              )
+            ? "exited"
+            : "running"
+      if (
+        isBrowser &&
+        proof === "browser-exits-first" &&
+        status === "exited" &&
+        state.driverObservations === 1
+      )
+        state.browserExitedWithDriverPending = true
+      console.log(
+        JSON.stringify({
+          Id:
+            proof === "wrong-id" ||
+            (isBackend && proof === "backend-wrong-id") ||
+            (isDenied && proof === "denied-wrong-id")
+              ? "f".repeat(64)
+              : id,
+          Config: {
+            User: "10001:10001",
+            Labels: {
+              "com.docker.compose.project":
+                proof === "lookup-wrong-project" ? "another-project" : project,
+              "com.docker.compose.service":
+                proof === "lookup-wrong-service"
+                  ? "another-service"
+                  : isBackend
+                    ? "backend"
+                    : isBrowser
+                      ? "browser-tests"
+                      : isDenied
+                        ? "proof-denied-driver"
+                        : "proof-driver",
+            },
+          },
+          HostConfig: {
+            Privileged: false,
+            Init: !(isBackend && proof === "backend-without-init"),
+            PidMode: isBackend && proof === "backend-host-pid" ? "host" : "",
+            NetworkMode:
+              isDenied && proof === "denied-host-net"
+                ? "host"
+                : isBackend
+                  ? "account-private"
+                  : isBrowser && proof === "browser-wrong-owner"
+                    ? `container:${"f".repeat(64)}`
+                    : id === driver && proof === "driver-browser-owner"
+                      ? `container:${browser}`
+                      : `container:${backend}`,
+          },
+          State: {
+            Status: status,
+            ExitCode: isDenied
+              ? proof === "denied-wrong-exit"
+                ? 0
+                : 1
+              : isBrowser && proof === "browser-failed"
+                ? 8
+                : id === driver &&
+                    ["driver-failed", "driver-logs-failed"].includes(proof)
+                  ? 7
+                  : 0,
+            Health: {
+              Status: isBackend
+                ? "absent"
+                : proof === "unhealthy"
+                  ? "unhealthy"
+                  : proof === "never-ready"
+                    ? "starting"
+                    : "healthy",
+            },
+          },
+        })
+      )
+    }
+  } else if (args.includes("logs")) {
+    const id = args.at(-1)
+    if (id === backend) console.log("controlled backend diagnostic")
+    else if (id === browser) console.log("controlled browser diagnostic")
+    else if (id === denied && proof === "denied-wrong-exit")
+      console.log("controlled denied diagnostic")
+    else if (
+      id === driver &&
+      ["driver-failed", "driver-logs-failed"].includes(proof)
+    ) {
+      console.log("controlled allowed diagnostic")
+      if (proof === "driver-logs-failed") process.exitCode = 43
+    } else
+      console.log(
+        id === denied
+          ? '{"schemaVersion":1,"error":{"kind":"denied","resourceCleanup":"not-needed","credentialCleanup":"not-needed"}}'
+          : '{"schemaVersion":1,"result":{}}'
+      )
+  } else if (operation === "exec") {
+    if (service === "browser-tests") {
+      const profile = args.indexOf("--profile")
+      process.exitCode =
+        profile < 0 || args[profile + 1] !== "qualification"
+          ? 1
+          : proof === "second-readiness-failed"
+            ? 17
+            : state.negativeVerified
+              ? 0
+              : 10
+    } else if (args.includes("verify-denied-result")) {
+      if (proof === "denied-effects") process.exitCode = 25
+      else state.negativeVerified = true
+    } else process.exitCode = proof === "verify-failed" ? 25 : 0
+  }
+  if (!args.includes("logs")) writeFileSync(stateFile, JSON.stringify(state))
 } else if (startup && operation) {
   // Model fresh fixture lifetimes and socket-only temporary Postgres startup.
   // This state machine never opens a network connection or invokes a provider.

@@ -4,7 +4,7 @@
 
 Alice closes the CLI and returns tomorrow. Her saved login is bound to one installation and verified human. Refresh can replace credentials for that identity, but cannot switch accounts or revive a credential invalidated by recovery.
 
-> **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
+> **Status:** the complete saved-login lifecycle below remains accepted behavior with unfinished implementation and qualification. The [repair-only transient proof capability](../../../../docs/development/guides/recipient-proof.md) is implemented separately. It verifies the generated current-session response, hands proof to protected maintenance stdin and revokes only its newly issued credentials. It saves no login and implements no ordinary refresh/logout or account selection. The [verification report](../../../../docs/development/reports/recipient-proof-verification.md) records selected native-driver coverage. Ordinary operator/system-browser and human qualification remain pending. Existing Python types, generated OpenAPI and migrations own implemented shapes.
 
 <a id="cli-login-transaction"></a>
 
@@ -187,7 +187,7 @@ The implemented bearer service now reuses the same `human_identity_links` and `p
 
 For example, a test provider can recognize Alice while the local test database contains no identity link for her. The session request returns 403. Requesting the `linked_human` test fixture first creates an active local principal and its link, so the same verified identity can return 200. Each test uses an isolated database, so admission from an earlier test does not carry over. [The implemented authentication boundary](credential-dispatch.md#implemented-human-authentication) links both the mocked-provider scenarios and real Hydra/Kratos tests that resolve cookie and bearer credentials to the same local principal.
 
-The table describes ownership rather than new schema changes. Native Kratos/Hydra login, backend consent, client provisioning and provider lifecycle scenarios are implemented. The separate [recovery workflow](recovery-completion.md#implemented-execution-and-proof-backed-completion) owns implemented cleanup orchestration and its qualification limits. Account pages, protected CLI storage and first-local-admission integration remain unfinished. Incoming application-key records and their two-usable-key limit remain separate.
+The table describes ownership rather than new schema changes. Native Kratos/Hydra login, backend consent, client provisioning and provider lifecycle scenarios are implemented. The separate [recovery workflow](recovery-completion.md#implemented-execution-and-proof-backed-completion) owns implemented cleanup orchestration and its qualification limits. Existing-human account pages are delivered with scoped native navigation coverage. Protected CLI storage and first-local-admission integration remain unfinished. Incoming application-key records and their two-usable-key limit remain separate.
 
 <a id="handle-invalidated-human-cli-credentials"></a>
 

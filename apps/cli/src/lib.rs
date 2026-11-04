@@ -9,4 +9,5 @@ pub mod metadata;
 mod targets;
 
 pub use app::run;
+pub mod auth;
 pub mod discovery;
