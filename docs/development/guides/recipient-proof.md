@@ -107,7 +107,7 @@ The callback has raw request-target and parser caps of 128 KiB and 192 KiB, plus
 
 ## Read the result before deciding what to do next
 
-After argument parsing, the helper writes one secret-safe JSON result. Help uses plain text, and malformed arguments produce a safe usage failure. Interrupted or failed output can leave incomplete JSON. A `result` separates `maintenance.effect`, `maintenance.processCleanup`, any maintenance `failure` and `credentialCleanup`. A top-level `error` identifies a failed stage and independent cleanup facts. Ordinary errors do not include provider bodies, token text or child output.
+After argument parsing, the helper writes one secret-safe JSON result. Help uses plain text, and malformed arguments produce a safe usage failure. Interrupted or failed output can leave incomplete JSON. A `result` separates `maintenance.effect`, `maintenance.processCleanup`, any maintenance `failure` and `credentialCleanup`. Early input and startup errors have only `error.kind`, set to `invalid-input` or `startup-unavailable`. Flow failures also include `resourceCleanup` and `credentialCleanup` under `error`. Ordinary errors do not include provider bodies, token text or child output.
 
 | Observation | Meaning and recovery |
 | --- | --- |

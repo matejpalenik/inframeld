@@ -267,7 +267,7 @@ jobs:
         env:
           INFRAMELD_CONTAINER_RUNTIME: docker
           INFRAMELD_INTEGRATION_IMAGE: localhost/inframeld-integration-tests:ci
-        run: pnpm test:integration
+        run: pnpm test:integration tests/integration --durations=20
 
       - name: Verify integration teardown
         if: ${{ !cancelled() && needs.changes.outputs.integration == 'true' && steps.integration.outcome != 'skipped' && steps.integration.outcome != '' }}
