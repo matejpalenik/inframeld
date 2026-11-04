@@ -6,13 +6,82 @@ from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import BaseModel, ValidationError
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
+from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
+from inframeld_backend.access.http.requests.project_creation_request import ProjectCreationRequest
+from inframeld_backend.access.http.requests.project_membership_request import (
+    ProjectMembershipRequest,
+)
+from inframeld_backend.access.http.requests.project_metadata_update_request import (
+    ProjectMetadataUpdateRequest,
+)
 from inframeld_backend.bootstrap.application_factory import create_app
 
 CONTRACT_PATH = (
     Path(__file__).resolve().parents[5] / "contracts" / "openapi" / "v1" / "inframeld-v1.json"
 )
+
+
+@pytest.mark.parametrize("public_json", [False, True], ids=["native", "public-json"])
+@pytest.mark.parametrize(
+    ("component", "field"),
+    [
+        ("HumanAdmissionRequest", "expectedAccessRevision"),
+        ("ProjectCreationRequest", "expectedAccessRevision"),
+        ("ProjectMembershipRequest", "expectedAccessRevision"),
+        ("ProjectMetadataUpdateRequest", "expectedMetadataRevision"),
+        ("MyOrganizationAccessResponse", "accessRevision"),
+    ],
+)
+def test_native_and_public_schemas_preserve_exact_integer_revision_bounds(
+    component: str, field: str, public_json: bool
+) -> None:
+    application = create_app()
+    if public_json:
+        response = TestClient(application).get("/v1/openapi.json")
+        assert response.status_code == 200
+        schema = response.json()
+    else:
+        schema = application.openapi()
+
+    revision = schema["components"]["schemas"][component]["properties"][field]
+    assert revision["type"] == "integer"
+    assert type(revision["minimum"]) is int and revision["minimum"] == 0
+    assert type(revision["maximum"]) is int and revision["maximum"] == 2**63 - 1
+
+
+@pytest.mark.parametrize(
+    ("model", "field", "other_fields"),
+    [
+        (
+            HumanAdmissionRequest,
+            "expectedAccessRevision",
+            {"identityId": "00000000-0000-4000-8000-000000000001"},
+        ),
+        (
+            ProjectCreationRequest,
+            "expectedAccessRevision",
+            {
+                "organizationId": "00000000-0000-4000-8000-000000000001",
+                "name": "support",
+                "displayName": "Support",
+            },
+        ),
+        (ProjectMembershipRequest, "expectedAccessRevision", {}),
+        (ProjectMetadataUpdateRequest, "expectedMetadataRevision", {"name": "support"}),
+    ],
+)
+def test_request_revision_models_accept_exact_maximum_and_reject_its_successor(
+    model: type[BaseModel], field: str, other_fields: dict[str, object]
+) -> None:
+    for revision in (0, 2**63 - 1):
+        request = model.model_validate({**other_fields, field: revision})
+        assert request.model_dump(by_alias=True)[field] == revision
+
+    with pytest.raises(ValidationError):
+        model.model_validate({**other_fields, field: 2**63})
 
 
 def test_human_admission_contract_preserves_original_receipt_and_current_human_scope() -> None:
@@ -39,7 +108,7 @@ def test_human_admission_contract_preserves_original_receipt_and_current_human_s
     assert set(request["required"]) == {"identityId", "expectedAccessRevision"}
     assert request["properties"]["identityId"]["format"] == "uuid"
     assert request["properties"]["expectedAccessRevision"]["minimum"] == 0
-    assert request["properties"]["expectedAccessRevision"]["maximum"] == float(2**63 - 1)
+    assert request["properties"]["expectedAccessRevision"]["maximum"] == 2**63 - 1
     response = schema["components"]["schemas"]["HumanAdmissionResponse"]
     assert set(response["required"]) == {
         "operationId",
@@ -482,7 +551,7 @@ def test_project_creation_contract_keeps_strict_input_and_exact_original_grant_r
     assert request["properties"]["displayName"]["maxLength"] == 128
     revision = request["properties"]["expectedAccessRevision"]
     assert revision["type"] == "integer" and revision["minimum"] == 0
-    assert revision["maximum"] == float(2**63 - 1)
+    assert revision["maximum"] == 2**63 - 1
     response = components["ProjectCreationResponse"]
     assert set(response["required"]) == {
         "operationId",

@@ -131,8 +131,8 @@
         "additionalProperties": false,
         "properties": {
           "expectedAccessRevision": {
-            "maximum": 9.223372036854776e+18,
-            "minimum": 0.0,
+            "maximum": 9223372036854775807,
+            "minimum": 0,
             "title": "Expectedaccessrevision",
             "type": "integer"
           },
@@ -412,8 +412,8 @@
       "MyOrganizationAccessResponse": {
         "properties": {
           "accessRevision": {
-            "maximum": 9.223372036854776e+18,
-            "minimum": 0.0,
+            "maximum": 9223372036854775807,
+            "minimum": 0,
             "title": "Accessrevision",
             "type": "integer"
           },
@@ -705,8 +705,8 @@
             "type": "string"
           },
           "expectedAccessRevision": {
-            "maximum": 9.223372036854776e+18,
-            "minimum": 0.0,
+            "maximum": 9223372036854775807,
+            "minimum": 0,
             "title": "Expectedaccessrevision",
             "type": "integer"
           },
@@ -931,8 +931,8 @@
         "additionalProperties": false,
         "properties": {
           "expectedAccessRevision": {
-            "maximum": 9.223372036854776e+18,
-            "minimum": 0.0,
+            "maximum": 9223372036854775807,
+            "minimum": 0,
             "title": "Expectedaccessrevision",
             "type": "integer"
           }
@@ -1111,8 +1111,8 @@
           },
           "expectedMetadataRevision": {
             "description": "Metadata revision reviewed for this exact change.",
-            "maximum": 9.223372036854776e+18,
-            "minimum": 0.0,
+            "maximum": 9223372036854775807,
+            "minimum": 0,
             "title": "Expectedmetadatarevision",
             "type": "integer"
           },

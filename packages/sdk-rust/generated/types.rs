@@ -1322,7 +1322,7 @@ impl AsRef<str> for OperationLookupAuthorityFamily {
 pub struct MyOrganizationAccessResponse {
     ///Constraint: minimum=0, maximum=9223372036854775807
     #[serde(rename = "accessRevision")]
-    pub access_revision: u64,
+    pub access_revision: i64,
     ///Constraint: maxItems=4
     pub grants: Vec<OwnOrganizationGrantResponse>,
     #[serde(rename = "organizationId")]
@@ -2211,7 +2211,7 @@ pub struct GetHealthResponse {
 pub struct HumanAdmissionRequest {
     ///Constraint: minimum=0, maximum=9223372036854775807
     #[serde(rename = "expectedAccessRevision")]
-    pub expected_access_revision: u64,
+    pub expected_access_revision: i64,
     #[serde(rename = "identityId")]
     pub identity_id: uuid::Uuid,
 }
@@ -2242,7 +2242,7 @@ pub struct ProjectCreationRequest {
     pub display_name: String,
     ///Constraint: minimum=0, maximum=9223372036854775807
     #[serde(rename = "expectedAccessRevision")]
-    pub expected_access_revision: u64,
+    pub expected_access_revision: i64,
     ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
     pub name: String,
     #[serde(rename = "organizationId")]
@@ -2268,7 +2268,7 @@ pub struct ProjectMembershipRemovalResponse {
 pub struct ProjectMembershipRequest {
     ///Constraint: minimum=0, maximum=9223372036854775807
     #[serde(rename = "expectedAccessRevision")]
-    pub expected_access_revision: u64,
+    pub expected_access_revision: i64,
 }
 ///Report original bare membership, without restoring grants or later state.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -2343,7 +2343,7 @@ pub struct ProjectMetadataUpdateRequest {
     ///Metadata revision reviewed for this exact change.
     ///Constraint: minimum=0, maximum=9223372036854775807
     #[serde(rename = "expectedMetadataRevision")]
-    pub expected_metadata_revision: u64,
+    pub expected_metadata_revision: i64,
     ///Explicit exact selector replacement. Omit to preserve the current selector.
     ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
     #[serde(
@@ -2355,7 +2355,7 @@ pub struct ProjectMetadataUpdateRequest {
 }
 impl ProjectMetadataUpdateRequest {
     /// Construct this request with every required wire field.
-    pub fn new(expected_metadata_revision: u64) -> Self {
+    pub fn new(expected_metadata_revision: i64) -> Self {
         Self {
             expected_metadata_revision,
             display_name: None,
@@ -2364,7 +2364,7 @@ impl ProjectMetadataUpdateRequest {
     }
     /// Start a dependency-free builder with every required wire field.
     pub fn builder(
-        expected_metadata_revision: u64,
+        expected_metadata_revision: i64,
     ) -> ProjectMetadataUpdateRequestBuilder {
         ProjectMetadataUpdateRequestBuilder::new(expected_metadata_revision)
     }
@@ -2377,7 +2377,7 @@ pub struct ProjectMetadataUpdateRequestBuilder {
 }
 impl ProjectMetadataUpdateRequestBuilder {
     /// Start a builder with every required wire field.
-    pub fn new(expected_metadata_revision: u64) -> Self {
+    pub fn new(expected_metadata_revision: i64) -> Self {
         Self {
             value: ProjectMetadataUpdateRequest::new(expected_metadata_revision),
         }

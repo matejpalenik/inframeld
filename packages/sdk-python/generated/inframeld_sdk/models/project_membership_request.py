@@ -29,7 +29,7 @@ class ProjectMembershipRequest(BaseModel):
     """
     ProjectMembershipRequest
     """ # noqa: E501
-    expected_access_revision: Annotated[int, Field(le=9223372036854776000, strict=True, ge=0)] = Field(alias="expectedAccessRevision")
+    expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)] = Field(alias="expectedAccessRevision")
     __properties: ClassVar[List[str]] = ["expectedAccessRevision"]
     @field_validator('expected_access_revision', mode='before')
     def expected_access_revision_reject_explicit_null(cls, value):

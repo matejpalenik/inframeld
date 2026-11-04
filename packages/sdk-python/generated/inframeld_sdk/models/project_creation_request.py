@@ -31,7 +31,7 @@ class ProjectCreationRequest(BaseModel):
     ProjectCreationRequest
     """ # noqa: E501
     display_name: Annotated[str, Field(min_length=1, strict=True, max_length=128)] = Field(alias="displayName")
-    expected_access_revision: Annotated[int, Field(le=9223372036854776000, strict=True, ge=0)] = Field(alias="expectedAccessRevision")
+    expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)] = Field(alias="expectedAccessRevision")
     name: Annotated[str, Field(min_length=1, strict=True, max_length=63)]
     organization_id: UUID = Field(alias="organizationId")
     __properties: ClassVar[List[str]] = ["displayName", "expectedAccessRevision", "name", "organizationId"]

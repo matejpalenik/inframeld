@@ -321,7 +321,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &principal_id,
                 &key,
                 ProjectMembershipRequest {
-                    expected_access_revision: revision,
+                    expected_access_revision: signed_revision,
                 },
             )
             .await

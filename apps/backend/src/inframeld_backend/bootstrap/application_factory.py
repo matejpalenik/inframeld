@@ -30,6 +30,17 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
 from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler import (
     register_human_oauth_credential_error_handler,
 )
+from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
+from inframeld_backend.access.http.requests.project_creation_request import ProjectCreationRequest
+from inframeld_backend.access.http.requests.project_membership_request import (
+    ProjectMembershipRequest,
+)
+from inframeld_backend.access.http.requests.project_metadata_update_request import (
+    ProjectMetadataUpdateRequest,
+)
+from inframeld_backend.access.http.responses.my_organization_access_response import (
+    MyOrganizationAccessResponse,
+)
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
 from inframeld_backend.access.http.routes.human_admission_routes import (
@@ -179,7 +190,16 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
 
         register_error_handlers(application)
         register_human_oauth_credential_error_handler(application)
-        configure_problem_openapi(application)
+        configure_problem_openapi(
+            application,
+            validation_models=(
+                HumanAdmissionRequest,
+                ProjectCreationRequest,
+                ProjectMembershipRequest,
+                ProjectMetadataUpdateRequest,
+            ),
+            serialization_models=(MyOrganizationAccessResponse,),
+        )
         application.include_router(health_router)
         application.include_router(
             create_discovery_router(discovery.read if discovery else lambda: None)
