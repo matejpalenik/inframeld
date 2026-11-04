@@ -14,7 +14,7 @@ use url::Origin;
 use uuid::Uuid;
 
 pub(crate) use discover::discover_with_context;
-pub use error::DiscoveryError;
+pub use error::{DiscoveryError, DiscoveryProblem};
 pub use installation::{
     DiscoveredInstallation, DiscoveryOptions, DiscoveryProviderMetadata, ProviderExtensions,
 };
@@ -36,7 +36,8 @@ const BODY_LIMIT: usize = 64 * 1024;
 /// # Errors
 /// Returns a [`DiscoveryError`] for invalid URLs, mismatched identities,
 /// unsupported profiles, malformed metadata or failed transport. Upstream
-/// response text is not included in the safe error category.
+/// bodies and provider text are excluded. Declared backend problems retain only
+/// validated public reporting fields, not authentication or installation trust.
 ///
 /// # Examples
 /// Call from an existing Tokio runtime with an operator-supplied API identity.

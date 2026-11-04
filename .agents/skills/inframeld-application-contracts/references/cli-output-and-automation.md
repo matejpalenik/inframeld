@@ -2,7 +2,7 @@
 
 Alice scripts a command that admits work, then inspects its outcome. One machine result must describe the same permitted facts as the human view, including uncertainty and partial saved effects.
 
-> **Status:** common CLI representation accepted on 2026-10-29 through the approved joint #124/#156 specification plan. Help/version and the credential-free target commands implement final JSON/JSONL framing, safe exits, warnings and descriptive previews. Target previews and preference views have the bounded contracts below. Job/progress, backend-problem and pagination consumers remain delivery work. Illustrative domain examples do not publish those commands.
+> **Status:** common CLI representation accepted on 2026-10-29 through the approved joint #124/#156 specification plan. Help/version and the credential-free target commands implement final JSON/JSONL framing, safe exits, warnings and descriptive previews. Target previews and preference views have the bounded contracts below. Declared backend problems are reported for anonymous target registration. Job/progress, pagination and other backend-problem consumers remain delivery work. Illustrative domain examples do not publish those commands.
 
 ## Read the right contract
 
