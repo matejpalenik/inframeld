@@ -1287,13 +1287,13 @@ print(json.dumps({'schemaVersion':1,'mode':request['mode'],'operationId':request
     #[tokio::test]
     async fn cancellation_after_transport_effect_preserves_unknown_commit_and_reaps_once() {
         let (directory, mut execution) = scripted(
-            "import time\nopen(sys.argv[1], 'a').write('one effect')\ntime.sleep(30)",
+            "import time\nwith open(sys.argv[1], 'w') as marker:\n    time.sleep(0.25)\n    marker.write('one effect')\n    marker.flush()\ntime.sleep(30)",
             false,
         );
         let marker = directory.path().join("effects");
         execution.args.push(marker.to_str().unwrap().into());
         let cancelling = async {
-            while !marker.exists() {
+            while !fs::read_to_string(&marker).is_ok_and(|value| value == "one effect") {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
         };
@@ -1305,12 +1305,25 @@ print(json.dumps({'schemaVersion':1,'mode':request['mode'],'operationId':request
             cancelling,
         )
         .await;
-        assert!(
-            matches!(&result.effect,MaintenanceEffect::Unknown{operation_id} if operation_id=="original-operation")
+        let context = format!(
+            "failure={:?} cleanup={:?} child_status={:?}",
+            result.failure, result.process_cleanup, result.child_status
         );
-        assert_eq!(result.failure, Some(HandoffFailure::Cancelled));
-        assert_eq!(result.process_cleanup, CleanupStatus::Confirmed);
-        assert_eq!(fs::read_to_string(marker).unwrap(), "one effect");
+        assert!(
+            matches!(&result.effect,MaintenanceEffect::Unknown{operation_id} if operation_id=="original-operation"),
+            "{context}"
+        );
+        assert_eq!(result.failure, Some(HandoffFailure::Cancelled), "{context}");
+        assert_eq!(
+            result.process_cleanup,
+            CleanupStatus::Confirmed,
+            "{context}"
+        );
+        assert_eq!(
+            fs::read_to_string(marker).unwrap(),
+            "one effect",
+            "{context}"
+        );
     }
 
     #[tokio::test]
@@ -1342,6 +1355,7 @@ print(json.dumps({'schemaVersion':1,'mode':request['mode'],'operationId':request
         for (close_pipes, leader_exits) in [(false, true), (true, true), (false, false)] {
             let tail = format!(
                 r"import os, signal, time
+time.sleep(0.25)
 read_end, write_end=os.pipe()
 child=os.fork()
 if child==0:
@@ -1355,8 +1369,10 @@ if child==0:
     time.sleep(30)
     os._exit(0)
 os.close(write_end)
-os.read(read_end,1)
+assert os.read(read_end,1)==b'R'
 os.close(read_end)
+with open(sys.argv[1], 'w') as marker:
+    marker.write('ready')
 if {leader_exits}:
     os._exit(0)
 time.sleep(30)
@@ -1364,24 +1380,39 @@ time.sleep(30)
                 close_pipes = if close_pipes { "True" } else { "False" },
                 leader_exits = if leader_exits { "True" } else { "False" }
             );
-            let (_directory, execution) = scripted(&tail, true);
+            let (directory, mut execution) = scripted(&tail, true);
+            let marker = directory.path().join("descendant-ready");
+            execution.args.push(marker.to_str().unwrap().into());
+            let mut budgets = short_budgets();
+            budgets.execution = Duration::from_secs(3);
             let result = handoff_with_budgets(
                 &execution,
                 &intent(),
                 &proof(),
                 Instant::now() + Duration::from_secs(3),
                 std::future::pending(),
-                short_budgets(),
+                budgets,
             )
             .await;
-            assert!(matches!(result.effect, MaintenanceEffect::Committed { .. }));
+            let context = format!(
+                "close_pipes={close_pipes} leader_exits={leader_exits} failure={:?} cleanup={:?} child_status={:?}",
+                result.failure, result.process_cleanup, result.child_status
+            );
+            assert!(
+                fs::read_to_string(marker).is_ok_and(|value| value == "ready"),
+                "descendant readiness was not observed: {context}"
+            );
+            assert!(
+                matches!(result.effect, MaintenanceEffect::Committed { .. }),
+                "{context}"
+            );
             assert_eq!(
                 result.process_cleanup,
                 CleanupStatus::Confirmed,
-                "close_pipes={close_pipes} leader_exits={leader_exits}"
+                "{context}"
             );
             if !close_pipes {
-                assert_eq!(result.failure, Some(HandoffFailure::TimedOut));
+                assert_eq!(result.failure, Some(HandoffFailure::TimedOut), "{context}");
             }
         }
     }
@@ -1389,48 +1420,93 @@ time.sleep(30)
     #[tokio::test]
     async fn bound_receipt_survives_explicit_unconfirmed_cleanup_of_an_escaped_descendant() {
         let tail = r"import os, time
+time.sleep(0.25)
 read_end, write_end=os.pipe()
 child=os.fork()
 if child==0:
     os.close(read_end)
     os.setsid()
     os.close(1)
-    open(sys.argv[1], 'w').write(str(os.getpid()))
     os.write(write_end,b'R')
     os.close(write_end)
-    time.sleep(0.5)
+    time.sleep(3)
     os._exit(0)
 os.close(write_end)
-os.read(read_end,1)
+assert os.read(read_end,1)==b'R'
 os.close(read_end)
+with open(sys.argv[1], 'w') as marker:
+    marker.write(f'{child}\n')
+    marker.flush()
 os._exit(0)
 ";
         let (directory, mut execution) = scripted(tail, true);
         let marker = directory.path().join("escaped-pid");
         execution.args.push(marker.to_str().unwrap().into());
         let mut budgets = short_budgets();
+        budgets.execution = Duration::from_secs(3);
         budgets.kill = Duration::from_millis(40);
+        let cancelling = async {
+            while !fs::read_to_string(&marker).is_ok_and(|value| {
+                value
+                    .strip_suffix('\n')
+                    .and_then(|pid| pid.parse::<i32>().ok())
+                    .is_some_and(|pid| pid > 1)
+            }) {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        };
         let result = handoff_with_budgets(
             &execution,
             &intent(),
             &proof(),
             Instant::now() + Duration::from_secs(3),
-            std::future::pending(),
+            cancelling,
             budgets,
         )
         .await;
-        assert!(matches!(result.effect, MaintenanceEffect::Committed { .. }));
-        assert_eq!(result.process_cleanup, CleanupStatus::Unconfirmed);
-        let pid = Pid::from_raw(fs::read_to_string(marker).unwrap().parse().unwrap());
+        let pid = fs::read_to_string(marker)
+            .ok()
+            .and_then(|value| {
+                value
+                    .strip_suffix('\n')
+                    .and_then(|pid| pid.parse::<i32>().ok())
+            })
+            .filter(|pid| *pid > 1)
+            .map(Pid::from_raw);
         // The fixture exits on its own finite timer. Probe only, never signal a
         // numerical PID after the supervisor's ownership has ended.
-        tokio::time::timeout(Duration::from_secs(2), async {
-            while nix::sys::signal::kill(pid, None) != Err(Errno::ESRCH) {
-                tokio::time::sleep(Duration::from_millis(10)).await;
-            }
-        })
-        .await
-        .unwrap();
+        let retired = if let Some(pid) = pid {
+            tokio::time::timeout(Duration::from_secs(4), async {
+                while nix::sys::signal::kill(pid, None) != Err(Errno::ESRCH) {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .is_ok()
+        } else {
+            false
+        };
+        let context = format!(
+            "ready={} retired={retired} failure={:?} cleanup={:?} child_status={:?}",
+            pid.is_some(),
+            result.failure,
+            result.process_cleanup,
+            result.child_status
+        );
+        assert!(
+            pid.is_some(),
+            "escaped readiness was not observed: {context}"
+        );
+        assert!(retired, "escaped fixture did not retire: {context}");
+        assert!(
+            matches!(result.effect, MaintenanceEffect::Committed { .. }),
+            "{context}"
+        );
+        assert_eq!(
+            result.process_cleanup,
+            CleanupStatus::Unconfirmed,
+            "{context}"
+        );
     }
 
     #[tokio::test]
