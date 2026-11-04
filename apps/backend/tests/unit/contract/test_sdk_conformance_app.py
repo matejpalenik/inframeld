@@ -3,9 +3,103 @@
 import base64
 from urllib.parse import parse_qs
 
+import pytest
 from fastapi.testclient import TestClient
 from tests.support.project_creation_scenarios import INITIAL_ACTIONS
 from tests.support.sdk_conformance_app import create_sdk_conformance_app
+
+
+@pytest.mark.parametrize(
+    "identity,status,changed,revision",
+    [
+        ("00000000-0000-4000-8000-000000000004", 201, True, 8),
+        ("00000000-0000-4000-8000-000000000005", 200, False, 7),
+    ],
+)
+def test_human_admission_fixture_returns_typed_original_receipts_and_witnesses(
+    identity: str, status: int, changed: bool, revision: int
+) -> None:
+    route = "/v1/organizations/00000000-0000-4000-8000-000000000002/human-admissions"
+    body = {"identityId": identity, "expectedAccessRevision": 7}
+    headers = {
+        "Authorization": "Bearer sdk-human",
+        "Idempotency-Key": "sdk-admit-key",
+        "X-SDK-Test": "admission-wire",
+    }
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/admission-wire",
+            json={"calls": {"admission-wire": {"kind": "none"}}},
+        )
+        first = client.post(route, json=body, headers=headers)
+        replay = client.post(route, json=body, headers=headers)
+        assert first.status_code == replay.status_code == status
+        assert (
+            first.json()
+            == replay.json()
+            == {
+                "operationId": "sdk-human-admission",
+                "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
+                "organizationId": "00000000-0000-4000-8000-000000000002",
+                "principalId": identity,
+                "accessRevision": revision,
+                "changed": changed,
+            }
+        )
+        witness = client.get("/sdk-control/cases/admission-wire").json()["observations"][
+            "admission-wire"
+        ]
+    assert first.headers["cache-control"] == replay.headers["cache-control"] == "no-store"
+    assert witness["method"] == "POST" and witness["path"] == route
+    assert witness["jsonBody"] == body
+    assert witness["headers"]["idempotency-key"] == "sdk-admit-key"
+    assert not witness["csrf"]
+
+
+@pytest.mark.parametrize(
+    "case,status,code",
+    [
+        ("csrf", 403, "access_denied"),
+        ("missing", 401, "http_error"),
+        ("application-key", 401, "http_error"),
+        ("forbidden", 403, "access_denied"),
+        ("foreign-org", 404, "resource_not_found"),
+        ("stale", 409, "stale_revision"),
+        ("unavailable", 503, "dependency_unavailable"),
+    ],
+)
+def test_human_admission_fixture_preserves_native_problem_responses(
+    case: str, status: int, code: str
+) -> None:
+    organization = (
+        "00000000-0000-4000-8000-000000000099"
+        if case == "foreign-org"
+        else "00000000-0000-4000-8000-000000000002"
+    )
+    body = {
+        "identityId": "00000000-0000-4000-8000-000000000004",
+        "expectedAccessRevision": 0 if case == "stale" else 7,
+    }
+    headers = {"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-admit-key"}
+    if case == "csrf":
+        headers = {"Cookie": "ory_kratos_session=sdk-cookie", "Idempotency-Key": "sdk-admit-key"}
+    elif case == "missing":
+        del headers["Authorization"]
+    elif case in {"application-key", "forbidden", "unavailable"}:
+        token = {
+            "application-key": "ifm_app_unsupported",
+            "forbidden": "sdk-denied",
+            "unavailable": "sdk-unavailable",
+        }[case]
+        headers["Authorization"] = f"Bearer {token}"
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.post(
+            f"/v1/organizations/{organization}/human-admissions", json=body, headers=headers
+        )
+    assert response.status_code == status
+    assert response.json()["code"] == code
+    assert response.headers["content-type"] == "application/problem+json"
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_project_members_fixture_uses_real_router_service_and_one_explicit_page_per_request() -> (

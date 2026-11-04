@@ -10,6 +10,7 @@ Operation: TypeAlias = Literal[
     "getHealth",
     "getCurrentSession",
     "getMyOrganizationAccess",
+    "admitHuman",
     "createProject",
     "listProjectMembers",
     "inspectHumanOAuthConsent",

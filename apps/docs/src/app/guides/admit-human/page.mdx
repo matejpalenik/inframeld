@@ -1,0 +1,127 @@
+export const pageMetadata = {
+  title: "Admit an existing human",
+  description:
+    "Admit an existing Kratos identity using current Organization authority.",
+}
+
+# Admit an existing human
+
+Alice can admit Bob to an installation where he already has a Kratos account. Admission links his verified provider identity to a local human principal. It supplies no Project membership, action grants or private starter resources.
+
+This task uses the HTTP API through the generated browser TypeScript SDK. It requires an existing admitted Alice with permission to use `admit-users` on the Organization. Permission to delegate that action is unnecessary. First-administrator bootstrap is a separate operator claim.
+
+## Use the existing browser sessions
+
+Use your installation's configured HTTPS account origin, where the account pages, Kratos public session route and `/v1` API share an origin. Use separate browser profiles for Alice and Bob so one sign-in does not replace the other's session. Both people need existing Kratos accounts. This operation does not register a provider account.
+
+1. Bob opens `/login` on that origin and completes the supported sign-in steps. He then opens `/sessions/whoami` in the same browser profile. From a successful response, retain only `identity.id`, his exact Kratos identity UUID. The top-level `id` identifies the session. Share only the identity UUID with Alice, not the session body, cookie or other credentials. If the session or identity is unavailable, stop and resolve that sign-in flow.
+2. Alice signs in at `/login` in her own profile. Opening `/v1/session` confirms her admitted local `principalId`. It is a different kind of identifier from Bob's Kratos identity UUID.
+3. Alice opens `/v1/my-organization-access` in her profile. Review its actual `organizationId`, `accessRevision` and stored `grants`. Look for `actionId: "admit-users"`. Either `canGrant` value permits use. A successful read with `grants: []` supplies no admission authority.
+
+These are reads under current credentials, not permission snapshots for the write. The server checks Alice's authority and Bob's admissibility again. Alice needs no Kratos administration access or copied provider token.
+
+## Submit the reviewed admission
+
+Build the current local SDK using [TypeScript SDK setup](/clients/typescript#build-and-install-the-package). Place this complete `admit-human.ts` module in your existing browser application's client bundle on the configured account/API origin. Run it there after reviewing the inputs. The browser supplies its session cookie and real `Origin`. The write supplies `X-Inframeld-CSRF: 1`, which is separate from the Kratos sign-in form's CSRF token.
+
+Replace the example Organization UUID, Bob's identity UUID and revision below with the values you reviewed. Choose a unique idempotency key once, such as a browser-generated `crypto.randomUUID()` value, and save it with those exact inputs before submission. Keep that saved value in the module when repeating the original request.
+
+<CodeGroup>
+
+```typescript {{ title: "TypeScript (browser)" }}
+import { admitHuman, createClient } from "@inframeld/sdk"
+
+const original = {
+  organizationId: "00000000-0000-4000-8000-000000000001",
+  identityId: "00000000-0000-4000-8000-000000000002",
+  expectedAccessRevision: 7,
+  idempotencyKey: "replace-with-your-saved-unique-key",
+}
+
+if (
+  !Number.isSafeInteger(original.expectedAccessRevision) ||
+  original.expectedAccessRevision < 0
+) {
+  throw new Error("Review an exact nonnegative Access revision before sending")
+}
+
+const client = createClient({
+  baseUrl: window.location.origin,
+  credentials: "same-origin",
+  timeoutMs: 5000,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+const result = await admitHuman({
+  client,
+  path: { organization_id: original.organizationId },
+  headers: {
+    "Idempotency-Key": original.idempotencyKey,
+    "X-Inframeld-CSRF": "1",
+  },
+  body: {
+    identityId: original.identityId,
+    expectedAccessRevision: original.expectedAccessRevision,
+  },
+})
+
+if (result.error !== undefined) {
+  console.error({
+    httpStatus: result.response?.status,
+    failureKind: result.error.kind,
+  })
+  if (result.error.kind === "api") {
+    console.error({
+      code: result.error.body.code,
+      requestId: result.error.body.requestId,
+    })
+  }
+} else if (result.data !== undefined) {
+  console.info({
+    httpStatus: result.response?.status,
+    organizationId: result.data.organizationId,
+    principalId: result.data.principalId,
+    accessRevision: result.data.accessRevision,
+    changed: result.data.changed,
+    operationId: result.data.operationId,
+    idempotencyExpiresAt: result.data.idempotencyExpiresAt,
+  })
+} else {
+  throw new Error("No usable admission response. Keep the original request")
+}
+```
+
+</CodeGroup>
+
+This calls `POST /v1/organizations/{organization_id}/human-admissions`. Keep the retained request and safe result. Do not add an `Authorization` header to this cookie-authenticated example or copy the browser cookie into your source code.
+
+## Interpret the original result
+
+| Fresh result            | Meaning                                                                                                                                                                                      |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `201`, `changed: true`  | Bob was newly admitted. His local principal/link and the original result were saved together. The Organization Access revision advances once.                                                |
+| `200`, `changed: false` | Bob was already an eligible admitted human. Admission, credentials and the Organization Access revision stay unchanged. This records a no-change operation, rather than repairing his state. |
+
+`principalId` is Bob's local Inframeld identity. `operationId`, `accessRevision`, `changed` and `idempotencyExpiresAt` describe this original result. They are not a report of his current permissions. Bob can check `/v1/session` in his own browser profile after admission and compare its `principalId` with the receipt.
+
+Admission gives Bob no `create-projects` permission or Project access. Project membership and grants have their own administration workflows. Private starters and the complete first-use setup remain unfinished. Successful admission does not establish setup readiness or make Bob an administrator.
+
+## Keep the original request after uncertainty
+
+A timeout, cancellation, lost response or decoding failure can leave the write's outcome unconfirmed. Keep the original installation, Organization, identity UUID, reviewed revision and idempotency key. Do not generate another key merely to make an uncertain result disappear.
+
+An explicit exact replay checks Alice's current authority and Bob's current provider identity, local binding and recovery eligibility before returning the original business result. It retains the original response status, values and expiry. An original `201` remains that original `201` even though Bob now exists. Replay neither initializes credentials, restores rights, provisions starters nor adds another admission audit. The retained result is not guaranteed beyond its `idempotencyExpiresAt` deadline.
+
+[Generic original-request lookup](/guides/recover-original-request) is a separate metadata observation with its own disclosure rules. It is not the admission response and does not supply authority to admit or restore anyone.
+
+| Failure                      | Next decision                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401`                        | Reestablish Alice's current session through the configured sign-in flow.                                                                                                                                                                                                                                                                 |
+| `403`                        | Check Alice's current eligibility and `admit-users` assignment, the actual browser origin and cookie CSRF configuration.                                                                                                                                                                                                                 |
+| `404`                        | Check the exact installation and reviewed Organization. The response is not an Organization inventory.                                                                                                                                                                                                                                   |
+| `409`                        | A fresh request needs the current reviewed revision. Changed request meaning or Bob's current inactive, suspended or recovery-blocked state can also conflict. Keep the original revision for exact replay. Completed recovery history alone does not deny it. Preserve an uncertain original request before choosing any new operation. |
+| `400`, `413`, `415` or `422` | Correct the malformed, oversized or invalid request. The operation requires the native JSON request and a retained idempotency key.                                                                                                                                                                                                      |
+| `503` or no usable response  | Retain the original request and resolve the unavailable dependency or uncertain outcome before another submission.                                                                                                                                                                                                                       |
+
+See [the native operation and models](/api-reference/projects-and-access#admit-an-existing-human) for the exact request, response and declared errors.

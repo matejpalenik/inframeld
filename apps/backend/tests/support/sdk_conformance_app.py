@@ -22,6 +22,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 
+from inframeld_backend.access.application.commands.admit_human_command import AdmitHumanCommand
 from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
     AssignProjectUseOnlyGrantCommand,
 )
@@ -36,6 +37,9 @@ from inframeld_backend.access.application.commands.update_project_metadata_comma
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.created_project_dto import CreatedProjectDTO
+from inframeld_backend.access.application.dtos.human_admission_result_dto import (
+    HumanAdmissionResultDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto import (
     HumanOAuthConsentDetailsDTO,
 )
@@ -76,6 +80,7 @@ from inframeld_backend.access.application.errors.retired_project_name_error impo
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
 )
+from inframeld_backend.access.application.protocols.human_admitter import HumanAdmitter
 from inframeld_backend.access.application.protocols.human_oauth_consent_handler import (
     HumanOAuthConsentHandler,
 )
@@ -140,6 +145,9 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
+from inframeld_backend.access.http.routes.human_admission_routes import (
+    create_human_admission_router,
+)
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
@@ -185,6 +193,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     AuthenticationRequiredError,
     DependencyUnavailableError,
+    ResourceNotFoundError,
     StaleRevisionError,
 )
 from inframeld_backend.shared.application.protocols.deletion_status_lookup import (
@@ -362,6 +371,47 @@ async def _open_my_organization_access() -> AsyncGenerator[MyOrganizationAccessR
 @asynccontextmanager
 async def _open_project_creator() -> AsyncGenerator[ProjectCreator]:
     yield MockSDKProjectCreator()
+
+
+class MockSDKHumanAdmitter(HumanAdmitter):
+    """Supply typed original outcomes without simulating admission or provider state."""
+
+    @override
+    async def admit(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: AdmitHumanCommand,
+        context: OperationAdmissionContextDTO,
+    ) -> HumanAdmissionResultDTO:
+        if command.organization_id.value != UUID("00000000-0000-4000-8000-000000000002"):
+            raise ResourceNotFoundError()
+        if command.expected_access_revision != 7:
+            raise StaleRevisionError()
+        if context.key.value != "sdk-admit-key":
+            raise ValueError("The SDK changed the admission idempotency header.")
+        changed = command.identity_id != UUID("00000000-0000-4000-8000-000000000005")
+        operation_id = OperationId("sdk-human-admission")
+        return HumanAdmissionResultDTO(
+            InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            VerifiedHumanIdentityDTO(IDENTITY.authority, IdentitySubject(str(command.identity_id))),
+            command.organization_id,
+            access.actor_principal_id,
+            PrincipalId(command.identity_id),
+            8 if changed else 7,
+            changed,
+            CompletedSynchronousOperationDTO(
+                operation_id,
+                True,
+                OperationReplayKind.SAFE_RESULT,
+                datetime(2030, 1, 1, tzinfo=UTC),
+            ),
+        )
+
+
+@asynccontextmanager
+async def _open_human_admitter() -> AsyncGenerator[HumanAdmitter]:
+    yield MockSDKHumanAdmitter()
 
 
 class MockSDKProjectMembersFacts(ProjectMembersFactsReader):
@@ -722,6 +772,7 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(create_discovery_router(discovery_snapshot.get))
     application.include_router(health_router)
     application.include_router(create_session_router(authenticate))
+    application.include_router(create_human_admission_router(authenticate, _open_human_admitter))
     application.include_router(create_project_grant_router(authenticate, _open_grant_change))
     application.include_router(
         create_organization_access_router(authenticate, _open_my_organization_access)

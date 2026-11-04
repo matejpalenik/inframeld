@@ -12,7 +12,7 @@ An invitation is a revocable, single-use intent, not an identity proof or an unr
 
 ## Admit a human without provisioning starters
 
-**Accepted design:** [ADR-0126](../../../../docs/adr/ADR-0126-separate-human-admission-from-private-starter-provisioning.md), approved on 2026-11-03, separates ordinary human admission from required private starter provisioning. This ordinary admission operation is not yet implemented or qualified.
+**Accepted design:** [ADR-0126](../../../../docs/adr/ADR-0126-separate-human-admission-from-private-starter-provisioning.md), approved on 2026-11-03, separates ordinary human admission from required private starter provisioning. Ordinary human admission is implemented through HTTP and the generated application clients as a supporting component.
 
 Alice must be a currently eligible human with permission to use `admit-users` for the installation's Organization. Authorize Alice's current use of `admit-users` in a preliminary transaction, then close it before the private Kratos lookup for Bob. Access then verifies Bob's real Kratos identity and its exact trusted provider authority and subject. A typed email, an OAuth consent result or a caller-supplied local identity cannot replace that verification. All provider I/O stays outside local database transactions.
 
@@ -64,7 +64,7 @@ Retain the original identity, issuer, target bindings, intended effects, expiry/
 
 ## Implementation status and reading routes
 
-Ordinary admission under ADR-0126 and the invitation lifecycle are accepted at their stated status. They do not establish implemented admission or invitation routes, generated client methods or qualified concurrent first admission. The invitation transport draft remains separate from the new ordinary-admission operation. Full #27 still includes the unadmitted-human proof producer, private starters and usable first setup. Human acceptance remains unperformed under [#185](https://github.com/matejpalenik/inframeld/issues/185).
+Ordinary admission uses `POST /v1/organizations/{organization_id}/human-admissions` (`admitHuman`). The [browser guide](../../../../apps/docs/src/app/guides/admit-human/page.mdx) and [native API reference](../../../../apps/docs/src/app/api-reference/projects-and-access/page.mdx#admit-an-existing-human) describe its consumer path. Invitation issuance, preview and activation remain separate accepted design, not implemented by this component. Full #27 still includes the unadmitted-human proof producer, private starters and usable first setup. Human acceptance remains unperformed under [#185](https://github.com/matejpalenik/inframeld/issues/185).
 
 For exact inputs, route symbols, limits and response alternatives, read [Invitation contracts](invitation-contracts.md). For a target's exact fields, read [Grant targets](grant-target-contract.md). For existing membership or delegation changes, read [Grant administration](grant-administration.md) and [Memberships and handover](memberships-groups-and-handover.md).
 

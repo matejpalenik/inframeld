@@ -13,6 +13,8 @@ inframeld_sdk/models/accepted_operation_lookup_response.py
 inframeld_sdk/models/completed_operation_lookup_response.py
 inframeld_sdk/models/current_session_response.py
 inframeld_sdk/models/deletion_status_response.py
+inframeld_sdk/models/human_admission_request.py
+inframeld_sdk/models/human_admission_response.py
 inframeld_sdk/models/human_o_auth_consent_decision_response.py
 inframeld_sdk/models/human_o_auth_consent_details_response.py
 inframeld_sdk/models/human_o_auth_consent_request.py

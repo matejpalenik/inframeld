@@ -11,6 +11,17 @@ pub async fn observe(
 ) -> Observation {
     let body = request.body.clone().unwrap_or(Value::Null);
     match request.operation.as_str() {
+        "admitHuman" => observed!(
+            client
+                .admit_human(
+                    request.path.as_ref().unwrap()["organization_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
         "contractFixtureVariants" => {
             let native = fixture
                 .contract_fixture_variants(
