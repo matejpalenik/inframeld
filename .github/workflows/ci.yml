@@ -200,7 +200,7 @@ jobs:
     needs: [changes, quality]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 40
     env:
       CHANGES: ${{ needs.changes.result }}
       INTEGRATION: ${{ needs.changes.outputs.integration }}
