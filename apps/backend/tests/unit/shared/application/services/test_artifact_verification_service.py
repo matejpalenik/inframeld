@@ -26,6 +26,7 @@ from inframeld_backend.shared.application.value_objects.artifact_content_digest 
     ArtifactContentDigest,
 )
 from inframeld_backend.shared.application.value_objects.artifact_id import ArtifactId
+from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
 SCOPE = ArtifactScopeDTO(
@@ -60,7 +61,13 @@ class MockReadbackStore(ArtifactStore):
             self.closed = True
 
     @override
-    async def put(self, attempt: ArtifactAttemptDTO, content: BinaryIO) -> None:
+    async def put(
+        self,
+        attempt: ArtifactAttemptDTO,
+        content: BinaryIO,
+        *,
+        observation: JobEffectId | None = None,
+    ) -> None:
         raise AssertionError("Verification cannot dispatch another upload.")
 
     @override
@@ -76,7 +83,13 @@ class MockReadbackStore(ArtifactStore):
         raise AssertionError("Verification reads only the original attempt.")
 
     @override
-    async def delete(self, scope: ArtifactScopeDTO, attempt_id: ArtifactAttemptId) -> None:
+    async def delete(
+        self,
+        scope: ArtifactScopeDTO,
+        attempt_id: ArtifactAttemptId,
+        *,
+        observation: JobEffectId | None = None,
+    ) -> None:
         raise AssertionError("Verification cannot delete storage evidence.")
 
 
