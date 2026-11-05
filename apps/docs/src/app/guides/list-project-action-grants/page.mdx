@@ -189,7 +189,7 @@ An illustrative page from a newly created Project is:
 
 </CodeGroup>
 
-Each item identifies the exact Project, recipient and action. `canGrant: true` records use and grant authority. `false` records use-only permission, not an explicit denial. The page contains no names, emails, totals or Access revision.
+Each item identifies the exact Project, recipient and action. `canGrant: true` records use and grant authority. `false` records use-only permission, not an explicit denial. The page contains no names, emails, totals or Access revision. For your current revision and actual own relationships, use [the own-access read](/guides/assign-project-grant#read-your-project-access-and-current-revision).
 
 These are stored assignments, not effective permissions. A suspended recipient's row remains visible even though that person cannot currently act. The read does not expand implied actions or discover eligible recipients. An authorized empty `items` array means no matching stored assignment was returned for that page.
 
@@ -232,4 +232,4 @@ Recipients are ordered by principal ID. Every page checks current credentials, e
 
 [The native operation](/api-reference/projects-and-access#read-project-action-grants) defines the exact parameters, page schema and declared problems. A denied or failed read is not an empty success. Responses use `Cache-Control: no-store`. Browser-cookie reads use the installation's actual session configuration and need no cookie-write CSRF header. Keep credentials and raw cursors out of diagnostic logs.
 
-To assign the supported use-only `create-access-groups` permission, follow [Assign a Project grant](/guides/assign-project-grant). Full grant-level changes, removals, other target reads and recipient discovery remain separate unfinished administration capabilities. This read does not perform them.
+[Manage Project action grants](/guides/assign-project-grant) covers own-access review, explicit Project grant levels, removal and immutable original-result recovery. The compatible use-only POST remains available. This action-scoped GET changes no assignments. Other-resource and Organization administration and recipient discovery remain unfinished parts of #226.

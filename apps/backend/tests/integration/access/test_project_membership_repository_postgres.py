@@ -10,6 +10,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios, ProjectAuthorizationSeedDTO
 
+from inframeld_backend.access.application.dtos.project_action_grant_changed_audit_event_dto import (
+    ProjectActionGrantChangedAuditEventDTO,
+)
 from inframeld_backend.access.application.dtos.project_use_only_grant_assigned_audit_event_dto import (
     ProjectUseOnlyGrantAssignedAuditEventDTO,
 )
@@ -427,7 +430,10 @@ class MockFailingAuditEventWriter(AuditEventWriter):
         self._real = PostgresAuditEventWriter(session)
 
     @override
-    async def append(self, event: ProjectUseOnlyGrantAssignedAuditEventDTO) -> None:
+    async def append(
+        self,
+        event: ProjectUseOnlyGrantAssignedAuditEventDTO | ProjectActionGrantChangedAuditEventDTO,
+    ) -> None:
         await self._real.append(event)
         raise RuntimeError("Injected audit failure")
 
@@ -466,3 +472,71 @@ async def test_failed_save_invalidates_repository_and_owner_rolls_back(database:
                     )
                 raise
     await assert_effects(database, seed, revision=0, grants=0, audits=0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("transition", ["add", "level", "remove", "noop"])
+async def test_exact_action_save_preserves_other_assignments_and_updates_only_changed_history(
+    database: Database, transition: str
+) -> None:
+    seed = await seed_membership(database, existing=True)
+    async with database.session() as session, session.begin():
+        session.add(
+            ProjectActionGrantRow(
+                project_id=seed.project_id.value,
+                recipient_principal_id=seed.principal_id.value,
+                recipient_kind=PrincipalKind.HUMAN,
+                action=ACTION.value,
+                can_grant=False,
+                assigned_by_principal_id=seed.principal_id.value,
+            )
+        )
+    async with database.session() as session:
+        prior = await session.get(
+            ProjectActionGrantRow, (seed.project_id.value, seed.principal_id.value, ACTION.value)
+        )
+        assert prior is not None
+        assigned_at = prior.assigned_at
+    action = ActionId("inspect-feedback") if transition == "add" else ACTION
+    async with database.session() as session, session.begin():
+        repo = repository(session)
+        membership = await load(repo, seed)
+        if transition == "remove":
+            assert membership.remove_action_grant(action_id=action)
+        else:
+            assert membership.set_action_grant(
+                action_id=action,
+                level=ProjectGrantLevel.USE_ONLY
+                if transition == "noop"
+                else ProjectGrantLevel.USE_AND_GRANT,
+                assigned_by_principal_id=seed.principal_id,
+            ) is (transition != "noop")
+        await repo.save_action_grant_change(
+            membership,
+            action_id=action,
+            actor_principal_id=seed.principal_id,
+            expected_project_access_revision=0,
+            operation_id=OPERATION,
+        )
+    async with database.session() as session:
+        other = await session.get(
+            ProjectActionGrantRow,
+            (seed.project_id.value, seed.principal_id.value, seed.action.value),
+        )
+        assert other is not None and not other.can_grant and other.assigned_by_principal_id is None
+        current = await session.get(
+            ProjectActionGrantRow, (seed.project_id.value, seed.principal_id.value, ACTION.value)
+        )
+        if transition == "remove":
+            assert current is None
+        else:
+            assert current is not None and current.assigned_at == assigned_at
+            assert current.assigned_by_principal_id == seed.principal_id.value
+            assert current.can_grant is (transition == "level")
+    await assert_effects(
+        database,
+        seed,
+        revision=int(transition != "noop"),
+        grants=3 if transition == "add" else 1 if transition == "remove" else 2,
+        audits=int(transition != "noop"),
+    )

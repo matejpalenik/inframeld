@@ -10,6 +10,235 @@ from tests.support.sdk_conformance_app import create_sdk_conformance_app
 
 
 @pytest.mark.parametrize(
+    "credential",
+    [
+        {"Authorization": "Bearer sdk-human"},
+        {"Cookie": "ory_kratos_session=sdk-cookie"},
+    ],
+)
+def test_own_project_access_fixture_exposes_real_target_shapes_and_reviewed_revision(
+    credential: dict[str, str],
+) -> None:
+    project = "00000000-0000-4000-8000-000000000003"
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.get(f"/v1/projects/{project}/my-access", headers=credential)
+    assert response.status_code == 200 and response.headers["cache-control"] == "no-store"
+    body = response.json()
+    assert (
+        body["projectId"] == project
+        and body["principalId"] == "00000000-0000-4000-8000-000000000001"
+    )
+    assert body["accessRevision"] == 7 and body["nextCursor"] is None
+    assert [grant["target"]["kind"] for grant in body["grants"]] == [
+        "project",
+        "access-group",
+        "application-account",
+    ]
+    assert [grant["canGrant"] for grant in body["grants"]] == [True, False, True]
+    assert (
+        body["groupMemberships"]
+        == body["groupManagements"]
+        == [{"accessGroupId": "00000000-0000-4000-8000-000000000007"}]
+    )
+
+
+def test_own_project_access_fixture_uses_one_combined_page_and_independent_get_witnesses() -> None:
+    path = "/v1/projects/00000000-0000-4000-8000-000000000003/my-access"
+    headers = {"Authorization": "Bearer sdk-human"}
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/own-access-wire",
+            json={"calls": {"own-first": {"kind": "none"}, "own-next": {"kind": "none"}}},
+        )
+        first = client.get(path, params={"limit": 1}, headers=headers | {"X-SDK-Test": "own-first"})
+        assert first.status_code == 200
+        body = first.json()
+        assert (
+            len(body["grants"]) == 1 and body["groupMemberships"] == body["groupManagements"] == []
+        )
+        cursor = body["nextCursor"]
+        assert isinstance(cursor, str)
+        second = client.get(
+            path,
+            params={"limit": 4, "cursor": cursor},
+            headers=headers | {"X-SDK-Test": "own-next"},
+        )
+        evidence = client.get("/sdk-control/cases/own-access-wire").json()
+        denied = client.get(
+            path, params={"cursor": cursor}, headers={"Authorization": "Bearer sdk-denied"}
+        )
+    assert second.status_code == 200 and second.json()["nextCursor"] is None
+    assert (
+        len(second.json()["grants"]) == 2
+        and len(second.json()["groupMemberships"]) == len(second.json()["groupManagements"]) == 1
+    )
+    assert denied.status_code == 403 and denied.json()["code"] == "access_denied"
+    assert evidence["counts"] == {"own-first": 1, "own-next": 1}
+    for witness in evidence["observations"].values():
+        assert (
+            witness["method"] == "GET"
+            and witness["path"] == path
+            and witness["rawBodyBase64"] == ""
+        )
+        assert "idempotency-key" not in witness["headers"] and not witness["csrf"]
+    assert parse_qs(evidence["observations"]["own-next"]["query"]) == {
+        "limit": ["4"],
+        "cursor": [cursor],
+    }
+
+
+@pytest.mark.parametrize(
+    "suffix,query,status,code",
+    [
+        ("000000000099", {}, 404, "resource_not_found"),
+        ("000000000003", {"cursor": "malformed_cursor"}, 422, "invalid_input"),
+        ("000000000003", {"actionId": "inspect-budget"}, 422, "invalid_input"),
+    ],
+)
+def test_own_project_access_fixture_preserves_scoped_and_query_problems(
+    suffix: str, query: dict[str, str], status: int, code: str
+) -> None:
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.get(
+            f"/v1/projects/00000000-0000-4000-8000-{suffix}/my-access",
+            params=query,
+            headers={"Authorization": "Bearer sdk-human"},
+        )
+    assert response.status_code == status and response.json()["code"] == code
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize(
+    "method,recipient,level,status,changed",
+    [
+        ("PUT", "000000000004", False, 201, True),
+        ("PUT", "000000000004", True, 201, True),
+        ("PUT", "000000000005", False, 200, False),
+        ("PUT", "000000000006", False, 200, True),
+        ("DELETE", "000000000004", None, 200, True),
+        ("DELETE", "000000000005", None, 200, False),
+    ],
+)
+def test_full_project_grant_fixture_preserves_original_outcome_and_wire_inputs(
+    method: str, recipient: str, level: bool | None, status: int, changed: bool
+) -> None:
+    project = "00000000-0000-4000-8000-000000000003"
+    principal = f"00000000-0000-4000-8000-{recipient}"
+    path = f"/v1/projects/{project}/grants/{principal}/inspect-budget"
+    headers = {
+        "Authorization": "Bearer sdk-human",
+        "Idempotency-Key": "sdk-project-grant-key",
+        "X-SDK-Test": "grant-change-wire",
+    }
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/grant-change-wire",
+            json={"calls": {"grant-change-wire": {"kind": "none"}}},
+        )
+        response = client.request(
+            method,
+            path,
+            json={"canGrant": level, "expectedAccessRevision": 7} if method == "PUT" else None,
+            params={"expectedAccessRevision": 7} if method == "DELETE" else None,
+            headers=headers,
+        )
+        witness = client.get("/sdk-control/cases/grant-change-wire").json()["observations"][
+            "grant-change-wire"
+        ]
+    assert response.status_code == status and response.headers["cache-control"] == "no-store"
+    body = response.json()
+    assert (
+        body["projectId"],
+        body["recipientPrincipalId"],
+        body["actionId"],
+        body["accessRevision"],
+        body["changed"],
+    ) == (project, principal, "inspect-budget", 7 + int(changed), changed)
+    assert body["idempotencyExpiresAt"] == "2030-01-01T00:00:00Z"
+    assert witness["method"] == method and witness["path"] == path
+    assert witness["headers"]["idempotency-key"] == "sdk-project-grant-key"
+    if method == "PUT":
+        assert body["canGrant"] is level
+        assert (
+            witness["jsonBody"] == {"canGrant": level, "expectedAccessRevision": 7}
+            and witness["query"] == ""
+        )
+    else:
+        assert body["removed"] is True and "canGrant" not in body
+        assert parse_qs(witness["query"]) == {"expectedAccessRevision": ["7"]}
+        assert witness["rawBodyBase64"] == "" and "jsonBody" not in witness
+
+
+@pytest.mark.parametrize(
+    "action,recipient,revision,status,code",
+    [
+        ("inspect-feedback", "000000000004", 7, 403, "access_denied"),
+        ("inspect-budget", "000000000007", 7, 409, "conflict"),
+        ("inspect-budget", "000000000008", 7, 422, "invalid_input"),
+        ("inspect-budget", "000000000004", 6, 409, "stale_revision"),
+        ("inspect-budget", "000000000099", 7, 404, "resource_not_found"),
+    ],
+)
+def test_full_project_grant_fixture_preserves_actor_input_recipient_and_revision_problems(
+    action: str, recipient: str, revision: int, status: int, code: str
+) -> None:
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.put(
+            f"/v1/projects/00000000-0000-4000-8000-000000000003/grants/00000000-0000-4000-8000-{recipient}/{action}",
+            json={"canGrant": False, "expectedAccessRevision": revision},
+            headers={
+                "Authorization": "Bearer sdk-human",
+                "Idempotency-Key": "sdk-project-grant-key",
+            },
+        )
+    assert response.status_code == status and response.json()["code"] == code
+    assert (
+        response.headers["content-type"] == "application/problem+json"
+        and response.headers["cache-control"] == "no-store"
+    )
+
+
+@pytest.mark.parametrize(
+    "query", ["", "expectedAccessRevision=01", "expectedAccessRevision=7&expectedAccessRevision=7"]
+)
+def test_full_project_grant_fixture_keeps_canonical_delete_query_validation(query: str) -> None:
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.delete(
+            "/v1/projects/00000000-0000-4000-8000-000000000003/grants/00000000-0000-4000-8000-000000000004/inspect-budget?"
+            + query,
+            headers={
+                "Authorization": "Bearer sdk-human",
+                "Idempotency-Key": "sdk-project-grant-key",
+            },
+        )
+    assert response.status_code == 422 and response.headers["cache-control"] == "no-store"
+
+
+def test_full_project_grant_fixture_uses_cookie_csrf_and_strict_boolean_validation() -> None:
+    path = "/v1/projects/00000000-0000-4000-8000-000000000003/grants/00000000-0000-4000-8000-000000000004/inspect-budget"
+    cookie = {"Cookie": "ory_kratos_session=sdk-cookie", "Idempotency-Key": "sdk-project-grant-key"}
+    with TestClient(create_sdk_conformance_app()) as client:
+        denied = client.put(
+            path, json={"canGrant": False, "expectedAccessRevision": 7}, headers=cookie
+        )
+        allowed = client.put(
+            path,
+            json={"canGrant": False, "expectedAccessRevision": 7},
+            headers=cookie | {"Origin": "https://account.test", "X-Inframeld-CSRF": "1"},
+        )
+        invalid = client.put(
+            path,
+            json={"canGrant": "false", "expectedAccessRevision": 7},
+            headers={
+                "Authorization": "Bearer sdk-human",
+                "Idempotency-Key": "sdk-project-grant-key",
+            },
+        )
+    assert denied.status_code == 403 and denied.json()["code"] == "access_denied"
+    assert allowed.status_code == 201 and invalid.status_code == 422
+
+
+@pytest.mark.parametrize(
     "method,principal,status,changed",
     [
         ("PUT", "00000000-0000-4000-8000-000000000004", 201, True),

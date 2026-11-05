@@ -1,6 +1,9 @@
 from abc import abstractmethod
 from typing import Protocol
 
+from inframeld_backend.access.application.dtos.project_action_grant_changed_audit_event_dto import (
+    ProjectActionGrantChangedAuditEventDTO,
+)
 from inframeld_backend.access.application.dtos.project_use_only_grant_assigned_audit_event_dto import (
     ProjectUseOnlyGrantAssignedAuditEventDTO,
 )
@@ -14,7 +17,10 @@ class AuditEventWriter(Protocol):
     """
 
     @abstractmethod
-    async def append(self, event: ProjectUseOnlyGrantAssignedAuditEventDTO) -> None:
+    async def append(
+        self,
+        event: ProjectUseOnlyGrantAssignedAuditEventDTO | ProjectActionGrantChangedAuditEventDTO,
+    ) -> None:
         """Append the assignment event and send its pending write to the database.
 
         Flushing does not commit. Use the owning change's session and let

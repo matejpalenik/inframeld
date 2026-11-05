@@ -11,6 +11,9 @@ from inframeld_backend.access.application.services.project_grant_change_fingerpr
 from inframeld_backend.access.application.services.project_grant_change_service import (
     ProjectGrantChangeService,
 )
+from inframeld_backend.access.infrastructure.readers.postgres_project_action_grant_result_reader import (
+    PostgresProjectActionGrantResultReader,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_project_grant_change_facts_reader import (
     PostgresProjectGrantChangeFactsReader,
 )
@@ -19,6 +22,9 @@ from inframeld_backend.access.infrastructure.repositories.postgres_project_membe
 )
 from inframeld_backend.access.infrastructure.writers.postgres_audit_event_writer import (
     PostgresAuditEventWriter,
+)
+from inframeld_backend.access.infrastructure.writers.postgres_project_action_grant_result_writer import (
+    PostgresProjectActionGrantResultWriter,
 )
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -46,4 +52,7 @@ async def open_project_grant_change(
                 session, PostgresAuditEventWriter(session)
             ),
             fingerprints=fingerprints,
+            management_facts=PostgresProjectGrantChangeFactsReader(session),
+            results=PostgresProjectActionGrantResultReader(session),
+            result_writer=PostgresProjectActionGrantResultWriter(session),
         )

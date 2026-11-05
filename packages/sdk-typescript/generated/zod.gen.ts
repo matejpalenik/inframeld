@@ -3,6 +3,24 @@
 import * as z from 'zod';
 
 /**
+ * AccessGroupGrantTargetResponse
+ */
+export const zAccessGroupGrantTargetResponse = z.object({
+    accessGroupId: z.uuid(),
+    kind: z.literal('access-group'),
+    projectId: z.uuid()
+});
+
+/**
+ * ApplicationAccountGrantTargetResponse
+ */
+export const zApplicationAccountGrantTargetResponse = z.object({
+    applicationPrincipalId: z.uuid(),
+    kind: z.literal('application-account'),
+    projectId: z.uuid()
+});
+
+/**
  * CompletedOperationLookupResponse
  *
  * Expose safe synchronous outcome metadata without replaying content.
@@ -119,6 +137,13 @@ export const zKnownJobReferenceResponse = z.object({
 });
 
 /**
+ * MyProjectAccessGroupResponse
+ */
+export const zMyProjectAccessGroupResponse = z.object({
+    accessGroupId: z.uuid()
+});
+
+/**
  * OAuthConsentDecision
  */
 export const zOAuthConsentDecision = z.enum(['allow', 'deny']);
@@ -219,6 +244,42 @@ export const zPageResponseProjectActionGrantItemResponse = z.object({
 });
 
 /**
+ * ProjectActionGrantRemovalResponse
+ */
+export const zProjectActionGrantRemovalResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9223372036854776000),
+    actionId: z.string(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    projectId: z.uuid(),
+    recipientPrincipalId: z.uuid(),
+    removed: z.literal(true)
+});
+
+/**
+ * ProjectActionGrantRequest
+ */
+export const zProjectActionGrantRequest = z.object({
+    canGrant: z.boolean(),
+    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000)
+});
+
+/**
+ * ProjectActionGrantResponse
+ */
+export const zProjectActionGrantResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9223372036854776000),
+    actionId: z.string(),
+    canGrant: z.boolean(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    projectId: z.uuid(),
+    recipientPrincipalId: z.uuid()
+});
+
+/**
  * ProjectCreationRequest
  */
 export const zProjectCreationRequest = z.object({
@@ -262,6 +323,32 @@ export const zInitialProjectGrantResponse = z.object({
     ]),
     canGrant: z.literal(true),
     target: zProjectGrantTargetResponse
+});
+
+/**
+ * MyProjectAccessGrantResponse
+ */
+export const zMyProjectAccessGrantResponse = z.object({
+    actionId: z.string(),
+    canGrant: z.boolean(),
+    target: z.discriminatedUnion('kind', [
+        zProjectGrantTargetResponse,
+        zAccessGroupGrantTargetResponse,
+        zApplicationAccountGrantTargetResponse
+    ])
+});
+
+/**
+ * MyProjectAccessResponse
+ */
+export const zMyProjectAccessResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9223372036854776000),
+    grants: z.array(zMyProjectAccessGrantResponse),
+    groupManagements: z.array(zMyProjectAccessGroupResponse),
+    groupMemberships: z.array(zMyProjectAccessGroupResponse),
+    nextCursor: z.string().nullable(),
+    principalId: z.uuid(),
+    projectId: z.uuid()
 });
 
 /**
@@ -1165,6 +1252,137 @@ export const zAssignProjectUseOnlyGrant503Representation0Response = zProblemDeta
  */
 export const zAssignProjectUseOnlyGrantResponse = zProjectUseOnlyGrantResponse;
 
+export const zRemoveProjectActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRemoveProjectActionGrantPath = z.object({
+    project_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: z.string()
+});
+
+export const zRemoveProjectActionGrantQuery = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000)
+});
+
+/**
+ * Successful Response
+ */
+export const zRemoveProjectActionGrant200Representation0Response = zProjectActionGrantRemovalResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRemoveProjectActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRemoveProjectActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRemoveProjectActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRemoveProjectActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zRemoveProjectActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRemoveProjectActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRemoveProjectActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRemoveProjectActionGrantResponse = zProjectActionGrantRemovalResponse;
+
+export const zSetProjectActionGrantBody = zProjectActionGrantRequest;
+
+export const zSetProjectActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zSetProjectActionGrantPath = z.object({
+    project_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: z.string()
+});
+
+/**
+ * Changed or unchanged existing assignment.
+ */
+export const zSetProjectActionGrant200Representation0Response = zProjectActionGrantResponse;
+
+/**
+ * Successful Response
+ */
+export const zSetProjectActionGrant201Representation0Response = zProjectActionGrantResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zSetProjectActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zSetProjectActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zSetProjectActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zSetProjectActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zSetProjectActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zSetProjectActionGrant413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zSetProjectActionGrant415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zSetProjectActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zSetProjectActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Changed or unchanged existing assignment.
+ */
+export const zSetProjectActionGrantResponse = zProjectActionGrantResponse;
+
 export const zListProjectMembersPath = z.object({
     project_id: z.uuid()
 });
@@ -1456,6 +1674,55 @@ export const zUpdateProjectMetadata503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zUpdateProjectMetadataResponse = zProjectMetadataChangeResponse;
+
+export const zGetMyProjectAccessPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zGetMyProjectAccessQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetMyProjectAccess200Representation0Response = zMyProjectAccessResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetMyProjectAccess400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetMyProjectAccess401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetMyProjectAccess403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zGetMyProjectAccess404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zGetMyProjectAccess422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetMyProjectAccess503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetMyProjectAccessResponse = zMyProjectAccessResponse;
 
 /**
  * Successful Response

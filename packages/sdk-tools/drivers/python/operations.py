@@ -14,6 +14,7 @@ from inframeld_sdk.api.operations_api import OperationsApi
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
+from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest
 from inframeld_sdk.models.project_membership_request import ProjectMembershipRequest
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest
@@ -34,6 +35,74 @@ def string(value: object) -> str:
     if not isinstance(value, str):
         raise ValueError("Expected a string in the driver call")
     return value
+
+
+def my_project_access_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_my_project_access_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def my_project_access_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_my_project_access_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def set_project_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).set_project_action_grant_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_action_grant_request=ProjectActionGrantRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def set_project_action_grant_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).set_project_action_grant_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_action_grant_request=ProjectActionGrantRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def remove_project_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).remove_project_action_grant_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def remove_project_action_grant_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).remove_project_action_grant_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
 
 
 def integer(value: object) -> int:
@@ -546,6 +615,11 @@ BINDINGS: dict[Operation, Binding] = {
     "createProject": Binding(create_project_sync, create_project_async),
     "listProjectMembers": Binding(project_members_sync, project_members_async),
     "listProjectActionGrants": Binding(project_action_grants_sync, project_action_grants_async),
+    "getMyProjectAccess": Binding(my_project_access_sync, my_project_access_async),
+    "setProjectActionGrant": Binding(set_project_action_grant_sync, set_project_action_grant_async),
+    "removeProjectActionGrant": Binding(
+        remove_project_action_grant_sync, remove_project_action_grant_async
+    ),
     "addProjectMember": Binding(project_member_add_sync, project_member_add_async),
     "removeProjectMember": Binding(project_member_remove_sync, project_member_remove_async),
     "getProtectedResourceMetadata": Binding(discovery_sync, discovery_async),

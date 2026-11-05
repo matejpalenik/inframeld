@@ -90,13 +90,37 @@ Read `GET /v1/projects/{project_id}/grants` with one required supported `actionI
 
 The page contains only `items` and nullable `nextCursor`. Each stored assignment has flat `projectId`, `recipientPrincipalId`, `actionId` and `canGrant` fields. Suspended recipients remain listed. This is neither effective-permission expansion nor recipient discovery. There is no body, Access revision, total or idempotency key. All responses are no-store. [List Project action grants](/guides/list-project-action-grants) explains setup, paging and failures.
 
+## Read your own Project access
+
+<ApiOperation operationId="getMyProjectAccess" />
+
+`GET /v1/projects/{project_id}/my-access` requires a currently eligible human member of the Project, without a separate action or membership-management grant. It accepts ordinary `limit`/`cursor` and no body or principal selector. `MyProjectAccessResponse` identifies the actual Project/principal and current `accessRevision`, plus stored `grants`, `groupMemberships`, `groupManagements` and required nullable `nextCursor`.
+
+One combined page has at most `limit` entries across the three arrays, default 25 and maximum 100. Grants carry a typed exact Project/access-group/application-account target, `actionId` and `canGrant`. Group relationships carry only `accessGroupId`. Each page checks current authority and revision, with a principal/scope-bound cursor. It supplies no implied grants, hidden linked resources or permission snapshot. [The guide](/guides/assign-project-grant#read-your-project-access-and-current-revision) explains revision review.
+
+## Set a Project action grant
+
+<ApiOperation operationId="setProjectActionGrant" />
+
+`PUT /v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}` supports the eighteen Project actions. Require a current eligible human member with exact use-and-grant authority, one retained idempotency key and a `ProjectActionGrantRequest` body containing only strict `canGrant` and reviewed `expectedAccessRevision`. A fresh recipient must be eligible for that action. Applications can receive only eligible use-only assignments.
+
+New assignments return `201`. Existing assignments return `200`, including unchanged assignments. Changed writes advance Access revision once, while fresh no-ops do not. The original HTTP status and `ProjectActionGrantResponse` preserve the revision, expiry, exact recipient/action, requested level and `changed`. A downgrade must preserve another eligible coherently linked human member able to grant that same Project action. [The task](/guides/assign-project-grant#set-one-project-assignment) distinguishes use-only from removal.
+
+## Remove a Project action grant
+
+<ApiOperation operationId="removeProjectActionGrant" />
+
+`DELETE /v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}` requires the same current human authority and original-key handling. It takes one canonical `expectedAccessRevision` query value and no body. It can clean an inactive or recovery-blocked recipient after scope checks, preserving the last-grantor guard.
+
+A `200` `ProjectActionGrantRemovalResponse` records original `removed: true` and `changed`, whether removal changed the assignment or it was already absent. An unchanged result does not advance Access revision. Current actor authority precedes immutable original replay, before fresh-recipient/revision/handover checks. Replay neither restores a removed assignment nor removes a later one. [Recovery guidance](/guides/assign-project-grant#handle-a-stale-revision-or-lost-result) explains historical receipts and current reads. All three operations are no-store. Fresh-recipient/state conflicts are `409`, actor denial is `403`, and unsupported action/recipient/delegation combinations or malformed inputs are `422`. Existing credential/scope/dependency failures and PUT `413`/`415` bounds remain.
+
 ## Assign a use-only grant
 
 <ApiOperation operationId="assignProjectUseOnlyGrant" />
 
 This operation assigns the delivered use-only `create-access-groups` action to the specified recipient. Supply the reviewed Project Access revision and a retained idempotency key. A grant does not bypass membership or the actor's current ability to grant that action.
 
-The request body's generated model is `ProjectUseOnlyGrantRequest`. [Assign a Project grant](/guides/assign-project-grant) shows equivalent cURL, Python, TypeScript and Rust programs. Preserve the original request context before dispatch so [lookup](/guides/recover-original-request) can observe an uncertain result.
+The request body's generated model is `ProjectUseOnlyGrantRequest`. [The compatible POST section](/guides/assign-project-grant#assign-the-permission) shows equivalent cURL, Python, TypeScript and Rust programs. The explicit Project PUT/DELETE operations retain separate meanings and original requests. Preserve the original request context before dispatch so [lookup](/guides/recover-original-request) can observe an uncertain result.
 
 ## Inspect account-site consent
 

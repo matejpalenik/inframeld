@@ -111,6 +111,30 @@ Records the original admission or no-change result, including the local `princip
 
 <ApiSchema name="MyOrganizationAccessResponse" />
 
+<a id="MyProjectAccessResponse" />
+
+## MyProjectAccessResponse
+
+<ApiSchema name="MyProjectAccessResponse" />
+
+Reports the actual caller's Project/principal IDs and current Access revision, stored grants, group memberships and group managements. Its one combined bounded page has a required nullable continuation cursor. This is separate from a historical mutation receipt and metadata revision. [The guide](/guides/assign-project-grant#read-your-project-access-and-current-revision) explains paging and review.
+
+<a id="MyProjectAccessGrantResponse" />
+
+## MyProjectAccessGrantResponse
+
+<ApiSchema name="MyProjectAccessGrantResponse" />
+
+One actual own assignment with its typed exact Project, access-group or application-account target, action and grant level. It does not manufacture implied View grants or another principal's assignments.
+
+<a id="MyProjectAccessGroupResponse" />
+
+## MyProjectAccessGroupResponse
+
+<ApiSchema name="MyProjectAccessGroupResponse" />
+
+Identifies one actual own group membership or management relationship by `accessGroupId`, without document contents or another person's relationships.
+
 <a id="OAuthConsentDecision" />
 
 ## OAuthConsentDecision
@@ -175,6 +199,30 @@ One stored assignment for an exact Project action and recipient. `canGrant` dist
 
 <ApiSchema name="ProjectActionGrantItemResponse" />
 
+<a id="ProjectActionGrantRequest" />
+
+## ProjectActionGrantRequest
+
+<ApiSchema name="ProjectActionGrantRequest" />
+
+The explicit Project PUT body contains only strict `canGrant` and reviewed `expectedAccessRevision`. The recipient and action are in the path. A false grant level is use-only, not removal.
+
+<a id="ProjectActionGrantResponse" />
+
+## ProjectActionGrantResponse
+
+<ApiSchema name="ProjectActionGrantResponse" />
+
+Preserves the original Project assignment, grant level, operation, Access revision, expiry and change flag. An identical retry returns that historical result under current authority without restoring later-removed access.
+
+<a id="ProjectActionGrantRemovalResponse" />
+
+## ProjectActionGrantRemovalResponse
+
+<ApiSchema name="ProjectActionGrantRemovalResponse" />
+
+Preserves original removal or already-absent outcome, with `removed: true` and `changed`. It does not describe current state after a later assignment or permit replay to remove it again.
+
 <a id="ProjectCreationRequest" />
 
 ## ProjectCreationRequest
@@ -188,6 +236,18 @@ One stored assignment for an exact Project action and recipient. `canGrant` dist
 Records the original names, Project revisions and eighteen initial assignments. It is not a listing of current permissions or metadata. [Project creation](/guides/create-project) explains the result and exact-request recovery.
 
 <ApiSchema name="ProjectCreationResponse" />
+
+<a id="AccessGroupGrantTargetResponse" />
+
+## AccessGroupGrantTargetResponse
+
+<ApiSchema name="AccessGroupGrantTargetResponse" />
+
+<a id="ApplicationAccountGrantTargetResponse" />
+
+## ApplicationAccountGrantTargetResponse
+
+<ApiSchema name="ApplicationAccountGrantTargetResponse" />
 
 <a id="ProjectGrantTargetResponse" />
 

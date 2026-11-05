@@ -1,22 +1,414 @@
 export const pageMetadata = {
-  title: "Give a Project member permission to create access groups",
+  title: "Manage Project action grants",
   description:
-    "Assign the delivered use-only action with a reviewed Access revision.",
+    "Review your current Project access, assign an exact action and recover its original result.",
 }
 
-# Give a Project member permission to create access groups
+# Manage Project action grants
 
-Alice wants Bob to create access groups in Support. The delivered grant operation can give him use-only `create-access-groups` permission on that Project. It preserves Alice's original operation identity if the response is lost.
+Alice lets Bob use or grant one action on Support. She reviews the current Project Access revision, saves one exact request and changes only that recipient's assignment. The Project routes support the fixed eighteen Project actions. They do not administer Pipeline, Organization or other resource grants.
+
+The compatible use-only POST remains available [below](#assign-the-permission). Use the PUT and DELETE paths for explicit grant levels and removal.
 
 ## Prepare the exact change
 
-You need the installation URL, a current human bearer credential, the permanent Project ID, Bob's principal UUID and the reviewed Project Access revision. Alice needs current Project membership, visibility and use-and-grant authority for `create-access-groups`. Bob must be eligible for the assignment. An ID supplies no permission.
+You need the installation URL, permanent Project ID, Bob's local principal ID and a current human credential. Alice must be a currently eligible Project member with use and grant authority for the exact action she changes. Use-only permission and group-manager status are insufficient for Project grant administration.
 
-Get those existing identifiers and the current Access revision through your installation's supported administration procedure. This preview has no general member-directory or Access-revision inspection command. The metadata revision returned by Project metadata is a different value.
+Bob must already be a member of that Project and eligible for a fresh assignment. He can supply his local `principalId` from his authenticated `/v1/session` response. A separately authorized [member read](/guides/list-project-members) also supplies stored principal IDs. This ID is distinct from Bob's Kratos identity UUID, and a stored row alone does not prove current eligibility. [Membership changes](/guides/manage-project-members) are a separate operation.
 
-Use [HTTP setup](/clients/http) or the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) setup. In your example project, set `INFRAMELD_URL`, `INFRAMELD_TOKEN`, `PROJECT_ID` and `PROJECT_GRANT_KEY` through your normal local configuration. The key is an original, nonblank request key of at most 128 characters. Keep it with the request before dispatch.
+These requests assume `INFRAMELD_URL` and an existing valid human `INFRAMELD_TOKEN` are prepared through [HTTP setup](/clients/http#call-protected-operations). Browser sign-in alone does not create a terminal bearer token. The supported manual account-to-client/disposable setup, engineering dry run and human acceptance remain deferred to pre-v1 under [qualification #336](https://github.com/matejpalenik/inframeld/issues/336). This page does not claim that handoff is ready.
 
-Save this complete file as `grant.json`. Replace the example recipient and revision with the reviewed values:
+The bearer examples use one credential family. Cookie-authenticated writes retain the installation's trusted Origin requirement and `X-Inframeld-CSRF: 1`. Do not mix credentials or synthesize browser authentication. There is no Project-grant administration CLI command.
+
+Replace the illustrative IDs with your prepared values. `create-access-groups` is the action used throughout this example:
+
+<CodeGroup>
+
+```shell
+export PROJECT_ID='00000000-0000-4000-8000-000000000003'
+export RECIPIENT_ID='00000000-0000-4000-8000-000000000004'
+export ACTION_ID='create-access-groups'
+```
+
+</CodeGroup>
+
+## Read your Project access and current revision
+
+`GET /v1/projects/{project_id}/my-access` requires a currently eligible human Project member. It needs no action grant or permission to manage members. It returns only the actual caller's stored access and relationships:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get --data-urlencode 'limit=25' \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/my-access" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+Review `projectId`, your `principalId` and `accessRevision`. This is the Project's current Access revision, separate from `metadataRevision`. Do not use an old mutation receipt as a current revision producer.
+
+The response has `grants`, `groupMemberships`, `groupManagements` and nullable `nextCursor`. A grant carries its typed exact `target`, `actionId` and `canGrant`. Group relationships identify only `accessGroupId`. These are actual stored assignments and relationships, without implied View grants or another person's private inventory.
+
+One page contains at most `limit` entries across all three arrays combined, default 25 and maximum 100. Ordering is grants, memberships, then managements, with target UUID and action order within each kind. Pass a non-null cursor unchanged with the same installation, Project and principal to continue. Every page checks current authority and reports a fresh revision. Neither a cursor nor a page is a permission snapshot for a later write. An eligible member can receive empty arrays.
+
+## Set one Project assignment
+
+Choose whether Bob may only use the action or also grant it. `canGrant: false` means use-only, not denial or removal. `true` permits use and administration of that same action on that exact Project. Application recipients can receive only actions eligible for applications, always use-only.
+
+Save this complete request as `project-grant.json`. Replace the illustrative revision `7` with the reviewed `accessRevision` from the own-access read:
+
+<CodeGroup>
+
+```json
+{
+  "canGrant": true,
+  "expectedAccessRevision": 7
+}
+```
+
+</CodeGroup>
+
+Choose and retain one nonblank `SET_PROJECT_GRANT_KEY` of at most 128 characters. Save the installation, method, exact route, recipient, action, body and key before dispatch:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PUT \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/grants/$RECIPIENT_ID/$ACTION_ID" \
+  --header @- \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @project-grant.json <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $SET_PROJECT_GRANT_KEY
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A new assignment returns `201`. An existing assignment returns `200`, whether its level changed or was already the requested level. `changed: true` advances the Project Access revision once. A fresh no-op returns `changed: false` without advancing it. Assignment, revision, required audit and the original outcome are saved together. The response's `operationId`, `idempotencyExpiresAt` and `accessRevision` identify that original result, not continuing authority.
+
+This route accepts only a JSON boolean `canGrant` and the reviewed integer `expectedAccessRevision` within its declared nonnegative bound. Use a supported Project action and an eligible recipient for that action. Do not send another resource target or a generic grant object.
+
+## Remove one Project assignment
+
+Read your current Access revision again before a fresh removal. Set `EXPECTED_ACCESS_REVISION` to that reviewed integer and choose a distinct retained `REMOVE_PROJECT_GRANT_KEY`. Keep the exact Project, recipient and action. DELETE takes the revision as one query value and has no body:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request DELETE \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/grants/$RECIPIENT_ID/$ACTION_ID?expectedAccessRevision=$EXPECTED_ACCESS_REVISION" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $REMOVE_PROJECT_GRANT_KEY
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A `200` removal receipt contains `removed: true` and `changed`. Actual removal advances the revision once. An already-absent assignment returns `changed: false` without an advance. The receipt describes the original absence, not whether someone later grants the action again. Removal changes neither Project membership nor the recipient's other assignments. It may clean up an inactive or recovery-blocked recipient without restoring that account first.
+
+Downgrading or removing grant authority must leave another eligible, coherently linked human Project member able to grant that exact action on that Project. Applications, suspended or recovery-blocked people and use-only holders do not count. A missing replacement conflicts atomically. A self-downgrade or removal can leave Alice unable to inspect or replay that action afterward. The endpoint never selects a replacement automatically.
+
+## Distinguish a fresh no-op from historical replay
+
+For an illustrative sequence, Alice reviews revision `7` and creates Bob's assignment with key A. The original `201` reports `changed: true` and revision `8`. A fresh equivalent PUT with a new key and reviewed revision `8` reports `200`, `changed: false` and revision `8`.
+
+Suppose a later operation removes Bob's assignment and advances the revision to `9`. Replaying key A with its exact original body, including revision `7`, returns the original `201` and revision `8`. It does not restore Bob's assignment. Replaying an old DELETE likewise cannot remove a later assignment. Use a fresh authorized read to inspect today's stored state.
+
+## Handle a stale revision or lost result
+
+Current actor credential, eligibility, Project scope/membership and exact use-and-grant authority are checked before business replay. Only then can an exact retry recover the immutable original status, outcome and expiry, before fresh-recipient, reviewed-revision and last-grantor checks. Lost authority rejects replay. A receipt never supplies its own permission.
+
+After a timeout, cancellation, lost response or decoding failure, preserve the original request and key. Do not refresh its revision, change its body or choose a new key merely to retry. Changing meaningful inputs under that key conflicts. [Original-request lookup](/guides/recover-original-request) is a separate metadata observation, not this business receipt or proof of current permissions. An unresolved lookup is not permission to repeat the change as new work, and retained-result recovery is bounded by its expiry.
+
+| Observation                   | Next decision                                                                                                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` or `403`                | Review the current credential and Alice's eligibility/exact delegation authority. No saved key bypasses those checks.                                                                                               |
+| `404`                         | The Project or recipient is missing or hidden in the checked scope. A remembered UUID supplies no visibility.                                                                                                       |
+| `409`                         | Inspect the actual conflict: a stale fresh-write revision, ineligible fresh PUT recipient, last-grantor guard, changed key meaning or another state conflict. Review current state before choosing a new operation. |
+| `422`                         | Check the supported Project action, exact field types, IDs and canonical revision query. Unsupported action/recipient/delegation combinations and ambiguous inputs are rejected.                                    |
+| `400`, `413` or `415`         | Correct malformed authentication, an oversized body or the PUT content type. Keep credentials out of diagnostics.                                                                                                   |
+| `503` or an unusable response | Preserve the original context and reconcile uncertainty before more work.                                                                                                                                           |
+
+The own-access GET and Project PUT/DELETE responses are no-store. There is no recipient-directory producer or full Organization/other-resource grant administration in this component. Those remain separate work in #226. The [Project API reference](/api-reference/projects-and-access) explains the supported operation shapes.
+
+## Use a generated client
+
+Use the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) workspace setup. These complete programs make one request each time they run. Save the matching program as `project_grants.py`, `project-grants.ts` or `src/main.rs`.
+
+Set `GRANT_OPERATION` to `read`, `set` or `remove`. The read uses the current credential and Project, with an optional unchanged `PROJECT_ACCESS_CURSOR`. The set uses the saved `project-grant.json` and `SET_PROJECT_GRANT_KEY`. Removal uses the reviewed `EXPECTED_ACCESS_REVISION` and `REMOVE_PROJECT_GRANT_KEY`, with no body. Both writes also require the exact `RECIPIENT_ID` and `ACTION_ID` prepared above.
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+import sys
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest
+
+
+async def main() -> None:
+    operation = os.environ["GRANT_OPERATION"]
+    project_id = UUID(os.environ["PROJECT_ID"])
+    headers = {"Authorization": "Bearer " + os.environ["INFRAMELD_TOKEN"]}
+    async with ApiClient(Configuration(host=os.environ["INFRAMELD_URL"])) as client:
+        api = AccessApi(client)
+        if operation == "read":
+            response = await api.get_my_project_access_with_http_info(
+                project_id=project_id,
+                limit=25,
+                cursor=os.environ.get("PROJECT_ACCESS_CURSOR"),
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        elif operation == "set":
+            request = ProjectActionGrantRequest.model_validate_json(
+                Path("project-grant.json").read_text()
+            )
+            response = await api.set_project_action_grant_with_http_info(
+                project_id=project_id,
+                recipient_principal_id=UUID(os.environ["RECIPIENT_ID"]),
+                action_id=os.environ["ACTION_ID"],
+                idempotency_key=os.environ["SET_PROJECT_GRANT_KEY"],
+                project_action_grant_request=request,
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        elif operation == "remove":
+            revision = int(os.environ["EXPECTED_ACCESS_REVISION"])
+            if not 0 <= revision <= 9223372036854775807:
+                raise ValueError("Use the exact reviewed nonnegative Access revision")
+            response = await api.remove_project_action_grant_with_http_info(
+                project_id=project_id,
+                recipient_principal_id=UUID(os.environ["RECIPIENT_ID"]),
+                action_id=os.environ["ACTION_ID"],
+                expected_access_revision=revision,
+                idempotency_key=os.environ["REMOVE_PROJECT_GRANT_KEY"],
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        else:
+            raise ValueError("Choose read, set or remove")
+        print("HTTP", response.status_code)
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except ApiException as error:
+        print("No usable result: HTTP", error.status, file=sys.stderr)
+        raise SystemExit(1) from None
+    except httpx.HTTPError:
+        print("No usable response. Preserve the original request.", file=sys.stderr)
+        raise SystemExit(1) from None
+```
+
+```typescript
+import { readFile } from "node:fs/promises"
+import {
+  createClient,
+  getMyProjectAccess,
+  removeProjectActionGrant,
+  setProjectActionGrant,
+  type ProjectActionGrantRequest,
+} from "@inframeld/sdk"
+
+function required(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`Set ${name}`)
+  return value
+}
+
+function reviewedRevision(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error("Use a client that can preserve this exact Access revision")
+  }
+  return value
+}
+
+const client = createClient({
+  baseUrl: required("INFRAMELD_URL"),
+  timeoutMs: 5000,
+})
+const projectId = required("PROJECT_ID")
+const headers = { Authorization: `Bearer ${required("INFRAMELD_TOKEN")}` }
+
+async function request() {
+  switch (required("GRANT_OPERATION")) {
+    case "read":
+      return getMyProjectAccess({
+        client,
+        path: { project_id: projectId },
+        query: { limit: 25, cursor: process.env.PROJECT_ACCESS_CURSOR },
+        headers,
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    case "set": {
+      const body: ProjectActionGrantRequest = JSON.parse(
+        await readFile("project-grant.json", "utf8")
+      )
+      reviewedRevision(body.expectedAccessRevision)
+      if (typeof body.canGrant !== "boolean")
+        throw new Error("Use a boolean canGrant")
+      return setProjectActionGrant({
+        client,
+        path: {
+          project_id: projectId,
+          recipient_principal_id: required("RECIPIENT_ID"),
+          action_id: required("ACTION_ID"),
+        },
+        headers: {
+          ...headers,
+          "Idempotency-Key": required("SET_PROJECT_GRANT_KEY"),
+        },
+        body,
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    }
+    case "remove":
+      return removeProjectActionGrant({
+        client,
+        path: {
+          project_id: projectId,
+          recipient_principal_id: required("RECIPIENT_ID"),
+          action_id: required("ACTION_ID"),
+        },
+        query: {
+          expectedAccessRevision: reviewedRevision(
+            Number(required("EXPECTED_ACCESS_REVISION"))
+          ),
+        },
+        headers: {
+          ...headers,
+          "Idempotency-Key": required("REMOVE_PROJECT_GRANT_KEY"),
+        },
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    default:
+      throw new Error("Choose read, set or remove")
+  }
+}
+
+const result = await request()
+if (result.error) {
+  console.error("No usable result:", result.error.kind)
+  console.error("HTTP status:", result.response?.status ?? "unavailable")
+  if (result.error.kind === "api") {
+    console.error(result.error.body.code, result.error.body.requestId)
+  }
+  process.exitCode = 1
+} else {
+  reviewedRevision(result.data.accessRevision)
+  console.log("HTTP status:", result.response?.status ?? "unavailable")
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+use std::env;
+
+use inframeld_sdk::client::{ApiOpError, HttpClient};
+use inframeld_sdk::types::ProjectActionGrantRequest;
+
+/// Preserve available HTTP context without printing raw upstream content.
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
+    if let Some(context) = error.api() {
+        eprintln!("Request failed: HTTP {}", context.status);
+    } else {
+        eprintln!("No usable response.");
+    }
+    std::io::Error::other("Preserve the original request before deciding what to do next")
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let token = env::var("INFRAMELD_TOKEN")?;
+    let project_id = env::var("PROJECT_ID")?;
+    let client = HttpClient::new()
+        .with_base_url(env::var("INFRAMELD_URL")?)
+        .with_header("Authorization", format!("Bearer {token}"));
+    let (status, body) = match env::var("GRANT_OPERATION")?.as_str() {
+        "read" => {
+            let cursor = env::var("PROJECT_ACCESS_CURSOR").ok();
+            let response = client
+                .get_my_project_access(&project_id, Some(25), cursor.as_deref())
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        "set" => {
+            let request: ProjectActionGrantRequest =
+                serde_json::from_str(&std::fs::read_to_string("project-grant.json")?)?;
+            let response = client
+                .set_project_action_grant(
+                    &project_id,
+                    env::var("RECIPIENT_ID")?,
+                    env::var("ACTION_ID")?,
+                    env::var("SET_PROJECT_GRANT_KEY")?,
+                    request,
+                )
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        "remove" => {
+            let revision: i64 = env::var("EXPECTED_ACCESS_REVISION")?.parse()?;
+            if revision < 0 {
+                return Err("Use the exact reviewed nonnegative Access revision".into());
+            }
+            let response = client
+                .remove_project_action_grant(
+                    &project_id,
+                    env::var("RECIPIENT_ID")?,
+                    env::var("ACTION_ID")?,
+                    revision,
+                    env::var("REMOVE_PROJECT_GRANT_KEY")?,
+                )
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        _ => return Err("Choose read, set or remove".into()),
+    };
+    println!("HTTP {status}");
+    println!("{}", serde_json::to_string_pretty(&body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Start with `GRANT_OPERATION=read .venv/bin/python project_grants.py`, `GRANT_OPERATION=read node project-grants.ts` with Node 26 in the ESM project, or `GRANT_OPERATION=read cargo run` in the Cargo project. For a prepared write, change only that selector to `set` or `remove` after saving the matching inputs and original key. These selectors belong to the example programs, not an Inframeld CLI.
+
+Each program prints the available HTTP status and typed page or receipt. A read can succeed without action grants, while a write still requires current exact use-and-grant authority. Pass a read's non-null `nextCursor` unchanged as `PROJECT_ACCESS_CURSOR` for another page, then clear it when changing scope. Never reuse a mutation receipt's revision as a current review. TypeScript uses JavaScript numbers, so the example refuses revisions outside the safe integer range rather than rounding them. Python and Rust preserve the native signed-integer bound.
+
+## Assign the permission
+
+The compatible `POST /v1/projects/{project_id}/grants` assigns only use-only `create-access-groups`. It does not change grant levels or remove assignments. For this alternative, keep its own original `PROJECT_GRANT_KEY` and save this complete `grant.json`, replacing the recipient and illustrative revision with reviewed values:
 
 <CodeGroup>
 
@@ -24,15 +416,13 @@ Save this complete file as `grant.json`. Replace the example recipient and revis
 {
   "recipientPrincipalId": "00000000-0000-4000-8000-000000000004",
   "actionId": "create-access-groups",
-  "expectedAccessRevision": 0
+  "expectedAccessRevision": 7
 }
 ```
 
 </CodeGroup>
 
-## Assign the permission
-
-Choose one alternative. Every example sends the same saved request and key. The Python, TypeScript and Rust blocks are complete programs, saved as `grant.py`, `grant.ts` and `src/main.rs` respectively. Run them using the corresponding client setup page.
+Use the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) setup for these existing generated-client alternatives. Every alternative below sends that same POST request and its retained key. Save the programs as `grant.py`, `grant.ts` and `src/main.rs` respectively:
 
 <CodeGroup>
 
@@ -134,10 +524,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 A completed result identifies the retained operation, recipient, action and committed Access revision. Use the [native operation and model](/api-reference/projects-and-access#assign-a-use-only-grant) for exact fields. This action permits use of `create-access-groups`. It does not let Bob grant the permission onward.
 
-## Handle a stale revision or lost result
-
-A new request with a stale Access revision is rejected. Review current state and the intended change before deciding on another request. An identical original request can recover its retained result under current authority, without applying a second grant.
-
-For a timeout or unusable response, keep `grant.json`, the original key, installation and scope. Use [original-request lookup](/guides/recover-original-request), whose grant example uses the same canonical route and `project_grant_read` authority guard. An unresolved lookup does not establish failure and is not permission to generate a fresh key and repeat the change.
-
-This walkthrough creates a real permission assignment. General grant removal is outside this delivered endpoint. Use a designated test Project or your operator's supported access-management procedure before running it as an experiment.
+Preserve this POST's original request after uncertainty as well. Its existing use-only contract is unchanged. Use the reviewed PUT or DELETE workflow above for explicit Project grant-level changes or removal, with a distinct original request and key for each operation.

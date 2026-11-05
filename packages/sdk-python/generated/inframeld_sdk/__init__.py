@@ -32,6 +32,8 @@ __all__ = [
     "ApiAttributeError",
     "ApiException",
     "AcceptedOperationLookupResponse",
+    "AccessGroupGrantTargetResponse",
+    "ApplicationAccountGrantTargetResponse",
     "CompletedOperationLookupResponse",
     "CurrentSessionResponse",
     "DeletionStatusResponse",
@@ -48,6 +50,9 @@ __all__ = [
     "Jobreference",
     "KnownJobReferenceResponse",
     "MyOrganizationAccessResponse",
+    "MyProjectAccessGrantResponse",
+    "MyProjectAccessGroupResponse",
+    "MyProjectAccessResponse",
     "OAuthConsentDecision",
     "OperationLookupAuthorityFamily",
     "OperationLookupAuthorityRequest",
@@ -59,6 +64,9 @@ __all__ = [
     "PrincipalKind",
     "ProblemDetails",
     "ProjectActionGrantItemResponse",
+    "ProjectActionGrantRemovalResponse",
+    "ProjectActionGrantRequest",
+    "ProjectActionGrantResponse",
     "ProjectCreationRequest",
     "ProjectCreationResponse",
     "ProjectGrantTargetResponse",
@@ -76,6 +84,7 @@ __all__ = [
     "ProtectedResourceMetadataResponse",
     "RecoveryRequiredOperationLookupResponse",
     "RetainedDeletionStatusResponse",
+    "Target",
     "UnknownJobReference",
     "UnresolvedDeletionStatusResponse",
     "UnresolvedOperationLookupResponse",
@@ -101,6 +110,8 @@ from inframeld_sdk.exceptions import ApiException as ApiException
 
 # import models into sdk package
 from inframeld_sdk.models.accepted_operation_lookup_response import AcceptedOperationLookupResponse as AcceptedOperationLookupResponse
+from inframeld_sdk.models.access_group_grant_target_response import AccessGroupGrantTargetResponse as AccessGroupGrantTargetResponse
+from inframeld_sdk.models.application_account_grant_target_response import ApplicationAccountGrantTargetResponse as ApplicationAccountGrantTargetResponse
 from inframeld_sdk.models.completed_operation_lookup_response import CompletedOperationLookupResponse as CompletedOperationLookupResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse as CurrentSessionResponse
 from inframeld_sdk.models.deletion_status_response import DeletionStatusResponse as DeletionStatusResponse
@@ -117,6 +128,9 @@ from inframeld_sdk.models.job_status import JobStatus as JobStatus
 from inframeld_sdk.models.jobreference import Jobreference as Jobreference
 from inframeld_sdk.models.known_job_reference_response import KnownJobReferenceResponse as KnownJobReferenceResponse
 from inframeld_sdk.models.my_organization_access_response import MyOrganizationAccessResponse as MyOrganizationAccessResponse
+from inframeld_sdk.models.my_project_access_grant_response import MyProjectAccessGrantResponse as MyProjectAccessGrantResponse
+from inframeld_sdk.models.my_project_access_group_response import MyProjectAccessGroupResponse as MyProjectAccessGroupResponse
+from inframeld_sdk.models.my_project_access_response import MyProjectAccessResponse as MyProjectAccessResponse
 from inframeld_sdk.models.o_auth_consent_decision import OAuthConsentDecision as OAuthConsentDecision
 from inframeld_sdk.models.operation_lookup_authority_family import OperationLookupAuthorityFamily as OperationLookupAuthorityFamily
 from inframeld_sdk.models.operation_lookup_authority_request import OperationLookupAuthorityRequest as OperationLookupAuthorityRequest
@@ -128,6 +142,9 @@ from inframeld_sdk.models.path_inner import PathInner as PathInner
 from inframeld_sdk.models.principal_kind import PrincipalKind as PrincipalKind
 from inframeld_sdk.models.problem_details import ProblemDetails as ProblemDetails
 from inframeld_sdk.models.project_action_grant_item_response import ProjectActionGrantItemResponse as ProjectActionGrantItemResponse
+from inframeld_sdk.models.project_action_grant_removal_response import ProjectActionGrantRemovalResponse as ProjectActionGrantRemovalResponse
+from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest as ProjectActionGrantRequest
+from inframeld_sdk.models.project_action_grant_response import ProjectActionGrantResponse as ProjectActionGrantResponse
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest as ProjectCreationRequest
 from inframeld_sdk.models.project_creation_response import ProjectCreationResponse as ProjectCreationResponse
 from inframeld_sdk.models.project_grant_target_response import ProjectGrantTargetResponse as ProjectGrantTargetResponse
@@ -145,6 +162,7 @@ from inframeld_sdk.models.project_use_only_grant_response import ProjectUseOnlyG
 from inframeld_sdk.models.protected_resource_metadata_response import ProtectedResourceMetadataResponse as ProtectedResourceMetadataResponse
 from inframeld_sdk.models.recovery_required_operation_lookup_response import RecoveryRequiredOperationLookupResponse as RecoveryRequiredOperationLookupResponse
 from inframeld_sdk.models.retained_deletion_status_response import RetainedDeletionStatusResponse as RetainedDeletionStatusResponse
+from inframeld_sdk.models.target import Target as Target
 from inframeld_sdk.models.unknown_job_reference import UnknownJobReference as UnknownJobReference
 from inframeld_sdk.models.unresolved_deletion_status_response import UnresolvedDeletionStatusResponse as UnresolvedDeletionStatusResponse
 from inframeld_sdk.models.unresolved_operation_lookup_response import UnresolvedOperationLookupResponse as UnresolvedOperationLookupResponse
