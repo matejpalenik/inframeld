@@ -20,7 +20,7 @@ A local change saves its domain effects, revision, audit and original outcome to
 
 ## Concrete HTTP contract draft
 
-**Status:** accepted product boundaries and documented transport drafts. Human-session, consent, Project metadata, the supported use-only grant, own Organization access, ordinary Project creation, Project member list/add/remove and the Project-target action-grant read are implemented. Other named models and routes remain design contracts. Native backend OpenAPI remains authoritative for delivered symbols. The implemented membership and creation routes use human cookie or Hydra bearer authentication, without an application-key subsystem.
+**Status:** accepted product boundaries and documented transport drafts. Human-session, consent, Project metadata, the supported use-only grant, own Organization access, ordinary Project creation, Project member list/add/remove and the Project-target action-grant read are implemented. The current candidate also implements own Project access and full Project action-grant PUT/DELETE, with final SDK/platform qualification still pending. Organization and other-target grant administration, recipient discovery and other undelivered routes remain design contracts. Native backend OpenAPI remains authoritative for implemented symbols. The implemented human routes use cookie or Hydra bearer authentication, without an application-key authentication subsystem.
 
 For example, Alice sets SupportBot's `query` assignment on Support's Pipeline with `canGrant: false` and the reviewed access revision. If the response is lost, her same idempotency key recovers that original assignment result under current authority. Removing that assignment returns a removal result, not `canGrant: false`: the latter still permits use. If SupportBot is subsequently given another grant, replay of Alice's old removal cannot remove it again.
 
@@ -54,7 +54,17 @@ The [creation response](../../../../apps/backend/src/inframeld_backend/access/ht
 
 Every page requires current admitted-human eligibility, Project visibility/membership and use plus grant authority for that exact action. Recovery blocks and current OAuth credential evidence retain their ordinary effects. A Project action read has no group-manager alternative. Stored suspended-recipient assignments remain visible. Results do not expand implied permissions or discover eligible recipients. Cursors bind installation, Organization, Project, action and recipient-ID order, without becoming authorization or snapshots. All responses are no-store. [The guide](../../../../apps/docs/src/app/guides/list-project-action-grants/page.mdx) explains the caller's setup and continuation.
 
-The existing POST use-only operation is unchanged. Full assignment/removal operations, other-target reads and the recipient-directory route below remain design contracts until their own implementation and qualification.
+The existing POST use-only operation and this GET remain unchanged. The current candidate implements the Project own-access and full Project mutation contracts below. Other-target reads and mutations and the recipient-directory route remain implementation work.
+
+<a id="implemented-project-grant-administration"></a>
+
+### Project own-access and grant changes in the current candidate
+
+[`getMyProjectAccess`](../../../../apps/backend/src/inframeld_backend/access/http/routes/my_project_access_routes.py) uses `GET /v1/projects/{project_id}/my-access`. A current eligible human Project member can read their own stored Project, access-group and application-account grants, group memberships and group managements, together with the current Project Access revision. No action-administration grant is required. One bounded page and cursor cover all those relationships, with current authorization on every page. There is no caller-selected principal, eligible-recipient directory or effective-permission expansion.
+
+[`setProjectActionGrant` and `removeProjectActionGrant`](../../../../apps/backend/src/inframeld_backend/access/http/routes/project_action_grant_change_routes.py) implement PUT/DELETE at `/v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}` for all eighteen Project actions. PUT uses strict `canGrant` and `expectedAccessRevision` JSON fields. DELETE has no body and requires one canonical `expectedAccessRevision` query field. Both require the single idempotency key and current human use-and-grant authority for the exact Project/action. New assignments return 201, while existing-assignment changes, no-ops and removals return 200. The saved original receipt preserves its status, revision, outcome and expiry. Current authority is checked before replay, and replay cannot reapply an assignment or remove a later one.
+
+The [assignment guide](../../../../apps/docs/src/app/guides/assign-project-grant/page.mdx) explains revision discovery, eligible recipients, safe departure and original-result recovery while retaining the legacy POST. Source and PostgreSQL evidence establish the Project backend component. Final SDK/runtime/platform qualification remains pending, and [human qualification #336](https://github.com/matejpalenik/inframeld/issues/336) is not claimed complete. Full [#226](https://github.com/matejpalenik/inframeld/issues/226) still includes Organization/other-resource administration and missing recipient/target producers.
 
 <a id="credential-and-response-profiles"></a>
 

@@ -31,6 +31,9 @@ from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler
     register_human_oauth_credential_error_handler,
 )
 from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
+from inframeld_backend.access.http.requests.project_action_grant_request import (
+    ProjectActionGrantRequest,
+)
 from inframeld_backend.access.http.requests.project_creation_request import ProjectCreationRequest
 from inframeld_backend.access.http.requests.project_membership_request import (
     ProjectMembershipRequest,
@@ -41,6 +44,15 @@ from inframeld_backend.access.http.requests.project_metadata_update_request impo
 from inframeld_backend.access.http.responses.my_organization_access_response import (
     MyOrganizationAccessResponse,
 )
+from inframeld_backend.access.http.responses.my_project_access_response import (
+    MyProjectAccessResponse,
+)
+from inframeld_backend.access.http.responses.project_action_grant_removal_response import (
+    ProjectActionGrantRemovalResponse,
+)
+from inframeld_backend.access.http.responses.project_action_grant_response import (
+    ProjectActionGrantResponse,
+)
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
 from inframeld_backend.access.http.routes.human_admission_routes import (
@@ -49,8 +61,14 @@ from inframeld_backend.access.http.routes.human_admission_routes import (
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
+from inframeld_backend.access.http.routes.my_project_access_routes import (
+    create_my_project_access_router,
+)
 from inframeld_backend.access.http.routes.organization_access_routes import (
     create_organization_access_router,
+)
+from inframeld_backend.access.http.routes.project_action_grant_change_routes import (
+    create_project_action_grant_change_router,
 )
 from inframeld_backend.access.http.routes.project_action_grant_routes import (
     create_project_action_grant_router,
@@ -82,6 +100,7 @@ from inframeld_backend.bootstrap.application_resources import ApplicationResourc
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
 from inframeld_backend.bootstrap.deletion_status_composition import open_deletion_status_lookup
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
+from inframeld_backend.bootstrap.my_project_access_composition import open_my_project_access
 from inframeld_backend.bootstrap.organization_access_composition import open_my_organization_access
 from inframeld_backend.bootstrap.original_operation_lookup_composition import (
     open_original_operation_lookup,
@@ -201,8 +220,14 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ProjectCreationRequest,
                 ProjectMembershipRequest,
                 ProjectMetadataUpdateRequest,
+                ProjectActionGrantRequest,
             ),
-            serialization_models=(MyOrganizationAccessResponse,),
+            serialization_models=(
+                MyOrganizationAccessResponse,
+                MyProjectAccessResponse,
+                ProjectActionGrantResponse,
+                ProjectActionGrantRemovalResponse,
+            ),
         )
         application.include_router(health_router)
         application.include_router(
@@ -265,6 +290,16 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_project_action_grant_router(
                 human_session, partial(open_project_action_grants, database)
+            )
+        )
+        application.include_router(
+            create_project_action_grant_change_router(
+                human_session, partial(open_project_grant_change, database, fingerprints)
+            )
+        )
+        application.include_router(
+            create_my_project_access_router(
+                human_session, partial(open_my_project_access, database)
             )
         )
 

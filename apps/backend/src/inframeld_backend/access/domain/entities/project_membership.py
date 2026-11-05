@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import override
 
 from inframeld_backend.access.domain.entities.project_action_grant import ProjectActionGrant
@@ -5,6 +6,9 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_grant_level import ProjectGrantLevel
 from inframeld_backend.access.domain.errors.project_grant_errors import (
     ProjectGrantAlreadyExistsError,
+)
+from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
+    ProjectActionEligibilityPolicy,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -91,6 +95,43 @@ class ProjectMembership:
             assigned_by_principal_id=assigned_by_principal_id,
         )
         self._grants[action_id] = grant
+
+    def set_action_grant(
+        self,
+        *,
+        action_id: ActionId,
+        level: ProjectGrantLevel,
+        assigned_by_principal_id: PrincipalId,
+    ) -> bool:
+        """Set an eligible exact assignment and report whether its state changed."""
+        if not ProjectActionEligibilityPolicy.may_use(
+            action_id=action_id, principal_kind=self._principal_kind
+        ):
+            raise ValueError("This action is not eligible for the recipient.")
+        if (
+            self._principal_kind is PrincipalKind.APPLICATION
+            and level is ProjectGrantLevel.USE_AND_GRANT
+        ):
+            raise ValueError("Applications cannot hold delegation rights.")
+
+        current = self._grants.get(action_id)
+        if current is not None:
+            if current.level is level:
+                return False
+            self._grants[action_id] = replace(current, level=level)
+        else:
+            self._grants[action_id] = ProjectActionGrant(
+                self._project_id,
+                self._principal_id,
+                action_id,
+                level,
+                assigned_by_principal_id,
+            )
+        return True
+
+    def remove_action_grant(self, *, action_id: ActionId) -> bool:
+        """Remove only this exact action and report whether it was present."""
+        return self._grants.pop(action_id, None) is not None
 
     @override
     def __eq__(self, other: object) -> bool:

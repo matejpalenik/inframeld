@@ -1,9 +1,24 @@
 import asyncio
 from typing import final, override
+from uuid import UUID
 
-from sqlalchemy import BigInteger, Nullable, and_, exists, literal, select
+from sqlalchemy import (
+    BigInteger,
+    Nullable,
+    SQLColumnExpression,
+    String,
+    and_,
+    exists,
+    func,
+    literal,
+    or_,
+    select,
+)
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
+from sqlalchemy.sql.selectable import Exists
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
@@ -12,13 +27,23 @@ from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dt
 from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
     HumanOAuthCredentialFactsDTO,
 )
+from inframeld_backend.access.application.dtos.project_action_grant_management_facts_dto import (
+    ProjectActionGrantManagementFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_change_facts_dto import (
     ProjectGrantChangeFactsDTO,
 )
 from inframeld_backend.access.application.protocols.project_grant_change_facts_reader import (
     ProjectGrantChangeFactsReader,
 )
+from inframeld_backend.access.application.protocols.project_grant_management_facts_reader import (
+    ProjectGrantManagementFactsReader,
+)
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.policy_inputs.project_departure_candidate_policy_input import (
+    ProjectDepartureCandidatePolicyInput,
+)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
@@ -28,6 +53,12 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.human_credential_state_queries import (
     HumanCredentialStateQueries,
+)
+from inframeld_backend.access.infrastructure.rows.application_account_row import (
+    ApplicationAccountRow,
+)
+from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
+    HumanCredentialVersionRow,
 )
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
@@ -47,6 +78,7 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.rows.installation_identity_row import (
     InstallationIdentityRow,
 )
@@ -64,7 +96,9 @@ def _to_principal(row: PrincipalRow) -> Principal:
 
 
 @final
-class PostgresProjectGrantChangeFactsReader(ProjectGrantChangeFactsReader):
+class PostgresProjectGrantChangeFactsReader(
+    ProjectGrantChangeFactsReader, ProjectGrantManagementFactsReader
+):
     """Acquire Access locks and load facts within one five-second database deadline.
 
     The caller owns the transaction and retains acquired locks until commit or
@@ -73,6 +107,196 @@ class PostgresProjectGrantChangeFactsReader(ProjectGrantChangeFactsReader):
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    @override
+    async def read_for_management(
+        self,
+        *,
+        access: AccessContextDTO,
+        project_id: ProjectId,
+        recipient_principal_id: PrincipalId,
+        action_id: ActionId,
+    ) -> ProjectActionGrantManagementFactsDTO | None:
+        if not self._session.in_transaction() or not self._session.is_active:
+            raise RuntimeError("Grant management requires the active caller transaction.")
+        try:
+            async with asyncio.timeout(_GRANT_FACTS_TIMEOUT_SECONDS):
+                with self._session.no_autoflush:
+                    isolation = await self._session.scalar(
+                        select(func.current_setting("transaction_isolation", type_=String()))
+                    )
+                    if isolation != "read committed":
+                        raise RuntimeError("Grant coordination requires READ COMMITTED isolation.")
+                    grant = await self._read_for_change(
+                        access=access,
+                        project_id=project_id,
+                        recipient_principal_id=recipient_principal_id,
+                        action_id=action_id,
+                    )
+                    if grant is None:
+                        return None
+                    installed = await self._session.scalar(
+                        select(InstallationIdentityRow.installation_id).where(
+                            InstallationIdentityRow.singleton_key == 1
+                        )
+                    )
+                    if installed is None:
+                        raise DependencyUnavailableError(
+                            "The installation identity is not available."
+                        )
+                    installation = InstallationId(installed)
+                    organization = grant.actor.organization_id
+                    recipient = (
+                        (
+                            await self._session.execute(
+                                select(
+                                    self._pending(PrincipalRow.id, installation).label(
+                                        "recipient_pending"
+                                    ),
+                                    self._coherent_identity(
+                                        PrincipalRow.id, organization, installation
+                                    ).label("recipient_coherent"),
+                                    exists()
+                                    .where(
+                                        ApplicationAccountRow.principal_id == PrincipalRow.id,
+                                        ApplicationAccountRow.project_id == project_id.value,
+                                        ApplicationAccountRow.organization_id == organization.value,
+                                        ApplicationAccountRow.principal_kind == PrincipalRow.kind,
+                                    )
+                                    .correlate(PrincipalRow)
+                                    .label("recipient_application_bound"),
+                                ).where(
+                                    PrincipalRow.id == recipient_principal_id.value,
+                                    PrincipalRow.organization_id == organization.value,
+                                )
+                            )
+                        )
+                        .tuples()
+                        .one_or_none()
+                    )
+                    exact_grant = (
+                        exists()
+                        .where(
+                            ProjectActionGrantRow.project_id == project_id.value,
+                            ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                            ProjectActionGrantRow.recipient_kind == PrincipalRow.kind,
+                            ProjectActionGrantRow.action == action_id.value,
+                            ProjectActionGrantRow.can_grant.is_(True),
+                        )
+                        .correlate(PrincipalRow)
+                    )
+                    candidates = (
+                        (
+                            await self._session.execute(
+                                select(
+                                    PrincipalRow,
+                                    self._pending(PrincipalRow.id, installation).label(
+                                        "candidate_pending"
+                                    ),
+                                    exists()
+                                    .where(
+                                        ProjectMembershipRow.project_id == project_id.value,
+                                        ProjectMembershipRow.organization_id == organization.value,
+                                        ProjectMembershipRow.principal_id == PrincipalRow.id,
+                                    )
+                                    .correlate(PrincipalRow)
+                                    .label("candidate_member"),
+                                    self._coherent_identity(
+                                        PrincipalRow.id, organization, installation
+                                    ).label("candidate_coherent"),
+                                    exact_grant.label("candidate_can_grant"),
+                                )
+                                .where(
+                                    PrincipalRow.organization_id == organization.value,
+                                    PrincipalRow.kind == PrincipalKind.HUMAN,
+                                    PrincipalRow.id != recipient_principal_id.value,
+                                    exact_grant,
+                                )
+                                .execution_options(populate_existing=True, autoflush=False)
+                            )
+                        )
+                        .tuples()
+                        .all()
+                    )
+                    return ProjectActionGrantManagementFactsDTO(
+                        installation,
+                        organization,
+                        project_id,
+                        action_id,
+                        grant,
+                        recipient[0] if recipient is not None else False,
+                        recipient[1] if recipient is not None else False,
+                        recipient[2] if recipient is not None else False,
+                        tuple(
+                            ProjectDepartureCandidatePolicyInput(
+                                _to_principal(principal),
+                                pending,
+                                member,
+                                coherent,
+                                can_grant,
+                                False,
+                                False,
+                            )
+                            for principal, pending, member, coherent, can_grant in candidates
+                        ),
+                    )
+        except (TimeoutError, OperationalError, SqlAlchemyTimeoutError) as error:
+            raise DependencyUnavailableError() from error
+
+    @staticmethod
+    def _pending(principal: SQLColumnExpression[UUID], installation: InstallationId) -> Exists:
+        return (
+            select(IdentityRecoveryAdmissionRow.operation_id)
+            .join(
+                HumanIdentityLinkRow,
+                and_(
+                    HumanIdentityLinkRow.authority == IdentityRecoveryAdmissionRow.authority,
+                    HumanIdentityLinkRow.subject == IdentityRecoveryAdmissionRow.subject,
+                ),
+            )
+            .where(
+                IdentityRecoveryAdmissionRow.installation_id == installation.value,
+                HumanIdentityLinkRow.principal_id == principal,
+                IdentityRecoveryAdmissionRow.released_at.is_(None),
+            )
+            .exists()
+            .correlate_except(IdentityRecoveryAdmissionRow, HumanIdentityLinkRow)
+        )
+
+    @staticmethod
+    def _coherent_identity(
+        principal: SQLColumnExpression[UUID],
+        organization: OrganizationId,
+        installation: InstallationId,
+    ) -> Exists:
+        version = (
+            exists()
+            .where(
+                HumanCredentialVersionRow.installation_id == installation.value,
+                HumanCredentialVersionRow.authority == HumanIdentityLinkRow.authority,
+                HumanCredentialVersionRow.subject == HumanIdentityLinkRow.subject,
+            )
+            .correlate(HumanIdentityLinkRow)
+        )
+        history = (
+            exists()
+            .where(
+                IdentityRecoveryAdmissionRow.installation_id == installation.value,
+                IdentityRecoveryAdmissionRow.authority == HumanIdentityLinkRow.authority,
+                IdentityRecoveryAdmissionRow.subject == HumanIdentityLinkRow.subject,
+            )
+            .correlate(HumanIdentityLinkRow)
+        )
+        return (
+            exists()
+            .where(
+                HumanIdentityLinkRow.principal_id == principal,
+                HumanIdentityLinkRow.organization_id == organization.value,
+                HumanIdentityLinkRow.principal_kind == PrincipalKind.HUMAN,
+                or_(version, ~history),
+            )
+            .correlate_except(HumanIdentityLinkRow)
+        )
 
     @override
     async def read_for_change(

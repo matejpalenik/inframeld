@@ -5,7 +5,7 @@ export const pageMetadata = {
 
 # Manage Projects and access
 
-- [Give a Project member permission to create access groups](/guides/assign-project-grant).
+- [Review your access and manage exact Project action grants](/guides/assign-project-grant).
 
 Use an existing Project's permanent ID to inspect or change its metadata. Current membership, visibility and the action being performed determine what your credential can do.
 
@@ -18,7 +18,8 @@ Use an existing Project's permanent ID to inspect or change its metadata. Curren
 - [Add and remove human Project members](/guides/manage-project-members).
 - [Name and rename an existing Project](/guides/name-and-rename-project).
 - [Inspect the current session](/api-reference/projects-and-access#inspect-your-session).
-- [Assign the supported use-only grant](/api-reference/projects-and-access#assign-a-use-only-grant).
+- [Read your current Project access and revision](/guides/assign-project-grant#read-your-project-access-and-current-revision).
+- [Assign the compatible use-only grant](/api-reference/projects-and-access#assign-a-use-only-grant).
 - [Check an original request after losing its response](/guides/recover-original-request).
 
 ## Understand access before changing it
@@ -29,6 +30,6 @@ Human admission uses current Organization `admit-users` authority and verifies t
 
 Membership changes use current Project `manage-project-members` authority. Adding an admitted human gives bare membership. Removal clears only that recipient's received access within the Project and preserves required human responsibilities. Rejoining restores no old grants or group roles. [The guide](/guides/manage-project-members) explains the current inputs, departure guards and original receipts.
 
-[Project action-grant reads](/guides/list-project-action-grants) require current use and grant authority for the exact action on the Project. They list stored assignments, including suspended recipients, rather than effective permissions or every action the recipient may use.
+[Project action-grant reads](/guides/list-project-action-grants) require current use and grant authority for the exact action on the Project. They list stored assignments, including suspended recipients, rather than effective permissions or every action the recipient may use. Your own-access read needs current eligible-human membership and returns a current Access revision, not a permission snapshot. Project grant PUT/DELETE require exact use-and-grant authority again, preserve original results and prevent removal of the last eligible exact-action grantor. `canGrant: false` means use-only, not removal. Other-resource and Organization grant administration remains separate work.
 
 Project creation uses your current Organization `create-projects` permission. It creates an ordinary Project with its membership and eighteen initial assignments. Group administration and private-starter provisioning remain separate unfinished procedures. The [API reference](/api-reference/projects-and-access) lists the operations you can call today.

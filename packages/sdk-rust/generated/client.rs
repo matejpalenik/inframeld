@@ -452,6 +452,16 @@ pub enum GetMyOrganizationAccessApiError {
     Status404(ProblemDetails),
     Status503(ProblemDetails),
 }
+///Typed error responses for `getMyProjectAccess`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum GetMyProjectAccessApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
 ///Typed error responses for `getProjectMetadata`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum GetProjectMetadataApiError {
@@ -519,6 +529,17 @@ pub enum LookupOriginalOperationApiError {
     Status422(ProblemDetails),
     Status503(ProblemDetails),
 }
+///Typed error responses for `removeProjectActionGrant`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum RemoveProjectActionGrantApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
 ///Typed error responses for `removeProjectMember`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum RemoveProjectMemberApiError {
@@ -538,6 +559,19 @@ pub enum ResolveProjectNameApiError {
     Status403(ProblemDetails),
     Status404(ProblemDetails),
     Status409(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
+///Typed error responses for `setProjectActionGrant`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum SetProjectActionGrantApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status413(ProblemDetails),
+    Status415(ProblemDetails),
     Status422(ProblemDetails),
     Status503(ProblemDetails),
 }
@@ -565,6 +599,12 @@ pub enum AddProjectMemberHttpResponseBody {
 pub enum AdmitHumanHttpResponseBody {
     Status200Representation0(super::types::HumanAdmissionResponse),
     Status201Representation1(super::types::HumanAdmissionResponse),
+}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum SetProjectActionGrantHttpResponseBody {
+    Status200Representation0(super::types::ProjectActionGrantResponse),
+    Status201Representation1(super::types::ProjectActionGrantResponse),
 }
 fn __json_response_representation(
     headers: &reqwest::header::HeaderMap,
@@ -2801,6 +2841,251 @@ impl HttpClient {
             )
         }
     }
+    /// Own Access
+    ///
+    /// `GET /v1/projects/{project_id}/my-access`
+    pub async fn get_my_project_access(
+        &self,
+        project_id: impl AsRef<str>,
+        limit: Option<i64>,
+        cursor: Option<impl AsRef<str>>,
+    ) -> Result<
+        self::response::ApiResponse<MyProjectAccessResponse>,
+        ApiOpError<GetMyProjectAccessApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/projects/{}/my-access",
+            __pct_encode_path_segment(project_id.as_ref()))
+        );
+        let mut req = self.http_client.get(request_url);
+        {
+            let mut query_params: Vec<(String, String)> = Vec::new();
+            if let Some(v) = limit {
+                query_params.push(("limit".to_string(), v.to_string()));
+            }
+            if let Some(v) = cursor {
+                query_params.push(("cursor".to_string(), v.as_ref().to_string()));
+            }
+            if !query_params.is_empty() {
+                req = req.query(&query_params);
+            }
+        }
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<GetMyProjectAccessApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetMyProjectAccessApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetMyProjectAccessApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetMyProjectAccessApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetMyProjectAccessApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetMyProjectAccessApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetMyProjectAccessApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
     /// Get
     ///
     /// `GET /v1/projects/{project_id}/metadata`
@@ -4424,6 +4709,289 @@ impl HttpClient {
     }
     /// Remove
     ///
+    /// `DELETE /v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}`
+    pub async fn remove_project_action_grant(
+        &self,
+        project_id: impl AsRef<str>,
+        recipient_principal_id: impl AsRef<str>,
+        action_id: impl AsRef<str>,
+        expected_access_revision: i64,
+        idempotency_key: impl AsRef<str>,
+    ) -> Result<
+        self::response::ApiResponse<ProjectActionGrantRemovalResponse>,
+        ApiOpError<RemoveProjectActionGrantApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/projects/{}/grants/{}/{}",
+            __pct_encode_path_segment(project_id.as_ref()),
+            __pct_encode_path_segment(recipient_principal_id.as_ref()),
+            __pct_encode_path_segment(action_id.as_ref()))
+        );
+        let mut req = self.http_client.delete(request_url);
+        {
+            let mut query_params: Vec<(String, String)> = Vec::new();
+            query_params
+                .push((
+                    "expectedAccessRevision".to_string(),
+                    expected_access_revision.to_string(),
+                ));
+            if !query_params.is_empty() {
+                req = req.query(&query_params);
+            }
+        }
+        req = req.header("Idempotency-Key", idempotency_key.as_ref());
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<RemoveProjectActionGrantApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProjectActionGrantApiError::Status400(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProjectActionGrantApiError::Status401(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProjectActionGrantApiError::Status403(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProjectActionGrantApiError::Status404(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProjectActionGrantApiError::Status409(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProjectActionGrantApiError::Status422(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProjectActionGrantApiError::Status503(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Remove
+    ///
     /// `DELETE /v1/projects/{project_id}/members/{principal_id}`
     pub async fn remove_project_member(
         &self,
@@ -4914,6 +5482,336 @@ impl HttpClient {
                         {
                             Ok(v) => {
                                 typed = Some(ResolveProjectNameApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Assign
+    ///
+    /// `PUT /v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}`
+    pub async fn set_project_action_grant(
+        &self,
+        project_id: impl AsRef<str>,
+        recipient_principal_id: impl AsRef<str>,
+        action_id: impl AsRef<str>,
+        idempotency_key: impl AsRef<str>,
+        request: ProjectActionGrantRequest,
+    ) -> Result<
+        self::response::ApiResponse<self::SetProjectActionGrantHttpResponseBody>,
+        ApiOpError<SetProjectActionGrantApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/projects/{}/grants/{}/{}",
+            __pct_encode_path_segment(project_id.as_ref()),
+            __pct_encode_path_segment(recipient_principal_id.as_ref()),
+            __pct_encode_path_segment(action_id.as_ref()))
+        );
+        let mut req = self.http_client.put(request_url);
+        req = req
+            .body(serde_json::to_vec(&request).map_err(HttpError::serialization_error)?)
+            .header("content-type", "application/json");
+        req = req.header("Idempotency-Key", idempotency_key.as_ref());
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            req = req.header(name, value);
+        }
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 || status_code == 201u16 {
+            match (|| -> Result<SetProjectActionGrantHttpResponseBody, String> {
+                if status_code == 200u16 {
+                    return match __json_response_representation(
+                        &headers,
+                        &["application/json"],
+                    )? {
+                        0usize => {
+                            serde_json::from_slice::<
+                                super::types::ProjectActionGrantResponse,
+                            >(&raw_body)
+                                .map(
+                                    SetProjectActionGrantHttpResponseBody::Status200Representation0,
+                                )
+                                .map_err(|error| error.to_string())
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                if status_code == 201u16 {
+                    return match __json_response_representation(
+                        &headers,
+                        &["application/json"],
+                    )? {
+                        0usize => {
+                            serde_json::from_slice::<
+                                super::types::ProjectActionGrantResponse,
+                            >(&raw_body)
+                                .map(
+                                    SetProjectActionGrantHttpResponseBody::Status201Representation1,
+                                )
+                                .map_err(|error| error.to_string())
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                Err("No declared JSON response matched the status".into())
+            })() {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200, 201",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<SetProjectActionGrantApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(SetProjectActionGrantApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(SetProjectActionGrantApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(SetProjectActionGrantApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(SetProjectActionGrantApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(SetProjectActionGrantApiError::Status409(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    413u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(SetProjectActionGrantApiError::Status413(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    415u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(SetProjectActionGrantApiError::Status415(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(SetProjectActionGrantApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(SetProjectActionGrantApiError::Status503(v));
                                 parse_error = None;
                             }
                             Err(e) => {

@@ -8,6 +8,8 @@ import {
   stopProcess,
   withResources,
   type OwnedProcess,
+  type CommandObservation,
+  hasConfirmedCleanup,
 } from "../../src/system/process.ts";
 import { describeError } from "../../src/workflows/stages.ts";
 import { withDeniedFixtureRecovery } from "../native/fixtures/denied-cleanup.ts";
@@ -454,6 +456,7 @@ test("pure stub first primary failure survives successful and late target-exit e
           nested.mock.timers.enable({ apis: ["setTimeout"] });
           const controller = new AbortController();
           const reason = new Error("original pure cancellation");
+          const observations: Readonly<CommandObservation>[] = [];
           const pattern =
             first === "timeout"
               ? /timed out/
@@ -494,6 +497,9 @@ test("pure stub first primary failure survives successful and late target-exit e
                       cleanupTimeout: 200,
                       maxOutputBytes: 3,
                       signal: controller.signal,
+                      observeOutcome(observation) {
+                        observations.push(observation);
+                      },
                     }),
                     (error: unknown) => {
                       const primary =
@@ -502,6 +508,7 @@ test("pure stub first primary failure survives successful and late target-exit e
                           : error;
                       if (first === "cancel") assert.equal(primary, reason);
                       else assert.match(String(primary), pattern);
+                      assert.equal(hasConfirmedCleanup(error), false);
                       return true;
                     },
                   )
@@ -533,6 +540,12 @@ test("pure stub first primary failure survives successful and late target-exit e
                 await completed;
                 assert.equal(settled, true);
                 assert.equal(stops.length, 1);
+                assert.equal(observations.length, 1);
+                assert.equal(observations[0]?.stopReason, first);
+                assert.equal(
+                  observations[0]?.closeResult,
+                  late ? "rejected" : "resolved",
+                );
               },
             );
           } finally {
@@ -1172,6 +1185,89 @@ test("commands preserve stdin, split UTF-8 and a nonzero target result", async (
     command("python3", ["-c", "raise SystemExit(2)"]),
     /exited 2/,
   );
+});
+
+for (const status of [2, 0])
+  test(`command observer retains ${status === 2 ? "wrong exit" : "unexpected fulfillment"} after close`, async () => {
+    const observations: Readonly<CommandObservation>[] = [];
+    const running = command("python3", ["-c", `raise SystemExit(${status})`], {
+      observeOutcome(observation) {
+        observations.push(observation);
+      },
+    });
+    if (status === 0) await running;
+    else await assert.rejects(running, /exited 2/);
+    assert.equal(observations.length, 1);
+    assert.equal(observations[0]?.status, status);
+    assert.equal(observations[0]?.reason, "target-exit");
+    assert.equal(observations[0]?.leaderReaped, true);
+    assert.equal(observations[0]?.groupState, "quiescent");
+    assert.equal(observations[0]?.closeResult, "resolved");
+    assert.ok(Object.isFrozen(observations[0]));
+  });
+
+test("command observer preserves frozen and primitive cancellation with ordered cleanup failures", async (context) => {
+  for (const reason of [
+    Object.freeze(new Error("original frozen cancellation")),
+    "original primitive cancellation",
+  ]) {
+    await pureHelper(
+      context,
+      { waitForStop: true, errors: ["group-observation-failed"] },
+      async () => {
+        const controller = new AbortController();
+        const diagnostic = new Error("observer failed");
+        const observations: Readonly<CommandObservation>[] = [];
+        const running = command("unused", [], {
+          signal: controller.signal,
+          cleanupTimeout: 100,
+          observeOutcome(observation) {
+            observations.push(observation);
+            throw diagnostic;
+          },
+        });
+        void running.catch(() => {});
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        controller.abort(reason);
+        await assert.rejects(running, (error: unknown) => {
+          assert.ok(error instanceof AggregateError);
+          assert.equal(error.errors.length, 3);
+          assert.equal(error.errors[0], reason);
+          assert.match(String(error.errors[1]), /cleanup/i);
+          assert.equal(error.errors[2], diagnostic);
+          assert.equal(hasConfirmedCleanup(error), false);
+          return true;
+        });
+        assert.equal(observations.length, 1);
+        assert.equal(observations[0]?.stopReason, "cancel");
+        assert.equal(observations[0]?.closeResult, "rejected");
+      },
+    );
+  }
+});
+
+test("command observer reports no received handle without changing an early cancellation reason", async () => {
+  for (const reason of [
+    Object.freeze(new Error("frozen before acquisition")),
+    "primitive before acquisition",
+  ]) {
+    const controller = new AbortController();
+    controller.abort(reason);
+    const observations: Readonly<CommandObservation>[] = [];
+    await assert.rejects(
+      command("unused", [], {
+        signal: controller.signal,
+        observeOutcome(observation) {
+          observations.push(observation);
+        },
+      }),
+      (error: unknown) => error === reason,
+    );
+    assert.equal(observations.length, 1);
+    assert.equal(observations[0]?.closeResult, "not-acquired");
+    assert.equal(observations[0]?.status, null);
+    assert.equal(observations[0]?.leaderReaped, undefined);
+  }
 });
 
 test("log failure retains a nonzero command result", async () => {

@@ -42,6 +42,123 @@ export function describeError(error: unknown): string {
       result.push(Object.getOwnPropertyDescriptor(value, String(index))?.value);
     return result;
   };
+  const commandCarrier = (
+    value: unknown,
+  ): { command: Record<string, unknown>; cause: unknown } | undefined => {
+    if (
+      !value ||
+      typeof value !== "object" ||
+      ![Object.prototype, null].includes(Object.getPrototypeOf(value))
+    )
+      return;
+    const outer = Object.getOwnPropertyDescriptors(value);
+    if (
+      Reflect.ownKeys(outer).length !== 2 ||
+      !outer.command ||
+      !("value" in outer.command) ||
+      !outer.cause ||
+      !("value" in outer.cause)
+    )
+      return;
+    const input: unknown = outer.command.value;
+    if (
+      !input ||
+      typeof input !== "object" ||
+      ![Object.prototype, null].includes(Object.getPrototypeOf(input))
+    )
+      return;
+    const fields = Object.getOwnPropertyDescriptors(input);
+    const keys = [
+      "settlement",
+      "status",
+      "reason",
+      "stopReason",
+      "leaderReaped",
+      "groupState",
+      "closeResult",
+      "reportedCleanupConfirmed",
+      "helperCode",
+      "helperClosed",
+      "streamsEnded",
+    ];
+    const required = [
+      "settlement",
+      "status",
+      "reason",
+      "stopReason",
+      "groupState",
+      "closeResult",
+      "reportedCleanupConfirmed",
+    ];
+    if (
+      Reflect.ownKeys(fields).some(
+        (key) =>
+          typeof key !== "string" ||
+          !keys.includes(key) ||
+          !("value" in fields[key]!),
+      ) ||
+      required.some((key) => !fields[key] || !("value" in fields[key]!))
+    )
+      return;
+    const data: Record<string, unknown> = {};
+    for (const key of keys) if (fields[key]) data[key] = fields[key]!.value;
+    if (
+      typeof data.settlement !== "string" ||
+      !["fulfilled", "rejected", "unknown"].includes(data.settlement) ||
+      (data.status !== null && typeof data.status !== "number") ||
+      typeof data.reason !== "string" ||
+      typeof data.stopReason !== "string" ||
+      typeof data.groupState !== "string" ||
+      !["quiescent", "live", "unknown"].includes(data.groupState) ||
+      typeof data.closeResult !== "string" ||
+      !["resolved", "rejected", "not-acquired", "unknown"].includes(
+        data.closeResult,
+      ) ||
+      typeof data.reportedCleanupConfirmed !== "boolean" ||
+      ["leaderReaped", "helperClosed", "streamsEnded"].some(
+        (key) => key in data && typeof data[key] !== "boolean",
+      ) ||
+      ("helperCode" in data &&
+        data.helperCode !== null &&
+        typeof data.helperCode !== "number")
+    )
+      return;
+    const reasons = [
+      "target-exit",
+      "close",
+      "cancel",
+      "timeout",
+      "overflow",
+      "control-lost",
+      "no-target",
+    ];
+    const command: Record<string, unknown> = {
+      settlement: data.settlement,
+      status:
+        Number.isSafeInteger(data.status) &&
+        Number(data.status) >= -127 &&
+        Number(data.status) <= 255
+          ? data.status
+          : null,
+      reason: reasons.includes(data.reason) ? data.reason : "unknown",
+      stopReason: [...reasons, "none", "unknown"].includes(data.stopReason)
+        ? data.stopReason
+        : "unknown",
+      groupState: data.groupState,
+      closeResult: data.closeResult,
+      reportedCleanupConfirmed: data.reportedCleanupConfirmed,
+    };
+    for (const key of ["leaderReaped", "helperClosed", "streamsEnded"])
+      if (key in data) command[key] = data[key];
+    if ("helperCode" in data)
+      command.helperCode =
+        Number.isSafeInteger(data.helperCode) &&
+        Number(data.helperCode) >= 0 &&
+        Number(data.helperCode) <= 255
+          ? data.helperCode
+          : null;
+    return { command, cause: outer.cause.value };
+  };
   const visit = (
     value: unknown,
     depth: number,
@@ -148,9 +265,22 @@ export function describeError(error: unknown): string {
         detail.errors = arrayValues(nested, 4).map((entry: unknown) =>
           visit(entry, depth + 1, nodeFailure || wrappedByNode),
         );
-      if ("value" in (fields.cause ?? {}))
+      let cause = fields.cause;
+      if (
+        code === "SDK_DENIED_COMMAND_EXIT" &&
+        (value instanceof Error || nodeFailure) &&
+        cause &&
+        "value" in cause
+      ) {
+        const captured = commandCarrier(cause.value);
+        if (captured) {
+          detail.command = captured.command;
+          cause = { value: captured.cause };
+        }
+      }
+      if (cause && "value" in cause)
         detail.cause = visit(
-          fields.cause!.value,
+          cause.value,
           depth + 1,
           nodeFailure || wrappedByNode,
         );

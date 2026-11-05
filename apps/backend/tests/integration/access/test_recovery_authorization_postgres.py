@@ -24,6 +24,9 @@ from inframeld_backend.access.application.dtos.identity_recovery_event_dto impor
 from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
     ProjectActionAuthorizationRequestDTO,
 )
+from inframeld_backend.access.application.dtos.project_action_grant_changed_audit_event_dto import (
+    ProjectActionGrantChangedAuditEventDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
 )
@@ -381,7 +384,10 @@ class MockControlledAuditEventWriter(AuditEventWriter):
         self.release = asyncio.Event()
 
     @override
-    async def append(self, event: ProjectUseOnlyGrantAssignedAuditEventDTO) -> None:
+    async def append(
+        self,
+        event: ProjectUseOnlyGrantAssignedAuditEventDTO | ProjectActionGrantChangedAuditEventDTO,
+    ) -> None:
         await self._delegate.append(event)
         self.appended.set()
         if self._fail:

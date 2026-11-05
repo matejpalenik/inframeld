@@ -2,6 +2,7 @@ from abc import abstractmethod
 from typing import Protocol
 
 from inframeld_backend.access.domain.entities.project_membership import ProjectMembership
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -15,6 +16,26 @@ class ProjectMembershipRepository(Protocol):
     caller owns the transaction and existing organization/project locks. Keep
     original value snapshots outside the entity, independently of ID equality.
     """
+
+    @abstractmethod
+    async def save_action_grant_change(
+        self,
+        membership: ProjectMembership,
+        *,
+        action_id: ActionId,
+        actor_principal_id: PrincipalId,
+        expected_project_access_revision: int,
+        operation_id: OperationId,
+    ) -> None:
+        """Persist one explicitly supported set/remove transition without commit.
+
+        Retain transaction-bound instance/value snapshots and every other action.
+        Advance Project revision once and append exact before/after audit only
+        for a real change. Preserve original assignment attribution/timestamp on
+        level changes. An unchanged save performs no SQL writes. Legacy save
+        remains additions-only with its existing independent guards.
+        """
+        ...
 
     @abstractmethod
     async def get(

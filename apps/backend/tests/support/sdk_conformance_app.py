@@ -35,13 +35,25 @@ from inframeld_backend.access.application.commands.create_project_command import
 from inframeld_backend.access.application.commands.decide_human_oauth_consent_command import (
     DecideHumanOAuthConsentCommand,
 )
+from inframeld_backend.access.application.commands.remove_project_action_grant_command import (
+    RemoveProjectActionGrantCommand,
+)
 from inframeld_backend.access.application.commands.remove_project_member_command import (
     RemoveProjectMemberCommand,
+)
+from inframeld_backend.access.application.commands.set_project_action_grant_command import (
+    SetProjectActionGrantCommand,
 )
 from inframeld_backend.access.application.commands.update_project_metadata_command import (
     UpdateProjectMetadataCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.access_group_grant_target_dto import (
+    AccessGroupGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
+    ApplicationAccountGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.created_project_dto import CreatedProjectDTO
 from inframeld_backend.access.application.dtos.human_admission_result_dto import (
     HumanAdmissionResultDTO,
@@ -58,6 +70,15 @@ from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto 
 from inframeld_backend.access.application.dtos.my_organization_access_dto import (
     MyOrganizationAccessDTO,
 )
+from inframeld_backend.access.application.dtos.my_project_access_facts_dto import (
+    MyProjectAccessFactsDTO,
+)
+from inframeld_backend.access.application.dtos.my_project_access_grant_dto import (
+    MyProjectAccessGrantDTO,
+)
+from inframeld_backend.access.application.dtos.my_project_access_relationship_dto import (
+    MyProjectAccessRelationshipDTO,
+)
 from inframeld_backend.access.application.dtos.oauth_consent_continuation_dto import (
     OAuthConsentContinuationDTO,
 )
@@ -65,6 +86,9 @@ from inframeld_backend.access.application.dtos.organization_action_grant_dto imp
     OrganizationActionGrantDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
+from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
+    ProjectActionGrantChangeResultDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_grant_dto import ProjectActionGrantDTO
 from inframeld_backend.access.application.dtos.project_action_grants_page_facts_dto import (
     ProjectActionGrantsPageFactsDTO,
@@ -72,6 +96,7 @@ from inframeld_backend.access.application.dtos.project_action_grants_page_facts_
 from inframeld_backend.access.application.dtos.project_creation_result_dto import (
     ProjectCreationResultDTO,
 )
+from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.project_member_dto import ProjectMemberDTO
 from inframeld_backend.access.application.dtos.project_members_page_facts_dto import (
     ProjectMembersPageFactsDTO,
@@ -103,6 +128,9 @@ from inframeld_backend.access.application.protocols.human_session_authenticator 
 from inframeld_backend.access.application.protocols.my_organization_access_reader import (
     MyOrganizationAccessReader,
 )
+from inframeld_backend.access.application.protocols.my_project_access_facts_reader import (
+    MyProjectAccessFactsReader,
+)
 from inframeld_backend.access.application.protocols.project_action_grants_facts_reader import (
     ProjectActionGrantsFactsReader,
 )
@@ -130,6 +158,9 @@ from inframeld_backend.access.application.queries.inspect_human_oauth_consent_qu
 from inframeld_backend.access.application.queries.resolve_project_name_query import (
     ResolveProjectNameQuery,
 )
+from inframeld_backend.access.application.services.my_project_access_service import (
+    MyProjectAccessService,
+)
 from inframeld_backend.access.application.services.project_action_grants_service import (
     ProjectActionGrantsService,
 )
@@ -142,6 +173,9 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
+from inframeld_backend.access.application.value_objects.my_project_access_position import (
+    MyProjectAccessPosition,
+)
 from inframeld_backend.access.application.value_objects.oauth_client_id import OAuthClientId
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.human_oauth_scope import HumanOAuthScope
@@ -149,6 +183,7 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.policies.project_creation_policy import ProjectCreationPolicy
+from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
@@ -173,8 +208,14 @@ from inframeld_backend.access.http.routes.human_admission_routes import (
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
+from inframeld_backend.access.http.routes.my_project_access_routes import (
+    create_my_project_access_router,
+)
 from inframeld_backend.access.http.routes.organization_access_routes import (
     create_organization_access_router,
+)
+from inframeld_backend.access.http.routes.project_action_grant_change_routes import (
+    create_project_action_grant_change_router,
 )
 from inframeld_backend.access.http.routes.project_action_grant_routes import (
     create_project_action_grant_router,
@@ -222,6 +263,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
     ConflictError,
     DependencyUnavailableError,
+    InvalidInputError,
     ResourceNotFoundError,
     StaleRevisionError,
 )
@@ -324,6 +366,77 @@ class MockSDKConsentHandler(HumanOAuthConsentHandler):
 
 
 class MockSDKGrantChanger(ProjectGrantChanger):
+    """Supply wire outcomes without emulating SQL, eligibility or retained history."""
+
+    @override
+    async def set_action_grant(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: SetProjectActionGrantCommand,
+        context: OperationAdmissionContextDTO,
+    ) -> ProjectActionGrantChangeResultDTO:
+        return self._outcome(access, command, context, "set")
+
+    @override
+    async def remove_action_grant(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: RemoveProjectActionGrantCommand,
+        context: OperationAdmissionContextDTO,
+    ) -> ProjectActionGrantChangeResultDTO:
+        return self._outcome(access, command, context, "remove")
+
+    @staticmethod
+    def _outcome(
+        access: AccessContextDTO,
+        command: SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
+        context: OperationAdmissionContextDTO,
+        kind: Literal["set", "remove"],
+    ) -> ProjectActionGrantChangeResultDTO:
+        if command.project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
+            raise ResourceNotFoundError()
+        if command.action_id.value == "inspect-feedback":
+            raise AccessDeniedError()
+        recipient = command.recipient_principal_id.value
+        if recipient == UUID("00000000-0000-4000-8000-000000000007"):
+            raise ConflictError("The controlled recipient is not currently eligible.")
+        if recipient == UUID("00000000-0000-4000-8000-000000000008"):
+            raise InvalidInputError("The controlled grant combination is unsupported.")
+        if recipient not in {
+            UUID("00000000-0000-4000-8000-000000000004"),
+            UUID("00000000-0000-4000-8000-000000000005"),
+            UUID("00000000-0000-4000-8000-000000000006"),
+        }:
+            raise ResourceNotFoundError()
+        if command.expected_access_revision != 7:
+            raise StaleRevisionError()
+        if context.key.value != "sdk-project-grant-key":
+            raise ValueError("The SDK changed the grant idempotency header.")
+        changed = recipient != UUID("00000000-0000-4000-8000-000000000005")
+        return ProjectActionGrantChangeResultDTO(
+            InstallationId(UUID(int=123)),
+            OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            command.project_id,
+            access.actor_principal_id,
+            command.recipient_principal_id,
+            command.action_id,
+            kind,
+            command.can_grant if isinstance(command, SetProjectActionGrantCommand) else None,
+            7 + int(changed),
+            changed,
+            201
+            if kind == "set" and recipient == UUID("00000000-0000-4000-8000-000000000004")
+            else 200,
+            CompletedSynchronousOperationDTO(
+                OperationId("sdk-project-grant-" + kind),
+                False,
+                OperationReplayKind.SAFE_RESULT,
+                datetime(2030, 1, 1, tzinfo=UTC),
+            ),
+        )
+
     @override
     async def assign_use_only(
         self,
@@ -632,6 +745,88 @@ async def _open_project_action_grants() -> AsyncGenerator[ProjectActionGrantsSer
     yield ProjectActionGrantsService(MockSDKProjectActionGrantsFacts())
 
 
+class MockSDKMyProjectAccessFacts(MyProjectAccessFactsReader):
+    """Supply typed stored relationships, without inventing public setup workflows."""
+
+    @override
+    async def read_page(
+        self,
+        *,
+        access: AccessContextDTO,
+        project_id: ProjectId,
+        after: MyProjectAccessPosition | None,
+        limit: int,
+    ) -> MyProjectAccessFactsDTO | None:
+        if project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
+            return None
+        organization = OrganizationId(UUID("00000000-0000-4000-8000-000000000002"))
+        group = AccessGroupId(UUID("00000000-0000-4000-8000-000000000007"))
+        application = PrincipalId(UUID("00000000-0000-4000-8000-000000000008"))
+        entries: tuple[
+            tuple[
+                MyProjectAccessPosition, MyProjectAccessGrantDTO | MyProjectAccessRelationshipDTO
+            ],
+            ...,
+        ] = (
+            (
+                MyProjectAccessPosition("grant", project_id.value, ActionId("inspect-budget")),
+                MyProjectAccessGrantDTO(
+                    ProjectGrantTargetDTO(project_id), ActionId("inspect-budget"), True
+                ),
+            ),
+            (
+                MyProjectAccessPosition("grant", group.value, ActionId("add-documents")),
+                MyProjectAccessGrantDTO(
+                    AccessGroupGrantTargetDTO(project_id, group), ActionId("add-documents"), False
+                ),
+            ),
+            (
+                MyProjectAccessPosition(
+                    "grant", application.value, ActionId("issue-application-keys")
+                ),
+                MyProjectAccessGrantDTO(
+                    ApplicationAccountGrantTargetDTO(project_id, application),
+                    ActionId("issue-application-keys"),
+                    True,
+                ),
+            ),
+            (
+                MyProjectAccessPosition("membership", group.value, None),
+                MyProjectAccessRelationshipDTO("membership", project_id, group),
+            ),
+            (
+                MyProjectAccessPosition("management", group.value, None),
+                MyProjectAccessRelationshipDTO("management", project_id, group),
+            ),
+        )
+        items = tuple(
+            item
+            for position, item in entries
+            if after is None or position.sort_key > after.sort_key
+        )[: limit + 1]
+        return MyProjectAccessFactsDTO(
+            InstallationId(UUID(int=123)),
+            organization,
+            project_id,
+            7,
+            Principal(
+                access.actor_principal_id, organization, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
+            ),
+            False,
+            HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+            if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+            else None,
+            ProjectStatus.ACTIVE,
+            True,
+            items,
+        )
+
+
+@asynccontextmanager
+async def _open_my_project_access() -> AsyncGenerator[MyProjectAccessService]:
+    yield MyProjectAccessService(MockSDKMyProjectAccessFacts())
+
+
 class MockSDKProjectMetadata(ProjectMetadataReader, ProjectMetadataChanger, ProjectNameResolver):
     """Supply explicit metadata observations without claiming persistence or grant administration."""
 
@@ -930,6 +1125,12 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(create_session_router(authenticate))
     application.include_router(create_human_admission_router(authenticate, _open_human_admitter))
     application.include_router(create_project_grant_router(authenticate, _open_grant_change))
+    application.include_router(
+        create_project_action_grant_change_router(authenticate, _open_grant_change)
+    )
+    application.include_router(
+        create_my_project_access_router(authenticate, _open_my_project_access)
+    )
     application.include_router(
         create_project_action_grant_router(authenticate, _open_project_action_grants)
     )
