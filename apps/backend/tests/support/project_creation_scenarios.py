@@ -154,16 +154,16 @@ def creation_service(
     session: AsyncSession, idempotency: OperationIdempotency | None = None
 ) -> ProjectCreationService:
     return ProjectCreationService(
-        transactions=SqlAlchemyTransactionManager(session),
-        authorizer=ProjectCreationAuthorizationService(
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        creation_authorizer=ProjectCreationAuthorizationService(
             PostgresOrganizationAccessFactsReader(session)
         ),
-        writer=PostgresProjectCreationWriter(session),
-        results=PostgresProjectCreationResultReader(session),
-        idempotency=IdempotencyService(PostgresOperationReservationWriter(session))
+        creation_writer=PostgresProjectCreationWriter(session),
+        creation_result_reader=PostgresProjectCreationResultReader(session),
+        operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session))
         if idempotency is None
         else idempotency,
-        fingerprints=creation_fingerprints(),
+        creation_fingerprint_service=creation_fingerprints(),
     )
 
 

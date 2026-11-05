@@ -37,13 +37,13 @@ async def open_project_grant_change(
     """Close one request-local session after the application operation owns its transaction."""
     async with database.session() as session:
         yield ProjectGrantChangeService(
-            transactions=SqlAlchemyTransactionManager(session),
-            authorizer=ProjectGrantAuthorizationService(
+            transaction_manager=SqlAlchemyTransactionManager(session),
+            project_grant_authorizer=ProjectGrantAuthorizationService(
                 PostgresProjectGrantChangeFactsReader(session)
             ),
-            idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-            memberships=PostgresProjectMembershipRepository(
+            operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+            membership_repository=PostgresProjectMembershipRepository(
                 session, PostgresAuditEventWriter(session)
             ),
-            fingerprints=fingerprints,
+            project_grant_change_fingerprint_service=fingerprints,
         )

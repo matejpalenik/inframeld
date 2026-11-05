@@ -98,19 +98,19 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
     def __init__(
         self,
         *,
-        transactions: TransactionManager,
-        facts: ProjectMembershipChangeFactsReader,
-        writer: ProjectMembershipChangeWriter,
-        results: ProjectMembershipChangeResultReader,
-        idempotency: OperationIdempotency,
-        fingerprints: ProjectMembershipChangeFingerprintService,
+        transaction_manager: TransactionManager,
+        membership_facts_reader: ProjectMembershipChangeFactsReader,
+        membership_change_writer: ProjectMembershipChangeWriter,
+        membership_result_reader: ProjectMembershipChangeResultReader,
+        operation_idempotency: OperationIdempotency,
+        membership_fingerprint_service: ProjectMembershipChangeFingerprintService,
     ) -> None:
-        self._transactions = transactions
-        self._facts = facts
-        self._writer = writer
-        self._results = results
-        self._idempotency = idempotency
-        self._fingerprints = fingerprints
+        self._transaction_manager = transaction_manager
+        self._membership_facts_reader = membership_facts_reader
+        self._membership_change_writer = membership_change_writer
+        self._membership_result_reader = membership_result_reader
+        self._operation_idempotency = operation_idempotency
+        self._membership_fingerprint_service = membership_fingerprint_service
 
     @override
     async def add_member(
@@ -125,7 +125,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
             command=command,
             context=context,
             change_kind=ProjectMembershipChangeKind.ADD,
-            fingerprint=self._fingerprints.for_add(command),
+            fingerprint=self._membership_fingerprint_service.for_add(command),
         )
 
     @override
@@ -141,7 +141,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
             command=command,
             context=context,
             change_kind=ProjectMembershipChangeKind.REMOVE,
-            fingerprint=self._fingerprints.for_remove(command),
+            fingerprint=self._membership_fingerprint_service.for_remove(command),
         )
 
     async def _change(
@@ -159,7 +159,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
             raise RuntimeError("Membership change altered its original method or route.")
 
         try:
-            async with asyncio.timeout(5), self._transactions.begin():
+            async with asyncio.timeout(5), self._transaction_manager.begin():
                 facts, scope = await self._lock_and_authorize(access, command)
                 operation = await self._reserve_or_recover(
                     context=context, access=access, scope=scope, fingerprint=fingerprint
@@ -176,8 +176,10 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
                     change_kind is ProjectMembershipChangeKind.REMOVE
                     and facts.recipient_is_project_member
                 ):
-                    responsibilities = await self._facts.load_departure_responsibilities(
-                        facts=facts, principal_id=command.principal_id
+                    responsibilities = (
+                        await self._membership_facts_reader.load_departure_responsibilities(
+                            facts=facts, principal_id=command.principal_id
+                        )
                     )
                     self._require_handover(facts, responsibilities)
                 changed = (
@@ -185,14 +187,14 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
                     if change_kind is ProjectMembershipChangeKind.ADD
                     else facts.recipient_is_project_member
                 )
-                await self._writer.save(
+                await self._membership_change_writer.save(
                     facts=facts,
                     principal_id=command.principal_id,
                     change_kind=change_kind,
                     operation_id=operation.operation_id,
                 )
                 completed = self._completed(
-                    await self._idempotency.record_completed_result(
+                    await self._operation_idempotency.record_completed_result(
                         operation, replay_kind=OperationReplayKind.SAFE_RESULT
                     )
                 )
@@ -218,7 +220,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         access: AccessContextDTO,
         command: AddProjectMemberCommand | RemoveProjectMemberCommand,
     ) -> tuple[ProjectMembershipChangeFactsDTO, ProjectActionAuthorizationDTO]:
-        facts = await self._facts.lock_and_load_membership_state(
+        facts = await self._membership_facts_reader.lock_and_load_membership_state(
             access=access, project_id=command.project_id, principal_id=command.principal_id
         )
         facts = ProjectMembershipObservationDTO.require_requested_scope(
@@ -246,7 +248,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         scope: ProjectActionAuthorizationDTO,
         fingerprint: RequestFingerprint,
     ) -> NewOperationReservationDTO | CompletedSynchronousOperationDTO:
-        operation = await self._idempotency.reserve_or_recover(
+        operation = await self._operation_idempotency.reserve_or_recover(
             context=context,
             access=access,
             authorization=scope,
@@ -271,7 +273,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         change_kind: ProjectMembershipChangeKind,
         operation: CompletedSynchronousOperationDTO,
     ) -> ProjectMembershipChangeResultDTO:
-        original = await self._results.load_original_membership_result(
+        original = await self._membership_result_reader.load_original_membership_result(
             facts=facts,
             principal_id=command.principal_id,
             change_kind=change_kind,

@@ -43,9 +43,11 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 class PostgresProjectMetadataRepairWriter(ProjectMetadataRepairWriter):
     """Save one typed operator receipt and its exact assignment in the caller transaction."""
 
-    def __init__(self, session: AsyncSession, audit: ProjectMetadataAuditWriter) -> None:
+    def __init__(
+        self, session: AsyncSession, metadata_audit_writer: ProjectMetadataAuditWriter
+    ) -> None:
         self._session = session
-        self._audit = audit
+        self._metadata_audit_writer = metadata_audit_writer
         self._recorded: ProjectMetadataRepairReceiptDTO | None = None
 
     def _require_transaction(self) -> None:
@@ -158,7 +160,7 @@ class PostgresProjectMetadataRepairWriter(ProjectMetadataRepairWriter):
                 },
             )
         )
-        await self._audit.repaired(
+        await self._metadata_audit_writer.repaired(
             ProjectMetadataAuthorityRepairedAuditEventDTO(
                 result.organization_id,
                 result.project_id,

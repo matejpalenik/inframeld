@@ -304,11 +304,11 @@ class GrantScenario:
         self.memberships = MockProjectMembershipRepository(self.events)
         self.fingerprints = MockFingerprints(self.events)
         self.service = ProjectGrantChangeService(
-            transactions=self.transactions,
-            authorizer=self.authorizer,
-            idempotency=self.idempotency,
-            memberships=self.memberships,
-            fingerprints=self.fingerprints,
+            transaction_manager=self.transactions,
+            project_grant_authorizer=self.authorizer,
+            operation_idempotency=self.idempotency,
+            membership_repository=self.memberships,
+            project_grant_change_fingerprint_service=self.fingerprints,
         )
 
     async def assign(

@@ -58,19 +58,19 @@ class ProjectCreationService(ProjectCreator):
     def __init__(
         self,
         *,
-        transactions: TransactionManager,
-        authorizer: ProjectCreationAuthorizer,
-        writer: ProjectCreationWriter,
-        results: ProjectCreationResultReader,
-        idempotency: OperationIdempotency,
-        fingerprints: ProjectCreationFingerprintService,
+        transaction_manager: TransactionManager,
+        creation_authorizer: ProjectCreationAuthorizer,
+        creation_writer: ProjectCreationWriter,
+        creation_result_reader: ProjectCreationResultReader,
+        operation_idempotency: OperationIdempotency,
+        creation_fingerprint_service: ProjectCreationFingerprintService,
     ) -> None:
-        self._transactions = transactions
-        self._authorizer = authorizer
-        self._writer = writer
-        self._results = results
-        self._idempotency = idempotency
-        self._fingerprints = fingerprints
+        self._transaction_manager = transaction_manager
+        self._creation_authorizer = creation_authorizer
+        self._creation_writer = creation_writer
+        self._creation_result_reader = creation_result_reader
+        self._operation_idempotency = operation_idempotency
+        self._creation_fingerprint_service = creation_fingerprint_service
 
     @override
     async def create(
@@ -82,16 +82,16 @@ class ProjectCreationService(ProjectCreator):
     ) -> ProjectCreationResultDTO:
         if context.method != "POST" or context.requested_route != "/v1/projects":
             raise RuntimeError("Project creation changed its original operation route.")
-        fingerprint = self._fingerprints.for_create(command)
+        fingerprint = self._creation_fingerprint_service.for_create(command)
         try:
-            async with asyncio.timeout(5), self._transactions.begin():
-                scope = await self._authorizer.require_creation(
+            async with asyncio.timeout(5), self._transaction_manager.begin():
+                scope = await self._creation_authorizer.require_creation(
                     access=access, organization_id=command.organization_id
                 )
                 if scope.organization_id != command.organization_id or scope.project_id is not None:
                     raise RuntimeError("Creation authorization changed the requested scope.")
 
-                operation = await self._idempotency.reserve_or_recover(
+                operation = await self._operation_idempotency.reserve_or_recover(
                     context=context,
                     access=access,
                     authorization=scope,
@@ -105,7 +105,7 @@ class ProjectCreationService(ProjectCreator):
                 actions = tuple(ActionId(value) for value in ProjectCreationPolicy.INITIAL_ACTIONS)
                 if not isinstance(operation, NewOperationReservationDTO):
                     completed = self._completed(operation)
-                    original = await self._results.original(
+                    original = await self._creation_result_reader.original(
                         organization_id=scope.organization_id,
                         actor_id=access.actor_principal_id,
                         operation_id=completed.operation_id,
@@ -134,11 +134,11 @@ class ProjectCreationService(ProjectCreator):
                     0,
                     actions,
                 )
-                await self._writer.create(
+                await self._creation_writer.create(
                     project=project, expected_organization_revision=scope.access_revision
                 )
                 completed = self._completed(
-                    await self._idempotency.record_completed_result(
+                    await self._operation_idempotency.record_completed_result(
                         operation, replay_kind=OperationReplayKind.SAFE_RESULT
                     )
                 )

@@ -134,7 +134,7 @@ def _service(
         recoveries if recoveries is not None else PostgresIdentityRecoveryRepository(session),
         installation_id=installation_id,
         authority=AUTHORITY,
-        proofs=PostgresIdentityRecoveryCleanupProofReader(
+        recovery_cleanup_proof_reader=PostgresIdentityRecoveryCleanupProofReader(
             session, installation_id=installation_id, authority=AUTHORITY
         ),
         proof_writer=PostgresIdentityRecoveryCleanupProofWriter(

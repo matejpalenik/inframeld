@@ -42,8 +42,8 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class ProjectMembersService(ProjectMembersReader):
-    def __init__(self, facts: ProjectMembersFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, project_members_facts_reader: ProjectMembersFactsReader) -> None:
+        self._project_members_facts_reader = project_members_facts_reader
 
     @override
     async def list_members(
@@ -59,7 +59,7 @@ class ProjectMembersService(ProjectMembersReader):
             ) from error
         try:
             async with asyncio.timeout(5):
-                facts = await self._facts.read_page(
+                facts = await self._project_members_facts_reader.read_page(
                     access=access,
                     project_id=query.project_id,
                     after=cursor.after if cursor is not None else None,

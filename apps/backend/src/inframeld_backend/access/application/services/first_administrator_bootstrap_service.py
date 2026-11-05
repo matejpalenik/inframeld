@@ -61,10 +61,10 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
         *,
         token_verifier: HumanAccessTokenVerifier,
         identity_verifier: HumanIdentityVerifier,
-        transactions: TransactionManager,
-        facts: FirstAdministratorBootstrapFactsReader,
-        writer: FirstAdministratorBootstrapWriter,
-        fingerprints: FirstAdministratorBootstrapFingerprintService,
+        transaction_manager: TransactionManager,
+        bootstrap_facts_reader: FirstAdministratorBootstrapFactsReader,
+        bootstrap_writer: FirstAdministratorBootstrapWriter,
+        bootstrap_fingerprint_service: FirstAdministratorBootstrapFingerprintService,
         provider_timeout_seconds: float = 5.0,
         total_timeout_seconds: float = 10.0,
     ) -> None:
@@ -73,10 +73,10 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
                 raise ValueError("Proof verification requires finite positive timeouts.")
         self._token_verifier = token_verifier
         self._identity_verifier = identity_verifier
-        self._transactions = transactions
-        self._facts = facts
-        self._writer = writer
-        self._fingerprints = fingerprints
+        self._transaction_manager = transaction_manager
+        self._bootstrap_facts_reader = bootstrap_facts_reader
+        self._bootstrap_writer = bootstrap_writer
+        self._bootstrap_fingerprint_service = bootstrap_fingerprint_service
         self._provider_timeout_seconds = provider_timeout_seconds
         self._total_timeout_seconds = total_timeout_seconds
 
@@ -85,10 +85,10 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
         self, command: BootstrapFirstAdministratorCommand
     ) -> FirstAdministratorBootstrapResultDTO:
         binding = await self._verify(command)
-        fingerprint = self._fingerprints.for_bootstrap(command, binding.identity)
+        fingerprint = self._bootstrap_fingerprint_service.for_bootstrap(command, binding.identity)
         try:
             async with asyncio.timeout(5):
-                async with self._transactions.begin():
+                async with self._transaction_manager.begin():
                     return await self._claim(command, binding, fingerprint)
         except TimeoutError:
             raise FirstAdministratorBootstrapError(Code.DEPENDENCY_UNAVAILABLE) from None
@@ -133,7 +133,7 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
         binding: HumanOAuthCredentialBindingDTO,
         fingerprint: RequestFingerprint,
     ) -> FirstAdministratorBootstrapResultDTO:
-        facts = await self._facts.read(
+        facts = await self._bootstrap_facts_reader.read(
             installation_id=command.expected_installation_id, identity=binding.identity
         )
         state = facts.credential_state
@@ -160,7 +160,7 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
         ):
             raise FirstAdministratorBootstrapError(Code.IDENTITY_INELIGIBLE)
 
-        recorded = await self._facts.receipt(
+        recorded = await self._bootstrap_facts_reader.receipt(
             installation_id=facts.installation_id, operation_id=command.operation_id
         )
         if recorded is not None:
@@ -210,6 +210,6 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
             facts.observed_at,
             result,
         )
-        if not await self._writer.bootstrap(facts=facts, receipt=receipt):
+        if not await self._bootstrap_writer.bootstrap(facts=facts, receipt=receipt):
             raise FirstAdministratorBootstrapError(Code.KEY_REUSED)
         return result

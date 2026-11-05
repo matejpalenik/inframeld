@@ -155,10 +155,10 @@ class Scenario:
             RequestFingerprintService(RequestFingerprintKey(b"K" * 32))
         )
         self.service = ProjectMetadataRepairService(
-            transactions=MockTransactions(self.events),
-            facts=self.facts,
-            writer=self.writer,
-            fingerprints=self.fingerprints,
+            transaction_manager=MockTransactions(self.events),
+            metadata_repair_facts_reader=self.facts,
+            metadata_repair_writer=self.writer,
+            metadata_fingerprint_service=self.fingerprints,
         )
 
     def save_original(self) -> None:

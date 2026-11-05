@@ -208,10 +208,10 @@ def scenario() -> BootstrapScenarioDTO:
         FirstAdministratorBootstrapService(
             token_verifier=token,
             identity_verifier=verifier,
-            transactions=transactions,
-            facts=reader,
-            writer=writer,
-            fingerprints=FirstAdministratorBootstrapFingerprintService(
+            transaction_manager=transactions,
+            bootstrap_facts_reader=reader,
+            bootstrap_writer=writer,
+            bootstrap_fingerprint_service=FirstAdministratorBootstrapFingerprintService(
                 RequestFingerprintService(RequestFingerprintKey(b"k" * 32))
             ),
         ),

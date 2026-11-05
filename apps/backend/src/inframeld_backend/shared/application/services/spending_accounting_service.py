@@ -79,18 +79,18 @@ class SpendingAccountingService(SpendingAccountant):
     def __init__(
         self,
         *,
-        transactions: TransactionManager,
-        authorizer: AdmittedWorkAuthorizer,
-        ownership: JobOwnership,
-        reader: SpendingLedgerReader,
-        writer: SpendingLedgerWriter,
+        transaction_manager: TransactionManager,
+        admitted_work_authorizer: AdmittedWorkAuthorizer,
+        job_ownership: JobOwnership,
+        spending_ledger_reader: SpendingLedgerReader,
+        spending_ledger_writer: SpendingLedgerWriter,
         budget_authorizer: ProjectBudgetAuthorizer,
     ) -> None:
-        self._transactions = transactions
-        self._authorizer = authorizer
-        self._ownership = ownership
-        self._reader = reader
-        self._writer = writer
+        self._transaction_manager = transaction_manager
+        self._admitted_work_authorizer = admitted_work_authorizer
+        self._job_ownership = job_ownership
+        self._spending_ledger_reader = spending_ledger_reader
+        self._spending_ledger_writer = spending_ledger_writer
         self._budget_authorizer = budget_authorizer
 
     @override
@@ -103,13 +103,15 @@ class SpendingAccountingService(SpendingAccountant):
     ) -> SpendingAccountingResultDTO:
         if operation_limit is not None and operation_limit.value < 0:
             raise ValueError("An operation spending limit cannot be negative.")
-        async with self._transactions.begin():
-            await self._authorizer.require_current(call.authority)
-            current = await self._ownership.require_current(call.attempt)
+        async with self._transaction_manager.begin():
+            await self._admitted_work_authorizer.require_current(call.authority)
+            current = await self._job_ownership.require_current(call.attempt)
             if current.cancel_requested:
                 raise JobStoppedError("Canceled work cannot reserve a new call.")
             policy = await self._lock_account(call)
-            await self._writer.ensure_operation(call=call, operation_limit=operation_limit)
+            await self._spending_ledger_writer.ensure_operation(
+                call=call, operation_limit=operation_limit
+            )
             existing = await self._find_call(call)
             if existing is not None:
                 self._require_binding(existing, call)
@@ -134,16 +136,16 @@ class SpendingAccountingService(SpendingAccountant):
                 policy.revision,
             )
             await self._require_allowance(policy, record, amount)
-            await self._writer.insert_call(record)
+            await self._spending_ledger_writer.insert_call(record)
             return SpendingAccountingResultDTO(record)
 
     @override
     async def approve_accounting(
         self, *, call: SpendingCallContextDTO, expected_call_revision: int
     ) -> SpendingAccountingResultDTO:
-        async with self._transactions.begin():
-            await self._authorizer.require_current(call.authority)
-            current = await self._ownership.require_current(call.attempt)
+        async with self._transaction_manager.begin():
+            await self._admitted_work_authorizer.require_current(call.authority)
+            current = await self._job_ownership.require_current(call.attempt)
             if current.cancel_requested:
                 raise JobStoppedError("Canceled work cannot receive accounting approval.")
             policy = await self._lock_account(call)
@@ -162,7 +164,7 @@ class SpendingAccountingService(SpendingAccountant):
                 approved_policy_revision=policy.revision,
                 revision=record.revision + 1,
             )
-            await self._writer.save_call(updated, expected_revision=record.revision)
+            await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
             return SpendingAccountingResultDTO(updated)
 
     @override
@@ -175,11 +177,11 @@ class SpendingAccountingService(SpendingAccountant):
     ) -> SpendingAccountingResultDTO:
         if observation.call_id != call.call_id:
             raise ConflictError("Evidence must identify the original call.")
-        async with self._transactions.begin():
-            await self._authorizer.require_current(call.authority)
+        async with self._transaction_manager.begin():
+            await self._admitted_work_authorizer.require_current(call.authority)
             await self._require_call(call)
             try:
-                await self._ownership.require_current(call.attempt)
+                await self._job_ownership.require_current(call.attempt)
             except JobFenceLostError:
                 # Normal return preserves this evidence in the owning transaction.
                 # The accounting record and its hold remain untouched.
@@ -195,10 +197,10 @@ class SpendingAccountingService(SpendingAccountant):
             if record.state in (SpendingCallState.SETTLED, SpendingCallState.RELEASED):
                 return await self._retain_pending(record, observation, expected_call_revision)
             updated = self._apply_observation(record, observation)
-            await self._writer.record_observation(
+            await self._spending_ledger_writer.record_observation(
                 record=record, observation=observation, applied_result=updated
             )
-            await self._writer.save_call(updated, expected_revision=record.revision)
+            await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
             return SpendingAccountingResultDTO(updated)
 
     @override
@@ -212,7 +214,7 @@ class SpendingAccountingService(SpendingAccountant):
         authoritative_evidence_id: UUID,
         expected_call_revision: int,
     ) -> SpendingAccountingResultDTO:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             authorization = await self._budget_authorizer.require_authorization(
                 access=access,
                 request=ProjectActionAuthorizationRequestDTO(
@@ -221,14 +223,14 @@ class SpendingAccountingService(SpendingAccountant):
             )
             if authorization.project_id != project_id:
                 raise AccessDeniedError()
-            await self._writer.ensure_project_account(
+            await self._spending_ledger_writer.ensure_project_account(
                 organization_id=authorization.organization_id, project_id=project_id
             )
-            policy = await self._reader.lock_project_policy(
+            policy = await self._spending_ledger_reader.lock_project_policy(
                 organization_id=authorization.organization_id, project_id=project_id
             )
             self._require_policy_scope(policy, authorization.organization_id, project_id)
-            record = await self._reader.find_call(
+            record = await self._spending_ledger_reader.find_call(
                 organization_id=authorization.organization_id,
                 project_id=project_id,
                 call_id=call_id,
@@ -269,16 +271,18 @@ class SpendingAccountingService(SpendingAccountant):
                 if already_applied
                 else self._apply_observation(record, observation)
             )
-            await self._writer.save_call(updated, expected_revision=record.revision)
+            await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
             if not already_applied and authoritative_evidence_id != pending_evidence_id:
-                await self._writer.mark_observation_applied(
+                await self._spending_ledger_writer.mark_observation_applied(
                     record=record, evidence_id=authoritative_evidence_id, result=updated
                 )
             resolution = SpendingEvidenceResolutionDTO(
                 pending_evidence_id, authoritative_evidence_id, updated
             )
-            await self._writer.record_resolution(record=record, resolution=resolution)
-            await self._writer.save_correction_audit(
+            await self._spending_ledger_writer.record_resolution(
+                record=record, resolution=resolution
+            )
+            await self._spending_ledger_writer.save_correction_audit(
                 actor_id=access.actor_principal_id,
                 resolution=resolution,
                 previous_revision=record.revision,
@@ -288,7 +292,9 @@ class SpendingAccountingService(SpendingAccountant):
     async def _evidence(
         self, record: SpendingCallRecordDTO, evidence_id: UUID
     ) -> tuple[SpendingObservationDTO, SpendingCallRecordDTO | None, bool] | None:
-        retained = await self._reader.observation(record=record, evidence_id=evidence_id)
+        retained = await self._spending_ledger_reader.observation(
+            record=record, evidence_id=evidence_id
+        )
         if retained is not None:
             observation, result, _ = retained
             if observation.call_id != record.call_id or observation.evidence_id != evidence_id:
@@ -305,7 +311,7 @@ class SpendingAccountingService(SpendingAccountant):
     async def _resolution(
         self, record: SpendingCallRecordDTO, pending_evidence_id: UUID
     ) -> SpendingEvidenceResolutionDTO | None:
-        resolution = await self._reader.resolution(
+        resolution = await self._spending_ledger_reader.resolution(
             record=record, pending_evidence_id=pending_evidence_id
         )
         if resolution is not None:
@@ -342,17 +348,17 @@ class SpendingAccountingService(SpendingAccountant):
 
     async def _lock_account(self, call: SpendingCallContextDTO) -> ProjectSpendingPolicyDTO:
         scope = call.authority
-        await self._writer.ensure_project_account(
+        await self._spending_ledger_writer.ensure_project_account(
             organization_id=scope.organization_id, project_id=scope.project_id
         )
-        policy = await self._reader.lock_project_policy(
+        policy = await self._spending_ledger_reader.lock_project_policy(
             organization_id=scope.organization_id, project_id=scope.project_id
         )
         self._require_policy_scope(policy, scope.organization_id, scope.project_id)
         return policy
 
     async def _find_call(self, call: SpendingCallContextDTO) -> SpendingCallRecordDTO | None:
-        return await self._reader.find_call(
+        return await self._spending_ledger_reader.find_call(
             organization_id=call.authority.organization_id,
             project_id=call.authority.project_id,
             call_id=call.call_id,
@@ -392,18 +398,20 @@ class SpendingAccountingService(SpendingAccountant):
         exclude_self: bool = False,
     ) -> None:
         excluded = record.call_id if exclude_self else None
-        project = await self._reader.project_totals(
+        project = await self._spending_ledger_reader.project_totals(
             organization_id=record.authority.organization_id,
             project_id=record.authority.project_id,
             period=record.period,
             exclude_call_id=excluded,
         )
-        operation = await self._reader.operation_totals(record=record, exclude_call_id=excluded)
+        operation = await self._spending_ledger_reader.operation_totals(
+            record=record, exclude_call_id=excluded
+        )
         if exclude_self:
             # Excluding this call prevents double-counting its reservation, but
             # cannot hide its pending evidence from the completeness precondition.
             if policy.monthly_limit is not None:
-                applicable = await self._reader.project_totals(
+                applicable = await self._spending_ledger_reader.project_totals(
                     organization_id=record.authority.organization_id,
                     project_id=record.authority.project_id,
                     period=record.period,
@@ -411,7 +419,7 @@ class SpendingAccountingService(SpendingAccountant):
                 if applicable.unquantified_holds:
                     raise IncompleteSpendingFactsError("Applicable Project facts are incomplete.")
             if record.operation_limit is not None:
-                applicable = await self._reader.operation_totals(record=record)
+                applicable = await self._spending_ledger_reader.operation_totals(record=record)
                 if applicable.unquantified_holds:
                     raise IncompleteSpendingFactsError("Applicable operation facts are incomplete.")
         if (
@@ -460,11 +468,11 @@ class SpendingAccountingService(SpendingAccountant):
         if recovered is not None:
             return recovered
         self._require_revision(record, expected_revision)
-        await self._writer.record_observation(
+        await self._spending_ledger_writer.record_observation(
             record=record, observation=observation, applied_result=None
         )
         updated = replace(record, revision=record.revision + 1)
-        await self._writer.save_call(updated, expected_revision=record.revision)
+        await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
         return SpendingAccountingResultDTO(updated, pending=True)
 
     @staticmethod

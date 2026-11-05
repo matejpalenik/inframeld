@@ -61,22 +61,22 @@ class IdentityRecoveryCompletionService(
 ):
     def __init__(
         self,
-        transactions: TransactionManager,
-        facts: IdentityRecoveryCompletionFactsReader,
-        recoveries: IdentityRecoveryRepository,
+        transaction_manager: TransactionManager,
+        recovery_completion_facts_reader: IdentityRecoveryCompletionFactsReader,
+        recovery_repository: IdentityRecoveryRepository,
         *,
-        proofs: IdentityRecoveryCleanupProofReader,
+        recovery_cleanup_proof_reader: IdentityRecoveryCleanupProofReader,
         proof_writer: IdentityRecoveryCleanupProofWriter,
         installation_id: InstallationId,
         authority: IdentityAuthority,
         database_timeout_seconds: float = 5,
     ) -> None:
         self._database_timeout_seconds = database_timeout_seconds
-        self._proofs = proofs
+        self._recovery_cleanup_proof_reader = recovery_cleanup_proof_reader
         self._proof_writer = proof_writer
-        self._transactions = transactions
-        self._facts = facts
-        self._recoveries = recoveries
+        self._transaction_manager = transaction_manager
+        self._recovery_completion_facts_reader = recovery_completion_facts_reader
+        self._recovery_repository = recovery_repository
         self._installation_id = installation_id
         self._authority = authority
 
@@ -85,7 +85,7 @@ class IdentityRecoveryCompletionService(
         self, *, operation_id: OperationId, covering_operation_id: OperationId | None = None
     ) -> IdentityRecoveryCleanupResultDTO:
         async with self._proof_stage():
-            original = await self._proofs.read_admission(operation_id)
+            original = await self._recovery_cleanup_proof_reader.read_admission(operation_id)
             if original.operation_id != operation_id:
                 raise RuntimeError("Proof facts do not match the original operation.")
 
@@ -94,7 +94,7 @@ class IdentityRecoveryCompletionService(
                 raise RuntimeError("Completion facts changed the original operation.")
 
             source_id = covering_operation_id or operation_id
-            proof = await self._proofs.read_proof(source_id)
+            proof = await self._recovery_cleanup_proof_reader.read_proof(source_id)
             if proof is None:
                 raise ConflictError("Recovery completion requires saved cleanup proof.")
 
@@ -103,7 +103,9 @@ class IdentityRecoveryCompletionService(
 
             self._require_complete_proof(proof, facts)
             source = proof.source_admission.operation_id
-            if source != operation_id and not await self._proofs.is_linked(source, operation_id):
+            if source != operation_id and not await self._recovery_cleanup_proof_reader.is_linked(
+                source, operation_id
+            ):
                 raise ConflictError("The newer recovery does not cover this checklist.")
 
             if covering_operation_id is not None and covering_operation_id != operation_id:
@@ -129,7 +131,7 @@ class IdentityRecoveryCompletionService(
     async def _proof_stage(self) -> AsyncGenerator[None]:
         try:
             async with asyncio.timeout(self._database_timeout_seconds):
-                async with self._transactions.begin():
+                async with self._transaction_manager.begin():
                     yield
         except TimeoutError:
             raise DependencyUnavailableError(
@@ -171,7 +173,7 @@ class IdentityRecoveryCompletionService(
         if event.identity.authority != self._authority:
             raise ConflictError("The recovery event does not match the configured provider.")
 
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             facts = await self._read_checked_facts(event)
             return await self._record(facts, kratos_outcome, hydra_outcome)
 
@@ -179,7 +181,7 @@ class IdentityRecoveryCompletionService(
         self, event: IdentityRecoveryEventDTO
     ) -> IdentityRecoveryCompletionFactsDTO:
         try:
-            facts = await self._facts.read(
+            facts = await self._recovery_completion_facts_reader.read(
                 installation_id=self._installation_id,
                 authority=self._authority,
                 flow_id=event.flow_id,
@@ -214,7 +216,7 @@ class IdentityRecoveryCompletionService(
     ) -> IdentityRecoveryCleanupResultDTO:
         stored_event = facts.admission.event
         try:
-            recovery = await self._recoveries.get(
+            recovery = await self._recovery_repository.get(
                 installation_id=facts.installation_id,
                 authority=stored_event.identity.authority,
                 flow_id=stored_event.flow_id,
@@ -245,7 +247,7 @@ class IdentityRecoveryCompletionService(
         if IdentityRecoveryReleasePolicy.may_release(recovery=recovery, principal=facts.principal):
             recovery.release_product_block(at=datetime.now(UTC))
 
-        await self._recoveries.save(recovery)
+        await self._recovery_repository.save(recovery)
 
         return self._to_result(recovery, facts)
 

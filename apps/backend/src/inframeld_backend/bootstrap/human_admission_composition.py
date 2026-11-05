@@ -51,12 +51,12 @@ async def open_human_admission(
 
     async with database.session() as session:
         yield HumanAdmissionService(
-            transactions=SqlAlchemyTransactionManager(session),
-            facts=PostgresHumanAdmissionFactsReader(session),
-            writer=PostgresHumanAdmissionWriter(session),
-            results=PostgresHumanAdmissionResultReader(session),
-            idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-            fingerprints=fingerprints,
+            transaction_manager=SqlAlchemyTransactionManager(session),
+            admission_facts_reader=PostgresHumanAdmissionFactsReader(session),
+            admission_writer=PostgresHumanAdmissionWriter(session),
+            admission_result_reader=PostgresHumanAdmissionResultReader(session),
+            operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+            admission_fingerprint_service=fingerprints,
             identity_verifier=identity_verifier,
             identity_authority=identity_authority,
             identity_timeout_seconds=identity_timeout_seconds,

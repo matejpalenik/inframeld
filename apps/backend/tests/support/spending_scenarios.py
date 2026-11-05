@@ -399,11 +399,13 @@ def accounting_service(
     session: AsyncSession, writer: SpendingLedgerWriter | None = None
 ) -> SpendingAccountingService:
     return SpendingAccountingService(
-        transactions=SqlAlchemyTransactionManager(session),
-        authorizer=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-        ownership=PostgresJobStore(session),
-        reader=PostgresSpendingLedgerReader(session),
-        writer=PostgresSpendingLedgerWriter(session) if writer is None else writer,
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        admitted_work_authorizer=AdmittedWorkAuthorizationService(
+            PostgresAdmittedWorkFactsReader(session)
+        ),
+        job_ownership=PostgresJobStore(session),
+        spending_ledger_reader=PostgresSpendingLedgerReader(session),
+        spending_ledger_writer=PostgresSpendingLedgerWriter(session) if writer is None else writer,
         budget_authorizer=ProjectBudgetAuthorizationService(
             PostgresProjectBudgetFactsReader(session)
         ),
@@ -414,12 +416,14 @@ def policy_service(
     session: AsyncSession, writer: SpendingLedgerWriter | None = None
 ) -> ProjectSpendingPolicyService:
     return ProjectSpendingPolicyService(
-        transactions=SqlAlchemyTransactionManager(session),
-        authorizer=ProjectBudgetAuthorizationService(PostgresProjectBudgetFactsReader(session)),
-        reader=PostgresSpendingLedgerReader(session),
-        writer=PostgresSpendingLedgerWriter(session) if writer is None else writer,
-        idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-        fingerprints=fingerprints(),
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        project_budget_authorizer=ProjectBudgetAuthorizationService(
+            PostgresProjectBudgetFactsReader(session)
+        ),
+        spending_ledger_reader=PostgresSpendingLedgerReader(session),
+        spending_ledger_writer=PostgresSpendingLedgerWriter(session) if writer is None else writer,
+        operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+        spending_policy_fingerprint_service=fingerprints(),
     )
 
 

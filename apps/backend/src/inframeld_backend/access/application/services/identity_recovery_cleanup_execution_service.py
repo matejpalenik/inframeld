@@ -51,10 +51,10 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        facts: IdentityRecoveryCleanupFactsReader,
-        writer: IdentityRecoveryCleanupWriter,
-        revoker: HumanOAuthCredentialRevoker,
+        transaction_manager: TransactionManager,
+        recovery_cleanup_facts_reader: IdentityRecoveryCleanupFactsReader,
+        recovery_cleanup_writer: IdentityRecoveryCleanupWriter,
+        human_o_auth_credential_revoker: HumanOAuthCredentialRevoker,
         *,
         worker_id: UUID,
         provider_timeout_seconds: float = 5,
@@ -62,10 +62,10 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
         lease_seconds: float = 60,
         stop_requested: Callable[[], bool] = lambda: False,
     ) -> None:
-        self._transactions = transactions
-        self._facts = facts
-        self._writer = writer
-        self._revoker = revoker
+        self._transaction_manager = transaction_manager
+        self._recovery_cleanup_facts_reader = recovery_cleanup_facts_reader
+        self._recovery_cleanup_writer = recovery_cleanup_writer
+        self._human_o_auth_credential_revoker = human_o_auth_credential_revoker
         self._worker_id = worker_id
         self._provider_timeout_seconds = provider_timeout_seconds
         self._database_timeout_seconds = database_timeout_seconds
@@ -76,7 +76,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
     async def _stage(self) -> AsyncGenerator[None]:
         try:
             async with asyncio.timeout(self._database_timeout_seconds):
-                async with self._transactions.begin():
+                async with self._transaction_manager.begin():
                     yield
         except TimeoutError:
             raise DependencyUnavailableError(
@@ -89,11 +89,11 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
             return False
 
         async with self._stage():
-            operation_id = await self._facts.next_candidate()
+            operation_id = await self._recovery_cleanup_facts_reader.next_candidate()
             if operation_id is None:
                 return False
 
-            work = await self._facts.lock_work(operation_id)
+            work = await self._recovery_cleanup_facts_reader.lock_work(operation_id)
             if work is None:
                 return False
 
@@ -104,7 +104,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
             if work.credential_version is None:
                 # Retain the block and let other identities proceed without an attempt.
                 next_at = now + timedelta(seconds=15)
-                await self._writer.finish(
+                await self._recovery_cleanup_writer.finish(
                     work,
                     at=now,
                     terminal_reason="deadline_exhausted" if next_at >= work.run.deadline else None,
@@ -123,7 +123,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
                 return True
 
             if work.released_at is not None:
-                await self._writer.finish(
+                await self._recovery_cleanup_writer.finish(
                     work,
                     at=now,
                     terminal_reason="cleanup_confirmed"
@@ -137,7 +137,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
                 return True
 
             if now >= work.run.deadline or work.run.consumed_attempts >= work.run.max_attempts:
-                await self._writer.finish(
+                await self._recovery_cleanup_writer.finish(
                     work,
                     at=now,
                     terminal_reason="deadline_exhausted"
@@ -157,7 +157,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
                 uuid4(),
                 now + timedelta(seconds=self._lease_seconds),
             )
-            await self._writer.claim(work, claim, at=now)
+            await self._recovery_cleanup_writer.claim(work, claim, at=now)
 
         try:
             for step in IdentityRecoveryCleanupStep:
@@ -185,7 +185,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
                     )
                     if timeout <= 0:
                         break
-                    await self._writer.admit_step(claim, step, at=now)
+                    await self._recovery_cleanup_writer.admit_step(claim, step, at=now)
 
                 now = datetime.now(UTC)
                 timeout = min(
@@ -198,11 +198,11 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
 
                 # Admission is committed. A later stop cannot recall this remote call.
                 outcome = await (
-                    self._revoker.revoke_cli_grants(
+                    self._human_o_auth_credential_revoker.revoke_cli_grants(
                         work.admission.event.identity.subject, timeout_seconds=timeout
                     )
                     if step is IdentityRecoveryCleanupStep.CLI_GRANTS
-                    else self._revoker.revoke_remembered_logins(
+                    else self._human_o_auth_credential_revoker.revoke_remembered_logins(
                         work.admission.event.identity.subject, timeout_seconds=timeout
                     )
                 )
@@ -210,7 +210,9 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
                 async with self._stage():
                     if await self._owned_work(claim) is None:
                         return True
-                    await self._writer.checkpoint(claim, step, outcome, at=datetime.now(UTC))
+                    await self._recovery_cleanup_writer.checkpoint(
+                        claim, step, outcome, at=datetime.now(UTC)
+                    )
 
                 if outcome.disposition is OAuthCleanupDisposition.OPERATOR_REQUIRED:
                     break
@@ -227,7 +229,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
             async with self._stage():
                 current = await self._owned_work(claim)
                 if current is not None:
-                    await self._writer.finish(
+                    await self._recovery_cleanup_writer.finish(
                         current, at=datetime.now(UTC), terminal_reason="unexpected_error"
                     )
             raise
@@ -237,7 +239,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
     async def _owned_work(
         self, claim: IdentityRecoveryCleanupClaimDTO
     ) -> IdentityRecoveryCleanupWorkDTO | None:
-        current = await self._facts.lock_work(claim.operation_id)
+        current = await self._recovery_cleanup_facts_reader.lock_work(claim.operation_id)
         if (
             current is None
             or current.claim != claim
@@ -274,8 +276,10 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
 
     async def _finish(self, work: IdentityRecoveryCleanupWorkDTO, now: datetime) -> None:
         if self._confirmed(work):
-            await self._writer.save_complete_proof(work, at=now)
-            await self._writer.finish(work, at=now, terminal_reason="cleanup_confirmed")
+            await self._recovery_cleanup_writer.save_complete_proof(work, at=now)
+            await self._recovery_cleanup_writer.finish(
+                work, at=now, terminal_reason="cleanup_confirmed"
+            )
             return
 
         outcomes = [step.outcome for step in work.steps if step.outcome is not None]
@@ -289,12 +293,12 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
                 if permanent.state is IdentityRecoveryCleanupState.FAILED
                 else "provider_protocol_error"
             )
-            await self._writer.finish(work, at=now, terminal_reason=reason)
+            await self._recovery_cleanup_writer.finish(work, at=now, terminal_reason=reason)
             return
 
         budget = IdentityRecoveryCleanupRunBudget(work.run.authorized_at)
         if work.run.consumed_attempts >= budget.max_attempts or now >= budget.deadline:
-            await self._writer.finish(
+            await self._recovery_cleanup_writer.finish(
                 work,
                 at=now,
                 terminal_reason="attempt_budget_exhausted"
@@ -310,7 +314,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
             jitter_seconds=random.randint(1, min(600, 15 * 2 ** (work.run.consumed_attempts - 1))),
             retry_after_seconds=delay,
         )
-        await self._writer.finish(
+        await self._recovery_cleanup_writer.finish(
             work,
             at=now,
             terminal_reason="deadline_exhausted" if next_at is None else None,

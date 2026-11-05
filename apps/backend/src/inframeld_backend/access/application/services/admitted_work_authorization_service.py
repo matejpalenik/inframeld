@@ -23,8 +23,8 @@ from inframeld_backend.shared.application.errors.application_errors import Acces
 
 
 class AdmittedWorkAuthorizationService(AdmittedWorkAuthorizer):
-    def __init__(self, facts: AdmittedWorkFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, admitted_work_facts_reader: AdmittedWorkFactsReader) -> None:
+        self._admitted_work_facts_reader = admitted_work_facts_reader
 
     @override
     async def require_current(self, authority: AdmittedWorkAuthorityDTO) -> None:
@@ -33,7 +33,7 @@ class AdmittedWorkAuthorizationService(AdmittedWorkAuthorizer):
         ):
             raise AccessDeniedError("The admitted Project action is not eligible for this caller.")
 
-        facts = await self._facts.read(authority)
+        facts = await self._admitted_work_facts_reader.read(authority)
         if facts is None or (
             facts.principal.id != authority.principal_id
             or facts.principal.organization_id != authority.organization_id

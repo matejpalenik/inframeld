@@ -64,27 +64,29 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
     def __init__(
         self,
         *,
-        transactions: TransactionManager,
-        authorizer: ProjectMetadataAuthorizer,
-        idempotency: OperationIdempotency,
-        repository: ProjectMetadataRepository,
-        fingerprints: ProjectMetadataFingerprintService,
+        transaction_manager: TransactionManager,
+        metadata_authorizer: ProjectMetadataAuthorizer,
+        operation_idempotency: OperationIdempotency,
+        metadata_repository: ProjectMetadataRepository,
+        metadata_fingerprint_service: ProjectMetadataFingerprintService,
     ) -> None:
-        self._transactions = transactions
-        self._authorizer = authorizer
-        self._idempotency = idempotency
-        self._repository = repository
-        self._fingerprints = fingerprints
+        self._transaction_manager = transaction_manager
+        self._metadata_authorizer = metadata_authorizer
+        self._operation_idempotency = operation_idempotency
+        self._metadata_repository = metadata_repository
+        self._metadata_fingerprint_service = metadata_fingerprint_service
 
     @override
     async def get(
         self, *, access: AccessContextDTO, query: GetProjectMetadataQuery
     ) -> ProjectMetadataDTO:
-        async with self._transactions.begin():
-            scope = await self._authorizer.require_read(access=access, project_id=query.project_id)
+        async with self._transaction_manager.begin():
+            scope = await self._metadata_authorizer.require_read(
+                access=access, project_id=query.project_id
+            )
             if scope.project_id != query.project_id:
                 raise RuntimeError("Metadata authorization changed the Project.")
-            metadata = await self._repository.get(
+            metadata = await self._metadata_repository.get(
                 organization_id=scope.organization_id, project_id=scope.project_id
             )
             self._require_scope(metadata, scope.organization_id, scope.project_id)
@@ -98,14 +100,14 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
         command: UpdateProjectMetadataCommand,
         context: IdempotencyContextDTO,
     ) -> ProjectMetadataChangeResultDTO:
-        fingerprint = self._fingerprints.for_update(command)
-        async with self._transactions.begin():
-            scope = await self._authorizer.require_change(
+        fingerprint = self._metadata_fingerprint_service.for_update(command)
+        async with self._transaction_manager.begin():
+            scope = await self._metadata_authorizer.require_change(
                 access=access, project_id=command.project_id
             )
             if scope.project_id != command.project_id:
                 raise RuntimeError("Metadata authorization changed the Project.")
-            operation = await self._idempotency.reserve_or_recover(
+            operation = await self._operation_idempotency.reserve_or_recover(
                 context=context,
                 access=access,
                 authorization=scope,
@@ -118,7 +120,7 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
             )
             if not isinstance(operation, NewOperationReservationDTO):
                 completed = self._completed(operation)
-                original = await self._repository.original(
+                original = await self._metadata_repository.original(
                     organization_id=scope.organization_id,
                     project_id=scope.project_id,
                     operation_id=completed.operation_id,
@@ -130,7 +132,7 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
                     raise RuntimeError("The original result changed its Project binding.")
                 return ProjectMetadataChangeResultDTO(original, completed)
 
-            metadata = await self._repository.get(
+            metadata = await self._metadata_repository.get(
                 organization_id=scope.organization_id, project_id=scope.project_id
             )
             self._require_scope(metadata, scope.organization_id, scope.project_id)
@@ -143,14 +145,14 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
             except ProjectMetadataStaleRevisionError as error:
                 raise StaleRevisionError() from error
 
-            await self._repository.save(
+            await self._metadata_repository.save(
                 metadata,
                 expected_revision=command.expected_metadata_revision,
                 actor_id=access.actor_principal_id,
                 operation_id=operation.operation_id,
             )
             completed = self._completed(
-                await self._idempotency.record_completed_result(
+                await self._operation_idempotency.record_completed_result(
                     operation, replay_kind=OperationReplayKind.SAFE_RESULT
                 )
             )

@@ -26,14 +26,16 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class ProjectCreationAuthorizationService(ProjectCreationAuthorizer):
-    def __init__(self, facts: OrganizationAccessFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, organization_access_facts_reader: OrganizationAccessFactsReader) -> None:
+        self._organization_access_facts_reader = organization_access_facts_reader
 
     @override
     async def require_creation(
         self, *, access: AccessContextDTO, organization_id: OrganizationId
     ) -> ProjectCreationAuthorizationDTO:
-        facts = await self._facts.read_for_creation(access=access, organization_id=organization_id)
+        facts = await self._organization_access_facts_reader.read_for_creation(
+            access=access, organization_id=organization_id
+        )
         if facts is None:
             raise ResourceNotFoundError()
         if facts.principal.id != access.actor_principal_id:

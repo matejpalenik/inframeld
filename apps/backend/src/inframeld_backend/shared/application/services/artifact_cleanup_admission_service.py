@@ -17,17 +17,19 @@ class ArtifactCleanupAdmissionService:
 
     def __init__(
         self,
-        jobs: ArtifactCleanupAdmissionWriter,
-        audit: ArtifactCleanupAuditWriter,
+        artifact_cleanup_admission_writer: ArtifactCleanupAdmissionWriter,
+        artifact_cleanup_audit_writer: ArtifactCleanupAuditWriter,
         *,
         capacity: int = 8,
     ) -> None:
-        self._jobs = jobs
-        self._audit = audit
+        self._artifact_cleanup_admission_writer = artifact_cleanup_admission_writer
+        self._artifact_cleanup_audit_writer = artifact_cleanup_audit_writer
         self._capacity = capacity
 
     async def admit(self, binding: ArtifactCleanupJobBindingDTO) -> ArtifactCleanupAdmissionDTO:
-        admission = await self._jobs.admit(binding, capacity=self._capacity)
+        admission = await self._artifact_cleanup_admission_writer.admit(
+            binding, capacity=self._capacity
+        )
         if admission.created:
-            await self._audit.append(admission, binding)
+            await self._artifact_cleanup_audit_writer.append(admission, binding)
         return admission

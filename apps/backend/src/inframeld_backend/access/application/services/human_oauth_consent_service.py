@@ -67,9 +67,9 @@ from inframeld_backend.shared.application.errors.application_errors import (
 class HumanOAuthConsentService(HumanOAuthConsentHandler):
     def __init__(
         self,
-        reader: OAuthConsentRequestReader,
-        writer: OAuthConsentDecisionWriter,
-        verifier: BrowserSessionVerifier,
+        o_auth_consent_request_reader: OAuthConsentRequestReader,
+        o_auth_consent_decision_writer: OAuthConsentDecisionWriter,
+        browser_session_verifier: BrowserSessionVerifier,
         recovery_blocks: IdentityRecoveryBlockReader,
         *,
         credential_states: HumanCredentialStateReader,
@@ -87,9 +87,9 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
             raise ValueError("Remembered consent must have a positive whole duration.")
         self._credential_states = credential_states
         self._credential_initializer = credential_initializer
-        self._reader = reader
-        self._writer = writer
-        self._verifier = verifier
+        self._o_auth_consent_request_reader = o_auth_consent_request_reader
+        self._o_auth_consent_decision_writer = o_auth_consent_decision_writer
+        self._browser_session_verifier = browser_session_verifier
         self._recovery_blocks = recovery_blocks
         self._authority = authority
         self._api_audience = api_audience
@@ -129,7 +129,7 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
                 if command.decision is OAuthConsentDecision.DENY:
                     await self._check_read_only_request(credential, command.challenge, deadline)
                     return await self._provider_call(
-                        lambda timeout: self._writer.deny(
+                        lambda timeout: self._o_auth_consent_decision_writer.deny(
                             command.challenge, timeout_seconds=timeout
                         ),
                         deadline,
@@ -143,7 +143,7 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
                     else None
                 )
                 return await self._provider_call(
-                    lambda timeout: self._writer.allow(
+                    lambda timeout: self._o_auth_consent_decision_writer.allow(
                         command.challenge,
                         binding=binding,
                         scopes=request.scopes,
@@ -174,7 +174,10 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         self, challenge: OAuthConsentChallenge, deadline: float
     ) -> HumanOAuthConsentRequestDTO:
         request = await self._provider_call(
-            lambda timeout: self._reader.read(challenge, timeout_seconds=timeout), deadline
+            lambda timeout: self._o_auth_consent_request_reader.read(
+                challenge, timeout_seconds=timeout
+            ),
+            deadline,
         )
         if not HumanOAuthConsentPolicy.supports_requested_access(
             client_id=request.client_id.value,
@@ -192,7 +195,7 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         deadline: float,
     ) -> VerifiedHumanIdentityDTO:
         identity = await self._provider_call(
-            lambda _timeout: self._verifier.verify(credential), deadline
+            lambda _timeout: self._browser_session_verifier.verify(credential), deadline
         )
         if identity is None:
             raise AuthenticationRequiredError()

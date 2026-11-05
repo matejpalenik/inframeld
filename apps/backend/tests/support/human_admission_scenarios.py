@@ -261,12 +261,12 @@ class HumanAdmissionScenario:
             RequestFingerprintService(RequestFingerprintKey(b"a" * 32))
         )
         self.service = HumanAdmissionService(
-            transactions=self.transactions,
-            facts=self.facts,
-            writer=self.writer,
-            results=self.results,
-            idempotency=self.idempotency,
-            fingerprints=self.fingerprints,
+            transaction_manager=self.transactions,
+            admission_facts_reader=self.facts,
+            admission_writer=self.writer,
+            admission_result_reader=self.results,
+            operation_idempotency=self.idempotency,
+            admission_fingerprint_service=self.fingerprints,
             identity_verifier=self.verifier,
             identity_authority=AUTHORITY,
             identity_timeout_seconds=5,

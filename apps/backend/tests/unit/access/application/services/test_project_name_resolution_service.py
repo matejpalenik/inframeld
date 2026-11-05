@@ -45,11 +45,11 @@ async def test_real_project_service_consumes_checked_typed_binding_then_current_
     )
     bindings = MockResourceBindings((binding,))
     service = ProjectNameResolutionService(
-        transactions=MockTransactions(events),
-        facts=MockMetadataScope(),
-        resolver=ResourceNameResolutionService(bindings),
-        authorizer=authorizer,
-        repository=repository,
+        transaction_manager=MockTransactions(events),
+        metadata_facts_reader=MockMetadataScope(),
+        resource_name_resolver=ResourceNameResolutionService(bindings),
+        metadata_authorizer=authorizer,
+        metadata_repository=repository,
     )
     result = await service.resolve(
         access=ACCESS, query=ResolveProjectNameQuery(ResourceName("support"))
@@ -91,11 +91,11 @@ async def test_retired_name_guidance_uses_latest_selector_only_after_current_aut
         True,
     )
     service = ProjectNameResolutionService(
-        transactions=MockTransactions(events),
-        facts=MockMetadataScope(),
-        resolver=ResourceNameResolutionService(MockResourceBindings((binding,))),
-        authorizer=authorizer,
-        repository=repository,
+        transaction_manager=MockTransactions(events),
+        metadata_facts_reader=MockMetadataScope(),
+        resource_name_resolver=ResourceNameResolutionService(MockResourceBindings((binding,))),
+        metadata_authorizer=authorizer,
+        metadata_repository=repository,
     )
     with pytest.raises(RetiredProjectNameError) as failure:
         await service.resolve(access=ACCESS, query=ResolveProjectNameQuery(ResourceName("support")))

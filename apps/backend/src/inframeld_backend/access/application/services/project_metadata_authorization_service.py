@@ -36,21 +36,23 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class ProjectMetadataAuthorizationService(ProjectMetadataAuthorizer):
-    def __init__(self, facts: ProjectMetadataFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, metadata_facts_reader: ProjectMetadataFactsReader) -> None:
+        self._metadata_facts_reader = metadata_facts_reader
 
     @override
     async def require_read(
         self, *, access: AccessContextDTO, project_id: ProjectId
     ) -> ProjectActionAuthorizationDTO:
-        facts = await self._facts.read(access=access, project_id=project_id)
+        facts = await self._metadata_facts_reader.read(access=access, project_id=project_id)
         return self._require(facts, access, project_id, change=False)
 
     @override
     async def require_change(
         self, *, access: AccessContextDTO, project_id: ProjectId
     ) -> ProjectActionAuthorizationDTO:
-        facts = await self._facts.read_for_change(access=access, project_id=project_id)
+        facts = await self._metadata_facts_reader.read_for_change(
+            access=access, project_id=project_id
+        )
         return self._require(facts, access, project_id, change=True)
 
     @staticmethod

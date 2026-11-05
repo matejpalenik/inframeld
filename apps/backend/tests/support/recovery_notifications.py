@@ -40,7 +40,7 @@ def notification_service(
         ),
         PostgresIdentityRecoveryRepository(session),
         installation_id=installation_id,
-        facts=PostgresIdentityRecoveryAssociationFactsReader(
+        recovery_association_facts_reader=PostgresIdentityRecoveryAssociationFactsReader(
             session, installation_id=installation_id, authority=authority
         ),
     )

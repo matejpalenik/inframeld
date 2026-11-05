@@ -128,7 +128,12 @@ class Scenario(
             subject=EVENT.identity.subject,
         )
         self.service = IdentityRecoveryNotificationService(
-            self, self, self, self, facts=self, installation_id=INSTALLATION
+            self,
+            self,
+            self,
+            self,
+            recovery_association_facts_reader=self,
+            installation_id=INSTALLATION,
         )
 
     @override
@@ -286,7 +291,13 @@ async def test_database_deadline_includes_transaction_exit() -> None:
     s = Scenario()
     s.commit_gate = asyncio.Event()
     s.service = IdentityRecoveryNotificationService(
-        s, s, s, s, facts=s, installation_id=INSTALLATION, database_timeout_seconds=0.02
+        s,
+        s,
+        s,
+        s,
+        recovery_association_facts_reader=s,
+        installation_id=INSTALLATION,
+        database_timeout_seconds=0.02,
     )
     with pytest.raises(DependencyUnavailableError):
         await s.service.admit(EVENT)

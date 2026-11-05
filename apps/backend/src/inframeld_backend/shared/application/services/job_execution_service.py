@@ -13,24 +13,24 @@ class JobExecutionService:
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        jobs: JobStore,
+        transaction_manager: TransactionManager,
+        job_store: JobStore,
         *,
         supported_payloads: tuple[tuple[str, int], ...],
         worker_id: UUID,
         lease_seconds: float = 30,
         work_seconds: float = 7200,
     ) -> None:
-        self._transactions = transactions
-        self._jobs = jobs
+        self._transaction_manager = transaction_manager
+        self._job_store = job_store
         self._supported_payloads = supported_payloads
         self._worker_id = worker_id
         self._lease_seconds = lease_seconds
         self._work_seconds = work_seconds
 
     async def claim_next(self) -> JobAttemptContextDTO | None:
-        async with self._transactions.begin():
-            job = await self._jobs.next_candidate()
+        async with self._transaction_manager.begin():
+            job = await self._job_store.next_candidate()
             if job is None:
                 return None
             now = job.observed_at
@@ -49,7 +49,7 @@ class JobExecutionService:
                     if status is JobStatus.FAILED
                     else "lease_lost_safe_retry"
                 )
-                await self._jobs.retire_attempt(
+                await self._job_store.retire_attempt(
                     job,
                     status=status,
                     reason=reason,
@@ -67,9 +67,9 @@ class JobExecutionService:
             elif (job.payload.kind, job.payload.version) not in self._supported_payloads:
                 reason = "unsupported_payload"
             if reason is not None:
-                await self._jobs.retire_attempt(job, status=status, reason=reason, due_at=now)
+                await self._job_store.retire_attempt(job, status=status, reason=reason, due_at=now)
                 return None
-            return await self._jobs.start_attempt(
+            return await self._job_store.start_attempt(
                 job,
                 worker_id=self._worker_id,
                 lease_seconds=self._lease_seconds,

@@ -19,83 +19,87 @@ class JobCheckpointService(JobCheckpoints):
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        jobs: JobStore,
-        authorizer: AdmittedWorkAuthorizer,
+        transaction_manager: TransactionManager,
+        job_store: JobStore,
+        admitted_work_authorizer: AdmittedWorkAuthorizer,
         *,
         lease_seconds: float = 30,
     ) -> None:
-        self._transactions = transactions
-        self._jobs = jobs
-        self._authorizer = authorizer
+        self._transaction_manager = transaction_manager
+        self._job_store = job_store
+        self._admitted_work_authorizer = admitted_work_authorizer
         self._lease_seconds = lease_seconds
 
     @override
     async def check(self, context: JobAttemptContextDTO) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.checkpoint(
+                await self._job_store.checkpoint(
                     context, current.checkpoint, lease_seconds=self._lease_seconds
                 )
         self._require_continuation(current)
 
     @override
     async def save(self, context: JobAttemptContextDTO, data: bytes) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.checkpoint(context, data, lease_seconds=self._lease_seconds)
+                await self._job_store.checkpoint(context, data, lease_seconds=self._lease_seconds)
         self._require_continuation(current)
 
     @override
     async def begin_effect(self, context: JobAttemptContextDTO, effect_id: str) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.begin_effect(context, effect_id)
+                await self._job_store.begin_effect(context, effect_id)
         self._require_continuation(current)
 
     @override
     async def confirm_effect(
         self, context: JobAttemptContextDTO, effect_id: str, data: bytes
     ) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.confirm_effect(context, effect_id, data)
+                await self._job_store.confirm_effect(context, effect_id, data)
         self._require_continuation(current)
 
     @override
     async def succeed(self, context: JobAttemptContextDTO) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.finish(context, status=JobStatus.SUCCEEDED, reason=None)
+                await self._job_store.finish(context, status=JobStatus.SUCCEEDED, reason=None)
         self._require_continuation(current)
         if current is not None and current.pending_effect is not None:
             raise JobStoppedError("The job retained an unknown external outcome.")
 
     @override
     async def fail(self, context: JobAttemptContextDTO) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.finish(context, status=JobStatus.FAILED, reason="handler_failed")
+                await self._job_store.finish(
+                    context, status=JobStatus.FAILED, reason="handler_failed"
+                )
         self._require_continuation(current)
 
     async def _guard(self, context: JobAttemptContextDTO) -> JobSnapshotDTO | None:
         if not isinstance(context.binding, ProductJobBindingDTO):
             raise JobStoppedError("Product checkpoints require the original product binding.")
         try:
-            await self._authorizer.require_current(context.binding.authority)
+            await self._admitted_work_authorizer.require_current(context.binding.authority)
         except AccessDeniedError:
             # Stopped metadata is safe to retain. No protected result is saved.
-            await self._jobs.finish(context, status=JobStatus.FAILED, reason="authority_changed")
+            await self._job_store.finish(
+                context, status=JobStatus.FAILED, reason="authority_changed"
+            )
             return None
-        current = await self._jobs.require_current(context)
+        current = await self._job_store.require_current(context)
         if current.cancel_requested:
-            await self._jobs.finish(
+            await self._job_store.finish(
                 context, status=JobStatus.CANCELED, reason="cancellation_requested"
             )
             return None

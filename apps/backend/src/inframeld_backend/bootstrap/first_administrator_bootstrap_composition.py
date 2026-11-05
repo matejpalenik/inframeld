@@ -99,10 +99,10 @@ async def execute_first_administrator_bootstrap(
                     identity_verifier=KratosHumanIdentityVerifier(
                         IdentityApi(kratos), settings.kratos.authority
                     ),
-                    transactions=_BootstrapTransactionManager(database, session),
-                    facts=PostgresFirstAdministratorBootstrapFactsReader(session),
-                    writer=PostgresFirstAdministratorBootstrapWriter(session),
-                    fingerprints=fingerprints,
+                    transaction_manager=_BootstrapTransactionManager(database, session),
+                    bootstrap_facts_reader=PostgresFirstAdministratorBootstrapFactsReader(session),
+                    bootstrap_writer=PostgresFirstAdministratorBootstrapWriter(session),
+                    bootstrap_fingerprint_service=fingerprints,
                     provider_timeout_seconds=settings.human_authentication.provider_timeout_seconds,
                     total_timeout_seconds=settings.human_authentication.total_timeout_seconds,
                 ).bootstrap(command)

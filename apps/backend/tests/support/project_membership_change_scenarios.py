@@ -193,12 +193,12 @@ class MembershipChangeScenario:
             RequestFingerprintService(RequestFingerprintKey(b"m" * 32))
         )
         self.service = ProjectMembershipChangeService(
-            transactions=self.transactions,
-            facts=self.facts,
-            writer=self.writer,
-            results=self.results,
-            idempotency=self.idempotency,
-            fingerprints=self.fingerprints,
+            transaction_manager=self.transactions,
+            membership_facts_reader=self.facts,
+            membership_change_writer=self.writer,
+            membership_result_reader=self.results,
+            operation_idempotency=self.idempotency,
+            membership_fingerprint_service=self.fingerprints,
         )
 
     def member(self) -> None:

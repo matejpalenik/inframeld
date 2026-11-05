@@ -62,20 +62,20 @@ class JobAdmissionService:
 
     def __init__(
         self,
-        authorizer: ActionAuthorizer,
+        action_authorizer: ActionAuthorizer,
         work_authorizer: AdmittedWorkAuthorizer,
-        idempotency: OperationIdempotency,
-        jobs: JobStore,
-        audit: JobAdmissionAuditWriter,
+        operation_idempotency: OperationIdempotency,
+        job_store: JobStore,
+        job_admission_audit_writer: JobAdmissionAuditWriter,
         *,
         supported_payloads: tuple[tuple[str, int], ...],
         capacity: int = 8,
     ) -> None:
-        self._authorizer = authorizer
+        self._action_authorizer = action_authorizer
         self._work_authorizer = work_authorizer
-        self._idempotency = idempotency
-        self._jobs = jobs
-        self._audit = audit
+        self._operation_idempotency = operation_idempotency
+        self._job_store = job_store
+        self._job_admission_audit_writer = job_admission_audit_writer
         self._supported_payloads = supported_payloads
         self._capacity = capacity
 
@@ -109,7 +109,7 @@ class JobAdmissionService:
             raise InvalidInputError("Application admission has incompatible authority evidence.")
         if access.actor_principal_id != authority.principal_id:
             raise RuntimeError("Admission authority belongs to another authenticated principal.")
-        authorization = await self._authorizer.require_authorization(
+        authorization = await self._action_authorizer.require_authorization(
             access=access,
             request=ProjectActionAuthorizationRequestDTO(authority.project_id, authority.action_id),
         )
@@ -119,7 +119,7 @@ class JobAdmissionService:
         ):
             raise RuntimeError("Admission authorization returned another scope.")
         await self._work_authorizer.require_current(authority)
-        operation = await self._idempotency.reserve_or_recover(
+        operation = await self._operation_idempotency.reserve_or_recover(
             context=context,
             access=access,
             authorization=authorization,
@@ -130,7 +130,7 @@ class JobAdmissionService:
             ),
         )
         if isinstance(operation, AcceptedAsyncOperationDTO):
-            saved = await self._jobs.find(operation.operation_id)
+            saved = await self._job_store.find(operation.operation_id)
             if saved is None:
                 raise ConflictError("The accepted operation has no authoritative job binding.")
             if not isinstance(saved.binding, ProductJobBindingDTO):
@@ -150,17 +150,17 @@ class JobAdmissionService:
             raise ConflictError("The original operation cannot admit new background work.")
         if (payload.kind, payload.version) not in self._supported_payloads:
             raise UnsupportedJobPayloadError("This release does not support the job payload.")
-        admission = await self._jobs.admit(
+        admission = await self._job_store.admit(
             operation_id=operation.operation_id,
             request_id=request_id,
             authority=authority,
             payload=payload,
             capacity=self._capacity,
         )
-        await self._audit.append(
+        await self._job_admission_audit_writer.append(
             admission, request_id=request_id, authority=authority, payload=payload
         )
-        accepted = await self._idempotency.record_completed_result(
+        accepted = await self._operation_idempotency.record_completed_result(
             operation, replay_kind=OperationReplayKind.ASYNC_JOB
         )
         if not isinstance(accepted, AcceptedAsyncOperationDTO):

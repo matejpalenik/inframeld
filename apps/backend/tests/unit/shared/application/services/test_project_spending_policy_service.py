@@ -142,12 +142,12 @@ def manager(
     authorizer = MockBudgetAuthorizer(ledger)
     idempotency = MockIdempotency(ledger)
     service = ProjectSpendingPolicyService(
-        transactions=MockTransactions(ledger),
-        authorizer=authorizer,
-        reader=ledger,
-        writer=ledger,
-        idempotency=idempotency,
-        fingerprints=ProjectSpendingPolicyFingerprintService(
+        transaction_manager=MockTransactions(ledger),
+        project_budget_authorizer=authorizer,
+        spending_ledger_reader=ledger,
+        spending_ledger_writer=ledger,
+        operation_idempotency=idempotency,
+        spending_policy_fingerprint_service=ProjectSpendingPolicyFingerprintService(
             RequestFingerprintService(RequestFingerprintKey(b"k" * 32))
         ),
     )

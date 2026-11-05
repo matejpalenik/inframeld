@@ -561,11 +561,11 @@ def accountant(
     authorizer = MockWorkAuthorizer(ledger)
     budget = MockBudgetAuthorizer(ledger)
     service = SpendingAccountingService(
-        transactions=MockTransactions(ledger),
-        authorizer=authorizer,
-        ownership=ownership,
-        reader=ledger,
-        writer=ledger,
+        transaction_manager=MockTransactions(ledger),
+        admitted_work_authorizer=authorizer,
+        job_ownership=ownership,
+        spending_ledger_reader=ledger,
+        spending_ledger_writer=ledger,
         budget_authorizer=budget,
     )
     return service, ledger, ownership, authorizer, budget

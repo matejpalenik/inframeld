@@ -39,16 +39,18 @@ class PostgresProjectMembershipChangeServiceFactory(ProjectMembershipChangeServi
     """Bind each membership operation's database collaborators to one fresh session."""
 
     def __init__(
-        self, database: Database, fingerprints: ProjectMembershipChangeFingerprintService
+        self,
+        database: Database,
+        membership_change_fingerprint_service: ProjectMembershipChangeFingerprintService,
     ) -> None:
         self._database = database
-        self._fingerprints = fingerprints
+        self._membership_change_fingerprint_service = membership_change_fingerprint_service
 
     @override
     @asynccontextmanager
     async def open(self) -> AsyncGenerator[ProjectMembershipChanger]:
         async with self._database.session() as session:
-            yield self.create(session, self._fingerprints)
+            yield self.create(session, self._membership_change_fingerprint_service)
 
     @staticmethod
     def create(
@@ -56,10 +58,10 @@ class PostgresProjectMembershipChangeServiceFactory(ProjectMembershipChangeServi
     ) -> ProjectMembershipChangeService:
         """Assemble one service on the session owned by the calling scope."""
         return ProjectMembershipChangeService(
-            transactions=SqlAlchemyTransactionManager(session),
-            facts=PostgresProjectMembershipChangeFactsReader(session),
-            writer=PostgresProjectMembershipChangeWriter(session),
-            results=PostgresProjectMembershipChangeResultReader(session),
-            idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-            fingerprints=fingerprints,
+            transaction_manager=SqlAlchemyTransactionManager(session),
+            membership_facts_reader=PostgresProjectMembershipChangeFactsReader(session),
+            membership_change_writer=PostgresProjectMembershipChangeWriter(session),
+            membership_result_reader=PostgresProjectMembershipChangeResultReader(session),
+            operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+            membership_fingerprint_service=fingerprints,
         )

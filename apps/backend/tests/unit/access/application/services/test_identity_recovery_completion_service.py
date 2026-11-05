@@ -176,7 +176,7 @@ class MockCompletionScenario:
             self.recoveries,
             installation_id=INSTALLATION,
             authority=AUTHORITY,
-            proofs=self.proofs,
+            recovery_cleanup_proof_reader=self.proofs,
             proof_writer=self.proofs,
         )
 

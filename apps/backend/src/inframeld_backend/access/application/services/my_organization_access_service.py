@@ -25,12 +25,12 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class MyOrganizationAccessService(MyOrganizationAccessReader):
-    def __init__(self, facts: OrganizationAccessFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, organization_access_facts_reader: OrganizationAccessFactsReader) -> None:
+        self._organization_access_facts_reader = organization_access_facts_reader
 
     @override
     async def read(self, *, access: AccessContextDTO) -> MyOrganizationAccessDTO:
-        facts = await self._facts.read(access=access)
+        facts = await self._organization_access_facts_reader.read(access=access)
         if facts is None:
             raise ResourceNotFoundError()
         if facts.principal.id != access.actor_principal_id:

@@ -220,8 +220,8 @@ def _service_and_writer(
 ) -> tuple[ProjectOperationAdmissionService, PostgresOperationReservationWriter]:
     writer = PostgresOperationReservationWriter(session)
     service = ProjectOperationAdmissionService(
-        authorizer=ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
-        idempotency=IdempotencyService(writer),
+        action_authorizer=ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+        operation_idempotency=IdempotencyService(writer),
     )
     return service, writer
 
@@ -269,11 +269,13 @@ async def test_mismatched_admission_scope_preserves_records_and_caller_transacti
         with pytest.raises(RuntimeError, match="The caller requested rollback"):
             async with session.begin():
                 service = ProjectOperationAdmissionService(
-                    authorizer=MockMismatchedActionAuthorizer(
+                    action_authorizer=MockMismatchedActionAuthorizer(
                         ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
                         wrong_project_id,
                     ),
-                    idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+                    operation_idempotency=IdempotencyService(
+                        PostgresOperationReservationWriter(session)
+                    ),
                 )
                 with pytest.raises(
                     RuntimeError, match="Authorization returned a different project"

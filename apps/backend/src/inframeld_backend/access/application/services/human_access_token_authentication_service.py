@@ -42,7 +42,7 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
         self,
         token_verifier: HumanAccessTokenVerifier,
         identity_verifier: HumanIdentityVerifier,
-        reader: HumanIdentityLinkReader,
+        human_identity_link_reader: HumanIdentityLinkReader,
         *,
         credential_state_reader: HumanCredentialStateReader,
         provider_timeout_seconds: float = 5.0,
@@ -54,7 +54,7 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
 
         self._token_verifier = token_verifier
         self._identity_verifier = identity_verifier
-        self._reader = reader
+        self._human_identity_link_reader = human_identity_link_reader
         self._credential_state_reader = credential_state_reader
         self._provider_timeout_seconds = provider_timeout_seconds
         self._total_timeout_seconds = total_timeout_seconds
@@ -98,7 +98,7 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
                     raise AuthenticationRequiredError
 
                 # Find the principal identity in the DB
-                principal = await self._reader.find_principal(current_identity)
+                principal = await self._human_identity_link_reader.find_principal(current_identity)
 
                 if loop.time() >= deadline:
                     raise TimeoutError()

@@ -68,19 +68,19 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
     def __init__(
         self,
         *,
-        transactions: TransactionManager,
-        authorizer: ProjectBudgetAuthorizer,
-        reader: SpendingLedgerReader,
-        writer: SpendingLedgerWriter,
-        idempotency: OperationIdempotency,
-        fingerprints: ProjectSpendingPolicyFingerprintService,
+        transaction_manager: TransactionManager,
+        project_budget_authorizer: ProjectBudgetAuthorizer,
+        spending_ledger_reader: SpendingLedgerReader,
+        spending_ledger_writer: SpendingLedgerWriter,
+        operation_idempotency: OperationIdempotency,
+        spending_policy_fingerprint_service: ProjectSpendingPolicyFingerprintService,
     ) -> None:
-        self._transactions = transactions
-        self._authorizer = authorizer
-        self._reader = reader
-        self._writer = writer
-        self._idempotency = idempotency
-        self._fingerprints = fingerprints
+        self._transaction_manager = transaction_manager
+        self._project_budget_authorizer = project_budget_authorizer
+        self._spending_ledger_reader = spending_ledger_reader
+        self._spending_ledger_writer = spending_ledger_writer
+        self._operation_idempotency = operation_idempotency
+        self._spending_policy_fingerprint_service = spending_policy_fingerprint_service
 
     @override
     async def change_limit(
@@ -90,9 +90,9 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
         command: ChangeProjectSpendingPolicyCommand,
         context: IdempotencyContextDTO,
     ) -> ProjectSpendingPolicyResultDTO:
-        fingerprint = self._fingerprints.for_change(command)
-        async with self._transactions.begin():
-            authorization = await self._authorizer.require_authorization(
+        fingerprint = self._spending_policy_fingerprint_service.for_change(command)
+        async with self._transaction_manager.begin():
+            authorization = await self._project_budget_authorizer.require_authorization(
                 access=access,
                 request=ProjectActionAuthorizationRequestDTO(
                     command.project_id, ActionId(ProjectAction.MANAGE_BUDGET.value)
@@ -100,7 +100,7 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
             )
             if authorization.project_id != command.project_id:
                 raise AccessDeniedError()
-            operation = await self._idempotency.reserve_or_recover(
+            operation = await self._operation_idempotency.reserve_or_recover(
                 context=context,
                 access=access,
                 authorization=authorization,
@@ -112,7 +112,7 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
                 ),
             )
             if isinstance(operation, CompletedSynchronousOperationDTO):
-                result = await self._reader.policy_result(
+                result = await self._spending_ledger_reader.policy_result(
                     organization_id=authorization.organization_id,
                     project_id=command.project_id,
                     actor_id=access.actor_principal_id,
@@ -124,10 +124,10 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
                 return result
             if not isinstance(operation, NewOperationReservationDTO):
                 raise ConflictError("Budget policy requires a synchronous safe result.")
-            await self._writer.ensure_project_account(
+            await self._spending_ledger_writer.ensure_project_account(
                 organization_id=authorization.organization_id, project_id=command.project_id
             )
-            policy = await self._reader.lock_project_policy(
+            policy = await self._spending_ledger_reader.lock_project_policy(
                 organization_id=authorization.organization_id, project_id=command.project_id
             )
             self._require_scope(policy, authorization.organization_id, command.project_id)
@@ -138,19 +138,19 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
                 policy = replace(
                     policy, revision=policy.revision + 1, monthly_limit=command.monthly_limit
                 )
-                await self._writer.change_policy(
+                await self._spending_ledger_writer.change_policy(
                     policy=policy,
                     expected_revision=command.expected_policy_revision,
                     actor_id=access.actor_principal_id,
                     operation_id=operation.operation_id,
                 )
-            await self._writer.save_policy_result(
+            await self._spending_ledger_writer.save_policy_result(
                 policy=policy,
                 actor_id=access.actor_principal_id,
                 operation_id=operation.operation_id,
                 changed=changed,
             )
-            completion = await self._idempotency.record_completed_result(
+            completion = await self._operation_idempotency.record_completed_result(
                 operation, replay_kind=OperationReplayKind.SAFE_RESULT
             )
             if not isinstance(completion, CompletedSynchronousOperationDTO):
@@ -161,8 +161,8 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
     async def inspect(
         self, *, access: AccessContextDTO, project_id: ProjectId, period: SpendingPeriod
     ) -> SpendingProjectionDTO:
-        async with self._transactions.begin():
-            authorization = await self._authorizer.require_authorization(
+        async with self._transaction_manager.begin():
+            authorization = await self._project_budget_authorizer.require_authorization(
                 access=access,
                 request=ProjectActionAuthorizationRequestDTO(
                     project_id, ActionId(ProjectAction.INSPECT_BUDGET.value)
@@ -170,7 +170,7 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
             )
             if authorization.project_id != project_id:
                 raise AccessDeniedError()
-            projection = await self._reader.project_projection(
+            projection = await self._spending_ledger_reader.project_projection(
                 organization_id=authorization.organization_id, project_id=project_id, period=period
             )
             self._require_scope(projection.policy, authorization.organization_id, project_id)

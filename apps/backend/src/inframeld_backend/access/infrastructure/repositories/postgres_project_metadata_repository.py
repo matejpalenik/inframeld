@@ -52,9 +52,11 @@ class PostgresProjectMetadataRepository(ProjectMetadataRepository):
     The application owns current authorization and commit or rollback.
     """
 
-    def __init__(self, session: AsyncSession, audit: ProjectMetadataAuditWriter) -> None:
+    def __init__(
+        self, session: AsyncSession, metadata_audit_writer: ProjectMetadataAuditWriter
+    ) -> None:
         self._session = session
-        self._audit = audit
+        self._metadata_audit_writer = metadata_audit_writer
         self._transaction: AsyncSessionTransaction | None = None
         self._failed = False
         self._tracked: dict[
@@ -168,7 +170,7 @@ class PostgresProjectMetadataRepository(ProjectMetadataRepository):
                     metadata_revision=metadata.revision,
                 )
             )
-            await self._audit.changed(
+            await self._metadata_audit_writer.changed(
                 ProjectMetadataChangedAuditEventDTO(
                     metadata.organization_id,
                     metadata.project_id,

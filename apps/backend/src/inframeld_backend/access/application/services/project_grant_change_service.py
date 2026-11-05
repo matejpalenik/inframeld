@@ -55,17 +55,17 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
 class ProjectGrantChangeService(ProjectGrantChanger):
     def __init__(
         self,
-        transactions: TransactionManager,
-        authorizer: ProjectGrantAuthorizer,
-        idempotency: OperationIdempotency,
-        memberships: ProjectMembershipRepository,
-        fingerprints: ProjectGrantChangeFingerprintService,
+        transaction_manager: TransactionManager,
+        project_grant_authorizer: ProjectGrantAuthorizer,
+        operation_idempotency: OperationIdempotency,
+        membership_repository: ProjectMembershipRepository,
+        project_grant_change_fingerprint_service: ProjectGrantChangeFingerprintService,
     ) -> None:
-        self._transactions = transactions
-        self._authorizer = authorizer
-        self._idempotency = idempotency
-        self._memberships = memberships
-        self._fingerprints = fingerprints
+        self._transaction_manager = transaction_manager
+        self._project_grant_authorizer = project_grant_authorizer
+        self._operation_idempotency = operation_idempotency
+        self._membership_repository = membership_repository
+        self._project_grant_change_fingerprint_service = project_grant_change_fingerprint_service
 
     @override
     async def assign_use_only(
@@ -75,10 +75,10 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         command: AssignProjectUseOnlyGrantCommand,
         context: IdempotencyContextDTO,
     ) -> CompletedSynchronousOperationDTO:
-        fingerprint = self._fingerprints.for_assign_use_only(command)
+        fingerprint = self._project_grant_change_fingerprint_service.for_assign_use_only(command)
 
-        async with self._transactions.begin():
-            authorization = await self._authorizer.require_authorization(
+        async with self._transaction_manager.begin():
+            authorization = await self._project_grant_authorizer.require_authorization(
                 access=access,
                 request=ProjectUseOnlyGrantAuthorizationRequestDTO(
                     project_id=command.project_id,
@@ -90,7 +90,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             if authorization.project_id != command.project_id:
                 raise RuntimeError("Authorization returned a different project than requested.")
 
-            operation = await self._idempotency.reserve_or_recover(
+            operation = await self._operation_idempotency.reserve_or_recover(
                 context=context,
                 access=access,
                 authorization=authorization,
@@ -108,7 +108,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             if authorization.project_access_revision != command.expected_access_revision:
                 raise StaleRevisionError()
 
-            membership = await self._memberships.get(
+            membership = await self._membership_repository.get(
                 organization_id=authorization.organization_id,
                 project_id=authorization.project_id,
                 principal_id=command.recipient_principal_id,
@@ -130,12 +130,12 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             except ProjectGrantAlreadyExistsError as error:
                 raise ConflictError("This project action grant already exists.") from error
 
-            await self._memberships.save(
+            await self._membership_repository.save(
                 membership,
                 expected_project_access_revision=authorization.project_access_revision,
                 operation_id=operation.operation_id,
             )
-            completed = await self._idempotency.record_completed_result(
+            completed = await self._operation_idempotency.record_completed_result(
                 operation, replay_kind=OperationReplayKind.SAFE_RESULT
             )
             return self._require_completed_result(completed)

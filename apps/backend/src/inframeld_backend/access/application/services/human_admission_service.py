@@ -87,22 +87,22 @@ class HumanAdmissionService(HumanAdmitter):
     def __init__(
         self,
         *,
-        transactions: TransactionManager,
-        facts: HumanAdmissionFactsReader,
-        writer: HumanAdmissionWriter,
-        results: HumanAdmissionResultReader,
-        idempotency: OperationIdempotency,
-        fingerprints: HumanAdmissionFingerprintService,
+        transaction_manager: TransactionManager,
+        admission_facts_reader: HumanAdmissionFactsReader,
+        admission_writer: HumanAdmissionWriter,
+        admission_result_reader: HumanAdmissionResultReader,
+        operation_idempotency: OperationIdempotency,
+        admission_fingerprint_service: HumanAdmissionFingerprintService,
         identity_verifier: HumanIdentityVerifier,
         identity_authority: IdentityAuthority,
         identity_timeout_seconds: float,
     ) -> None:
-        self._transactions = transactions
-        self._facts = facts
-        self._writer = writer
-        self._results = results
-        self._idempotency = idempotency
-        self._fingerprints = fingerprints
+        self._transaction_manager = transaction_manager
+        self._admission_facts_reader = admission_facts_reader
+        self._admission_writer = admission_writer
+        self._admission_result_reader = admission_result_reader
+        self._operation_idempotency = operation_idempotency
+        self._admission_fingerprint_service = admission_fingerprint_service
         self._identity_verifier = identity_verifier
         self._identity_authority = identity_authority
         self._identity_timeout_seconds = identity_timeout_seconds
@@ -118,13 +118,13 @@ class HumanAdmissionService(HumanAdmitter):
         route = f"/v1/organizations/{command.organization_id.value}/human-admissions"
         if context.method != "POST" or context.requested_route != route:
             raise RuntimeError("Human admission changed its original operation route.")
-        fingerprint = self._fingerprints.for_admit(command)
+        fingerprint = self._admission_fingerprint_service.for_admit(command)
         try:
-            async with asyncio.timeout(5), self._transactions.begin():
+            async with asyncio.timeout(5), self._transaction_manager.begin():
                 self._authorize(
                     access,
                     command.organization_id,
-                    await self._facts.read_authorization(
+                    await self._admission_facts_reader.read_authorization(
                         access=access, organization_id=command.organization_id
                     ),
                 )
@@ -142,8 +142,8 @@ class HumanAdmissionService(HumanAdmitter):
             if verified != identity:
                 raise RuntimeError("Human identity verification changed its requested binding.")
 
-            async with asyncio.timeout(5), self._transactions.begin():
-                facts = await self._facts.read_for_admission(
+            async with asyncio.timeout(5), self._transaction_manager.begin():
+                facts = await self._admission_facts_reader.read_for_admission(
                     access=access, organization_id=command.organization_id, identity=verified
                 )
                 if facts is None:
@@ -224,7 +224,7 @@ class HumanAdmissionService(HumanAdmitter):
         facts: HumanAdmissionFactsDTO,
         scope: HumanAdmissionAuthorizationDTO,
     ) -> HumanAdmissionResultDTO:
-        operation = await self._idempotency.reserve_or_recover(
+        operation = await self._operation_idempotency.reserve_or_recover(
             context=context,
             access=access,
             authorization=scope,
@@ -237,7 +237,7 @@ class HumanAdmissionService(HumanAdmitter):
         )
         if not isinstance(operation, NewOperationReservationDTO):
             completed = self._completed(operation)
-            original = await self._results.original(
+            original = await self._admission_result_reader.original(
                 installation_id=facts.installation_id,
                 identity=facts.identity,
                 organization_id=scope.organization_id,
@@ -262,14 +262,14 @@ class HumanAdmissionService(HumanAdmitter):
         principal = facts.principal or Principal(
             PrincipalId(uuid4()), scope.organization_id, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
         )
-        await self._writer.save(
+        await self._admission_writer.save(
             facts=facts,
             principal=principal,
             actor_id=access.actor_principal_id,
             operation_id=operation.operation_id,
         )
         completed = self._completed(
-            await self._idempotency.record_completed_result(
+            await self._operation_idempotency.record_completed_result(
                 operation, replay_kind=OperationReplayKind.SAFE_RESULT
             )
         )

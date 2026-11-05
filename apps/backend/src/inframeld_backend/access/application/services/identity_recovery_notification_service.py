@@ -53,29 +53,29 @@ from inframeld_backend.shared.domain.value_objects.installation_id import Instal
 class IdentityRecoveryNotificationService(IdentityRecoveryNotificationHandler):
     def __init__(
         self,
-        transactions: TransactionManager,
+        transaction_manager: TransactionManager,
         admitter: IdentityRecoveryAdmitter,
-        evidence: IdentityRecoveryEvidenceWriter,
-        recoveries: IdentityRecoveryRepository,
+        recovery_evidence_writer: IdentityRecoveryEvidenceWriter,
+        recovery_repository: IdentityRecoveryRepository,
         *,
         installation_id: InstallationId,
-        facts: IdentityRecoveryAssociationFactsReader,
+        recovery_association_facts_reader: IdentityRecoveryAssociationFactsReader,
         database_timeout_seconds: float = 5.0,
     ) -> None:
-        self._facts = facts
-        self._transactions = transactions
+        self._recovery_association_facts_reader = recovery_association_facts_reader
+        self._transaction_manager = transaction_manager
         self._admitter = admitter
-        self._evidence = evidence
-        self._recoveries = recoveries
+        self._recovery_evidence_writer = recovery_evidence_writer
+        self._recovery_repository = recovery_repository
         self._installation_id = installation_id
         self._database_timeout = database_timeout_seconds
 
     @override
     async def admit(self, event: IdentityRecoveryEventDTO) -> IdentityRecoveryNotificationResultDTO:
         async with self._database_stage():
-            async with self._transactions.begin():
+            async with self._transaction_manager.begin():
                 operation_id = await self._admitter.admit(event)
-                await self._evidence.record_admission(event, operation_id)
+                await self._recovery_evidence_writer.record_admission(event, operation_id)
 
             return IdentityRecoveryNotificationResultDTO(
                 operation_id, IdentityRecoveryEvidenceType.RECOVERY_CODE_VERIFIED
@@ -86,11 +86,13 @@ class IdentityRecoveryNotificationService(IdentityRecoveryNotificationHandler):
         self, evidence: IdentityRecoverySettingsEvidenceDTO
     ) -> IdentityRecoveryNotificationResultDTO | None:
         async with self._database_stage():
-            async with self._transactions.begin():
-                facts = await self._facts.read(evidence)
+            async with self._transaction_manager.begin():
+                facts = await self._recovery_association_facts_reader.read(evidence)
                 admission = self._select_settings_admission(evidence, facts)
                 if admission is not None:
-                    await self._evidence.record_settings_association(evidence, admission)
+                    await self._recovery_evidence_writer.record_settings_association(
+                        evidence, admission
+                    )
             if admission is None:
                 return None
             return IdentityRecoveryNotificationResultDTO(
@@ -102,14 +104,14 @@ class IdentityRecoveryNotificationService(IdentityRecoveryNotificationHandler):
         self, evidence: IdentityRecoverySettingsEvidenceDTO
     ) -> IdentityRecoveryNotificationResultDTO | None:
         async with self._database_stage():
-            async with self._transactions.begin():
-                facts = await self._facts.read(evidence)
+            async with self._transaction_manager.begin():
+                facts = await self._recovery_association_facts_reader.read(evidence)
                 admission = self._select_password_admission(evidence, facts)
 
                 if admission is None:
                     return None
 
-                recovery = await self._recoveries.get(
+                recovery = await self._recovery_repository.get(
                     installation_id=self._installation_id,
                     authority=admission.event.identity.authority,
                     flow_id=admission.event.flow_id,
@@ -124,12 +126,14 @@ class IdentityRecoveryNotificationService(IdentityRecoveryNotificationHandler):
 
                 recovery.record_kratos_cleanup(IdentityRecoveryCleanupState.CONFIRMED)
 
-                await self._recoveries.save(recovery)
+                await self._recovery_repository.save(recovery)
 
-                recorded_at = await self._evidence.record_password_saved(evidence, admission)
+                recorded_at = await self._recovery_evidence_writer.record_password_saved(
+                    evidence, admission
+                )
                 if not recovery.is_released and not recovery.is_cleanup_confirmed:
                     budget = IdentityRecoveryCleanupRunBudget(recorded_at)
-                    await self._evidence.ensure_initial_cleanup_handoff(
+                    await self._recovery_evidence_writer.ensure_initial_cleanup_handoff(
                         evidence, admission, budget=budget
                     )
 

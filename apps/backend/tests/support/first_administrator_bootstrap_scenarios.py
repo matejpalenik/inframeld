@@ -111,10 +111,10 @@ def bootstrap_service(
     return FirstAdministratorBootstrapService(
         token_verifier=MockBootstrapTokenVerifier(binding),
         identity_verifier=MockBootstrapIdentityVerifier(),
-        transactions=SqlAlchemyTransactionManager(session),
-        facts=PostgresFirstAdministratorBootstrapFactsReader(session),
-        writer=PostgresFirstAdministratorBootstrapWriter(session),
-        fingerprints=FirstAdministratorBootstrapFingerprintService(
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        bootstrap_facts_reader=PostgresFirstAdministratorBootstrapFactsReader(session),
+        bootstrap_writer=PostgresFirstAdministratorBootstrapWriter(session),
+        bootstrap_fingerprint_service=FirstAdministratorBootstrapFingerprintService(
             RequestFingerprintService(RequestFingerprintKey(b"k" * 32))
         ),
     )

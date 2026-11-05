@@ -49,16 +49,18 @@ class DeletionStatusReadService(DeletionStatusLookup):
     """Authorize current initiator scope and interpret retained content-free facts."""
 
     def __init__(
-        self, authorizer: DeletionStatusAuthorizer, reader: DeletionStatusProjectionReader
+        self,
+        deletion_status_authorizer: DeletionStatusAuthorizer,
+        deletion_status_projection_reader: DeletionStatusProjectionReader,
     ) -> None:
-        self._authorizer = authorizer
-        self._reader = reader
+        self._deletion_status_authorizer = deletion_status_authorizer
+        self._deletion_status_projection_reader = deletion_status_projection_reader
 
     @override
     async def lookup(
         self, *, access: AccessContextDTO, query: GetDeletionStatusQuery
     ) -> RetainedDeletionStatusDTO | UnresolvedOperationDTO:
-        authorized = await self._authorizer.require_authorization(
+        authorized = await self._deletion_status_authorizer.require_authorization(
             access=access,
             request=DeletionStatusAuthorizationRequestDTO(query.operation_id),
         )
@@ -68,7 +70,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
         ):
             raise RuntimeError("Deletion status authorization returned a different scope.")
 
-        stored = await self._reader.read(authorization=authorized)
+        stored = await self._deletion_status_projection_reader.read(authorization=authorized)
         if stored is None or not self._matches_binding(stored.binding, authorized):
             return UnresolvedOperationDTO()
         if not self._has_owner_observation(stored):

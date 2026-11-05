@@ -14,8 +14,8 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 class ProjectSpendingPolicyFingerprintService:
     """Keep conditional policy request meaning stable without storing credentials."""
 
-    def __init__(self, fingerprints: RequestFingerprintService) -> None:
-        self._fingerprints = fingerprints
+    def __init__(self, request_fingerprint_service: RequestFingerprintService) -> None:
+        self._request_fingerprint_service = request_fingerprint_service
 
     def for_change(self, command: ChangeProjectSpendingPolicyCommand) -> RequestFingerprint:
         amount = command.monthly_limit
@@ -27,6 +27,6 @@ class ProjectSpendingPolicyFingerprintService:
             ],
             separators=(",", ":"),
         ).encode("utf-8")
-        return self._fingerprints.fingerprint(
+        return self._request_fingerprint_service.fingerprint(
             purpose="project-spending-policy.change.v1", canonical_request=canonical
         )

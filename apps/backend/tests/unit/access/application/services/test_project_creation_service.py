@@ -177,12 +177,12 @@ def scenario() -> CreationScenarioDTO:
     idempotency, transactions = MockOperationIdempotency(events), MockTransactions(events)
     return CreationScenarioDTO(
         ProjectCreationService(
-            transactions=transactions,
-            authorizer=authorizer,
-            writer=writer,
-            results=results,
-            idempotency=idempotency,
-            fingerprints=ProjectCreationFingerprintService(
+            transaction_manager=transactions,
+            creation_authorizer=authorizer,
+            creation_writer=writer,
+            creation_result_reader=results,
+            operation_idempotency=idempotency,
+            creation_fingerprint_service=ProjectCreationFingerprintService(
                 RequestFingerprintService(RequestFingerprintKey(b"k" * 32))
             ),
         ),

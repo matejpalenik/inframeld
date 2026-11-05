@@ -14,12 +14,12 @@ from inframeld_backend.shared.application.value_objects.operation_id import Oper
 
 
 class IdentityRecoveryAdmissionService(IdentityRecoveryAdmitter):
-    def __init__(self, writer: IdentityRecoveryAdmissionWriter) -> None:
-        self._writer = writer
+    def __init__(self, recovery_admission_writer: IdentityRecoveryAdmissionWriter) -> None:
+        self._recovery_admission_writer = recovery_admission_writer
 
     @override
     async def admit(self, event: IdentityRecoveryEventDTO) -> OperationId:
-        admission = await self._writer.reserve(event)
+        admission = await self._recovery_admission_writer.reserve(event)
         if admission.event != event:
             raise ConflictError("The recovery flow is already bound to another event.")
         return admission.operation_id

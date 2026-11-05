@@ -76,13 +76,15 @@ def metadata_service(
     session: AsyncSession, audit: ProjectMetadataAuditWriter | None = None
 ) -> ProjectMetadataService:
     return ProjectMetadataService(
-        transactions=SqlAlchemyTransactionManager(session),
-        authorizer=ProjectMetadataAuthorizationService(PostgresProjectMetadataFactsReader(session)),
-        idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-        repository=PostgresProjectMetadataRepository(
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        metadata_authorizer=ProjectMetadataAuthorizationService(
+            PostgresProjectMetadataFactsReader(session)
+        ),
+        operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+        metadata_repository=PostgresProjectMetadataRepository(
             session, PostgresProjectMetadataAuditWriter(session) if audit is None else audit
         ),
-        fingerprints=ProjectMetadataFingerprintService(
+        metadata_fingerprint_service=ProjectMetadataFingerprintService(
             RequestFingerprintService(RequestFingerprintKey(b"K" * 32))
         ),
     )
@@ -234,12 +236,14 @@ def metadata_repair_service(
     facts: ProjectMetadataRepairFactsReader | None = None,
 ) -> "ProjectMetadataRepairService":
     return ProjectMetadataRepairService(
-        transactions=SqlAlchemyTransactionManager(session),
-        facts=PostgresProjectMetadataRepairFactsReader(session) if facts is None else facts,
-        writer=PostgresProjectMetadataRepairWriter(
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        metadata_repair_facts_reader=PostgresProjectMetadataRepairFactsReader(session)
+        if facts is None
+        else facts,
+        metadata_repair_writer=PostgresProjectMetadataRepairWriter(
             session, PostgresProjectMetadataAuditWriter(session) if audit is None else audit
         ),
-        fingerprints=ProjectMetadataFingerprintService(
+        metadata_fingerprint_service=ProjectMetadataFingerprintService(
             RequestFingerprintService(RequestFingerprintKey(b"K" * 32))
         ),
     )

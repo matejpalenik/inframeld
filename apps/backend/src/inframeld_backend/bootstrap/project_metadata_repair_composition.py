@@ -51,12 +51,12 @@ async def open_project_metadata_repair(
 ) -> AsyncGenerator[ProjectMetadataRepairer]:
     async with database.session() as session:
         yield ProjectMetadataRepairService(
-            transactions=SqlAlchemyTransactionManager(session),
-            facts=PostgresProjectMetadataRepairFactsReader(session),
-            writer=PostgresProjectMetadataRepairWriter(
+            transaction_manager=SqlAlchemyTransactionManager(session),
+            metadata_repair_facts_reader=PostgresProjectMetadataRepairFactsReader(session),
+            metadata_repair_writer=PostgresProjectMetadataRepairWriter(
                 session, PostgresProjectMetadataAuditWriter(session)
             ),
-            fingerprints=fingerprints,
+            metadata_fingerprint_service=fingerprints,
         )
 
 
