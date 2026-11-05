@@ -165,6 +165,114 @@ def test_human_admission_fixture_preserves_native_problem_responses(
     assert response.headers["cache-control"] == "no-store"
 
 
+@pytest.mark.parametrize(
+    "credential",
+    [{"Authorization": "Bearer sdk-human"}, {"Cookie": "ory_kratos_session=sdk-cookie"}],
+)
+def test_project_action_grant_fixture_returns_flat_stored_assignments(
+    credential: dict[str, str],
+) -> None:
+    project = "00000000-0000-4000-8000-000000000003"
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.get(
+            f"/v1/projects/{project}/grants",
+            params={"actionId": "inspect-budget"},
+            headers=credential,
+        )
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "items": [
+            {
+                "projectId": project,
+                "recipientPrincipalId": "00000000-0000-4000-8000-000000000001",
+                "actionId": "inspect-budget",
+                "canGrant": True,
+            },
+            {
+                "projectId": project,
+                "recipientPrincipalId": "00000000-0000-4000-8000-000000000006",
+                "actionId": "inspect-budget",
+                "canGrant": False,
+            },
+        ],
+        "nextCursor": None,
+    }
+
+
+def test_project_action_grant_fixture_pages_with_independent_bodyless_get_witnesses() -> None:
+    project = "00000000-0000-4000-8000-000000000003"
+    path = f"/v1/projects/{project}/grants"
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/grants-wire",
+            json={"calls": {"grants-first": {"kind": "none"}, "grants-next": {"kind": "none"}}},
+        )
+        first = client.get(
+            path,
+            params={"actionId": "inspect-budget", "limit": 1},
+            headers={"Authorization": "Bearer sdk-human", "X-SDK-Test": "grants-first"},
+        )
+        assert first.status_code == 200
+        token = first.json()["nextCursor"]
+        assert isinstance(token, str) and len(first.json()["items"]) == 1
+        second = client.get(
+            path,
+            params={"actionId": "inspect-budget", "limit": 1, "cursor": token},
+            headers={"Authorization": "Bearer sdk-human", "X-SDK-Test": "grants-next"},
+        )
+        witnesses = client.get("/sdk-control/cases/grants-wire").json()["observations"]
+        mismatched = client.get(
+            path,
+            params={"actionId": "manage-budget", "cursor": token},
+            headers={"Authorization": "Bearer sdk-human"},
+        )
+    assert second.status_code == 200 and second.json()["nextCursor"] is None
+    assert (
+        second.json()["items"][0]["recipientPrincipalId"] == "00000000-0000-4000-8000-000000000006"
+    )
+    assert mismatched.status_code == 422 and mismatched.json()["code"] == "invalid_input"
+    for name in ("grants-first", "grants-next"):
+        witness = witnesses[name]
+        assert witness["method"] == "GET" and witness["path"] == path
+        assert witness["rawBodyBase64"] == "" and witness["csrf"] == ""
+        assert "idempotency-key" not in witness["headers"]
+    assert parse_qs(witnesses["grants-next"]["query"]) == {
+        "actionId": ["inspect-budget"],
+        "limit": ["1"],
+        "cursor": [token],
+    }
+
+
+@pytest.mark.parametrize(
+    "action,project,cursor,status,code",
+    [
+        ("inspect-feedback", "000000000003", None, 403, "access_denied"),
+        ("query", "000000000003", None, 422, "invalid_input"),
+        ("inspect-budget", "000000000099", None, 404, "resource_not_found"),
+        ("inspect-budget", "000000000003", "malformed_cursor", 422, "invalid_input"),
+    ],
+)
+def test_project_action_grant_fixture_rejects_non_delegation_and_wrong_scope(
+    action: str,
+    project: str,
+    cursor: str | None,
+    status: int,
+    code: str,
+) -> None:
+    query = {"actionId": action}
+    if cursor is not None:
+        query["cursor"] = cursor
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.get(
+            f"/v1/projects/00000000-0000-4000-8000-{project}/grants",
+            params=query,
+            headers={"Authorization": "Bearer sdk-human"},
+        )
+    assert response.status_code == status and response.json()["code"] == code
+    assert response.headers["cache-control"] == "no-store"
+
+
 def test_project_members_fixture_uses_real_router_service_and_one_explicit_page_per_request() -> (
     None
 ):

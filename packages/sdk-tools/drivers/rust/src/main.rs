@@ -17,6 +17,7 @@ const BINDINGS: &[&str] = &[
     "admitHuman",
     "createProject",
     "listProjectMembers",
+    "listProjectActionGrants",
     "addProjectMember",
     "removeProjectMember",
     "inspectHumanOAuthConsent",
@@ -81,6 +82,7 @@ async fn main() {
                 | "createProject"
                 | "admitHuman"
                 | "listProjectMembers"
+                | "listProjectActionGrants"
                 | "addProjectMember"
                 | "removeProjectMember"
                 | "assignProjectUseOnlyGrant"

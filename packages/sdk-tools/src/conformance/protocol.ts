@@ -16,6 +16,7 @@ export const operations = [
   "admitHuman",
   "createProject",
   "listProjectMembers",
+  "listProjectActionGrants",
   "addProjectMember",
   "removeProjectMember",
   "inspectHumanOAuthConsent",

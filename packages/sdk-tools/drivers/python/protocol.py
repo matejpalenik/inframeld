@@ -13,6 +13,7 @@ Operation: TypeAlias = Literal[
     "admitHuman",
     "createProject",
     "listProjectMembers",
+    "listProjectActionGrants",
     "addProjectMember",
     "removeProjectMember",
     "inspectHumanOAuthConsent",

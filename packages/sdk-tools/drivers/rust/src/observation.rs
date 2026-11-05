@@ -87,6 +87,15 @@ problems!(
 );
 problems!(GetHealthApiError, GetHealthApiError::Status500);
 problems!(
+    ListProjectActionGrantsApiError,
+    ListProjectActionGrantsApiError::Status400,
+    ListProjectActionGrantsApiError::Status401,
+    ListProjectActionGrantsApiError::Status403,
+    ListProjectActionGrantsApiError::Status404,
+    ListProjectActionGrantsApiError::Status422,
+    ListProjectActionGrantsApiError::Status503
+);
+problems!(
     ListProjectMembersApiError,
     ListProjectMembersApiError::Status400,
     ListProjectMembersApiError::Status401,
