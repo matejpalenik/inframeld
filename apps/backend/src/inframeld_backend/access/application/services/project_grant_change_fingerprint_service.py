@@ -5,6 +5,12 @@ from json import dumps
 from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
     AssignProjectUseOnlyGrantCommand,
 )
+from inframeld_backend.access.application.commands.remove_project_action_grant_command import (
+    RemoveProjectActionGrantCommand,
+)
+from inframeld_backend.access.application.commands.set_project_action_grant_command import (
+    SetProjectActionGrantCommand,
+)
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -20,6 +26,39 @@ class ProjectGrantChangeFingerprintService:
 
     def __init__(self, fingerprints: RequestFingerprintService) -> None:
         self._fingerprints = fingerprints
+
+    def for_set(self, command: SetProjectActionGrantCommand) -> RequestFingerprint:
+        canonical_request = dumps(
+            {
+                "actionId": command.action_id.value,
+                "canGrant": command.can_grant,
+                "expectedAccessRevision": command.expected_access_revision,
+                "projectId": str(command.project_id.value),
+                "recipientPrincipalId": str(command.recipient_principal_id.value),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return self._fingerprints.fingerprint(
+            purpose="access.project-grant.set:v1", canonical_request=canonical_request
+        )
+
+    def for_remove(self, command: RemoveProjectActionGrantCommand) -> RequestFingerprint:
+        canonical_request = dumps(
+            {
+                "actionId": command.action_id.value,
+                "expectedAccessRevision": command.expected_access_revision,
+                "projectId": str(command.project_id.value),
+                "recipientPrincipalId": str(command.recipient_principal_id.value),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return self._fingerprints.fingerprint(
+            purpose="access.project-grant.remove:v1", canonical_request=canonical_request
+        )
 
     def for_assign_use_only(self, command: AssignProjectUseOnlyGrantCommand) -> RequestFingerprint:
         """Retain the canonical request bytes used by existing reservations."""
