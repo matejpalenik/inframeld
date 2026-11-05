@@ -89,6 +89,7 @@ const deniedCheckCodes = [
 test("denied receipt checkpoints distinguish operations without publishing receipt contents", () => {
   for (const code of [
     ...deniedCheckCodes,
+    "SDK_DENIED_OUTER_CUSTODY",
     "SDK_DENIED_UNCERTAIN_READ",
     "SDK_DENIED_UNCERTAIN_JSON",
     "SDK_DENIED_UNCERTAIN_SCHEMA",

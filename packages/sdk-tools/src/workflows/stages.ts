@@ -30,6 +30,7 @@ export function describeError(error: unknown): string {
     "SDK_DENIED_PS_OBSERVATION",
     "SDK_DENIED_TARGET_LIVE",
     "SDK_DENIED_INDEPENDENT_RECOVERY",
+    "SDK_DENIED_OUTER_CUSTODY",
   ];
   const seen = new Set<object>();
   let remaining = 16;
