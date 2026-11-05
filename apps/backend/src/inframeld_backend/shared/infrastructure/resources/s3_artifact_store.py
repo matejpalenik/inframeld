@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from collections.abc import AsyncGenerator, Callable
+import threading
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import TYPE_CHECKING, BinaryIO, override
 from uuid import UUID
 
@@ -20,8 +21,13 @@ from inframeld_backend.shared.application.errors.artifact_errors import (
     ArtifactStoreUnavailableError,
     ArtifactWriteOutcomeUnknownError,
 )
+from inframeld_backend.shared.application.errors.job_errors import SafeJobRetryError
 from inframeld_backend.shared.application.protocols.artifact_store import ArtifactStore
+from inframeld_backend.shared.application.protocols.job_effect_observation_recorder import (
+    JobEffectObservationRecorder,
+)
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
+from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.infrastructure.settings.artifact_storage_settings import (
     ArtifactStorageSettings,
 )
@@ -35,6 +41,28 @@ class _ReadInterruptedError(ArtifactStoreUnavailableError):
     pass
 
 
+class _InvocationGate:
+    """Exclude late native entry only when the waiting caller wins the race."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._state = "waiting"
+
+    def enter(self) -> bool:
+        with self._lock:
+            if self._state != "waiting":
+                return False
+            self._state = "entered"
+            return True
+
+    def abort(self) -> bool:
+        with self._lock:
+            if self._state != "waiting":
+                return False
+            self._state = "aborted"
+            return True
+
+
 class S3ArtifactStore(ArtifactStore):
     """Use one immutable scoped object per attempt with controlled SDK dispatch.
 
@@ -45,9 +73,14 @@ class S3ArtifactStore(ArtifactStore):
     """
 
     def __init__(
-        self, settings: ArtifactStorageSettings, *, client: S3Client | None = None
+        self,
+        settings: ArtifactStorageSettings,
+        *,
+        client: S3Client | None = None,
+        observations: JobEffectObservationRecorder | None = None,
     ) -> None:
         self._settings = settings
+        self._observations = observations
         self._client = (
             client
             if client is not None
@@ -79,8 +112,27 @@ class S3ArtifactStore(ArtifactStore):
         self._closing: asyncio.Task[None] | None = None
 
     @override
-    async def put(self, attempt: ArtifactAttemptDTO, content: BinaryIO) -> None:
+    async def put(
+        self,
+        attempt: ArtifactAttemptDTO,
+        content: BinaryIO,
+        *,
+        observation: JobEffectId | None = None,
+    ) -> None:
+        deadline = asyncio.get_running_loop().time() + self._settings.operation_timeout_seconds
         self._require_attempt(attempt)
+        aborted: Callable[[], Awaitable[None]] | None = None
+        if observation is not None:
+            recorder = self._observations
+            if recorder is None:
+                raise ArtifactStoreUnavailableError("The bound invocation recorder is unavailable.")
+            async with asyncio.timeout_at(deadline):
+                await recorder.admit_put(observation, attempt)
+
+            async def record_abort() -> None:
+                await recorder.record_put_abort(observation, attempt)
+
+            aborted = record_abort
 
         def upload() -> None:
             content.seek(0)
@@ -106,7 +158,7 @@ class S3ArtifactStore(ArtifactStore):
                 IfNoneMatch="*",
             )
 
-        await self._call(upload, mutating=True)
+        await self._call(upload, mutating=True, deadline=deadline, aborted=aborted)
 
     @override
     async def read(self, attempt: ArtifactAttemptDTO) -> AsyncGenerator[bytes]:
@@ -233,12 +285,34 @@ class S3ArtifactStore(ArtifactStore):
         return ArtifactListingDTO(tuple(objects), objects[-1].attempt_id if truncated else None)
 
     @override
-    async def delete(self, scope: ArtifactScopeDTO, attempt_id: ArtifactAttemptId) -> None:
+    async def delete(
+        self,
+        scope: ArtifactScopeDTO,
+        attempt_id: ArtifactAttemptId,
+        *,
+        observation: JobEffectId | None = None,
+    ) -> None:
+        deadline = asyncio.get_running_loop().time() + self._settings.operation_timeout_seconds
+        aborted: Callable[[], Awaitable[None]] | None = None
+        if observation is not None:
+            recorder = self._observations
+            if recorder is None:
+                raise ArtifactStoreUnavailableError("The bound invocation recorder is unavailable.")
+            async with asyncio.timeout_at(deadline):
+                await recorder.admit_delete(observation, scope, attempt_id)
+
+            async def record_abort() -> None:
+                await recorder.record_delete_abort(observation, scope, attempt_id)
+
+            aborted = record_abort
+
         await self._call(
             lambda: self._client.delete_object(
                 Bucket=self._settings.bucket, Key=self._key(scope, attempt_id)
             ),
             mutating=True,
+            deadline=deadline,
+            aborted=aborted,
         )
 
     async def close(self) -> None:
@@ -277,6 +351,7 @@ class S3ArtifactStore(ArtifactStore):
         mutating: bool,
         cleanup: Callable[[T | None], None] | None = None,
         deadline: float | None = None,
+        aborted: Callable[[], Awaitable[None]] | None = None,
     ) -> T:
         if self._closed or len(self._pending) >= 2:
             raise ArtifactStoreUnavailableError(
@@ -291,9 +366,11 @@ class S3ArtifactStore(ArtifactStore):
             raise _ReadInterruptedError("The original storage observation deadline expired.")
         result: list[T] = []
         abandoned = False
+        gate = _InvocationGate() if aborted is not None else None
 
         def perform() -> None:
-            result.append(action())
+            if gate is None or gate.enter():
+                result.append(action())
 
         task = asyncio.create_task(asyncio.to_thread(perform))
         self._pending.add(task)
@@ -313,6 +390,22 @@ class S3ArtifactStore(ArtifactStore):
             abandoned = True
             if task.done() and cleanup is not None:
                 cleanup(result[0] if result else None)
+            if gate is not None and gate.abort() and aborted is not None:
+                try:
+                    if deadline is None or asyncio.get_running_loop().time() >= deadline:
+                        raise TimeoutError("The original storage operation deadline expired.")
+                    async with asyncio.timeout_at(deadline):
+                        await aborted()
+                        if asyncio.get_running_loop().time() >= deadline:
+                            raise TimeoutError("The original storage operation deadline expired.")
+                except TimeoutError as recording_error:
+                    raise ArtifactWriteOutcomeUnknownError(
+                        "The original storage write outcome is unknown."
+                    ) from BaseExceptionGroup(
+                        "Storage interruption and abort recording failed.",
+                        [error, recording_error],
+                    )
+                raise SafeJobRetryError() from None
             if mutating:
                 raise ArtifactWriteOutcomeUnknownError(
                     "The original storage write outcome is unknown."

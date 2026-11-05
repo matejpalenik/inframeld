@@ -67,7 +67,7 @@ async def test_empty_spending_roundtrip_preserves_delivered_project_and_original
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0020_project_membership"
+                == "0021_job_effect_observations"
             )
             assert await session.get(ProjectRow, scenario.project_id.value) is not None
             job = await session.get(DurableJobRow, scenario.attempt.job_id.value)
@@ -181,7 +181,8 @@ async def test_retained_financial_obligations_refuse_downgrade(
         command.downgrade(configuration(temporary_postgres_settings), "0017_project_creation")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num)) == "0020_project_membership"
+            await session.scalar(select(AlembicVersionRow.version_num))
+            == "0021_job_effect_observations"
         )
         row = await session.get(ModelCallAccountingRow, call.call_id.value)
         assert row is not None and row.hold_amount == Decimal("0.1")

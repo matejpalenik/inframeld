@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
+from tests.support.seaweedfs_fixture import storage_settings
 
 
 def _environment(database: DatabaseSettings) -> dict[str, str]:
@@ -30,18 +31,33 @@ def _environment(database: DatabaseSettings) -> dict[str, str]:
             "INFRAMELD_LOG_FORMAT": "json",
         }
     )
+    artifacts = storage_settings()
+    environment.update(
+        {
+            "INFRAMELD_ARTIFACT_STORAGE__ENDPOINT_URL": artifacts.endpoint_url,
+            "INFRAMELD_ARTIFACT_STORAGE__BUCKET": artifacts.bucket,
+            "INFRAMELD_ARTIFACT_STORAGE__ACCESS_KEY_ID": artifacts.access_key_id.get_secret_value(),
+            "INFRAMELD_ARTIFACT_STORAGE__SECRET_ACCESS_KEY": artifacts.secret_access_key.get_secret_value(),
+            "INFRAMELD_ARTIFACT_STORAGE__REGION": artifacts.region,
+            "INFRAMELD_ARTIFACT_STORAGE__MAX_OBJECT_BYTES": str(artifacts.max_object_bytes),
+        }
+    )
+    if artifacts.ca_bundle is not None:
+        environment["INFRAMELD_ARTIFACT_STORAGE__CA_BUNDLE"] = str(artifacts.ca_bundle)
     return environment
 
 
 @asynccontextmanager
 async def application_worker_process(
-    database: DatabaseSettings, *, allow_killed: bool = False
+    database: DatabaseSettings, *, allow_killed: bool = False, artifact_cleanup: bool = False
 ) -> AsyncGenerator[tuple[asyncio.subprocess.Process, list[int]]]:
     environment = _environment(database)
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
-        "tests.support.application_job_worker",
+        "inframeld_backend.application_worker"
+        if artifact_cleanup
+        else "tests.support.application_job_worker",
         env=environment,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
