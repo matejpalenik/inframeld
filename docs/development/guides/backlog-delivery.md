@@ -117,13 +117,13 @@ Before substantive workflow edits, define a few must-pass outcomes. Validate fro
 | A prerequisite is already merged while a correction is being prepared | Where practical, adopt the known base at a safe checkpoint before final verification/review. Preserve normal hooks, combined-delta review, affected-evidence checks and final-head CI. |
 | A focused epic has a completable issue and an unrelated partial foundation is available | Finish the existing issue. Spare capacity alone does not authorize opening the unrelated foundation. |
 | A focused issue needs a capability owned by another epic | Deliver the real prerequisite, retaining the next focused action or return condition. No whole-epic barrier. |
-| A supporting PR merges with feasible implementation acceptance remaining | Reconsider that remaining work before selecting unrelated work. Do not force an oversized PR or false closure. |
+| A supporting PR merges with feasible implementation acceptance remaining | Continue the owning issue's remaining acceptance through closure. Do not force an oversized PR or false closure. |
 | A human-facing delivery lacks a published qualification issue or publication authority | Create or reuse under actual authority before closure. A draft alone is insufficient. |
 | A mixed qualification issue has automated obligations and human cases | Complete the automated work and transfer only human cases to the linked qualification issue before closure. |
-| Two issues with independent paths/contracts | Parallel implementation within real capacity, preferring work within the focused epic. |
+| Two existing issues with independent paths/contracts | Parallel implementation within real capacity, preferring work within the focused epic. Unrelated new work still requires the coordinator's selection gate. |
 | Shared authorization contract or migration | One owner or serial delivery before dependent writes. |
 | Two requests for the fixed integration stack | One named executor and observed cleanup before the next. |
-| Blocked writer with independent eligible work | Preserve checkpoint, stop positively, reconcile and reuse safely. |
+| Blocked writer with independent eligible work | Preserve the checkpoint, stop positively and reconcile resources. Resume existing unfinished work or deliver its authorized prerequisite. Unrelated new work requires explicit human reprioritization, otherwise leave capacity unused. |
 | Useful supporting capability with feature work remaining | Scoped review/checks and no false issue closure. |
 | A small harness repair proposes another general supervisor | Review the demonstrated need and minimal maintained alternative before expansion. |
 | A plan is otherwise highly rated but has 4/10 overengineering risk | Return Changes needed under Review's ceiling. Explain the material cost and smaller alternative without adjusting the score to obtain approval. |
