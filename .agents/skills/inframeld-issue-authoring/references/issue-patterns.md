@@ -29,7 +29,7 @@ Keep progress in completed deliverables, PR links and scoped evidence. Update th
 
 ## Worked example: Access-owned grant administration
 
-The following is a proposed issue body showing the agreed narrower #226 boundary. It is an authoring example, not a competing Access specification or a claim of implementation. Its POST-retirement deliverable is a proposed amendment to current published guidance, which explicitly preserves that operation. Reconcile the owning contract through the architecture-decision process before dependent implementation. Copy only source-checked detail appropriate to the actual issue, and recheck receiving owners when restructuring.
+The following issue body illustrates the Access-owned #226 boundary and selected POST consolidation in [ADR-0128](../../../../docs/adr/ADR-0128-consolidate-exact-target-grant-mutations.md). It is an authoring example, not a competing Access specification or a claim of implementation. The target contract is accepted, while POST retirement remains implementation work and the current operation remains supported until cutover. Copy only source-checked detail appropriate to the actual issue, and recheck receiving owners when restructuring.
 
 ### Outcome
 
@@ -52,7 +52,7 @@ Provide the supporting reads:
 - `GET /v1/projects/{project_id}/my-access`: the caller's own Project relationships and reviewed revision.
 - `GET /v1/projects/{project_id}/grant-recipients`: eligible Project recipients for the specified exact target/action, with the accepted `targetKind`, `targetId`, `actionId`, `limit` and `cursor` inputs.
 
-Consolidate Project mutation on PUT/DELETE by retiring `POST /v1/projects/{project_id}/grants` and its generated operation after reconciling the contract amendment. Migrate actual callers deliberately. POST's duplicate rejection and PUT's ability to change an existing grant differ, so do not redirect or replay POST as PUT automatically. Preserve historical original-operation lookup under its current authority and unresolved-effect safeguards.
+Consolidate Project mutation on PUT/DELETE by retiring `POST /v1/projects/{project_id}/grants` and its generated operation under ADR-0128. Migrate actual callers deliberately. POST's duplicate rejection and PUT's ability to change an existing grant differ, so do not redirect or replay POST as PUT automatically. Preserve historical original-operation lookup under its current authority and unresolved-effect safeguards.
 
 ### Technical approach
 

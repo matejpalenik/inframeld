@@ -54,7 +54,7 @@ The [creation response](../../../../apps/backend/src/inframeld_backend/access/ht
 
 Every page requires current admitted-human eligibility, Project visibility/membership and use plus grant authority for that exact action. Recovery blocks and current OAuth credential evidence retain their ordinary effects. A Project action read has no group-manager alternative. Stored suspended-recipient assignments remain visible. Results do not expand implied permissions or discover eligible recipients. Cursors bind installation, Organization, Project, action and recipient-ID order, without becoming authorization or snapshots. All responses are no-store. [The guide](../../../../apps/docs/src/app/guides/list-project-action-grants/page.mdx) explains the caller's setup and continuation.
 
-The existing POST use-only operation and this GET remain unchanged. The current candidate implements the Project own-access and full Project mutation contracts below. Other-target reads and mutations and the recipient-directory route remain implementation work.
+This GET remains unchanged. The currently implemented POST use-only operation retains its own behavior until the [selected cutover](#grant-delivery-boundary-and-cutover). The Project component implements the own-access and full Project mutation contracts below. Other-target reads and mutations and the recipient-directory route remain implementation work with the delivery owners identified below.
 
 <a id="implemented-project-grant-administration"></a>
 
@@ -64,7 +64,17 @@ The existing POST use-only operation and this GET remain unchanged. The current 
 
 [`setProjectActionGrant` and `removeProjectActionGrant`](../../../../apps/backend/src/inframeld_backend/access/http/routes/project_action_grant_change_routes.py) implement PUT/DELETE at `/v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}` for all eighteen Project actions. PUT uses strict `canGrant` and `expectedAccessRevision` JSON fields. DELETE has no body and requires one canonical `expectedAccessRevision` query field. Both require the single idempotency key and current human use-and-grant authority for the exact Project/action. New assignments return 201, while existing-assignment changes, no-ops and removals return 200. The saved original receipt preserves its status, revision, outcome and expiry. Current authority is checked before replay, and replay cannot reapply an assignment or remove a later one.
 
-The [assignment guide](../../../../apps/docs/src/app/guides/assign-project-grant/page.mdx) explains revision discovery, eligible recipients, safe departure and original-result recovery while retaining the legacy POST. Source and PostgreSQL evidence establish the Project backend component. Final SDK/runtime/platform qualification remains pending, and [human qualification #336](https://github.com/matejpalenik/inframeld/issues/336) is not claimed complete. Full [#226](https://github.com/matejpalenik/inframeld/issues/226) still includes Organization/other-resource administration and missing recipient/target producers.
+The [assignment guide](../../../../apps/docs/src/app/guides/assign-project-grant/page.mdx) explains revision discovery, eligible recipients, safe departure and original-result recovery, including the currently implemented POST. Source and PostgreSQL evidence establish the Project backend component. This documentation change establishes no additional SDK/runtime/platform qualification, and [human qualification #336](https://github.com/matejpalenik/inframeld/issues/336) is not claimed complete. Full [#226](https://github.com/matejpalenik/inframeld/issues/226) remains open for its complete Access-owned administration and cutover acceptance.
+
+<a id="grant-delivery-boundary-and-cutover"></a>
+
+### Grant delivery boundary and selected cutover
+
+[ADR-0128](../../../../docs/adr/ADR-0128-consolidate-exact-target-grant-mutations.md) selects complete Organization, Project, access-group and application-account administration for #226, with own-access reads and eligible-recipient discovery for those Project-scoped targets. The target catalogue below retains every accepted resource variant. Each other resource feature supplies its actual target tables, target-specific GET/PUT/DELETE and eligible-recipient integration under Access's rules when delivering that feature. Future target integration remains required v1 work with those owners. No generic registry or placeholder table is needed to close Access-owned administration.
+
+The selected Project mutation interface is `PUT /v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}` and DELETE at the same path. Retire `POST /v1/projects/{project_id}/grants`, `assignProjectUseOnlyGrant` and its generated request/response exports together, updating actual callers, public examples and SDK qualification in the implementation. Current native OpenAPI and public guidance continue to describe POST until that cutover lands. GET and the existing PUT/DELETE operation IDs and semantics remain unchanged.
+
+POST rejects an existing assignment. PUT can change it, including downgrading use-and-grant to use-only. Never redirect or automatically convert an original POST retry into PUT. Preserve retained original operation identity, method, canonical route, fingerprint, expiry and outcome without extending retention. Original-operation lookup remains read-only and checks current authority for the original exact Project/action. Route removal cannot convert an uncertain or expired original result into proof of failure or permission to dispatch a new write.
 
 <a id="credential-and-response-profiles"></a>
 
@@ -113,7 +123,7 @@ Invalid/expired/revoked invitation tokens on new activation use the same safe 40
 
 ### Full action-grant operations
 
-For each concrete base below, register three distinct operations: `PUT {base}/grants/{recipient_principal_id}/{action_id}`, `DELETE` at that same route, and `GET {base}/grants`. The table enumerates the symbols, rather than introducing a generic resource registry or catch-all grant endpoint. `action_id` is a catalogue literal appropriate to that target. Colon-containing accepted literals such as `feedback:write` retain their value after normal URL decoding.
+When delivering each concrete target below, register three distinct operations: `PUT {base}/grants/{recipient_principal_id}/{action_id}`, `DELETE` at that same route, and `GET {base}/grants`. The [delivery boundary](#grant-delivery-boundary-and-cutover) assigns Access-owned and resource-feature implementation. The table enumerates the symbols, rather than introducing a generic resource registry or catch-all grant endpoint. `action_id` is a catalogue literal appropriate to that target. Colon-containing accepted literals such as `feedback:write` retain their value after normal URL decoding.
 
 | Exact base | PUT / DELETE / GET operation IDs | Result target field and model stem |
 | --- | --- | --- |
