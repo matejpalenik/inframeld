@@ -209,7 +209,7 @@ The future CLI checks `/v1/session` before saving a completed login. After bound
 
 ### Keep credential invalidation independent of recovery replay
 
-[Human credential versions](#human-credential-versions) currently advance when the original recovery admission is newly inserted. The accepted restoration trigger below adds a distinct actual state transition, without fabricating a recovery event. Its version, operation and block commit together. Repeated callbacks retain the existing version and operation. A failed transaction commits none of these effects. Independent recoveries each invalidate the previous generation, while release changes only the original checklist.
+[Human credential versions](#human-credential-versions) currently advance when the original recovery admission is newly inserted. The accepted restoration trigger below adds a distinct actual state transition, without fabricating a recovery event. Recovery admission commits its version, operation and block together. The accepted restoration transition commits principal state, credential version, Access revision, audit and immutable original outcome together, without creating a recovery block. Repeated callbacks retain the existing version and operation. A failed transaction commits none of these effects. Independent recoveries each invalidate the previous generation, while release changes only the original checklist.
 
 A request authenticated before recovery still carries its original binding. Both existing authorization families compare it with current state before reservation/replay. Completed operation metadata does not authorize disclosure to a stale credential. Grant fingerprints and operation identities remain unchanged.
 
