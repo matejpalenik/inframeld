@@ -36,36 +36,9 @@ For authorized issue work, follow [Author delivery issues](#author-delivery-issu
 
 ## Author delivery issues
 
-An issue describes a stable delivery outcome, not an inventory of today's code. For example, “Reject Alice's expired browser cookie without trying her CLI token” tells a new engineer what to deliver. “Wire authentication and qualify the boundary” does not.
+Use [Issue Authoring](../../.agents/skills/inframeld-issue-authoring/SKILL.md) to draft, review or restructure a GitHub issue. It owns the authoring procedure, conditional formats and safe bulk reconciliation. The [implementation template](../../.github/ISSUE_TEMPLATE/implementation.md) is the canonical blank format.
 
-Choose the smallest coherent delivery scope and one of these formats:
-
-| Format | Required contents |
-| --- | --- |
-| Implementation | Outcome through an example, concrete work, observable acceptance examples, boundaries/owning issues, focused reading and behavioral verification. |
-| Delivery defect report | Problem through a realistic example, expected versus observed behavior, minimal reproduction or inspected evidence, impact, tentative solution or specific investigation, observable acceptance and exclusions. |
-| Parent | Outcome, actual native child map, exclusions and completion boundary. Keep implementation instructions and acceptance evidence in the children. Use the existing `epic` label. |
-| Specification | Concrete unanswered questions, accepted constraints, outputs needing approval, affected consumers and review examples. Link the owning pending-decision analysis rather than copying it. |
-| Qualification | Behavior to demonstrate, tested artifacts/environment/inputs, injected failures, required evidence and limitations. A planned test is not a passing result. |
-| Deferred Studio | Intended UI behavior, delivered backend dependencies and explicit exclusion from v1. Do not invent future backend contracts. |
-
-Use `type:implementation`, `type:specification` or `type:qualification` on open leaves. Apply `needs-decision` only when an unresolved answer prevents that ticket's implementation. Missing qualification evidence alone does not forbid evidence-gathering tests.
-
-Human-facing features use one linked `type:qualification` issue per delivery, created from the [human-qualification template](../../.github/ISSUE_TEMPLATE/human_qualification.md). Reuse an existing issue for the same delivery rather than creating one for every PR or retry. [Testing](../../.agents/skills/inframeld-testing/references/human-qualification.md) owns the procedure and execution records. Explain unavailable capabilities and their owners instead of publishing guessed commands or unexplained placeholders. Keep reusable steps separate from dated run comments. Native blockers remain the dependency authority, without duplicate manual Ready/Blocked fields. A test-run outcome of Blocked describes what happened during execution, not a competing implementation status. Publication still needs actual authority, and tracking does not expand a finite implementation scope or waive required implementation and automated acceptance. During automated backlog delivery, record human-only deferral under the closure policy, including preparation gaps, owners and pre-v1 timing. Keep missing product capabilities with their implementation owners. [Delivery gates](../../.agents/skills/inframeld-backlog-delivery/references/gates-and-recovery.md#separate-implementation-and-human-acceptance) own the distinction between component completion and human acceptance.
-
-Before writing, compare the delivery scope with the owning skill workflow, exact contracts and accepted ADRs. The repository owns behavior. Issues own delivery and evidence. Follow explicit supersession, preserve unresolved choices and surface genuine contradictions before publishing affected requirements. Do not infer new permissions, endpoints or provider guarantees. Keep useful unique requirements visible as explicit questions if their authority is unclear.
-
-Give a junior engineer a short path to the relevant explanation. Link exact sections instead of copying field catalogues, global conventions or the same workflow into several issue sections. Include an exact value only when the acceptance example needs it. For accepted unpublished guidance, state the exact repository path and its pending publication. Link a real PR or published revision when available. Never link `main` to missing or materially older content as if it contained the accepted update.
-
-For defects, use the existing [bug form](../../.github/ISSUE_TEMPLATE/bug_report.yml) or the same clear structure in an API-authored body. Public bug intake leaves solution, acceptance and exclusions optional so a reporter need not design the fix. Before assigning delivery, the coordinator completes the report to the delivery format above, including a specific investigation if the solution is unknown. Explain unfamiliar terms and distinguish an observed failure from a source-supported risk. A report found through review need not claim that a runtime failure occurred. Label the proposed solution as tentative. Keep useful redacted evidence and the affected revision, without private transcripts or operational inventories. [Delivery triage](../../.agents/skills/inframeld-backlog-delivery/references/discovered-defects.md) owns whether a new defect should interrupt current work and includes a complete example.
-
-Reuse existing issues before creating a child. Use native parents for decomposition and native blockers for actual prerequisite capabilities, using GitHub's database issue IDs when an API requires them. Avoid blanket epic blockers where a particular child supplies the capability. Keep the graph acyclic and ensure v1 has no dependency on deferred Studio. Do not duplicate those relationships with manually maintained Ready/Blocked fields.
-
-Update an issue when delivery scope, acceptance, an authoritative reading route, a prerequisite capability or a genuine decision changes. Code reorganization alone does not require a new starting-point inventory. Record implementation progress through completed delivery tasks, linked PRs and scoped evidence. Preserve comments and closed historical scope/results. Add only necessary navigation or a clearly separated current clarification to closed records.
-
-Keep newly described work open while implementation is unmerged or required acceptance evidence is missing. A local adapter, an open PR or a successful ordinary path does not establish complete production integration. Distinguish source inspection, checks personally run, reported results and pending release gates. Qualification evidence should identify the tested artifacts, failures and limits.
-
-For authorized bulk changes, snapshot bodies, comments, metadata and relationships outside the repository. Prepare coverage and the complete graph before publishing. Recheck current bodies/update times before each edit, preserve intervening work, journal actual created IDs and read back mutations. After an uncertain create, locate the issue before retrying. Verify states, milestones, labels, parents, dependencies and scope after application. Do not create repetitive migration comments or a permanent parallel backlog.
+Domain references retain accepted product behavior. [Testing](../../.agents/skills/inframeld-testing/references/human-qualification.md) owns human qualification, and [Backlog Delivery](../../.agents/skills/inframeld-backlog-delivery/SKILL.md) owns execution and closure under the actual launch. Authoring guidance grants no publication or implementation authority.
 
 <a id="preserve-status-and-explain-evidence"></a>
 

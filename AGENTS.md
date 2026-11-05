@@ -33,6 +33,7 @@ Read the skill whose invariant or behavior the question concerns. Domain skills 
 | End-user documentation, Protocol MDX pages and public usage examples | [Documentation](.agents/skills/inframeld-documentation/SKILL.md) |
 | Requested CLI or SDK developer-experience assessment | [Developer Experience](.agents/skills/inframeld-developer-experience/SKILL.md) |
 | Coordinate the authorized v1 backlog with native subagents, or rehearse it read-only | [Backlog Delivery](.agents/skills/inframeld-backlog-delivery/SKILL.md) |
+| Drafting, reviewing, restructuring or publishing GitHub issues and their scope/dependencies | [Issue Authoring](.agents/skills/inframeld-issue-authoring/SKILL.md) |
 | Any repository code planning, suggestions, additions, changes, refactoring or review, including tests and code snippets | [Coding Standards](.agents/skills/inframeld-coding-standards/SKILL.md) |
 | Authored Python, including backend components and tests | [Python Standards](.agents/skills/inframeld-python-standards/SKILL.md) |
 | Authored Rust, including CLI and xtask code | [Rust Standards](.agents/skills/inframeld-rust-standards/SKILL.md) |
@@ -93,7 +94,7 @@ Read applicable directory instructions, including [web guidance](apps/web/AGENTS
 
 ## PR descriptions and maintenance
 
-Before authorized GitHub issue creation, rewriting or relationship changes, follow [Author delivery issues](docs/development/documentation-maintenance.md#author-delivery-issues). Use concrete delivery examples, focused authoritative reading and native parent/blocker relationships. Preserve closed evidence and distinguish unmerged work from completed delivery. Drafting or reviewing an issue does not authorize publishing it.
+For GitHub issue drafting, review, rewriting or relationship changes, use [Issue Authoring](.agents/skills/inframeld-issue-authoring/SKILL.md). It owns issue content and safe publication. Domain references retain product authority, and Backlog Delivery retains execution and closure. Drafting or reviewing an issue does not authorize publishing it.
 
 Before drafting a PR title/description or creating a PR, read [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md). Use its headings/checklists and actual branch changes. Describe the concrete problem, resulting behavior and relevant validation. Keep CI and CodeRabbit progress updates out of the description. Keep future launch and approval instructions in the owning runbook. Distinguish personally run checks from reported or unavailable validation. Never mark unverified items complete. Drafting text does not authorize creating/updating a GitHub PR.
 

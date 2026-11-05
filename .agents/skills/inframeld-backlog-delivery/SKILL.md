@@ -19,6 +19,7 @@ Every assigned role reads the [assignment protocol](references/assignment-protoc
 | Implement and return a reviewed capability | [Worker](references/worker.md) |
 | Assess evidence, schedule shared execution, repair, merge or close | [Gates and recovery](references/gates-and-recovery.md) |
 | Classify an incidental defect or expanding tooling repair | [Defect triage](references/discovered-defects.md), with the dated [#237 case](references/case-237-testing-repair.md) when useful |
+| Draft or revise issue acceptance, split scope or repair native relationships | [Issue Authoring](../inframeld-issue-authoring/SKILL.md) |
 | Prepare or assess human qualification | [Testing's human-qualification policy](../inframeld-testing/references/human-qualification.md) |
 | Launch, adopt guidance, rehearse or use the personal adapter | [Delivery guide](../../../docs/development/guides/backlog-delivery.md) |
 
