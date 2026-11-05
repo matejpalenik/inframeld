@@ -70,9 +70,9 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         o_auth_consent_request_reader: OAuthConsentRequestReader,
         o_auth_consent_decision_writer: OAuthConsentDecisionWriter,
         browser_session_verifier: BrowserSessionVerifier,
-        recovery_blocks: IdentityRecoveryBlockReader,
+        recovery_block_reader: IdentityRecoveryBlockReader,
         *,
-        credential_states: HumanCredentialStateReader,
+        credential_state_reader: HumanCredentialStateReader,
         credential_initializer: HumanCredentialStateInitializer,
         authority: IdentityAuthority,
         api_audience: HumanAPIAudience,
@@ -85,12 +85,12 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
                 raise ValueError("Consent timeouts must be finite and positive.")
         if type(remember_consent_seconds) is not int or remember_consent_seconds <= 0:
             raise ValueError("Remembered consent must have a positive whole duration.")
-        self._credential_states = credential_states
+        self._credential_state_reader = credential_state_reader
         self._credential_initializer = credential_initializer
         self._o_auth_consent_request_reader = o_auth_consent_request_reader
         self._o_auth_consent_decision_writer = o_auth_consent_decision_writer
         self._browser_session_verifier = browser_session_verifier
-        self._recovery_blocks = recovery_blocks
+        self._recovery_block_reader = recovery_block_reader
         self._authority = authority
         self._api_audience = api_audience
         self._remember_consent_seconds = remember_consent_seconds
@@ -159,6 +159,7 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
     async def _provider_call[Result](
         self, operation: Callable[[float], Awaitable[Result]], deadline: float
     ) -> Result:
+        """Bound provider work without opening an application database transaction."""
         loop = asyncio.get_running_loop()
         provider_deadline = min(deadline, loop.time() + self._provider_timeout_seconds)
         remaining = provider_deadline - loop.time()
@@ -173,6 +174,7 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
     async def _read_supported_request(
         self, challenge: OAuthConsentChallenge, deadline: float
     ) -> HumanOAuthConsentRequestDTO:
+        """Reject unsupported OAuth requests before making a consent decision."""
         request = await self._provider_call(
             lambda timeout: self._o_auth_consent_request_reader.read(
                 challenge, timeout_seconds=timeout
@@ -194,6 +196,7 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         request: HumanOAuthConsentRequestDTO,
         deadline: float,
     ) -> VerifiedHumanIdentityDTO:
+        """Bind the browser session to the exact human named by the consent request."""
         identity = await self._provider_call(
             lambda _timeout: self._browser_session_verifier.verify(credential), deadline
         )
@@ -209,9 +212,10 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         challenge: OAuthConsentChallenge,
         deadline: float,
     ) -> tuple[HumanOAuthConsentRequestDTO, VerifiedHumanIdentityDTO]:
+        """Check consent eligibility without initializing or changing credential state."""
         request = await self._read_supported_request(challenge, deadline)
         identity = await self._verify_browser_identity(credential, request, deadline)
-        blocked = await self._recovery_blocks.is_blocked(identity)
+        blocked = await self._recovery_block_reader.is_blocked(identity)
         if asyncio.get_running_loop().time() >= deadline:
             raise TimeoutError
         if not HumanOAuthConsentPolicy.may_approve(
@@ -230,12 +234,13 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         challenge: OAuthConsentChallenge,
         deadline: float,
     ) -> tuple[HumanOAuthConsentRequestDTO, HumanOAuthCredentialBindingDTO]:
+        """Establish the credential binding required for an approved consent decision."""
         request = await self._read_supported_request(challenge, deadline)
         initial = await self._credential_initializer.initialize(
             VerifiedHumanIdentityDTO(self._authority, request.subject)
         )
         identity = await self._verify_browser_identity(credential, request, deadline)
-        current = await self._credential_states.read(identity)
+        current = await self._credential_state_reader.read(identity)
         if (
             initial.identity != identity
             or current.identity != identity

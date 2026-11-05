@@ -109,6 +109,7 @@ class AccountUIRunner:
         self.recipient_proof = False
 
     def _stop_phase(self, phase: _Phase) -> bool:
+        """Stop and reconcile only the process group retained by this runner."""
         valid = True
         quiescent = False
         term_deadline = time.monotonic() + self.term_seconds
@@ -158,6 +159,7 @@ class AccountUIRunner:
         return confirmed
 
     def _members(self, phase: _Phase, deadline: float) -> bool:
+        """Observe owned process-group members without adopting an unrelated numeric identity."""
         deadline = min(deadline, time.monotonic() + 1)
         if time.monotonic() >= deadline:
             raise TimeoutError
@@ -239,6 +241,7 @@ class AccountUIRunner:
         pass
 
     def _environment(self) -> dict[str, str]:
+        """Give the isolated Compose project its own image and proof-context bindings."""
         assert self.directory is not None
         return {
             **os.environ,
@@ -258,6 +261,7 @@ class AccountUIRunner:
         *,
         cleanup: bool = False,
     ) -> int:
+        """Bound one owned command while preserving its original failure and cleanup result."""
         if self.cancelled and not cleanup:
             return self.cancelled
         deadline = time.monotonic() + work_seconds
@@ -311,6 +315,7 @@ class AccountUIRunner:
                 output.close()
 
     def _shell(self, name: str) -> list[str]:
+        """Run a shell phase under the same process ownership and deadline rules."""
         if name not in {
             "runtime_preflight",
             "startup_stack",
@@ -351,6 +356,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
         ]
 
     def _work(self) -> int:
+        """Run the selected account journey while retaining the owner needed for cleanup."""
         assert self.directory is not None
         commands = [
             (
@@ -417,6 +423,8 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
         return 0
 
     def _write_context(self, cleanup_state: str) -> None:
+        """Prepare the isolated build context without modifying the ordinary application checkout.
+        """
         assert self.directory is not None
         environment = self._environment()
         values = {
@@ -538,6 +546,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
 
 
 def _executable_members(payload: bytes, group: int) -> bool:
+    """Identify executable group members separately from exited processes awaiting reaping."""
     if not payload.strip():
         raise ValueError("Missing process observation.")
     running = False

@@ -253,10 +253,12 @@ class S3ArtifactStore(ArtifactStore):
         await asyncio.shield(self._closing)
 
     async def _drain_and_close(self) -> None:
+        """Wait for owned SDK threads before closing the client they may still use."""
         await asyncio.gather(*tuple(self._pending), return_exceptions=True)
         self._client.close()
 
     def _require_attempt(self, attempt: ArtifactAttemptDTO) -> None:
+        """Enforce the sealed artifact length and configured capacity before storage work."""
         if type(attempt.length) is not int or attempt.length < 0:
             raise ArtifactIntegrityError("The original sealed length is invalid.")
         if attempt.length > self._settings.max_object_bytes:
@@ -264,6 +266,7 @@ class S3ArtifactStore(ArtifactStore):
 
     @staticmethod
     def _prefix(scope: ArtifactScopeDTO) -> str:
+        """Keep artifact keys scoped to the installation, Organization and Project."""
         return f"artifacts/{scope.installation_id.value.hex}/{scope.organization_id.value.hex}/{scope.project_id.value.hex}/"
 
     @staticmethod
@@ -278,6 +281,10 @@ class S3ArtifactStore(ArtifactStore):
         cleanup: Callable[[T | None], None] | None = None,
         deadline: float | None = None,
     ) -> T:
+        """Bound the SDK wait while retaining ownership of a thread that may still finish.
+
+        A timed-out write keeps its uncertain-outcome meaning.
+        """
         if self._closed or len(self._pending) >= 2:
             raise ArtifactStoreUnavailableError(
                 "The private storage client is unavailable or busy."

@@ -13,6 +13,7 @@ from inframeld_backend.access.infrastructure.types.human_oauth_client_name impor
 
 
 def _require_endpoint(value: str) -> None:
+    """Validate the configured provider endpoint without interpreting it as user input."""
     message = "Expected an HTTP(S) URL without credentials, query or fragment."
 
     if not value or any(character.isspace() or ord(character) < 32 for character in value):

@@ -109,6 +109,7 @@ class PostgresProjectGrantChangeFactsReader(ProjectGrantChangeFactsReader):
         recipient_principal_id: PrincipalId,
         action_id: ActionId,
     ) -> ProjectGrantChangeFactsDTO | None:
+        """Observe the actor and target under the grant workflow coordination locks."""
         actor_organization_id = await self._session.scalar(
             select(PrincipalRow.organization_id).where(
                 PrincipalRow.id == access.actor_principal_id.value

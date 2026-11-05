@@ -78,6 +78,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
 
     @asynccontextmanager
     async def _stage(self) -> AsyncGenerator[None]:
+        """Bound the database write and translate its availability failures."""
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Spending writes require the caller's active transaction.")
         try:
@@ -164,6 +165,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
         authority: AdmittedWorkAuthorityDTO,
         operation_limit: UsdAmount | None,
     ) -> None:
+        """Require the original operation identity and checked authority before accounting writes."""
         binding = authority.human_binding
         stored = (
             row.job_id,
@@ -232,6 +234,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
     async def _locked_call(
         self, record: SpendingCallRecordDTO
     ) -> tuple[ModelCallAccountingRow, SpendingCallRecordDTO]:
+        """Lock the original model call before checking and updating its accounting state."""
         operation = await self._operation(record.operation_id)
         self._require_operation_binding(
             operation, record.job_id, record.authority, record.operation_limit
@@ -257,6 +260,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
     def _require_immutable_call(
         original: SpendingCallRecordDTO, candidate: SpendingCallRecordDTO
     ) -> None:
+        """Prevent an accounting update from changing the original call identity or rate basis."""
         if (
             original.call_id,
             original.operation_id,
@@ -466,6 +470,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
     async def _require_human_actor(
         self, actor_id: PrincipalId, organization_id: OrganizationId
     ) -> None:
+        """Require the retained human credential binding when the actor is human."""
         actor = await self._session.scalar(
             select(PrincipalRow.id).where(
                 PrincipalRow.id == actor_id.value,

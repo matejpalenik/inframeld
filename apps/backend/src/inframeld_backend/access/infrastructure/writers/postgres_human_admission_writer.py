@@ -79,6 +79,7 @@ class PostgresHumanAdmissionWriter(HumanAdmissionWriter):
         actor_id: PrincipalId,
         operation_id: OperationId,
     ) -> None:
+        """Persist the admission and retained receipt under the original checked reservation."""
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Admission persistence requires the active caller transaction.")
         organization_id = facts.actor.principal.organization_id

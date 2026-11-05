@@ -210,7 +210,7 @@ class MockConsentScenario:
             self.writer,
             self.verifier,
             self.blocks,
-            credential_states=self.states,
+            credential_state_reader=self.states,
             credential_initializer=self.states,
             authority=AUTHORITY,
             api_audience=AUDIENCE,

@@ -119,7 +119,7 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
                 ),
             )
             if not isinstance(operation, NewOperationReservationDTO):
-                completed = self._completed(operation)
+                completed = self._require_safe_completed_operation(operation)
                 original = await self._metadata_repository.original(
                     organization_id=scope.organization_id,
                     project_id=scope.project_id,
@@ -151,7 +151,7 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
                 actor_id=access.actor_principal_id,
                 operation_id=operation.operation_id,
             )
-            completed = self._completed(
+            completed = self._require_safe_completed_operation(
                 await self._operation_idempotency.record_completed_result(
                     operation, replay_kind=OperationReplayKind.SAFE_RESULT
                 )
@@ -172,11 +172,13 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
     def _require_scope(
         metadata: ProjectMetadata, organization_id: OrganizationId, project_id: ProjectId
     ) -> None:
+        """Reject an authorizer result that substituted another Project."""
         if (metadata.organization_id, metadata.project_id) != (organization_id, project_id):
             raise RuntimeError("The loaded metadata changed its authorized scope.")
 
     @staticmethod
-    def _completed(operation: object) -> CompletedSynchronousOperationDTO:
+    def _require_safe_completed_operation(operation: object) -> CompletedSynchronousOperationDTO:
+        """Require the safe synchronous outcome supported by metadata retries."""
         if (
             not isinstance(operation, CompletedSynchronousOperationDTO)
             or operation.replay_kind is not OperationReplayKind.SAFE_RESULT

@@ -292,6 +292,7 @@ class SpendingAccountingService(SpendingAccountant):
     async def _evidence(
         self, record: SpendingCallRecordDTO, evidence_id: UUID
     ) -> tuple[SpendingObservationDTO, SpendingCallRecordDTO | None, bool] | None:
+        """Recover retained evidence only when it belongs to this model call."""
         retained = await self._spending_ledger_reader.observation(
             record=record, evidence_id=evidence_id
         )
@@ -311,6 +312,7 @@ class SpendingAccountingService(SpendingAccountant):
     async def _resolution(
         self, record: SpendingCallRecordDTO, pending_evidence_id: UUID
     ) -> SpendingEvidenceResolutionDTO | None:
+        """Load a resolution bound to the original pending evidence and call."""
         resolution = await self._spending_ledger_reader.resolution(
             record=record, pending_evidence_id=pending_evidence_id
         )
@@ -332,6 +334,7 @@ class SpendingAccountingService(SpendingAccountant):
         project_id: ProjectId,
         call_id: ModelCallId,
     ) -> None:
+        """Reject a call record that substituted a different checked spending scope."""
         if (record.authority.organization_id, record.authority.project_id, record.call_id) != (
             organization_id,
             project_id,
@@ -343,10 +346,12 @@ class SpendingAccountingService(SpendingAccountant):
     def _require_policy_scope(
         policy: ProjectSpendingPolicyDTO, organization_id: OrganizationId, project_id: ProjectId
     ) -> None:
+        """Reject a budget policy returned for another Organization or Project."""
         if (policy.organization_id, policy.project_id) != (organization_id, project_id):
             raise RuntimeError("Accounting policy changed its scope.")
 
     async def _lock_account(self, call: SpendingCallContextDTO) -> ProjectSpendingPolicyDTO:
+        """Create the Project account if necessary and lock its current spending policy."""
         scope = call.authority
         await self._spending_ledger_writer.ensure_project_account(
             organization_id=scope.organization_id, project_id=scope.project_id
@@ -365,6 +370,7 @@ class SpendingAccountingService(SpendingAccountant):
         )
 
     async def _require_call(self, call: SpendingCallContextDTO) -> SpendingCallRecordDTO:
+        """Require an existing call before changing its accounting state."""
         record = await self._find_call(call)
         if record is None:
             raise ResourceNotFoundError()
@@ -373,6 +379,7 @@ class SpendingAccountingService(SpendingAccountant):
 
     @staticmethod
     def _require_binding(record: SpendingCallRecordDTO, call: SpendingCallContextDTO) -> None:
+        """Keep a model call bound to its original operation and authority."""
         if (
             record.call_id != call.call_id
             or record.operation_id != call.operation_id
@@ -384,6 +391,7 @@ class SpendingAccountingService(SpendingAccountant):
 
     @staticmethod
     def _require_revision(record: SpendingCallRecordDTO, expected_revision: int) -> None:
+        """Reject stale accounting updates before changing retained evidence."""
         if type(expected_revision) is not int or expected_revision < 0:
             raise ValueError("Accounting requires a nonnegative reviewed call revision.")
         if record.revision != expected_revision:
@@ -397,6 +405,10 @@ class SpendingAccountingService(SpendingAccountant):
         *,
         exclude_self: bool = False,
     ) -> None:
+        """Check conservative Project and operation totals before approving a reservation.
+
+        Excluding this call must not conceal unresolved evidence.
+        """
         excluded = record.call_id if exclude_self else None
         project = await self._spending_ledger_reader.project_totals(
             organization_id=record.authority.organization_id,
@@ -432,13 +444,13 @@ class SpendingAccountingService(SpendingAccountant):
             )
         if not SpendingAllowancePolicy.can_reserve(
             SpendingAllowancePolicyInput(
-                policy.monthly_limit,
-                project.settled,
-                project.held,
-                record.operation_limit,
-                operation.settled,
-                operation.held,
-                amount,
+                project_limit=policy.monthly_limit,
+                project_settled=project.settled,
+                project_held=project.held,
+                operation_limit=record.operation_limit,
+                operation_settled=operation.settled,
+                operation_held=operation.held,
+                reservation_amount=amount,
             )
         ):
             raise SpendingLimitExceededError()
@@ -446,6 +458,7 @@ class SpendingAccountingService(SpendingAccountant):
     async def _recover_observation(
         self, record: SpendingCallRecordDTO, observation: SpendingObservationDTO
     ) -> SpendingAccountingResultDTO | None:
+        """Return the original applied result when this evidence was already recorded."""
         previous = await self._evidence(record, observation.evidence_id)
         if previous is None:
             return None
@@ -464,6 +477,7 @@ class SpendingAccountingService(SpendingAccountant):
         observation: SpendingObservationDTO,
         expected_revision: int,
     ) -> SpendingAccountingResultDTO:
+        """Preserve unresolved evidence without prematurely applying a charge or releasing a hold."""
         recovered = await self._recover_observation(record, observation)
         if recovered is not None:
             return recovered
@@ -479,6 +493,7 @@ class SpendingAccountingService(SpendingAccountant):
     def _cost(
         basis: CapturedSpendingBasisDTO | None, usage: tuple[SpendingUsageDTO, ...] | None
     ) -> UsdAmount | None:
+        """Calculate a charge only from the usage categories and rates accepted for this call."""
         if basis is None or usage is None:
             return None
         rates = {(rate.category, rate.unit): rate.usd_per_unit for rate in basis.rates}
@@ -501,6 +516,7 @@ class SpendingAccountingService(SpendingAccountant):
     def _apply_observation(
         record: SpendingCallRecordDTO, observation: SpendingObservationDTO
     ) -> SpendingCallRecordDTO:
+        """Apply the supported evidence transition and retain its accounting result together."""
         zero = UsdAmount(Decimal("0"))
         if observation.kind in ("not_sent", "not_billed"):
             return replace(

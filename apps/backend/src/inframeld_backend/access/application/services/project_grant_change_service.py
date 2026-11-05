@@ -146,6 +146,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         | AcceptedAsyncOperationDTO
         | RecoveryRequiredOperationDTO,
     ) -> CompletedSynchronousOperationDTO:
+        """Accept only the safe synchronous result supported by this grant operation."""
         if (
             not isinstance(operation, CompletedSynchronousOperationDTO)
             or operation.replay_kind is not OperationReplayKind.SAFE_RESULT

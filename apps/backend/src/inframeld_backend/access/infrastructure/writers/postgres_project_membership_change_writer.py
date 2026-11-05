@@ -75,6 +75,10 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
         change_kind: ProjectMembershipChangeKind,
         operation_id: OperationId,
     ) -> None:
+        """Persist membership, revision, receipt and audit changes in the caller transaction.
+
+        Recheck the original reservation and locked scope before mutation.
+        """
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Membership persistence requires the active caller transaction.")
         actor = facts.action.principal

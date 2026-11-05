@@ -60,6 +60,7 @@ class PostgresProjectBudgetFactsReader(ProjectActionFactsReader):
     async def _read(
         self, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
     ) -> ProjectActionFactsDTO | None:
+        """Observe current budget authority in the requested Project scope."""
         installation = await self._session.scalar(
             select(InstallationIdentityRow.installation_id).where(
                 InstallationIdentityRow.singleton_key == 1

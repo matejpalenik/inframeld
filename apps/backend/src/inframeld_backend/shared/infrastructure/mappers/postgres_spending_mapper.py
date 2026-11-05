@@ -232,6 +232,7 @@ class PostgresSpendingMapper:
         revision: int | None,
         approval_revision: int | None,
     ) -> SpendingCallRecordDTO | None:
+        """Reconstruct the accounting result recorded for this call without inventing missing fields."""
         if state is None:
             if any(value is not None for value in (hold, settled, revision, approval_revision)):
                 raise ValueError("Stored financial receipt is incomplete.")
@@ -249,6 +250,7 @@ class PostgresSpendingMapper:
 
     @staticmethod
     def _evidence_scope(row: ModelCallAccountingEvidenceRow, record: SpendingCallRecordDTO) -> None:
+        """Reject accounting evidence stored against another model call or tenant scope."""
         if (row.call_id, row.organization_id, row.project_id) != (
             record.call_id.value,
             record.authority.organization_id.value,
@@ -258,6 +260,7 @@ class PostgresSpendingMapper:
 
     @staticmethod
     def _basis(value: dict[str, object] | None) -> CapturedSpendingBasisDTO | None:
+        """Decode the rate basis retained when the model call was reserved."""
         if value is None:
             return None
         rates: list[SpendingRateDTO] = []
@@ -281,6 +284,7 @@ class PostgresSpendingMapper:
 
     @staticmethod
     def _usage(value: object) -> tuple[SpendingUsageDTO, ...] | None:
+        """Decode retained usage quantities without accepting an untyped accounting payload."""
         if value is None:
             return None
         result: list[SpendingUsageDTO] = []

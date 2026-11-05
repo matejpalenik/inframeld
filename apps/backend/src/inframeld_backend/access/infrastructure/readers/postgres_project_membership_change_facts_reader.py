@@ -124,6 +124,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
         project_id: ProjectId,
         principal_id: PrincipalId,
     ) -> ProjectMembershipChangeFactsDTO | None:
+        """Lock the Project and observe the actor and recipient before the application decides the change."""
         organization = await self._session.scalar(
             select(PrincipalRow.organization_id).where(
                 PrincipalRow.id == access.actor_principal_id.value
@@ -284,6 +285,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
     async def _responsibilities(
         self, facts: ProjectMembershipChangeFactsDTO, departing: PrincipalId
     ) -> tuple[ProjectDepartureResponsibilityDTO, ...]:
+        """Observe affected assignments and possible replacements without deciding whether departure is safe."""
         project = facts.project_id.value
         result: list[ProjectDepartureResponsibilityDTO] = []
         project_actions = (
@@ -415,6 +417,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
         grant: ColumnElement[bool],
         group: UUID | None = None,
     ) -> tuple[ProjectDepartureCandidateDTO, ...]:
+        """Observe remaining humans and their exact grant or group-manager relationships."""
         group_member = (
             exists()
             .where(
@@ -480,6 +483,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
     def _membership(
         principal: SQLColumnExpression[UUID], project: ProjectId, organization: OrganizationId
     ) -> Exists:
+        """Build the current Project-membership predicate for a candidate human."""
         return (
             exists()
             .where(
@@ -492,6 +496,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
 
     @staticmethod
     def _pending(principal: SQLColumnExpression[UUID], installation: InstallationId) -> Exists:
+        """Include unreleased recovery blocks when observing candidate eligibility."""
         return (
             select(IdentityRecoveryAdmissionRow.operation_id)
             .join(
@@ -516,6 +521,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
         organization: OrganizationId,
         installation: InstallationId,
     ) -> Exists:
+        """Require one coherent admitted identity when observing a replacement candidate."""
         version = (
             exists()
             .where(

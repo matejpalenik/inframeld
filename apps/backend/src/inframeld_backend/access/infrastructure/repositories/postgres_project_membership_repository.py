@@ -79,6 +79,7 @@ def _snapshot(membership: ProjectMembership) -> _MembershipSnapshot:
 def _additions(
     original: _MembershipSnapshot, current: _MembershipSnapshot
 ) -> tuple[_GrantSnapshot, ...]:
+    """Identify new supported grants without allowing removal or mutation of retained assignments."""
     if (
         original.organization_id != current.organization_id
         or original.project_id != current.project_id
@@ -116,9 +117,9 @@ class PostgresProjectMembershipRepository(ProjectMembershipRepository):
     writer. Keep database-generated timestamps on their existing rows.
     """
 
-    def __init__(self, session: AsyncSession, audit_events: AuditEventWriter) -> None:
+    def __init__(self, session: AsyncSession, audit_event_writer: AuditEventWriter) -> None:
         self._session = session
-        self._audit_events = audit_events
+        self._audit_event_writer = audit_event_writer
         self._transaction: AsyncSessionTransaction | None = None
         self._failed = False
         self._tracked: dict[tuple[OrganizationId, ProjectId, PrincipalId], _TrackedMembership] = {}
@@ -230,6 +231,7 @@ class PostgresProjectMembershipRepository(ProjectMembershipRepository):
     async def _advance_revision(
         self, membership: _MembershipSnapshot, expected_revision: int
     ) -> None:
+        """Advance the locked Access revision only from the expected current value."""
         statement = (
             update(ProjectRow)
             .where(
@@ -247,6 +249,7 @@ class PostgresProjectMembershipRepository(ProjectMembershipRepository):
     async def _insert_grant(
         self, membership: _MembershipSnapshot, grant: _GrantSnapshot, operation_id: OperationId
     ) -> None:
+        """Save a new exact grant and its audit evidence within the caller transaction."""
         actor = grant.assigned_by_principal_id
         if actor is None:
             raise RuntimeError("An assigning principal is required for a new grant.")
@@ -265,7 +268,7 @@ class PostgresProjectMembershipRepository(ProjectMembershipRepository):
         )
         if (await self._session.execute(statement)).scalar_one_or_none() is None:
             raise ConflictError("This project action grant already exists.")
-        await self._audit_events.append(
+        await self._audit_event_writer.append(
             ProjectUseOnlyGrantAssignedAuditEventDTO(
                 organization_id=membership.organization_id,
                 project_id=membership.project_id,

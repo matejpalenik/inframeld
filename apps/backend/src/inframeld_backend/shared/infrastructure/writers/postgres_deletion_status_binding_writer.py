@@ -91,6 +91,7 @@ class PostgresDeletionStatusBindingWriter(DeletionStatusBindingWriter):
     ) -> DeletionStatusBindingDTO:
         # Existing reservation coordination serializes first bindings. Re-read
         # retained history after waiting, so the first committed attribution wins.
+        """Retain the original deletion lookup binding without overwriting another request meaning."""
         native = await self._session.scalar(
             select(IdempotencyReservationRow)
             .where(IdempotencyReservationRow.operation_id == reservation.operation_id.value)
@@ -180,6 +181,7 @@ class PostgresDeletionStatusBindingWriter(DeletionStatusBindingWriter):
     def _require_native_meaning(
         row: IdempotencyReservationRow, request: OperationReservationRequestDTO
     ) -> None:
+        """Check the request against the supported native deletion operation."""
         authority = request.lookup_authority
         if (
             authority is None
@@ -205,6 +207,7 @@ class PostgresDeletionStatusBindingWriter(DeletionStatusBindingWriter):
         installation_id: InstallationId,
         request: OperationReservationRequestDTO,
     ) -> None:
+        """Reject a retained lookup binding that changes the original deletion request."""
         authority = request.lookup_authority
         if (
             authority is None

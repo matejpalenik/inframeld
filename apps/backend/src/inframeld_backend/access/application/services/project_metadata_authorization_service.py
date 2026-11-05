@@ -63,6 +63,7 @@ class ProjectMetadataAuthorizationService(ProjectMetadataAuthorizer):
         *,
         change: bool,
     ) -> ProjectActionAuthorizationDTO:
+        """Authorize from the requested Project facts before exposing or changing metadata."""
         if facts is None:
             raise ResourceNotFoundError()
         if facts.project_id != project_id or facts.action.principal.id != access.actor_principal_id:

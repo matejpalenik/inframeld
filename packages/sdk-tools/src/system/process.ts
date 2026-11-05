@@ -219,6 +219,7 @@ class ProcessOwner implements OwnedProcess {
     if (options.signal?.aborted) this.requestStop("cancel");
   }
 
+  /** Bound received bytes while decoding stdout and stderr independently. */
   private append(chunk: Buffer, index: number): void {
     this.capture.received += chunk.length;
     if (this.capture.overflow) return;
@@ -241,11 +242,13 @@ class ProcessOwner implements OwnedProcess {
     this.timers.add(timer);
   }
 
+  /** Translate an existing deadline using the owner's observed clock anchor. */
   private mapped(deadline: number): number {
     if (!this.clock) throw new Error("Process owner has no clock anchor");
     return Math.floor(this.clock.helper + deadline - this.clock.node);
   }
 
+  /** Retain the first control failure and start owned cleanup immediately. */
   private fail(error: unknown): void {
     this.failure ??=
       error instanceof Error
@@ -255,6 +258,7 @@ class ProcessOwner implements OwnedProcess {
     this.requestStop("close");
   }
 
+  /** Send bounded control frames without extending the caller's deadline. */
   private async send(value: object, deadline: number): Promise<void> {
     const payload = Buffer.from(
       JSON.stringify({ version: 1, ...value }) + "\n",
@@ -285,6 +289,7 @@ class ProcessOwner implements OwnedProcess {
     }
   }
 
+  /** Accept only ordered, bounded owner evidence before advancing local state. */
   private receive(chunk: Buffer): void {
     this.buffer = Buffer.concat([this.buffer, chunk]);
     if (this.buffer.length > 65536)
@@ -438,6 +443,7 @@ class ProcessOwner implements OwnedProcess {
     }
   }
 
+  /** Fix one cleanup deadline shared by every later stop request. */
   private beginStop(reason: string): void {
     if (this.stopDeadline !== undefined) return;
     this.stopReason = reason;
@@ -459,6 +465,7 @@ class ProcessOwner implements OwnedProcess {
   }
 
   private sentStop = false;
+  /** Send at most one stop instruction using the already fixed deadline. */
   private sendStop(): void {
     if (
       this.sentStop ||
@@ -491,6 +498,7 @@ class ProcessOwner implements OwnedProcess {
     return this.closing;
   }
 
+  /** Settle once from owner evidence, preserving unknown cleanup as failure. */
   private finish(expired = false): void {
     if (this.settled || (!expired && !this.helperClosed)) return;
     this.settled = true;

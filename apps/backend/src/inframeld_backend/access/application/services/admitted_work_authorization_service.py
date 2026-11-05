@@ -57,7 +57,9 @@ class AdmittedWorkAuthorizationService(AdmittedWorkAuthorizer):
             raise AccessDeniedError("The admitted authority has an incompatible identity.")
 
         eligibility = PrincipalAccessPolicyInput(
-            facts.principal, facts.has_pending_recovery, generation_current
+            principal=facts.principal,
+            has_pending_recovery=facts.has_pending_recovery,
+            credential_is_current=generation_current,
         )
         if not (
             PrincipalAccessPolicy.may_use_product(eligibility)

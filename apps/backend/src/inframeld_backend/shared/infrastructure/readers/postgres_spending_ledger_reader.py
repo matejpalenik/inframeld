@@ -82,6 +82,7 @@ class PostgresSpendingLedgerReader(SpendingLedgerReader):
 
     @asynccontextmanager
     async def _stage(self) -> AsyncGenerator[None]:
+        """Bound the database observation and translate its availability failures."""
         if not self._session.is_active:
             raise RuntimeError("Spending reads require an active caller session.")
         try:
@@ -209,6 +210,7 @@ class PostgresSpendingLedgerReader(SpendingLedgerReader):
     def _totals_columns() -> tuple[
         ColumnElement[Decimal], ColumnElement[Decimal], ColumnElement[int]
     ]:
+        """Calculate retained settlements and holds without dropping unquantified evidence."""
         zero = literal(Decimal("0"), Numeric())
         settled = func.coalesce(
             func.sum(

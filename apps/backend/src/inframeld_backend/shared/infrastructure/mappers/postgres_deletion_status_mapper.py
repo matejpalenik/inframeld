@@ -88,6 +88,7 @@ class PostgresDeletionStatusMapper:
     def _to_unfinished_obligation(
         row: DeletionStatusObservationRow,
     ) -> DeletionStatusObligationProvenanceDTO | None:
+        """Decode an unfinished cleanup obligation while retaining its original scope and deadline."""
         obligation_id = row.unfinished_obligation_id
         operation_id = row.unfinished_operation_id
         installation_id = row.unfinished_installation_id

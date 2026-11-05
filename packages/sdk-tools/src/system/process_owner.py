@@ -146,6 +146,7 @@ class OwnedTarget:
 
 
 def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate control fields before accepting process ownership or stop instructions."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -155,6 +156,7 @@ def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _invalid_constant(value: str) -> object:
+    """Reject non-finite numbers in the process-owner control protocol."""
     raise ValueError("Non-finite control number.")
 
 
@@ -411,6 +413,7 @@ class Control:
 
 
 def _stop_document(value: dict[str, object]) -> tuple[str, int]:
+    """Validate one stop instruction without extending the existing cleanup deadline."""
     if (
         set(value) != {"version", "type", "reason", "deadline"}
         or type(value["version"]) is not int

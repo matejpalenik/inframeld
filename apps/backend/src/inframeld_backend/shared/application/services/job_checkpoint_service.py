@@ -87,6 +87,7 @@ class JobCheckpointService(JobCheckpoints):
         self._require_continuation(current)
 
     async def _guard(self, context: JobAttemptContextDTO) -> JobSnapshotDTO | None:
+        """Check current ownership and authority before continuing or changing an ordinary job."""
         if not isinstance(context.binding, ProductJobBindingDTO):
             raise JobStoppedError("Product checkpoints require the original product binding.")
         try:
@@ -107,6 +108,7 @@ class JobCheckpointService(JobCheckpoints):
 
     @staticmethod
     def _require_continuation(current: JobSnapshotDTO | None) -> None:
+        """Stop work once the checked continuation state no longer permits it."""
         if current is None:
             # Raise after transaction exit so the stopped outcome remains committed.
             raise JobStoppedError("The admitted work has stopped.")

@@ -74,6 +74,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
 
     @asynccontextmanager
     async def _stage(self) -> AsyncGenerator[None]:
+        """Keep one database phase within the configured cleanup-stage deadline."""
         try:
             async with asyncio.timeout(self._database_timeout_seconds):
                 async with self._transaction_manager.begin():
@@ -239,6 +240,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
     async def _owned_work(
         self, claim: IdentityRecoveryCleanupClaimDTO
     ) -> IdentityRecoveryCleanupWorkDTO | None:
+        """Require the current cleanup claim before using its execution authority."""
         current = await self._recovery_cleanup_facts_reader.lock_work(claim.operation_id)
         if (
             current is None
@@ -253,6 +255,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
 
     @staticmethod
     def _confirmed(work: IdentityRecoveryCleanupWorkDTO) -> bool:
+        """Recognize completion only when every required provider step is confirmed."""
         return (
             work.cli_grants_state
             is work.remembered_logins_state
@@ -261,6 +264,7 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
 
     @staticmethod
     def _require_proof_inputs(work: IdentityRecoveryCleanupWorkDTO) -> None:
+        """Reject inconsistent ownership or budget facts before writing completion proof."""
         if (
             not work.has_original_password_receipt
             or work.kratos_cleanup_state is not IdentityRecoveryCleanupState.CONFIRMED
@@ -275,6 +279,10 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
             raise RuntimeError("The stored cleanup budget is inconsistent.")
 
     async def _finish(self, work: IdentityRecoveryCleanupWorkDTO, now: datetime) -> None:
+        """Record complete proof, an operator-required stop or the next bounded retry.
+
+        Provider success alone does not settle the entire cleanup run.
+        """
         if self._confirmed(work):
             await self._recovery_cleanup_writer.save_complete_proof(work, at=now)
             await self._recovery_cleanup_writer.finish(

@@ -92,6 +92,7 @@ class PostgresIdentityRecoveryAdmissionWriter(IdentityRecoveryAdmissionWriter):
             ) from error
 
     async def _reserve(self, event: IdentityRecoveryEventDTO) -> IdentityRecoveryAdmissionDTO:
+        """Reserve the recovery and its cleanup work while preserving the original identity binding."""
         await PostgresIdentityCoordinator(self._session).acquire(
             installation_id=self._installation_id, identity=event.identity
         )

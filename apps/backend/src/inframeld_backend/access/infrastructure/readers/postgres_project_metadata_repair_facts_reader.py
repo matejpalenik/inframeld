@@ -167,6 +167,7 @@ class PostgresProjectMetadataRepairFactsReader(ProjectMetadataRepairFactsReader)
     async def _eligible_grantor(
         self, project_id: ProjectId, installation_id: InstallationId
     ) -> bool | None:
+        """Find currently eligible humans for the exact stored Project action."""
         linked = exists().where(HumanIdentityLinkRow.principal_id == PrincipalRow.id)
         pending = (
             select(IdentityRecoveryAdmissionRow.operation_id)

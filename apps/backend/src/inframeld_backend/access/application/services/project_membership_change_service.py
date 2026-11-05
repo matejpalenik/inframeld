@@ -156,6 +156,10 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         change_kind: ProjectMembershipChangeKind,
         fingerprint: RequestFingerprint,
     ) -> ProjectMembershipChangeResultDTO:
+        """Apply one membership request or recover its receipt after checking current authority.
+
+        Only newly reserved work evaluates the requested revision and departure responsibilities.
+        """
         method = change_kind.http_method
         route = f"/v1/projects/{command.project_id.value}/members/{command.principal_id.value}"
         if context.method != method or context.requested_route != route:
@@ -163,9 +167,12 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
 
         try:
             async with asyncio.timeout(5), self._transaction_manager.begin():
-                facts, scope = await self._lock_and_authorize(access, command)
+                facts, authorization = await self._lock_and_authorize(access, command)
                 operation = await self._reserve_or_recover(
-                    context=context, access=access, scope=scope, fingerprint=fingerprint
+                    context=context,
+                    access=access,
+                    authorization=authorization,
+                    fingerprint=fingerprint,
                 )
                 if not isinstance(operation, NewOperationReservationDTO):
                     return await self._load_original_membership_result(
@@ -196,7 +203,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
                     change_kind=change_kind,
                     operation_id=operation.operation_id,
                 )
-                completed = self._completed(
+                completed = self._require_safe_completed_operation(
                     await self._operation_idempotency.record_completed_result(
                         operation, replay_kind=OperationReplayKind.SAFE_RESULT
                     )
@@ -205,8 +212,8 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
                     raise RuntimeError("Membership completion changed the original operation.")
                 return ProjectMembershipChangeResultDTO(
                     facts.installation_id,
-                    scope.organization_id,
-                    scope.project_id,
+                    authorization.organization_id,
+                    authorization.project_id,
                     access.actor_principal_id,
                     command.principal_id,
                     change_kind,
@@ -223,6 +230,10 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         access: AccessContextDTO,
         command: AddProjectMemberCommand | RemoveProjectMemberCommand,
     ) -> tuple[ProjectMembershipChangeFactsDTO, ProjectActionAuthorizationDTO]:
+        """Read membership and actor authority under the Project lock.
+
+        Establish current permission before recovering a receipt or making a change.
+        """
         facts = await self._membership_facts_reader.lock_and_load_membership_state(
             access=access, project_id=command.project_id, principal_id=command.principal_id
         )
@@ -248,13 +259,14 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         *,
         context: IdempotencyContextDTO,
         access: AccessContextDTO,
-        scope: ProjectActionAuthorizationDTO,
+        authorization: ProjectActionAuthorizationDTO,
         fingerprint: RequestFingerprint,
     ) -> NewOperationReservationDTO | CompletedSynchronousOperationDTO:
+        """Bind this retry to the original membership operation and its safe result category."""
         operation = await self._operation_idempotency.reserve_or_recover(
             context=context,
             access=access,
-            authorization=scope,
+            authorization=authorization,
             fingerprint=fingerprint,
             expected_replay_kind=OperationReplayKind.SAFE_RESULT,
             lookup_authority=OperationLookupAuthority(
@@ -265,7 +277,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         return (
             operation
             if isinstance(operation, NewOperationReservationDTO)
-            else self._completed(operation)
+            else self._require_safe_completed_operation(operation)
         )
 
     async def _load_original_membership_result(
@@ -276,6 +288,10 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         change_kind: ProjectMembershipChangeKind,
         operation: CompletedSynchronousOperationDTO,
     ) -> ProjectMembershipChangeResultDTO:
+        """Return the retained membership outcome without applying the change again.
+
+        Reject a receipt that disagrees with the checked scope or original operation.
+        """
         original = await self._membership_result_reader.load_original_membership_result(
             facts=facts,
             principal_id=command.principal_id,
@@ -302,6 +318,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         command: AddProjectMemberCommand | RemoveProjectMemberCommand,
         change_kind: ProjectMembershipChangeKind,
     ) -> None:
+        """Check the requested human identity and, for additions, current eligibility to join."""
         recipient = facts.recipient
         if recipient is None:
             raise ResourceNotFoundError()
@@ -315,7 +332,11 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         if change_kind is ProjectMembershipChangeKind.ADD and (
             not facts.recipient_has_coherent_identity
             or not PrincipalAccessPolicy.may_use_product(
-                PrincipalAccessPolicyInput(recipient, facts.recipient_has_pending_recovery, True)
+                PrincipalAccessPolicyInput(
+                    principal=recipient,
+                    has_pending_recovery=facts.recipient_has_pending_recovery,
+                    credential_is_current=True,
+                )
             )
         ):
             raise ConflictError("The requested human is not currently eligible to join.")
@@ -325,31 +346,32 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         facts: ProjectMembershipChangeFactsDTO,
         responsibilities: tuple[ProjectDepartureResponsibilityDTO, ...],
     ) -> None:
-        for item in responsibilities:
+        """Keep each affected responsibility with an eligible remaining human before departure."""
+        for responsibility in responsibilities:
             if (
-                item.target_kind is ProjectDepartureTargetKind.PROJECT
-                and item.target_id != facts.project_id.value
+                responsibility.target_kind is ProjectDepartureTargetKind.PROJECT
+                and responsibility.target_id != facts.project_id.value
             ):
                 raise RuntimeError("Departure facts changed the checked Project responsibility.")
 
         policy_inputs = tuple(
             ProjectDepartureResponsibilityPolicyInput(
-                item.target_kind,
-                item.action_id,
-                tuple(
+                target_kind=responsibility.target_kind,
+                action_id=responsibility.action_id,
+                candidates=tuple(
                     ProjectDepartureCandidatePolicyInput(
-                        candidate.principal,
-                        candidate.has_pending_recovery,
-                        candidate.is_project_member,
-                        candidate.has_coherent_identity,
-                        candidate.can_grant,
-                        candidate.is_group_member,
-                        candidate.is_group_manager,
+                        principal=candidate.principal,
+                        has_pending_recovery=candidate.has_pending_recovery,
+                        is_project_member=candidate.is_project_member,
+                        has_coherent_identity=candidate.has_coherent_identity,
+                        can_grant=candidate.can_grant,
+                        is_group_member=candidate.is_group_member,
+                        is_group_manager=candidate.is_group_manager,
                     )
-                    for candidate in item.candidates
+                    for candidate in responsibility.candidates
                 ),
             )
-            for item in responsibilities
+            for responsibility in responsibilities
         )
         if not ProjectDeparturePolicy.may_depart(policy_inputs):
             raise ConflictError(
@@ -357,7 +379,8 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
             )
 
     @staticmethod
-    def _completed(operation: object) -> CompletedSynchronousOperationDTO:
+    def _require_safe_completed_operation(operation: object) -> CompletedSynchronousOperationDTO:
+        """Require a safely replayable synchronous outcome before reading the membership receipt."""
         if (
             not isinstance(operation, CompletedSynchronousOperationDTO)
             or operation.replay_kind is not OperationReplayKind.SAFE_RESULT

@@ -40,14 +40,14 @@ class ArtifactAllocationService:
     def __init__(
         self,
         transaction_manager: TransactionManager,
-        attempts: ArtifactAttemptRepository,
-        obligations: ArtifactCleanupObligationRepository,
+        artifact_attempt_repository: ArtifactAttemptRepository,
+        artifact_cleanup_obligation_repository: ArtifactCleanupObligationRepository,
         artifact_cleanup_admission_service: ArtifactCleanupAdmissionService,
         artifact_capacity_reader: ArtifactCapacityReader,
     ) -> None:
         self._transaction_manager = transaction_manager
-        self._attempts = attempts
-        self._obligations = obligations
+        self._artifact_attempt_repository = artifact_attempt_repository
+        self._artifact_cleanup_obligation_repository = artifact_cleanup_obligation_repository
         self._artifact_cleanup_admission_service = artifact_cleanup_admission_service
         self._artifact_capacity_reader = artifact_capacity_reader
 
@@ -74,7 +74,7 @@ class ArtifactAllocationService:
             obligation_id, scope, ArtifactCleanupKind.ABANDONED_STAGING, origin
         )
         async with self._transaction_manager.begin():
-            reservation = await self._attempts.reserve(
+            reservation = await self._artifact_attempt_repository.reserve(
                 scope=scope,
                 artifact_id=artifact_id,
                 attempt_id=attempt_id,
@@ -83,7 +83,7 @@ class ArtifactAllocationService:
                 transfer_seconds=transfer_seconds,
                 capacity=capacity,
             )
-            await self._obligations.create_staging(
+            await self._artifact_cleanup_obligation_repository.create_staging(
                 binding, targets=(attempt_id,), transfer_deadline=reservation.expires_at
             )
             admission = await self._artifact_cleanup_admission_service.admit(binding)

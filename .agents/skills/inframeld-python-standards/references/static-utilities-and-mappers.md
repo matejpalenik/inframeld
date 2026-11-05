@@ -63,6 +63,7 @@ from uuid import UUID
 from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
     AssignProjectUseOnlyGrantCommand,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -78,7 +79,9 @@ from inframeld_backend.shared.application.dtos.completed_synchronous_operation_d
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+
 
 class ProjectUseOnlyGrantMapper:
     """Convert the published grant contract without performing authorization or I/O."""
@@ -97,7 +100,7 @@ class ProjectUseOnlyGrantMapper:
     @staticmethod
     def to_operation_context(key: IdempotencyKey) -> IdempotencyContextDTO:
         return IdempotencyContextDTO(
-            method="POST", requested_route="/v1/projects/{project_id}/grants", key=key
+            method=HttpMethod.POST, requested_route="/v1/projects/{project_id}/grants", key=key
         )
 
     @staticmethod
@@ -105,13 +108,13 @@ class ProjectUseOnlyGrantMapper:
         *, command: AssignProjectUseOnlyGrantCommand, result: CompletedSynchronousOperationDTO
     ) -> ProjectUseOnlyGrantResponse:
         action = command.action_id.value
-        if action != "create-access-groups":
+        if action != ProjectAction.CREATE_ACCESS_GROUPS.value:
             raise ValueError("Unsupported project grant action.")
         return ProjectUseOnlyGrantResponse(
             operation_id=result.operation_id.value,
             project_id=command.project_id.value,
             recipient_principal_id=command.recipient_principal_id.value,
-            action_id=action,
+            action_id=ProjectAction.CREATE_ACCESS_GROUPS,
             access_revision=command.expected_access_revision + 1,
             idempotency_expires_at=result.expires_at,
         )
@@ -235,11 +238,12 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 
 _ASSIGN_USE_ONLY_PURPOSE = "access.project-grant.assign-use-only:v1"
 
+
 class ProjectGrantChangeFingerprintService:
     """Define grant-command meaning before the shared keyed fingerprint is made."""
 
-    def __init__(self, fingerprints: RequestFingerprintService) -> None:
-        self._fingerprints = fingerprints
+    def __init__(self, request_fingerprint_service: RequestFingerprintService) -> None:
+        self._request_fingerprint_service = request_fingerprint_service
 
     def for_assign_use_only(self, command: AssignProjectUseOnlyGrantCommand) -> RequestFingerprint:
         """Retain the canonical request bytes used by existing reservations."""
@@ -254,7 +258,7 @@ class ProjectGrantChangeFingerprintService:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
-        return self._fingerprints.fingerprint(
+        return self._request_fingerprint_service.fingerprint(
             purpose=_ASSIGN_USE_ONLY_PURPOSE, canonical_request=canonical_request
         )
 ```

@@ -50,6 +50,7 @@ class HydraHumanOAuthCredentialRevoker(HumanOAuthCredentialRevoker):
         operation: HydraCleanupOperation,
         deadline: float,
     ) -> object:
+        """Dispatch the selected subject-wide cleanup call using only the remaining deadline."""
         remaining = deadline - monotonic()
         if remaining <= 0:
             raise TimeoutError
@@ -68,6 +69,7 @@ class HydraHumanOAuthCredentialRevoker(HumanOAuthCredentialRevoker):
         operation: HydraCleanupOperation,
         timeout_seconds: float,
     ) -> HumanOAuthCleanupOutcomeDTO:
+        """Classify provider cleanup without treating timeout or cancellation as confirmed revocation."""
         if (
             isinstance(timeout_seconds, bool)
             or not math.isfinite(timeout_seconds)
@@ -133,6 +135,7 @@ class HydraHumanOAuthCredentialRevoker(HumanOAuthCredentialRevoker):
 
     @staticmethod
     def _http_outcome(status: object, headers: object) -> HumanOAuthCleanupOutcomeDTO:
+        """Distinguish confirmed cleanup, retryable failure and required operator intervention."""
         retry_after = HydraHumanOAuthCredentialRevoker._retry_after(headers)
         if isinstance(status, int) and not isinstance(status, bool):
             if status == 429:
@@ -172,6 +175,7 @@ class HydraHumanOAuthCredentialRevoker(HumanOAuthCredentialRevoker):
 
     @staticmethod
     def _retry_after(headers: object) -> float | None:
+        """Interpret a bounded provider retry hint without granting a new cleanup allowance."""
         if not isinstance(headers, Mapping):
             return None
 

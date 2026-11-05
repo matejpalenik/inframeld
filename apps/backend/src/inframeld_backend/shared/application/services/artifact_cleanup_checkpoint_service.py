@@ -102,6 +102,7 @@ class ArtifactCleanupCheckpointService(JobCheckpoints):
     async def _guard(
         self, context: JobAttemptContextDTO
     ) -> tuple[JobSnapshotDTO, ArtifactCleanupFactsDTO] | None:
+        """Check current cleanup ownership and authority before another storage effect."""
         if not isinstance(context.binding, ArtifactCleanupJobBindingDTO):
             raise JobStoppedError("Cleanup checkpoints require the original cleanup binding.")
         # Lock the live job before its obligation and exact target rows. No
@@ -122,5 +123,6 @@ class ArtifactCleanupCheckpointService(JobCheckpoints):
     def _require_continuation(
         current: tuple[JobSnapshotDTO, ArtifactCleanupFactsDTO] | None,
     ) -> None:
+        """Reject cleanup work whose checked continuation is no longer valid."""
         if current is None:
             raise JobStoppedError("The original cleanup authority cannot be confirmed.")

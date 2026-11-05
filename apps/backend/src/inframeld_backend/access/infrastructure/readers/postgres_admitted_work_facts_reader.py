@@ -71,6 +71,7 @@ class PostgresAdmittedWorkFactsReader(AdmittedWorkFactsReader):
             ) from error
 
     async def _read(self, authority: AdmittedWorkAuthorityDTO) -> AdmittedWorkFactsDTO | None:
+        """Observe current actor and exact-grant facts for the original admitted work."""
         installation = await self._session.scalar(
             select(InstallationIdentityRow.installation_id).where(
                 InstallationIdentityRow.singleton_key == 1

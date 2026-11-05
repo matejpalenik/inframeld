@@ -353,6 +353,7 @@ enum LeaderOwnership {
     Lost,
 }
 impl ProcessAnchor {
+    /// Observe exit without reaping the leader whose identity still guards group signals.
     fn observe(&mut self) -> Result<Option<bool>, HandoffFailure> {
         if let Some(success) = self.observed {
             return Ok(Some(success));
@@ -607,6 +608,7 @@ impl OwnedProcess {
             Err(_) => false,
         }
     }
+    /// Stop descendants while identity is retained, then reap once and drain owned streams.
     async fn finalize(&mut self, term_budget: Duration, kill_budget: Duration) -> bool {
         drop(self.stdin.take());
         if self.anchor.ownership != LeaderOwnership::Retained {

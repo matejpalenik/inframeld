@@ -63,6 +63,7 @@ class HydraOAuthConsentDecisionWriter(OAuthConsentDecisionWriter):
         payload: AcceptOAuth2ConsentRequest | None,
         deadline: float,
     ) -> object:
+        """Submit one provider consent decision within the remaining request deadline."""
         remaining = deadline - monotonic()
         if remaining <= 0:
             raise TimeoutError
@@ -84,6 +85,7 @@ class HydraOAuthConsentDecisionWriter(OAuthConsentDecisionWriter):
         payload: AcceptOAuth2ConsentRequest | None,
         timeout_seconds: float,
     ) -> OAuthConsentContinuationDTO:
+        """Retain uncertainty when a consent write may have reached Hydra but cannot be confirmed."""
         if (
             isinstance(timeout_seconds, bool)
             or not math.isfinite(timeout_seconds)

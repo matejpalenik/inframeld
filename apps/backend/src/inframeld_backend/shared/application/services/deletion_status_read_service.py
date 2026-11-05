@@ -94,6 +94,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
     def _matches_binding(
         binding: DeletionStatusBindingDTO, authorization: DeletionStatusAuthorizationDTO
     ) -> bool:
+        """Keep retained deletion facts bound to the authorized original operation."""
         return (
             binding.operation_id == authorization.operation_id
             and binding.installation_id == authorization.installation_id
@@ -106,6 +107,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
 
     @staticmethod
     def _has_owner_observation(stored: DeletionStatusObservationDTO) -> bool:
+        """Distinguish absent owner evidence from a partial or incoherent observation."""
         if stored.owner_revision is None:
             if any(
                 value is not None
@@ -130,6 +132,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
 
     @staticmethod
     def _retention(stored: DeletionStatusObservationDTO) -> datetime | None:
+        """Validate retained timing and completion evidence before reporting an expiry."""
         binding = stored.binding
         if binding.retention_days is None or binding.retention_policy_version is None:
             raise DependencyUnavailableError()
@@ -188,6 +191,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
 
     @staticmethod
     def _require_unfinished_obligation(stored: DeletionStatusObservationDTO) -> None:
+        """Reject cleanup obligations that disagree with their retained deletion scope."""
         obligation = stored.unfinished_obligation
         binding = stored.binding
         if obligation is None or (
@@ -206,6 +210,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
 
     @staticmethod
     def _require_utc(value: datetime | None) -> datetime:
+        """Require an aware timestamp before comparing retained deletion evidence."""
         if not isinstance(value, datetime) or value.utcoffset() != timedelta(0):
             raise DependencyUnavailableError()
         return value

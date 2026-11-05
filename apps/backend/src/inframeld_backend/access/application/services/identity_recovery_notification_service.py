@@ -146,6 +146,10 @@ class IdentityRecoveryNotificationService(IdentityRecoveryNotificationHandler):
         evidence: IdentityRecoverySettingsEvidenceDTO,
         facts: IdentityRecoveryAssociationFactsDTO,
     ) -> IdentityRecoveryAdmissionDTO | None:
+        """Associate settings evidence with its explicit source or existing native session.
+
+        An ordinary settings change must not select an unrelated recovery.
+        """
         session = facts.session_binding
         if session is not None:
             if session.session_id != evidence.session_id:
@@ -190,6 +194,7 @@ class IdentityRecoveryNotificationService(IdentityRecoveryNotificationHandler):
         evidence: IdentityRecoverySettingsEvidenceDTO,
         facts: IdentityRecoveryAssociationFactsDTO,
     ) -> IdentityRecoveryAdmissionDTO | None:
+        """Select the original recovery from the stored native bindings before completing password evidence."""
         settings = facts.settings_binding
         if settings is None:
             if evidence.source_recovery_flow_id is not None or facts.session_binding is not None:
@@ -224,6 +229,7 @@ class IdentityRecoveryNotificationService(IdentityRecoveryNotificationHandler):
         admission: IdentityRecoveryAdmissionDTO | None,
         evidence: IdentityRecoverySettingsEvidenceDTO,
     ) -> IdentityRecoveryAdmissionDTO:
+        """Reject recovery evidence associated with a different admitted identity."""
         if admission is None or admission.event.identity != evidence.identity:
             raise ConflictError(
                 "Native evidence requires its matching original recovery admission."
@@ -231,6 +237,7 @@ class IdentityRecoveryNotificationService(IdentityRecoveryNotificationHandler):
         return admission
 
     def _require_version(self, facts: IdentityRecoveryAssociationFactsDTO) -> None:
+        """Require current credential-version facts before accepting recovery evidence."""
         if facts.current_version is None:
             raise DependencyUnavailableError(
                 "Recovery requires its original credential version state."
@@ -238,6 +245,7 @@ class IdentityRecoveryNotificationService(IdentityRecoveryNotificationHandler):
 
     @asynccontextmanager
     async def _database_stage(self) -> AsyncGenerator[None]:
+        """Bound the database phase independently of provider work and translate availability failures."""
         try:
             async with asyncio.timeout(self._database_timeout):
                 yield

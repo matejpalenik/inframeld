@@ -331,6 +331,7 @@ class PostgresJobStore(JobStore):
             raise RuntimeError("Job persistence requires its caller-owned transaction.")
 
     async def _queue_turn(self) -> None:
+        """Serialize ordinary queue decisions using the shared queue-row lock."""
         self._require_transaction()
         row = await self._session.scalar(
             select(ApplicationJobQueueRow)
@@ -341,6 +342,7 @@ class PostgresJobStore(JobStore):
             raise RuntimeError("The ordinary queue is not initialized.")
 
     async def _now(self) -> datetime:
+        """Use the database clock for lease and attempt decisions."""
         now = await self._session.scalar(
             select(func.clock_timestamp(type_=DateTime(timezone=True)))
         )
@@ -349,6 +351,7 @@ class PostgresJobStore(JobStore):
         return now
 
     async def _owned_row(self, context: JobAttemptContextDTO) -> tuple[DurableJobRow, datetime]:
+        """Lock the exact active attempt and reject an expired or superseded claim."""
         self._require_transaction()
         row = await self._session.scalar(
             select(DurableJobRow)
@@ -381,6 +384,7 @@ class PostgresJobStore(JobStore):
             raise ValueError("A job checkpoint may contain at most 64 KiB.")
 
     async def _end_attempt(self, row: DurableJobRow, now: datetime, reason: str | None) -> None:
+        """Record the end of the owned attempt without committing the caller transaction."""
         if row.fence is not None:
             await self._session.execute(
                 update(DurableJobAttemptRow)
@@ -395,6 +399,7 @@ class PostgresJobStore(JobStore):
     async def _complete(
         self, row: DurableJobRow, now: datetime, status: JobStatus, reason: str | None
     ) -> None:
+        """Persist the terminal job outcome with the original operation result."""
         if reason is not None and len(reason) > 100:
             raise ValueError("A job outcome reason must be bounded.")
         binding = (await self._snapshot(row, now)).binding
@@ -430,6 +435,7 @@ class PostgresJobStore(JobStore):
         await self._session.flush()
 
     async def _snapshot(self, row: DurableJobRow, now: datetime) -> JobSnapshotDTO:
+        """Reconstruct job state and its original authority from persisted facts."""
         binding: ProductJobBindingDTO | ArtifactCleanupJobBindingDTO
         if row.binding_kind == "product":
             binding = PostgresJobBindingMapper.product(row)

@@ -129,6 +129,7 @@ class IdentityRecoveryCompletionService(
 
     @asynccontextmanager
     async def _proof_stage(self) -> AsyncGenerator[None]:
+        """Bound proof lookup separately from the owning recovery transaction."""
         try:
             async with asyncio.timeout(self._database_timeout_seconds):
                 async with self._transaction_manager.begin():
@@ -142,6 +143,7 @@ class IdentityRecoveryCompletionService(
     def _require_complete_proof(
         proof: IdentityRecoveryCleanupProofDTO, facts: IdentityRecoveryCompletionFactsDTO
     ) -> None:
+        """Require complete, matching provider cleanup evidence before releasing recovery."""
         if (
             proof.installation_id != facts.installation_id
             or proof.source_admission.event.identity != facts.admission.event.identity
@@ -180,6 +182,7 @@ class IdentityRecoveryCompletionService(
     async def _read_checked_facts(
         self, event: IdentityRecoveryEventDTO
     ) -> IdentityRecoveryCompletionFactsDTO:
+        """Bind current completion facts to the original identity and recovery operation."""
         try:
             facts = await self._recovery_completion_facts_reader.read(
                 installation_id=self._installation_id,
@@ -214,6 +217,7 @@ class IdentityRecoveryCompletionService(
         kratos_outcome: IdentityRecoveryCleanupState | None,
         hydra_outcome: IdentityRecoveryCleanupState | None,
     ) -> IdentityRecoveryCleanupResultDTO:
+        """Persist the supported recovery completion and its evidence in the caller transaction."""
         stored_event = facts.admission.event
         try:
             recovery = await self._recovery_repository.get(

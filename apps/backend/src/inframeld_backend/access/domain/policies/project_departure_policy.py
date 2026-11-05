@@ -63,7 +63,9 @@ class ProjectDeparturePolicy:
                     or not candidate.has_coherent_identity
                     or not PrincipalAccessPolicy.may_use_product(
                         PrincipalAccessPolicyInput(
-                            candidate.principal, candidate.has_pending_recovery, True
+                            principal=candidate.principal,
+                            has_pending_recovery=candidate.has_pending_recovery,
+                            credential_is_current=True,
                         )
                     )
                 ):

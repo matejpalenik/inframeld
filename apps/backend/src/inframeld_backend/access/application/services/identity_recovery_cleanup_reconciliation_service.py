@@ -45,6 +45,7 @@ class IdentityRecoveryCleanupReconciliationService(IdentityRecoveryCleanupReconc
 
     @asynccontextmanager
     async def _stage(self) -> AsyncGenerator[None]:
+        """Bound reconciliation database work without extending the cleanup run allowance."""
         try:
             async with asyncio.timeout(self._database_timeout_seconds):
                 async with self._transaction_manager.begin():

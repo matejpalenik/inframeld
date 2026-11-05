@@ -91,6 +91,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
     async def _resume(
         self, command: ResumeIdentityRecoveryCleanupCommand
     ) -> IdentityRecoveryCleanupResumeResultDTO:
+        """Reconcile the host request with current recovery work before authorizing further cleanup."""
         installed = await self._recovery_cleanup_resume_facts_reader.installation()
         if installed is None:
             raise RecoveryMaintenanceError(Code.DEPENDENCY_UNAVAILABLE)
@@ -198,6 +199,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
         command: ResumeIdentityRecoveryCleanupCommand,
         receipt: IdentityRecoveryMaintenanceReceiptDTO,
     ) -> IdentityRecoveryCleanupResumeResultDTO:
+        """Recover the prior maintenance result only for the same request meaning."""
         if (
             receipt.mode is not RecoveryMaintenanceMode.RESUME_RECOVERY_CLEANUP
             or receipt.command != command
@@ -208,6 +210,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
 
     @staticmethod
     def _outcome(facts: IdentityRecoveryCleanupResumeFactsDTO) -> Outcome:
+        """Distinguish completed recovery from confirmed cleanup and remaining authorized work."""
         if facts.released_at is not None:
             return Outcome.ALREADY_COMPLETED
 
@@ -231,6 +234,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
     def _require_work_binding(
         work: IdentityRecoveryCleanupWorkDTO, command: ResumeIdentityRecoveryCleanupCommand
     ) -> None:
+        """Keep the selected cleanup work bound to the requested installation and recovery."""
         if (
             work.installation_id != command.expected_installation_id
             or work.admission.operation_id != command.recovery_operation_id
@@ -243,6 +247,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
 
     @staticmethod
     def _terminal_reason(work: IdentityRecoveryCleanupWorkDTO, now: datetime) -> str | None:
+        """Determine whether existing ownership and consumed budget allow another attempt."""
         if work.run.ended_at is not None:
             if work.claim is not None:
                 raise RuntimeError("An ended run retains execution ownership.")

@@ -104,6 +104,7 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
         identity: VerifiedHumanIdentityDTO,
         fingerprint: RequestFingerprint,
     ) -> ProjectMetadataRepairResultDTO:
+        """Check the host request against current Project facts before recording an authority repair."""
         code = ProjectMetadataMaintenanceErrorCode
         facts = await self._metadata_repair_facts_reader.read(access=access, command=command)
         if facts is None:
@@ -187,6 +188,7 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
         identity: VerifiedHumanIdentityDTO,
         fingerprint: RequestFingerprint,
     ) -> ProjectMetadataRepairResultDTO:
+        """Return a prior repair only when its retained request meaning still matches."""
         result = receipt.result
         if (
             not compare_digest(receipt.fingerprint.value, fingerprint.value)

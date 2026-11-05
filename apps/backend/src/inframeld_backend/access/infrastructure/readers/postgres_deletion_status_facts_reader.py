@@ -66,6 +66,7 @@ class PostgresDeletionStatusFactsReader(DeletionStatusFactsReader):
             raise DependencyUnavailableError() from None
 
     async def _read_current(self, access: AccessContextDTO) -> DeletionStatusFactsDTO | None:
+        """Observe current deletion-lookup authority separately from retained operation results."""
         organization = await self._session.scalar(
             select(PrincipalRow.organization_id).where(
                 PrincipalRow.id == access.actor_principal_id.value

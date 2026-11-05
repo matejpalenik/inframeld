@@ -60,6 +60,7 @@ class HumanAccessTokenAuthenticationService(HumanAccessTokenAuthenticator):
         self._total_timeout_seconds = total_timeout_seconds
 
     def _provider_budget(self, deadline: float) -> float:
+        """Keep provider verification within the original authentication deadline."""
         remaining = deadline - asyncio.get_running_loop().time()
         if remaining <= 0:
             raise TimeoutError()

@@ -194,6 +194,7 @@ class PostgresProjectMetadataRepository(ProjectMetadataRepository):
             raise
 
     async def _change_name(self, metadata: ProjectMetadata, old_name: ResourceName | None) -> None:
+        """Replace the active name binding without losing its original Project ownership."""
         name = metadata.name
         if name is None:
             raise RuntimeError("A Project selector cannot be silently removed.")

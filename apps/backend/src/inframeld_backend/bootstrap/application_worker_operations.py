@@ -39,6 +39,7 @@ class ApplicationWorkerOperations(JobCheckpoints):
 
     @asynccontextmanager
     async def _open(self) -> AsyncGenerator[JobCheckpoints]:
+        """Give each checkpoint a fresh bounded database session and transaction collaborators."""
         try:
             async with (
                 asyncio.timeout(self._settings.database_timeout_seconds),

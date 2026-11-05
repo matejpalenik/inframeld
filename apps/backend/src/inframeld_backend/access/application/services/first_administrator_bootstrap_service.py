@@ -94,6 +94,7 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
             raise FirstAdministratorBootstrapError(Code.DEPENDENCY_UNAVAILABLE) from None
 
     def _provider_budget(self, deadline: float) -> float:
+        """Limit provider verification to the time left in the original bootstrap request."""
         remaining = deadline - asyncio.get_running_loop().time()
         if remaining <= 0:
             raise TimeoutError()
@@ -102,6 +103,7 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
     async def _verify(
         self, command: BootstrapFirstAdministratorCommand
     ) -> HumanOAuthCredentialBindingDTO:
+        """Verify the human with both providers before entering the database claim."""
         deadline = asyncio.get_running_loop().time() + self._total_timeout_seconds
         try:
             async with asyncio.timeout_at(deadline):
@@ -133,6 +135,7 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
         binding: HumanOAuthCredentialBindingDTO,
         fingerprint: RequestFingerprint,
     ) -> FirstAdministratorBootstrapResultDTO:
+        """Establish the first administrator from current locked installation and identity facts."""
         facts = await self._bootstrap_facts_reader.read(
             installation_id=command.expected_installation_id, identity=binding.identity
         )

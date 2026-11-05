@@ -53,6 +53,7 @@ async def _claim(
     worker_id: UUID,
     supported: tuple[tuple[str, int], ...],
 ) -> JobAttemptContextDTO | None:
+    """Acquire one job attempt in a short database scope before executing its handler."""
     try:
         async with (
             asyncio.timeout(settings.jobs.database_timeout_seconds),
@@ -76,6 +77,7 @@ async def _execute(
     operations: ApplicationWorkerOperations,
     lease_seconds: float,
 ) -> None:
+    """Run the handler while renewing ownership and retaining the original work deadline."""
     log = structlog.get_logger()
     work: asyncio.Task[None] | None = None
     renew: asyncio.Task[None] | None = None
@@ -237,6 +239,7 @@ async def run_application_worker(
 
 
 async def _serve(settings: ApplicationWorkerApplicationSettings) -> None:
+    """Install worker stop handlers for this lifetime and remove them on exit."""
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for signum in (signal.SIGINT, signal.SIGTERM):

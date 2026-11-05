@@ -93,6 +93,7 @@ async def _execute(
     ),
     settings: MaintenanceApplicationSettings,
 ) -> dict[str, object]:
+    """Own database startup and shutdown around the selected host-maintenance operation."""
     if isinstance(command, BootstrapFirstAdministratorCommand):
         if not isinstance(settings, FirstAdministratorBootstrapSettings):
             raise RuntimeError("The first-administrator configuration is missing.")
@@ -126,6 +127,7 @@ def _discard_failed_stdout() -> None:
 
 
 def _emit(response: dict[str, object], status: int) -> int:
+    """Report one bounded maintenance result and preserve output-write failure as failure."""
     try:
         print(json.dumps(response, ensure_ascii=True), flush=True)
     except BrokenPipeError:

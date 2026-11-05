@@ -167,6 +167,7 @@ class HumanAdmissionService(HumanAdmitter):
         organization_id: OrganizationId,
         facts: OrganizationAccessFactsDTO | None,
     ) -> HumanAdmissionAuthorizationDTO:
+        """Require current Organization admission authority before observing or changing the recipient."""
         if facts is None:
             raise ResourceNotFoundError()
         if facts.principal.id != access.actor_principal_id:
@@ -198,6 +199,7 @@ class HumanAdmissionService(HumanAdmitter):
         organization_id: OrganizationId,
         identity: VerifiedHumanIdentityDTO,
     ) -> None:
+        """Bind the verified provider identity to coherent local admission facts."""
         state = facts.credential_state
         if (
             facts.identity != identity
@@ -224,6 +226,7 @@ class HumanAdmissionService(HumanAdmitter):
         facts: HumanAdmissionFactsDTO,
         scope: HumanAdmissionAuthorizationDTO,
     ) -> HumanAdmissionResultDTO:
+        """Recover the original admission receipt or save a new admission in the caller transaction."""
         operation = await self._operation_idempotency.reserve_or_recover(
             context=context,
             access=access,
@@ -236,7 +239,7 @@ class HumanAdmissionService(HumanAdmitter):
             ),
         )
         if not isinstance(operation, NewOperationReservationDTO):
-            completed = self._completed(operation)
+            completed = self._require_safe_completed_operation(operation)
             original = await self._admission_result_reader.original(
                 installation_id=facts.installation_id,
                 identity=facts.identity,
@@ -268,7 +271,7 @@ class HumanAdmissionService(HumanAdmitter):
             actor_id=access.actor_principal_id,
             operation_id=operation.operation_id,
         )
-        completed = self._completed(
+        completed = self._require_safe_completed_operation(
             await self._operation_idempotency.record_completed_result(
                 operation, replay_kind=OperationReplayKind.SAFE_RESULT
             )
@@ -287,7 +290,8 @@ class HumanAdmissionService(HumanAdmitter):
         )
 
     @staticmethod
-    def _completed(operation: object) -> CompletedSynchronousOperationDTO:
+    def _require_safe_completed_operation(operation: object) -> CompletedSynchronousOperationDTO:
+        """Require a safe synchronous receipt before recovering a previous admission."""
         if (
             not isinstance(operation, CompletedSynchronousOperationDTO)
             or operation.replay_kind is not OperationReplayKind.SAFE_RESULT
