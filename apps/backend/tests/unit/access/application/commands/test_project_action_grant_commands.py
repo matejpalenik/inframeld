@@ -18,7 +18,7 @@ RECIPIENT = PrincipalId(UUID(int=2))
 ACTION = ActionId("inspect-budget")
 
 
-@pytest.mark.parametrize("revision", [0, 2**63 - 1])
+@pytest.mark.parametrize("revision", [0, 2**53 - 1])
 def test_reviewed_access_revision_keeps_exact_integer_boundaries(revision: int) -> None:
     command = SetProjectActionGrantCommand(PROJECT, RECIPIENT, ACTION, False, revision)
     removal = RemoveProjectActionGrantCommand(PROJECT, RECIPIENT, ACTION, revision)
@@ -33,7 +33,7 @@ def test_noninteger_review_cannot_enter_either_mutation(revision: object) -> Non
         RemoveProjectActionGrantCommand(PROJECT, RECIPIENT, ACTION, cast(int, revision))
 
 
-@pytest.mark.parametrize("revision", [-1, 2**63])
+@pytest.mark.parametrize("revision", [-1, 2**53])
 def test_review_outside_signed_bigint_is_rejected(revision: int) -> None:
     with pytest.raises(ValueError):
         SetProjectActionGrantCommand(PROJECT, RECIPIENT, ACTION, False, revision)

@@ -48,8 +48,9 @@ def test_native_and_public_schemas_preserve_exact_integer_revision_bounds(
 
     revision = schema["components"]["schemas"][component]["properties"][field]
     assert revision["type"] == "integer"
+    assert revision["format"] == "int64"
     assert type(revision["minimum"]) is int and revision["minimum"] == 0
-    assert type(revision["maximum"]) is int and revision["maximum"] == 2**63 - 1
+    assert type(revision["maximum"]) is int and revision["maximum"] == 2**53 - 1
 
 
 @pytest.mark.parametrize(
@@ -76,12 +77,12 @@ def test_native_and_public_schemas_preserve_exact_integer_revision_bounds(
 def test_request_revision_models_accept_exact_maximum_and_reject_its_successor(
     model: type[BaseModel], field: str, other_fields: dict[str, object]
 ) -> None:
-    for revision in (0, 2**63 - 1):
+    for revision in (0, 2**53 - 1):
         request = model.model_validate({**other_fields, field: revision})
         assert request.model_dump(by_alias=True)[field] == revision
 
     with pytest.raises(ValidationError):
-        model.model_validate({**other_fields, field: 2**63})
+        model.model_validate({**other_fields, field: 2**53})
 
 
 def test_human_admission_contract_preserves_original_receipt_and_current_human_scope() -> None:
@@ -108,7 +109,7 @@ def test_human_admission_contract_preserves_original_receipt_and_current_human_s
     assert set(request["required"]) == {"identityId", "expectedAccessRevision"}
     assert request["properties"]["identityId"]["format"] == "uuid"
     assert request["properties"]["expectedAccessRevision"]["minimum"] == 0
-    assert request["properties"]["expectedAccessRevision"]["maximum"] == 2**63 - 1
+    assert request["properties"]["expectedAccessRevision"]["maximum"] == 2**53 - 1
     response = schema["components"]["schemas"]["HumanAdmissionResponse"]
     assert set(response["required"]) == {
         "operationId",
@@ -551,7 +552,7 @@ def test_project_creation_contract_keeps_strict_input_and_exact_original_grant_r
     assert request["properties"]["displayName"]["maxLength"] == 128
     revision = request["properties"]["expectedAccessRevision"]
     assert revision["type"] == "integer" and revision["minimum"] == 0
-    assert revision["maximum"] == 2**63 - 1
+    assert revision["maximum"] == 2**53 - 1
     response = components["ProjectCreationResponse"]
     assert set(response["required"]) == {
         "operationId",

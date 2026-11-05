@@ -18,8 +18,9 @@ import re  # noqa: F401
 import json
 
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from typing_extensions import Annotated
 from uuid import UUID
 from typing import Optional, Set
 from typing_extensions import Self
@@ -32,7 +33,7 @@ class ProjectMetadataChangeResponse(BaseModel):
     """ # noqa: E501
     display_name: StrictStr = Field(description="Stored presentation label, including retained legacy values.", alias="displayName")
     idempotency_expires_at: datetime = Field(description="Original replay deadline, unchanged by retries.", alias="idempotencyExpiresAt")
-    metadata_revision: StrictInt = Field(description="Review revision for metadata changes, separate from permission revision.", alias="metadataRevision")
+    metadata_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(description="Review revision for metadata changes, separate from permission revision.", alias="metadataRevision")
     name: Optional[StrictStr] = Field(description="Exact current selector, or null until explicitly allocated.")
     operation_id: StrictStr = Field(description="Original operation identity for safe recovery.", alias="operationId")
     organization_id: UUID = Field(description="Owning installation Organization.", alias="organizationId")

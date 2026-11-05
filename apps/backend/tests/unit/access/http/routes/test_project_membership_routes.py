@@ -221,7 +221,7 @@ def test_delete_rejects_missing_invalid_duplicate_or_unknown_query_without_call(
     assert not service.calls
 
 
-@pytest.mark.parametrize("revision", [0, 2**63 - 1])
+@pytest.mark.parametrize("revision", [0, 2**53 - 1])
 def test_delete_accepts_canonical_integer_revision_boundaries(revision: int) -> None:
     service = MockMembershipChanger()
     with client_for(service) as client:
@@ -252,7 +252,7 @@ def test_delete_rejects_a_body_instead_of_reading_revision_from_it() -> None:
         {"expectedAccessRevision": "7"},
         {"expectedAccessRevision": -1},
         {"expectedAccessRevision": 7, "canGrant": True},
-        {"expectedAccessRevision": 2**63},
+        {"expectedAccessRevision": 2**53},
     ],
 )
 def test_put_rejects_invalid_or_extra_fields(body: dict[str, object]) -> None:

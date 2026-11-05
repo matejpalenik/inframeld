@@ -10,6 +10,8 @@ In qualified fields mode, inspect the result's success/error branch and availabl
 
 The selected SDK generation enables response validators and disables request validation. Qualification exercises backend validation responses and native multipart file inputs. Enabling request validators, data-only results, throwing mode or other response parsing choices requires tests for those promises. Their presence as configurable options does not make them qualified public modes.
 
+Numeric product revisions use ordinary `number` values within the [shared safe-integer contract](../../inframeld-application-contracts/references/http-mcp-and-generated-clients.md#numeric-revisions). Copy the reviewed typed revision unchanged. Reject invalid or out-of-range input rather than rounding it. Revision handling requires neither public `bigint` values nor a custom JSON parser. Other numeric quantities retain their own declared contracts.
+
 ## Browser and Node behavior
 
 Use caller-configured credentials and base URL. Buffered defaults are five seconds and manual redirects, with no SDK redispatch. Positive finite `timeoutMs` can be configured per client or request. A defined request override wins. The deadline remains active alongside caller cancellation. Explicit transport overrides change the qualified policy. Node tests can supply controlled headers directly. Browser tests use isolated cookie storage, browser-supplied Origin and the fixture's explicit CORS exposure. Code cannot reconstruct a hidden response header or redirect status.

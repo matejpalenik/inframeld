@@ -246,7 +246,7 @@ def test_delete_is_bodyless_and_returns_original_removal(changed: bool) -> None:
         {"canGrant": 0, "expectedAccessRevision": 7},
         {"canGrant": False, "expectedAccessRevision": True},
         {"canGrant": False, "expectedAccessRevision": -1},
-        {"canGrant": False, "expectedAccessRevision": 2**63},
+        {"canGrant": False, "expectedAccessRevision": 2**53},
         {"canGrant": False, "expectedAccessRevision": 7, "extra": True},
     ],
 )
@@ -259,7 +259,7 @@ def test_invalid_put_never_opens_the_mutation(body: dict[str, object]) -> None:
 
 
 @pytest.mark.parametrize(
-    "revision", ["", "-1", "+1", "01", "0" * 20, "1.0", "1e0", " 1", "١", str(2**63)]
+    "revision", ["", "-1", "+1", "01", "0" * 20, "1.0", "1e0", " 1", "١", str(2**53)]
 )
 def test_delete_requires_one_canonical_signed_bigint_revision(revision: str) -> None:
     changer = MockGrantChanger()
@@ -371,7 +371,7 @@ def test_registered_contract_keeps_exact_numeric_bounds_and_delete_query_only(
     ):
         revision = schemas[name]["properties"][field]
         assert type(revision["minimum"]) is int and revision["minimum"] == 0
-        assert type(revision["maximum"]) is int and revision["maximum"] == 2**63 - 1
+        assert type(revision["maximum"]) is int and revision["maximum"] == 2**53 - 1
     path = schema["paths"]["/v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}"]
     assert path["put"]["operationId"] == "setProjectActionGrant"
     assert set(schemas["ProjectActionGrantRequest"]["required"]) == {
@@ -387,6 +387,6 @@ def test_registered_contract_keeps_exact_numeric_bounds_and_delete_query_only(
         value for value in path["delete"]["parameters"] if value["name"] == "expectedAccessRevision"
     )
     assert revision["in"] == "query" and revision["required"] is True
-    assert type(revision["schema"]["maximum"]) is int and revision["schema"]["maximum"] == 2**63 - 1
+    assert type(revision["schema"]["maximum"]) is int and revision["schema"]["maximum"] == 2**53 - 1
     own = schema["paths"]["/v1/projects/{project_id}/my-access"]["get"]
     assert own["operationId"] == "getMyProjectAccess"

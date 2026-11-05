@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+const MAX_REVISION: i64 = 9_007_199_254_740_991;
+
 /// A proof-free request for an already-admitted Project metadata recipient.
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -132,6 +134,8 @@ pub enum MaintenanceErrorCode {
     InstallationMismatch,
     /// The reviewed Access revision was stale.
     StaleRevision,
+    /// The Access revision cannot advance without exceeding its exact numeric range.
+    RevisionExhausted,
     /// The operation ID already described another request.
     IdempotencyKeyReused,
     /// The reviewed responsibility was not stranded.
@@ -150,6 +154,7 @@ impl std::fmt::Display for MaintenanceErrorCode {
             Self::IdentityIneligible => "identity_ineligible",
             Self::InstallationMismatch => "installation_mismatch",
             Self::StaleRevision => "stale_revision",
+            Self::RevisionExhausted => "revision_exhausted",
             Self::IdempotencyKeyReused => "idempotency_key_reused",
             Self::ResponsibilityNotStranded => "responsibility_not_stranded",
             Self::DependencyUnavailable => "dependency_unavailable",
@@ -184,7 +189,7 @@ impl RepairRequest {
         }
         let request: Self = serde_json::from_slice(bytes).map_err(|_| InvalidRepairRequest)?;
         if request.schema_version != 1
-            || request.expected_access_revision < 0
+            || !(0..=MAX_REVISION).contains(&request.expected_access_revision)
             || !valid_text(&request.operation_id, 128)
             || !valid_text(&request.operator_label, 128)
             || !valid_text(&request.reason, 512)
@@ -224,6 +229,7 @@ impl RepairRequest {
             || receipt.operation_id != self.operation_id
             || receipt.installation_id != self.expected_installation_id
             || receipt.principal_id != principal_id
+            || !(0..=MAX_REVISION).contains(&receipt.access_revision)
             || Some(receipt.access_revision) != self.expected_access_revision.checked_add(1)
             || receipt.responsibility != self.responsibility
         {
@@ -331,6 +337,47 @@ mod tests {
     }
 
     #[test]
+    fn repair_revisions_stay_within_the_json_safe_integer_range() {
+        let maximum = 9_007_199_254_740_991_i64;
+        for revision in [0, maximum] {
+            let mut value = request();
+            value["expectedAccessRevision"] = serde_json::json!(revision);
+            assert!(RepairRequest::parse(&serde_json::to_vec(&value).unwrap()).is_ok());
+        }
+        let mut value = request();
+        value["expectedAccessRevision"] = serde_json::json!(maximum + 1);
+        assert!(RepairRequest::parse(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn repair_receipt_preserves_exact_increment_without_crossing_the_revision_limit() {
+        let maximum = 9_007_199_254_740_991_i64;
+        let mut input = request();
+        input["expectedAccessRevision"] = serde_json::json!(maximum - 1);
+        let reviewed = RepairRequest::parse(&serde_json::to_vec(&input).unwrap()).unwrap();
+        let principal = Uuid::from_u128(10);
+        let mut receipt = serde_json::json!({
+            "schemaVersion":1,"mode":"repair-stranded-authority",
+            "operationId":input["operationId"],"installationId":input["expectedInstallationId"],
+            "principalId":principal,"accessRevision":maximum,"outcome":"repaired", "responsibility":input["responsibility"]
+        });
+        assert!(
+            reviewed
+                .validate_receipt(&serde_json::to_vec(&receipt).unwrap(), principal)
+                .is_ok()
+        );
+
+        input["expectedAccessRevision"] = serde_json::json!(maximum);
+        let exhausted = RepairRequest::parse(&serde_json::to_vec(&input).unwrap()).unwrap();
+        receipt["accessRevision"] = serde_json::json!(maximum + 1);
+        assert!(
+            exhausted
+                .validate_receipt(&serde_json::to_vec(&receipt).unwrap(), principal)
+                .is_err()
+        );
+    }
+
+    #[test]
     fn receipt_must_prove_the_original_request_and_verified_session_without_rebinding() {
         let input = request();
         let request = RepairRequest::parse(&serde_json::to_vec(&input).unwrap()).unwrap();
@@ -383,6 +430,19 @@ mod tests {
     }
 
     #[test]
+    fn exhausted_revision_is_a_bound_backend_rejection() {
+        let request = RepairRequest::parse(&serde_json::to_vec(&request()).unwrap()).unwrap();
+        let reply = serde_json::to_vec(&serde_json::json!({
+            "schemaVersion":1,"operationId":request.operation_id(),"code":"revision_exhausted"
+        }))
+        .unwrap();
+        assert!(matches!(
+            request.validate_receipt(&reply, Uuid::from_u128(10)),
+            Err(InvalidReceipt::Backend { code }) if code.to_string() == "revision_exhausted"
+        ));
+    }
+
+    #[test]
     fn recipient_diagnostic_accepts_only_existing_codes_bound_to_the_original_operation() {
         let request = RepairRequest::parse(&serde_json::to_vec(&request()).unwrap()).unwrap();
         for (code, expected) in [
@@ -400,6 +460,10 @@ mod tests {
                 MaintenanceErrorCode::InstallationMismatch,
             ),
             ("stale_revision", MaintenanceErrorCode::StaleRevision),
+            (
+                "revision_exhausted",
+                MaintenanceErrorCode::RevisionExhausted,
+            ),
             (
                 "idempotency_key_reused",
                 MaintenanceErrorCode::IdempotencyKeyReused,

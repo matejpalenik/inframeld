@@ -67,7 +67,7 @@ type InvitationAssignment = (
 
 class ProjectAccessRevision(TypedDict):
     projectId: UUID
-    accessRevision: int  # Strict nonnegative signed-BIGINT range.
+    accessRevision: int  # Strict integer from 0 through 9,007,199,254,740,991.
 
 class InvitationIssueRequest(TypedDict):
     organizationId: UUID

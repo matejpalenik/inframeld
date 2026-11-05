@@ -10,7 +10,7 @@ Alice changes Bob’s permission on one resource. The request identifies that re
 
 New Access-management JSON bodies are limited to **32 KiB (32,768 bytes)**. New bulk assignment requests carry at most **100 explicit assignments**. Reject unknown fields in new request schemas. These limits do not apply to document uploads or complete domain configuration payloads. Preserve existing published schema names, field behavior and restrictions rather than silently tightening them through a shared replacement model.
 
-Use camelCase wire fields, UUID strings for known resource identities, an opaque string `operationId`, UTC timestamps and strictly nonnegative integer revisions. Access writes carry `expectedAccessRevision`. Other owners retain their domain-specific revision inputs. Every mutation carries exactly one `Idempotency-Key`, at most 128 characters. The original operation is found before treating today's revision as a new write, with current authentication/authorization still required to recover it. [Jobs and idempotency](../../inframeld-application-contracts/references/idempotency-and-replay.md#requests) own request identity and recovery.
+Use camelCase wire fields, UUID strings for known resource identities, an opaque string `operationId`, UTC timestamps and strictly nonnegative integer revisions within the [shared exact numeric range](../../inframeld-application-contracts/references/http-mcp-and-generated-clients.md#numeric-revisions). Access writes carry `expectedAccessRevision`. Other owners retain their domain-specific revision inputs. Every mutation carries exactly one `Idempotency-Key`, at most 128 characters. The original operation is found before treating today's revision as a new write, with current authentication/authorization still required to recover it. [Jobs and idempotency](../../inframeld-application-contracts/references/idempotency-and-replay.md#requests) own request identity and recovery.
 
 A local change saves its domain effects, revision, audit and original outcome together. Use 201 for creation, 200 for completed metadata changes and 202 when durable cleanup remains. Return the original operation identity, appropriate resource identity, committed revision and safe outcome through the owning operation's typed result. A 202 response means accepted work, not completed erasure. This profile does not introduce a generic operation envelope or command framework. The [concrete HTTP draft](#http-operation-matrix) supplies the new request/response symbols and oversize-response declarations for final review.
 
@@ -42,7 +42,7 @@ The [creation response](../../../../apps/backend/src/inframeld_backend/access/ht
 
 ### Implemented Project membership changes
 
-[`addProjectMember` and `removeProjectMember`](memberships-groups-and-handover.md#change-project-membership) share `/v1/projects/{project_id}/members/{principal_id}`. PUT uses `ProjectMembershipRequest` with only strict integer `expectedAccessRevision`. DELETE has no body and requires that same revision as one scalar query field. Reject duplicate or unknown query fields, unknown or duplicate JSON fields, boolean revisions and revisions outside the nonnegative signed-BIGINT range. PUT uses the bounded JSON and 413/415 profile. Both require one nonblank, at-most-128-character `Idempotency-Key`, ordinary human authentication and cookie-write CSRF where applicable.
+[`addProjectMember` and `removeProjectMember`](memberships-groups-and-handover.md#change-project-membership) share `/v1/projects/{project_id}/members/{principal_id}`. PUT uses `ProjectMembershipRequest` with only strict integer `expectedAccessRevision`. DELETE has no body and requires that same revision as one scalar query field. Reject duplicate or unknown query fields, unknown or duplicate JSON fields, boolean revisions and revisions outside 0–9,007,199,254,740,991. PUT uses the bounded JSON and 413/415 profile. Both require one nonblank, at-most-128-character `Idempotency-Key`, ordinary human authentication and cookie-write CSRF where applicable.
 
 `ProjectMembershipResponse` and `ProjectMembershipRemovalResponse` contain the original `operationId`, `idempotencyExpiresAt`, `projectId`, `principalId`, `accessRevision`, `changed` and literal `member: true` or `removed: true`. Changed PUT is 201, unchanged PUT is 200 and DELETE is 200. The existing 400/401/403/404/409/422/503 problems apply. Every response is no-store. Current eligibility, Project visibility/membership and use of `manage-project-members` precede reservation and replay. Stale review is checked only for fresh work. The [original receipt](access-lifecycle-persistence.md#project-membership-original-results) preserves original status and outcome independently of a later membership change.
 
@@ -160,7 +160,7 @@ from uuid import UUID
 # UUID and datetime denote their JSON string representations.
 class AccessMutationFields(TypedDict):
     operationId: str  # Nonblank, at most 128 characters.
-    accessRevision: int  # Strict integer in the nonnegative signed-BIGINT range.
+    accessRevision: int  # Strict integer from 0 through 9,007,199,254,740,991.
     idempotencyExpiresAt: datetime  # UTC RFC 3339 on the wire.
 
 class AssignmentInputFields(TypedDict):
@@ -317,7 +317,7 @@ A `ProjectActionGrantResponse` has `projectId` at the top level. Adding a nested
 | --- | --- |
 | Resource/principal/identity IDs | UUID strings converted into their distinct application-owned runtime ID types. Preserve accepted UUID versions/zero values. Only generated key IDs are explicitly UUIDv4. |
 | `operationId`, `cleanupOperationId` | Opaque nonblank string, maximum 128 characters. Correlation, not authority. |
-| Revisions | JSON bodies require strict integer numbers, 0–9,223,372,036,854,775,807 inclusive. JSON booleans/strings/floats are invalid. Query revisions use one decimal scalar matching `0` or `[1-9][0-9]{0,18}`, parsed within the same range. Reject signs, whitespace, leading zeros, decimal points, exponent notation and duplicate parameters. |
+| Revisions | Follow the [shared numeric revision contract](../../inframeld-application-contracts/references/http-mcp-and-generated-clients.md#numeric-revisions): strict JSON integer numbers, 0–9,007,199,254,740,991 inclusive. JSON booleans/strings/floats are invalid. Query revisions use one decimal scalar matching `0` or `[1-9][0-9]{0,15}`, parsed within the same range. Reject signs, whitespace, leading zeros, decimal points, exponent notation and duplicate parameters. |
 | Boolean fields | Strict JSON boolean. Acknowledgments required by an operation are literal `true`. |
 | `name` | Draft new-model bound 1–64 characters with the accepted ASCII selector grammar. Reserved words and migration behavior follow the resource-naming contract. No silent normalization. |
 | `displayName` | Draft new-model bound 1–128 Unicode characters, nonblank. Never an identity selector. |

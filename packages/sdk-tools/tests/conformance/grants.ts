@@ -59,38 +59,42 @@ for (const [id, credential] of [
     },
   );
 
-sdkTest(
-  {
-    id: "grant-invalid",
-    operation: "assignProjectUseOnlyGrant",
-    outcome: "failure",
-  },
-  async ({ call }) => {
-    const { observation } = await call({
+for (const [id, revision] of [
+  ["grant-invalid", -1],
+  ["grant-revision-above-safe-bound", Number.MAX_SAFE_INTEGER + 1],
+] as const)
+  sdkTest(
+    {
+      id,
       operation: "assignProjectUseOnlyGrant",
-      headers: {
-        Authorization: "Bearer sdk-human",
-        "Idempotency-Key": "sdk-key",
-      },
-      path: { project_id: projectId },
-      body: { ...grantInput, expectedAccessRevision: -1 },
-      uncheckedModel: true,
-      timeout: 2000,
-    });
-    assert.equal(observation.kind, "sdk-error");
-    assert.equal(observation.status, 422);
-    assert.notEqual(observation.validation, "none");
-    assert.ok(
-      observation.body &&
-        typeof observation.body === "object" &&
-        !Array.isArray(observation.body),
-    );
-    const issues = observation.body.errors;
-    assert.ok(Array.isArray(issues));
-    const issue = issues[0];
-    assert.ok(issue && typeof issue === "object" && !Array.isArray(issue));
-    assert.equal(issue.code, "out_of_range");
-    assert.equal(issue.location, "body");
-    assert.deepEqual(issue.path, []);
-  },
-);
+      outcome: "failure",
+    },
+    async ({ call }) => {
+      const { observation } = await call({
+        operation: "assignProjectUseOnlyGrant",
+        headers: {
+          Authorization: "Bearer sdk-human",
+          "Idempotency-Key": "sdk-key",
+        },
+        path: { project_id: projectId },
+        body: { ...grantInput, expectedAccessRevision: revision },
+        uncheckedModel: true,
+        timeout: 2000,
+      });
+      assert.equal(observation.kind, "sdk-error");
+      assert.equal(observation.status, 422);
+      assert.notEqual(observation.validation, "none");
+      assert.ok(
+        observation.body &&
+          typeof observation.body === "object" &&
+          !Array.isArray(observation.body),
+      );
+      const issues = observation.body.errors;
+      assert.ok(Array.isArray(issues));
+      const issue = issues[0];
+      assert.ok(issue && typeof issue === "object" && !Array.isArray(issue));
+      assert.equal(issue.code, "out_of_range");
+      assert.equal(issue.location, "body");
+      assert.deepEqual(issue.path, []);
+    },
+  );

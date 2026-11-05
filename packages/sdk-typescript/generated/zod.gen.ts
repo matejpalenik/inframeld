@@ -59,7 +59,7 @@ export const zHttpMethod = z.enum([
  * HumanAdmissionRequest
  */
 export const zHumanAdmissionRequest = z.object({
-    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
     identityId: z.uuid()
 });
 
@@ -69,7 +69,7 @@ export const zHumanAdmissionRequest = z.object({
  * Describe original admission, without promising starter or setup readiness.
  */
 export const zHumanAdmissionResponse = z.object({
-    accessRevision: z.int(),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
     changed: z.boolean(),
     idempotencyExpiresAt: z.iso.datetime(),
     operationId: z.string(),
@@ -226,7 +226,7 @@ export const zOwnOrganizationGrantResponse = z.object({
  * MyOrganizationAccessResponse
  */
 export const zMyOrganizationAccessResponse = z.object({
-    accessRevision: z.int().gte(0).lte(9223372036854776000),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
     grants: z.array(zOwnOrganizationGrantResponse).max(4),
     organizationId: z.uuid(),
     principalId: z.uuid()
@@ -287,7 +287,7 @@ export const zPageResponseProjectActionGrantItemResponse = z.object({
  * ProjectActionGrantRemovalResponse
  */
 export const zProjectActionGrantRemovalResponse = z.object({
-    accessRevision: z.int().gte(0).lte(9223372036854776000),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
     actionId: z.string(),
     changed: z.boolean(),
     idempotencyExpiresAt: z.iso.datetime(),
@@ -302,14 +302,14 @@ export const zProjectActionGrantRemovalResponse = z.object({
  */
 export const zProjectActionGrantRequest = z.object({
     canGrant: z.boolean(),
-    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000)
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
 });
 
 /**
  * ProjectActionGrantResponse
  */
 export const zProjectActionGrantResponse = z.object({
-    accessRevision: z.int().gte(0).lte(9223372036854776000),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
     actionId: z.string(),
     canGrant: z.boolean(),
     changed: z.boolean(),
@@ -324,7 +324,7 @@ export const zProjectActionGrantResponse = z.object({
  */
 export const zProjectCreationRequest = z.object({
     displayName: z.string().min(1).max(128),
-    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
     name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/),
     organizationId: z.uuid()
 });
@@ -363,7 +363,7 @@ export const zMyProjectAccessGrantResponse = z.object({
  * MyProjectAccessResponse
  */
 export const zMyProjectAccessResponse = z.object({
-    accessRevision: z.int().gte(0).lte(9223372036854776000),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
     grants: z.array(zMyProjectAccessGrantResponse),
     groupManagements: z.array(zMyProjectAccessGroupResponse),
     groupMemberships: z.array(zMyProjectAccessGroupResponse),
@@ -421,7 +421,7 @@ export const zProjectMemberResponse = z.object({
  * ProjectMembersPageResponse
  */
 export const zProjectMembersPageResponse = z.object({
-    accessRevision: z.int().gte(0),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
     items: z.array(zProjectMemberResponse),
     nextCursor: z.string().nullable(),
     projectId: z.uuid()
@@ -433,7 +433,7 @@ export const zProjectMembersPageResponse = z.object({
  * Report original removal, independently of a later rejoin.
  */
 export const zProjectMembershipRemovalResponse = z.object({
-    accessRevision: z.int(),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
     changed: z.boolean(),
     idempotencyExpiresAt: z.iso.datetime(),
     operationId: z.string(),
@@ -446,7 +446,7 @@ export const zProjectMembershipRemovalResponse = z.object({
  * ProjectMembershipRequest
  */
 export const zProjectMembershipRequest = z.object({
-    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000)
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
 });
 
 /**
@@ -455,7 +455,7 @@ export const zProjectMembershipRequest = z.object({
  * Report original bare membership, without restoring grants or later state.
  */
 export const zProjectMembershipResponse = z.object({
-    accessRevision: z.int(),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
     changed: z.boolean(),
     idempotencyExpiresAt: z.iso.datetime(),
     member: z.literal(true),
@@ -470,7 +470,7 @@ export const zProjectMembershipResponse = z.object({
 export const zProjectMetadataChangeResponse = z.object({
     displayName: z.string(),
     idempotencyExpiresAt: z.iso.datetime(),
-    metadataRevision: z.int(),
+    metadataRevision: z.int().gte(0).lte(9007199254740991),
     name: z.string().nullable(),
     operationId: z.string(),
     organizationId: z.uuid(),
@@ -482,7 +482,7 @@ export const zProjectMetadataChangeResponse = z.object({
  */
 export const zProjectMetadataResponse = z.object({
     displayName: z.string(),
-    metadataRevision: z.int(),
+    metadataRevision: z.int().gte(0).lte(9007199254740991),
     name: z.string().nullable(),
     organizationId: z.uuid(),
     projectId: z.uuid()
@@ -495,7 +495,7 @@ export const zProjectMetadataResponse = z.object({
  */
 export const zProjectMetadataUpdateRequest = z.object({
     displayName: z.string().min(1).max(128).optional(),
-    expectedMetadataRevision: z.int().gte(0).lte(9223372036854776000),
+    expectedMetadataRevision: z.int().gte(0).lte(9007199254740991),
     name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/).optional()
 });
 
@@ -506,7 +506,7 @@ export const zProjectMetadataUpdateRequest = z.object({
  */
 export const zProjectNameResolutionResponse = z.object({
     displayName: z.string(),
-    metadataRevision: z.int(),
+    metadataRevision: z.int().gte(0).lte(9007199254740991),
     name: z.string().nullable(),
     organizationId: z.uuid(),
     projectId: z.uuid()
@@ -517,7 +517,7 @@ export const zProjectNameResolutionResponse = z.object({
  */
 export const zProjectUseOnlyGrantRequest = z.object({
     actionId: z.literal('create-access-groups'),
-    expectedAccessRevision: z.int().gte(0),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
     recipientPrincipalId: z.uuid()
 });
 
@@ -527,7 +527,7 @@ export const zProjectUseOnlyGrantRequest = z.object({
  * Describe the original change - current grants require a fresh authorized read.
  */
 export const zProjectUseOnlyGrantResponse = z.object({
-    accessRevision: z.int(),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
     actionId: z.literal('create-access-groups'),
     canGrant: z.literal(false).optional().default(false),
     idempotencyExpiresAt: z.iso.datetime(),
@@ -1291,7 +1291,7 @@ export const zRemoveProjectActionGrantPath = z.object({
 });
 
 export const zRemoveProjectActionGrantQuery = z.object({
-    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000)
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
 });
 
 /**
@@ -1470,7 +1470,7 @@ export const zRemoveProjectMemberPath = z.object({
 });
 
 export const zRemoveProjectMemberQuery = z.object({
-    expectedAccessRevision: z.int().gte(0).lte(9223372036854776000)
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
 });
 
 /**

@@ -30,7 +30,7 @@ class ProjectMetadataUpdateRequest(BaseModel):
     Omitted fields preserve stored values. Explicit null never clears either field.
     """ # noqa: E501
     display_name: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=128)]] = Field(default=None, description="New label in Unicode code points. Omit to preserve even an unrestricted legacy label.", alias="displayName")
-    expected_metadata_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)] = Field(description="Metadata revision reviewed for this exact change.", alias="expectedMetadataRevision")
+    expected_metadata_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(description="Metadata revision reviewed for this exact change.", alias="expectedMetadataRevision")
     name: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=63)]] = Field(default=None, description="Explicit exact selector replacement. Omit to preserve the current selector.")
     __properties: ClassVar[List[str]] = ["displayName", "expectedMetadataRevision", "name"]
     @field_validator('display_name', mode='before')

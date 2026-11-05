@@ -112,6 +112,20 @@ Public fields use **lower camel case**. Each operation has a stable `operationId
 
 CI compares the generated schema with the file committed in Git. A difference, called **contract drift**, fails the check. This check belongs to developing Inframeld itself. It does not release a customer's pipeline version.
 
+<a id="numeric-revisions"></a>
+
+### Preserve numeric revisions exactly
+
+Alice reads `accessRevision: 42` and sends `expectedAccessRevision: 42` when changing a grant. Ordinary clients copy the reviewed value. They do not predict the next revision or treat a receipt as current authority. The domain owns which state the revision protects and when it advances.
+
+Under [ADR-0129](../../../../docs/adr/ADR-0129-bound-numeric-revisions-to-the-javascript-safe-integer-range.md), numeric product revisions are integer JSON numbers between **0 and 9,007,199,254,740,991** inclusive. Preserve any stricter minimum of the owning operation. Native OpenAPI declares `integer`, `int64` and the effective bounds. JSON booleans, quoted numbers and floating-point values are invalid. An operation's decimal query form has the same range and retains its strict parsing and duplicate-parameter rules.
+
+JavaScript/TypeScript uses validated safe-integer `number` values. Python uses bounded `int`. Rust uses the existing generated `i64`, while Java/Kotlin, C# and Go callers use `long`/`Long`, `long` and `int64` respectively. A language's narrower `int` is not an interchangeable representation. PostgreSQL uses bounded `BIGINT` storage for participating counters, and retained results preserve the same exact values.
+
+Reject a fresh change that needs to advance a counter beyond the maximum before committing its effects. Never wrap, reset or clamp it. An unchanged operation may retain the current revision, and a currently authorized exact replay returns the original retained result without advancing again. The expected-revision comparison, changed state, audit and required completion metadata still agree within the owning transaction. Specialized internal receipt checks may use checked arithmetic. They must reject impossible values rather than weakening the result binding.
+
+The bound applies to numeric state revisions, not every numeric field or immutable revision identity. Credential generations, advisory-lock keys, provider durations, byte quantities and monetary values keep their owning contracts. Changing any of those requires inspecting its actual representation and guarantees.
+
 <a id="publish-and-consume-a-change"></a>
 
 <a id="workflow"></a>

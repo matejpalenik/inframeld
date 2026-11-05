@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, DateTime, Integer, Text, Uuid, func
+from sqlalchemy import BigInteger, DateTime, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
@@ -21,7 +21,7 @@ class ProjectRow(AccessPersistenceBase):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[ProjectStatus] = mapped_column(PROJECT_STATUS_TYPE, nullable=False)
     access_revision: Mapped[int] = mapped_column(
-        Integer,
+        BigInteger,
         nullable=False,
         init=False,
         server_default="0",

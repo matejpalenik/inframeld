@@ -31,7 +31,7 @@ class ProjectMembersPageResponse(BaseModel):
     """
     ProjectMembersPageResponse
     """ # noqa: E501
-    access_revision: Annotated[int, Field(strict=True, ge=0)] = Field(alias="accessRevision")
+    access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(alias="accessRevision")
     items: List[ProjectMemberResponse]
     next_cursor: Optional[StrictStr] = Field(alias="nextCursor")
     project_id: UUID = Field(alias="projectId")

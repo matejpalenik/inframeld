@@ -3,6 +3,7 @@ from typing import Annotated, Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
     SubmittedDisplayName,
@@ -18,8 +19,9 @@ class ProjectMetadataUpdateRequest(BaseModel):
         alias="expectedMetadataRevision",
         strict=True,
         ge=0,
-        le=2**63 - 1,
+        le=RevisionValidation.MAX_VALUE,
         description="Metadata revision reviewed for this exact change.",
+        json_schema_extra={"format": "int64"},
     )
     name: (
         Annotated[str, Field(min_length=1, max_length=63, pattern="^[a-z](?:[a-z0-9-]*[a-z0-9])?$")]

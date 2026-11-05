@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class ProjectUseOnlyGrantResponse(BaseModel):
@@ -17,5 +18,11 @@ class ProjectUseOnlyGrantResponse(BaseModel):
     recipient_principal_id: UUID = Field(serialization_alias="recipientPrincipalId")
     action_id: Literal[ProjectAction.CREATE_ACCESS_GROUPS] = Field(serialization_alias="actionId")
     can_grant: Literal[False] = Field(default=False, serialization_alias="canGrant")
-    access_revision: int = Field(serialization_alias="accessRevision")
+    access_revision: int = Field(
+        serialization_alias="accessRevision",
+        strict=True,
+        ge=0,
+        le=RevisionValidation.MAX_VALUE,
+        json_schema_extra={"format": "int64"},
+    )
     idempotency_expires_at: datetime = Field(serialization_alias="idempotencyExpiresAt")

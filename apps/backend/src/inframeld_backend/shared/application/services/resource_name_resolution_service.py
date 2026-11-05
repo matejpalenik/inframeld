@@ -13,6 +13,7 @@ from inframeld_backend.shared.application.protocols.resource_name_resolver impor
 from inframeld_backend.shared.application.queries.resolve_resource_name_query import (
     ResolveResourceNameQuery,
 )
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class ResourceNameResolutionService(ResourceNameResolver):
@@ -31,7 +32,7 @@ class ResourceNameResolutionService(ResourceNameResolver):
             or binding.scope != query.scope
             or binding.name != query.name
             or type(binding.revision) is not int
-            or binding.revision < 0
+            or not 0 <= binding.revision <= RevisionValidation.MAX_VALUE
         ):
             raise ResourceNotFoundError()
 

@@ -81,6 +81,7 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class HumanAdmissionService(HumanAdmitter):
@@ -262,6 +263,8 @@ class HumanAdmissionService(HumanAdmitter):
         if command.expected_access_revision != scope.access_revision:
             raise StaleRevisionError()
         changed = facts.principal is None
+        if changed and scope.access_revision == RevisionValidation.MAX_VALUE:
+            raise ConflictError("The Organization Access revision cannot advance.")
         principal = facts.principal or Principal(
             PrincipalId(uuid4()), scope.organization_id, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
         )

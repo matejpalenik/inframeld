@@ -196,7 +196,7 @@ async def main() -> None:
             )
         elif operation == "remove":
             revision = int(os.environ["EXPECTED_ACCESS_REVISION"])
-            if not 0 <= revision <= 9223372036854775807:
+            if not 0 <= revision <= 9007199254740991:
                 raise ValueError("Use the exact reviewed nonnegative Access revision")
             response = await api.remove_project_action_grant_with_http_info(
                 project_id=project_id,
@@ -242,9 +242,16 @@ function required(name: string): string {
 
 function reviewedRevision(value: number): number {
   if (!Number.isSafeInteger(value) || value < 0) {
-    throw new Error("Use a client that can preserve this exact Access revision")
+    throw new Error("Use an Access revision from 0 through 9007199254740991")
   }
   return value
+}
+
+function reviewedRevisionText(value: string): number {
+  if (!/^(0|[1-9][0-9]{0,15})$/.test(value)) {
+    throw new Error("Use an unsigned decimal Access revision without leading zeros")
+  }
+  return reviewedRevision(Number(value))
 }
 
 const client = createClient({
@@ -297,8 +304,8 @@ async function request() {
           action_id: required("ACTION_ID"),
         },
         query: {
-          expectedAccessRevision: reviewedRevision(
-            Number(required("EXPECTED_ACCESS_REVISION"))
+          expectedAccessRevision: reviewedRevisionText(
+            required("EXPECTED_ACCESS_REVISION")
           ),
         },
         headers: {
@@ -404,7 +411,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 Start with `GRANT_OPERATION=read .venv/bin/python project_grants.py`, `GRANT_OPERATION=read node project-grants.ts` with Node 26 in the ESM project, or `GRANT_OPERATION=read cargo run` in the Cargo project. For a prepared write, change only that selector to `set` or `remove` after saving the matching inputs and original key. These selectors belong to the example programs, not an Inframeld CLI.
 
-Each program prints the available HTTP status and typed page or receipt. A read can succeed without action grants, while a write still requires current exact use-and-grant authority. Pass a read's non-null `nextCursor` unchanged as `PROJECT_ACCESS_CURSOR` for another page, then clear it when changing scope. Never reuse a mutation receipt's revision as a current review. TypeScript uses JavaScript numbers, so the example refuses revisions outside the safe integer range rather than rounding them. Python and Rust preserve the native signed-integer bound.
+Each program prints the available HTTP status and typed page or receipt. A read can succeed without action grants, while a write still requires current exact use-and-grant authority. Pass a read's non-null `nextCursor` unchanged as `PROJECT_ACCESS_CURSOR` for another page, then clear it when changing scope. Never reuse a mutation receipt's revision as a current review. Access revisions are integer numbers from 0 through 9,007,199,254,740,991 across all three clients. Copy the reviewed value unchanged and reject invalid input rather than rounding it.
 
 ## Assign the permission
 

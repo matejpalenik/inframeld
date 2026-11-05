@@ -186,7 +186,7 @@ def test_creation_returns_typed_original_project_and_all_creator_assignments() -
         {"expectedAccessRevision": "7"},
         {"expectedAccessRevision": 7.0},
         {"expectedAccessRevision": -1},
-        {"expectedAccessRevision": 2**63},
+        {"expectedAccessRevision": 2**53},
         {"name": "Production"},
         {"name": "p" * 64},
         {"name": "1project"},

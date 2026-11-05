@@ -6,6 +6,7 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
 )
 from inframeld_backend.shared.application.commands.command import Command
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.domain.validation.value_validation import ValueValidation
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
@@ -26,7 +27,7 @@ class BootstrapFirstAdministratorCommand(Command):
         ValueValidation.require_uuid(self.expected_identity_id)
         if type(self.expected_access_revision) is not int:
             raise TypeError("The Access revision must be a whole number.")
-        if not 0 <= self.expected_access_revision < 2**63:
+        if not 0 <= self.expected_access_revision <= RevisionValidation.MAX_VALUE:
             raise ValueError("The Access revision is outside its supported range.")
         for value, bound in (
             (self.operation_id.value, 128),

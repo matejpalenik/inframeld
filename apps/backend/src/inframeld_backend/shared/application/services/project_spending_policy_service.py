@@ -60,6 +60,7 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
     OperationLookupAuthority,
 )
 from inframeld_backend.shared.application.value_objects.spending_period import SpendingPeriod
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
@@ -135,6 +136,8 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
                 raise StaleRevisionError()
             changed = policy.monthly_limit != command.monthly_limit
             if changed:
+                if policy.revision == RevisionValidation.MAX_VALUE:
+                    raise ConflictError("The spending policy revision cannot advance.")
                 policy = replace(
                     policy, revision=policy.revision + 1, monthly_limit=command.monthly_limit
                 )

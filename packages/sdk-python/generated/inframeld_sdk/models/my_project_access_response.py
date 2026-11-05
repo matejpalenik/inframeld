@@ -32,7 +32,7 @@ class MyProjectAccessResponse(BaseModel):
     """
     MyProjectAccessResponse
     """ # noqa: E501
-    access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)] = Field(alias="accessRevision")
+    access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(alias="accessRevision")
     grants: List[MyProjectAccessGrantResponse]
     group_managements: List[MyProjectAccessGroupResponse] = Field(alias="groupManagements")
     group_memberships: List[MyProjectAccessGroupResponse] = Field(alias="groupMemberships")

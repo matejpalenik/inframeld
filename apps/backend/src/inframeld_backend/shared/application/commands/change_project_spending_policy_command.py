@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.commands.command import Command
 from inframeld_backend.shared.application.protocols.project_command import ProjectCommand
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.domain.value_objects.usd_amount import UsdAmount
 
 
@@ -15,7 +16,10 @@ class ChangeProjectSpendingPolicyCommand(Command, ProjectCommand):
     monthly_limit: UsdAmount | None
 
     def __post_init__(self) -> None:
-        if type(self.expected_policy_revision) is not int or self.expected_policy_revision < 0:
+        if (
+            type(self.expected_policy_revision) is not int
+            or not 0 <= self.expected_policy_revision <= RevisionValidation.MAX_VALUE
+        ):
             raise ValueError("A policy change requires a nonnegative reviewed revision.")
         if self.monthly_limit is not None and self.monthly_limit.value < 0:
             raise ValueError("A Project spending limit cannot be negative.")

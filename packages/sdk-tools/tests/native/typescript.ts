@@ -49,8 +49,19 @@ for (const [field, schema, otherFields] of revisionModels) {
       schema.safeParse({ ...otherFields, [field]: revision }).success,
       true,
     );
+    assert.deepEqual(schema.parse({ ...otherFields, [field]: revision }), {
+      ...otherFields,
+      [field]: revision,
+    });
   }
-  for (const revision of [-1, Number.MAX_SAFE_INTEGER + 1, 1n]) {
+  for (const revision of [
+    -1,
+    Number.MAX_SAFE_INTEGER + 1,
+    1n,
+    true,
+    "1",
+    1.5,
+  ]) {
     assert.equal(
       schema.safeParse({ ...otherFields, [field]: revision }).success,
       false,

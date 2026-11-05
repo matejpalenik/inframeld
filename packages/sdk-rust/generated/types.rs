@@ -118,6 +118,7 @@ impl AsRef<str> for ProtectedResourceMetadataResponseBearerMethodsSupportedItem1
 ///Describe the original change - current grants require a fresh authorized read.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectUseOnlyGrantResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "accessRevision")]
     pub access_revision: i64,
     #[serde(rename = "actionId")]
@@ -165,7 +166,7 @@ impl AsRef<str> for ProjectUseOnlyGrantResponseActionId {
 pub struct ProjectUseOnlyGrantRequest {
     #[serde(rename = "actionId")]
     pub action_id: ProjectUseOnlyGrantRequestActionId,
-    ///Constraint: minimum=0
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "expectedAccessRevision")]
     pub expected_access_revision: i64,
     #[serde(rename = "recipientPrincipalId")]
@@ -196,7 +197,7 @@ impl AsRef<str> for ProjectUseOnlyGrantRequestActionId {
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectMembersPageResponse {
-    ///Constraint: minimum=0
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "accessRevision")]
     pub access_revision: i64,
     pub items: Vec<ProjectMemberResponse>,
@@ -1340,7 +1341,7 @@ impl AsRef<str> for OperationLookupAuthorityFamily {
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MyProjectAccessResponse {
-    ///Constraint: minimum=0, maximum=9223372036854775807
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "accessRevision")]
     pub access_revision: i64,
     pub grants: Vec<MyProjectAccessGrantResponse>,
@@ -1736,7 +1737,7 @@ impl<'de> serde::Deserialize<'de> for MyProjectAccessGrantResponseTarget {
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MyOrganizationAccessResponse {
-    ///Constraint: minimum=0, maximum=9223372036854775807
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "accessRevision")]
     pub access_revision: i64,
     ///Constraint: maxItems=4
@@ -2689,7 +2690,7 @@ pub struct GetHealthResponse {
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HumanAdmissionRequest {
-    ///Constraint: minimum=0, maximum=9223372036854775807
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "expectedAccessRevision")]
     pub expected_access_revision: i64,
     #[serde(rename = "identityId")]
@@ -2698,6 +2699,7 @@ pub struct HumanAdmissionRequest {
 ///Describe original admission, without promising starter or setup readiness.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HumanAdmissionResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "accessRevision")]
     pub access_revision: i64,
     pub changed: bool,
@@ -2717,7 +2719,7 @@ pub struct HumanOAuthConsentDecisionResponse {
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectActionGrantRemovalResponse {
-    ///Constraint: minimum=0, maximum=9223372036854775807
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "accessRevision")]
     pub access_revision: i64,
     #[serde(rename = "actionId")]
@@ -2738,13 +2740,13 @@ pub struct ProjectActionGrantRemovalResponse {
 pub struct ProjectActionGrantRequest {
     #[serde(rename = "canGrant")]
     pub can_grant: bool,
-    ///Constraint: minimum=0, maximum=9223372036854775807
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "expectedAccessRevision")]
     pub expected_access_revision: i64,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectActionGrantResponse {
-    ///Constraint: minimum=0, maximum=9223372036854775807
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "accessRevision")]
     pub access_revision: i64,
     #[serde(rename = "actionId")]
@@ -2767,7 +2769,7 @@ pub struct ProjectCreationRequest {
     ///Constraint: minLength=1, maxLength=128
     #[serde(rename = "displayName")]
     pub display_name: String,
-    ///Constraint: minimum=0, maximum=9223372036854775807
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "expectedAccessRevision")]
     pub expected_access_revision: i64,
     ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
@@ -2778,6 +2780,7 @@ pub struct ProjectCreationRequest {
 ///Report original removal, independently of a later rejoin.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectMembershipRemovalResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "accessRevision")]
     pub access_revision: i64,
     pub changed: bool,
@@ -2793,13 +2796,14 @@ pub struct ProjectMembershipRemovalResponse {
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectMembershipRequest {
-    ///Constraint: minimum=0, maximum=9223372036854775807
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "expectedAccessRevision")]
     pub expected_access_revision: i64,
 }
 ///Report original bare membership, without restoring grants or later state.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectMembershipResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "accessRevision")]
     pub access_revision: i64,
     pub changed: bool,
@@ -2822,6 +2826,7 @@ pub struct ProjectMetadataChangeResponse {
     #[serde(rename = "idempotencyExpiresAt")]
     pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
     ///Review revision for metadata changes, separate from permission revision.
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "metadataRevision")]
     pub metadata_revision: i64,
     ///Exact current selector, or null until explicitly allocated.
@@ -2843,6 +2848,7 @@ pub struct ProjectMetadataResponse {
     #[serde(rename = "displayName")]
     pub display_name: String,
     ///Review revision for metadata changes, separate from permission revision.
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "metadataRevision")]
     pub metadata_revision: i64,
     ///Exact current selector, or null until explicitly allocated.
@@ -2868,7 +2874,7 @@ pub struct ProjectMetadataUpdateRequest {
     )]
     pub display_name: Option<String>,
     ///Metadata revision reviewed for this exact change.
-    ///Constraint: minimum=0, maximum=9223372036854775807
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "expectedMetadataRevision")]
     pub expected_metadata_revision: i64,
     ///Explicit exact selector replacement. Omit to preserve the current selector.
@@ -2933,6 +2939,7 @@ pub struct ProjectNameResolutionResponse {
     #[serde(rename = "displayName")]
     pub display_name: String,
     ///Review revision for metadata changes, separate from permission revision.
+    ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "metadataRevision")]
     pub metadata_revision: i64,
     ///Exact current selector, or null until explicitly allocated.

@@ -58,6 +58,7 @@ from inframeld_backend.shared.application.protocols.transaction_manager import T
 from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
     OperationLookupAuthority,
 )
+from inframeld_backend.shared.domain.errors.domain_errors import InvalidStateTransitionError
 
 
 class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
@@ -144,6 +145,8 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
                 )
             except ProjectMetadataStaleRevisionError as error:
                 raise StaleRevisionError() from error
+            except InvalidStateTransitionError as error:
+                raise ConflictError("The metadata revision cannot advance.") from error
 
             await self._metadata_repository.save(
                 metadata,

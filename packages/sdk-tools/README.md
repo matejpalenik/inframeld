@@ -103,6 +103,8 @@ The [manifest](generators/manifest.json) owns versions, original archives, diges
 
 Apply patches to verified generator source or built-in resources before generation. Never edit emitted SDK source or weaken native OpenAPI to make a client pass. The [generator walkthrough](docs/generators.md) explains the procedure and [shared maintenance policy](../../.agents/skills/inframeld-sdks/references/generator-maintenance.md) owns the obligations.
 
+TypeScript's native Zod resolver keeps an `int64` schema as a strict JavaScript number only when its explicit inclusive bounds both fit the exact safe-integer range. It preserves those bounds and leaves other integer formats, unbounded wide integers and conditional schemas to the generator's default handling. The native model checks retain numeric revision results and reject coercion from strings, booleans or `bigint`. [ADR-0129](../../docs/adr/ADR-0129-bound-numeric-revisions-to-the-javascript-safe-integer-range.md) owns the public revision limit and language mappings.
+
 Rust's metadata-disabled consumer and synthetic binary/streaming/SSE/builder tests remain separate from shared HTTP counts. Published source-archive library tests do not establish an upstream integration suite absent from that archive.
 
 ## CI and proof boundaries

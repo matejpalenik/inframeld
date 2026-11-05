@@ -119,7 +119,7 @@ class GeneratedModelTests(unittest.TestCase):
         fixtures = inframeld_sdk_fixtures.Configuration(access_token="test-only-token")
         self.assertEqual(fixtures.auth_settings(), {})
 
-    def test_revision_models_preserve_the_exact_signed_64_bit_bound(self) -> None:
+    def test_revision_models_preserve_the_exact_json_safe_integer_bound(self) -> None:
         identifier = "00000000-0000-4000-8000-000000000001"
         cases: tuple[tuple[type[BaseModel], str, dict[str, JsonValue]], ...] = (
             (
@@ -146,14 +146,14 @@ class GeneratedModelTests(unittest.TestCase):
         )
         for model, field, other_fields in cases:
             with self.subTest(model=model.__name__):
-                for revision in (0, 2**63 - 1):
+                for revision in (0, 2**53 - 1):
                     value = model.model_validate({**other_fields, field: revision})
                     self.assertEqual(
                         _JSON_OBJECT.validate_json(value.model_dump_json(by_alias=True))[field],
                         revision,
                     )
                 with self.assertRaises(ValidationError):
-                    model.model_validate({**other_fields, field: 2**63})
+                    model.model_validate({**other_fields, field: 2**53})
 
     def test_metadata_change_preserves_omission_and_counts_unicode_code_points(self) -> None:
         source: dict[str, JsonValue] = {"expectedMetadataRevision": 0, "name": "production"}

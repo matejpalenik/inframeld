@@ -68,7 +68,7 @@ async def test_same_spelling_collection_cannot_replace_profile_binding() -> None
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "mismatch", ["kind", "project", "organization", "installation", "name", "ambiguous"]
+    "mismatch", ["kind", "project", "organization", "installation", "name", "ambiguous", "revision"]
 )
 async def test_rejects_bad_adapter_scope_or_ambiguity(mismatch: str) -> None:
     wanted = binding()
@@ -81,6 +81,8 @@ async def test_rejects_bad_adapter_scope_or_ambiguity(mismatch: str) -> None:
         bad = replace(wanted, scope=replace(wanted.scope, organization_id=OrganizationId(uuid4())))
     elif mismatch == "installation":
         bad = replace(wanted, scope=replace(wanted.scope, installation_id=InstallationId(uuid4())))
+    elif mismatch == "revision":
+        bad = replace(wanted, revision=2**53)
     elif mismatch == "name":
         bad = replace(wanted, name=ResourceName("other"))
     rows = (bad, bad) if mismatch == "ambiguous" else (bad,)

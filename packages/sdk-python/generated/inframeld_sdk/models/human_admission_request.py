@@ -30,7 +30,7 @@ class HumanAdmissionRequest(BaseModel):
     """
     HumanAdmissionRequest
     """ # noqa: E501
-    expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)] = Field(alias="expectedAccessRevision")
+    expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(alias="expectedAccessRevision")
     identity_id: UUID = Field(alias="identityId")
     __properties: ClassVar[List[str]] = ["expectedAccessRevision", "identityId"]
     @field_validator('expected_access_revision', mode='before')

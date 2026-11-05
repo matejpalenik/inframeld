@@ -193,12 +193,13 @@ async def test_new_repair_records_exact_outcome_before_assignment_in_same_transa
 
 
 @pytest.mark.asyncio
-async def test_current_refreshed_proof_replays_before_new_revision_or_stranded_checks_without_regrant() -> (
-    None
-):
+@pytest.mark.parametrize("revision", [20, 2**53 - 1])
+async def test_current_refreshed_proof_replays_before_new_revision_or_stranded_checks_without_regrant(
+    revision: int,
+) -> None:
     s = Scenario()
     s.save_original()
-    s.facts.facts = replace(s.facts.facts, access_revision=20, eligible_grantor_exists=True)
+    s.facts.facts = replace(s.facts.facts, access_revision=revision, eligible_grantor_exists=True)
     result = await s.service.repair(
         access=ACCESS,
         command=replace(COMMAND, identity_proof=HumanAccessTokenCredential("refreshed-proof")),
@@ -240,3 +241,19 @@ async def test_changed_original_meaning_conflicts_and_unavailable_stranded_facts
         await s.service.repair(access=ACCESS, command=COMMAND)
     assert failure.value.code is Code.DEPENDENCY_UNAVAILABLE
     assert "assign" not in s.events
+
+
+@pytest.mark.asyncio
+async def test_exhausted_repair_revision_rejects_fresh_authorized_change_before_receipt_effects() -> (
+    None
+):
+    scenario = Scenario()
+    scenario.facts.facts = replace(scenario.facts.facts, access_revision=2**53 - 1)
+    command = replace(COMMAND, expected_access_revision=2**53 - 1)
+
+    with pytest.raises(ProjectMetadataMaintenanceError) as failure:
+        await scenario.service.repair(access=ACCESS, command=command)
+
+    assert failure.value.code is Code.REVISION_EXHAUSTED
+    assert scenario.writer.recorded is None and scenario.facts.saved is None
+    assert scenario.events == ["begin", "facts", "receipt", "rollback"]

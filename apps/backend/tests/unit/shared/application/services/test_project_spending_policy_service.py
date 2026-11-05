@@ -347,3 +347,26 @@ async def test_review_policy_records_cannot_cross_authorized_scope(
         else:
             await service.change_limit(access=ACCESS, command=command, context=CONTEXT)
     assert ledger.state.policy == previous
+
+
+@pytest.mark.asyncio
+async def test_exhausted_policy_revision_allows_noop_and_replay_but_no_changed_limit() -> None:
+    service, ledger, _, _ = manager()
+    ledger.state.policy = replace(ledger.state.policy, revision=2**53 - 1)
+    command = ChangeProjectSpendingPolicyCommand(
+        PROJECT, 2**53 - 1, ledger.state.policy.monthly_limit
+    )
+    result = await service.change_limit(access=ACCESS, command=command, context=CONTEXT)
+    assert not result.changed and result.policy.revision == 2**53 - 1
+    replay = await service.change_limit(access=ACCESS, command=command, context=CONTEXT)
+    assert not replay.completion.created and replay.policy == result.policy
+    service, ledger, _, _ = manager()
+    original = replace(ledger.state.policy, revision=2**53 - 1)
+    ledger.state.policy = original
+    with pytest.raises(ConflictError):
+        await service.change_limit(
+            access=ACCESS,
+            command=ChangeProjectSpendingPolicyCommand(PROJECT, 2**53 - 1, money("123")),
+            context=CONTEXT,
+        )
+    assert ledger.state.policy == original and not ledger.state.audits

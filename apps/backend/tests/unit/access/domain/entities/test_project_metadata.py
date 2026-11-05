@@ -52,3 +52,27 @@ def test_stale_combined_rename_changes_neither_field() -> None:
         "Support",
         3,
     )
+
+
+def test_exhausted_metadata_revision_preserves_names_and_still_allows_noop() -> None:
+    from inframeld_backend.shared.domain.errors.domain_errors import InvalidStateTransitionError
+
+    project = ProjectMetadata(
+        project_id=ProjectId(uuid4()),
+        organization_id=OrganizationId(uuid4()),
+        name=ResourceName("support"),
+        display_name="Support",
+        revision=2**53 - 1,
+    )
+    assert not project.change(expected_revision=2**53 - 1, name=None, display_name=None)
+    with pytest.raises(InvalidStateTransitionError):
+        project.change(
+            expected_revision=2**53 - 1,
+            name=ResourceName("legal"),
+            display_name=SubmittedDisplayName("Legal"),
+        )
+    assert (project.name, project.display_name, project.revision) == (
+        ResourceName("support"),
+        "Support",
+        2**53 - 1,
+    )

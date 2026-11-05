@@ -253,7 +253,7 @@ let client = HttpClient::new()
 
 </CodeGroup>
 
-Use the typed revision from the reviewed member-list response. Python and Rust retain the signed 64-bit integer. TypeScript's generated response validation requires an exact safe integer. Use Python, Rust or cURL if the server revision exceeds JavaScript's safe integer range. Do not convert revision text through JavaScript's `Number()` before validating its exact decimal representation.
+Use the typed revision from the reviewed member-list response. Access revisions are integer numbers from 0 through 9,007,199,254,740,991, which all three clients preserve exactly. Copy the reviewed value unchanged. Reject invalid input instead of rounding it, and do not predict the next revision.
 
 At the Python application boundary, handle `inframeld_sdk.exceptions.ApiException` and `httpx.HTTPError` without printing their raw bodies or exception text. Report the available HTTP status and preserve the original request. Rust's `report_error` similarly returns a safe error and ends the operation unsuccessfully. Neither an HTTP error nor a transport or decoding failure supplies a usable receipt.
 

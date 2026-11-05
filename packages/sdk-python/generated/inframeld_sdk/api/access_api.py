@@ -6141,7 +6141,7 @@ class AccessApi:
         project_id: UUID,
         recipient_principal_id: UUID,
         action_id: StrictStr,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -6262,7 +6262,7 @@ class AccessApi:
         project_id: UUID,
         recipient_principal_id: UUID,
         action_id: StrictStr,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -6383,7 +6383,7 @@ class AccessApi:
         project_id: UUID,
         recipient_principal_id: UUID,
         action_id: StrictStr,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -6500,7 +6500,7 @@ class AccessApi:
         project_id: UUID,
         recipient_principal_id: UUID,
         action_id: StrictStr,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -6542,7 +6542,7 @@ class AccessApi:
         project_id: UUID,
         recipient_principal_id: UUID,
         action_id: StrictStr,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -6584,7 +6584,7 @@ class AccessApi:
         project_id: UUID,
         recipient_principal_id: UUID,
         action_id: StrictStr,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -6705,7 +6705,7 @@ class AccessApi:
         self,
         project_id: UUID,
         principal_id: UUID,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -6822,7 +6822,7 @@ class AccessApi:
         self,
         project_id: UUID,
         principal_id: UUID,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -6939,7 +6939,7 @@ class AccessApi:
         self,
         project_id: UUID,
         principal_id: UUID,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -7052,7 +7052,7 @@ class AccessApi:
         self,
         project_id: UUID,
         principal_id: UUID,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -7092,7 +7092,7 @@ class AccessApi:
         self,
         project_id: UUID,
         principal_id: UUID,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,
@@ -7132,7 +7132,7 @@ class AccessApi:
         self,
         project_id: UUID,
         principal_id: UUID,
-        expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)],
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
         _request_timeout: Union[
             None,

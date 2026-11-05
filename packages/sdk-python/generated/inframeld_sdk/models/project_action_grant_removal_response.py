@@ -31,7 +31,7 @@ class ProjectActionGrantRemovalResponse(BaseModel):
     """
     ProjectActionGrantRemovalResponse
     """ # noqa: E501
-    access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)] = Field(alias="accessRevision")
+    access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(alias="accessRevision")
     action_id: StrictStr = Field(alias="actionId")
     changed: StrictBool
     idempotency_expires_at: datetime = Field(alias="idempotencyExpiresAt")

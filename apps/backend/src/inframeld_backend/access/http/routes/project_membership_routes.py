@@ -29,6 +29,7 @@ from inframeld_backend.access.http.responses.project_membership_response import 
 )
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.http.builders.problem_response import build_problem_response
 from inframeld_backend.shared.http.definitions.problem_catalogue import (
     ACCESS_DENIED_PROBLEM,
@@ -206,7 +207,13 @@ def create_project_membership_router(
         project_id: UUID,
         principal_id: UUID,
         expected_access_revision: Annotated[
-            int, Query(alias="expectedAccessRevision", ge=0, le=2**63 - 1)
+            int,
+            Query(
+                alias="expectedAccessRevision",
+                ge=0,
+                le=RevisionValidation.MAX_VALUE,
+                json_schema_extra={"format": "int64"},
+            ),
         ],
         access: Annotated[AccessContextDTO, Depends(authenticate)],
         key: Annotated[IdempotencyKey, Depends(key_dependency)],

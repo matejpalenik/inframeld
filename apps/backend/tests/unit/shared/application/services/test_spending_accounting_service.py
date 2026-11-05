@@ -1510,3 +1510,23 @@ async def test_resolving_a_marker_does_not_pretend_its_own_charge_was_applied() 
     assert (
         ledger.state.evidence[(call.call_id, other_proof.evidence_id)][1] == resolved_first.record
     )
+
+
+@pytest.mark.asyncio
+async def test_exhausted_call_revision_keeps_recovered_evidence_and_rejects_new_transition() -> (
+    None
+):
+    service, ledger, _, _, _ = accountant()
+    call = call_context()
+    original = await service.reserve(call=call, basis=price_basis(), operation_limit=None)
+    ledger.state.calls[call.call_id] = replace(original.record, revision=2**53 - 1)
+    before = deepcopy(ledger.state)
+    with pytest.raises(ConflictError):
+        await service.record_observation(
+            call=call,
+            observation=observation(call, charge="0.08"),
+            expected_call_revision=2**53 - 1,
+        )
+    assert ledger.state == before
+    recovered = await service.reserve(call=call, basis=price_basis(), operation_limit=None)
+    assert recovered.recovered and recovered.record.revision == 2**53 - 1

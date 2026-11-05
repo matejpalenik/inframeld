@@ -43,6 +43,7 @@ from inframeld_backend.shared.application.value_objects.deletion_status_retentio
     DeletionStatusRetentionProfile,
 )
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class DeletionStatusReadService(DeletionStatusLookup):
@@ -126,7 +127,10 @@ class DeletionStatusReadService(DeletionStatusLookup):
                 raise DependencyUnavailableError()
             return False
 
-        if type(stored.owner_revision) is not int or stored.owner_revision < 1:
+        if (
+            type(stored.owner_revision) is not int
+            or not 1 <= stored.owner_revision <= RevisionValidation.MAX_VALUE
+        ):
             raise DependencyUnavailableError()
         return True
 
@@ -201,7 +205,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
             or obligation.project_id != binding.project_id
             or obligation.initiator_principal_id != binding.initiator_principal_id
             or type(obligation.source_revision) is not int
-            or obligation.source_revision < 1
+            or not 1 <= obligation.source_revision <= RevisionValidation.MAX_VALUE
         ):
             raise DependencyUnavailableError()
         observed = DeletionStatusReadService._require_utc(obligation.observed_at)
