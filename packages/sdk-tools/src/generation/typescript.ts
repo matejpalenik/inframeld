@@ -4,6 +4,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { sourceInputs, typescriptParserInputs } from "./source.ts";
 import { preparePatchedSource } from "./patched-source.ts";
 import type { GenerationTarget } from "./types.ts";
+import { jsonSafeInteger } from "./zod-safe-integers.ts";
 
 export async function prepareTypescript(): Promise<string> {
   const { pins, archive, patches, destination } =
@@ -78,7 +79,7 @@ export async function emitTypescript(
     plugins: [
       "@hey-api/typescript",
       "@hey-api/client-fetch",
-      "zod",
+      { name: "zod", $resolvers: { number: jsonSafeInteger } },
       { name: "@hey-api/sdk", validator: { request: false, response: true } },
     ],
     logs: { file: false },

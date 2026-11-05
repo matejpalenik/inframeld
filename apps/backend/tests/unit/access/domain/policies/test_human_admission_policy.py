@@ -82,7 +82,7 @@ def test_recipient_admission_never_restores_or_crosses_org(
     )
 
 
-@pytest.mark.parametrize("revision", [-1, True, 2**63])
+@pytest.mark.parametrize("revision", [-1, True, 2**53])
 def test_command_rejects_invalid_revision(revision: int) -> None:
     with pytest.raises((TypeError, ValueError)):
         replace(COMMAND, expected_access_revision=revision)

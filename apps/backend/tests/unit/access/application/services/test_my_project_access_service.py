@@ -282,7 +282,7 @@ async def test_verified_application_cannot_read_the_human_own_access_operation()
         replace(FACTS, project_id=ProjectId(UUID(int=90))),
         replace(FACTS, access_revision=-1),
         replace(FACTS, access_revision=True),
-        replace(FACTS, access_revision=2**63),
+        replace(FACTS, access_revision=2**53),
     ],
 )
 async def test_reader_cannot_substitute_actor_scope_or_an_invalid_revision(

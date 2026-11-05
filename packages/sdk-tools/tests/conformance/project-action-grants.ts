@@ -803,6 +803,49 @@ for (const { kind, operation } of changes) {
 
   sdkTest(
     {
+      id: `project-action-grant-${kind}-safe-revision-boundary`,
+      operation,
+      outcome: "success",
+    },
+    async ({ call }) => {
+      const revision = Number.MAX_SAFE_INTEGER - 1;
+      const expected = {
+        ...grantReceipt(kind, grantRecipient, true),
+        accessRevision: Number.MAX_SAFE_INTEGER,
+      };
+      const { observation, witness } = await call({
+        ...changeInput(kind, grantRecipient, grantHeaders, revision),
+        fault: {
+          kind: "json",
+          status: kind === "set" ? 201 : 200,
+          body: expected,
+        },
+      });
+      assert.deepEqual(
+        assertSuccess(observation, kind === "set" ? 201 : 200),
+        expected,
+      );
+      assertDispatch(
+        witness,
+        kind === "set" ? "PUT" : "DELETE",
+        `/v1/projects/${projectId}/grants/${grantRecipient}/${actionId}`,
+      );
+      if (kind === "set") {
+        assertJsonBody(witness, {
+          canGrant: false,
+          expectedAccessRevision: revision,
+        });
+      } else {
+        assert.deepEqual(
+          [...new URLSearchParams(String(witness.query))],
+          [["expectedAccessRevision", "9007199254740990"]],
+        );
+      }
+    },
+  );
+
+  sdkTest(
+    {
       id: `project-action-grant-${kind}-original-wire-result`,
       operation,
       outcome: "success",

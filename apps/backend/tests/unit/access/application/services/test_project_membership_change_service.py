@@ -76,7 +76,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
         ("7", TypeError),
         (None, TypeError),
         (-1, ValueError),
-        (2**63, ValueError),
+        (2**53, ValueError),
     ],
 )
 def test_commands_reject_noninteger_or_out_of_range_reviewed_revision(
@@ -89,7 +89,7 @@ def test_commands_reject_noninteger_or_out_of_range_reviewed_revision(
 
 
 @pytest.mark.parametrize("command", [ADD, REMOVE], ids=["add", "remove"])
-@pytest.mark.parametrize("revision", [0, 2**63 - 1])
+@pytest.mark.parametrize("revision", [0, 2**53 - 1])
 def test_commands_accept_exact_integer_revision_boundaries(
     command: AddProjectMemberCommand | RemoveProjectMemberCommand, revision: int
 ) -> None:
@@ -467,3 +467,39 @@ async def test_replay_rejects_changed_original_business_binding() -> None:
     with pytest.raises(ConflictError):
         await s.service.add_member(access=ACCESS, command=ADD, context=ADD_CONTEXT)
     assert s.writer.saved is None and s.events[-1] == "rollback"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("revision", [2**53 - 2, 2**53 - 1])
+async def test_membership_exhaustion_rejects_only_changed_write_without_partial_save(
+    revision: int,
+) -> None:
+    scenario = MembershipChangeScenario()
+    scenario.facts.facts = replace(FACTS, access_revision=revision)
+    command = replace(ADD, expected_access_revision=revision)
+    if revision == 2**53 - 1:
+        with pytest.raises(ConflictError):
+            await scenario.service.add_member(access=ACCESS, command=command, context=ADD_CONTEXT)
+        assert scenario.writer.saved is None and scenario.events[-1] == "rollback"
+    else:
+        result = await scenario.service.add_member(
+            access=ACCESS, command=command, context=ADD_CONTEXT
+        )
+        assert result.changed and result.access_revision == 2**53 - 1
+
+
+@pytest.mark.asyncio
+async def test_exhausted_membership_revision_keeps_noop_and_original_replay_usable() -> None:
+    scenario = MembershipChangeScenario()
+    scenario.facts.facts = replace(
+        FACTS, access_revision=2**53 - 1, recipient_is_project_member=True
+    )
+    result = await scenario.service.add_member(
+        access=ACCESS, command=replace(ADD, expected_access_revision=2**53 - 1), context=ADD_CONTEXT
+    )
+    assert not result.changed and result.access_revision == 2**53 - 1
+    scenario = MembershipChangeScenario()
+    scenario.facts.facts = replace(FACTS, access_revision=2**53 - 1)
+    scenario.idempotency.result = SAVED_RESULT
+    result = await scenario.service.add_member(access=ACCESS, command=ADD, context=ADD_CONTEXT)
+    assert result is scenario.results.result and scenario.writer.saved is None

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     #[test]
-    fn revision_models_round_trip_signed_64_bit_maximum_and_reject_overflow() {
+    fn revision_models_round_trip_json_safe_maximum_without_narrowing_the_storage_type() {
         use inframeld_sdk::types::{
             HumanAdmissionRequest, MyOrganizationAccessResponse, ProjectCreationRequest,
             ProjectMembershipRequest, ProjectMetadataUpdateRequest,
@@ -11,7 +11,7 @@ mod tests {
             input: serde_json::Value,
             field: &str,
         ) {
-            for revision in [0, i64::MAX] {
+            for revision in [0, 9_007_199_254_740_991_i64] {
                 let mut source = input.clone();
                 source[field] = serde_json::json!(revision);
                 let model: Model = serde_json::from_value(source.clone()).unwrap();

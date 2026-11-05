@@ -113,6 +113,7 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class ProjectGrantChangeService(ProjectGrantChanger):
@@ -205,7 +206,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                     or facts.grant.actor.id != access.actor_principal_id
                     or facts.grant.actor.organization_id != facts.organization_id
                     or type(facts.grant.project_access_revision) is not int
-                    or not 0 <= facts.grant.project_access_revision <= 2**63 - 1
+                    or not 0 <= facts.grant.project_access_revision <= RevisionValidation.MAX_VALUE
                 ):
                     raise RuntimeError("Grant management facts changed actor, scope or revision.")
                 scope = self._authorize_management(access, facts)
@@ -322,7 +323,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                             )
                     if (
                         before_can_grant != after_can_grant
-                        and scope.project_access_revision == 2**63 - 1
+                        and scope.project_access_revision == RevisionValidation.MAX_VALUE
                     ):
                         raise ConflictError("The Project Access revision cannot advance.")
 
@@ -436,7 +437,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             or original.can_grant
             != (command.can_grant if isinstance(command, SetProjectActionGrantCommand) else None)
             or type(original.access_revision) is not int
-            or not 0 <= original.access_revision <= 2**63 - 1
+            or not 0 <= original.access_revision <= RevisionValidation.MAX_VALUE
             or type(original.changed) is not bool
             or original.status_code not in ({200, 201} if setting else {200})
             or (original.status_code == 201 and not original.changed)
@@ -483,6 +484,8 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             # A replay keeps its original revision. Only new work checks current state.
             if authorization.project_access_revision != command.expected_access_revision:
                 raise StaleRevisionError()
+            if authorization.project_access_revision == RevisionValidation.MAX_VALUE:
+                raise ConflictError("The Project Access revision cannot advance.")
 
             membership = await self._membership_repository.get(
                 organization_id=authorization.organization_id,

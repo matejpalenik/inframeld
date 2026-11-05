@@ -50,6 +50,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     InvalidInputError,
     ResourceNotFoundError,
 )
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 def _position(
@@ -101,7 +102,7 @@ class MyProjectAccessService(MyProjectAccessReader):
             or facts.actor.id != access.actor_principal_id
             or facts.actor.organization_id != facts.organization_id
             or type(facts.access_revision) is not int
-            or not 0 <= facts.access_revision <= 2**63 - 1
+            or not 0 <= facts.access_revision <= RevisionValidation.MAX_VALUE
         ):
             raise RuntimeError("The own-access observation changed actor, scope or revision.")
 

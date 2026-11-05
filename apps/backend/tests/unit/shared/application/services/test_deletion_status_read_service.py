@@ -304,6 +304,8 @@ async def test_exact_retained_expiry_is_not_extended(after_expiry: timedelta) ->
         ),
         replace(ACTIVE, unfinished_obligation=replace(PROVENANCE, source_revision=0)),
         replace(ACTIVE, owner_revision=0),
+        replace(ACTIVE, owner_revision=2**53),
+        replace(ACTIVE, unfinished_obligation=replace(PROVENANCE, source_revision=2**53)),
         replace(ACTIVE, owner_observed_at=None),
         replace(ACTIVE, owner_observed_at=NOW + timedelta(seconds=1)),
         replace(ACTIVE, observed_at=NOW.replace(tzinfo=None)),

@@ -49,6 +49,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class ProjectUseOnlyGrantRequest(BaseModel):
@@ -58,6 +59,8 @@ class ProjectUseOnlyGrantRequest(BaseModel):
         alias="expectedAccessRevision",
         strict=True,
         ge=0,
+        le=RevisionValidation.MAX_VALUE,
+        json_schema_extra={"format": "int64"},
     )
 ```
 
@@ -165,6 +168,8 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.commands.command import Command
 from inframeld_backend.shared.application.protocols.project_command import ProjectCommand
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
+
 
 @dataclass(frozen=True, slots=True)
 class AssignProjectUseOnlyGrantCommand(Command, ProjectCommand):
@@ -178,11 +183,11 @@ class AssignProjectUseOnlyGrantCommand(Command, ProjectCommand):
     def __post_init__(self) -> None:
         if type(self.expected_access_revision) is not int:
             raise TypeError("The expected access revision must be a whole number.")
-        if self.expected_access_revision < 0:
-            raise ValueError("The expected access revision cannot be negative.")
+        if not 0 <= self.expected_access_revision <= RevisionValidation.MAX_VALUE:
+            raise ValueError("The expected access revision is outside its supported range.")
 ```
 
-**Walkthrough.** The Command describes requested work. Its revision is an integer because this published counter already has a defined representation and local validation. The exact `int` check rejects booleans as well as other types, and the next check rejects negative values. This is a documented primitive choice, not a reason to wrap every scalar or remove useful value objects.
+**Walkthrough.** The Command describes requested work. Its revision is an integer because this published counter already has a defined representation and local validation. The exact `int` check rejects booleans as well as other types, and the next check enforces the shared numeric revision range. This is a documented primitive choice, not a reason to wrap every scalar or remove useful value objects.
 
 The service separately receives `AccessContextDTO` and `IdempotencyContextDTO`. Access carries the authenticated actor and complete authentication evidence. Operation context carries retry metadata. Current authorization returns checked scope. None of those roles belongs on this Command, and local revision validation does not check current state. See [the complete service signature and workflow](services-and-use-cases.md).
 

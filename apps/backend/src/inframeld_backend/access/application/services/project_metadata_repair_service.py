@@ -57,6 +57,7 @@ from inframeld_backend.shared.application.protocols.transaction_manager import T
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class ProjectMetadataRepairService(ProjectMetadataRepairer):
@@ -151,6 +152,9 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
             raise ProjectMetadataMaintenanceError(code.NOT_STRANDED)
         if facts.observed_at.tzinfo is None:
             raise RuntimeError("Repair authorization requires aware database time.")
+
+        if facts.access_revision == RevisionValidation.MAX_VALUE:
+            raise ProjectMetadataMaintenanceError(code.REVISION_EXHAUSTED)
 
         result = ProjectMetadataRepairResultDTO(
             operation_id=command.operation_id,

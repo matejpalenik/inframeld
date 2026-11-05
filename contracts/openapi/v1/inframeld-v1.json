@@ -194,7 +194,8 @@
         "additionalProperties": false,
         "properties": {
           "expectedAccessRevision": {
-            "maximum": 9223372036854775807,
+            "format": "int64",
+            "maximum": 9007199254740991,
             "minimum": 0,
             "title": "Expectedaccessrevision",
             "type": "integer"
@@ -216,6 +217,9 @@
         "description": "Describe original admission, without promising starter or setup readiness.",
         "properties": {
           "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Accessrevision",
             "type": "integer"
           },
@@ -454,7 +458,8 @@
       "MyOrganizationAccessResponse": {
         "properties": {
           "accessRevision": {
-            "maximum": 9223372036854775807,
+            "format": "int64",
+            "maximum": 9007199254740991,
             "minimum": 0,
             "title": "Accessrevision",
             "type": "integer"
@@ -545,7 +550,8 @@
       "MyProjectAccessResponse": {
         "properties": {
           "accessRevision": {
-            "maximum": 9223372036854775807,
+            "format": "int64",
+            "maximum": 9007199254740991,
             "minimum": 0,
             "title": "Accessrevision",
             "type": "integer"
@@ -938,7 +944,8 @@
       "ProjectActionGrantRemovalResponse": {
         "properties": {
           "accessRevision": {
-            "maximum": 9223372036854775807,
+            "format": "int64",
+            "maximum": 9007199254740991,
             "minimum": 0,
             "title": "Accessrevision",
             "type": "integer"
@@ -999,7 +1006,8 @@
             "type": "boolean"
           },
           "expectedAccessRevision": {
-            "maximum": 9223372036854775807,
+            "format": "int64",
+            "maximum": 9007199254740991,
             "minimum": 0,
             "title": "Expectedaccessrevision",
             "type": "integer"
@@ -1015,7 +1023,8 @@
       "ProjectActionGrantResponse": {
         "properties": {
           "accessRevision": {
-            "maximum": 9223372036854775807,
+            "format": "int64",
+            "maximum": 9007199254740991,
             "minimum": 0,
             "title": "Accessrevision",
             "type": "integer"
@@ -1077,7 +1086,8 @@
             "type": "string"
           },
           "expectedAccessRevision": {
-            "maximum": 9223372036854775807,
+            "format": "int64",
+            "maximum": 9007199254740991,
             "minimum": 0,
             "title": "Expectedaccessrevision",
             "type": "integer"
@@ -1214,6 +1224,8 @@
       "ProjectMembersPageResponse": {
         "properties": {
           "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
             "minimum": 0.0,
             "title": "Accessrevision",
             "type": "integer"
@@ -1255,6 +1267,9 @@
         "description": "Report original removal, independently of a later rejoin.",
         "properties": {
           "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Accessrevision",
             "type": "integer"
           },
@@ -1303,7 +1318,8 @@
         "additionalProperties": false,
         "properties": {
           "expectedAccessRevision": {
-            "maximum": 9223372036854775807,
+            "format": "int64",
+            "maximum": 9007199254740991,
             "minimum": 0,
             "title": "Expectedaccessrevision",
             "type": "integer"
@@ -1319,6 +1335,9 @@
         "description": "Report original bare membership, without restoring grants or later state.",
         "properties": {
           "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Accessrevision",
             "type": "integer"
           },
@@ -1378,6 +1397,9 @@
           },
           "metadataRevision": {
             "description": "Review revision for metadata changes, separate from permission revision.",
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Metadatarevision",
             "type": "integer"
           },
@@ -1432,6 +1454,9 @@
           },
           "metadataRevision": {
             "description": "Review revision for metadata changes, separate from permission revision.",
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Metadatarevision",
             "type": "integer"
           },
@@ -1483,7 +1508,8 @@
           },
           "expectedMetadataRevision": {
             "description": "Metadata revision reviewed for this exact change.",
-            "maximum": 9223372036854775807,
+            "format": "int64",
+            "maximum": 9007199254740991,
             "minimum": 0,
             "title": "Expectedmetadatarevision",
             "type": "integer"
@@ -1513,6 +1539,9 @@
           },
           "metadataRevision": {
             "description": "Review revision for metadata changes, separate from permission revision.",
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Metadatarevision",
             "type": "integer"
           },
@@ -1559,6 +1588,8 @@
             "type": "string"
           },
           "expectedAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
             "minimum": 0.0,
             "title": "Expectedaccessrevision",
             "type": "integer"
@@ -1581,6 +1612,9 @@
         "description": "Describe the original change - current grants require a fresh authorized read.",
         "properties": {
           "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
             "title": "Accessrevision",
             "type": "integer"
           },
@@ -3438,7 +3472,8 @@
             "name": "expectedAccessRevision",
             "required": true,
             "schema": {
-              "maximum": 9223372036854775807,
+              "format": "int64",
+              "maximum": 9007199254740991,
               "minimum": 0,
               "title": "Expectedaccessrevision",
               "type": "integer"
@@ -3942,7 +3977,8 @@
             "name": "expectedAccessRevision",
             "required": true,
             "schema": {
-              "maximum": 9223372036854775807,
+              "format": "int64",
+              "maximum": 9007199254740991,
               "minimum": 0,
               "title": "Expectedaccessrevision",
               "type": "integer"

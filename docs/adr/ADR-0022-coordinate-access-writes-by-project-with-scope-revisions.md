@@ -20,6 +20,8 @@ These options summarize the recorded choices, exclusions, and deferrals. They do
 
 Use the accepted shared organization-row lock followed by the affected project’s exclusive row lock for participating Access changes. Re-read current policy and handover state, check the required expected revision, apply the change, increment the scope revision, and commit audit together. Installation permission/status changes use the organization’s exclusive lock. All participating mutation paths follow the protocol.
 
+[ADR-0129](ADR-0129-bound-numeric-revisions-to-the-javascript-safe-integer-range.md) narrows numeric revisions to the exact JavaScript-safe range. Its representation and exhaustion rules supersede a wider revision range, while the coordination and authorization protocol above remains in force.
+
 **Example.** A stale form cannot remove a freshly regranted assignment merely because its recipient/action/target tuple looks the same. The scope revision has changed.
 
 ## Consequences

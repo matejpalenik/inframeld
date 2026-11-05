@@ -17,8 +17,9 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from typing_extensions import Annotated
 from uuid import UUID
 from typing import Optional, Set
 from typing_extensions import Self
@@ -30,7 +31,7 @@ class ProjectMetadataResponse(BaseModel):
     ProjectMetadataResponse
     """ # noqa: E501
     display_name: StrictStr = Field(description="Stored presentation label, including retained legacy values.", alias="displayName")
-    metadata_revision: StrictInt = Field(description="Review revision for metadata changes, separate from permission revision.", alias="metadataRevision")
+    metadata_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(description="Review revision for metadata changes, separate from permission revision.", alias="metadataRevision")
     name: Optional[StrictStr] = Field(description="Exact current selector, or null until explicitly allocated.")
     organization_id: UUID = Field(description="Owning installation Organization.", alias="organizationId")
     project_id: UUID = Field(description="Permanent Project identity, preserved through rename.", alias="projectId")

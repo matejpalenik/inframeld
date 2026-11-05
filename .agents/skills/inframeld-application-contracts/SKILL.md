@@ -74,6 +74,7 @@ Choose the row matching the task. Workflow, contract and architecture views are 
 | Http error adapters | [Translate and report failures at HTTP boundaries](references/http-error-adapters.md) |
 | Http errors | [Translate failures into safe HTTP problems](references/http-errors.md) |
 | Http mcp and generated clients | [Share behavior across HTTP, MCP and generated clients](references/http-mcp-and-generated-clients.md) |
+| Numeric revision ranges, storage or cross-language representation | [Preserve numeric revisions exactly](references/http-mcp-and-generated-clients.md#numeric-revisions) |
 | Shared SDK generation policy or cross-language endpoint qualification | [SDKs skill](../inframeld-sdks/SKILL.md) |
 | Language-specific SDK consumption or maintenance | [Rust](../inframeld-rust-sdk/SKILL.md), [TypeScript](../inframeld-typescript-sdk/SKILL.md) or [Python](../inframeld-python-sdk/SKILL.md), independently |
 | Http problem contract | [Read the delivered HTTP problem contract](references/http-problem-contract.md) |

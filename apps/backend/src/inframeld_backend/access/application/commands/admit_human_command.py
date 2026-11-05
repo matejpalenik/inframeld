@@ -3,6 +3,7 @@ from uuid import UUID
 
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.shared.application.commands.command import Command
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.domain.validation.value_validation import ValueValidation
 
 
@@ -18,5 +19,5 @@ class AdmitHumanCommand(Command):
         ValueValidation.require_uuid(self.identity_id)
         if type(self.expected_access_revision) is not int:
             raise TypeError("The expected access revision must be a whole number.")
-        if not 0 <= self.expected_access_revision <= 2**63 - 1:
+        if not 0 <= self.expected_access_revision <= RevisionValidation.MAX_VALUE:
             raise ValueError("The expected access revision is outside its supported range.")

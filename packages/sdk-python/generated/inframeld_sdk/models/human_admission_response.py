@@ -18,8 +18,9 @@ import re  # noqa: F401
 import json
 
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List
+from typing_extensions import Annotated
 from uuid import UUID
 from typing import Optional, Set
 from typing_extensions import Self
@@ -30,7 +31,7 @@ class HumanAdmissionResponse(BaseModel):
     """
     Describe original admission, without promising starter or setup readiness.
     """ # noqa: E501
-    access_revision: StrictInt = Field(alias="accessRevision")
+    access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(alias="accessRevision")
     changed: StrictBool
     idempotency_expires_at: datetime = Field(alias="idempotencyExpiresAt")
     operation_id: StrictStr = Field(alias="operationId")

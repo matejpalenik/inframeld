@@ -54,7 +54,7 @@ def test_reads_only_the_fixed_bootstrap_intent_and_keeps_proof_out_of_repr() -> 
         ("expectedAccessRevision", True),
         ("expectedAccessRevision", 0.0),
         ("expectedAccessRevision", -1),
-        ("expectedAccessRevision", 2**63),
+        ("expectedAccessRevision", 2**53),
         ("operationId", " "),
         ("operationId", "x" * 129),
         ("operatorLabel", "x" * 129),

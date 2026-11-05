@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
+
 
 class HumanAdmissionResponse(BaseModel):
     """Describe original admission, without promising starter or setup readiness."""
@@ -11,5 +13,11 @@ class HumanAdmissionResponse(BaseModel):
     idempotency_expires_at: datetime = Field(serialization_alias="idempotencyExpiresAt")
     organization_id: UUID = Field(serialization_alias="organizationId")
     principal_id: UUID = Field(serialization_alias="principalId")
-    access_revision: int = Field(serialization_alias="accessRevision")
+    access_revision: int = Field(
+        serialization_alias="accessRevision",
+        strict=True,
+        ge=0,
+        le=RevisionValidation.MAX_VALUE,
+        json_schema_extra={"format": "int64"},
+    )
     changed: bool

@@ -2,6 +2,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
+
 
 class ProjectMetadataResponse(BaseModel):
     project_id: UUID = Field(
@@ -21,4 +23,8 @@ class ProjectMetadataResponse(BaseModel):
     metadata_revision: int = Field(
         serialization_alias="metadataRevision",
         description="Review revision for metadata changes, separate from permission revision.",
+        strict=True,
+        ge=0,
+        le=RevisionValidation.MAX_VALUE,
+        json_schema_extra={"format": "int64"},
     )

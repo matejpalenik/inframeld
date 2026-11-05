@@ -2,6 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
     SubmittedDisplayName,
@@ -13,7 +14,11 @@ class ProjectCreationRequest(BaseModel):
 
     organization_id: UUID = Field(alias="organizationId")
     expected_access_revision: int = Field(
-        alias="expectedAccessRevision", strict=True, ge=0, le=2**63 - 1
+        alias="expectedAccessRevision",
+        strict=True,
+        ge=0,
+        le=RevisionValidation.MAX_VALUE,
+        json_schema_extra={"format": "int64"},
     )
     name: str = Field(
         strict=True, min_length=1, max_length=63, pattern="^[a-z](?:[a-z0-9-]*[a-z0-9])?$"

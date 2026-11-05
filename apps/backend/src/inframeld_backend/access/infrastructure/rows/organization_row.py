@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Integer, Text, Uuid, func
+from sqlalchemy import BigInteger, DateTime, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from inframeld_backend.access.infrastructure.rows.access_persistence_base import (
@@ -17,7 +17,7 @@ class OrganizationRow(AccessPersistenceBase):
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     access_revision: Mapped[int] = mapped_column(
-        Integer,
+        BigInteger,
         nullable=False,
         init=False,
         server_default="0",

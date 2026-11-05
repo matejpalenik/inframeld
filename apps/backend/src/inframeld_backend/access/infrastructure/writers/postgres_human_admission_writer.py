@@ -44,6 +44,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     StaleRevisionError,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
 )
@@ -169,6 +170,8 @@ class PostgresHumanAdmissionWriter(HumanAdmissionWriter):
             if state.version is None and state_row is not None and state_row[3]:
                 raise DependencyUnavailableError()
 
+        if changed and revision == RevisionValidation.MAX_VALUE:
+            raise ConflictError("The Access revision cannot advance.")
         if changed:
             self._session.add(
                 PrincipalRow(

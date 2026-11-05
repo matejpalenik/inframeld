@@ -5,6 +5,8 @@ from inframeld_backend.access.domain.errors.project_metadata_errors import (
 )
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.shared.domain.errors.domain_errors import InvalidStateTransitionError
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
     SubmittedDisplayName,
@@ -27,6 +29,7 @@ class ProjectMetadata:
         self._organization_id = organization_id
         self._name = name
         self._display_name = display_name
+        RevisionValidation.require(revision)
         self._revision: int = revision
 
     @property
@@ -66,6 +69,7 @@ class ProjectMetadata:
         name: ResourceName | None,
         display_name: SubmittedDisplayName | None,
     ) -> bool:
+        RevisionValidation.require(expected_revision)
         if expected_revision != self._revision:
             raise ProjectMetadataStaleRevisionError()
 
@@ -73,6 +77,8 @@ class ProjectMetadata:
         selected_label = self._display_name if display_name is None else display_name.value
         changed = (selected_name, selected_label) != (self._name, self._display_name)
         if changed:
+            if self._revision == RevisionValidation.MAX_VALUE:
+                raise InvalidStateTransitionError("The metadata revision cannot advance.")
             self._name = selected_name
             self._display_name = selected_label
             self._revision += 1

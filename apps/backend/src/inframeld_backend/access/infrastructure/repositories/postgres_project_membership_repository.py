@@ -34,6 +34,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     ResourceNotFoundError,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 @dataclass(frozen=True, slots=True)
@@ -282,7 +283,7 @@ class PostgresProjectMembershipRepository(ProjectMembershipRepository):
                 raise RuntimeError("An existing assignment's attribution cannot change.")
             if (
                 type(expected_project_access_revision) is not int
-                or not 0 <= expected_project_access_revision < 2**63 - 1
+                or not 0 <= expected_project_access_revision < RevisionValidation.MAX_VALUE
             ):
                 raise ConflictError("The project access revision cannot advance.")
             await self._advance_revision(current, expected_project_access_revision)
@@ -361,6 +362,11 @@ class PostgresProjectMembershipRepository(ProjectMembershipRepository):
         self, membership: _MembershipSnapshot, expected_revision: int
     ) -> None:
         """Advance the locked Access revision only from the expected current value."""
+        if (
+            type(expected_revision) is not int
+            or not 0 <= expected_revision < RevisionValidation.MAX_VALUE
+        ):
+            raise ConflictError("The Project Access revision cannot advance.")
         statement = (
             update(ProjectRow)
             .where(

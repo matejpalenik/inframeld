@@ -70,6 +70,7 @@ from inframeld_backend.shared.domain.policies.spending_allowance_policy import (
 from inframeld_backend.shared.domain.policy_inputs.spending_allowance_policy_input import (
     SpendingAllowancePolicyInput,
 )
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.domain.value_objects.usd_amount import UsdAmount
 
 
@@ -162,7 +163,7 @@ class SpendingAccountingService(SpendingAccountant):
                 record,
                 state=SpendingCallState.ACCOUNTING_APPROVED,
                 approved_policy_revision=policy.revision,
-                revision=record.revision + 1,
+                revision=SpendingAccountingService._next_revision(record.revision),
             )
             await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
             return SpendingAccountingResultDTO(updated)
@@ -267,7 +268,7 @@ class SpendingAccountingService(SpendingAccountant):
                 and proof_resolution.authoritative_evidence_id == authoritative_evidence_id
             )
             updated = (
-                replace(record, revision=record.revision + 1)
+                replace(record, revision=SpendingAccountingService._next_revision(record.revision))
                 if already_applied
                 else self._apply_observation(record, observation)
             )
@@ -392,10 +393,20 @@ class SpendingAccountingService(SpendingAccountant):
     @staticmethod
     def _require_revision(record: SpendingCallRecordDTO, expected_revision: int) -> None:
         """Reject stale accounting updates before changing retained evidence."""
-        if type(expected_revision) is not int or expected_revision < 0:
+        if (
+            type(expected_revision) is not int
+            or not 0 <= expected_revision <= RevisionValidation.MAX_VALUE
+        ):
             raise ValueError("Accounting requires a nonnegative reviewed call revision.")
         if record.revision != expected_revision:
             raise StaleRevisionError()
+
+    @staticmethod
+    def _next_revision(revision: int) -> int:
+        RevisionValidation.require(revision)
+        if revision == RevisionValidation.MAX_VALUE:
+            raise ConflictError("The accounting revision cannot advance.")
+        return revision + 1
 
     async def _require_allowance(
         self,
@@ -485,7 +496,9 @@ class SpendingAccountingService(SpendingAccountant):
         await self._spending_ledger_writer.record_observation(
             record=record, observation=observation, applied_result=None
         )
-        updated = replace(record, revision=record.revision + 1)
+        updated = replace(
+            record, revision=SpendingAccountingService._next_revision(record.revision)
+        )
         await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
         return SpendingAccountingResultDTO(updated, pending=True)
 
@@ -524,7 +537,7 @@ class SpendingAccountingService(SpendingAccountant):
                 state=SpendingCallState.RELEASED,
                 hold_amount=zero,
                 settled_amount=zero,
-                revision=record.revision + 1,
+                revision=SpendingAccountingService._next_revision(record.revision),
             )
         amount = (
             UsdAmount.round_up(observation.charge)
@@ -537,15 +550,17 @@ class SpendingAccountingService(SpendingAccountant):
                 state=SpendingCallState.SETTLED,
                 hold_amount=zero,
                 settled_amount=amount,
-                revision=record.revision + 1,
+                revision=SpendingAccountingService._next_revision(record.revision),
             )
         # Missing or unsupported usage supplies no evidence to erase a prior
         # charge or release any quantified or unquantified hold.
         if record.state in (SpendingCallState.SETTLED, SpendingCallState.RELEASED):
-            return replace(record, revision=record.revision + 1)
+            return replace(
+                record, revision=SpendingAccountingService._next_revision(record.revision)
+            )
         return replace(
             record,
             state=SpendingCallState.UNRESOLVED,
             hold_amount=None if observation.kind == "usage" else record.hold_amount,
-            revision=record.revision + 1,
+            revision=SpendingAccountingService._next_revision(record.revision),
         )

@@ -43,6 +43,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     StaleRevisionError,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
 )
@@ -200,6 +201,8 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
             )
             if removed != recipient:
                 raise ConflictError("The checked membership disappeared before persistence.")
+        if changed and revision == RevisionValidation.MAX_VALUE:
+            raise ConflictError("The Access revision cannot advance.")
         if changed:
             advanced = await self._session.scalar(
                 update(ProjectRow)

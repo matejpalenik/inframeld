@@ -95,6 +95,7 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class ProjectMembershipChangeService(ProjectMembershipChanger):
@@ -197,6 +198,8 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
                     if change_kind is ProjectMembershipChangeKind.ADD
                     else facts.recipient_is_project_member
                 )
+                if changed and facts.access_revision == RevisionValidation.MAX_VALUE:
+                    raise ConflictError("The Project Access revision cannot advance.")
                 await self._membership_change_writer.save(
                     facts=facts,
                     principal_id=command.principal_id,
@@ -306,7 +309,7 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
             or original.actor_principal_id != facts.action.principal.id
             or original.principal_id != command.principal_id
             or original.change_kind is not change_kind
-            or original.access_revision < 0
+            or not 0 <= original.access_revision <= RevisionValidation.MAX_VALUE
             or original.status_code != change_kind.success_status(changed=original.changed)
         ):
             raise ConflictError("The original membership result is incoherent.")

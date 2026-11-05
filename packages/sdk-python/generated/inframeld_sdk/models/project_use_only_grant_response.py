@@ -18,8 +18,9 @@ import re  # noqa: F401
 import json
 
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, field_validator
 from typing import Any, ClassVar, Dict, List, Optional
+from typing_extensions import Annotated
 from uuid import UUID
 from typing import Optional, Set
 from typing_extensions import Self
@@ -30,7 +31,7 @@ class ProjectUseOnlyGrantResponse(BaseModel):
     """
     Describe the original change - current grants require a fresh authorized read.
     """ # noqa: E501
-    access_revision: StrictInt = Field(alias="accessRevision")
+    access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(alias="accessRevision")
     action_id: StrictStr = Field(alias="actionId")
     can_grant: Optional[StrictBool] = Field(default=False, alias="canGrant")
     idempotency_expires_at: datetime = Field(alias="idempotencyExpiresAt")

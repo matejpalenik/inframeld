@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
 
 class ProjectUseOnlyGrantRequest(BaseModel):
@@ -15,4 +16,6 @@ class ProjectUseOnlyGrantRequest(BaseModel):
         alias="expectedAccessRevision",
         strict=True,
         ge=0,
+        le=RevisionValidation.MAX_VALUE,
+        json_schema_extra={"format": "int64"},
     )

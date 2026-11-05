@@ -14,7 +14,7 @@ The recipient must already be an active admitted human and current member of the
 
 Review the exact Project UUID, recipient's Kratos identity UUID and current Project **Access revision** through protected operator records. The public metadata response's `metadataRevision` is a different revision and cannot substitute for this review.
 
-Apply schema `0018_spending_accounting` explicitly through the [upgrade and migration procedure](upgrades.md#upgrades). Migration `0014_project_metadata` introduced metadata and this narrow repair. Startup does not migrate or replace missing installation identity. Use compatible backend code and the original installation identity.
+Apply the schema revision supported by the selected backend explicitly through the [upgrade and migration procedure](upgrades.md#upgrades). Migration `0014_project_metadata` introduced metadata and this narrow repair, while `0023_safe_numeric_revisions` introduces the shared safe revision bounds. Startup does not migrate or replace missing installation identity. Use compatible backend code and the original installation identity.
 
 ## Configure the existing consumer
 
@@ -56,6 +56,7 @@ Exit `0` returns one stdout JSON object with `schemaVersion`, `mode`, `operation
 | `identity_ineligible` | Current human eligibility or Project membership does not permit repair. Host execution does not bypass that requirement. |
 | `installation_mismatch` | Stop and reconcile the independent installation/backend binding. Never initialize a replacement identity. |
 | `stale_revision` | The new-write review is outdated. Reassess current stranded authority before a distinct new repair. |
+| `revision_exhausted` | The Project Access revision cannot advance within its supported range. The repair is rejected without a partial assignment. Do not reset or wrap the counter. |
 | `responsibility_not_stranded` | An eligible human grantor exists or the exact repair is ineligible. Use the owning ordinary administration path when delivered, not broader host assignments. |
 | `idempotency_key_reused` | The request ID belongs to different mode, identity or meaning. Do not overwrite that history. |
 | `dependency_unavailable` or `unexpected_error` | The result could not be established. Preserve the original request context and investigate safe diagnostics. |

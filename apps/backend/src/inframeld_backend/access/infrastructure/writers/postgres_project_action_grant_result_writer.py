@@ -19,6 +19,7 @@ from inframeld_backend.shared.application.enums.operation_replay_kind import Ope
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
 )
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
 )
@@ -40,9 +41,9 @@ class PostgresProjectActionGrantResultWriter(ProjectActionGrantResultWriter):
             raise RuntimeError("Grant results require the active caller transaction.")
         if (
             type(before_revision) is not int
-            or not 0 <= before_revision <= 2**63 - 1
+            or not 0 <= before_revision <= RevisionValidation.MAX_VALUE
             or type(result.access_revision) is not int
-            or not 0 <= result.access_revision <= 2**63 - 1
+            or not 0 <= result.access_revision <= RevisionValidation.MAX_VALUE
         ):
             raise RuntimeError("The original grant revisions are invalid.")
         if (

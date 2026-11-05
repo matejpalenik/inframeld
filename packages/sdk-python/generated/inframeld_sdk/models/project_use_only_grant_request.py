@@ -31,7 +31,7 @@ class ProjectUseOnlyGrantRequest(BaseModel):
     ProjectUseOnlyGrantRequest
     """ # noqa: E501
     action_id: StrictStr = Field(alias="actionId")
-    expected_access_revision: Annotated[int, Field(strict=True, ge=0)] = Field(alias="expectedAccessRevision")
+    expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(alias="expectedAccessRevision")
     recipient_principal_id: UUID = Field(alias="recipientPrincipalId")
     additional_properties: Dict[str, Any] = {}
     __properties: ClassVar[List[str]] = ["actionId", "expectedAccessRevision", "recipientPrincipalId"]

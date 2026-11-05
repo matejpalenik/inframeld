@@ -30,7 +30,7 @@ class ProjectActionGrantRequest(BaseModel):
     ProjectActionGrantRequest
     """ # noqa: E501
     can_grant: StrictBool = Field(alias="canGrant")
-    expected_access_revision: Annotated[int, Field(le=9223372036854775807, strict=True, ge=0)] = Field(alias="expectedAccessRevision")
+    expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)] = Field(alias="expectedAccessRevision")
     __properties: ClassVar[List[str]] = ["canGrant", "expectedAccessRevision"]
     @field_validator('can_grant', mode='before')
     def can_grant_reject_explicit_null(cls, value):

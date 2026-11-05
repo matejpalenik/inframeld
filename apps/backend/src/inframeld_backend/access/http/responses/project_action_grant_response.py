@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
+
 
 class ProjectActionGrantResponse(BaseModel):
     operation_id: str = Field(serialization_alias="operationId", min_length=1, max_length=128)
@@ -11,5 +13,11 @@ class ProjectActionGrantResponse(BaseModel):
     recipient_principal_id: UUID = Field(serialization_alias="recipientPrincipalId")
     action_id: str = Field(serialization_alias="actionId")
     can_grant: bool = Field(serialization_alias="canGrant")
-    access_revision: int = Field(serialization_alias="accessRevision", ge=0, le=2**63 - 1)
+    access_revision: int = Field(
+        serialization_alias="accessRevision",
+        ge=0,
+        le=RevisionValidation.MAX_VALUE,
+        strict=True,
+        json_schema_extra={"format": "int64"},
+    )
     changed: bool
