@@ -6,7 +6,7 @@ labels: "type:qualification"
 assignees: ""
 ---
 
-<!-- Follow docs/development/documentation-maintenance.md#author-delivery-issues
+<!-- Use .agents/skills/inframeld-issue-authoring/SKILL.md
 and .agents/skills/inframeld-testing/references/human-qualification.md.
 Replace these instructions with feature-specific content before publication.
 If a capability or command is unavailable, explain the exact gap and its owner.

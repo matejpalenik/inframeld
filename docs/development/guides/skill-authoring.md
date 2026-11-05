@@ -82,6 +82,7 @@ Keep one active `SKILL.md` for each capability listed below under `.agents/skill
 | [Documentation](../../../.agents/skills/inframeld-documentation/SKILL.md) | Plain-language user pages, tested public examples and the Protocol MDX authoring workflow. |
 | [Developer Experience](../../../.agents/skills/inframeld-developer-experience/SKILL.md) | Task-oriented CLI and SDK review, using Review's severity and report conventions. |
 | [Backlog Delivery](../../../.agents/skills/inframeld-backlog-delivery/SKILL.md) | Explicitly authorized main-chat coordination with native subagents, plus read-only planning and rehearsal. |
+| [Issue Authoring](../../../.agents/skills/inframeld-issue-authoring/SKILL.md) | GitHub issue content, conditional issue patterns and safe scope/dependency restructuring. Domains retain accepted behavior and Backlog Delivery retains execution/closure. |
 | [Coding Standards](../../../.agents/skills/inframeld-coding-standards/SKILL.md) | Shared engineering and [TDD/documentation](../../../.agents/skills/inframeld-coding-standards/references/testing-and-documentation.md), with language routing. |
 | [Python Standards](../../../.agents/skills/inframeld-python-standards/SKILL.md) | Seven focused backend component/test references and package-specific exclusions. |
 | [Rust Standards](../../../.agents/skills/inframeld-rust-standards/SKILL.md) | Rust idioms and the [accepted CLI structure and lifecycle](../../../.agents/skills/inframeld-rust-standards/references/cli-structure.md). |

@@ -31,6 +31,7 @@ Start the backend, learn one workflow and follow its owner when you need details
 | Finish or document a change | [Definition of Done](definition-of-done.md) and [documentation maintenance](documentation-maintenance.md) |
 | Write or preview end-user documentation | [Docs app authoring guide](../../apps/docs/README.md) and [Documentation skill](../../.agents/skills/inframeld-documentation/SKILL.md) |
 | Assess CLI or SDK usability | [Developer Experience skill](../../.agents/skills/inframeld-developer-experience/SKILL.md) |
+| Write, review or restructure GitHub issues | [Issue Authoring skill](../../.agents/skills/inframeld-issue-authoring/SKILL.md) and [implementation template](../../.github/ISSUE_TEMPLATE/implementation.md) |
 | Rehearse or explicitly launch native-subagent backlog delivery | [Backlog delivery](guides/backlog-delivery.md) |
 
 <a id="find-the-detailed-owner"></a>
@@ -53,6 +54,7 @@ The skill references are written for people as well as coding agents. They own d
 - [Python SDK](../../.agents/skills/inframeld-python-sdk/SKILL.md): OpenAPI Generator HTTPX/Pydantic consumption, lifecycle and packaging.
 - [Testing](../../.agents/skills/inframeld-testing/SKILL.md): test layers, controlled dependencies, integration isolation and honest verification evidence.
 - [Review](../../.agents/skills/inframeld-review/SKILL.md): structured code and architectural review, calibrated ratings and separate commit/merge readiness.
+- [Issue Authoring](../../.agents/skills/inframeld-issue-authoring/SKILL.md): finishable delivery scope, concrete technical direction and safe issue/dependency reconciliation.
 - [Coding Standards](../../.agents/skills/inframeld-coding-standards/SKILL.md): shared engineering, TDD/documentation and language routing.
 - [Python Standards](../../.agents/skills/inframeld-python-standards/SKILL.md): backend component conventions and complete Python examples, with client/tooling exclusions.
 - [Rust Standards](../../.agents/skills/inframeld-rust-standards/SKILL.md): authored Rust idioms, checks, [selected CLI libraries](../../.agents/skills/inframeld-rust-standards/references/cli-libraries.md) and the [accepted CLI structure and lifecycle](../../.agents/skills/inframeld-rust-standards/references/cli-structure.md).
