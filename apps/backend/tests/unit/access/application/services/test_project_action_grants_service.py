@@ -48,12 +48,25 @@ ACTOR = Principal(
     PrincipalId(UUID(int=1)), ORGANIZATION, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
 )
 ACCESS = AccessContextDTO(ACTOR.id, MockAuthenticationEvidence.browser())
-AUTHORITY = ProjectActionFactsDTO(ACTOR, False, None, ProjectStatus.ACTIVE, True, True)
+AUTHORITY = ProjectActionFactsDTO(
+    principal=ACTOR,
+    has_pending_recovery=False,
+    oauth_credential_facts=None,
+    project_status=ProjectStatus.ACTIVE,
+    is_project_member=True,
+    has_exact_action_grant=True,
+)
 ITEMS = tuple(
     ProjectActionGrantDTO(PrincipalId(UUID(int=i)), ACTION, i == 20) for i in (10, 20, 30)
 )
 FACTS = ProjectActionGrantsPageFactsDTO(
-    INSTALLATION, ORGANIZATION, PROJECT, ACTION, AUTHORITY, True, ITEMS
+    installation_id=INSTALLATION,
+    organization_id=ORGANIZATION,
+    project_id=PROJECT,
+    action_id=ACTION,
+    action=AUTHORITY,
+    actor_can_grant_action=True,
+    items=ITEMS,
 )
 
 

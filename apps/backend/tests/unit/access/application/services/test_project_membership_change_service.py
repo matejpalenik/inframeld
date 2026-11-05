@@ -170,7 +170,15 @@ async def test_unsupported_stored_action_cannot_count_as_remaining_authority(
     target_kind: ProjectDepartureTargetKind,
 ) -> None:
     s = MembershipChangeScenario()
-    candidate = ProjectDepartureCandidateDTO(ALICE, False, True, True, True, False, False)
+    candidate = ProjectDepartureCandidateDTO(
+        principal=ALICE,
+        has_pending_recovery=False,
+        is_project_member=True,
+        has_coherent_identity=True,
+        can_grant=True,
+        is_group_member=False,
+        is_group_manager=False,
+    )
     responsibility = ProjectDepartureResponsibilityDTO(
         target_kind, PROJECT.value, ActionId("unsupported-action"), (candidate,)
     )
@@ -184,7 +192,15 @@ async def test_unsupported_stored_action_cannot_count_as_remaining_authority(
 @pytest.mark.asyncio
 async def test_departure_facts_cannot_substitute_another_project_responsibility() -> None:
     s = MembershipChangeScenario()
-    candidate = ProjectDepartureCandidateDTO(ALICE, False, True, True, True, False, False)
+    candidate = ProjectDepartureCandidateDTO(
+        principal=ALICE,
+        has_pending_recovery=False,
+        is_project_member=True,
+        has_coherent_identity=True,
+        can_grant=True,
+        is_group_member=False,
+        is_group_manager=False,
+    )
     responsibility = ProjectDepartureResponsibilityDTO(
         ProjectDepartureTargetKind.PROJECT,
         UUID(int=99),

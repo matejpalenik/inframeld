@@ -367,13 +367,13 @@ class MockSDKConsentHandler(HumanOAuthConsentHandler):
             raise ValueError("The SDK changed the challenge query parameter.")
 
         return HumanOAuthConsentDetailsDTO(
-            IDENTITY,
-            OAuthClientId("inframeld-cli"),
-            HumanAPIAudience("https://api.test"),
-            (HumanOAuthScope.API,),
-            (HumanAPIAudience("https://api.test"),),
-            True,
-            3600,
+            identity=IDENTITY,
+            client_id=OAuthClientId("inframeld-cli"),
+            installation=HumanAPIAudience("https://api.test"),
+            scopes=(HumanOAuthScope.API,),
+            audiences=(HumanAPIAudience("https://api.test"),),
+            approval_required=True,
+            remember_consent_seconds=3600,
         )
 
     @override
@@ -439,21 +439,23 @@ class MockSDKGrantChanger(ProjectGrantChanger):
             raise ValueError("The SDK changed the grant idempotency header.")
         changed = recipient != UUID("00000000-0000-4000-8000-000000000005")
         return ProjectActionGrantChangeResultDTO(
-            InstallationId(UUID(int=123)),
-            OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
-            command.project_id,
-            access.actor_principal_id,
-            command.recipient_principal_id,
-            command.action_id,
-            kind,
-            command.can_grant if isinstance(command, SetProjectActionGrantCommand) else None,
-            7 + int(changed),
-            changed,
-            201
+            installation_id=InstallationId(UUID(int=123)),
+            organization_id=OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            project_id=command.project_id,
+            actor_principal_id=access.actor_principal_id,
+            recipient_principal_id=command.recipient_principal_id,
+            action_id=command.action_id,
+            change_kind=kind,
+            can_grant=command.can_grant
+            if isinstance(command, SetProjectActionGrantCommand)
+            else None,
+            access_revision=7 + int(changed),
+            changed=changed,
+            status_code=201
             if kind == ProjectActionGrantChangeKind.SET
             and recipient == UUID("00000000-0000-4000-8000-000000000004")
             else 200,
-            CompletedSynchronousOperationDTO(
+            operation=CompletedSynchronousOperationDTO(
                 OperationId("sdk-project-grant-" + kind),
                 False,
                 OperationReplayKind.SAFE_RESULT,
@@ -510,15 +512,17 @@ class MockSDKProjectCreator(ProjectCreator):
         operation_id = OperationId("sdk-project-creation")
         return ProjectCreationResultDTO(
             CreatedProjectDTO(
-                operation_id,
-                command.organization_id,
-                ProjectId(UUID("00000000-0000-4000-8000-000000000004")),
-                access.actor_principal_id,
-                command.name,
-                command.display_name.value,
-                1,
-                0,
-                tuple(ActionId(action) for action in ProjectCreationPolicy.INITIAL_ACTIONS),
+                operation_id=operation_id,
+                organization_id=command.organization_id,
+                project_id=ProjectId(UUID("00000000-0000-4000-8000-000000000004")),
+                creator_principal_id=access.actor_principal_id,
+                name=command.name,
+                display_name=command.display_name.value,
+                access_revision=1,
+                metadata_revision=0,
+                initial_actions=tuple(
+                    ActionId(action) for action in ProjectCreationPolicy.INITIAL_ACTIONS
+                ),
             ),
             CompletedSynchronousOperationDTO(
                 operation_id,
@@ -559,14 +563,16 @@ class MockSDKHumanAdmitter(HumanAdmitter):
         changed = command.identity_id != UUID("00000000-0000-4000-8000-000000000005")
         operation_id = OperationId("sdk-human-admission")
         return HumanAdmissionResultDTO(
-            InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
-            VerifiedHumanIdentityDTO(IDENTITY.authority, IdentitySubject(str(command.identity_id))),
-            command.organization_id,
-            access.actor_principal_id,
-            PrincipalId(command.identity_id),
-            8 if changed else 7,
-            changed,
-            CompletedSynchronousOperationDTO(
+            installation_id=InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            identity=VerifiedHumanIdentityDTO(
+                IDENTITY.authority, IdentitySubject(str(command.identity_id))
+            ),
+            organization_id=command.organization_id,
+            actor_principal_id=access.actor_principal_id,
+            principal_id=PrincipalId(command.identity_id),
+            access_revision=8 if changed else 7,
+            changed=changed,
+            operation=CompletedSynchronousOperationDTO(
                 operation_id,
                 True,
                 OperationReplayKind.SAFE_RESULT,
@@ -625,16 +631,16 @@ class MockSDKMembershipChanger(ProjectMembershipChanger):
             raise ValueError("The SDK changed the membership idempotency header.")
         changed = command.principal_id.value != UUID("00000000-0000-4000-8000-000000000005")
         return ProjectMembershipChangeResultDTO(
-            InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
-            OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
-            command.project_id,
-            access.actor_principal_id,
-            command.principal_id,
-            kind,
-            8 if changed else 7,
-            changed,
-            201 if kind is ProjectMembershipChangeKind.ADD and changed else 200,
-            CompletedSynchronousOperationDTO(
+            installation_id=InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            organization_id=OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            project_id=command.project_id,
+            actor_principal_id=access.actor_principal_id,
+            principal_id=command.principal_id,
+            change_kind=kind,
+            access_revision=8 if changed else 7,
+            changed=changed,
+            status_code=201 if kind is ProjectMembershipChangeKind.ADD and changed else 200,
+            operation=CompletedSynchronousOperationDTO(
                 OperationId("sdk-project-membership-" + kind),
                 True,
                 OperationReplayKind.SAFE_RESULT,
@@ -684,26 +690,26 @@ class MockSDKProjectMembersFacts(ProjectMembersFactsReader):
             if after is None or member.principal_id.value.int > after.value.int
         )[: limit + 1]
         return ProjectMembersPageFactsDTO(
-            InstallationId(UUID(int=123)),
-            organization,
-            project_id,
-            12,
-            ProjectActionFactsDTO(
-                Principal(
+            installation_id=InstallationId(UUID(int=123)),
+            organization_id=organization,
+            project_id=project_id,
+            access_revision=12,
+            action=ProjectActionFactsDTO(
+                principal=Principal(
                     access.actor_principal_id,
                     organization,
                     PrincipalKind.HUMAN,
                     PrincipalStatus.ACTIVE,
                 ),
-                False,
-                HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+                has_pending_recovery=False,
+                oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
                 if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
                 else None,
-                ProjectStatus.ACTIVE,
-                True,
-                True,
+                project_status=ProjectStatus.ACTIVE,
+                is_project_member=True,
+                has_exact_action_grant=True,
             ),
-            bounded,
+            members=bounded,
         )
 
 
@@ -742,27 +748,27 @@ class MockSDKProjectActionGrantsFacts(ProjectActionGrantsFactsReader):
             if after is None or item.recipient_principal_id.value.int > after.value.int
         )[: limit + 1]
         return ProjectActionGrantsPageFactsDTO(
-            InstallationId(UUID(int=123)),
-            organization,
-            project_id,
-            action_id,
-            ProjectActionFactsDTO(
-                Principal(
+            installation_id=InstallationId(UUID(int=123)),
+            organization_id=organization,
+            project_id=project_id,
+            action_id=action_id,
+            action=ProjectActionFactsDTO(
+                principal=Principal(
                     access.actor_principal_id,
                     organization,
                     PrincipalKind.HUMAN,
                     PrincipalStatus.ACTIVE,
                 ),
-                False,
-                HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+                has_pending_recovery=False,
+                oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
                 if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
                 else None,
-                ProjectStatus.ACTIVE,
-                True,
-                True,
+                project_status=ProjectStatus.ACTIVE,
+                is_project_member=True,
+                has_exact_action_grant=True,
             ),
-            can_grant,
-            bounded,
+            actor_can_grant_action=can_grant,
+            items=bounded,
         )
 
 
@@ -841,20 +847,20 @@ class MockSDKMyProjectAccessFacts(MyProjectAccessFactsReader):
             if after is None or position.sort_key > after.sort_key
         )[: limit + 1]
         return MyProjectAccessFactsDTO(
-            InstallationId(UUID(int=123)),
-            organization,
-            project_id,
-            7,
-            Principal(
+            installation_id=InstallationId(UUID(int=123)),
+            organization_id=organization,
+            project_id=project_id,
+            access_revision=7,
+            actor=Principal(
                 access.actor_principal_id, organization, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
             ),
-            False,
-            HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+            has_pending_recovery=False,
+            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
             if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
             else None,
-            ProjectStatus.ACTIVE,
-            True,
-            items,
+            project_status=ProjectStatus.ACTIVE,
+            is_project_member=True,
+            items=items,
         )
 
 
@@ -1031,21 +1037,33 @@ class MockSDKDeletionStatusLookup(DeletionStatusLookup):
         match query.operation_id.value:
             case "settled +/&é":
                 return RetainedDeletionStatusDTO(
-                    query.operation_id,
-                    JobStatus.SUCCEEDED,
-                    True,
-                    True,
-                    True,
-                    True,
-                    datetime(2030, 1, 1, tzinfo=UTC),
+                    operation_id=query.operation_id,
+                    job_status=JobStatus.SUCCEEDED,
+                    admission_confirmed=True,
+                    access_blocked=True,
+                    application_shutdown_complete=True,
+                    physical_cleanup_complete=True,
+                    expires_at=datetime(2030, 1, 1, tzinfo=UTC),
                 )
             case "active":
                 return RetainedDeletionStatusDTO(
-                    query.operation_id, JobStatus.RUNNING, True, True, False, None, None
+                    operation_id=query.operation_id,
+                    job_status=JobStatus.RUNNING,
+                    admission_confirmed=True,
+                    access_blocked=True,
+                    application_shutdown_complete=False,
+                    physical_cleanup_complete=None,
+                    expires_at=None,
                 )
             case "unknown":
                 return RetainedDeletionStatusDTO(
-                    query.operation_id, None, None, None, None, None, None
+                    operation_id=query.operation_id,
+                    job_status=None,
+                    admission_confirmed=None,
+                    access_blocked=None,
+                    application_shutdown_complete=None,
+                    physical_cleanup_complete=None,
+                    expires_at=None,
                 )
             case "unavailable":
                 raise DependencyUnavailableError()

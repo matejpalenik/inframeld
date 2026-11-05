@@ -96,25 +96,31 @@ async def _reserve_prepared_record(
         zero = money("0")
         if not SpendingAllowancePolicy.can_reserve(
             SpendingAllowancePolicyInput(
-                policy.monthly_limit, totals.settled, totals.held, None, zero, zero, amount
+                project_limit=policy.monthly_limit,
+                project_settled=totals.settled,
+                project_held=totals.held,
+                operation_limit=None,
+                operation_settled=zero,
+                operation_held=zero,
+                reservation_amount=amount,
             )
         ):
             raise SpendingLimitExceededError()
         record = SpendingCallRecordDTO(
-            call.call_id,
-            call.operation_id,
-            call.authority,
-            call.attempt.job_id,
-            call.meaning_fingerprint,
-            period,
-            None,
-            None,
-            amount,
-            amount,
-            None,
-            SpendingCallState.RESERVED,
-            0,
-            policy.revision,
+            call_id=call.call_id,
+            operation_id=call.operation_id,
+            authority=call.authority,
+            job_id=call.attempt.job_id,
+            meaning_fingerprint=call.meaning_fingerprint,
+            period=period,
+            operation_limit=None,
+            basis=None,
+            reserved_amount=amount,
+            hold_amount=amount,
+            settled_amount=None,
+            state=SpendingCallState.RESERVED,
+            revision=0,
+            reservation_policy_revision=policy.revision,
         )
         await writer.insert_call(record)
         return record

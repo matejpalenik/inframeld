@@ -114,15 +114,17 @@ class MockProjectCreator(ProjectCreator):
         )
         return ProjectCreationResultDTO(
             CreatedProjectDTO(
-                operation.operation_id,
-                command.organization_id,
-                ProjectId(UUID(int=3)),
-                access.actor_principal_id,
-                command.name,
-                command.display_name.value,
-                1,
-                0,
-                tuple(ActionId(value) for value in ProjectCreationPolicy.INITIAL_ACTIONS),
+                operation_id=operation.operation_id,
+                organization_id=command.organization_id,
+                project_id=ProjectId(UUID(int=3)),
+                creator_principal_id=access.actor_principal_id,
+                name=command.name,
+                display_name=command.display_name.value,
+                access_revision=1,
+                metadata_revision=0,
+                initial_actions=tuple(
+                    ActionId(value) for value in ProjectCreationPolicy.INITIAL_ACTIONS
+                ),
             ),
             operation,
         )

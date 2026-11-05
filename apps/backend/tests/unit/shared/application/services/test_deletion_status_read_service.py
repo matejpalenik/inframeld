@@ -92,14 +92,14 @@ BINDING = DeletionStatusBindingDTO(
     retention_policy_version="ADR-0117/PD-KNOWLEDGE-02:v1",
 )
 PROVENANCE = DeletionStatusObligationProvenanceDTO(
-    UUID(int=6),
-    BINDING.operation_id,
-    BINDING.installation_id,
-    BINDING.organization_id,
-    BINDING.project_id,
-    BINDING.initiator_principal_id,
-    NOW - timedelta(minutes=1),
-    1,
+    obligation_id=UUID(int=6),
+    operation_id=BINDING.operation_id,
+    installation_id=BINDING.installation_id,
+    organization_id=BINDING.organization_id,
+    project_id=BINDING.project_id,
+    initiator_principal_id=BINDING.initiator_principal_id,
+    observed_at=NOW - timedelta(minutes=1),
+    source_revision=1,
 )
 ACTIVE = DeletionStatusObservationDTO(
     binding=BINDING,
@@ -190,7 +190,13 @@ async def test_denied_human_never_searches_retained_history(
 async def test_active_outcome_preserves_unknown_completion_without_private_binding_fields() -> None:
     result = await _lookup(ACTIVE)
     assert result == RetainedDeletionStatusDTO(
-        QUERY.operation_id, JobStatus.RUNNING, True, True, None, None, None
+        operation_id=QUERY.operation_id,
+        job_status=JobStatus.RUNNING,
+        admission_confirmed=True,
+        access_blocked=True,
+        application_shutdown_complete=None,
+        physical_cleanup_complete=None,
+        expires_at=None,
     )
 
 
@@ -211,13 +217,13 @@ async def test_settled_read_preserves_original_clock_and_does_not_extend_it_on_r
         first
         == second
         == RetainedDeletionStatusDTO(
-            QUERY.operation_id,
-            JobStatus.SUCCEEDED,
-            True,
-            True,
-            True,
-            True,
-            STARTED + timedelta(days=30),
+            operation_id=QUERY.operation_id,
+            job_status=JobStatus.SUCCEEDED,
+            admission_confirmed=True,
+            access_blocked=True,
+            application_shutdown_complete=True,
+            physical_cleanup_complete=True,
+            expires_at=STARTED + timedelta(days=30),
         )
     )
     assert observation.retention_started_at == STARTED

@@ -169,13 +169,13 @@ async def _request(
         installation = await session.scalar(select(InstallationIdentityRow.installation_id))
         assert organization is not None and installation is not None
     authority = AdmittedWorkAuthorityDTO(
-        scenario.principal_id,
-        PrincipalKind.APPLICATION,
-        InstallationId(installation),
-        OrganizationId(organization),
-        scenario.project_id,
-        ActionId("inspect-feedback"),
-        None,
+        principal_id=scenario.principal_id,
+        principal_kind=PrincipalKind.APPLICATION,
+        installation_id=InstallationId(installation),
+        organization_id=OrganizationId(organization),
+        project_id=scenario.project_id,
+        action_id=ActionId("inspect-feedback"),
+        human_binding=None,
     )
     request = OperationReservationRequestDTO(
         principal_id=scenario.principal_id,
@@ -709,13 +709,13 @@ async def _human_request(
         identity, InstallationId(installation), HumanCredentialVersion(1)
     )
     authority = AdmittedWorkAuthorityDTO(
-        scenario.principal_id,
-        PrincipalKind.HUMAN,
-        InstallationId(installation),
-        scenario.organization_id,
-        scenario.project_id,
-        ActionId("create-sources"),
-        binding,
+        principal_id=scenario.principal_id,
+        principal_kind=PrincipalKind.HUMAN,
+        installation_id=InstallationId(installation),
+        organization_id=scenario.organization_id,
+        project_id=scenario.project_id,
+        action_id=ActionId("create-sources"),
+        human_binding=binding,
     )
     request = OperationReservationRequestDTO(
         principal_id=scenario.principal_id,

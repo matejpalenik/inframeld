@@ -62,7 +62,14 @@ QUERY = LookupOriginalOperationQuery(
     ),
 )
 FACTS = OperationLookupFactsDTO(
-    QUERY.installation_id, ACTOR, ProjectStatus.ACTIVE, True, True, True, False, None
+    installation_id=QUERY.installation_id,
+    principal=ACTOR,
+    project_status=ProjectStatus.ACTIVE,
+    is_project_member=True,
+    has_exact_action_grant=True,
+    can_grant_action=True,
+    has_pending_recovery=False,
+    oauth_credential_facts=None,
 )
 
 

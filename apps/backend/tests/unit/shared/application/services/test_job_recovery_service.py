@@ -183,13 +183,13 @@ async def test_changed_locked_candidate_is_not_recovered_or_dispatched(change: s
 def queued_product(store: MockClaimStore) -> None:
     scope = store.binding.scope
     authority = AdmittedWorkAuthorityDTO(
-        PrincipalId(UUID(int=20)),
-        PrincipalKind.APPLICATION,
-        scope.installation_id,
-        scope.organization_id,
-        scope.project_id,
-        ActionId("inspect-feedback"),
-        None,
+        principal_id=PrincipalId(UUID(int=20)),
+        principal_kind=PrincipalKind.APPLICATION,
+        installation_id=scope.installation_id,
+        organization_id=scope.organization_id,
+        project_id=scope.project_id,
+        action_id=ActionId("inspect-feedback"),
+        human_binding=None,
     )
     binding = ProductJobBindingDTO(
         OperationId("original-operation"), RequestId(UUID(int=21)), authority

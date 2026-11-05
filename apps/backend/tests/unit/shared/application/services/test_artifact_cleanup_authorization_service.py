@@ -43,7 +43,16 @@ BINDING = ArtifactCleanupJobBindingDTO(
     ArtifactCleanupKind.ABANDONED_STAGING,
     UnadmittedStagingArtifactOriginDTO(ATTEMPT, RequestId(UUID(int=7))),
 )
-FACTS = ArtifactCleanupFactsDTO(BINDING, JOB, (ATTEMPT,), True, False, False, False, False)
+FACTS = ArtifactCleanupFactsDTO(
+    binding=BINDING,
+    job_id=JOB,
+    targets=(ATTEMPT,),
+    owns_targets=True,
+    retirement_authorized=False,
+    retention_allows_cleanup=False,
+    published=False,
+    pending_write=False,
+)
 
 
 class MockCleanupFactsReader(ArtifactCleanupFactsReader):

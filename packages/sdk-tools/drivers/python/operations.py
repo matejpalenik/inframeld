@@ -620,8 +620,12 @@ BINDINGS: dict[Operation, Binding] = {
         project_action_grants_sync, project_action_grants_async
     ),
     Operation.GET_MY_PROJECT_ACCESS: Binding(my_project_access_sync, my_project_access_async),
-    Operation.SET_PROJECT_ACTION_GRANT: Binding(set_project_action_grant_sync, set_project_action_grant_async),
-    Operation.REMOVE_PROJECT_ACTION_GRANT: Binding(remove_project_action_grant_sync, remove_project_action_grant_async),
+    Operation.SET_PROJECT_ACTION_GRANT: Binding(
+        set_project_action_grant_sync, set_project_action_grant_async
+    ),
+    Operation.REMOVE_PROJECT_ACTION_GRANT: Binding(
+        remove_project_action_grant_sync, remove_project_action_grant_async
+    ),
     Operation.ADD_PROJECT_MEMBER: Binding(project_member_add_sync, project_member_add_async),
     Operation.REMOVE_PROJECT_MEMBER: Binding(
         project_member_remove_sync, project_member_remove_async

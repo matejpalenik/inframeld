@@ -71,5 +71,7 @@ def test_stale_credential_keeps_an_active_unblocked_account_ineligible() -> None
         status=PrincipalStatus.ACTIVE,
     )
     assert not PrincipalAccessPolicy.may_use_product(
-        PrincipalAccessPolicyInput(principal, False, credential_is_current=False)
+        PrincipalAccessPolicyInput(
+            principal=principal, has_pending_recovery=False, credential_is_current=False
+        )
     )

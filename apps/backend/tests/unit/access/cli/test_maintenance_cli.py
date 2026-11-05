@@ -82,12 +82,12 @@ class MockRepairOperation(ProjectMetadataRepairer):
     ) -> ProjectMetadataRepairResultDTO:
         self.events.append("repair")
         return ProjectMetadataRepairResultDTO(
-            command.operation_id,
-            command.expected_installation_id,
-            OrganizationId(UUID(int=2)),
-            command.project_id,
-            access.actor_principal_id,
-            1,
+            operation_id=command.operation_id,
+            installation_id=command.expected_installation_id,
+            organization_id=OrganizationId(UUID(int=2)),
+            project_id=command.project_id,
+            recipient_id=access.actor_principal_id,
+            access_revision=1,
         )
 
 
@@ -108,14 +108,14 @@ async def test_recipient_verification_finishes_before_opening_operation_session(
             events.append("close-session")
 
     command = RepairProjectMetadataAuthorityCommand(
-        InstallationId(UUID(int=4)),
-        OperationId("original"),
-        ProjectId(UUID(int=3)),
-        0,
-        UUID(int=5),
-        "Operator",
-        "Repair",
-        HumanAccessTokenCredential("private-proof"),
+        expected_installation_id=InstallationId(UUID(int=4)),
+        operation_id=OperationId("original"),
+        project_id=ProjectId(UUID(int=3)),
+        expected_access_revision=0,
+        expected_identity_id=UUID(int=5),
+        operator_label="Operator",
+        reason="Repair",
+        identity_proof=HumanAccessTokenCredential("private-proof"),
     )
     result = await ProjectMetadataMaintenanceCli(
         MockProofAuthenticator(events), open_repair

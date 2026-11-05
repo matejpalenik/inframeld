@@ -194,13 +194,13 @@ async def seed_spending_scenario(
     project = await create_project(database, creator)
     access = AccessContextDTO(creator.access.actor_principal_id, creator.binding)
     authority = AdmittedWorkAuthorityDTO(
-        access.actor_principal_id,
-        PrincipalKind.HUMAN,
-        creator.binding.installation_id,
-        creator.organization_id,
-        project.project.project_id,
-        ActionId("create-sources"),
-        creator.binding,
+        principal_id=access.actor_principal_id,
+        principal_kind=PrincipalKind.HUMAN,
+        installation_id=creator.binding.installation_id,
+        organization_id=creator.organization_id,
+        project_id=project.project.project_id,
+        action_id=ActionId("create-sources"),
+        human_binding=creator.binding,
     )
     if create_account:
         async with database.session() as session, session.begin():
@@ -300,13 +300,13 @@ async def seed_human_work(
     binding = access.authentication_evidence
     assert isinstance(binding, HumanOAuthCredentialBindingDTO)
     authority = AdmittedWorkAuthorityDTO(
-        access.actor_principal_id,
-        PrincipalKind.HUMAN,
-        binding.installation_id,
-        original.organization_id,
-        original.project_id,
-        ActionId("create-sources"),
-        binding,
+        principal_id=access.actor_principal_id,
+        principal_kind=PrincipalKind.HUMAN,
+        installation_id=binding.installation_id,
+        organization_id=original.organization_id,
+        project_id=original.project_id,
+        action_id=ActionId("create-sources"),
+        human_binding=binding,
     )
     attempt = await _admit_attempt(database, access, authority, key)
     return SpendingScenarioDTO(access, original.organization_id, original.project_id, attempt)
@@ -397,12 +397,12 @@ def call_context(scenario: SpendingScenarioDTO, number: int = 1) -> SpendingCall
 
 def price_basis(amount: str = "0.1", maximum: str = "1") -> CapturedSpendingBasisDTO:
     return CapturedSpendingBasisDTO(
-        "controlled-basis",
-        "accounting-fixture",
-        "v1",
-        datetime.now(UTC),
-        (SpendingRateDTO("input", "unit", Decimal(amount)),),
-        (SpendingUsageDTO("input", "unit", Decimal(maximum)),),
+        basis_id="controlled-basis",
+        source_reference="accounting-fixture",
+        source_revision="v1",
+        captured_at=datetime.now(UTC),
+        rates=(SpendingRateDTO("input", "unit", Decimal(amount)),),
+        maximum_usage=(SpendingUsageDTO("input", "unit", Decimal(maximum)),),
     )
 
 

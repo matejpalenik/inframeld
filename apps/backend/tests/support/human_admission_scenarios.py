@@ -91,12 +91,12 @@ ACTOR_FACTS = OrganizationAccessFactsDTO(
     ALICE, 7, (OrganizationActionGrantDTO(ActionId("admit-users"), False),), False, None
 )
 FACTS = HumanAdmissionFactsDTO(
-    INSTALLATION,
-    IDENTITY,
-    ACTOR_FACTS,
-    None,
-    HumanCredentialStateDTO(INSTALLATION, IDENTITY, None, False),
-    False,
+    installation_id=INSTALLATION,
+    identity=IDENTITY,
+    actor=ACTOR_FACTS,
+    principal=None,
+    credential_state=HumanCredentialStateDTO(INSTALLATION, IDENTITY, None, False),
+    has_credential_history=False,
 )
 
 
@@ -213,14 +213,14 @@ class MockAdmissionResults(HumanAdmissionResultReader):
     def __init__(self, owner: MockAdmissionTransactions) -> None:
         self.owner = owner
         self.result = HumanAdmissionResultDTO(
-            INSTALLATION,
-            IDENTITY,
-            ORG,
-            ALICE.id,
-            BOB.id,
-            8,
-            True,
-            CompletedSynchronousOperationDTO(
+            installation_id=INSTALLATION,
+            identity=IDENTITY,
+            organization_id=ORG,
+            actor_principal_id=ALICE.id,
+            principal_id=BOB.id,
+            access_revision=8,
+            changed=True,
+            operation=CompletedSynchronousOperationDTO(
                 OperationId("metadata-original"),
                 False,
                 OperationReplayKind.SAFE_RESULT,

@@ -41,7 +41,12 @@ async def test_real_project_service_consumes_checked_typed_binding_then_current_
     repository.metadata.change(expected_revision=0, name=ResourceName("support"), display_name=None)
     authorizer = MockMetadataAuthorizer(events)
     binding = ResourceNameBindingDTO(
-        ResourceNameKind.PROJECT, PROJECT_ID.value, SCOPE, ResourceName("support"), 1, False
+        kind=ResourceNameKind.PROJECT,
+        resource_id=PROJECT_ID.value,
+        scope=SCOPE,
+        name=ResourceName("support"),
+        revision=1,
+        retired=False,
     )
     bindings = MockResourceBindings((binding,))
     service = ProjectNameResolutionService(
@@ -83,12 +88,12 @@ async def test_retired_name_guidance_uses_latest_selector_only_after_current_aut
         )
     authorizer = MockMetadataAuthorizer(events)
     binding = ResourceNameBindingDTO(
-        ResourceNameKind.PROJECT,
-        PROJECT_ID.value,
-        SCOPE,
-        ResourceName("support"),
-        1,
-        True,
+        kind=ResourceNameKind.PROJECT,
+        resource_id=PROJECT_ID.value,
+        scope=SCOPE,
+        name=ResourceName("support"),
+        revision=1,
+        retired=True,
     )
     service = ProjectNameResolutionService(
         transaction_manager=MockTransactions(events),

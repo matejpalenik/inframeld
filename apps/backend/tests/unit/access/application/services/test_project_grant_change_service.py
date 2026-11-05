@@ -162,44 +162,52 @@ INSTALLATION = InstallationId(UUID(int=5))
 ACTOR = Principal(ACTOR_ID, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE)
 RECIPIENT = Principal(RECIPIENT_ID, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE)
 OTHER = ProjectDepartureCandidatePolicyInput(
-    Principal(
+    principal=Principal(
         PrincipalId(UUID(int=6)), ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
     ),
-    False,
-    True,
-    True,
-    True,
-    False,
-    False,
+    has_pending_recovery=False,
+    is_project_member=True,
+    has_coherent_identity=True,
+    can_grant=True,
+    is_group_member=False,
+    is_group_manager=False,
 )
 MANAGEMENT = ProjectActionGrantManagementFactsDTO(
-    INSTALLATION,
-    ORGANIZATION_ID,
-    PROJECT_ID,
-    ACTION_ID,
-    ProjectGrantChangeFactsDTO(
-        ACTOR, False, None, RECIPIENT, ProjectStatus.ACTIVE, 7, True, True, True
+    installation_id=INSTALLATION,
+    organization_id=ORGANIZATION_ID,
+    project_id=PROJECT_ID,
+    action_id=ACTION_ID,
+    grant=ProjectGrantChangeFactsDTO(
+        actor=ACTOR,
+        has_pending_recovery=False,
+        oauth_credential_facts=None,
+        recipient=RECIPIENT,
+        project_status=ProjectStatus.ACTIVE,
+        project_access_revision=7,
+        actor_is_project_member=True,
+        recipient_is_project_member=True,
+        actor_can_grant_action=True,
     ),
-    False,
-    True,
-    False,
-    (OTHER,),
+    recipient_has_pending_recovery=False,
+    recipient_has_coherent_identity=True,
+    recipient_application_is_project_bound=False,
+    other_grantors=(OTHER,),
 )
 SET_COMMAND = SetProjectActionGrantCommand(PROJECT_ID, RECIPIENT_ID, ACTION_ID, False, 7)
 REMOVE_COMMAND = RemoveProjectActionGrantCommand(PROJECT_ID, RECIPIENT_ID, ACTION_ID, 7)
 ORIGINAL = ProjectActionGrantChangeResultDTO(
-    INSTALLATION,
-    ORGANIZATION_ID,
-    PROJECT_ID,
-    ACTOR_ID,
-    RECIPIENT_ID,
-    ACTION_ID,
-    ProjectActionGrantChangeKind.SET,
-    False,
-    8,
-    True,
-    201,
-    SAVED_RESULT,
+    installation_id=INSTALLATION,
+    organization_id=ORGANIZATION_ID,
+    project_id=PROJECT_ID,
+    actor_principal_id=ACTOR_ID,
+    recipient_principal_id=RECIPIENT_ID,
+    action_id=ACTION_ID,
+    change_kind=ProjectActionGrantChangeKind.SET,
+    can_grant=False,
+    access_revision=8,
+    changed=True,
+    status_code=201,
+    operation=SAVED_RESULT,
 )
 
 

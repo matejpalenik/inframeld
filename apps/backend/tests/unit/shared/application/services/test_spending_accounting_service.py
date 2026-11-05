@@ -124,24 +124,24 @@ def money(value: str) -> UsdAmount:
 def call_context(number: int = 1, *, attempt: int = 1) -> SpendingCallContextDTO:
     evidence = MockAuthenticationEvidence.human_oauth()
     authority = AdmittedWorkAuthorityDTO(
-        ACTOR,
-        PrincipalKind.HUMAN,
-        evidence.installation_id,
-        ORG,
-        PROJECT,
-        ActionId("build"),
-        evidence,
+        principal_id=ACTOR,
+        principal_kind=PrincipalKind.HUMAN,
+        installation_id=evidence.installation_id,
+        organization_id=ORG,
+        project_id=PROJECT,
+        action_id=ActionId("build"),
+        human_binding=evidence,
     )
     operation = OperationId("original-job-operation")
     binding = ProductJobBindingDTO(operation, RequestId(UUID(int=5)), authority)
     context = JobAttemptContextDTO(
-        JobId(UUID(int=6)),
-        binding,
-        JobPayload("fixture.accounting", 1, b""),
-        attempt,
-        JobFence(UUID(int=10 + attempt)),
-        NOW + timedelta(hours=1),
-        b"",
+        job_id=JobId(UUID(int=6)),
+        binding=binding,
+        payload=JobPayload("fixture.accounting", 1, b""),
+        attempt=attempt,
+        fence=JobFence(UUID(int=10 + attempt)),
+        work_deadline=NOW + timedelta(hours=1),
+        checkpoint=b"",
     )
     return SpendingCallContextDTO(
         ModelCallId(UUID(int=number)),
@@ -154,12 +154,12 @@ def call_context(number: int = 1, *, attempt: int = 1) -> SpendingCallContextDTO
 
 def price_basis(amount: str = "0.1") -> CapturedSpendingBasisDTO:
     return CapturedSpendingBasisDTO(
-        "basis",
-        "fixture-pricing",
-        "v1",
-        NOW,
-        (SpendingRateDTO("input", "unit", Decimal(amount)),),
-        (SpendingUsageDTO("input", "unit", Decimal("1")),),
+        basis_id="basis",
+        source_reference="fixture-pricing",
+        source_revision="v1",
+        captured_at=NOW,
+        rates=(SpendingRateDTO("input", "unit", Decimal(amount)),),
+        maximum_usage=(SpendingUsageDTO("input", "unit", Decimal("1")),),
     )
 
 
@@ -517,22 +517,22 @@ class MockOwnership(JobOwnership):
         if self.failure is not None:
             raise self.failure
         return JobSnapshotDTO(
-            context.job_id,
-            context.binding,
-            context.payload,
-            JobStatus.RUNNING,
-            NOW,
-            NOW + timedelta(days=1),
-            NOW,
-            NOW,
-            context.attempt,
-            context.work_deadline,
-            context.fence,
-            NOW + timedelta(seconds=30),
-            self.cancel_requested,
-            None,
-            None,
-            context.checkpoint,
+            job_id=context.job_id,
+            binding=context.binding,
+            payload=context.payload,
+            status=JobStatus.RUNNING,
+            admitted_at=NOW,
+            queued_deadline=NOW + timedelta(days=1),
+            due_at=NOW,
+            observed_at=NOW,
+            attempt=context.attempt,
+            work_deadline=context.work_deadline,
+            fence=context.fence,
+            lease_expires_at=NOW + timedelta(seconds=30),
+            cancel_requested=self.cancel_requested,
+            pending_effect=None,
+            reason=None,
+            checkpoint=context.checkpoint,
         )
 
 
@@ -601,12 +601,12 @@ async def test_reservation_uses_authorization_ownership_then_accounting_and_orig
 async def test_below_quantum_rate_is_rounded_only_after_exact_multiplication() -> None:
     service, _, _, _, _ = accountant()
     basis = CapturedSpendingBasisDTO(
-        "tiny",
-        "fixture",
-        "v1",
-        NOW,
-        (SpendingRateDTO("input", "unit", Decimal("0.000000000000001")),),
-        (SpendingUsageDTO("input", "unit", Decimal("1000")),),
+        basis_id="tiny",
+        source_reference="fixture",
+        source_revision="v1",
+        captured_at=NOW,
+        rates=(SpendingRateDTO("input", "unit", Decimal("0.000000000000001")),),
+        maximum_usage=(SpendingUsageDTO("input", "unit", Decimal("1000")),),
     )
 
     result = await service.reserve(call=call_context(), basis=basis, operation_limit=money("1"))

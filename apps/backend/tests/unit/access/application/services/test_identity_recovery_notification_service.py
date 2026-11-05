@@ -98,9 +98,21 @@ SETTINGS_BINDING = IdentityRecoverySettingsBindingDTO(
     EVENT.identity, EVIDENCE.settings_flow_id, EVIDENCE.session_id, OPERATION, EVENT.flow_id
 )
 FACTS = IdentityRecoveryAssociationFactsDTO(
-    ADMISSION, SESSION_BINDING, ADMISSION, SETTINGS_BINDING, ADMISSION, HumanCredentialVersion(2)
+    source_admission=ADMISSION,
+    session_binding=SESSION_BINDING,
+    session_admission=ADMISSION,
+    settings_binding=SETTINGS_BINDING,
+    settings_admission=ADMISSION,
+    current_version=HumanCredentialVersion(2),
 )
-EMPTY_FACTS = IdentityRecoveryAssociationFactsDTO(None, None, None, None, None, None)
+EMPTY_FACTS = IdentityRecoveryAssociationFactsDTO(
+    source_admission=None,
+    session_binding=None,
+    session_admission=None,
+    settings_binding=None,
+    settings_admission=None,
+    current_version=None,
+)
 
 
 class Scenario(

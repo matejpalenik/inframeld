@@ -97,13 +97,13 @@ def test_result_mapping_omits_run_for_no_work(
     run_id = uuid4() if outcome is IdentityRecoveryCleanupResumeOutcome.AUTHORIZED else None
     deadline = datetime(2026, 10, 26, 12, tzinfo=UTC) if run_id is not None else None
     result = IdentityRecoveryCleanupResumeResultDTO(
-        command.operation_id,
-        command.expected_installation_id,
-        command.recovery_operation_id,
-        outcome,
-        False,
-        run_id,
-        deadline,
+        operation_id=command.operation_id,
+        installation_id=command.expected_installation_id,
+        recovery_operation_id=command.recovery_operation_id,
+        outcome=outcome,
+        released=False,
+        run_id=run_id,
+        deadline=deadline,
     )
     response = RecoveryMaintenanceMapper.result(result)
     assert response["schemaVersion"] == 1

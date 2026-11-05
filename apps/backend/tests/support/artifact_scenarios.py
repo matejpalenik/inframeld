@@ -255,13 +255,13 @@ async def completed_product_origin(
             assert principal is not None
             actor = PrincipalId(principal)
     authority = AdmittedWorkAuthorityDTO(
-        actor,
-        PrincipalKind.APPLICATION,
-        scope.installation_id,
-        scope.organization_id,
-        scope.project_id,
-        ActionId("inspect-feedback"),
-        None,
+        principal_id=actor,
+        principal_kind=PrincipalKind.APPLICATION,
+        installation_id=scope.installation_id,
+        organization_id=scope.organization_id,
+        project_id=scope.project_id,
+        action_id=ActionId("inspect-feedback"),
+        human_binding=None,
     )
     request_id = RequestId(uuid4())
     async with database.session() as session, session.begin():

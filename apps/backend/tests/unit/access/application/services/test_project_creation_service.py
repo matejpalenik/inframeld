@@ -89,15 +89,15 @@ COMMAND = CreateProjectCommand(
 )
 CONTEXT = IdempotencyContextDTO(HttpMethod.POST, "/v1/projects", IdempotencyKey("create-original"))
 ORIGINAL = CreatedProjectDTO(
-    SAVED_RESULT.operation_id,
-    COMMAND.organization_id,
-    ProjectId(UUID(int=3)),
-    ACCESS.actor_principal_id,
-    COMMAND.name,
-    COMMAND.display_name.value,
-    1,
-    0,
-    INITIAL_ACTIONS,
+    operation_id=SAVED_RESULT.operation_id,
+    organization_id=COMMAND.organization_id,
+    project_id=ProjectId(UUID(int=3)),
+    creator_principal_id=ACCESS.actor_principal_id,
+    name=COMMAND.name,
+    display_name=COMMAND.display_name.value,
+    access_revision=1,
+    metadata_revision=0,
+    initial_actions=INITIAL_ACTIONS,
 )
 
 

@@ -127,15 +127,15 @@ async def test_registered_unsealed_cleanup_invocation_is_admitted_once(database:
         ).claim_next()
         assert context is not None and context.job_id == allocation.cleanup_job_id
         binding = JobEffectBindingDTO(
-            JobEffectId(uuid4()),
-            context,
-            "delete-original",
-            JobEffectAction.DELETE,
-            scenario.artifact_id,
-            scenario.attempt_id,
-            scope,
-            None,
-            None,
+            effect_id=JobEffectId(uuid4()),
+            context=context,
+            unit="delete-original",
+            action=JobEffectAction.DELETE,
+            artifact_id=scenario.artifact_id,
+            artifact_attempt_id=scenario.attempt_id,
+            scope=scope,
+            length=None,
+            digest=None,
         )
         operation = JobEffectObservationService(
             SqlAlchemyTransactionManager(session),
@@ -198,15 +198,15 @@ async def _registered_invocation(
             await checkpoints.save(context, saved_checkpoint)
             assert context.checkpoint == b""
         binding = JobEffectBindingDTO(
-            JobEffectId(uuid4()),
-            context,
-            "delete-original",
-            JobEffectAction.DELETE,
-            allocation.reservation.artifact_id,
-            allocation.reservation.attempt_id,
-            allocation.reservation.scope,
-            None,
-            None,
+            effect_id=JobEffectId(uuid4()),
+            context=context,
+            unit="delete-original",
+            action=JobEffectAction.DELETE,
+            artifact_id=allocation.reservation.artifact_id,
+            artifact_attempt_id=allocation.reservation.attempt_id,
+            scope=allocation.reservation.scope,
+            length=None,
+            digest=None,
         )
         await _recording_service(session).register(binding)
         return binding

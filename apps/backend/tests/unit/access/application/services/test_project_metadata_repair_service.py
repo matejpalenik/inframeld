@@ -85,14 +85,14 @@ ACCESS = AccessContextDTO(
     ACTOR.id, HumanOAuthCredentialBindingDTO(IDENTITY, INSTALLATION, HumanCredentialVersion(2))
 )
 COMMAND = RepairProjectMetadataAuthorityCommand(
-    INSTALLATION,
-    OperationId("operator-original"),
-    PROJECT,
-    0,
-    UUID(int=5),
-    "Operator",
-    "Repair metadata authority",
-    HumanAccessTokenCredential("first-proof"),
+    expected_installation_id=INSTALLATION,
+    operation_id=OperationId("operator-original"),
+    project_id=PROJECT,
+    expected_access_revision=0,
+    expected_identity_id=UUID(int=5),
+    operator_label="Operator",
+    reason="Repair metadata authority",
+    identity_proof=HumanAccessTokenCredential("first-proof"),
 )
 
 
@@ -100,16 +100,16 @@ class MockRepairFacts(ProjectMetadataRepairFactsReader):
     def __init__(self, events: list[str]) -> None:
         self.events = events
         self.facts = ProjectMetadataRepairFactsDTO(
-            INSTALLATION,
-            ACTOR,
-            PROJECT,
-            ProjectStatus.ACTIVE,
-            0,
-            True,
-            False,
-            HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
-            False,
-            datetime(2030, 1, 1, tzinfo=UTC),
+            installation_id=INSTALLATION,
+            recipient=ACTOR,
+            project_id=PROJECT,
+            project_status=ProjectStatus.ACTIVE,
+            access_revision=0,
+            is_project_member=True,
+            has_pending_recovery=False,
+            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+            eligible_grantor_exists=False,
+            observed_at=datetime(2030, 1, 1, tzinfo=UTC),
         )
         self.saved: ProjectMetadataRepairReceiptDTO | None = None
 
@@ -163,17 +163,22 @@ class Scenario:
 
     def save_original(self) -> None:
         result = ProjectMetadataRepairResultDTO(
-            COMMAND.operation_id, INSTALLATION, ACTOR.organization_id, PROJECT, ACTOR.id, 1
+            operation_id=COMMAND.operation_id,
+            installation_id=INSTALLATION,
+            organization_id=ACTOR.organization_id,
+            project_id=PROJECT,
+            recipient_id=ACTOR.id,
+            access_revision=1,
         )
         self.facts.saved = ProjectMetadataRepairReceiptDTO(
-            self.fingerprints.for_repair(COMMAND, IDENTITY),
-            IDENTITY,
-            COMMAND.expected_identity_id,
-            COMMAND.operator_label,
-            COMMAND.reason,
-            0,
-            self.facts.facts.observed_at,
-            result,
+            fingerprint=self.fingerprints.for_repair(COMMAND, IDENTITY),
+            identity=IDENTITY,
+            expected_identity_id=COMMAND.expected_identity_id,
+            operator_label=COMMAND.operator_label,
+            reason=COMMAND.reason,
+            before_revision=0,
+            authorized_at=self.facts.facts.observed_at,
+            result=result,
         )
 
 

@@ -89,13 +89,13 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
         installation = await session.scalar(select(InstallationIdentityRow.installation_id))
         assert installation is not None
         authority = AdmittedWorkAuthorityDTO(
-            seed.principal_id,
-            PrincipalKind.APPLICATION,
-            InstallationId(installation),
-            seed.organization_id,
-            seed.project_id,
-            ActionId("inspect-feedback"),
-            None,
+            principal_id=seed.principal_id,
+            principal_kind=PrincipalKind.APPLICATION,
+            installation_id=InstallationId(installation),
+            organization_id=seed.organization_id,
+            project_id=seed.project_id,
+            action_id=ActionId("inspect-feedback"),
+            human_binding=None,
         )
         service = JobAdmissionService(
             ActionAuthorizationService(PostgresProjectActionFactsReader(session)),

@@ -17,6 +17,7 @@ An aggregate is the domain object responsible for a group of state that must sta
 **Inspected teaching excerpt:** complete inspected module from [apps/backend/src/inframeld_backend/access/domain/entities/project_membership.py](../../../../apps/backend/src/inframeld_backend/access/domain/entities/project_membership.py). This is existing code for explanation, not replacement or insertion instructions.
 
 ```python
+from dataclasses import replace
 from typing import override
 
 from inframeld_backend.access.domain.entities.project_action_grant import ProjectActionGrant
@@ -25,10 +26,14 @@ from inframeld_backend.access.domain.enums.project_grant_level import ProjectGra
 from inframeld_backend.access.domain.errors.project_grant_errors import (
     ProjectGrantAlreadyExistsError,
 )
+from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
+    ProjectActionEligibilityPolicy,
+)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+
 
 class ProjectMembership:
     """Own one member's complete collection of direct project action grants.
@@ -110,6 +115,43 @@ class ProjectMembership:
         )
         self._grants[action_id] = grant
 
+    def set_action_grant(
+        self,
+        *,
+        action_id: ActionId,
+        level: ProjectGrantLevel,
+        assigned_by_principal_id: PrincipalId,
+    ) -> bool:
+        """Set an eligible exact assignment and report whether its state changed."""
+        if not ProjectActionEligibilityPolicy.may_use(
+            action_id=action_id, principal_kind=self._principal_kind
+        ):
+            raise ValueError("This action is not eligible for the recipient.")
+        if (
+            self._principal_kind is PrincipalKind.APPLICATION
+            and level is ProjectGrantLevel.USE_AND_GRANT
+        ):
+            raise ValueError("Applications cannot hold delegation rights.")
+
+        current = self._grants.get(action_id)
+        if current is not None:
+            if current.level is level:
+                return False
+            self._grants[action_id] = replace(current, level=level)
+        else:
+            self._grants[action_id] = ProjectActionGrant(
+                self._project_id,
+                self._principal_id,
+                action_id,
+                level,
+                assigned_by_principal_id,
+            )
+        return True
+
+    def remove_action_grant(self, *, action_id: ActionId) -> bool:
+        """Remove only this exact action and report whether it was present."""
+        return self._grants.pop(action_id, None) is not None
+
     @override
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ProjectMembership):
@@ -144,10 +186,12 @@ from abc import abstractmethod
 from typing import Protocol
 
 from inframeld_backend.access.domain.entities.project_membership import ProjectMembership
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+
 
 class ProjectMembershipRepository(Protocol):
     """Load and save membership grants in an already authorized transaction.
@@ -156,6 +200,26 @@ class ProjectMembershipRepository(Protocol):
     caller owns the transaction and existing organization/project locks. Keep
     original value snapshots outside the entity, independently of ID equality.
     """
+
+    @abstractmethod
+    async def save_action_grant_change(
+        self,
+        membership: ProjectMembership,
+        *,
+        action_id: ActionId,
+        actor_principal_id: PrincipalId,
+        expected_project_access_revision: int,
+        operation_id: OperationId,
+    ) -> None:
+        """Persist one explicitly supported set/remove transition without commit.
+
+        Retain transaction-bound instance/value snapshots and every other action.
+        Advance Project revision once and append exact before/after audit only
+        for a real change. Preserve original assignment attribution/timestamp on
+        level changes. An unchanged save performs no SQL writes. Legacy save
+        remains additions-only with its existing independent guards.
+        """
+        ...
 
     @abstractmethod
     async def get(
@@ -291,7 +355,7 @@ The adapter opens no transaction, acquires no explicit coordination locks, commi
 
 ## Status and evidence
 
-Only the current attributed use-only addition workflow is implemented by this repository. Membership creation/removal, arbitrary updates, revocation and cross-member lifecycle operations remain deferred. The existing boolean storage representation, nullable historical attribution and timestamps are preserved. Do not invent a membership revision, generic `Repository[T]`, Unit of Work service locator or additional schema to imitate this example.
+The legacy `save()` path supports attributed use-only additions. Exact Project action assignment and removal use `set_action_grant()` and `remove_action_grant()` on the same aggregate, then the repository's `save_action_grant_change()` with the original operation, actor, expected revision and previous grant level. The existing boolean storage representation, nullable historical attribution and timestamps are preserved. Project membership creation/removal belongs to the separate coordinated [membership workflow](../../inframeld-access-models/references/memberships-groups-and-handover.md#change-project-membership), rather than an implicit create or delete in this repository. Do not invent a membership revision, generic `Repository[T]`, Unit of Work service locator or additional schema to imitate this example.
 
 Behavior tests should cover accepted/rejected transitions, exact scoped instances, unchanged saves, value preservation, revision conflicts, required audit and rollback. Existing integration scenarios are evidence of what was recorded or inspected, not checks personally rerun by reading this reference.
 
@@ -305,10 +369,10 @@ Behavior tests should cover accepted/rejected transitions, exact scoped instance
 
 Bob can hold several direct project action grants on Support. [`ProjectMembership`](../../../../apps/backend/src/inframeld_backend/access/domain/entities/project_membership.py) owns that complete collection, identified by `(project_id, principal_id)`. Organization and principal kind remain read-only metadata. An immutable [`ProjectActionGrant`](../../../../apps/backend/src/inframeld_backend/access/domain/entities/project_action_grant.py) has natural identity `(project_id, recipient_principal_id, action_id)`. Its level and attribution are state, so comparing child identity does not prove those values are unchanged.
 
-The aggregate validates the complete reconstituted collection, rejects wrong-scope children, duplicate actions and application delegation, and adds attributed use-only assignments through domain behavior. It does not own eligibility, delegation authorization, project revisions or operation metadata. The whole Project is not loaded to change one member, but the existing project lock and revision still coordinate writes across members.
+The aggregate validates the complete reconstituted collection, rejects wrong-scope children, duplicate actions and application delegation, and owns attributed use-only addition plus exact-action assignment and removal. It does not own eligibility, delegation authorization, project revisions or operation metadata. The whole Project is not loaded to change one member, but the existing project lock and revision still coordinate writes across members.
 
 [`ProjectMembershipRepository`](../../../../apps/backend/src/inframeld_backend/access/application/protocols/project_membership_repository.py) is a specific application port. Its [`Postgres` adapter](../../../../apps/backend/src/inframeld_backend/access/infrastructure/repositories/postgres_project_membership_repository.py) loads an existing scoped membership and all its direct grants through one typed outer join. Missing membership returns the existing not-found failure and never provisions anything. Repeated loads in one transaction return the same aggregate instance.
 
-The adapter keeps immutable value snapshots outside the entity, bound to that active session transaction. Only its exact loaded instances may be saved. It compares levels and attribution explicitly and rejects unsupported modifications or removals. An unchanged save writes nothing. A save with additions conditionally advances the active project's revision once, inserts without overwriting rows, and appends correlated audit events. The boolean database level, existing attribution and database timestamps retain their current storage format.
+The adapter keeps immutable value snapshots outside the entity, bound to that active session transaction. Only its exact loaded instances may be saved. Its legacy `save()` compares levels and attribution explicitly and rejects unsupported modifications or removals. An unchanged save writes nothing. A save with additions conditionally advances the active project's revision once, inserts without overwriting rows, and appends correlated audit events. Exact-action management instead calls `save_action_grant_change()`, which verifies the original before/after assignment, conditionally persists that one change and appends its typed audit event. The service retains handover and receipt ownership. The boolean database level, existing attribution and database timestamps retain their current storage format.
 
-Discard the repository and aggregates after commit, rollback or failed save. If a save fails or is cancelled, errors propagate and the transaction owner must roll back. Snapshots advance only after persistence and audit succeed. The adapter opens no transaction, acquires no explicit locks, commits nothing and performs no retries. Membership creation/removal, grant updates/revocation and cross-member lifecycle operations remain deferred. [ADR-0068](../../../../docs/adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md) records the decision.
+Discard the repository and aggregates after commit, rollback or failed save. If a save fails or is cancelled, errors propagate and the transaction owner must roll back. Snapshots advance only after persistence and audit succeed. The adapter opens no transaction, acquires no explicit locks, commits nothing and performs no retries. Project membership creation/removal uses the separate coordinated membership workflow. Grant updates and revocation are implemented by the exact-action path described above. Other cross-member lifecycle operations remain outside this repository. [ADR-0068](../../../../docs/adr/ADR-0068-model-project-grants-through-project-membership-aggregates.md) records the decision.

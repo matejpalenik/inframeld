@@ -80,15 +80,22 @@ ROUTE = f"/v1/projects/{PROJECT.value}/members/{BOB.id.value}"
 ADD_CONTEXT = IdempotencyContextDTO(HttpMethod.PUT, ROUTE, IdempotencyKey("join-bob"))
 REMOVE_CONTEXT = IdempotencyContextDTO(HttpMethod.DELETE, ROUTE, IdempotencyKey("remove-bob"))
 FACTS = ProjectMembershipChangeFactsDTO(
-    INSTALLATION,
-    ORG,
-    PROJECT,
-    7,
-    ProjectActionFactsDTO(ALICE, False, None, ProjectStatus.ACTIVE, True, True),
-    BOB,
-    False,
-    True,
-    False,
+    installation_id=INSTALLATION,
+    organization_id=ORG,
+    project_id=PROJECT,
+    access_revision=7,
+    action=ProjectActionFactsDTO(
+        principal=ALICE,
+        has_pending_recovery=False,
+        oauth_credential_facts=None,
+        project_status=ProjectStatus.ACTIVE,
+        is_project_member=True,
+        has_exact_action_grant=True,
+    ),
+    recipient=BOB,
+    recipient_has_pending_recovery=False,
+    recipient_has_coherent_identity=True,
+    recipient_is_project_member=False,
 )
 
 
@@ -156,16 +163,16 @@ class MockMembershipResults(ProjectMembershipChangeResultReader):
     def __init__(self, events: list[str]) -> None:
         self.events = events
         self.result = ProjectMembershipChangeResultDTO(
-            INSTALLATION,
-            ORG,
-            PROJECT,
-            ALICE.id,
-            BOB.id,
-            ProjectMembershipChangeKind.ADD,
-            8,
-            True,
-            201,
-            SAVED_RESULT,
+            installation_id=INSTALLATION,
+            organization_id=ORG,
+            project_id=PROJECT,
+            actor_principal_id=ALICE.id,
+            principal_id=BOB.id,
+            change_kind=ProjectMembershipChangeKind.ADD,
+            access_revision=8,
+            changed=True,
+            status_code=201,
+            operation=SAVED_RESULT,
         )
 
     @override

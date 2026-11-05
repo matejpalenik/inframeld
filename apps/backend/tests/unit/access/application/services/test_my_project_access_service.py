@@ -88,16 +88,16 @@ GRANTS = (
 MEMBERSHIP = MyProjectAccessRelationshipDTO(MyProjectAccessItemKind.MEMBERSHIP, PROJECT, GROUP)
 MANAGEMENT = MyProjectAccessRelationshipDTO(MyProjectAccessItemKind.MANAGEMENT, PROJECT, GROUP)
 FACTS = MyProjectAccessFactsDTO(
-    INSTALLATION,
-    ORGANIZATION,
-    PROJECT,
-    7,
-    ACTOR,
-    False,
-    None,
-    ProjectStatus.ACTIVE,
-    True,
-    (*GRANTS, MEMBERSHIP, MANAGEMENT),
+    installation_id=INSTALLATION,
+    organization_id=ORGANIZATION,
+    project_id=PROJECT,
+    access_revision=7,
+    actor=ACTOR,
+    has_pending_recovery=False,
+    oauth_credential_facts=None,
+    project_status=ProjectStatus.ACTIVE,
+    is_project_member=True,
+    items=(*GRANTS, MEMBERSHIP, MANAGEMENT),
 )
 
 

@@ -95,18 +95,18 @@ OPERATION = CompletedSynchronousOperationDTO(
     datetime(2030, 1, 1, tzinfo=UTC),
 )
 RESULT = ProjectActionGrantChangeResultDTO(
-    InstallationId(UUID(int=5)),
-    OrganizationId(UUID(int=4)),
-    PROJECT,
-    ACTOR,
-    RECIPIENT,
-    ACTION,
-    ProjectActionGrantChangeKind.SET,
-    False,
-    8,
-    True,
-    201,
-    OPERATION,
+    installation_id=InstallationId(UUID(int=5)),
+    organization_id=OrganizationId(UUID(int=4)),
+    project_id=PROJECT,
+    actor_principal_id=ACTOR,
+    recipient_principal_id=RECIPIENT,
+    action_id=ACTION,
+    change_kind=ProjectActionGrantChangeKind.SET,
+    can_grant=False,
+    access_revision=8,
+    changed=True,
+    status_code=201,
+    operation=OPERATION,
 )
 
 

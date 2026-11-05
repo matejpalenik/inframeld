@@ -190,13 +190,13 @@ def scenario() -> BootstrapScenarioDTO:
     installed = InstallationId(UUID(int=1))
     binding = HumanOAuthCredentialBindingDTO(identity, installed, HumanCredentialVersion(1))
     facts = FirstAdministratorBootstrapFactsDTO(
-        installed,
-        identity,
-        HumanCredentialStateDTO(installed, identity, binding.version, False),
-        None,
-        False,
-        False,
-        datetime(2026, 1, 1, tzinfo=UTC),
+        installation_id=installed,
+        identity=identity,
+        credential_state=HumanCredentialStateDTO(installed, identity, binding.version, False),
+        principal=None,
+        has_business_state=False,
+        has_bootstrap_claim=False,
+        observed_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
     events: list[str] = []
     token = MockTokenVerifier(events, binding)
@@ -216,13 +216,13 @@ def scenario() -> BootstrapScenarioDTO:
             ),
         ),
         BootstrapFirstAdministratorCommand(
-            installed,
-            OperationId("first-claim"),
-            0,
-            UUID(int=2),
-            "Operator",
-            "First admission",
-            HumanAccessTokenCredential("private-proof"),
+            expected_installation_id=installed,
+            operation_id=OperationId("first-claim"),
+            expected_access_revision=0,
+            expected_identity_id=UUID(int=2),
+            operator_label="Operator",
+            reason="First admission",
+            identity_proof=HumanAccessTokenCredential("private-proof"),
         ),
         events,
         token,

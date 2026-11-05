@@ -275,22 +275,29 @@ def _scenario() -> Scenario:
         command.recovery_operation_id,
     )
     work = IdentityRecoveryCleanupWorkDTO(
-        installation,
-        admission,
-        uuid4(),
-        True,
-        HumanCredentialVersion(2),
-        State.CONFIRMED,
-        None,
-        State.PENDING,
-        State.PENDING,
-        None,
-        None,
-        IdentityRecoveryCleanupRunDTO(
-            uuid4(), now, now + timedelta(hours=1), now, 12, 1, now, "permanent_provider_rejection"
+        installation_id=installation,
+        admission=admission,
+        evidence_receipt_id=uuid4(),
+        has_original_password_receipt=True,
+        credential_version=HumanCredentialVersion(2),
+        kratos_cleanup_state=State.CONFIRMED,
+        released_at=None,
+        cli_grants_state=State.PENDING,
+        remembered_logins_state=State.PENDING,
+        cli_confirmation_attempt_id=None,
+        login_confirmation_attempt_id=None,
+        run=IdentityRecoveryCleanupRunDTO(
+            id=uuid4(),
+            authorized_at=now,
+            deadline=now + timedelta(hours=1),
+            next_attempt_at=now,
+            max_attempts=12,
+            consumed_attempts=1,
+            ended_at=now,
+            terminal_reason="permanent_provider_rejection",
         ),
-        None,
-        (),
+        claim=None,
+        steps=(),
     )
     trace: list[str] = []
     transactions = _FakeTransactions(trace)
@@ -382,12 +389,12 @@ async def test_expired_lease_or_live_final_attempt_does_not_grant_budget(
 ) -> None:
     s = _scenario()
     claim = IdentityRecoveryCleanupClaimDTO(
-        s.command.recovery_operation_id,
-        s.work.run.id,
-        uuid4(),
-        uuid4(),
-        uuid4(),
-        datetime.now(UTC) + timedelta(seconds=lease_seconds),
+        operation_id=s.command.recovery_operation_id,
+        run_id=s.work.run.id,
+        attempt_id=uuid4(),
+        worker_id=uuid4(),
+        token=uuid4(),
+        lease_expires_at=datetime.now(UTC) + timedelta(seconds=lease_seconds),
     )
     work = replace(
         s.work,
@@ -404,12 +411,12 @@ async def test_expired_lease_or_live_final_attempt_does_not_grant_budget(
 async def test_expired_final_attempt_is_settled_after_receipt_before_replacement() -> None:
     s = _scenario()
     claim = IdentityRecoveryCleanupClaimDTO(
-        s.command.recovery_operation_id,
-        s.work.run.id,
-        uuid4(),
-        uuid4(),
-        uuid4(),
-        datetime.now(UTC) - timedelta(seconds=1),
+        operation_id=s.command.recovery_operation_id,
+        run_id=s.work.run.id,
+        attempt_id=uuid4(),
+        worker_id=uuid4(),
+        token=uuid4(),
+        lease_expires_at=datetime.now(UTC) - timedelta(seconds=1),
     )
     work = replace(
         s.work, run=replace(s.work.run, ended_at=None, consumed_attempts=12), claim=claim

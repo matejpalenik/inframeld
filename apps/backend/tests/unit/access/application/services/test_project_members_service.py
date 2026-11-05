@@ -64,8 +64,22 @@ MEMBERS = (
     ProjectMemberDTO(PrincipalId(UUID(int=20)), "Alias", PrincipalKind.APPLICATION),
     ProjectMemberDTO(PrincipalId(UUID(int=30)), "Alias", PrincipalKind.HUMAN),
 )
-ACTION = ProjectActionFactsDTO(ACTOR, False, None, ProjectStatus.ACTIVE, True, True)
-FACTS = ProjectMembersPageFactsDTO(INSTALLATION, ORGANIZATION, PROJECT, 7, ACTION, MEMBERS)
+ACTION = ProjectActionFactsDTO(
+    principal=ACTOR,
+    has_pending_recovery=False,
+    oauth_credential_facts=None,
+    project_status=ProjectStatus.ACTIVE,
+    is_project_member=True,
+    has_exact_action_grant=True,
+)
+FACTS = ProjectMembersPageFactsDTO(
+    installation_id=INSTALLATION,
+    organization_id=ORGANIZATION,
+    project_id=PROJECT,
+    access_revision=7,
+    action=ACTION,
+    members=MEMBERS,
+)
 
 
 def _cursor(
