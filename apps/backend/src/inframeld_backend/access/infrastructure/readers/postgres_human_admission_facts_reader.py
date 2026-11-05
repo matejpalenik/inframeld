@@ -148,7 +148,12 @@ class PostgresHumanAdmissionFactsReader(HumanAdmissionFactsReader):
                     if state.installation_id != installation_id or state_row is None:
                         raise DependencyUnavailableError()
                     return HumanAdmissionFactsDTO(
-                        installation_id, identity, actor, principal, state, state_row[3]
+                        installation_id=installation_id,
+                        identity=identity,
+                        actor=actor,
+                        principal=principal,
+                        credential_state=state,
+                        has_credential_history=state_row[3],
                     )
         except (TimeoutError, OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None

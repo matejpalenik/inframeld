@@ -151,12 +151,12 @@ class IdentityRecoveryCleanupExecutionService(IdentityRecoveryCleanupExecutor):
                 return False
 
             claim = IdentityRecoveryCleanupClaimDTO(
-                operation_id,
-                work.run.id,
-                uuid4(),
-                self._worker_id,
-                uuid4(),
-                now + timedelta(seconds=self._lease_seconds),
+                operation_id=operation_id,
+                run_id=work.run.id,
+                attempt_id=uuid4(),
+                worker_id=self._worker_id,
+                token=uuid4(),
+                lease_expires_at=now + timedelta(seconds=self._lease_seconds),
             )
             await self._recovery_cleanup_writer.claim(work, claim, at=now)
 

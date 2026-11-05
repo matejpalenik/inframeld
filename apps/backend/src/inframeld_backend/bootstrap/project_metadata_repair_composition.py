@@ -47,7 +47,7 @@ from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_ma
 
 @asynccontextmanager
 async def open_project_metadata_repair(
-    database: Database, fingerprints: ProjectMetadataFingerprintService
+    database: Database, metadata_fingerprint_service: ProjectMetadataFingerprintService
 ) -> AsyncGenerator[ProjectMetadataRepairer]:
     async with database.session() as session:
         yield ProjectMetadataRepairService(
@@ -56,7 +56,7 @@ async def open_project_metadata_repair(
             metadata_repair_writer=PostgresProjectMetadataRepairWriter(
                 session, PostgresProjectMetadataAuditWriter(session)
             ),
-            metadata_fingerprint_service=fingerprints,
+            metadata_fingerprint_service=metadata_fingerprint_service,
         )
 
 
@@ -76,13 +76,14 @@ async def execute_project_metadata_repair(
         authenticator = access.access_token_authenticator
         if authenticator is None:
             raise DependencyUnavailableError("Recipient verification is unavailable.")
-        fingerprints = ProjectMetadataFingerprintService(
+        metadata_fingerprint_service = ProjectMetadataFingerprintService(
             RequestFingerprintService(
                 FileRequestFingerprintKeyReader(settings.request_fingerprint.key_file).read()
             )
         )
         return await ProjectMetadataMaintenanceCli(
-            authenticator, partial(open_project_metadata_repair, database, fingerprints)
+            authenticator,
+            partial(open_project_metadata_repair, database, metadata_fingerprint_service),
         ).execute(command)
     finally:
         if access is not None:

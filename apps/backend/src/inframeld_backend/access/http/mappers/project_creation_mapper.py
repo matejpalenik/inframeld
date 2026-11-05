@@ -4,10 +4,10 @@ from inframeld_backend.access.application.commands.create_project_command import
 from inframeld_backend.access.application.dtos.project_creation_result_dto import (
     ProjectCreationResultDTO,
 )
-from inframeld_backend.access.domain.enums.project_departure_target_kind import (
-    ProjectDepartureTargetKind,
-)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
+from inframeld_backend.access.http.enums.grant_target_kind import (
+    GrantTargetKind,
+)
 from inframeld_backend.access.http.requests.project_creation_request import ProjectCreationRequest
 from inframeld_backend.access.http.responses.initial_project_grant_response import (
     InitialProjectGrantResponse,
@@ -47,7 +47,7 @@ class ProjectCreationMapper:
     def response(result: ProjectCreationResultDTO) -> ProjectCreationResponse:
         project = result.project
         target = ProjectGrantTargetResponse(
-            kind=ProjectDepartureTargetKind.PROJECT, project_id=project.project_id.value
+            kind=GrantTargetKind.PROJECT, project_id=project.project_id.value
         )
         return ProjectCreationResponse.model_validate(
             {

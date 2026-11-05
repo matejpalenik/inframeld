@@ -37,6 +37,42 @@ export type AcceptedOperationLookupResponse = {
 };
 
 /**
+ * AccessGroupGrantTargetResponse
+ */
+export type AccessGroupGrantTargetResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Kind
+     */
+    kind: 'access-group';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * ApplicationAccountGrantTargetResponse
+ */
+export type ApplicationAccountGrantTargetResponse = {
+    /**
+     * Applicationprincipalid
+     */
+    applicationPrincipalId: string;
+    /**
+     * Kind
+     */
+    kind: 'application-account';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
  * CompletedOperationLookupResponse
  *
  * Expose safe synchronous outcome metadata without replaying content.
@@ -279,6 +315,74 @@ export type MyOrganizationAccessResponse = {
 };
 
 /**
+ * MyProjectAccessGrantResponse
+ */
+export type MyProjectAccessGrantResponse = {
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Target
+     */
+    target: ({
+        kind: 'project';
+    } & ProjectGrantTargetResponse) | ({
+        kind: 'access-group';
+    } & AccessGroupGrantTargetResponse) | ({
+        kind: 'application-account';
+    } & ApplicationAccountGrantTargetResponse);
+};
+
+/**
+ * MyProjectAccessGroupResponse
+ */
+export type MyProjectAccessGroupResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+};
+
+/**
+ * MyProjectAccessResponse
+ */
+export type MyProjectAccessResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Grants
+     */
+    grants: Array<MyProjectAccessGrantResponse>;
+    /**
+     * Groupmanagements
+     */
+    groupManagements: Array<MyProjectAccessGroupResponse>;
+    /**
+     * Groupmemberships
+     */
+    groupMemberships: Array<MyProjectAccessGroupResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
  * OAuthConsentDecision
  */
 export type OAuthConsentDecision = 'allow' | 'deny';
@@ -470,6 +574,96 @@ export type ProjectActionGrantItemResponse = {
      * Cangrant
      */
     canGrant: boolean;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
+ * ProjectActionGrantRemovalResponse
+ */
+export type ProjectActionGrantRemovalResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
+ * ProjectActionGrantRequest
+ */
+export type ProjectActionGrantRequest = {
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * ProjectActionGrantResponse
+ */
+export type ProjectActionGrantResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
     /**
      * Projectid
      */
@@ -1734,6 +1928,159 @@ export type AssignProjectUseOnlyGrantResponses = {
 
 export type AssignProjectUseOnlyGrantResponse = AssignProjectUseOnlyGrantResponses[keyof AssignProjectUseOnlyGrantResponses];
 
+export type RemoveProjectActionGrantData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type RemoveProjectActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveProjectActionGrantError = RemoveProjectActionGrantErrors[keyof RemoveProjectActionGrantErrors];
+
+export type RemoveProjectActionGrantResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectActionGrantRemovalResponse;
+};
+
+export type RemoveProjectActionGrantResponse = RemoveProjectActionGrantResponses[keyof RemoveProjectActionGrantResponses];
+
+export type SetProjectActionGrantData = {
+    body: ProjectActionGrantRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type SetProjectActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type SetProjectActionGrantError = SetProjectActionGrantErrors[keyof SetProjectActionGrantErrors];
+
+export type SetProjectActionGrantResponses = {
+    /**
+     * Changed or unchanged existing assignment.
+     */
+    200: ProjectActionGrantResponse;
+    /**
+     * Successful Response
+     */
+    201: ProjectActionGrantResponse;
+};
+
+export type SetProjectActionGrantResponse = SetProjectActionGrantResponses[keyof SetProjectActionGrantResponses];
+
 export type ListProjectMembersData = {
     body?: never;
     path: {
@@ -2059,6 +2406,65 @@ export type UpdateProjectMetadataResponses = {
 };
 
 export type UpdateProjectMetadataResponse = UpdateProjectMetadataResponses[keyof UpdateProjectMetadataResponses];
+
+export type GetMyProjectAccessData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/my-access';
+};
+
+export type GetMyProjectAccessErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetMyProjectAccessError = GetMyProjectAccessErrors[keyof GetMyProjectAccessErrors];
+
+export type GetMyProjectAccessResponses = {
+    /**
+     * Successful Response
+     */
+    200: MyProjectAccessResponse;
+};
+
+export type GetMyProjectAccessResponse = GetMyProjectAccessResponses[keyof GetMyProjectAccessResponses];
 
 export type GetCurrentSessionData = {
     body?: never;

@@ -81,9 +81,13 @@ class PostgresIdentityRecoveryCleanupWriter(IdentityRecoveryCleanupWriter):
             raise ConflictError("The original cleanup job is unavailable.")
         return job
 
-    async def _owner(
+    async def _require_current_cleanup_owner(
         self, claim: IdentityRecoveryCleanupClaimDTO, *, at: datetime
     ) -> IdentityRecoveryCleanupJobRow:
+        """Reject a replaced or expired worker claim before it can update cleanup progress.
+
+        The original run must still be active as well as matching the retained lease.
+        """
         job = await self._job(claim.operation_id.value)
         if (job.active_attempt_id, job.worker_id, job.ownership_token, job.lease_expires_at) != (
             claim.attempt_id,
@@ -164,7 +168,7 @@ class PostgresIdentityRecoveryCleanupWriter(IdentityRecoveryCleanupWriter):
         *,
         at: datetime,
     ) -> None:
-        job = await self._owner(claim, at=at)
+        job = await self._require_current_cleanup_owner(claim, at=at)
         run = await self._session.get(IdentityRecoveryCleanupRunRow, claim.run_id)
         if run is None or at >= run.deadline:
             raise ConflictError("The recovery dispatch deadline has elapsed.")
@@ -193,7 +197,7 @@ class PostgresIdentityRecoveryCleanupWriter(IdentityRecoveryCleanupWriter):
         *,
         at: datetime,
     ) -> None:
-        job = await self._owner(claim, at=at)
+        job = await self._require_current_cleanup_owner(claim, at=at)
         changed = await self._session.scalar(
             update(IdentityRecoveryCleanupStepRow)
             .where(

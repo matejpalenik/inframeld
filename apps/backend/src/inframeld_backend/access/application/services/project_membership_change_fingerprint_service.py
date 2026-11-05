@@ -31,6 +31,7 @@ class ProjectMembershipChangeFingerprintService:
 
     @staticmethod
     def _canonical(command: AddProjectMemberCommand | RemoveProjectMemberCommand) -> bytes:
+        """Keep membership request bytes stable so retries match their original reservation."""
         return json.dumps(
             {
                 "projectId": str(command.project_id.value),

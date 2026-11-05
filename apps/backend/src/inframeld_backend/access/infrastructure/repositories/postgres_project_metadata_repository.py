@@ -172,14 +172,14 @@ class PostgresProjectMetadataRepository(ProjectMetadataRepository):
             )
             await self._metadata_audit_writer.changed(
                 ProjectMetadataChangedAuditEventDTO(
-                    metadata.organization_id,
-                    metadata.project_id,
-                    actor_id,
-                    operation_id,
-                    old_revision,
-                    metadata.revision,
-                    metadata.name != old_name,
-                    metadata.display_name != old_label,
+                    organization_id=metadata.organization_id,
+                    project_id=metadata.project_id,
+                    actor_id=actor_id,
+                    operation_id=operation_id,
+                    before_revision=old_revision,
+                    after_revision=metadata.revision,
+                    name_changed=metadata.name != old_name,
+                    display_name_changed=metadata.display_name != old_label,
                 )
             )
             await self._session.flush()

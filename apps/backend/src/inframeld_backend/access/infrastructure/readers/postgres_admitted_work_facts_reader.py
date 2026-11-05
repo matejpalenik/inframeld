@@ -168,18 +168,18 @@ class PostgresAdmittedWorkFactsReader(AdmittedWorkFactsReader):
             return None
         principal, status, is_member, has_grant, pending, binding_matches, current_version = row
         return AdmittedWorkFactsDTO(
-            Principal(
+            principal=Principal(
                 PrincipalId(principal.id),
                 OrganizationId(principal.organization_id),
                 principal.kind,
                 principal.status,
             ),
-            InstallationId(installation),
-            status,
-            is_member,
-            has_grant,
-            pending,
-            HumanOAuthCredentialFactsDTO(
+            installation_id=InstallationId(installation),
+            project_status=status,
+            is_project_member=is_member,
+            has_exact_action_grant=has_grant,
+            has_pending_recovery=pending,
+            human_generation=HumanOAuthCredentialFactsDTO(
                 binding_matches,
                 HumanCredentialVersion(current_version) if current_version is not None else None,
             )

@@ -1,6 +1,6 @@
 # ADR-0073: Carry explicit authentication evidence in Access contexts
 
-**Status:** Accepted
+**Status:** Accepted, partially superseded by [ADR-0127](ADR-0127-fence-human-authentication-evidence-at-restoration.md) on 2026-11-05 for browser evidence and its currentness checks. The original three-family distinction, secret exclusion and separate current authorization remain selected. The restoration extension is accepted design with implementation and qualification unfinished.
 
 **Date:** 2026-10-24
 
@@ -17,6 +17,8 @@ Alice's CLI credential needs its original version checked again during authoriza
 - Require one complete evidence record from three concrete alternatives. This is selected. Each alternative carries the data needed for its credential family, without a base class or Protocol hierarchy.
 
 ## Decision Outcome
+
+The fields and browser-currentness exception below describe the original decision and current inspected implementation. ADR-0127 requires a captured installation/identity/version binding before final same-cookie verification, followed by current-version checks during authorization. Its explicit late-created-session tolerance remains part of that limited guarantee. Do not treat the original identity-only browser shape as the completed restoration contract.
 
 `AccessContextDTO` remains a frozen application transfer record. It requires the local `PrincipalId` and browser-session, human OAuth or application-key evidence. Browser evidence contains the verified provider identity. OAuth evidence retains the existing identity, installation and version binding. Application evidence contains a distinct typed public key ID. No credential secret, mutable account status or permission snapshot is retained.
 

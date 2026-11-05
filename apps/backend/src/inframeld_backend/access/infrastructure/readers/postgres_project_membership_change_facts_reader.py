@@ -236,14 +236,14 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
             current_version,
         ) = row
         return ProjectMembershipChangeFactsDTO(
-            installation,
-            org,
-            ProjectId(project_row.id),
-            project_row.access_revision,
-            ProjectActionFactsDTO(
-                self._principal(actor_row),
-                actor_pending,
-                HumanOAuthCredentialFactsDTO(
+            installation_id=installation,
+            organization_id=org,
+            project_id=ProjectId(project_row.id),
+            access_revision=project_row.access_revision,
+            action=ProjectActionFactsDTO(
+                principal=self._principal(actor_row),
+                has_pending_recovery=actor_pending,
+                oauth_credential_facts=HumanOAuthCredentialFactsDTO(
                     binding_matches,
                     HumanCredentialVersion(current_version)
                     if current_version is not None
@@ -251,14 +251,14 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                 )
                 if isinstance(evidence, HumanOAuthCredentialBindingDTO)
                 else None,
-                project_row.status,
-                actor_is_member,
-                has_authority,
+                project_status=project_row.status,
+                is_project_member=actor_is_member,
+                has_exact_action_grant=has_authority,
             ),
-            self._principal(recipient_row) if recipient_row is not None else None,
-            recipient_pending,
-            coherent,
-            recipient_is_member,
+            recipient=self._principal(recipient_row) if recipient_row is not None else None,
+            recipient_has_pending_recovery=recipient_pending,
+            recipient_has_coherent_identity=coherent,
+            recipient_is_project_member=recipient_is_member,
         )
 
     @override
@@ -468,13 +468,13 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
         )
         return tuple(
             ProjectDepartureCandidateDTO(
-                self._principal(principal),
-                pending,
-                member,
-                coherent,
-                can_grant,
-                member_of_group,
-                manages_group,
+                principal=self._principal(principal),
+                has_pending_recovery=pending,
+                is_project_member=member,
+                has_coherent_identity=coherent,
+                can_grant=can_grant,
+                is_group_member=member_of_group,
+                is_group_manager=manages_group,
             )
             for principal, pending, member, coherent, can_grant, member_of_group, manages_group in rows
         )

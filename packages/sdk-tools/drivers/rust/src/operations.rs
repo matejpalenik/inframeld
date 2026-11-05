@@ -11,6 +11,61 @@ pub async fn observe(
 ) -> Observation {
     let body = request.body.clone().unwrap_or(Value::Null);
     match request.operation.as_str() {
+        "getMyProjectAccess" => observed!(
+            client
+                .get_my_project_access(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str)
+                )
+                .await
+        ),
+        "setProjectActionGrant" => observed!(
+            client
+                .set_project_action_grant(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["action_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
+        "removeProjectActionGrant" => observed!(
+            client
+                .remove_project_action_grant(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["action_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
         "addProjectMember" => observed!(
             client
                 .add_project_member(

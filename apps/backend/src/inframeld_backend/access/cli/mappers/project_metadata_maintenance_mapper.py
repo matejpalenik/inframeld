@@ -76,14 +76,16 @@ class ProjectMetadataMaintenanceMapper:
             if type(revision) is not int:
                 raise ValueError("A whole-number review revision is required.")
             return RepairProjectMetadataAuthorityCommand(
-                InstallationId(UUID(_text(values["expectedInstallationId"]))),
-                OperationId(_text(values["operationId"])),
-                ProjectId(UUID(_text(target["projectId"]))),
-                revision,
-                UUID(_text(values["expectedIdentityId"])),
-                _text(values["operatorLabel"]),
-                _text(values["reason"]),
-                HumanAccessTokenCredential(_text(proof["accessToken"])),
+                expected_installation_id=InstallationId(
+                    UUID(_text(values["expectedInstallationId"]))
+                ),
+                operation_id=OperationId(_text(values["operationId"])),
+                project_id=ProjectId(UUID(_text(target["projectId"]))),
+                expected_access_revision=revision,
+                expected_identity_id=UUID(_text(values["expectedIdentityId"])),
+                operator_label=_text(values["operatorLabel"]),
+                reason=_text(values["reason"]),
+                identity_proof=HumanAccessTokenCredential(_text(proof["accessToken"])),
             )
         except (ValueError, TypeError, UnicodeError, RecursionError):
             raise ProjectMetadataMaintenanceInputError(operation_id) from None

@@ -204,18 +204,18 @@ class PostgresIdentityRecoveryCleanupProofReader(IdentityRecoveryCleanupProofRea
             and job.evidence_receipt_id == receipt.id
         )
         return IdentityRecoveryCleanupProofDTO(
-            self._installation_id,
-            self._admission(admission),
-            self._admission(original_source),
-            receipt.id,
-            proof.cli_confirmation_attempt_id,
-            proof.login_confirmation_attempt_id,
-            password,
-            original_source.kratos_cleanup_state,
-            cli_confirmed,
-            login_confirmed,
-            proof.checked_at,
-            proof.propagation_complete,
+            installation_id=self._installation_id,
+            admission=self._admission(admission),
+            source_admission=self._admission(original_source),
+            source_receipt_id=receipt.id,
+            cli_confirmation_attempt_id=proof.cli_confirmation_attempt_id,
+            login_confirmation_attempt_id=proof.login_confirmation_attempt_id,
+            has_password_saved_receipt=password,
+            source_kratos_cleanup_state=original_source.kratos_cleanup_state,
+            has_cli_confirmation=cli_confirmed,
+            has_login_confirmation=login_confirmed,
+            checked_at=proof.checked_at,
+            propagation_complete=proof.propagation_complete,
         )
 
     @override

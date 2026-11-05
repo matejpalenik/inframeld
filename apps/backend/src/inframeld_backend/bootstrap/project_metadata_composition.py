@@ -41,7 +41,7 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
 
 @asynccontextmanager
 async def open_project_metadata(
-    database: Database, fingerprints: ProjectMetadataFingerprintService
+    database: Database, metadata_fingerprint_service: ProjectMetadataFingerprintService
 ) -> AsyncGenerator[ProjectMetadataService]:
     async with database.session() as session:
         yield ProjectMetadataService(
@@ -53,7 +53,7 @@ async def open_project_metadata(
                 session, PostgresProjectMetadataAuditWriter(session)
             ),
             operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-            metadata_fingerprint_service=fingerprints,
+            metadata_fingerprint_service=metadata_fingerprint_service,
         )
 
 

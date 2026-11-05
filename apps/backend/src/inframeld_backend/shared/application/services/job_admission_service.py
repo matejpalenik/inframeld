@@ -63,7 +63,7 @@ class JobAdmissionService:
     def __init__(
         self,
         action_authorizer: ActionAuthorizer,
-        work_authorizer: AdmittedWorkAuthorizer,
+        admitted_work_authorizer: AdmittedWorkAuthorizer,
         operation_idempotency: OperationIdempotency,
         job_store: JobStore,
         job_admission_audit_writer: JobAdmissionAuditWriter,
@@ -72,7 +72,7 @@ class JobAdmissionService:
         capacity: int = 8,
     ) -> None:
         self._action_authorizer = action_authorizer
-        self._work_authorizer = work_authorizer
+        self._admitted_work_authorizer = admitted_work_authorizer
         self._operation_idempotency = operation_idempotency
         self._job_store = job_store
         self._job_admission_audit_writer = job_admission_audit_writer
@@ -118,7 +118,7 @@ class JobAdmissionService:
             or authorization.project_id != authority.project_id
         ):
             raise RuntimeError("Admission authorization returned another scope.")
-        await self._work_authorizer.require_current(authority)
+        await self._admitted_work_authorizer.require_current(authority)
         operation = await self._operation_idempotency.reserve_or_recover(
             context=context,
             access=access,

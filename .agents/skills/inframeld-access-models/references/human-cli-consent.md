@@ -24,7 +24,7 @@ The narrowly scoped credential-state initializer may commit metadata before brow
 
 ## Login and approval across the boundary
 
-**Accepted end-to-end target with inspected backend consent.** The sequence groups protocol details for readability. The complete CLI/account-UI path remains unfinished, and the checks below do not establish a universal issuance fence.
+**Accepted end-to-end target with inspected backend consent.** The sequence groups protocol details for readability. The complete CLI/account-UI path remains unfinished, and the checks below do not establish a universal issuance fence. The diagram retains the inspected version/recovery checks. The accepted linked-human restoration checks below are an additional, unimplemented extension.
 
 ```mermaid
 ---
@@ -65,6 +65,16 @@ sequenceDiagram
 ```
 
 The grouped read-only branch includes browser/subject and recovery checks before display or denial. It does not approve a login. The credential exchange is conditional on successful approval or checked permitted continuation. Consent supplies no local account, project grant or recovery-block release authority. [The inspected service](../../../../apps/backend/src/inframeld_backend/access/application/services/human_oauth_consent_service.py) retains the exact early-validation, capture and reread ordering.
+
+<a id="linked-human-restoration-checks"></a>
+
+## Check linked humans across restoration
+
+**Accepted under [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md), not current implemented consent behavior.** Keep genuinely unadmitted identity consent, subject to existing exact identity/installation, version/history and recovery-block checks. No local link is different from a linked human whose required facts are missing or incoherent. Neither case permits automatic account creation or fallback identity matching.
+
+For a linked human, both initial and final approval observations must reject `SUSPENDED`, `RETIRED` and incoherent linkage as well as independent recovery blocking. An initially blocked attempt stays denied even if restoration or completion clears that block during browser verification. Only unchanged, eligible observations for the exact captured identity/installation/version can reach allowance. The current credential-state projection observes version and recovery blocking, so these linked-status checks remain implementation work.
+
+An approval already sent to Hydra can finish late. It must retain the original captured OAuth version, never today's replacement version. After restoration advances that version, Inframeld rejects the old binding even if Hydra still considers it active. This does not drain every issuance or establish a session's causal generation. [Browser evidence](browser-sessions.md#restoration-evidence-cutover) owns final same-cookie verification, its shared provider/total deadlines and the explicitly accepted late-created Kratos-session limit. No provider wait holds SQL open, and no new consent allowance or automatic retry is introduced.
 
 <a id="remembering-approval-is-not-remembering-authority"></a>
 

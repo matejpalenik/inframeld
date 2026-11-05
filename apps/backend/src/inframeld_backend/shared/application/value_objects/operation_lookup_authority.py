@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from uuid import UUID
 
 from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
@@ -57,14 +58,36 @@ class OperationLookupAuthority:
             raise InvalidInputError()
 
         family = OperationLookupAuthorityFamily
-        if requested_route == _GRANT_ROUTE or self.family is family.PROJECT_GRANT_READ:
-            if not (
+        parts = requested_route.split("/")
+        grant_path = (
+            len(parts) >= 5 and parts[:3] == ["", "v1", "projects"] and parts[4] == "grants"
+        )
+        if grant_path or self.family is family.PROJECT_GRANT_READ:
+            legacy = (
                 requested_route == _GRANT_ROUTE
                 and method == "POST"
                 and project_id is not None
                 and self.family is family.PROJECT_GRANT_READ
-                and self.action_id.value == ProjectAction.CREATE_ACCESS_GROUPS.value
+                and self.action_id.value == "create-access-groups"
+            )
+            management = False
+            if (
+                len(parts) == 7
+                and method in {"PUT", "DELETE"}
+                and project_id is not None
+                and self.family is family.PROJECT_GRANT_READ
+                and self.action_id.value in _PROJECT_ACTIONS
+                and parts[6] == self.action_id.value
             ):
+                try:
+                    management = (
+                        UUID(parts[3]) == project_id.value
+                        and str(project_id.value) == parts[3]
+                        and str(UUID(parts[5])) == parts[5]
+                    )
+                except ValueError:
+                    management = False
+            if not legacy and not management:
                 raise InvalidInputError()
             return
 

@@ -3,6 +3,9 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from inframeld_backend.access.application.dtos.project_action_grant_changed_audit_event_dto import (
+    ProjectActionGrantChangedAuditEventDTO,
+)
 from inframeld_backend.access.application.dtos.project_use_only_grant_assigned_audit_event_dto import (
     ProjectUseOnlyGrantAssignedAuditEventDTO,
 )
@@ -21,7 +24,27 @@ class PostgresAuditEventWriter(AuditEventWriter):
         self._session = session
 
     @override
-    async def append(self, event: ProjectUseOnlyGrantAssignedAuditEventDTO) -> None:
+    async def append(
+        self,
+        event: ProjectUseOnlyGrantAssignedAuditEventDTO | ProjectActionGrantChangedAuditEventDTO,
+    ) -> None:
+        before: dict[str, object] | None = None
+        after: dict[str, object] | None = {"can_grant": False}
+        event_type = "project_action_grant_assigned"
+        if isinstance(event, ProjectActionGrantChangedAuditEventDTO):
+            before = (
+                {"can_grant": event.before_can_grant}
+                if event.before_can_grant is not None
+                else None
+            )
+            after = {"can_grant": event.can_grant} if event.can_grant is not None else None
+            event_type = (
+                "project_action_grant_removed"
+                if event.can_grant is None
+                else "project_action_grant_level_changed"
+                if event.before_can_grant is not None
+                else "project_action_grant_assigned"
+            )
         self._session.add(
             AccessAuditEventRow(
                 id=uuid4(),
@@ -30,11 +53,12 @@ class PostgresAuditEventWriter(AuditEventWriter):
                 actor_kind=PrincipalKind.HUMAN.value,
                 actor_principal_id=event.actor_principal_id.value,
                 affected_principal_id=event.recipient_principal_id.value,
-                event_type="project_action_grant_assigned",
+                event_type=event_type,
                 target_kind="project",
                 target_id=event.project_id.value,
                 action=event.action_id.value,
-                after_values={"can_grant": False},
+                before_values=before,
+                after_values=after,
                 correlation_id=event.operation_id.value,
             )
         )

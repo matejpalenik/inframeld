@@ -71,15 +71,15 @@ class PostgresProjectCreationResultReader(ProjectCreationResultReader):
             raise ConflictError("The original creation result is incoherent.")
         try:
             return CreatedProjectDTO(
-                operation_id,
-                organization_id,
-                ProjectId(row.project_id),
-                actor_id,
-                ResourceName(row.name),
-                row.display_name,
-                row.access_revision,
-                row.metadata_revision,
-                tuple(ActionId(action) for action in row.initial_actions),
+                operation_id=operation_id,
+                organization_id=organization_id,
+                project_id=ProjectId(row.project_id),
+                creator_principal_id=actor_id,
+                name=ResourceName(row.name),
+                display_name=row.display_name,
+                access_revision=row.access_revision,
+                metadata_revision=row.metadata_revision,
+                initial_actions=tuple(ActionId(action) for action in row.initial_actions),
             )
         except (ValueError, TypeError):
             raise ConflictError("The original creation result is incoherent.") from None

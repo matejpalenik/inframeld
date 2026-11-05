@@ -149,13 +149,13 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
         run_id = uuid4() if outcome is Outcome.AUTHORIZED else None
         budget = IdentityRecoveryCleanupRunBudget(now) if run_id is not None else None
         result = IdentityRecoveryCleanupResumeResultDTO(
-            command.operation_id,
-            installed,
-            command.recovery_operation_id,
-            outcome,
-            facts.released_at is not None,
-            run_id,
-            None if budget is None else budget.deadline,
+            operation_id=command.operation_id,
+            installation_id=installed,
+            recovery_operation_id=command.recovery_operation_id,
+            outcome=outcome,
+            released=facts.released_at is not None,
+            run_id=run_id,
+            deadline=None if budget is None else budget.deadline,
         )
         receipt = IdentityRecoveryMaintenanceReceiptDTO(command, now, result)
 

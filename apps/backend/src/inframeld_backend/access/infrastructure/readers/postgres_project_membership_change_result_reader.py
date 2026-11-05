@@ -97,14 +97,14 @@ class PostgresProjectMembershipChangeResultReader(ProjectMembershipChangeResultR
         ):
             raise ConflictError("The original membership result is incoherent.")
         return ProjectMembershipChangeResultDTO(
-            facts.installation_id,
-            facts.organization_id,
-            facts.project_id,
-            facts.action.principal.id,
-            principal_id,
-            change_kind,
-            row.access_revision,
-            row.changed,
-            row.status_code,
-            operation,
+            installation_id=facts.installation_id,
+            organization_id=facts.organization_id,
+            project_id=facts.project_id,
+            actor_principal_id=facts.action.principal.id,
+            principal_id=principal_id,
+            change_kind=change_kind,
+            access_revision=row.access_revision,
+            changed=row.changed,
+            status_code=row.status_code,
+            operation=operation,
         )

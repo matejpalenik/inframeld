@@ -124,15 +124,15 @@ class ProjectCreationService(ProjectCreator):
                 if command.expected_access_revision != scope.access_revision:
                     raise StaleRevisionError()
                 project = CreatedProjectDTO(
-                    operation.operation_id,
-                    scope.organization_id,
-                    ProjectId(uuid4()),
-                    access.actor_principal_id,
-                    command.name,
-                    command.display_name.value,
-                    1,
-                    0,
-                    actions,
+                    operation_id=operation.operation_id,
+                    organization_id=scope.organization_id,
+                    project_id=ProjectId(uuid4()),
+                    creator_principal_id=access.actor_principal_id,
+                    name=command.name,
+                    display_name=command.display_name.value,
+                    access_revision=1,
+                    metadata_revision=0,
+                    initial_actions=actions,
                 )
                 await self._creation_writer.create(
                     project=project, expected_organization_revision=scope.access_revision

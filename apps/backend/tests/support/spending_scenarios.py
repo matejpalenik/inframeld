@@ -434,7 +434,7 @@ def accounting_service(
         job_ownership=PostgresJobStore(session),
         spending_ledger_reader=PostgresSpendingLedgerReader(session),
         spending_ledger_writer=PostgresSpendingLedgerWriter(session) if writer is None else writer,
-        budget_authorizer=ProjectBudgetAuthorizationService(
+        project_budget_authorizer=ProjectBudgetAuthorizationService(
             PostgresProjectBudgetFactsReader(session)
         ),
     )

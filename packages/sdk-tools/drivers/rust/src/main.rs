@@ -18,6 +18,9 @@ const BINDINGS: &[&str] = &[
     "createProject",
     "listProjectMembers",
     "listProjectActionGrants",
+    "getMyProjectAccess",
+    "setProjectActionGrant",
+    "removeProjectActionGrant",
     "addProjectMember",
     "removeProjectMember",
     "inspectHumanOAuthConsent",
@@ -83,6 +86,9 @@ async fn main() {
                 | "admitHuman"
                 | "listProjectMembers"
                 | "listProjectActionGrants"
+                | "getMyProjectAccess"
+                | "setProjectActionGrant"
+                | "removeProjectActionGrant"
                 | "addProjectMember"
                 | "removeProjectMember"
                 | "assignProjectUseOnlyGrant"
@@ -110,6 +116,8 @@ async fn main() {
                 | "admitHuman"
                 | "addProjectMember"
                 | "removeProjectMember"
+                | "setProjectActionGrant"
+                | "removeProjectActionGrant"
         ) {
             additional_headers.remove("Idempotency-Key");
         }

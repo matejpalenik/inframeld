@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 from typing import final, override
 
-from sqlalchemy import Nullable, and_, select, update
+from sqlalchemy import Nullable, and_, delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 
+from inframeld_backend.access.application.dtos.project_action_grant_changed_audit_event_dto import (
+    ProjectActionGrantChangedAuditEventDTO,
+)
 from inframeld_backend.access.application.dtos.project_use_only_grant_assigned_audit_event_dto import (
     ProjectUseOnlyGrantAssignedAuditEventDTO,
 )
@@ -58,6 +61,7 @@ class _TrackedMembership:
 
 
 def _snapshot(membership: ProjectMembership) -> _MembershipSnapshot:
+    """Retain an immutable baseline so save can reject unsupported membership changes."""
     return _MembershipSnapshot(
         organization_id=membership.organization_id,
         project_id=membership.project_id,
@@ -225,6 +229,131 @@ class PostgresProjectMembershipRepository(ProjectMembershipRepository):
             tracked.snapshot = current
         except BaseException:
             # Cancellation also invalidates snapshots. The transaction owner rolls back.
+            self._failed = True
+            raise
+
+    @override
+    async def save_action_grant_change(
+        self,
+        membership: ProjectMembership,
+        *,
+        action_id: ActionId,
+        actor_principal_id: PrincipalId,
+        expected_project_access_revision: int,
+        operation_id: OperationId,
+    ) -> None:
+        try:
+            self._require_transaction()
+            key = (membership.organization_id, membership.project_id, membership.principal_id)
+            tracked = self._tracked.get(key)
+            if tracked is None or tracked.membership is not membership:
+                raise RuntimeError("Save only the membership instance loaded by this repository.")
+            current = _snapshot(membership)
+            original = tracked.snapshot
+            if (
+                original.organization_id,
+                original.project_id,
+                original.principal_id,
+                original.principal_kind,
+            ) != (
+                current.organization_id,
+                current.project_id,
+                current.principal_id,
+                current.principal_kind,
+            ):
+                raise RuntimeError("Membership metadata cannot be modified.")
+            before = {grant.action_id: grant for grant in original.grants}
+            after = {grant.action_id: grant for grant in current.grants}
+            if len(after) != len(current.grants) or {
+                k: v for k, v in before.items() if k != action_id
+            } != {k: v for k, v in after.items() if k != action_id}:
+                raise RuntimeError("Save only the requested exact action transition.")
+            previous, proposed = before.get(action_id), after.get(action_id)
+            if previous == proposed:
+                return
+            if proposed is not None and (
+                proposed.project_id != current.project_id
+                or proposed.principal_id != current.principal_id
+            ):
+                raise RuntimeError("The assignment belongs to another membership.")
+            if proposed is not None and proposed.assigned_by_principal_id != (
+                previous.assigned_by_principal_id if previous is not None else actor_principal_id
+            ):
+                raise RuntimeError("An existing assignment's attribution cannot change.")
+            if (
+                type(expected_project_access_revision) is not int
+                or not 0 <= expected_project_access_revision < 2**63 - 1
+            ):
+                raise ConflictError("The project access revision cannot advance.")
+            await self._advance_revision(current, expected_project_access_revision)
+            exact = (
+                ProjectActionGrantRow.project_id == current.project_id.value,
+                ProjectActionGrantRow.recipient_principal_id == current.principal_id.value,
+                ProjectActionGrantRow.recipient_kind == current.principal_kind,
+                ProjectActionGrantRow.action == action_id.value,
+            )
+            if previous is None:
+                if proposed is None:
+                    raise RuntimeError("An assignment transition is required.")
+                saved = await self._session.scalar(
+                    insert(ProjectActionGrantRow)
+                    .values(
+                        project_id=current.project_id.value,
+                        recipient_principal_id=current.principal_id.value,
+                        recipient_kind=current.principal_kind,
+                        action=action_id.value,
+                        can_grant=proposed.level is ProjectGrantLevel.USE_AND_GRANT,
+                        assigned_by_principal_id=actor_principal_id.value,
+                    )
+                    .on_conflict_do_nothing(constraint="pk_project_action_grants")
+                    .returning(ProjectActionGrantRow.project_id)
+                )
+            else:
+                unchanged = (
+                    *exact,
+                    ProjectActionGrantRow.can_grant.is_(
+                        previous.level is ProjectGrantLevel.USE_AND_GRANT
+                    ),
+                    ProjectActionGrantRow.assigned_by_principal_id
+                    == (
+                        previous.assigned_by_principal_id.value
+                        if previous.assigned_by_principal_id is not None
+                        else None
+                    ),
+                )
+                if proposed is None:
+                    saved = await self._session.scalar(
+                        delete(ProjectActionGrantRow)
+                        .where(*unchanged)
+                        .returning(ProjectActionGrantRow.project_id)
+                    )
+                else:
+                    saved = await self._session.scalar(
+                        update(ProjectActionGrantRow)
+                        .where(*unchanged)
+                        .values(can_grant=proposed.level is ProjectGrantLevel.USE_AND_GRANT)
+                        .returning(ProjectActionGrantRow.project_id)
+                    )
+            if saved is None:
+                raise ConflictError("The exact assignment has changed.")
+            await self._audit_event_writer.append(
+                ProjectActionGrantChangedAuditEventDTO(
+                    organization_id=current.organization_id,
+                    project_id=current.project_id,
+                    actor_principal_id=actor_principal_id,
+                    recipient_principal_id=current.principal_id,
+                    action_id=action_id,
+                    operation_id=operation_id,
+                    before_can_grant=previous.level is ProjectGrantLevel.USE_AND_GRANT
+                    if previous is not None
+                    else None,
+                    can_grant=proposed.level is ProjectGrantLevel.USE_AND_GRANT
+                    if proposed is not None
+                    else None,
+                )
+            )
+            tracked.snapshot = current
+        except BaseException:
             self._failed = True
             raise
 

@@ -162,14 +162,14 @@ class PostgresProjectMetadataRepairWriter(ProjectMetadataRepairWriter):
         )
         await self._metadata_audit_writer.repaired(
             ProjectMetadataAuthorityRepairedAuditEventDTO(
-                result.organization_id,
-                result.project_id,
-                result.recipient_id,
-                result.operation_id,
-                receipt.operator_label,
-                receipt.reason,
-                receipt.before_revision,
-                result.access_revision,
+                organization_id=result.organization_id,
+                project_id=result.project_id,
+                recipient_id=result.recipient_id,
+                operation_id=result.operation_id,
+                operator_label=receipt.operator_label,
+                reason=receipt.reason,
+                before_revision=receipt.before_revision,
+                after_revision=result.access_revision,
             )
         )
         self._recorded = None

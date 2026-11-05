@@ -96,6 +96,37 @@ problems!(
     ListProjectActionGrantsApiError::Status503
 );
 problems!(
+    GetMyProjectAccessApiError,
+    GetMyProjectAccessApiError::Status400,
+    GetMyProjectAccessApiError::Status401,
+    GetMyProjectAccessApiError::Status403,
+    GetMyProjectAccessApiError::Status404,
+    GetMyProjectAccessApiError::Status422,
+    GetMyProjectAccessApiError::Status503
+);
+problems!(
+    SetProjectActionGrantApiError,
+    SetProjectActionGrantApiError::Status400,
+    SetProjectActionGrantApiError::Status401,
+    SetProjectActionGrantApiError::Status403,
+    SetProjectActionGrantApiError::Status404,
+    SetProjectActionGrantApiError::Status409,
+    SetProjectActionGrantApiError::Status413,
+    SetProjectActionGrantApiError::Status415,
+    SetProjectActionGrantApiError::Status422,
+    SetProjectActionGrantApiError::Status503
+);
+problems!(
+    RemoveProjectActionGrantApiError,
+    RemoveProjectActionGrantApiError::Status400,
+    RemoveProjectActionGrantApiError::Status401,
+    RemoveProjectActionGrantApiError::Status403,
+    RemoveProjectActionGrantApiError::Status404,
+    RemoveProjectActionGrantApiError::Status409,
+    RemoveProjectActionGrantApiError::Status422,
+    RemoveProjectActionGrantApiError::Status503
+);
+problems!(
     ListProjectMembersApiError,
     ListProjectMembersApiError::Status400,
     ListProjectMembersApiError::Status401,

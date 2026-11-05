@@ -114,30 +114,30 @@ class PostgresSpendingMapper:
         ):
             raise ValueError("Stored human authority is incomplete.")
         authority = AdmittedWorkAuthorityDTO(
-            PrincipalId(operation.principal_id),
-            PrincipalKind(operation.principal_kind),
-            installation,
-            OrganizationId(operation.organization_id),
-            ProjectId(operation.project_id),
-            ActionId(operation.action_id),
-            binding,
+            principal_id=PrincipalId(operation.principal_id),
+            principal_kind=PrincipalKind(operation.principal_kind),
+            installation_id=installation,
+            organization_id=OrganizationId(operation.organization_id),
+            project_id=ProjectId(operation.project_id),
+            action_id=ActionId(operation.action_id),
+            human_binding=binding,
         )
         return SpendingCallRecordDTO(
-            ModelCallId(row.call_id),
-            OperationId(operation.operation_id),
-            authority,
-            JobId(operation.job_id),
-            RequestFingerprint(row.meaning_fingerprint),
-            SpendingPeriod(row.period_year, row.period_month),
-            PostgresSpendingMapper.amount(operation.operation_limit),
-            PostgresSpendingMapper._basis(row.basis),
-            PostgresSpendingMapper.amount(row.reserved_amount),
-            PostgresSpendingMapper.amount(row.hold_amount),
-            PostgresSpendingMapper.amount(row.settled_amount),
-            SpendingCallState(row.state),
-            row.revision,
-            row.reservation_policy_revision,
-            row.approved_policy_revision,
+            call_id=ModelCallId(row.call_id),
+            operation_id=OperationId(operation.operation_id),
+            authority=authority,
+            job_id=JobId(operation.job_id),
+            meaning_fingerprint=RequestFingerprint(row.meaning_fingerprint),
+            period=SpendingPeriod(row.period_year, row.period_month),
+            operation_limit=PostgresSpendingMapper.amount(operation.operation_limit),
+            basis=PostgresSpendingMapper._basis(row.basis),
+            reserved_amount=PostgresSpendingMapper.amount(row.reserved_amount),
+            hold_amount=PostgresSpendingMapper.amount(row.hold_amount),
+            settled_amount=PostgresSpendingMapper.amount(row.settled_amount),
+            state=SpendingCallState(row.state),
+            revision=row.revision,
+            reservation_policy_revision=row.reservation_policy_revision,
+            approved_policy_revision=row.approved_policy_revision,
         )
 
     @staticmethod
@@ -184,13 +184,13 @@ class PostgresSpendingMapper:
             raise ValueError("Stored spending evidence has an unsupported kind.")
         kind = SpendingObservationKind(row.kind)
         observation = SpendingObservationDTO(
-            row.evidence_id,
-            record.call_id,
-            kind,
-            row.observed_at,
-            row.source_reference,
-            PostgresSpendingMapper._usage(row.usage),
-            row.charge,
+            evidence_id=row.evidence_id,
+            call_id=record.call_id,
+            kind=kind,
+            observed_at=row.observed_at,
+            source_reference=row.source_reference,
+            usage=PostgresSpendingMapper._usage(row.usage),
+            charge=row.charge,
         )
         applied = PostgresSpendingMapper._receipt(
             record,
@@ -274,12 +274,14 @@ class PostgresSpendingMapper:
                 )
             )
         return CapturedSpendingBasisDTO(
-            PostgresSpendingMapper._text(value.get("basis_id")),
-            PostgresSpendingMapper._text(value.get("source_reference")),
-            PostgresSpendingMapper._text(value.get("source_revision")),
-            datetime.fromisoformat(PostgresSpendingMapper._text(value.get("captured_at"))),
-            tuple(rates),
-            PostgresSpendingMapper._usage(value.get("maximum_usage")),
+            basis_id=PostgresSpendingMapper._text(value.get("basis_id")),
+            source_reference=PostgresSpendingMapper._text(value.get("source_reference")),
+            source_revision=PostgresSpendingMapper._text(value.get("source_revision")),
+            captured_at=datetime.fromisoformat(
+                PostgresSpendingMapper._text(value.get("captured_at"))
+            ),
+            rates=tuple(rates),
+            maximum_usage=PostgresSpendingMapper._usage(value.get("maximum_usage")),
         )
 
     @staticmethod

@@ -18,6 +18,20 @@ export interface CommandOptions {
   startupDeadline?: number;
   executionDeadline?: number;
   mode?: "command" | "backend";
+  observeOutcome?: (observation: Readonly<CommandObservation>) => void;
+}
+/** Passive facts from one command, never cleanup or subprocess-admission authority. */
+export interface CommandObservation {
+  readonly status: number | null;
+  readonly reason: string;
+  readonly stopReason: string;
+  readonly groupState: "quiescent" | "live" | "unknown";
+  readonly leaderReaped?: boolean;
+  /** No handle received does not establish that no target existed. */
+  readonly closeResult: "resolved" | "rejected" | "not-acquired";
+  readonly helperCode?: number | null;
+  readonly helperClosed?: boolean;
+  readonly streamsEnded?: boolean;
 }
 export interface CommandResult {
   stdout: string;
@@ -613,44 +627,69 @@ export async function command(
   args: readonly string[],
   options: CommandOptions = {},
 ): Promise<CommandResult> {
-  const child = await startProcess(program, args, options);
-  const capture = child.capture;
+  let child: OwnedProcess | undefined;
+  let capture: OwnedProcess["capture"] | undefined;
+  let outcome: ProcessOutcome | undefined;
+  let ownerFailure: ProcessFailure | undefined;
+  let closeResult: CommandObservation["closeResult"] = "not-acquired";
   const limit = options.maxOutputBytes ?? 16 * 1024 * 1024;
   let failure: unknown;
+  let failed = false;
   try {
-    const result = await child.result;
-    if (child.stopReason === "timeout") throw new Error(`${program} timed out`);
-    if (child.stopReason === "cancel") options.signal?.throwIfAborted();
-    if (capture.overflow)
-      throw new Error(`${program} exceeded its ${limit}-byte output budget`);
-    options.signal?.throwIfAborted();
-    if (result.status !== 0)
-      throw new ProcessFailure(
-        `${program} exited ${result.status}\n${capture.output.slice(-5000)}`,
-        true,
-      );
+    child = await startProcess(program, args, options);
+    capture = child.capture;
   } catch (error) {
-    failure =
-      child.stopReason === "timeout"
-        ? new Error(`${program} timed out`, { cause: error })
-        : child.stopReason === "cancel" && options.signal?.aborted
-          ? options.signal.reason
-          : capture.overflow
-            ? new Error(`${program} exceeded its ${limit}-byte output budget`, {
-                cause: error,
-              })
-            : options.signal?.aborted
-              ? options.signal.reason
-              : error;
+    failure = error;
+    failed = true;
   }
+  if (child && capture)
+    try {
+      try {
+        outcome = await child.result;
+      } catch (error) {
+        if (error instanceof ProcessFailure) ownerFailure = error;
+        throw error;
+      }
+      if (child.stopReason === "timeout")
+        throw new Error(`${program} timed out`);
+      if (child.stopReason === "cancel") options.signal?.throwIfAborted();
+      if (capture.overflow)
+        throw new Error(`${program} exceeded its ${limit}-byte output budget`);
+      options.signal?.throwIfAborted();
+      if (outcome.status !== 0)
+        throw new ProcessFailure(
+          `${program} exited ${outcome.status}\n${capture.output.slice(-5000)}`,
+          true,
+        );
+    } catch (error) {
+      failed = true;
+      failure =
+        child.stopReason === "timeout"
+          ? new Error(`${program} timed out`, { cause: error })
+          : child.stopReason === "cancel" && options.signal?.aborted
+            ? options.signal.reason
+            : capture.overflow
+              ? new Error(
+                  `${program} exceeded its ${limit}-byte output budget`,
+                  {
+                    cause: error,
+                  },
+                )
+              : options.signal?.aborted
+                ? options.signal.reason
+                : error;
+    }
   const errors: unknown[] = [];
-  if (failure !== undefined) errors.push(failure);
-  try {
-    await child.close();
-  } catch (error) {
-    if (error !== failure) errors.push(error);
-  }
-  if (options.log) {
+  if (failed) errors.push(failure);
+  if (child)
+    try {
+      await child.close();
+      closeResult = "resolved";
+    } catch (error) {
+      closeResult = "rejected";
+      if (error !== failure) errors.push(error);
+    }
+  if (options.log && capture) {
     try {
       await mkdir(dirname(options.log), { recursive: true });
       await writeFile(options.log, capture.output);
@@ -658,10 +697,35 @@ export async function command(
       errors.push(error);
     }
   }
+  try {
+    const state = ownerFailure?.state;
+    const terminal = outcome ?? state?.terminal;
+    options.observeOutcome?.(
+      Object.freeze({
+        status: terminal?.status ?? null,
+        reason: terminal?.reason ?? "unknown",
+        stopReason: child ? (child.stopReason ?? "none") : "unknown",
+        groupState: terminal?.groupState ?? "unknown",
+        ...(terminal ? { leaderReaped: terminal.leaderReaped } : {}),
+        closeResult,
+        ...(state
+          ? {
+              ...(state.helperCode === undefined
+                ? {}
+                : { helperCode: state.helperCode }),
+              helperClosed: state.helperClosed,
+              streamsEnded: state.streamsEnded,
+            }
+          : {}),
+      }),
+    );
+  } catch (error) {
+    errors.push(error);
+  }
   if (errors.length === 1) throw errors[0];
   if (errors.length)
     throw new AggregateError(errors, "Execution and cleanup failed");
-  return { stdout: capture.stdout, output: capture.output };
+  return { stdout: capture!.stdout, output: capture!.output };
 }
 
 export async function withResources<T>(

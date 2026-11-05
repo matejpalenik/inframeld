@@ -95,12 +95,12 @@ class PostgresHumanAdmissionResultReader(HumanAdmissionResultReader):
         ):
             raise ConflictError("The original admission result is incoherent.")
         return HumanAdmissionResultDTO(
-            installation_id,
-            identity,
-            organization_id,
-            actor_id,
-            PrincipalId(row.principal_id),
-            row.access_revision,
-            row.changed,
-            operation,
+            installation_id=installation_id,
+            identity=identity,
+            organization_id=organization_id,
+            actor_principal_id=actor_id,
+            principal_id=PrincipalId(row.principal_id),
+            access_revision=row.access_revision,
+            changed=row.changed,
+            operation=operation,
         )

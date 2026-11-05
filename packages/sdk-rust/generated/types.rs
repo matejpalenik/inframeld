@@ -1339,6 +1339,402 @@ impl AsRef<str> for OperationLookupAuthorityFamily {
     }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MyProjectAccessResponse {
+    ///Constraint: minimum=0, maximum=9223372036854775807
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub grants: Vec<MyProjectAccessGrantResponse>,
+    #[serde(rename = "groupManagements")]
+    pub group_managements: Vec<MyProjectAccessGroupResponse>,
+    #[serde(rename = "groupMemberships")]
+    pub group_memberships: Vec<MyProjectAccessGroupResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MyProjectAccessGroupResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MyProjectAccessGrantResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    pub target: MyProjectAccessGrantResponseTarget,
+}
+#[derive(Debug, Clone)]
+pub enum MyProjectAccessGrantResponseTarget {
+    ProjectGrantTargetResponse(ProjectGrantTargetResponse),
+    AccessGroupGrantTargetResponse(AccessGroupGrantTargetResponse),
+    ApplicationAccountGrantTargetResponse(ApplicationAccountGrantTargetResponse),
+}
+impl serde::Serialize for MyProjectAccessGrantResponseTarget {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::ProjectGrantTargetResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(ProjectGrantTargetResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "project") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(ProjectGrantTargetResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("project".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::AccessGroupGrantTargetResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(AccessGroupGrantTargetResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "access-group") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(AccessGroupGrantTargetResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("access-group".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::ApplicationAccountGrantTargetResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(ApplicationAccountGrantTargetResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "application-account") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(ApplicationAccountGrantTargetResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("application-account".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+        }
+    }
+}
+impl<'de> serde::Deserialize<'de> for MyProjectAccessGrantResponseTarget {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = match value.get("kind") {
+            Some(serde_json::Value::String(discriminator)) => {
+                Some(discriminator.as_str())
+            }
+            Some(_) => {
+                return Err(
+                    serde::de::Error::custom(
+                        concat!("non-string discriminator `", "kind", "`",),
+                    ),
+                );
+            }
+            None => None,
+        };
+        match discriminator {
+            Some(discriminator) => {
+                match discriminator {
+                    "project" => {
+                        let primary_error = match serde_json::from_value::<
+                            ProjectGrantTargetResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::ProjectGrantTargetResponse(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            AccessGroupGrantTargetResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(AccessGroupGrantTargetResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::AccessGroupGrantTargetResponse(payload),
+                                stringify!(AccessGroupGrantTargetResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            ApplicationAccountGrantTargetResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(ApplicationAccountGrantTargetResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::ApplicationAccountGrantTargetResponse(payload),
+                                stringify!(ApplicationAccountGrantTargetResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "access-group" => {
+                        let primary_error = match serde_json::from_value::<
+                            AccessGroupGrantTargetResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::AccessGroupGrantTargetResponse(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            ProjectGrantTargetResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(ProjectGrantTargetResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::ProjectGrantTargetResponse(payload),
+                                stringify!(ProjectGrantTargetResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            ApplicationAccountGrantTargetResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(ApplicationAccountGrantTargetResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::ApplicationAccountGrantTargetResponse(payload),
+                                stringify!(ApplicationAccountGrantTargetResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "application-account" => {
+                        let primary_error = match serde_json::from_value::<
+                            ApplicationAccountGrantTargetResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(
+                                    Self::ApplicationAccountGrantTargetResponse(payload),
+                                );
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            ProjectGrantTargetResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(ProjectGrantTargetResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::ProjectGrantTargetResponse(payload),
+                                stringify!(ProjectGrantTargetResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            AccessGroupGrantTargetResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(AccessGroupGrantTargetResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::AccessGroupGrantTargetResponse(payload),
+                                stringify!(AccessGroupGrantTargetResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    other => {
+                        Err(
+                            serde::de::Error::custom(
+                                format!(
+                                    "unknown discriminator value `{other}` for `{}`", "kind",
+                                ),
+                            ),
+                        )
+                    }
+                }
+            }
+            None => {
+                Err(
+                    serde::de::Error::custom(
+                        concat!("missing string discriminator `", "kind", "`",),
+                    ),
+                )
+            }
+        }
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MyOrganizationAccessResponse {
     ///Constraint: minimum=0, maximum=9223372036854775807
     #[serde(rename = "accessRevision")]
@@ -2095,6 +2491,68 @@ impl AsRef<str> for CompletedOperationLookupResponseClassification {
         self.as_str()
     }
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountGrantTargetResponse {
+    #[serde(rename = "applicationPrincipalId")]
+    pub application_principal_id: uuid::Uuid,
+    pub kind: ApplicationAccountGrantTargetResponseKind,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ApplicationAccountGrantTargetResponseKind {
+    #[default]
+    #[serde(rename = "application-account")]
+    ApplicationAccount,
+}
+impl ApplicationAccountGrantTargetResponseKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ApplicationAccount => "application-account",
+        }
+    }
+}
+impl ::std::fmt::Display for ApplicationAccountGrantTargetResponseKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ApplicationAccountGrantTargetResponseKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupGrantTargetResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    pub kind: AccessGroupGrantTargetResponseKind,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum AccessGroupGrantTargetResponseKind {
+    #[default]
+    #[serde(rename = "access-group")]
+    AccessGroup,
+}
+impl AccessGroupGrantTargetResponseKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::AccessGroup => "access-group",
+        }
+    }
+}
+impl ::std::fmt::Display for AccessGroupGrantTargetResponseKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for AccessGroupGrantTargetResponseKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
 ///Confirm retained admission while making unknown dispatch and references explicit.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AcceptedOperationLookupResponse {
@@ -2256,6 +2714,53 @@ pub struct HumanAdmissionResponse {
 pub struct HumanOAuthConsentDecisionResponse {
     #[serde(rename = "redirectTo")]
     pub redirect_to: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectActionGrantRemovalResponse {
+    ///Constraint: minimum=0, maximum=9223372036854775807
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectActionGrantRequest {
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    ///Constraint: minimum=0, maximum=9223372036854775807
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectActionGrantResponse {
+    ///Constraint: minimum=0, maximum=9223372036854775807
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectCreationRequest {

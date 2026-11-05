@@ -142,38 +142,38 @@ class PostgresJobStore(JobStore):
         now = await self._now()
         job = await self._snapshot(original, now)
         context = JobAttemptContextDTO(
-            job.job_id,
-            job.binding,
-            job.payload,
-            row.attempt,
-            JobFence(row.fence),
-            row.work_deadline,
-            row.checkpoint,
+            job_id=job.job_id,
+            binding=job.binding,
+            payload=job.payload,
+            attempt=row.attempt,
+            fence=JobFence(row.fence),
+            work_deadline=row.work_deadline,
+            checkpoint=row.checkpoint,
         )
         binding = JobEffectBindingDTO(
-            effect_id,
-            context,
-            row.unit,
-            JobEffectAction(row.action),
-            ArtifactId(row.artifact_id),
-            ArtifactAttemptId(row.artifact_attempt_id),
-            ArtifactScopeDTO(
+            effect_id=effect_id,
+            context=context,
+            unit=row.unit,
+            action=JobEffectAction(row.action),
+            artifact_id=ArtifactId(row.artifact_id),
+            artifact_attempt_id=ArtifactAttemptId(row.artifact_attempt_id),
+            scope=ArtifactScopeDTO(
                 InstallationId(row.installation_id),
                 OrganizationId(row.organization_id),
                 ProjectId(row.project_id),
             ),
-            row.length,
-            ArtifactContentDigest(row.digest) if row.digest is not None else None,
+            length=row.length,
+            digest=ArtifactContentDigest(row.digest) if row.digest is not None else None,
         )
         if self._effect_fingerprint(binding) != row.binding_fingerprint:
             raise ConflictError("The retained invocation no longer matches its original work.")
         return JobEffectObservationDTO(
-            binding,
-            now,
-            row.admitted_at,
-            JobEffectObservationKind.NOT_DISPATCHED if row.aborted_at is not None else None,
-            row.aborted_at,
-            row.consumed_at,
+            binding=binding,
+            observed_at=now,
+            admitted_at=row.admitted_at,
+            kind=JobEffectObservationKind.NOT_DISPATCHED if row.aborted_at is not None else None,
+            aborted_at=row.aborted_at,
+            consumed_at=row.consumed_at,
         )
 
     @override
@@ -675,13 +675,13 @@ class PostgresJobStore(JobStore):
         await self._session.flush()
         saved = await self._snapshot(row, now)
         return JobAttemptContextDTO(
-            saved.job_id,
-            saved.binding,
-            saved.payload,
-            saved.attempt,
-            fence,
-            deadline,
-            saved.checkpoint,
+            job_id=saved.job_id,
+            binding=saved.binding,
+            payload=saved.payload,
+            attempt=saved.attempt,
+            fence=fence,
+            work_deadline=deadline,
+            checkpoint=saved.checkpoint,
         )
 
     @override
@@ -931,20 +931,20 @@ class PostgresJobStore(JobStore):
         else:
             raise ConflictError("The original job binding kind is unsupported.")
         return JobSnapshotDTO(
-            JobId(row.id),
-            binding,
-            JobPayload(row.payload_kind, row.payload_version, row.payload),
-            JobStatus(row.status),
-            row.admitted_at,
-            row.queued_deadline,
-            row.due_at,
-            now,
-            row.attempt_count,
-            row.work_deadline,
-            JobFence(row.fence) if row.fence is not None else None,
-            row.lease_expires_at,
-            row.cancel_requested,
-            row.pending_effect,
-            row.reason,
-            row.checkpoint,
+            job_id=JobId(row.id),
+            binding=binding,
+            payload=JobPayload(row.payload_kind, row.payload_version, row.payload),
+            status=JobStatus(row.status),
+            admitted_at=row.admitted_at,
+            queued_deadline=row.queued_deadline,
+            due_at=row.due_at,
+            observed_at=now,
+            attempt=row.attempt_count,
+            work_deadline=row.work_deadline,
+            fence=JobFence(row.fence) if row.fence is not None else None,
+            lease_expires_at=row.lease_expires_at,
+            cancel_requested=row.cancel_requested,
+            pending_effect=row.pending_effect,
+            reason=row.reason,
+            checkpoint=row.checkpoint,
         )

@@ -211,16 +211,16 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
                 if completed.operation_id != operation.operation_id:
                     raise RuntimeError("Membership completion changed the original operation.")
                 return ProjectMembershipChangeResultDTO(
-                    facts.installation_id,
-                    authorization.organization_id,
-                    authorization.project_id,
-                    access.actor_principal_id,
-                    command.principal_id,
-                    change_kind,
-                    facts.access_revision + int(changed),
-                    changed,
-                    change_kind.success_status(changed=changed),
-                    completed,
+                    installation_id=facts.installation_id,
+                    organization_id=authorization.organization_id,
+                    project_id=authorization.project_id,
+                    actor_principal_id=access.actor_principal_id,
+                    principal_id=command.principal_id,
+                    change_kind=change_kind,
+                    access_revision=facts.access_revision + int(changed),
+                    changed=changed,
+                    status_code=change_kind.success_status(changed=changed),
+                    operation=completed,
                 )
         except TimeoutError:
             raise DependencyUnavailableError() from None

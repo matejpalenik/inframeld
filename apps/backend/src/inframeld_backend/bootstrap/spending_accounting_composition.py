@@ -54,7 +54,7 @@ async def open_spending_accounting(database: Database) -> AsyncGenerator[Spendin
             job_ownership=PostgresJobStore(session),
             spending_ledger_reader=PostgresSpendingLedgerReader(session),
             spending_ledger_writer=PostgresSpendingLedgerWriter(session),
-            budget_authorizer=ProjectBudgetAuthorizationService(
+            project_budget_authorizer=ProjectBudgetAuthorizationService(
                 PostgresProjectBudgetFactsReader(session)
             ),
         )
@@ -62,7 +62,7 @@ async def open_spending_accounting(database: Database) -> AsyncGenerator[Spendin
 
 @asynccontextmanager
 async def open_project_spending_policy(
-    database: Database, fingerprints: ProjectSpendingPolicyFingerprintService
+    database: Database, spending_policy_fingerprint_service: ProjectSpendingPolicyFingerprintService
 ) -> AsyncGenerator[ProjectSpendingPolicyManager]:
     async with database.session() as session:
         yield ProjectSpendingPolicyService(
@@ -73,5 +73,5 @@ async def open_project_spending_policy(
             spending_ledger_reader=PostgresSpendingLedgerReader(session),
             spending_ledger_writer=PostgresSpendingLedgerWriter(session),
             operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-            spending_policy_fingerprint_service=fingerprints,
+            spending_policy_fingerprint_service=spending_policy_fingerprint_service,
         )

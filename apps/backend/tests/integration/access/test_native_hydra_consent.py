@@ -592,7 +592,7 @@ async def _record_test_cleanup(database: Database, event: IdentityRecoveryEventD
             recovery_cleanup_proof_reader=PostgresIdentityRecoveryCleanupProofReader(
                 session, installation_id=installation_id, authority=AUTHORITY
             ),
-            proof_writer=PostgresIdentityRecoveryCleanupProofWriter(
+            recovery_cleanup_proof_writer=PostgresIdentityRecoveryCleanupProofWriter(
                 session, installation_id=installation_id, authority=AUTHORITY
             ),
         )

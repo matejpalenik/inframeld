@@ -54,7 +54,8 @@ class PostgresProjectMembershipChangeServiceFactory(ProjectMembershipChangeServi
 
     @staticmethod
     def create(
-        session: AsyncSession, fingerprints: ProjectMembershipChangeFingerprintService
+        session: AsyncSession,
+        membership_fingerprint_service: ProjectMembershipChangeFingerprintService,
     ) -> ProjectMembershipChangeService:
         """Assemble one service on the session owned by the calling scope."""
         return ProjectMembershipChangeService(
@@ -63,5 +64,5 @@ class PostgresProjectMembershipChangeServiceFactory(ProjectMembershipChangeServi
             membership_change_writer=PostgresProjectMembershipChangeWriter(session),
             membership_result_reader=PostgresProjectMembershipChangeResultReader(session),
             operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-            membership_fingerprint_service=fingerprints,
+            membership_fingerprint_service=membership_fingerprint_service,
         )

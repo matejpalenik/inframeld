@@ -81,13 +81,13 @@ class DeletionStatusReadService(DeletionStatusLookup):
             return UnresolvedOperationDTO()
 
         return RetainedDeletionStatusDTO(
-            stored.binding.operation_id,
-            stored.job_status,
-            stored.admission_confirmed,
-            stored.access_blocked,
-            stored.application_shutdown_complete,
-            stored.physical_cleanup_complete,
-            expiry,
+            operation_id=stored.binding.operation_id,
+            job_status=stored.job_status,
+            admission_confirmed=stored.admission_confirmed,
+            access_blocked=stored.access_blocked,
+            application_shutdown_complete=stored.application_shutdown_complete,
+            physical_cleanup_complete=stored.physical_cleanup_complete,
+            expires_at=expiry,
         )
 
     @staticmethod

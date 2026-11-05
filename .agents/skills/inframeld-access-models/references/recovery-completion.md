@@ -53,7 +53,7 @@ A newer recovery's combined proof may satisfy explicitly linked older checklists
 
 ## Continue the original cleanup durably
 
-Suspension retains its separate transaction saving the immediate local block, revision, audit and original cleanup obligation together. Its deliberate restoration remains distinct from routine recovery.
+Suspension retains its separate transaction saving the immediate local block, revision, audit and original cleanup obligation together. Its [deliberate restoration](recovery.md#deliberate-restoration-cutover) remains distinct from routine recovery. Accepted [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md) advances the version only with an actual new authorized restoration, never because this checklist completed or replayed. Restoration does not clear newer independent blocks, manufacture password/native-session proof or recreate rights. Confirmed original cleanup and security review remain required. Its browser fence has an explicitly accepted late-created-session limit and remains unimplemented. The recovery diagram above continues to describe recovery, not restoration.
 
 Access owns one original cleanup job and its fixed two-step progress. It uses the accepted [PostgreSQL-backed worker and ownership checks](../../inframeld-application-contracts/references/jobs-and-recovery.md#admit-work-and-claim-an-attempt), not another queue or workflow engine. [The logical record contract](credential-and-recovery-records.md#recovery-delivery-records) specifies receipts, runs, attempts and retained provenance.
 

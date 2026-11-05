@@ -153,22 +153,22 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
             raise RuntimeError("Repair authorization requires aware database time.")
 
         result = ProjectMetadataRepairResultDTO(
-            command.operation_id,
-            facts.installation_id,
-            facts.recipient.organization_id,
-            facts.project_id,
-            facts.recipient.id,
-            facts.access_revision + 1,
+            operation_id=command.operation_id,
+            installation_id=facts.installation_id,
+            organization_id=facts.recipient.organization_id,
+            project_id=facts.project_id,
+            recipient_id=facts.recipient.id,
+            access_revision=facts.access_revision + 1,
         )
         receipt = ProjectMetadataRepairReceiptDTO(
-            fingerprint,
-            identity,
-            command.expected_identity_id,
-            command.operator_label,
-            command.reason,
-            facts.access_revision,
-            facts.observed_at.astimezone(UTC),
-            result,
+            fingerprint=fingerprint,
+            identity=identity,
+            expected_identity_id=command.expected_identity_id,
+            operator_label=command.operator_label,
+            reason=command.reason,
+            before_revision=facts.access_revision,
+            authorized_at=facts.observed_at.astimezone(UTC),
+            result=result,
         )
         if not await self._metadata_repair_writer.record(receipt):
             winner = await self._metadata_repair_facts_reader.receipt(

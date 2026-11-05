@@ -204,14 +204,14 @@ class FirstAdministratorBootstrapService(FirstAdministratorBootstrapper):
             1,
         )
         receipt = FirstAdministratorBootstrapReceiptDTO(
-            fingerprint,
-            binding.identity,
-            command.expected_identity_id,
-            command.operator_label,
-            command.reason,
-            0,
-            facts.observed_at,
-            result,
+            fingerprint=fingerprint,
+            identity=binding.identity,
+            expected_identity_id=command.expected_identity_id,
+            operator_label=command.operator_label,
+            reason=command.reason,
+            before_revision=0,
+            authorized_at=facts.observed_at,
+            result=result,
         )
         if not await self._bootstrap_writer.bootstrap(facts=facts, receipt=receipt):
             raise FirstAdministratorBootstrapError(Code.KEY_REUSED)

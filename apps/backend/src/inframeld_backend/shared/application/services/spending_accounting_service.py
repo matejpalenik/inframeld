@@ -84,14 +84,14 @@ class SpendingAccountingService(SpendingAccountant):
         job_ownership: JobOwnership,
         spending_ledger_reader: SpendingLedgerReader,
         spending_ledger_writer: SpendingLedgerWriter,
-        budget_authorizer: ProjectBudgetAuthorizer,
+        project_budget_authorizer: ProjectBudgetAuthorizer,
     ) -> None:
         self._transaction_manager = transaction_manager
         self._admitted_work_authorizer = admitted_work_authorizer
         self._job_ownership = job_ownership
         self._spending_ledger_reader = spending_ledger_reader
         self._spending_ledger_writer = spending_ledger_writer
-        self._budget_authorizer = budget_authorizer
+        self._project_budget_authorizer = project_budget_authorizer
 
     @override
     async def reserve(
@@ -120,20 +120,20 @@ class SpendingAccountingService(SpendingAccountant):
                 return SpendingAccountingResultDTO(existing, recovered=True)
             amount = self._cost(basis, None if basis is None else basis.maximum_usage)
             record = SpendingCallRecordDTO(
-                call.call_id,
-                call.operation_id,
-                call.authority,
-                call.attempt.job_id,
-                call.meaning_fingerprint,
-                SpendingPeriod.from_instant(policy.observed_at),
-                operation_limit,
-                basis,
-                amount,
-                amount,
-                None,
-                SpendingCallState.RESERVED,
-                0,
-                policy.revision,
+                call_id=call.call_id,
+                operation_id=call.operation_id,
+                authority=call.authority,
+                job_id=call.attempt.job_id,
+                meaning_fingerprint=call.meaning_fingerprint,
+                period=SpendingPeriod.from_instant(policy.observed_at),
+                operation_limit=operation_limit,
+                basis=basis,
+                reserved_amount=amount,
+                hold_amount=amount,
+                settled_amount=None,
+                state=SpendingCallState.RESERVED,
+                revision=0,
+                reservation_policy_revision=policy.revision,
             )
             await self._require_allowance(policy, record, amount)
             await self._spending_ledger_writer.insert_call(record)
@@ -215,7 +215,7 @@ class SpendingAccountingService(SpendingAccountant):
         expected_call_revision: int,
     ) -> SpendingAccountingResultDTO:
         async with self._transaction_manager.begin():
-            authorization = await self._budget_authorizer.require_authorization(
+            authorization = await self._project_budget_authorizer.require_authorization(
                 access=access,
                 request=ProjectActionAuthorizationRequestDTO(
                     project_id, ActionId(ProjectAction.MANAGE_BUDGET.value)

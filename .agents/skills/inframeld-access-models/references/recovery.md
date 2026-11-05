@@ -57,6 +57,18 @@ Deduplicate trusted completion using its original flow-bound event identity. A d
 
 A session ID in a pre-save callback does not prove password replacement or native cleanup. Neither a generic webhook response nor a completed password form proves both providers finished cleanup. [Provider observations](recovery-provider-cleanup.md#kratos-password-reset-evidence) distinguish inspected capability and earlier probes from the implemented private delivery and worker tests. [The private callback contract](private-recovery-handoff.md#recovery-callbacks) retains its dedicated rotatable service secret, versioned allowlisted body limited to 8 KiB and stable native-flow/event-type deduplication. [ADR-0085](../../../../docs/adr/ADR-0085-bind-password-settings-evidence-to-original-recoveries.md) settles the association, failure recovery and completion contract. Private native delivery is implemented as described in [the handoff](private-recovery-handoff.md#implemented-private-delivery). Durable Hydra execution and proof-backed release are implemented in the dedicated worker.
 
+<a id="deliberate-restoration-cutover"></a>
+
+## Restore deliberately after original cleanup
+
+**Accepted [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md) contract on 2026-11-05, implementation and qualification unfinished.** Alice stays suspended after a password reset or successful cleanup. A separate currently authorized human must review the same legitimate identity, verify its current stable Kratos binding, required confirmed original cleanup and applicable current restrictions. A security-review reference records that review but is not provider proof or a replacement identity link.
+
+A new authorized actual `SUSPENDED` to `ACTIVE` transition advances the identity's existing credential version exactly once. Save principal state, that advance, Access revision, required audit and immutable original outcome together under the existing identity/Organization coordination. An authorized replay or non-transition advances nothing. Failed local work rolls back together, while uncertain commit requires recovery of the original operation. Do not restore removed memberships or grants, affect Bob's identity/version or clear another recovery obligation.
+
+Browser evidence must bind the captured version before final same-cookie verification, and current authorization compares it before protected disclosure, original-result replay or mutation. Linked-human consent must reject initial/final suspension, retirement or incoherent state, while genuine no-local-link consent remains supported under its existing restrictions. Late OAuth issuance retains its original binding. [Browser sessions](browser-sessions.md#restoration-evidence-cutover), [consent](human-cli-consent.md#linked-human-restoration-checks) and [records](credential-and-recovery-records.md#restoration-version-transition) own the detailed contracts.
+
+**Explicitly accepted limit:** a fresh request after restoration may accept a session created late by earlier login work if Kratos currently verifies it as active, unexpired and for the same identity. No causal generation, password-save proof, universal cookie revocation or absence of pending provider work is established. Required original cleanup and legitimate-identity/security review are unchanged. Current code remains identity-only for browser evidence, and full #188 plus [human qualification #318](https://github.com/matejpalenik/inframeld/issues/318) remain unfinished.
+
 <a id="authorization-failure-scenarios"></a>
 
 ## Authorization failure scenarios

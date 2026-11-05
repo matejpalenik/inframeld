@@ -40,6 +40,16 @@ Recovery screens and authenticated cleanup callbacks remain usable under their o
 
 The complete grant service also checks that authorization returned the project requested by its Command. It compares the IDs immediately after authorization, before reserving work or returning a replay. If they differ, it raises an internal runtime error and rolls back. The existing HTTP error handler returns a generic 500. After a match, reservation, grant persistence and audit use scope from authorization, while the unchanged Command supplies the requested grant details. This scope check does not replace current permissions or the authorizer's project/organization checks.
 
+<a id="accepted-browser-currentness"></a>
+
+### Recheck bound browser evidence after restoration
+
+**Accepted extension under [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md), implementation and qualification unfinished.** The current shared evaluator treats the OAuth version check as inapplicable to identity-only browser evidence. The extension instead requires the browser binding captured before [final same-cookie verification](browser-sessions.md#restoration-evidence-cutover) to match the current actor, installation, provider identity and credential version before protected disclosure, reservation/history lookup, replay or mutation.
+
+Facts readers report those current observations under the existing scoped transaction/lock rules. The evaluator interprets evidence, while the owning policy decides currentness. A version never supplies membership or permissions and does not replace current status, independent recovery restrictions or exact operation authority. Do not silently accept absent browser binding as an older compatible path once the extension is delivered. No public credential/version details or new error vocabulary is selected here.
+
+A new authorized restoration advances the version once with its state/revision/audit/original outcome. A replay restores neither grants nor a former credential generation. Alice's stale evidence fails after cutover while Bob is unchanged. Fresh post-cutover verification retains the explicitly accepted possibility of a late-created currently valid Kratos session. It proves neither password-save provenance nor the legitimate-identity/security review required for restoration.
+
 <a id="project-membership-grant-model"></a>
 
 The supported use-only grant applies these checks before its [load, business action and save sequence](../../inframeld-python-standards/references/services-and-use-cases.md). Its repository supports attributed additions, not membership provisioning or arbitrary grant updates. The [aggregate/repository example](../../inframeld-python-standards/references/aggregates-and-repositories.md) owns snapshots, persistence failures and transaction lifetime.

@@ -279,14 +279,14 @@ class HumanAdmissionService(HumanAdmitter):
         if completed.operation_id != operation.operation_id:
             raise RuntimeError("Human admission completion changed the original operation.")
         return HumanAdmissionResultDTO(
-            facts.installation_id,
-            facts.identity,
-            scope.organization_id,
-            access.actor_principal_id,
-            principal.id,
-            scope.access_revision + int(changed),
-            changed,
-            completed,
+            installation_id=facts.installation_id,
+            identity=facts.identity,
+            organization_id=scope.organization_id,
+            actor_principal_id=access.actor_principal_id,
+            principal_id=principal.id,
+            access_revision=scope.access_revision + int(changed),
+            changed=changed,
+            operation=completed,
         )
 
     @staticmethod

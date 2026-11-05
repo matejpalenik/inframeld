@@ -26,16 +26,16 @@ class PostgresArtifactAttemptMapper:
         observed_at: datetime,
     ) -> ArtifactStagingReservationDTO:
         return ArtifactStagingReservationDTO(
-            ArtifactStagingReservationId(reservation.id),
-            ArtifactId(attempt.artifact_id),
-            ArtifactAttemptId(attempt.id),
-            ArtifactScopeDTO(
+            reservation_id=ArtifactStagingReservationId(reservation.id),
+            artifact_id=ArtifactId(attempt.artifact_id),
+            attempt_id=ArtifactAttemptId(attempt.id),
+            scope=ArtifactScopeDTO(
                 InstallationId(attempt.installation_id),
                 OrganizationId(attempt.organization_id),
                 ProjectId(attempt.project_id),
             ),
-            reservation.limit_bytes,
-            reservation.expires_at,
-            observed_at,
-            reservation.released,
+            limit_bytes=reservation.limit_bytes,
+            expires_at=reservation.expires_at,
+            observed_at=observed_at,
+            released=reservation.released,
         )

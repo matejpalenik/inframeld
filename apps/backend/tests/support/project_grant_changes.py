@@ -15,6 +15,9 @@ from inframeld_backend.access.application.services.project_grant_change_fingerpr
 from inframeld_backend.access.application.services.project_grant_change_service import (
     ProjectGrantChangeService,
 )
+from inframeld_backend.access.infrastructure.readers.postgres_project_action_grant_result_reader import (
+    PostgresProjectActionGrantResultReader,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_project_grant_change_facts_reader import (
     PostgresProjectGrantChangeFactsReader,
 )
@@ -23,6 +26,9 @@ from inframeld_backend.access.infrastructure.repositories.postgres_project_membe
 )
 from inframeld_backend.access.infrastructure.writers.postgres_audit_event_writer import (
     PostgresAuditEventWriter,
+)
+from inframeld_backend.access.infrastructure.writers.postgres_project_action_grant_result_writer import (
+    PostgresProjectActionGrantResultWriter,
 )
 from inframeld_backend.shared.application.protocols.operation_idempotency import (
     OperationIdempotency,
@@ -63,4 +69,7 @@ def create_project_grant_change_service(
         project_grant_change_fingerprint_service=ProjectGrantChangeFingerprintService(
             RequestFingerprintService(RequestFingerprintKey(b"T" * 32))
         ),
+        grant_management_facts_reader=PostgresProjectGrantChangeFactsReader(session),
+        grant_result_reader=PostgresProjectActionGrantResultReader(session),
+        grant_result_writer=PostgresProjectActionGrantResultWriter(session),
     )

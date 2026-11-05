@@ -66,14 +66,14 @@ class IdentityRecoveryCompletionService(
         recovery_repository: IdentityRecoveryRepository,
         *,
         recovery_cleanup_proof_reader: IdentityRecoveryCleanupProofReader,
-        proof_writer: IdentityRecoveryCleanupProofWriter,
+        recovery_cleanup_proof_writer: IdentityRecoveryCleanupProofWriter,
         installation_id: InstallationId,
         authority: IdentityAuthority,
         database_timeout_seconds: float = 5,
     ) -> None:
         self._database_timeout_seconds = database_timeout_seconds
         self._recovery_cleanup_proof_reader = recovery_cleanup_proof_reader
-        self._proof_writer = proof_writer
+        self._recovery_cleanup_proof_writer = recovery_cleanup_proof_writer
         self._transaction_manager = transaction_manager
         self._recovery_completion_facts_reader = recovery_completion_facts_reader
         self._recovery_repository = recovery_repository
@@ -113,7 +113,7 @@ class IdentityRecoveryCompletionService(
                     raise ConflictError(
                         "Only original complete evidence may cover older recoveries."
                     )
-                await self._proof_writer.apply_to_covered(
+                await self._recovery_cleanup_proof_writer.apply_to_covered(
                     proof, facts.admission, at=datetime.now(UTC)
                 )
 
@@ -122,7 +122,7 @@ class IdentityRecoveryCompletionService(
                 IdentityRecoveryCleanupState.CONFIRMED,
                 IdentityRecoveryCleanupState.CONFIRMED,
             )
-            await self._proof_writer.record_checked(
+            await self._recovery_cleanup_proof_writer.record_checked(
                 operation_id, at=datetime.now(UTC), released=result.released_at is not None
             )
             return result

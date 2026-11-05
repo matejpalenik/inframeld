@@ -113,13 +113,13 @@ class PostgresIdentityRecoveryCleanupResumeFactsReader(IdentityRecoveryCleanupRe
             row.reason,
         )
         result = IdentityRecoveryCleanupResumeResultDTO(
-            operation_id,
-            installation_id,
-            command.recovery_operation_id,
-            IdentityRecoveryCleanupResumeOutcome(row.outcome),
-            row.released,
-            row.run_id,
-            row.deadline,
+            operation_id=operation_id,
+            installation_id=installation_id,
+            recovery_operation_id=command.recovery_operation_id,
+            outcome=IdentityRecoveryCleanupResumeOutcome(row.outcome),
+            released=row.released,
+            run_id=row.run_id,
+            deadline=row.deadline,
         )
         return IdentityRecoveryMaintenanceReceiptDTO(command, row.authorized_at, result, mode)
 

@@ -16,13 +16,12 @@ This reference teaches the implementation shape. [Application Contracts](../../i
 
 A transaction saves related database changes together or rolls them all back. Idempotency means repeating the same operation identity and meaning can recover its outcome without applying the change again. Neither mechanism grants permission.
 
-**Code.** The following is the complete inspected service module, including imports, constructor, replay branch and result helper. It deliberately retains the checks surrounding load, business action and save:
+**Code.** The following selected excerpt includes the current constructor and complete `assign_use_only()` workflow with its result guard. It retains the checks surrounding load, business action and save. The same service also implements exact-action assignment and removal, which are not reproduced here:
 
-**Inspected teaching excerpt:** complete inspected module from [apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py). This is existing code for explanation, not replacement or insertion instructions.
+**Inspected teaching excerpt:** required imports, constructor, `assign_use_only()` and its result guard from [apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py). The linked class supplies the other required `ProjectGrantChanger` methods. This selected code is not a standalone service or replacement module.
 
 ```python
 from typing import override
-
 from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
     AssignProjectUseOnlyGrantCommand,
 )
@@ -30,10 +29,19 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_use_only_grant_authorization_request_dto import (
     ProjectUseOnlyGrantAuthorizationRequestDTO,
 )
+from inframeld_backend.access.application.protocols.project_action_grant_result_reader import (
+    ProjectActionGrantResultReader,
+)
+from inframeld_backend.access.application.protocols.project_action_grant_result_writer import (
+    ProjectActionGrantResultWriter,
+)
 from inframeld_backend.access.application.protocols.project_grant_authorizer import (
     ProjectGrantAuthorizer,
 )
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
+from inframeld_backend.access.application.protocols.project_grant_management_facts_reader import (
+    ProjectGrantManagementFactsReader,
+)
 from inframeld_backend.access.application.protocols.project_membership_repository import (
     ProjectMembershipRepository,
 )
@@ -62,10 +70,7 @@ from inframeld_backend.shared.application.enums.operation_lookup_authority_famil
     OperationLookupAuthorityFamily,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
-from inframeld_backend.shared.application.errors.application_errors import (
-    ConflictError,
-    StaleRevisionError,
-)
+from inframeld_backend.shared.application.errors.application_errors import ConflictError, StaleRevisionError
 from inframeld_backend.shared.application.protocols.operation_idempotency import (
     OperationIdempotency,
 )
@@ -83,12 +88,19 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         operation_idempotency: OperationIdempotency,
         membership_repository: ProjectMembershipRepository,
         project_grant_change_fingerprint_service: ProjectGrantChangeFingerprintService,
+        *,
+        grant_management_facts_reader: ProjectGrantManagementFactsReader,
+        grant_result_reader: ProjectActionGrantResultReader,
+        grant_result_writer: ProjectActionGrantResultWriter,
     ) -> None:
         self._transaction_manager = transaction_manager
         self._project_grant_authorizer = project_grant_authorizer
         self._operation_idempotency = operation_idempotency
         self._membership_repository = membership_repository
         self._project_grant_change_fingerprint_service = project_grant_change_fingerprint_service
+        self._grant_management_facts_reader = grant_management_facts_reader
+        self._grant_result_reader = grant_result_reader
+        self._grant_result_writer = grant_result_writer
 
     @override
     async def assign_use_only(
@@ -125,7 +137,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             )
 
             if not isinstance(operation, NewOperationReservationDTO):
-                return self._require_completed_result(operation)
+                return self._require_safe_completed_operation(operation)
 
             # A replay keeps its original revision. Only new work checks current state.
             if authorization.project_access_revision != command.expected_access_revision:
@@ -161,10 +173,10 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             completed = await self._operation_idempotency.record_completed_result(
                 operation, replay_kind=OperationReplayKind.SAFE_RESULT
             )
-            return self._require_completed_result(completed)
+            return self._require_safe_completed_operation(completed)
 
     @staticmethod
-    def _require_completed_result(
+    def _require_safe_completed_operation(
         operation: CompletedSynchronousOperationDTO
         | AcceptedAsyncOperationDTO
         | RecoveryRequiredOperationDTO,

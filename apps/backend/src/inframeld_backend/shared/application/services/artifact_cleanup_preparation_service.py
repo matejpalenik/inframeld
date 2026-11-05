@@ -112,15 +112,15 @@ class ArtifactCleanupPreparationService(ArtifactCleanupPreparer):
                 )
 
             prepared = JobEffectBindingDTO(
-                JobEffectId(uuid4()),
-                replace(context, checkpoint=current.checkpoint),
-                "artifact.cleanup:" + target.attempt_id.value.hex,
-                JobEffectAction.DELETE,
-                target.artifact_id,
-                target.attempt_id,
-                target.scope,
-                target.length,
-                target.digest,
+                effect_id=JobEffectId(uuid4()),
+                context=replace(context, checkpoint=current.checkpoint),
+                unit="artifact.cleanup:" + target.attempt_id.value.hex,
+                action=JobEffectAction.DELETE,
+                artifact_id=target.artifact_id,
+                artifact_attempt_id=target.attempt_id,
+                scope=target.scope,
+                length=target.length,
+                digest=target.digest,
             )
             await self._job_store.register_effect(prepared)
             return prepared

@@ -12,11 +12,11 @@ Alice’s authenticated request carries her principal ID and non-secret evidence
 
 ### Carry complete evidence for the authenticated caller
 
-Alice's browser context identifies the provider identity verified from her session. Her CLI context carries the exact identity, installation and credential version verified from Hydra. SupportBot's application-key evidence identifies its key without its secret. These are the three alternatives for the required `AccessContextDTO.authentication_evidence` field under [ADR-0073](../../../../docs/adr/ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md). [Record definitions](#authentication-evidence-records) own their fields.
+The current inspected browser context identifies the provider identity verified from her session. The accepted [restoration binding](#restoration-version-transition) adds version currentness before protected work, but is not implemented yet. Her CLI context carries the exact identity, installation and credential version verified from Hydra. SupportBot's application-key evidence identifies its key without its secret. These are the three alternatives for the required `AccessContextDTO.authentication_evidence` field under [ADR-0073](../../../../docs/adr/ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md). [Record definitions](#authentication-evidence-records) own their fields.
 
 The two implemented human authenticators construct complete contexts. HTTP dependencies and application services pass them unchanged. Authorizers read current facts separately. Both facts readers return the stored principal and exact OAuth binding/version observations. The shared application evaluator checks evidence against the stored principal kind. A kind mismatch is an internal `RuntimeError` before reservation, replay or mutation. It does not change the ordinary denial for a correctly represented application requesting human-only work.
 
-`PrincipalAccessPolicyInput.credential_is_current` has no default. Every producer supplies it explicitly. Browser/application contexts use true because the human OAuth generation check does not apply. That value does not establish browser-session or application-key validity. Production application-key authentication remains unfinished, and authorization tests simulate it with explicit evidence and synthetic key IDs. Add no empty evidence base, marker Protocol or parallel authentication-method enum.
+`PrincipalAccessPolicyInput.credential_is_current` has no default. Every producer supplies it explicitly. In the current implementation, browser/application contexts use true because the human OAuth generation check does not apply. Under the accepted restoration extension, browser currentness instead requires its captured identity/version comparison. Application-key currentness remains with its separate contract. That value does not establish browser-session or application-key validity. Production application-key authentication remains unfinished, and authorization tests simulate it with explicit evidence and synthetic key IDs. Add no empty evidence base, marker Protocol or parallel authentication-method enum.
 
 <a id="keep-identity-and-credential-lifecycles-separate"></a>
 
@@ -154,7 +154,7 @@ A maintenance result binds original operation/mode, installation, verified Krato
 
 ### Authentication evidence records
 
-`AccessContextDTO` is a frozen request-local transfer record containing `actor_principal_id: PrincipalId` and required `authentication_evidence`. The evidence is exactly one of these records:
+`AccessContextDTO` is a frozen request-local transfer record containing `actor_principal_id: PrincipalId` and required `authentication_evidence`. The current inspected evidence is exactly one of these records. The browser row is not the completed ADR-0127 target:
 
 | Record | Required values | Meaning |
 | --- | --- | --- |
@@ -181,6 +181,16 @@ The recovery admission writer advances the version once for each newly inserted 
 `HumanOAuthCredentialBindingDTO` carries verified provider identity, `InstallationId` and `HumanCredentialVersion`. `HumanCredentialStateDTO` observes authoritative installation, identity, optional initialized version and pending block together. These are typed transfer records, not extra tables or permission certificates. `AccessContextDTO` requires one of the [authentication evidence records](#authentication-evidence-records). OAuth evidence retains this binding so authorization can compare it again. The shared eligibility input carries the current comparison result, not a cached permission.
 
 `HumanOAuthCredentialFactsDTO` is an attempt-local read projection with required `binding_matches_actor: bool` and `current_version: HumanCredentialVersion | None`. The match covers the current installation and the presented provider identity's link to the actor. A missing version stays absent. Both project facts DTOs carry the stored principal/actor, pending-recovery flag and optional OAuth facts instead of an evaluated eligibility input. OAuth evidence always has a facts record, while browser/application evidence has none. The shared application evaluator constructs `PrincipalAccessPolicyInput` from these observations and the unchanged authenticated context. [Component ownership](eligibility-and-current-authority.md#credential-query-and-policy-boundaries) keeps SQL construction, boundary conversion and validity decisions separate.
+
+<a id="restoration-version-transition"></a>
+
+#### Accepted restoration version transition
+
+[ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md) reuses the existing identity-scoped version. A newly authorized actual `SUSPENDED` to `ACTIVE` transition advances it exactly once in the same transaction as principal state, Access revision, required audit and immutable original outcome. Original-result replay and non-transitions never advance it again. Failure or cancellation cannot save only part of the transition. An uncertain commit is reconciled through the same original operation. Preserve version/history integrity without reset, downgrade or a second registry.
+
+The browser's accepted logical evidence contains verified provider identity and the installation/version binding captured before final same-cookie verification. It contains no cookie, mutable account status or permissions. Current authorization needs the exact actor/installation/identity match and current version before disclosure, replay or effects. The identity-only browser row and OAuth-only facts projection above remain inspected current code. The new browser projection and restoration persistence are not delivered by this recording.
+
+Consent's accepted observations also distinguish a genuinely absent local link from a linked human's current suspension/retirement or incoherent required state. Initial blocking remains authoritative for that approval. See [consent](human-cli-consent.md#linked-human-restoration-checks). A fresh post-cutover request can still accept a late-created currently valid Kratos session under the [explicit limit](browser-sessions.md#restoration-evidence-cutover). No stored proof of that session's causal generation follows.
 
 [Access behavior](human-cli-credential-lifecycle.md#human-credential-versions) owns issuance, current checks and errors. [ADR-0072](../../../../docs/adr/ADR-0072-version-human-cli-credentials-across-account-recovery.md) owns the API guarantee and its provider limits.
 
