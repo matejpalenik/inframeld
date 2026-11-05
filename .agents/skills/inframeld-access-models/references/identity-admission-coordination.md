@@ -18,6 +18,7 @@ All participants must derive the same stable namespaced lock key across API and 
 | Recovery admission | Find any current local link and commit the original obligation, block and one credential-version advancement together. |
 | Recovery completion | Read the current optional local account and original obligation before applying release eligibility. |
 | Credential-state initialization | Create missing state only when permitted, without resetting existing state, creating an account or granting access. |
+| Deliberate restoration, accepted extension | Reread current same-identity authority, cleanup and restrictions, then save the actual restoration and exactly-once version advance with revision, audit and original outcome. Implementation unfinished. |
 
 The lock is not held from recovery admission until cleanup finishes. Each database operation has its own short transaction. Other participating operations can take their turns between those transactions, while the durable recovery block remains effective.
 
@@ -48,6 +49,14 @@ flowchart TB
 ```
 
 Arrows show the shared ordering inside each database operation, not a network sequence or another service. Provider verification and cleanup stay outside these transactions. The diagram covers both first admission and recovery, including the case with no local account.
+
+<a id="restoration-identity-turn"></a>
+
+## Give restoration the same identity turn
+
+[ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md) adds deliberate restoration to the accepted participants. Establish the trusted identity through the stable link and required current provider verification before the short transaction. Take the existing identity turn before Organization and any required Project coordination, then use fresh statements after waits for authority, principal status, version/history and original cleanup/recovery facts.
+
+Save the actual `SUSPENDED` to `ACTIVE` transition and version advance with its Access revision, audit and immutable original outcome. Replay and non-transitions advance nothing, and required missing state cannot prove eligibility. Provider verification and cleanup remain outside SQL. The existing diagram above illustrates first-admission/recovery ordering, not a delivered restoration path. No new lock namespace, coordination table, credential registry or executor is selected. Implementation and qualification of this participant remain unfinished.
 
 ## Reuse the implemented coordinator
 

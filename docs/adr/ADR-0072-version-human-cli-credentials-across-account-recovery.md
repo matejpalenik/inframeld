@@ -1,6 +1,6 @@
 # ADR-0072: Version human CLI credentials across account recovery
 
-**Status:** Accepted. [ADR-0073](ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md) refines the request context to require explicit authentication evidence. The versioning decision remains unchanged.
+**Status:** Accepted, partially superseded by [ADR-0127](ADR-0127-fence-human-authentication-evidence-at-restoration.md) on 2026-11-05 for the additional restoration advancement trigger and bound browser evidence. The recovery advancement, captured OAuth binding and stale-version rejection below remain selected. [ADR-0073](ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md) records the original explicit-evidence refinement. ADR-0127 implementation and qualification remain unfinished.
 
 **Date:** 2026-10-24
 
@@ -17,6 +17,8 @@ Alice starts CLI login with credential version 6. Its approval is delayed. Recov
 - Keep bulk cleanup and persist one credential version per identity. This is selected. Inframeld rejects an old generation independently of when Hydra finishes issuing it.
 
 ## Decision Outcome
+
+The following records the original recovery decision. ADR-0127 additionally advances the existing identity version exactly once on a new authorized `SUSPENDED` to `ACTIVE` transition, together with its revision, audit and immutable original outcome. Replay and non-transitions do not advance it. Its limited browser fence explicitly permits a fresh request to accept a late-created Kratos session that the provider currently verifies. It does not select universal session invalidation.
 
 Access owns a positive BIGINT credential version keyed by installation, provider authority and subject. It does not require a local principal. Version state is initialized at 1 and is never reset, pruned or downgraded.
 
