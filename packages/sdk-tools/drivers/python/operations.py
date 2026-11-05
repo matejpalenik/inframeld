@@ -289,6 +289,28 @@ async def project_members_async(clients: Clients, call: Call) -> NativeResponse:
     )
 
 
+def project_action_grants_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_project_action_grants_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def project_action_grants_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_project_action_grants_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 def metadata_read_sync(clients: Clients, call: Call) -> NativeResponse:
     return AccessApi(clients.production).get_project_metadata_sync_with_http_info(
         project_id=UUID(call.path["project_id"]),
@@ -525,6 +547,9 @@ BINDINGS: dict[Operation, Binding] = {
     ),
     Operation.CREATE_PROJECT: Binding(create_project_sync, create_project_async),
     Operation.LIST_PROJECT_MEMBERS: Binding(project_members_sync, project_members_async),
+    Operation.LIST_PROJECT_ACTION_GRANTS: Binding(
+        project_action_grants_sync, project_action_grants_async
+    ),
     Operation.ADD_PROJECT_MEMBER: Binding(project_member_add_sync, project_member_add_async),
     Operation.REMOVE_PROJECT_MEMBER: Binding(
         project_member_remove_sync, project_member_remove_async

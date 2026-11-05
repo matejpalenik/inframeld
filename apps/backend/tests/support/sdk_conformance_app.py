@@ -66,6 +66,10 @@ from inframeld_backend.access.application.dtos.organization_action_grant_dto imp
     OrganizationActionGrantDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
+from inframeld_backend.access.application.dtos.project_action_grant_dto import ProjectActionGrantDTO
+from inframeld_backend.access.application.dtos.project_action_grants_page_facts_dto import (
+    ProjectActionGrantsPageFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_creation_result_dto import (
     ProjectCreationResultDTO,
 )
@@ -103,6 +107,9 @@ from inframeld_backend.access.application.protocols.human_session_authenticator 
 from inframeld_backend.access.application.protocols.my_organization_access_reader import (
     MyOrganizationAccessReader,
 )
+from inframeld_backend.access.application.protocols.project_action_grants_facts_reader import (
+    ProjectActionGrantsFactsReader,
+)
 from inframeld_backend.access.application.protocols.project_creator import ProjectCreator
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
 from inframeld_backend.access.application.protocols.project_members_facts_reader import (
@@ -129,6 +136,9 @@ from inframeld_backend.access.application.queries.inspect_human_oauth_consent_qu
 )
 from inframeld_backend.access.application.queries.resolve_project_name_query import (
     ResolveProjectNameQuery,
+)
+from inframeld_backend.access.application.services.project_action_grants_service import (
+    ProjectActionGrantsService,
 )
 from inframeld_backend.access.application.services.project_members_service import (
     ProjectMembersService,
@@ -172,6 +182,9 @@ from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
 )
 from inframeld_backend.access.http.routes.organization_access_routes import (
     create_organization_access_router,
+)
+from inframeld_backend.access.http.routes.project_action_grant_routes import (
+    create_project_action_grant_router,
 )
 from inframeld_backend.access.http.routes.project_creation_routes import (
     create_project_creation_router,
@@ -579,6 +592,65 @@ async def _open_project_members() -> AsyncGenerator[ProjectMembersService]:
     yield ProjectMembersService(MockSDKProjectMembersFacts())
 
 
+class MockSDKProjectActionGrantsFacts(ProjectActionGrantsFactsReader):
+    """Supply exact stored assignments and current caller facts without a database."""
+
+    @override
+    async def read_page(
+        self,
+        *,
+        access: AccessContextDTO,
+        project_id: ProjectId,
+        action_id: ActionId,
+        after: PrincipalId | None,
+        limit: int,
+    ) -> ProjectActionGrantsPageFactsDTO | None:
+        if project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
+            return None
+
+        organization = OrganizationId(UUID("00000000-0000-4000-8000-000000000002"))
+        can_grant = action_id.value != "inspect-feedback"
+        assignments = (
+            ProjectActionGrantDTO(PRINCIPAL, action_id, can_grant),
+            ProjectActionGrantDTO(
+                PrincipalId(UUID("00000000-0000-4000-8000-000000000006")), action_id, False
+            ),
+        )
+        bounded = tuple(
+            item
+            for item in assignments
+            if after is None or item.recipient_principal_id.value.int > after.value.int
+        )[: limit + 1]
+        return ProjectActionGrantsPageFactsDTO(
+            InstallationId(UUID(int=123)),
+            organization,
+            project_id,
+            action_id,
+            ProjectActionFactsDTO(
+                Principal(
+                    access.actor_principal_id,
+                    organization,
+                    PrincipalKind.HUMAN,
+                    PrincipalStatus.ACTIVE,
+                ),
+                False,
+                HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+                if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+                else None,
+                ProjectStatus.ACTIVE,
+                True,
+                True,
+            ),
+            can_grant,
+            bounded,
+        )
+
+
+@asynccontextmanager
+async def _open_project_action_grants() -> AsyncGenerator[ProjectActionGrantsService]:
+    yield ProjectActionGrantsService(MockSDKProjectActionGrantsFacts())
+
+
 class MockSDKProjectMetadata(ProjectMetadataReader, ProjectMetadataChanger, ProjectNameResolver):
     """Supply explicit metadata observations without claiming persistence or grant administration."""
 
@@ -877,6 +949,9 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(create_session_router(authenticate))
     application.include_router(create_human_admission_router(authenticate, _open_human_admitter))
     application.include_router(create_project_grant_router(authenticate, _open_grant_change))
+    application.include_router(
+        create_project_action_grant_router(authenticate, _open_project_action_grants)
+    )
     application.include_router(
         create_organization_access_router(authenticate, _open_my_organization_access)
     )

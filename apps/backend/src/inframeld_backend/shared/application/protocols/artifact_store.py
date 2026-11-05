@@ -7,6 +7,7 @@ from inframeld_backend.shared.application.dtos.artifact_listing_dto import Artif
 from inframeld_backend.shared.application.dtos.artifact_object_dto import ArtifactObjectDTO
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
+from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 
 
 class ArtifactStore(Protocol):
@@ -15,10 +16,20 @@ class ArtifactStore(Protocol):
     Callers retain the original sealed expectation and commit unresolved-write
     evidence before PUT. Lost acknowledgments, timeouts and cancellation cannot
     authorize replacement identity, absence, publication or reservation release.
+    A supplied observation requires one committed invocation admission before
+    scheduling. Only the adapter's excluded-entry gate may record its abort.
+    Unobserved calls produce no job-recovery proof. An implementation unable to
+    honor an observation must reject it rather than silently run unobserved.
     """
 
     @abstractmethod
-    async def put(self, attempt: ArtifactAttemptDTO, content: BinaryIO) -> None:
+    async def put(
+        self,
+        attempt: ArtifactAttemptDTO,
+        content: BinaryIO,
+        *,
+        observation: JobEffectId | None = None,
+    ) -> None:
         """Conditionally create the original object, never overwrite an existing key.
 
         Keep content open until native calls drain after an unknown outcome.
@@ -40,4 +51,10 @@ class ArtifactStore(Protocol):
     ) -> ArtifactListingDTO: ...
 
     @abstractmethod
-    async def delete(self, scope: ArtifactScopeDTO, attempt_id: ArtifactAttemptId) -> None: ...
+    async def delete(
+        self,
+        scope: ArtifactScopeDTO,
+        attempt_id: ArtifactAttemptId,
+        *,
+        observation: JobEffectId | None = None,
+    ) -> None: ...

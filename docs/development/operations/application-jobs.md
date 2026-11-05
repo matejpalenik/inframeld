@@ -2,11 +2,11 @@
 
 Use this guide to start, observe and stop the PostgreSQL-backed application worker. For example, after a worker process exits, a replacement uses the original job and its saved checkpoints rather than admitting replacement work.
 
-The shared execution engine is implemented. Its default production handler registry is empty, so starting this process does not enable document processing, builds or evaluations. There is no generic job submission, inspection, cancellation or continuation command, HTTP endpoint or SDK operation. Qualification uses private local handlers, which are not operator features. The limits below bound the engine. They do not establish measured capacity for the full installation.
+The shared execution engine now registers `artifact.cleanup`, version `1`, for one original abandoned-staging target. Starting it does not enable document processing, builds or evaluations. There is no generic job submission, inspection, cancellation or continuation command, HTTP endpoint or SDK operation. The production composition and expired-attempt recovery are implemented. Targeted integration checks exercise original-invocation recovery and the registered PostgreSQL/S3 cleanup consumer. The limits below bound execution. They do not establish measured capacity for the full installation or complete artifact cleanup.
 
 ## Prepare the database and configuration
 
-Run commands from the repository root. Complete [local setup](../getting-started/local-setup.md), including locked backend dependencies and the explicit migration step. The worker and API must use compatible code and the same application database at schema `0018_spending_accounting`.
+Run commands from the repository root. Complete [local setup](../getting-started/local-setup.md), including locked backend dependencies and the explicit migration step. The worker and API must use compatible code and the same application database. This revision requires `0021_job_effect_observations`, whose parent is `0020_project_membership`. The [migration source](../../../apps/backend/migrations/versions/0021_job_effect_observations.py) retains original storage-invocation admission and observations.
 
 The existing operator-controlled migration command is:
 
@@ -18,6 +18,10 @@ For an existing installation, follow the [upgrade procedure](upgrades.md#upgrade
 
 The worker requires database configuration, with `INFRAMELD_DATABASE__NAME`, `INFRAMELD_DATABASE__USER` and `INFRAMELD_DATABASE__PASSWORD` set. `HOST` defaults to `localhost` and `PORT` to `5432`. Use the host connection values from `apps/backend/.env` for the development database. The worker has no HTTP listener and requires no fingerprint key, incoming product credential or model-provider secret.
 
+The worker also requires an operator-supplied private S3 endpoint, existing bucket and explicit storage credentials. Set `INFRAMELD_ARTIFACT_STORAGE__ENDPOINT_URL`, `INFRAMELD_ARTIFACT_STORAGE__BUCKET`, `INFRAMELD_ARTIFACT_STORAGE__ACCESS_KEY_ID` and `INFRAMELD_ARTIFACT_STORAGE__SECRET_ACCESS_KEY`. The endpoint must be reachable from the worker. Ambient AWS credentials are not used. `INFRAMELD_ARTIFACT_STORAGE__REGION` defaults to `us-east-1`.
+
+For a private certificate authority, set `INFRAMELD_ARTIFACT_STORAGE__CA_BUNDLE` to an absolute, worker-readable CA file. Omit it to use system trust. Keep TLS verification enabled. The existing [storage settings](../../../apps/backend/src/inframeld_backend/shared/infrastructure/settings/artifact_storage_settings.py) own call bounds and the other optional settings. Configuring these values does not create storage, grant product authority or prove storage health.
+
 ## Start on the host
 
 With the database running and migrated, run:
@@ -26,13 +30,13 @@ With the database running and migrated, run:
 mise exec -- uv run --project apps/backend --locked --env-file apps/backend/.env python -m inframeld_backend.application_worker
 ```
 
-The `--env-file` option explicitly loads your ignored local configuration. The worker does not automatically load the API's dotenv files. The worker reads the database settings and optional `INFRAMELD_JOBS__*`, `INFRAMELD_LOG_LEVEL` and `INFRAMELD_LOG_FORMAT` settings.
+The `--env-file` option explicitly loads your ignored local configuration. The worker does not automatically load the API's dotenv files. The worker reads the required database and artifact-storage settings, plus optional `INFRAMELD_JOBS__*`, `INFRAMELD_LOG_LEVEL` and `INFRAMELD_LOG_FORMAT` settings.
 
 Look for `application_worker_ready` after schema and installation-identity checks pass. This confirms startup, not successful product work or continuing dependency health. Stop this foreground process with Ctrl-C when finished.
 
 ## Start with development Compose
 
-As an alternative to the host process, use the opt-in `jobs` profile. With the development dependencies running and the database already migrated, build the current image and start only the worker:
+As an alternative to the host process, use the opt-in `jobs` profile. Prepare the required artifact-storage variables in the environment running Compose. The host command's `--env-file` option does not prepare that separate environment. Compose forwards the endpoint, bucket, explicit credentials, region and optional CA path to the worker. It adds no storage service or CA mount. A private CA needs an operator-supplied container-readable path and mount. With the development dependencies running and the database already migrated, build the current image and start only the worker:
 
 ```sh
 podman compose -f compose.dev.yaml --profile jobs up -d --build --no-deps application-worker
@@ -70,7 +74,7 @@ Logging accepts `INFRAMELD_LOG_LEVEL=DEBUG`, `INFO`, `WARNING` or `ERROR`, and `
 
 Admission is a separate application responsibility. It atomically commits the job, original retry identity and required audit with the owning operation. The shared admission service defaults to eight queued plus running jobs and rejects new admissions when that finite capacity is full. The stored queue-wait deadline is 24 hours after admission. Equivalent admission retries keep the original job and operation identity through queued, running and terminal states. They do not admit another job or establish current progress. Admission limits belong to the owning application and are not worker settings. Restarting does not rewrite stored deadlines.
 
-The worker claims the oldest eligible due job, using job ID to break ties. One ordinary attempt owns the execution slot. Checkpoints save completed units and check current authority and cancellation. They do not yield the slot to another job. Provider waits occur outside SQL transactions.
+The worker claims the oldest eligible due job, using job ID to break ties. One ordinary attempt owns the execution slot. Checkpoints save completed units and check current authority and cancellation. They do not yield the slot to another job. One process-lifetime database pool supplies fresh sessions for preparation, invocation admission, observations and checkpoints, each bounded by `DATABASE_TIMEOUT_SECONDS`, at most five seconds. Preparation and admission sessions close before the S3 call. Storage waits do not retain those SQL transactions.
 
 ## Interpret events and recover safely
 
@@ -86,11 +90,15 @@ Queue reports use `application_worker_queue`, with `queue_depth`, `oldest_eligib
 | `application_job_failed` | A handler raised an error. Preserve the recorded evidence. An unknown external outcome can still require recovery. |
 | `application_job_finished` | The current attempt saved successful completion. This says nothing about unrelated work. |
 
-Stopping the process with SIGINT or SIGTERM stops new claims and gives active work up to `SHUTDOWN_SECONDS` to finish its bounded exit. Compose allows 20 seconds by default, longer than the worker's default 15-second grace. If you change that grace, keep the container stop allowance longer too. Shutdown preserves accepted work and checkpoints. It may leave a running lease for the replacement to reconcile after expiry. It does not cancel a job, undo saved work or recall a sent provider request.
+Stopping the process with SIGINT or SIGTERM stops new claims and gives active work up to `SHUTDOWN_SECONDS` to finish its bounded exit. Compose allows 20 seconds by default, longer than the worker's default 15-second grace. If you change that grace, keep the container stop allowance longer too. Shutdown preserves accepted work and checkpoints. It joins handler and lease tasks before closing the database pool, then drains and closes the storage client. The configured shutdown grace does not establish a separate storage-drain completion deadline. Forced process termination may interrupt that drain. Neither a stopped process nor a drained client proves that an earlier server-side write cannot finish. Shutdown may leave a running lease for the replacement to reconcile after expiry. It does not cancel a job, undo saved work or recall a sent provider request.
 
 After an interrupted lease, safe remaining work can retry with retained checkpoints, bounded backoff and at most three attempts within the original work deadline. Restarting does not reset those budgets. Exhausted budgets or deadlines produce a recorded failure. An unsupported stored payload produces `failed` with reason `unsupported_payload` without running its handler. Do not edit stored payload bytes or queue rows to make a different release accept them.
 
 If an external effect was started but its outcome is unknown, the job retains `recovery_required` and the engine does not automatically repeat that effect. Its original admission replay binding remains nonexpiring while the effect is unresolved. Keep the original operation identity and evidence. A restart, missing response or failed process is not permission to issue replacement paid work.
+
+The registered cleanup consumer validates the current fence, original obligation, retained target and cleanup conditions before issuing its exact DELETE. A matching saved acknowledgment checkpoint suppresses redispatch only after those checks. A DELETE acknowledgment, an object-not-found observation or local drain does not establish physical retirement or release byte reservations. Without stored physical-completion facts, cleanup remains `recovery_required` with `physical_cleanup_pending`.
+
+The claim path takes an unlocked candidate observation, then checks current Access authority for product work before acquiring the queue turn. It locks and matches that exact candidate before mandatory recovery of an expired attempt. Recovery checks current eligibility and the original effect binding. For a pending effect, matching unused `not_dispatched` proof is consumed with retirement of the old attempt in one transaction. Only eligible safe work is requeued with its original identity, deadlines, checkpoints and attempt budget. An unconfirmed pending effect retains `recovery_required`. An observation is not permission to dispatch, and no operator command can manufacture completion or release bytes.
 
 Admitted work keeps its original principal and inputs. Ordinary credential expiry, replacement or individual key revocation does not cancel it. Protected boundaries recheck current account, exact permission and the saved human security generation. Lost authority stops further protected work, and restoring permission does not restart it. The shared admission contract accepts application evidence and generation-bound human OAuth evidence. Application-key authentication itself remains separate delivery work. Browser-derived durable admission is rejected until an owning caller implements qualified generation capture.
 

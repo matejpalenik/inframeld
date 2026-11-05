@@ -13,8 +13,24 @@ from tests.support.artifact_scenarios import (
     completed_product_origin,
 )
 
+from inframeld_backend.access.application.services.admitted_work_authorization_service import (
+    AdmittedWorkAuthorizationService,
+)
+from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_facts_reader import (
+    PostgresAdmittedWorkFactsReader,
+)
+from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
+    ArtifactCleanupAuthorizationService,
+)
+from inframeld_backend.shared.application.services.job_continuation_eligibility_service import (
+    JobContinuationEligibilityService,
+)
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
+from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
+from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
+    PostgresArtifactCleanupFactsReader,
+)
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
@@ -65,11 +81,26 @@ async def test_cleanup_terminal_routes_preserve_original_business_job_and_replay
 
     async with database.session() as session:
         jobs = PostgresJobStore(session)
+        recovery_store = PostgresJobStore(session)
+        product_authority = AdmittedWorkAuthorizationService(
+            PostgresAdmittedWorkFactsReader(session)
+        )
+        recovery_service = JobRecoveryService(
+            recovery_store,
+            JobContinuationEligibilityService(
+                recovery_store,
+                product_authority,
+                ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
+                supported_payloads=() if route == "unsupported" else (("artifact.cleanup", 1),),
+            ),
+        )
         execution = JobExecutionService(
             SqlAlchemyTransactionManager(session),
-            jobs,
+            recovery_store,
             supported_payloads=() if route == "unsupported" else (("artifact.cleanup", 1),),
             worker_id=uuid4(),
+            admitted_work_authorizer=product_authority,
+            job_recovery=recovery_service,
         )
         if route == "queue_deadline":
             async with session.begin():

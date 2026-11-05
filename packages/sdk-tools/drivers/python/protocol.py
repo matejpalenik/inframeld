@@ -17,6 +17,7 @@ class Operation(StrEnum):
     ADMIT_HUMAN = "admitHuman"
     CREATE_PROJECT = "createProject"
     LIST_PROJECT_MEMBERS = "listProjectMembers"
+    LIST_PROJECT_ACTION_GRANTS = "listProjectActionGrants"
     ADD_PROJECT_MEMBER = "addProjectMember"
     REMOVE_PROJECT_MEMBER = "removeProjectMember"
     INSPECT_HUMAN_OAUTH_CONSENT = "inspectHumanOAuthConsent"

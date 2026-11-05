@@ -90,7 +90,13 @@
       },
       {
         "title": "Manage Projects and access",
-        "href": "/guides/projects-and-access"
+        "href": "/guides/projects-and-access",
+        "children": [
+          {
+            "title": "List Project action grants",
+            "href": "/guides/list-project-action-grants"
+          }
+        ]
       },
       {
         "title": "Automate tasks and recover operations",

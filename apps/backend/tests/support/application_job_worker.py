@@ -6,7 +6,9 @@ from inframeld_backend.bootstrap.application_worker import run_application_worke
 from inframeld_backend.bootstrap.application_worker_application_settings import (
     ApplicationWorkerApplicationSettings,
 )
+from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
+from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
 from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 from tests.support.application_job_handler import BoundedJobHandler
@@ -21,7 +23,11 @@ async def _run() -> None:
     loop = asyncio.get_running_loop()
     loop.add_signal_handler(signal.SIGTERM, stopped.set)
     try:
-        await run_application_worker(settings, stopped, (BoundedJobHandler(),))
+        database = Database(settings.database)
+        operations = ApplicationWorkerOperations(database, settings.jobs, stopped)
+        await run_application_worker(
+            settings, stopped, (BoundedJobHandler(),), database=database, operations=operations
+        )
     finally:
         loop.remove_signal_handler(signal.SIGTERM)
 

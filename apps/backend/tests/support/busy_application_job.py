@@ -36,9 +36,16 @@ from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
 )
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
+    ArtifactCleanupAuthorizationService,
+)
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
 from inframeld_backend.shared.application.services.job_admission_service import JobAdmissionService
+from inframeld_backend.shared.application.services.job_continuation_eligibility_service import (
+    JobContinuationEligibilityService,
+)
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
+from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
@@ -47,6 +54,9 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
+    PostgresArtifactCleanupFactsReader,
+)
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
@@ -110,13 +120,28 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
             payload=JobPayload("test.busy", 1, b"bounded-busy-ordinary-slot"),
         )
     async with database.session() as session:
+        recovery_store = PostgresJobStore(session)
+        product_authority = AdmittedWorkAuthorizationService(
+            PostgresAdmittedWorkFactsReader(session)
+        )
+        recovery_service = JobRecoveryService(
+            recovery_store,
+            JobContinuationEligibilityService(
+                recovery_store,
+                product_authority,
+                ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
+                supported_payloads=(("test.busy", 1),),
+            ),
+        )
         context = await JobExecutionService(
             SqlAlchemyTransactionManager(session),
-            PostgresJobStore(session),
+            recovery_store,
             supported_payloads=(("test.busy", 1),),
             worker_id=uuid4(),
             lease_seconds=120,
             work_seconds=600,
+            admitted_work_authorizer=product_authority,
+            job_recovery=recovery_service,
         ).claim_next()
     assert context is not None and context.job_id == admission.job_id
 

@@ -241,6 +241,24 @@ export const zProjectAction = z.enum([
 ]);
 
 /**
+ * ProjectActionGrantItemResponse
+ */
+export const zProjectActionGrantItemResponse = z.object({
+    actionId: z.string(),
+    canGrant: z.boolean(),
+    projectId: z.uuid(),
+    recipientPrincipalId: z.uuid()
+});
+
+/**
+ * PageResponse[ProjectActionGrantItemResponse]
+ */
+export const zPageResponseProjectActionGrantItemResponse = z.object({
+    items: z.array(zProjectActionGrantItemResponse),
+    nextCursor: z.string().nullable()
+});
+
+/**
  * ProjectCreationRequest
  */
 export const zProjectCreationRequest = z.object({
@@ -1069,6 +1087,56 @@ export const zResolveProjectName503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zResolveProjectNameResponse = zProjectNameResolutionResponse;
+
+export const zListProjectActionGrantsPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zListProjectActionGrantsQuery = z.object({
+    actionId: z.string().min(1).max(100),
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListProjectActionGrants200Representation0Response = zPageResponseProjectActionGrantItemResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListProjectActionGrants400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListProjectActionGrants401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListProjectActionGrants403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListProjectActionGrants404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListProjectActionGrants422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListProjectActionGrants503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListProjectActionGrantsResponse = zPageResponseProjectActionGrantItemResponse;
 
 export const zAssignProjectUseOnlyGrantBody = zProjectUseOnlyGrantRequest;
 

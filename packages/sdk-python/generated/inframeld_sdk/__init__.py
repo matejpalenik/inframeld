@@ -56,10 +56,12 @@ __all__ = [
     "OrganizationAction",
     "OriginalOperationLookupRequest",
     "OwnOrganizationGrantResponse",
+    "PageResponseProjectActionGrantItemResponse",
     "PathInner",
     "PrincipalKind",
     "ProblemDetails",
     "ProjectAction",
+    "ProjectActionGrantItemResponse",
     "ProjectCreationRequest",
     "ProjectCreationResponse",
     "ProjectGrantTargetResponse",
@@ -127,10 +129,12 @@ from inframeld_sdk.models.operation_lookup_response import OperationLookupRespon
 from inframeld_sdk.models.organization_action import OrganizationAction as OrganizationAction
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest as OriginalOperationLookupRequest
 from inframeld_sdk.models.own_organization_grant_response import OwnOrganizationGrantResponse as OwnOrganizationGrantResponse
+from inframeld_sdk.models.page_response_project_action_grant_item_response import PageResponseProjectActionGrantItemResponse as PageResponseProjectActionGrantItemResponse
 from inframeld_sdk.models.path_inner import PathInner as PathInner
 from inframeld_sdk.models.principal_kind import PrincipalKind as PrincipalKind
 from inframeld_sdk.models.problem_details import ProblemDetails as ProblemDetails
 from inframeld_sdk.models.project_action import ProjectAction as ProjectAction
+from inframeld_sdk.models.project_action_grant_item_response import ProjectActionGrantItemResponse as ProjectActionGrantItemResponse
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest as ProjectCreationRequest
 from inframeld_sdk.models.project_creation_response import ProjectCreationResponse as ProjectCreationResponse
 from inframeld_sdk.models.project_grant_target_response import ProjectGrantTargetResponse as ProjectGrantTargetResponse

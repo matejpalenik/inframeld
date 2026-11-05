@@ -1,6 +1,6 @@
-# Finish independent work without expanding the project
+# Finish existing issues before opening new work
 
-Alice has several active branches, one shared integration stack and a limited review queue. The coordinator's job is to turn that work into useful merged capabilities. Opening more assignments helps only when they can progress independently and there is capacity to finish them.
+Alice has a member-list PR merged, membership changes still unfinished and a new group feature available. She finishes the membership issue before replacing it with the new feature. A useful supporting merge advances the owning issue but does not release its finishing owner.
 
 ## Establish the run
 
@@ -12,17 +12,21 @@ Default native scope is the launch-time open implementation snapshot in `matejpa
 
 A live run needs actual authority to create, update and link qualification issues for human-facing features in its finite scope. Reuse existing human authorization without asking again for each ticket. Without publication authority, retain a draft and report the gap before the required handoff. Qualification tracking does not add an implementation assignment to the allowlist. A missing implementation prerequisite outside that scope still needs the existing scope authorization.
 
-Use `pnpm delivery:plan` for the GitHub snapshot and dependency candidates. Inspect issue acceptance, native blockers, open PRs, unpublished work and likely contracts before assignment. The helper cannot establish code independence. Missing decisions block dependent work, while unrelated authorized work may proceed.
+Use `pnpm delivery:plan` for the GitHub snapshot and dependency candidates. Inspect issue acceptance, native blockers, open PRs, unpublished work and likely contracts before assignment. The helper cannot establish code independence. Missing decisions block dependent work, while existing independent assignments may proceed.
 
 ### Prefer epic completion without serializing the backlog
 
-Select an authorized issue with a verifiable close condition. Name one finishing owner, the remaining acceptance, the required product and verification capabilities, and the shared contracts the owner may change. Keep that owner accountable until observed closure or an explicit handoff accepted by a new owner. Choose a focused epic from developer priorities and actual dependencies, keeping the current selection in ordinary updates. Epics remain aggregate outcomes.
+Select the next whole issue to close from the existing unfinished queue before opening a new feature. Include recoverable parked work whose prerequisites have arrived. Name one finishing owner, the remaining acceptance, the delivered product and verification capabilities, and the shared contracts the owner may change. Keep that owner accountable through observed merge and closure or an explicit handoff accepted by a new owner. Choose a focused epic from developer priorities and actual dependencies. Epics remain aggregate outcomes.
 
-Prefer one coherent PR. Split when the prerequisite is independently useful and reviewable, a required producer belongs to another owner, or separating a demonstrated repair materially reduces integration or recovery risk. Before the split, name the consumer, the evidence that will make the prerequisite usable, and the next action on the owning issue. After a supporting merge, revisit that action before opening unrelated work. If it cannot proceed, preserve the checkpoint and name the actual blocker. Keep the finishing owner while delegating a prerequisite, or explicitly hand accountability to an accepting owner.
+Existing work means active assignments and preserved checkpoints. A new issue has not been started, even when already authorized by the finite backlog. An initial launch with no existing work can select from that backlog. After verified closure, select the next authorized issue with the same priority for recoverable unfinished work.
+
+Keep each lane on its selected issue until its full accepted scope is delivered and closure is verified. A supporting merge, local checkpoint, review queue or ordinary repair is not a reason to replace it with unrelated work. When a genuine blocker prevents completion, preserve the checkpoint and name the missing capability, its owner and the return condition. Deliver its authorized prerequisite or resume another existing issue that can finish. Opening an unrelated new issue before that closure requires explicit human reprioritization. If no existing issue or prerequisite can advance safely, report the concrete blocker or decision and leave capacity unused.
+
+Prefer one coherent PR. Split when the prerequisite is independently useful and reviewable, a required producer belongs to another owner, or separating a demonstrated repair materially reduces integration or recovery risk. Before the split, name the consumer, the evidence that will make the prerequisite usable, and the remaining path to the owning issue's closure. After a supporting merge, continue that path. Keep the finishing owner while delegating a prerequisite. A repeated supporting split needs a demonstrated obstacle to the next accepted behavior, not merely another separable component.
 
 A component issue may close when its own accepted scope is delivered. Do not import the future consumer's entire journey into that issue. Keep a broader issue open when its own promised behavior is still missing. Apply the [supporting-PR gates](gates-and-recovery.md#merge-useful-prerequisites-without-closing-the-feature) and separate [human-work deferral](gates-and-recovery.md#separate-implementation-and-human-acceptance).
 
-Parallelize verified independent work within the focus. An outside prerequisite or ready capability can use a lane when it can finish without delaying focused work through shared contracts, review or integration contention. Available capacity alone does not justify speculative machinery or more unfinished branches. Group related API changes when they form a coherent reviewable capability and avoid repeated generation. Let an independently useful ready PR land without waiting for speculative batching.
+Parallelize existing issues and their necessary prerequisites only where contracts, review and integration capacity permit completion. Group related API changes when they form a coherent reviewable capability and avoid repeated generation. Let a qualified useful PR land without waiting for speculative batching, then return to its issue's remaining acceptance.
 
 ### Check prerequisites before assignment
 
@@ -36,7 +40,11 @@ Follow one concrete user operation before dispatching a writer. Identify the cap
 
 Inspect relevant code/interfaces, merged PRs and scoped evidence. An approved design, an open implementation branch, a closed specification or a mocked response does not establish a delivered capability. This is a source/contract check, not a requirement to run full qualification before every assignment. Queued shared integration and final CI run at their normal stages. Test doubles remain valid for the decisions they actually demonstrate.
 
-Do not start a feature whose promised behavior or required verification depends on an unfinished capability. Prioritize the smallest useful prerequisite within authorization, or park the feature and assign verified independent work. If a narrow component is genuinely useful without the missing capability, establish its explicit accepted boundary and independent verification before starting it. Do not quietly convert a promised usable journey into an unused library, speculative adapter or deferred test. Existing human scope decisions remain authoritative, and routine choices need no new approval ceremony.
+Classify remaining work before declaring a blocker. Unimplemented behavior owned by the issue is work to finish. A missing capability owned elsewhere is a prerequisite. A future consumer outside the issue's accepted scope is not additional acceptance. Do not create a circular requirement by making a foundation wait for the downstream feature that consumes it. A broad issue spanning absent target types can supply a reviewed prerequisite, but remains open until all its own promised behavior exists.
+
+Before scheduling shared verification, inspect the actual retained database migration tip, candidate schema, generated outputs and their writers. A migration number on the branch alone does not establish compatibility with the shared environment. Order or isolate the maintained checks without resetting another owner's database or treating queued execution as missing implementation.
+
+Do not start dependent behavior whose producer or required verification capability is absent. Deliver the smallest useful authorized prerequisite on the selected issue's closure path. A narrow supporting component still needs its explicit acceptance and independent verification. It does not establish that the whole issue can now close. Preserve accepted scope instead of substituting an unused library, speculative adapter or deferred automated test. Routine sequencing within that scope needs no new approval ceremony.
 
 Require the capability, not completion of every related issue. A qualified supporting PR may supply the needed sign-in step while its broader owning issue remains open. Reassess native blockers against that actual delivered increment, recording why a broad edge is now satisfied. Never claim the larger issue is complete. Keep dependency relationships acyclic and avoid blanket parent/epic blockers.
 
@@ -81,7 +89,7 @@ Use stable identities such as `impl_a`, `impl_b`, `review_a` and `docs` for new 
 
 When several branches wait on the same prerequisite, review queues grow, or harness work dominates feature progress, stop opening new implementation assignments at a safe checkpoint. This pauses dispatch, not the Goal or a running command. Preserve current work and let safe operations finish.
 
-List active capabilities, reviewed checkpoints, real blockers and the next useful merge. Finish one coherent prerequisite or ready capability at a time through review, required checks and merge. Independent workers may still perform already assigned private checks, documentation and review. Keep truly blocked work parked. Resume new dispatch once ownership is reconciled and the integration/review queue can finish another independent assignment. No arbitrary waiting period or permanent serial-only mode is needed.
+List active capabilities, reviewed checkpoints, real blockers and the next expected whole-issue closure. Finish the selected issue or its necessary prerequisite through review, required checks and merge. Independent workers may still perform already assigned private checks, documentation and review. Keep truly blocked work parked. Reconcile ownership and apply the selection rule above before resuming dispatch.
 
 Prioritize a narrowly scoped shared maintenance PR when it genuinely unlocks several qualified branches. Do not bypass hooks, weaken cleanup or add another execution framework to avoid that blocker. Review any expansion of the maintenance scope under [Testing's harness boundary](../../inframeld-testing/references/isolation-and-evidence.md#keep-harness-repairs-bounded).
 
@@ -91,7 +99,7 @@ Name the next useful PR and what still prevents it. If correction attempts creat
 
 Preserve a recoverable checkpoint in the existing worktree with the exact blocker, next action and unblock condition. Obtain a positive writer-stop acknowledgment and reconcile all held resources. In native mode, `retire` releases the unfinished assignment only after verified cleanup. Retirement is not feature completion. Never delete a branch or discard dirty work to make room.
 
-Recheck the finite snapshot for a verified independent assignment, then give the released worker a fresh worktree and brief. Resume parked work through `adopt` after checking intervening main and contracts. If no independent work is verified, report that reason. Do not invent cleanup projects to keep agents busy.
+Recheck existing unfinished issues and the blocked issue's prerequisites under the selection rule above. Give a released worker a fresh worktree and brief only for the resulting assignment. Resume parked work through `adopt` after checking intervening main and contracts. Retirement releases resources, not the obligation to finish or return. It does not authorize an unrelated new issue.
 
 ## Own coordination, not every command
 
@@ -113,7 +121,7 @@ Keep ordinary progress updates short: report a meaningful result, changed gate, 
 
 Show one compact Markdown table when choosing the initial batch, assigning or resuming an issue, or reconsidering eligible work after a confirmed completion, supporting merge or changed blocker. This includes a selection decision to wait rather than dispatch. Combine related choices into one checkpoint update. A completion without a new selection decision needs only a short event message, then appears in the next selection table. Never repeat the table each turn or solely because time passed.
 
-Precede it with one line naming the focused epic, next expected issue closure and selected next issue or reason for no assignment. Use verified issue references, or state that no next closure is established. Include all active issues, parked blockers still relevant to this run, the immediate candidates being considered and issues completed since the previous selection checkpoint. Include deferred human qualification when it explains an implementation closure. Keep one row per issue, active work first. Do not copy the entire backlog, retain an ever-growing completed list or add a reporting ledger.
+Precede it with one line naming the focused epic, next expected whole-issue closure, remaining acceptance and why the needed capabilities are available. Distinguish this from the next supporting PR. If no closure is currently achievable, name the prerequisite or decision preventing it. Include active issues, relevant parked work, immediate candidates and issues completed since the previous selection checkpoint. Include deferred human qualification when it explains a closure. Keep one row per issue, active work first, using the existing table rather than another report.
 
 Use these columns and values:
 
@@ -148,7 +156,7 @@ For example, these fictional rows show a selection after a supporting read PR me
 | Issue | Epic | Deliverable | Status | Completion unblocks | Blockers | Next action / owner | Selection reason |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | #901 | #900 Access | Member administration | In progress | #905 | None | Read PR #950 merged. Finish add/remove acceptance / Implement · #901 Member administration · impl_a | Finish the focused issue |
-| #904 | #900 Access | Own permission inspection | Ready | (No Issue) | None | Assign at the next safe handoff / Coordinator | Independent focus work |
+| #904 | #900 Access | Own permission inspection | Ready | (No Issue) | None | Select after #901 closes / Coordinator | New feature waits for existing completion |
 | #905 | #900 Access | Safe departure | Blocked | (No Issue) | #901: membership changes must be delivered | Resume after #901's required capability merges / Coordinator | Preserve its checkpoint |
 | #911 | #900 Access | Human Access qualification | Deferred | (No Issue) | None | Prepare walkthrough and execute before v1 / Engineering, then human tester | Published human work stays tracked |
 

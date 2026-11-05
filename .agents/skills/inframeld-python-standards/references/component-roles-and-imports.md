@@ -265,7 +265,8 @@ inframeld_backend/
         ├── logging/
         ├── diagnostics/
         ├── timing/
-        └── types/logging_types.py
+        ├── types/log_format.py
+        └── types/log_level.py
 ```
 
 <a id="component-roles-and-naming"></a>

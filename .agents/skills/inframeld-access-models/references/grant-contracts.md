@@ -20,7 +20,7 @@ A local change saves its domain effects, revision, audit and original outcome to
 
 ## Concrete HTTP contract draft
 
-**Status:** accepted product boundaries and documented transport drafts. Human-session, consent, Project metadata, the supported use-only grant, own Organization access, ordinary Project creation and Project member list/add/remove are implemented. Other named models and routes remain design contracts. Native backend OpenAPI remains authoritative for delivered symbols. The implemented membership and creation routes use human cookie or Hydra bearer authentication, without an application-key subsystem.
+**Status:** accepted product boundaries and documented transport drafts. Human-session, consent, Project metadata, the supported use-only grant, own Organization access, ordinary Project creation, Project member list/add/remove and the Project-target action-grant read are implemented. Other named models and routes remain design contracts. Native backend OpenAPI remains authoritative for delivered symbols. The implemented membership and creation routes use human cookie or Hydra bearer authentication, without an application-key subsystem.
 
 For example, Alice sets SupportBot's `query` assignment on Support's Pipeline with `canGrant: false` and the reviewed access revision. If the response is lost, her same idempotency key recovers that original assignment result under current authority. Removing that assignment returns a removal result, not `canGrant: false`: the latter still permits use. If SupportBot is subsequently given another grant, replay of Alice's old removal cannot remove it again.
 
@@ -45,6 +45,16 @@ The [creation response](../../../../apps/backend/src/inframeld_backend/access/ht
 [`addProjectMember` and `removeProjectMember`](memberships-groups-and-handover.md#change-project-membership) share `/v1/projects/{project_id}/members/{principal_id}`. PUT uses `ProjectMembershipRequest` with only strict integer `expectedAccessRevision`. DELETE has no body and requires that same revision as one scalar query field. Reject duplicate or unknown query fields, unknown or duplicate JSON fields, boolean revisions and revisions outside the nonnegative signed-BIGINT range. PUT uses the bounded JSON and 413/415 profile. Both require one nonblank, at-most-128-character `Idempotency-Key`, ordinary human authentication and cookie-write CSRF where applicable.
 
 `ProjectMembershipResponse` and `ProjectMembershipRemovalResponse` contain the original `operationId`, `idempotencyExpiresAt`, `projectId`, `principalId`, `accessRevision`, `changed` and literal `member: true` or `removed: true`. Changed PUT is 201, unchanged PUT is 200 and DELETE is 200. The existing 400/401/403/404/409/422/503 problems apply. Every response is no-store. Current eligibility, Project visibility/membership and use of `manage-project-members` precede reservation and replay. Stale review is checked only for fresh work. The [original receipt](access-lifecycle-persistence.md#project-membership-original-results) preserves original status and outcome independently of a later membership change.
+
+<a id="project-action-grant-read"></a>
+
+### Implemented Project action-grant read
+
+[`listProjectActionGrants`](../../../../apps/backend/src/inframeld_backend/access/http/routes/project_action_grant_routes.py) uses `GET /v1/projects/{project_id}/grants`. Require one supported Project `actionId`, with ordinary `limit` and `cursor`. Reject request bodies, duplicate scalar query fields and unknown query fields. There is no expected revision or idempotency key. The [response item](../../../../apps/backend/src/inframeld_backend/access/http/responses/project_action_grant_item_response.py) has flat `projectId`, `recipientPrincipalId`, `actionId` and `canGrant` fields. The shared `PageResponse` carries only `items` and nullable `nextCursor`, without totals or an Access revision.
+
+Every page requires current admitted-human eligibility, Project visibility/membership and use plus grant authority for that exact action. Recovery blocks and current OAuth credential evidence retain their ordinary effects. A Project action read has no group-manager alternative. Stored suspended-recipient assignments remain visible. Results do not expand implied permissions or discover eligible recipients. Cursors bind installation, Organization, Project, action and recipient-ID order, without becoming authorization or snapshots. All responses are no-store. [The guide](../../../../apps/docs/src/app/guides/list-project-action-grants/page.mdx) explains the caller's setup and continuation.
+
+The existing POST use-only operation is unchanged. Full assignment/removal operations, other-target reads and the recipient-directory route below remain design contracts until their own implementation and qualification.
 
 <a id="credential-and-response-profiles"></a>
 
