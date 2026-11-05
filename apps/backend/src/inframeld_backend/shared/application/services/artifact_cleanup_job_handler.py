@@ -13,6 +13,10 @@ from inframeld_backend.shared.application.errors.job_errors import JobStoppedErr
 from inframeld_backend.shared.application.protocols.artifact_cleanup_preparer import (
     ArtifactCleanupPreparer,
 )
+from inframeld_backend.shared.application.protocols.artifact_local_cleanup import (
+    ArtifactLocalCleanup,
+)
+from inframeld_backend.shared.application.protocols.artifact_staging import ArtifactStaging
 from inframeld_backend.shared.application.protocols.artifact_store import ArtifactStore
 from inframeld_backend.shared.application.protocols.job_checkpoints import JobCheckpoints
 from inframeld_backend.shared.application.protocols.job_handler import JobHandler
@@ -21,9 +25,16 @@ from inframeld_backend.shared.application.protocols.job_handler import JobHandle
 class ArtifactCleanupJobHandler(JobHandler):
     """Dispatch one prepared DELETE and checkpoint its acknowledgment, never physical settlement."""
 
-    def __init__(self, preparer: ArtifactCleanupPreparer, artifacts: ArtifactStore) -> None:
+    def __init__(
+        self,
+        preparer: ArtifactCleanupPreparer,
+        artifacts: ArtifactStore,
+        local: ArtifactLocalCleanup,
+        staging: ArtifactStaging,
+    ) -> None:
         self._preparer = preparer
         self._artifacts = artifacts
+        self._local, self._staging = local, staging
 
     @override
     def payload_type(self) -> tuple[str, int]:
@@ -31,6 +42,10 @@ class ArtifactCleanupJobHandler(JobHandler):
 
     @override
     async def run(self, context: JobAttemptContextDTO, checkpoints: JobCheckpoints) -> None:
+        local = await self._local.prepare_local(context)
+        if local is not None:
+            await self._staging.remove(local)
+            await self._local.confirm_local(context, local)
         prepared = await self._preparer.prepare(context)
         if prepared is None:
             return

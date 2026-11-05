@@ -1,5 +1,6 @@
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterable
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import BinaryIO, override
@@ -12,6 +13,9 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
 from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto import (
     ArtifactCleanupJobBindingDTO,
+)
+from inframeld_backend.shared.application.dtos.artifact_cleanup_target_dto import (
+    ArtifactCleanupTargetDTO,
 )
 from inframeld_backend.shared.application.dtos.artifact_listing_dto import ArtifactListingDTO
 from inframeld_backend.shared.application.dtos.artifact_object_dto import ArtifactObjectDTO
@@ -32,6 +36,10 @@ from inframeld_backend.shared.application.errors.job_errors import JobStoppedErr
 from inframeld_backend.shared.application.protocols.artifact_cleanup_preparer import (
     ArtifactCleanupPreparer,
 )
+from inframeld_backend.shared.application.protocols.artifact_local_cleanup import (
+    ArtifactLocalCleanup,
+)
+from inframeld_backend.shared.application.protocols.artifact_staging import ArtifactStaging
 from inframeld_backend.shared.application.protocols.artifact_store import ArtifactStore
 from inframeld_backend.shared.application.protocols.job_checkpoints import JobCheckpoints
 from inframeld_backend.shared.application.services.artifact_cleanup_job_handler import (
@@ -42,6 +50,9 @@ from inframeld_backend.shared.application.value_objects.artifact_cleanup_obligat
     ArtifactCleanupObligationId,
 )
 from inframeld_backend.shared.application.value_objects.artifact_id import ArtifactId
+from inframeld_backend.shared.application.value_objects.artifact_staging_reservation_id import (
+    ArtifactStagingReservationId,
+)
 from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.application.value_objects.job_fence import JobFence
 from inframeld_backend.shared.application.value_objects.job_id import JobId
@@ -81,6 +92,56 @@ PREPARED = JobEffectBindingDTO(
     None,
     None,
 )
+
+
+class MockLocalCleanup(ArtifactLocalCleanup):
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    @override
+    async def prepare_local(self, context: JobAttemptContextDTO) -> ArtifactCleanupTargetDTO | None:
+        self.events.append("local_prepared")
+        return ArtifactCleanupTargetDTO(ARTIFACT, ATTEMPT, SCOPE, None, None)
+
+    @override
+    async def confirm_local(
+        self, context: JobAttemptContextDTO, target: ArtifactCleanupTargetDTO
+    ) -> None:
+        self.events.append("local_settled")
+
+
+class MockLocalStaging(ArtifactStaging):
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    @override
+    async def remove(self, target: ArtifactCleanupTargetDTO) -> None:
+        assert target == ArtifactCleanupTargetDTO(ARTIFACT, ATTEMPT, SCOPE, None, None)
+        self.events.append("local_removed")
+
+    @override
+    @asynccontextmanager
+    async def hold(self, attempt_id: ArtifactAttemptId) -> AsyncGenerator[None]:
+        raise AssertionError("The filesystem resource owns its holders.")
+        yield
+
+    @override
+    async def stage(
+        self,
+        reservation_id: ArtifactStagingReservationId,
+        *,
+        artifact_id: ArtifactId,
+        attempt_id: ArtifactAttemptId,
+        scope: ArtifactScopeDTO,
+        chunks: AsyncIterable[bytes],
+    ) -> ArtifactAttemptDTO:
+        raise AssertionError("Cleanup cannot stage new bytes.")
+
+    @override
+    @asynccontextmanager
+    async def open(self, attempt: ArtifactAttemptDTO) -> AsyncGenerator[BinaryIO]:
+        raise AssertionError("Cleanup cannot publish local content.")
+        yield
 
 
 class MockPreparer(ArtifactCleanupPreparer):
@@ -207,7 +268,24 @@ def _collaborators() -> tuple[
         MockArtifactStore(events),
         MockCheckpoints(events),
     )
-    return ArtifactCleanupJobHandler(preparer, store), preparer, store, checkpoints, events
+    return (
+        ArtifactCleanupJobHandler(
+            preparer, store, MockLocalCleanup(events), MockLocalStaging(events)
+        ),
+        preparer,
+        store,
+        checkpoints,
+        events,
+    )
+
+
+@pytest.mark.asyncio
+async def test_saved_remote_ack_never_skips_unfinished_local_removal() -> None:
+    handler, preparer, store, checkpoints, events = _collaborators()
+    preparer.result = None
+    await handler.run(CONTEXT, checkpoints)
+    assert events == ["local_prepared", "local_removed", "local_settled", "prepared"]
+    assert store.calls == [] and checkpoints.calls == []
 
 
 @pytest.mark.asyncio
@@ -247,7 +325,14 @@ async def test_dispatches_exact_prepared_delete_after_preparation_and_confirms_o
             + ATTEMPT.value.bytes,
         )
     ]
-    assert events == ["prepared", "delete_ack", "ack_checkpoint"]
+    assert events == [
+        "local_prepared",
+        "local_removed",
+        "local_settled",
+        "prepared",
+        "delete_ack",
+        "ack_checkpoint",
+    ]
     assert handler.payload_type() == ("artifact.cleanup", 1)
 
 
@@ -257,7 +342,11 @@ async def test_saved_ack_decision_skips_dispatch_without_trusting_stale_resume_b
     preparer.result = None
     await handler.run(CONTEXT, checkpoints)
     assert preparer.calls == [CONTEXT]
-    assert store.calls == [] and checkpoints.calls == [] and events == ["prepared"]
+    assert (
+        store.calls == []
+        and checkpoints.calls == []
+        and events == ["local_prepared", "local_removed", "local_settled", "prepared"]
+    )
 
 
 @pytest.mark.asyncio
