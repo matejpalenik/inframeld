@@ -28,6 +28,8 @@ Keep verification proportional to the change. Run focused behavior tests and req
 
 Start useful code documentation with purpose and the behavior's context. Preserve trust assumptions, caller prerequisites, result meaning, expected failures, non-obvious invariants, I/O/state changes and resource ownership where a maintainer would otherwise need to investigate. Keep ordinary propagation and details already obvious from names/types out of repetitive prose.
 
+Private visibility does not remove the need to explain non-obvious intent. Document why a helper exists and any important ordering, trust, failure or ownership constraint. Omit documentation that merely repeats the name or implementation.
+
 Shared contracts belong to the declaring interface or capability. Implementations add relevant details without repeating that contract. Explain what a transfer record establishes and what remains unchecked. Keep longer workflows in their owning references rather than copying them into each method.
 
 Prefer compact, value-based documentation over fixed function/docstring lengths or blanket declaration coverage. Document scenario and fixture details that explain behavior, without narrating every assertion or repeating signatures. The language guide owns syntax and declaration-specific conventions.

@@ -42,7 +42,18 @@ Useful purpose-first wording includes “Open a phase gate - return 204 even whe
 
 Remove text that merely repeats a name, signature, decorator or obvious statement. Do not pursue blanket declaration coverage. Apply the same rule to tests, fixtures, helpers and modules. Preserve meaningful scenarios and unusual setup while omitting descriptions that repeat assertions or test names.
 
-The [shared wording rule](../../inframeld-coding-standards/references/testing-and-documentation.md#purpose-before-implementation-detail) also applies to Python comments and docstrings.
+The [shared intent and wording rule](../../inframeld-coding-standards/references/testing-and-documentation.md#purpose-before-implementation-detail) also applies to private Python helpers. For example, `_lock_and_authorize()` needs to explain the ordering that its name alone does not establish.
+
+**Inspected teaching excerpt:** only the docstring of `ProjectMembershipChangeService._lock_and_authorize()` in [apps/backend/src/inframeld_backend/access/application/services/project_membership_change_service.py](../../../../apps/backend/src/inframeld_backend/access/application/services/project_membership_change_service.py). The enclosing method and its checks remain in the linked source. This is not a replacement method.
+
+```python
+"""Read membership and actor authority under the Project lock.
+
+Establish current permission before recovering a receipt or making a change.
+"""
+```
+
+The first sentence gives the purpose. The second preserves the reason for checking current authority before a saved receipt can be returned. A helper whose name and types already make its behavior obvious needs no filler docstring. Useful intent may fit in one sentence or need more context, without a mandatory sentence count.
 
 <a id="group-logical-steps-within-python-functions"></a>
 

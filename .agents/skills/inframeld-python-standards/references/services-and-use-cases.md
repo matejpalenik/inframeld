@@ -275,6 +275,37 @@ For an aggregate-changing database command with the grant workflow's retry and r
 
 Constructor dependencies must make the workflow's collaborators visible. Inject I/O and operational capabilities through application Protocols, with explicit implementation inheritance and overrides. Pure application helpers, such as the fingerprint service, can remain concrete. Do not construct adapters inside the service or fetch repositories from a transaction object. Keep caller input on the method, domain state on the aggregate, and session/cache lifetime in infrastructure and bootstrap. All transaction-bound collaborators must use the same session. Types alone do not establish this guarantee.
 
+<a id="name-collaborators-and-guards"></a>
+
+#### Name collaborators and guards
+
+Apply the shared [capability-naming convention](../../inframeld-coding-standards/SKILL.md#shared-conventions) to constructor parameters and their stored attributes. `facts`, `writer`, `results` and `fingerprints` hide the collaborator's responsibility. Use names such as `membership_facts_reader`, `membership_change_writer`, `membership_result_reader` and `membership_fingerprint_service`. Keep enough context to distinguish capabilities without mechanically repeating the enclosing service's full name. Already clear names such as `credential_state_reader` need no expansion.
+
+**Inspected teaching excerpt:** the complete constructor of `ProjectMembershipChangeService` in [apps/backend/src/inframeld_backend/access/application/services/project_membership_change_service.py](../../../../apps/backend/src/inframeld_backend/access/application/services/project_membership_change_service.py). The linked module supplies the protocol and service imports, enclosing class and remaining methods. This is a constructor excerpt, not a standalone service or replacement module.
+
+```python
+    def __init__(
+        self,
+        *,
+        transaction_manager: TransactionManager,
+        membership_facts_reader: ProjectMembershipChangeFactsReader,
+        membership_change_writer: ProjectMembershipChangeWriter,
+        membership_result_reader: ProjectMembershipChangeResultReader,
+        operation_idempotency: OperationIdempotency,
+        membership_fingerprint_service: ProjectMembershipChangeFingerprintService,
+    ) -> None:
+        self._transaction_manager = transaction_manager
+        self._membership_facts_reader = membership_facts_reader
+        self._membership_change_writer = membership_change_writer
+        self._membership_result_reader = membership_result_reader
+        self._operation_idempotency = operation_idempotency
+        self._membership_fingerprint_service = membership_fingerprint_service
+```
+
+The same service uses `_require_safe_completed_operation`, which explains the condition established before receipt recovery. `_completed` would hide that rejection is possible and that only a safe synchronous outcome is supported. Keep other helpers' names faithful to what they establish, without requiring this particular prefix for unrelated behavior.
+
+Update constructor keywords, stored attributes, composition sites, test doubles and current examples together when renaming a dependency. This naming convention does not change factories, session lifetime or the workflow's collaborators.
+
 <a id="adapt-the-pattern-to-the-workflow"></a>
 
 #### Adapt the pattern to the workflow
