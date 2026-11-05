@@ -8,8 +8,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 
 
@@ -27,7 +27,7 @@ class ProjectGrantChanger(Protocol):
         *,
         access: AccessContextDTO,
         command: AssignProjectUseOnlyGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> CompletedSynchronousOperationDTO:
         """Assign permission to use an action without granting permission to delegate it.
 

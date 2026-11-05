@@ -83,6 +83,9 @@ from inframeld_backend.access.application.dtos.public_discovery_dto import Publi
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
+from inframeld_backend.access.application.enums.project_membership_change_kind import (
+    ProjectMembershipChangeKind,
+)
 from inframeld_backend.access.application.errors.retired_project_name_error import (
     RetiredProjectNameError,
 )
@@ -103,6 +106,9 @@ from inframeld_backend.access.application.protocols.project_creator import Proje
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
 from inframeld_backend.access.application.protocols.project_members_facts_reader import (
     ProjectMembersFactsReader,
+)
+from inframeld_backend.access.application.protocols.project_membership_change_service_factory import (
+    ProjectMembershipChangeServiceFactory,
 )
 from inframeld_backend.access.application.protocols.project_membership_changer import (
     ProjectMembershipChanger,
@@ -185,11 +191,11 @@ from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto imp
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.in_progress_operation_dto import (
     InProgressOperationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
@@ -317,7 +323,7 @@ class MockSDKGrantChanger(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: AssignProjectUseOnlyGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> CompletedSynchronousOperationDTO:
         if context.key.value != "sdk-key":
             raise ValueError("The SDK changed the idempotency header.")
@@ -355,7 +361,7 @@ class MockSDKProjectCreator(ProjectCreator):
         *,
         access: AccessContextDTO,
         command: CreateProjectCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectCreationResultDTO:
         operation_id = OperationId("sdk-project-creation")
         return ProjectCreationResultDTO(
@@ -398,7 +404,7 @@ class MockSDKHumanAdmitter(HumanAdmitter):
         *,
         access: AccessContextDTO,
         command: AdmitHumanCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> HumanAdmissionResultDTO:
         if command.organization_id.value != UUID("00000000-0000-4000-8000-000000000002"):
             raise ResourceNotFoundError()
@@ -439,9 +445,9 @@ class MockSDKMembershipChanger(ProjectMembershipChanger):
         *,
         access: AccessContextDTO,
         command: AddProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMembershipChangeResultDTO:
-        return self._outcome(access, command, context, "add")
+        return self._outcome(access, command, context, ProjectMembershipChangeKind.ADD)
 
     @override
     async def remove_member(
@@ -449,16 +455,16 @@ class MockSDKMembershipChanger(ProjectMembershipChanger):
         *,
         access: AccessContextDTO,
         command: RemoveProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMembershipChangeResultDTO:
-        return self._outcome(access, command, context, "remove")
+        return self._outcome(access, command, context, ProjectMembershipChangeKind.REMOVE)
 
     @staticmethod
     def _outcome(
         access: AccessContextDTO,
         command: AddProjectMemberCommand | RemoveProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
-        kind: Literal["add", "remove"],
+        context: IdempotencyContextDTO,
+        kind: ProjectMembershipChangeKind,
     ) -> ProjectMembershipChangeResultDTO:
         if command.project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
             raise ResourceNotFoundError()
@@ -483,7 +489,7 @@ class MockSDKMembershipChanger(ProjectMembershipChanger):
             kind,
             8 if changed else 7,
             changed,
-            201 if kind == "add" and changed else 200,
+            201 if kind is ProjectMembershipChangeKind.ADD and changed else 200,
             CompletedSynchronousOperationDTO(
                 OperationId("sdk-project-membership-" + kind),
                 True,
@@ -493,9 +499,11 @@ class MockSDKMembershipChanger(ProjectMembershipChanger):
         )
 
 
-@asynccontextmanager
-async def _open_membership_changer() -> AsyncGenerator[ProjectMembershipChanger]:
-    yield MockSDKMembershipChanger()
+class MockSDKMembershipChangeServiceFactory(ProjectMembershipChangeServiceFactory):
+    @override
+    @asynccontextmanager
+    async def open(self) -> AsyncGenerator[ProjectMembershipChanger]:
+        yield MockSDKMembershipChanger()
 
 
 class MockSDKProjectMembersFacts(ProjectMembersFactsReader):
@@ -599,7 +607,7 @@ class MockSDKProjectMetadata(ProjectMetadataReader, ProjectMetadataChanger, Proj
         *,
         access: AccessContextDTO,
         command: UpdateProjectMetadataCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMetadataChangeResultDTO:
         if command.expected_metadata_revision != 0:
             raise StaleRevisionError()
@@ -864,7 +872,7 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(create_project_creation_router(authenticate, _open_project_creator))
     application.include_router(create_project_members_router(authenticate, _open_project_members))
     application.include_router(
-        create_project_membership_router(authenticate, _open_membership_changer)
+        create_project_membership_router(authenticate, MockSDKMembershipChangeServiceFactory())
     )
     application.include_router(
         create_project_metadata_router(

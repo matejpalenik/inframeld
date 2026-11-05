@@ -19,12 +19,12 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
     AcceptedAsyncOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
@@ -84,7 +84,7 @@ class JobAdmissionService:
         *,
         access: AccessContextDTO,
         authority: AdmittedWorkAuthorityDTO,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         fingerprint: RequestFingerprint,
         request_id: RequestId,
         payload: JobPayload,
@@ -119,7 +119,7 @@ class JobAdmissionService:
         ):
             raise RuntimeError("Admission authorization returned another scope.")
         await self._work_authorizer.require_current(authority)
-        operation = await self._idempotency.find_or_reserve(
+        operation = await self._idempotency.reserve_or_recover(
             context=context,
             access=access,
             authorization=authorization,

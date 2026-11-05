@@ -1,4 +1,3 @@
-from dataclasses import replace
 from typing import override
 from uuid import UUID
 
@@ -17,7 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.selectable import Exists
 
@@ -43,6 +42,7 @@ from inframeld_backend.access.application.protocols.project_membership_change_fa
 )
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
@@ -89,15 +89,16 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+        self._locked_state: ProjectMembershipChangeFactsDTO | None = None
+        self._locked_transaction: AsyncSessionTransaction | None = None
 
     @override
-    async def read_for_change(
+    async def lock_and_load_membership_state(
         self,
         *,
         access: AccessContextDTO,
         project_id: ProjectId,
         principal_id: PrincipalId,
-        removing: bool,
     ) -> ProjectMembershipChangeFactsDTO | None:
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Membership observation requires the active caller transaction.")
@@ -108,7 +109,9 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                 )
                 if isolation != "read committed":
                     raise RuntimeError("Membership coordination requires READ COMMITTED isolation.")
-                return await self._read(access, project_id, principal_id, removing)
+                self._locked_state = await self._read(access, project_id, principal_id)
+                self._locked_transaction = self._session.get_transaction()
+                return self._locked_state
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None
 
@@ -117,7 +120,6 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
         access: AccessContextDTO,
         project_id: ProjectId,
         principal_id: PrincipalId,
-        removing: bool,
     ) -> ProjectMembershipChangeFactsDTO | None:
         organization = await self._session.scalar(
             select(PrincipalRow.organization_id).where(
@@ -158,7 +160,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                 ProjectActionGrantRow.project_id == project_id.value,
                 ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
                 ProjectActionGrantRow.recipient_kind == PrincipalRow.kind,
-                ProjectActionGrantRow.action == "manage-project-members",
+                ProjectActionGrantRow.action == ProjectAction.MANAGE_PROJECT_MEMBERS.value,
             )
             .correlate(PrincipalRow)
         )
@@ -229,7 +231,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
             binding_matches,
             current_version,
         ) = row
-        facts = ProjectMembershipChangeFactsDTO(
+        return ProjectMembershipChangeFactsDTO(
             installation,
             org,
             ProjectId(project_row.id),
@@ -254,11 +256,27 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
             coherent,
             recipient_is_member,
         )
-        if removing and recipient_is_member:
-            return replace(
-                facts, responsibilities=await self._responsibilities(facts, principal_id)
-            )
-        return facts
+
+    @override
+    async def load_departure_responsibilities(
+        self, *, facts: ProjectMembershipChangeFactsDTO, principal_id: PrincipalId
+    ) -> tuple[ProjectDepartureResponsibilityDTO, ...]:
+        if (
+            not self._session.in_transaction()
+            or not self._session.is_active
+            or self._session.get_transaction() is not self._locked_transaction
+            or facts is not self._locked_state
+            or facts.recipient is None
+            or facts.recipient.id != principal_id
+            or not facts.recipient_is_project_member
+        ):
+            raise RuntimeError("Departure observation requires the checked coordinated state.")
+
+        try:
+            with self._session.no_autoflush:
+                return await self._responsibilities(facts, principal_id)
+        except (OperationalError, SqlAlchemyTimeoutError):
+            raise DependencyUnavailableError() from None
 
     async def _responsibilities(
         self, facts: ProjectMembershipChangeFactsDTO, departing: PrincipalId
@@ -291,8 +309,6 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                     "project",
                     project,
                     ActionId(action),
-                    False,
-                    False,
                     await self._candidates(facts, departing, grant),
                 )
             )
@@ -328,8 +344,6 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                     "access_group",
                     group,
                     ActionId(action),
-                    False,
-                    action in {"add-documents", "update-documents", "delete-documents"},
                     await self._candidates(facts, departing, grant, group),
                 )
             )
@@ -368,8 +382,6 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                     "application_account",
                     application,
                     ActionId(action),
-                    False,
-                    False,
                     await self._candidates(facts, departing, grant),
                 )
             )
@@ -388,8 +400,6 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                     "access_group",
                     group,
                     None,
-                    True,
-                    False,
                     await self._candidates(facts, departing, literal(False), group),
                 )
             )

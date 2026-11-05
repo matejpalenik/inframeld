@@ -32,7 +32,10 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
     NewOperationReservationDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
-from inframeld_backend.shared.application.errors.application_errors import ConflictError
+from inframeld_backend.shared.application.errors.application_errors import (
+    ConflictError,
+    StaleRevisionError,
+)
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
@@ -57,11 +60,12 @@ async def test_snapshot_isolation_cannot_observe_membership_change_facts(
     async with database.session() as session, session.begin():
         await session.connection(execution_options={"isolation_level": isolation})
         with pytest.raises(RuntimeError, match="READ COMMITTED"):
-            await PostgresProjectMembershipChangeFactsReader(session).read_for_change(
+            await PostgresProjectMembershipChangeFactsReader(
+                session
+            ).lock_and_load_membership_state(
                 access=seed.actor.access,
                 project_id=seed.project.project_id,
                 principal_id=seed.bob_id,
-                removing=False,
             )
     async with database.session() as session:
         assert await session.scalar(select(ProjectRow.access_revision)) == 1
@@ -274,6 +278,38 @@ async def test_generic_completed_metadata_cannot_replace_missing_original_busine
             is None
         )
         assert await session.scalar(select(ProjectRow.access_revision)) == 3
+
+
+@pytest.mark.parametrize("replay", [False, True], ids=["stale-new-removal", "completed-removal"])
+async def test_removal_replay_or_stale_revision_does_not_load_handover_facts(
+    database: Database, replay: bool
+) -> None:
+    seed = await seed_membership_project(database)
+    await change_membership(database, seed, revision=1, key="join")
+    original = await change_membership(database, seed, revision=2, key="leave", remove=True)
+    await change_membership(database, seed, revision=3, key="rejoin")
+
+    with patch.object(
+        PostgresProjectMembershipChangeFactsReader,
+        "load_departure_responsibilities",
+        side_effect=AssertionError("Departure dependencies were read before fresh-work checks."),
+    ):
+        if replay:
+            result = await change_membership(database, seed, revision=2, key="leave", remove=True)
+            assert result.operation.operation_id == original.operation.operation_id
+            assert result.access_revision == original.access_revision
+        else:
+            with pytest.raises(StaleRevisionError):
+                await change_membership(database, seed, revision=2, key="stale-leave", remove=True)
+
+    async with database.session() as session:
+        assert (
+            await session.get(
+                ProjectMembershipRow, (seed.project.project_id.value, seed.bob_id.value)
+            )
+            is not None
+        )
+        assert await session.scalar(select(ProjectRow.access_revision)) == 4
 
 
 @pytest.mark.parametrize("remove", [False, True], ids=["no-op-add", "no-op-remove"])

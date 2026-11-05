@@ -26,8 +26,8 @@ from inframeld_backend.bootstrap.original_operation_lookup_composition import (
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
@@ -67,7 +67,7 @@ async def test_original_request_lookup_preserves_exact_project_installation_and_
         seed = await seed_metadata_project(session)
         other = await seed_another_metadata_project(session, seed)
     access = AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser())
-    context = OperationAdmissionContextDTO(
+    context = IdempotencyContextDTO(
         "PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey("original")
     )
     async with database.session() as session:

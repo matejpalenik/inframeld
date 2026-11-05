@@ -65,11 +65,11 @@ from inframeld_backend.access.infrastructure.rows.project_name_reservation_row i
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.bootstrap.organization_access_composition import open_my_organization_access
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -205,7 +205,7 @@ async def test_original_result_survives_rename_removed_grants_and_changed_org_re
                 ResourceName("renamed"),
                 SubmittedDisplayName("Renamed"),
             ),
-            context=OperationAdmissionContextDTO(
+            context=IdempotencyContextDTO(
                 "PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey("rename")
             ),
         )
@@ -485,7 +485,7 @@ async def test_current_and_retired_names_conflict_only_within_their_organization
             command=UpdateProjectMetadataCommand(
                 first.project.project_id, 0, ResourceName("current")
             ),
-            context=OperationAdmissionContextDTO(
+            context=IdempotencyContextDTO(
                 "PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey("rename")
             ),
         )

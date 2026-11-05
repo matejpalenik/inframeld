@@ -102,11 +102,11 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -256,7 +256,7 @@ async def _assign(
         or AccessContextDTO(
             scenario.seed.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
         ),
-        context=OperationAdmissionContextDTO(
+        context=IdempotencyContextDTO(
             method="POST", requested_route="/v1/projects/{project_id}/grants", key=key
         ),
         command=AssignProjectUseOnlyGrantCommand(

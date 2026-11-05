@@ -86,12 +86,12 @@ from inframeld_backend.shared.application.dtos.artifact_scope_dto import Artifac
 from inframeld_backend.shared.application.dtos.business_operation_artifact_origin_dto import (
     BusinessOperationArtifactOriginDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
@@ -231,7 +231,7 @@ async def admitted_job(
                 ACTION,
                 binding,
             ),
-            context=OperationAdmissionContextDTO(query.method, query.requested_route, query.key),
+            context=IdempotencyContextDTO(query.method, query.requested_route, query.key),
             fingerprint=RequestFingerprint(b"R" * 32),
             request_id=RequestId(uuid4()),
             payload=JobPayload("test.lookup-reference", 1, b"private-worker-input"),

@@ -1,6 +1,12 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import override
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from inframeld_backend.access.application.protocols.project_membership_change_service_factory import (
+    ProjectMembershipChangeServiceFactory,
+)
 from inframeld_backend.access.application.protocols.project_membership_changer import (
     ProjectMembershipChanger,
 )
@@ -29,13 +35,27 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
 )
 
 
-@asynccontextmanager
-async def open_project_membership_change(
-    database: Database, fingerprints: ProjectMembershipChangeFingerprintService
-) -> AsyncGenerator[ProjectMembershipChanger]:
-    """Bind the complete membership operation to one request-local database session."""
-    async with database.session() as session:
-        yield ProjectMembershipChangeService(
+class PostgresProjectMembershipChangeServiceFactory(ProjectMembershipChangeServiceFactory):
+    """Bind each membership operation's database collaborators to one fresh session."""
+
+    def __init__(
+        self, database: Database, fingerprints: ProjectMembershipChangeFingerprintService
+    ) -> None:
+        self._database = database
+        self._fingerprints = fingerprints
+
+    @override
+    @asynccontextmanager
+    async def open(self) -> AsyncGenerator[ProjectMembershipChanger]:
+        async with self._database.session() as session:
+            yield self.create(session, self._fingerprints)
+
+    @staticmethod
+    def create(
+        session: AsyncSession, fingerprints: ProjectMembershipChangeFingerprintService
+    ) -> ProjectMembershipChangeService:
+        """Assemble one service on the session owned by the calling scope."""
+        return ProjectMembershipChangeService(
             transactions=SqlAlchemyTransactionManager(session),
             facts=PostgresProjectMembershipChangeFactsReader(session),
             writer=PostgresProjectMembershipChangeWriter(session),

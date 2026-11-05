@@ -54,7 +54,7 @@ Run `.venv/bin/python health.py`. A successful request prints `ok`.
 
 ## Use protected operations
 
-For a current human token, pass `_headers={"Authorization": "Bearer " + os.environ["INFRAMELD_TOKEN"]}` to the generated operation. [Authentication](/api-reference#authentication) explains the credential boundary. [Project metadata](/guides/name-and-rename-project) and [operation lookup](/guides/recover-original-request) provide complete request examples.
+For a current human token, configure `Configuration(host=os.environ["INFRAMELD_URL"], access_token=os.environ["INFRAMELD_TOKEN"])` once when constructing `ApiClient`. The generated operations reuse that credential. [Authentication](/api-reference#authentication) explains the credential boundary. [Project membership](/guides/manage-project-members#use-a-generated-client) shows operation snippets with shared client setup.
 
 ## Inspect results and close resources
 

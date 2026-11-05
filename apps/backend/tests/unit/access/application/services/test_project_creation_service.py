@@ -39,8 +39,8 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -86,7 +86,7 @@ INITIAL_ACTIONS = tuple(
 COMMAND = CreateProjectCommand(
     OrganizationId(UUID(int=2)), 7, ResourceName("production"), SubmittedDisplayName("Production")
 )
-CONTEXT = OperationAdmissionContextDTO("POST", "/v1/projects", IdempotencyKey("create-original"))
+CONTEXT = IdempotencyContextDTO("POST", "/v1/projects", IdempotencyKey("create-original"))
 ORIGINAL = CreatedProjectDTO(
     SAVED_RESULT.operation_id,
     COMMAND.organization_id,

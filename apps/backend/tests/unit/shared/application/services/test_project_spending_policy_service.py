@@ -39,11 +39,11 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
@@ -84,7 +84,7 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint_key 
 )
 from inframeld_backend.shared.application.value_objects.spending_period import SpendingPeriod
 
-CONTEXT = OperationAdmissionContextDTO(
+CONTEXT = IdempotencyContextDTO(
     "PATCH", "/projects/fixture/spending-policy", IdempotencyKey("policy-request")
 )
 
@@ -98,10 +98,10 @@ class MockIdempotency(OperationIdempotency):
         self.lookup_authorities: list[OperationLookupAuthority | None] = []
 
     @override
-    async def find_or_reserve[ProjectScope: ProjectId | None](
+    async def reserve_or_recover[ProjectScope: ProjectId | None](
         self,
         *,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         access: AccessContextDTO,
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,

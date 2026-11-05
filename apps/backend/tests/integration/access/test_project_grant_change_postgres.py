@@ -52,8 +52,8 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
@@ -145,7 +145,7 @@ async def test_mismatched_authorization_rolls_back_without_changing_either_proje
     command = AssignProjectUseOnlyGrantCommand(
         scenario.project_id, recipient_id, action_id, expected_access_revision=0
     )
-    context = OperationAdmissionContextDTO(
+    context = IdempotencyContextDTO(
         method="POST",
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-scope-mismatch"),
@@ -253,7 +253,7 @@ async def test_assign_use_only_saves_grant_revision_audit_and_reservation(
             ]
         )
 
-    request = OperationAdmissionContextDTO(
+    request = IdempotencyContextDTO(
         method="POST",
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-bob-1"),
@@ -373,7 +373,7 @@ async def test_assign_use_only_replay_keeps_original_operation_without_writing_a
             ]
         )
 
-    request = OperationAdmissionContextDTO(
+    request = IdempotencyContextDTO(
         method="POST",
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-bob-replay-1"),
@@ -497,7 +497,7 @@ async def test_new_key_with_stale_revision_rolls_back_entire_grant_change(
             ]
         )
 
-    request = OperationAdmissionContextDTO(
+    request = IdempotencyContextDTO(
         method="POST",
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-bob-original"),
@@ -626,7 +626,7 @@ async def test_same_key_cannot_change_grant_recipient(database: Database) -> Non
             ]
         )
 
-    request = OperationAdmissionContextDTO(
+    request = IdempotencyContextDTO(
         method="POST",
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-recipient-1"),
@@ -734,7 +734,7 @@ async def test_concurrent_equal_grants_commit_one_change(
             ]
         )
 
-    request = OperationAdmissionContextDTO(
+    request = IdempotencyContextDTO(
         method="POST",
         requested_route="/v1/projects/{project_id}/grants",
         key=IdempotencyKey("grant-bob-concurrent-1"),
@@ -904,7 +904,7 @@ async def test_competing_memberships_share_the_project_revision(database: Databa
             ).assign_use_only(
                 access=access,
                 command=AssignProjectUseOnlyGrantCommand(seed.project_id, bob, action, 0),
-                context=OperationAdmissionContextDTO(
+                context=IdempotencyContextDTO(
                     "POST", "/v1/projects/{project_id}/grants", IdempotencyKey("bob-change")
                 ),
             )
@@ -918,7 +918,7 @@ async def test_competing_memberships_share_the_project_revision(database: Databa
                 ).assign_use_only(
                     access=access,
                     command=AssignProjectUseOnlyGrantCommand(seed.project_id, carol, action, 0),
-                    context=OperationAdmissionContextDTO(
+                    context=IdempotencyContextDTO(
                         "POST", "/v1/projects/{project_id}/grants", IdempotencyKey("carol-change")
                     ),
                 )

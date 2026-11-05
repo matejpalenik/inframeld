@@ -10,7 +10,7 @@ Alice's project ID and Bob's principal ID are both UUIDs. Passing one in place o
 
 Use a dedicated value object when identity, invariants, secrecy or accidental mixing matter. Value objects express immutable meaning and validate their own invariants. Entities have stable identity and cohesive state. Do not introduce a wrapper just to make every field look alike.
 
-Use application-owned enums or `Literal` types for closed vocabularies. Meaningful open values, such as identity authorities and subjects, need distinct types when mixing them would be harmful. Free-form text and vocabularies whose values are not yet defined may remain strings.
+Use a scoped `StrEnum` when several components branch on the same closed vocabulary. For example, membership uses `ProjectMembershipChangeKind.ADD` and `REMOVE` through the service and receipt reader. Keep wire and storage values stable. Use the named `ProjectAction` constants for known Project actions and keep `ActionId` at boundaries that read stored identifiers. A local `Literal` still suits a fixed wire shape. Meaningful open values, such as identity authorities and subjects, need distinct types when mixing them would be harmful. Free-form text and vocabularies whose values are not yet defined may remain strings.
 
 Parse and validate at HTTP, provider, configuration and persistence boundaries. Serialize back to primitives there. Preserve existing wire/database values and real ORM conversion. An annotation alone performs no runtime validation.
 
@@ -111,7 +111,7 @@ class AssignProjectUseOnlyGrantCommand(Command, ProjectCommand):
 
 **Walkthrough.** The Command describes requested work. Its revision is an integer because this published counter already has a defined representation and local validation. The exact `int` check rejects booleans as well as other types, and the next check rejects negative values. This is a documented primitive choice, not a reason to wrap every scalar or remove useful value objects.
 
-The service separately receives `AccessContextDTO` and `OperationAdmissionContextDTO`. Access carries the authenticated actor and complete authentication evidence. Operation context carries retry metadata. Current authorization returns checked scope. None of those roles belongs on this Command, and local revision validation does not check current state. See [the complete service signature and workflow](services-and-use-cases.md).
+The service separately receives `AccessContextDTO` and `IdempotencyContextDTO`. Access carries the authenticated actor and complete authentication evidence. Operation context carries retry metadata. Current authorization returns checked scope. None of those roles belongs on this Command, and local revision validation does not check current state. See [the complete service signature and workflow](services-and-use-cases.md).
 
 **Alternatives.** Use a Query for a useful named read input. Keep results, projections and contexts as DTOs. `ProjectActionFactsDTO` becomes policy input only when the application selects the values for that domain decision. Direct typed parameters are valid when a named input adds no value.
 

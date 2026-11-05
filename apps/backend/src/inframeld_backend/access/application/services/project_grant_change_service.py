@@ -26,11 +26,11 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
@@ -73,7 +73,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: AssignProjectUseOnlyGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> CompletedSynchronousOperationDTO:
         fingerprint = self._fingerprints.for_assign_use_only(command)
 
@@ -90,7 +90,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             if authorization.project_id != command.project_id:
                 raise RuntimeError("Authorization returned a different project than requested.")
 
-            operation = await self._idempotency.find_or_reserve(
+            operation = await self._idempotency.reserve_or_recover(
                 context=context,
                 access=access,
                 authorization=authorization,

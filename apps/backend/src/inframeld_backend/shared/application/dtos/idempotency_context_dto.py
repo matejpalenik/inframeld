@@ -5,7 +5,7 @@ from inframeld_backend.shared.application.value_objects.idempotency_key import I
 
 
 @dataclass(frozen=True, slots=True)
-class OperationAdmissionContextDTO:
+class IdempotencyContextDTO:
     """Identify a logical retry scope without supplying caller authority or request meaning."""
 
     method: Literal["POST", "PUT", "PATCH", "DELETE"]

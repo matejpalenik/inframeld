@@ -49,8 +49,8 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.access.infrastructure.writers.postgres_project_creation_writer import (
     PostgresProjectCreationWriter,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
@@ -140,8 +140,8 @@ def creation_command(seed: ProjectCreationSeedDTO, name: str = "support") -> Cre
     )
 
 
-def creation_context(key: str = "original") -> OperationAdmissionContextDTO:
-    return OperationAdmissionContextDTO("POST", "/v1/projects", IdempotencyKey(key))
+def creation_context(key: str = "original") -> IdempotencyContextDTO:
+    return IdempotencyContextDTO("POST", "/v1/projects", IdempotencyKey(key))
 
 
 def creation_fingerprints() -> ProjectCreationFingerprintService:

@@ -79,10 +79,10 @@ from inframeld_backend.shared.application.commands.change_project_spending_polic
 from inframeld_backend.shared.application.dtos.captured_spending_basis_dto import (
     CapturedSpendingBasisDTO,
 )
-from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.dtos.project_spending_policy_result_dto import (
     ProjectSpendingPolicyResultDTO,
@@ -217,7 +217,7 @@ async def _admit_attempt(
         ).admit(
             access=access,
             authority=authority,
-            context=OperationAdmissionContextDTO(
+            context=IdempotencyContextDTO(
                 "POST", "/v1/projects/{project_id}/sources", IdempotencyKey(key)
             ),
             fingerprint=RequestFingerprint(b"S" * 32),
@@ -446,7 +446,7 @@ async def change_limit(
         return await policy.change_limit(
             access=scenario.access,
             command=ChangeProjectSpendingPolicyCommand(scenario.project_id, revision, limit),
-            context=OperationAdmissionContextDTO(
+            context=IdempotencyContextDTO(
                 "PATCH", "/internal/projects/{project_id}/spending-policy", IdempotencyKey(key)
             ),
         )

@@ -89,8 +89,8 @@ from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_
     PostgresIdentityRecoveryAdmissionWriter,
 )
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
@@ -163,7 +163,7 @@ async def _admit(
                 BOB_IDENTITY_ID,
                 seed.access_revision if revision is None else revision,
             ),
-            context=OperationAdmissionContextDTO(
+            context=IdempotencyContextDTO(
                 "POST",
                 f"/v1/organizations/{seed.organization_id.value}/human-admissions",
                 IdempotencyKey(key),

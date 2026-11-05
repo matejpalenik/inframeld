@@ -8,6 +8,7 @@ from inframeld_backend.access.application.dtos.project_action_authorization_requ
 from inframeld_backend.access.application.protocols.project_budget_authorizer import (
     ProjectBudgetAuthorizer,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -17,11 +18,11 @@ from inframeld_backend.shared.application.commands.change_project_spending_polic
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.project_spending_policy_dto import (
     ProjectSpendingPolicyDTO,
@@ -87,26 +88,27 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
         *,
         access: AccessContextDTO,
         command: ChangeProjectSpendingPolicyCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectSpendingPolicyResultDTO:
         fingerprint = self._fingerprints.for_change(command)
         async with self._transactions.begin():
             authorization = await self._authorizer.require_authorization(
                 access=access,
                 request=ProjectActionAuthorizationRequestDTO(
-                    command.project_id, ActionId("manage-budget")
+                    command.project_id, ActionId(ProjectAction.MANAGE_BUDGET.value)
                 ),
             )
             if authorization.project_id != command.project_id:
                 raise AccessDeniedError()
-            operation = await self._idempotency.find_or_reserve(
+            operation = await self._idempotency.reserve_or_recover(
                 context=context,
                 access=access,
                 authorization=authorization,
                 fingerprint=fingerprint,
                 expected_replay_kind=OperationReplayKind.SAFE_RESULT,
                 lookup_authority=OperationLookupAuthority(
-                    OperationLookupAuthorityFamily.PROJECT_ACTION_USE, ActionId("manage-budget")
+                    OperationLookupAuthorityFamily.PROJECT_ACTION_USE,
+                    ActionId(ProjectAction.MANAGE_BUDGET.value),
                 ),
             )
             if isinstance(operation, CompletedSynchronousOperationDTO):
@@ -163,7 +165,7 @@ class ProjectSpendingPolicyService(ProjectSpendingPolicyManager):
             authorization = await self._authorizer.require_authorization(
                 access=access,
                 request=ProjectActionAuthorizationRequestDTO(
-                    project_id, ActionId("inspect-budget")
+                    project_id, ActionId(ProjectAction.INSPECT_BUDGET.value)
                 ),
             )
             if authorization.project_id != project_id:

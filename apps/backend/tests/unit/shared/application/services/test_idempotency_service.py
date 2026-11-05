@@ -19,11 +19,11 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
@@ -70,7 +70,7 @@ REQUEST = OperationReservationRequestDTO(
     key=IdempotencyKey("retry-1"),
     fingerprint=b"F" * 32,
 )
-CONTEXT = OperationAdmissionContextDTO(
+CONTEXT = IdempotencyContextDTO(
     method=REQUEST.method, requested_route=REQUEST.requested_route, key=REQUEST.key
 )
 ACCESS = AccessContextDTO(
@@ -116,7 +116,7 @@ class MockOperationReservations(OperationReservationWriter):
 @pytest.mark.asyncio
 async def test_new_reservation_keeps_its_operation_identity_and_scope() -> None:
     writer = MockOperationReservations()
-    result = await IdempotencyService(writer).find_or_reserve(
+    result = await IdempotencyService(writer).reserve_or_recover(
         context=CONTEXT,
         access=ACCESS,
         authorization=AUTHORIZATION,
@@ -135,7 +135,7 @@ async def test_reservation_mapping_preserves_explicit_scope_and_retry_values(
 ) -> None:
     """Scope and retry values must reach storage unchanged to find the same operation."""
     writer = MockOperationReservations()
-    context = OperationAdmissionContextDTO(
+    context = IdempotencyContextDTO(
         method="PATCH",
         requested_route="/v1/ExampleOperations/{project_id}/",
         key=IdempotencyKey("Retry-Exact-Case"),
@@ -143,7 +143,7 @@ async def test_reservation_mapping_preserves_explicit_scope_and_retry_values(
     principal_id = PrincipalId(UUID(int=101))
     organization_id = OrganizationId(UUID(int=202))
     fingerprint = bytes(range(32))
-    result = await IdempotencyService(writer).find_or_reserve(
+    result = await IdempotencyService(writer).reserve_or_recover(
         context=context,
         access=AccessContextDTO(
             principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
@@ -169,7 +169,7 @@ async def test_reservation_mapping_preserves_explicit_scope_and_retry_values(
 async def test_in_progress_retry_reports_original_identity_and_delay() -> None:
     writer = MockOperationReservations(replace(NEW, created=False))
     with pytest.raises(IdempotencyInProgressError) as caught:
-        await IdempotencyService(writer).find_or_reserve(
+        await IdempotencyService(writer).reserve_or_recover(
             context=CONTEXT,
             access=ACCESS,
             authorization=AUTHORIZATION,
@@ -185,7 +185,7 @@ async def test_uncertain_outcome_is_returned_without_completing_or_restarting() 
     """The owner must decide how to present uncertainty about the original operation."""
     saved = replace(NEW, created=False, state=OperationReservationState.RECOVERY_REQUIRED)
     writer = MockOperationReservations(saved)
-    assert await IdempotencyService(writer).find_or_reserve(
+    assert await IdempotencyService(writer).reserve_or_recover(
         context=CONTEXT,
         access=ACCESS,
         authorization=AUTHORIZATION,
@@ -206,7 +206,7 @@ async def test_matching_replay_keeps_original_deadline(kind: OperationReplayKind
         expires_at=None if kind is OperationReplayKind.ASYNC_JOB else EXPIRY,
     )
     writer = MockOperationReservations(saved)
-    result = await IdempotencyService(writer).find_or_reserve(
+    result = await IdempotencyService(writer).reserve_or_recover(
         context=CONTEXT,
         access=ACCESS,
         authorization=AUTHORIZATION,
@@ -270,7 +270,7 @@ async def test_incompatible_reservation_cannot_be_treated_as_success(
     saved: OperationReservationResultDTO,
 ) -> None:
     with pytest.raises(ConflictError):
-        await IdempotencyService(MockOperationReservations(saved)).find_or_reserve(
+        await IdempotencyService(MockOperationReservations(saved)).reserve_or_recover(
             context=CONTEXT,
             access=ACCESS,
             authorization=AUTHORIZATION,
@@ -337,7 +337,7 @@ async def test_changed_request_conflict_propagates_without_a_new_operation() -> 
     writer = MockOperationReservations()
     writer.error = IdempotencyKeyReusedError()
     with pytest.raises(IdempotencyKeyReusedError):
-        await IdempotencyService(writer).find_or_reserve(
+        await IdempotencyService(writer).reserve_or_recover(
             context=CONTEXT,
             access=ACCESS,
             authorization=AUTHORIZATION,
@@ -361,7 +361,7 @@ async def test_async_replay_and_completion_preserve_optional_expiry(
         expires_at=expiry,
     )
     writer = MockOperationReservations(saved)
-    replay = await IdempotencyService(writer).find_or_reserve(
+    replay = await IdempotencyService(writer).reserve_or_recover(
         context=CONTEXT,
         access=ACCESS,
         authorization=AUTHORIZATION,
@@ -387,7 +387,7 @@ async def test_wrong_expected_kind_cannot_replay_a_completed_synchronous_result(
     )
     writer = MockOperationReservations(saved)
     with pytest.raises(ConflictError):
-        await IdempotencyService(writer).find_or_reserve(
+        await IdempotencyService(writer).reserve_or_recover(
             context=CONTEXT,
             access=ACCESS,
             authorization=AUTHORIZATION,
@@ -423,7 +423,7 @@ async def test_original_lookup_authority_is_passed_to_atomic_reservation() -> No
         OperationLookupAuthorityFamily.ORGANIZATION_ACTION_USE, ActionId("create-projects")
     )
     writer = MockOperationReservations()
-    await IdempotencyService(writer).find_or_reserve(
+    await IdempotencyService(writer).reserve_or_recover(
         context=CONTEXT,
         access=ACCESS,
         authorization=AUTHORIZATION,

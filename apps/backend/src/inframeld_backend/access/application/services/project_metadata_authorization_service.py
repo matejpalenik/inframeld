@@ -19,6 +19,7 @@ from inframeld_backend.access.application.protocols.project_metadata_facts_reade
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
 from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
     ProjectActionEligibilityPolicy,
@@ -85,7 +86,8 @@ class ProjectMetadataAuthorizationService(ProjectMetadataAuthorizer):
         if change and (
             not action.has_exact_action_grant
             or not ProjectActionEligibilityPolicy.may_use(
-                action_id=ActionId("edit-project-metadata"), principal_kind=action.principal.kind
+                action_id=ActionId(ProjectAction.EDIT_PROJECT_METADATA.value),
+                principal_kind=action.principal.kind,
             )
         ):
             raise AccessDeniedError()

@@ -7,6 +7,7 @@ from inframeld_backend.access.application.dtos.created_project_dto import Create
 from inframeld_backend.access.application.protocols.project_creation_result_reader import (
     ProjectCreationResultReader,
 )
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.policies.project_creation_policy import ProjectCreationPolicy
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -52,7 +53,7 @@ class PostgresProjectCreationResultReader(ProjectCreationResultReader):
                 parent.method == "POST",
                 parent.requested_route == "/v1/projects",
                 parent.lookup_authority_family == "organization_action_use",
-                parent.lookup_action_id == "create-projects",
+                parent.lookup_action_id == OrganizationAction.CREATE_PROJECTS.value,
                 parent.state == OperationReservationState.REPLAYABLE,
                 parent.replay_kind == OperationReplayKind.SAFE_RESULT,
                 parent.expires_at.is_not(None),

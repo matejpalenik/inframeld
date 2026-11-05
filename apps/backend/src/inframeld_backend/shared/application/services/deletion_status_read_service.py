@@ -11,6 +11,7 @@ from inframeld_backend.access.application.dtos.deletion_status_authorization_req
 from inframeld_backend.access.application.protocols.deletion_status_authorizer import (
     DeletionStatusAuthorizer,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.shared.application.dtos.deletion_status_binding_dto import (
     DeletionStatusBindingDTO,
 )
@@ -98,7 +99,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
             and binding.initiator_principal_id == authorization.principal_id
             and binding.authority_family is OperationLookupAuthorityFamily.PROJECT_ACTION_USE
             and binding.action_id is not None
-            and binding.action_id.value == "delete-project"
+            and binding.action_id.value == ProjectAction.DELETE_PROJECT.value
         )
 
     @staticmethod

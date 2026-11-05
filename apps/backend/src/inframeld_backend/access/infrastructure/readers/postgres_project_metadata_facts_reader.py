@@ -14,6 +14,7 @@ from inframeld_backend.access.application.dtos.project_metadata_authorization_fa
 from inframeld_backend.access.application.protocols.project_metadata_facts_reader import (
     ProjectMetadataFactsReader,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -70,7 +71,7 @@ class PostgresProjectMetadataFactsReader(ProjectMetadataFactsReader):
         scope = await self.scope(access=access)
         facts = await PostgresProjectActionFactsReader(self._session).read_action_facts(
             access=access,
-            action_id=ActionId("edit-project-metadata"),
+            action_id=ActionId(ProjectAction.EDIT_PROJECT_METADATA.value),
             target=ProjectActionTargetDTO(project_id),
         )
         if facts is None:

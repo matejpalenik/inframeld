@@ -36,11 +36,11 @@ from inframeld_backend.access.infrastructure.rows.human_credential_version_row i
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
@@ -161,10 +161,8 @@ class MockDeletionStatusScenarios:
         # This exercises native reservation, not Delete authorization or admission.
         reserved = await IdempotencyService(
             PostgresOperationReservationWriter(session)
-        ).find_or_reserve(
-            context=OperationAdmissionContextDTO(
-                request.method, request.requested_route, request.key
-            ),
+        ).reserve_or_recover(
+            context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
             access=access,
             authorization=ProjectActionAuthorizationDTO(actor.organization_id, actor.project_id),
             fingerprint=RequestFingerprint(request.fingerprint),

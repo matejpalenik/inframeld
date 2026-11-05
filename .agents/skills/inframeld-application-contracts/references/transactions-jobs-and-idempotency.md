@@ -10,7 +10,7 @@ Alice grants Bob a permission and loses the response. The server may already hav
 
 Idempotency recognizes the same caller, key and request meaning as one operation. The same key with different meaning conflicts. Expected revisions separately detect competing changes. A stored outcome is metadata, not permission. Authenticate and authorize before reservation or replay.
 
-The admission context, authenticated `access`, current `authorization`, typed `RequestFingerprint` and expected replay kind are explicit inputs to `OperationIdempotency`. Actor identity comes from access. Organization/project scope comes from authorization, never from inspecting the Command. Generic idempotency preserves the authorization result's project type. `IdempotencyService` alone assembles the low-level reservation request.
+The idempotency context, authenticated `access`, current `authorization`, typed `RequestFingerprint` and expected replay kind are explicit inputs to `OperationIdempotency`. Actor identity comes from access. Organization/project scope comes from authorization, never from inspecting the Command. Generic idempotency preserves the authorization result's project type. `IdempotencyService` alone assembles the low-level reservation request.
 
 <a id="follow-the-implemented-grant-pattern"></a>
 

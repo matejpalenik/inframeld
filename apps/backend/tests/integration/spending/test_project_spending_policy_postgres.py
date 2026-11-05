@@ -37,8 +37,8 @@ from inframeld_backend.bootstrap.spending_accounting_composition import (
 from inframeld_backend.shared.application.commands.change_project_spending_policy_command import (
     ChangeProjectSpendingPolicyCommand,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.project_spending_policy_dto import (
     ProjectSpendingPolicyDTO,
@@ -279,7 +279,7 @@ async def test_required_receipt_failure_rolls_back_policy_audit_and_replay(
             await service.change_limit(
                 access=scenario.access,
                 command=ChangeProjectSpendingPolicyCommand(scenario.project_id, 0, money("2")),
-                context=OperationAdmissionContextDTO(
+                context=IdempotencyContextDTO(
                     "PATCH",
                     "/internal/projects/{project_id}/spending-policy",
                     IdempotencyKey("failed-policy"),

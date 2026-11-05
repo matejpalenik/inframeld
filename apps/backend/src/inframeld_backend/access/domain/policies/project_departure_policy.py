@@ -11,25 +11,23 @@ from inframeld_backend.access.domain.policy_inputs.project_departure_responsibil
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 
+_GROUP_DOCUMENT_ACTIONS = frozenset({"add-documents", "update-documents", "delete-documents"})
+
 
 class ProjectDeparturePolicy:
     """Protect the remaining human authority for an ordinary Project departure."""
 
     @staticmethod
-    def supports_responsibility(
-        *, target_kind: str, action_id: ActionId | None, requires_group_manager: bool
-    ) -> bool:
+    def supports_responsibility(*, target_kind: str, action_id: ActionId | None) -> bool:
         """Reject unusable stored assignments instead of treating them as a grantor."""
-        if requires_group_manager:
-            return target_kind == "access_group" and action_id is None
         if action_id is None:
-            return False
+            return target_kind == "access_group"
         if target_kind == "project":
             return ProjectActionEligibilityPolicy.may_use(
                 action_id=action_id, principal_kind=PrincipalKind.HUMAN
             )
         if target_kind == "access_group":
-            return action_id.value in {"add-documents", "update-documents", "delete-documents"}
+            return action_id.value in _GROUP_DOCUMENT_ACTIONS
         if target_kind == "application_account":
             return action_id.value in {
                 "issue-application-keys",
@@ -43,6 +41,17 @@ class ProjectDeparturePolicy:
         responsibilities: tuple[ProjectDepartureResponsibilityPolicyInput, ...],
     ) -> bool:
         for responsibility in responsibilities:
+            if not ProjectDeparturePolicy.supports_responsibility(
+                target_kind=responsibility.target_kind, action_id=responsibility.action_id
+            ):
+                return False
+
+            requires_group_manager = responsibility.action_id is None
+            allows_group_manager = (
+                responsibility.target_kind == "access_group"
+                and responsibility.action_id is not None
+                and responsibility.action_id.value in _GROUP_DOCUMENT_ACTIONS
+            )
             supported = False
             for candidate in responsibility.candidates:
                 if (
@@ -58,12 +67,10 @@ class ProjectDeparturePolicy:
                     continue
 
                 manager = candidate.is_group_member and candidate.is_group_manager
-                if responsibility.requires_group_manager:
+                if requires_group_manager:
                     supported = manager
                 else:
-                    supported = candidate.can_grant or (
-                        responsibility.allows_group_manager and manager
-                    )
+                    supported = candidate.can_grant or (allows_group_manager and manager)
                 if supported:
                     break
 

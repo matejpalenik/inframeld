@@ -3,6 +3,9 @@ from typing import override
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.project_members_page_dto import ProjectMembersPageDTO
+from inframeld_backend.access.application.dtos.project_membership_observation_dto import (
+    ProjectMembershipObservationDTO,
+)
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
 )
@@ -21,6 +24,7 @@ from inframeld_backend.access.application.services.principal_access_evaluation_s
 from inframeld_backend.access.application.value_objects.project_members_cursor import (
     ProjectMembersCursor,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
 from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
     ProjectActionEligibilityPolicy,
@@ -63,16 +67,12 @@ class ProjectMembersService(ProjectMembersReader):
                 )
         except TimeoutError as error:
             raise DependencyUnavailableError() from error
-        if facts is None:
-            raise ResourceNotFoundError()
+        facts = ProjectMembershipObservationDTO.require_requested_scope(
+            observation=facts,
+            actor_principal_id=access.actor_principal_id,
+            project_id=query.project_id,
+        )
         action = facts.action
-        if (
-            facts.project_id != query.project_id
-            or action.principal.id != access.actor_principal_id
-            or facts.organization_id != action.principal.organization_id
-            or facts.access_revision < 0
-        ):
-            raise RuntimeError("The Project members observation changed its actor or scope.")
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=action.principal,
@@ -84,7 +84,8 @@ class ProjectMembersService(ProjectMembersReader):
         if not PrincipalAccessPolicy.may_use_product(
             eligibility
         ) or not ProjectActionEligibilityPolicy.may_use(
-            action_id=ActionId("manage-project-members"), principal_kind=action.principal.kind
+            action_id=ActionId(ProjectAction.MANAGE_PROJECT_MEMBERS.value),
+            principal_kind=action.principal.kind,
         ):
             raise AccessDeniedError()
         if not ProjectVisibilityPolicy.may_view_project(

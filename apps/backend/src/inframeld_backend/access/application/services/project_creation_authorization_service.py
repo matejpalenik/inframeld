@@ -16,6 +16,7 @@ from inframeld_backend.access.application.protocols.project_creation_authorizer 
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
 )
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.policies.project_creation_policy import ProjectCreationPolicy
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -51,7 +52,8 @@ class ProjectCreationAuthorizationService(ProjectCreationAuthorizer):
         if not ProjectCreationPolicy.may_create(
             eligibility,
             has_create_projects=any(
-                grant.action_id.value == "create-projects" for grant in facts.grants
+                grant.action_id.value == OrganizationAction.CREATE_PROJECTS.value
+                for grant in facts.grants
             ),
         ):
             raise AccessDeniedError()

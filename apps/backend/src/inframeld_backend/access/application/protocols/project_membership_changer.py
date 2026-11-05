@@ -11,8 +11,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_membership_change_result_dto import (
     ProjectMembershipChangeResultDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 
 
@@ -25,7 +25,7 @@ class ProjectMembershipChanger(Protocol):
         *,
         access: AccessContextDTO,
         command: AddProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMembershipChangeResultDTO:
         """Add only bare membership for an eligible admitted human, or recover its result."""
         ...
@@ -36,7 +36,7 @@ class ProjectMembershipChanger(Protocol):
         *,
         access: AccessContextDTO,
         command: RemoveProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMembershipChangeResultDTO:
         """Remove recipient relationships after safe handover, without deleting shared work."""
         ...

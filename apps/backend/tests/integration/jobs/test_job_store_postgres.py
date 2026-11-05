@@ -68,12 +68,12 @@ from inframeld_backend.bootstrap import application_worker
 from inframeld_backend.bootstrap.application_worker_application_settings import (
     ApplicationWorkerApplicationSettings,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_queue_status_dto import JobQueueStatusDTO
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
-)
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
 )
@@ -351,9 +351,7 @@ async def test_lost_admission_response_recovers_original_job_request_and_one_aud
                     authority.principal_id, MockAuthenticationEvidence.application_key()
                 ),
                 authority=authority,
-                context=OperationAdmissionContextDTO(
-                    request.method, request.requested_route, request.key
-                ),
+                context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
                 request_id=request_id,
                 payload=JobPayload("test.progress", 1, b"fixed"),
@@ -580,9 +578,7 @@ async def test_rejected_admission_leaves_no_job_audit_or_reservation(
                     authority.principal_id, MockAuthenticationEvidence.application_key()
                 ),
                 authority=authority,
-                context=OperationAdmissionContextDTO(
-                    request.method, request.requested_route, request.key
-                ),
+                context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
                 request_id=RequestId(uuid4()),
                 payload=JobPayload("test.progress", 1 if audit_failure else 2, b"fixed"),
@@ -726,9 +722,7 @@ async def _human_admit(
         return await _admission_service(session).admit(
             access=access,
             authority=authority,
-            context=OperationAdmissionContextDTO(
-                request.method, request.requested_route, request.key
-            ),
+            context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
             fingerprint=RequestFingerprint(request.fingerprint),
             request_id=RequestId(uuid4()),
             payload=JobPayload("test.progress", 1, b"3"),
@@ -974,9 +968,7 @@ async def test_application_human_only_action_is_denied_before_admission_effects(
                     authority.principal_id, MockAuthenticationEvidence.application_key()
                 ),
                 authority=authority,
-                context=OperationAdmissionContextDTO(
-                    request.method, request.requested_route, request.key
-                ),
+                context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
                 request_id=RequestId(uuid4()),
                 payload=JobPayload("test.progress", 1, b"fixed"),
@@ -1050,9 +1042,7 @@ async def test_aged_unresolved_effect_replay_preserves_original_job_and_operatio
                     authority.principal_id, MockAuthenticationEvidence.application_key()
                 ),
                 authority=authority,
-                context=OperationAdmissionContextDTO(
-                    request.method, request.requested_route, request.key
-                ),
+                context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
                 request_id=RequestId(uuid4()),
                 payload=JobPayload("test.progress", 1, b"fixed"),

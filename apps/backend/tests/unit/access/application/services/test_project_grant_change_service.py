@@ -50,11 +50,11 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
@@ -100,7 +100,7 @@ AUTHORIZATION = ProjectGrantAuthorizationDTO(
     organization_id=ORGANIZATION_ID, project_id=PROJECT_ID, project_access_revision=7
 )
 COMMAND = AssignProjectUseOnlyGrantCommand(PROJECT_ID, RECIPIENT_ID, ACTION_ID, 7)
-CONTEXT = OperationAdmissionContextDTO(
+CONTEXT = IdempotencyContextDTO(
     method="POST",
     requested_route="/v1/projects/{project_id}/grants",
     key=IdempotencyKey("assign-bob-1"),
@@ -176,7 +176,7 @@ class MockOperationIdempotency(OperationIdempotency):
         self.error: Exception | None = None
         self.completion_error: Exception | None = None
         self.calls = 0
-        self.context: OperationAdmissionContextDTO | None = None
+        self.context: IdempotencyContextDTO | None = None
         self.access: AccessContextDTO | None = None
         self.authorization: object | None = None
         self.fingerprint: RequestFingerprint | None = None
@@ -184,10 +184,10 @@ class MockOperationIdempotency(OperationIdempotency):
         self.expected_kind: OperationReplayKind | None = None
 
     @override
-    async def find_or_reserve[ProjectScope: ProjectId | None](
+    async def reserve_or_recover[ProjectScope: ProjectId | None](
         self,
         *,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         access: AccessContextDTO,
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,

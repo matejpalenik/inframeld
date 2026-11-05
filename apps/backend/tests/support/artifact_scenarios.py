@@ -46,8 +46,8 @@ from inframeld_backend.shared.application.dtos.artifact_scope_dto import Artifac
 from inframeld_backend.shared.application.dtos.business_operation_artifact_origin_dto import (
     BusinessOperationArtifactOriginDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origin_dto import (
     UnadmittedStagingArtifactOriginDTO,
@@ -264,7 +264,7 @@ async def completed_product_origin(
         ).admit(
             access=AccessContextDTO(actor, MockAuthenticationEvidence.application_key()),
             authority=authority,
-            context=OperationAdmissionContextDTO(
+            context=IdempotencyContextDTO(
                 "POST",
                 "/test/projects/{project_id}/feedback-reports",
                 IdempotencyKey("artifact-work-" + uuid4().hex),

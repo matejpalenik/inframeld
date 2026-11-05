@@ -14,6 +14,7 @@ from inframeld_backend.access.application.protocols.admitted_work_authorizer imp
 from inframeld_backend.access.application.protocols.project_budget_authorizer import (
     ProjectBudgetAuthorizer,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -214,7 +215,9 @@ class SpendingAccountingService(SpendingAccountant):
         async with self._transactions.begin():
             authorization = await self._budget_authorizer.require_authorization(
                 access=access,
-                request=ProjectActionAuthorizationRequestDTO(project_id, ActionId("manage-budget")),
+                request=ProjectActionAuthorizationRequestDTO(
+                    project_id, ActionId(ProjectAction.MANAGE_BUDGET.value)
+                ),
             )
             if authorization.project_id != project_id:
                 raise AccessDeniedError()

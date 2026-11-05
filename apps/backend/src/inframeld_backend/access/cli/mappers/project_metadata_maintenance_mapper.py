@@ -15,6 +15,7 @@ from inframeld_backend.access.cli.errors.project_metadata_maintenance_input_erro
     ProjectMetadataMaintenanceInputError,
 )
 from inframeld_backend.access.cli.mappers.maintenance_input_mapper import MaintenanceInputMapper
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
@@ -58,7 +59,7 @@ class ProjectMetadataMaintenanceMapper:
             if (
                 set(responsibility) != {"kind", "target", "actionId"}
                 or responsibility["kind"] != "action-grantor"
-                or responsibility["actionId"] != "edit-project-metadata"
+                or responsibility["actionId"] != ProjectAction.EDIT_PROJECT_METADATA.value
             ):
                 raise ValueError("Unsupported repair responsibility.")
             target = TypeAdapter(dict[str, object]).validate_python(
@@ -100,6 +101,6 @@ class ProjectMetadataMaintenanceMapper:
             "responsibility": {
                 "kind": "action-grantor",
                 "target": {"kind": "project", "projectId": str(result.project_id.value)},
-                "actionId": "edit-project-metadata",
+                "actionId": ProjectAction.EDIT_PROJECT_METADATA.value,
             },
         }

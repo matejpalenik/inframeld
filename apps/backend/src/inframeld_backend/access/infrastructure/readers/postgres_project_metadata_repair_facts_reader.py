@@ -37,6 +37,7 @@ from inframeld_backend.access.application.protocols.project_metadata_repair_fact
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
@@ -135,7 +136,7 @@ class PostgresProjectMetadataRepairFactsReader(ProjectMetadataRepairFactsReader)
 
         facts = await PostgresProjectActionFactsReader(self._session).read_action_facts(
             access=access,
-            action_id=ActionId("edit-project-metadata"),
+            action_id=ActionId(ProjectAction.EDIT_PROJECT_METADATA.value),
             target=ProjectActionTargetDTO(command.project_id),
         )
         if facts is None:
@@ -205,7 +206,7 @@ class PostgresProjectMetadataRepairFactsReader(ProjectMetadataRepairFactsReader)
                 ProjectMembershipRow.project_id == project_id.value,
                 PrincipalRow.kind == PrincipalKind.HUMAN,
                 PrincipalRow.status == PrincipalStatus.ACTIVE,
-                ProjectActionGrantRow.action == "edit-project-metadata",
+                ProjectActionGrantRow.action == ProjectAction.EDIT_PROJECT_METADATA.value,
                 ProjectActionGrantRow.can_grant.is_(True),
             )
         )

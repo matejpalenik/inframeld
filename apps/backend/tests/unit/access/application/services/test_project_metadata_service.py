@@ -19,8 +19,8 @@ from inframeld_backend.access.application.services.project_metadata_fingerprint_
 from inframeld_backend.access.application.services.project_metadata_service import (
     ProjectMetadataService,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.errors.application_errors import AccessDeniedError
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
@@ -53,7 +53,7 @@ class Scenario:
         return await self.service.update(
             access=ACCESS,
             command=UpdateProjectMetadataCommand(PROJECT_ID, revision, ResourceName("support")),
-            context=OperationAdmissionContextDTO(
+            context=IdempotencyContextDTO(
                 "PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey("same-request")
             ),
         )

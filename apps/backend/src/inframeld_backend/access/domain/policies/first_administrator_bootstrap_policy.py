@@ -1,4 +1,5 @@
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 
@@ -6,10 +7,10 @@ from inframeld_backend.access.domain.enums.principal_status import PrincipalStat
 class FirstAdministratorBootstrapPolicy:
     ORGANIZATION_NAME = "Inframeld"
     ORGANIZATION_ACTIONS = (
-        "admit-users",
-        "suspend-users",
-        "restore-users",
-        "create-projects",
+        OrganizationAction.ADMIT_USERS.value,
+        OrganizationAction.SUSPEND_USERS.value,
+        OrganizationAction.RESTORE_USERS.value,
+        OrganizationAction.CREATE_PROJECTS.value,
     )
 
     @staticmethod

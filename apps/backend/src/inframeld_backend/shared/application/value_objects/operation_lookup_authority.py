@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
@@ -9,28 +11,33 @@ from inframeld_backend.shared.application.errors.application_errors import Inval
 
 _PROJECT_ACTIONS = frozenset(
     {
-        "edit-project-metadata",
-        "manage-project-members",
-        "create-access-groups",
-        "create-application-accounts",
-        "create-pipelines",
-        "create-deployments",
-        "manage-upload-defaults",
-        "delete-project",
-        "inspect-budget",
-        "manage-budget",
-        "manage-trace-policy",
-        "delete-trace-history",
-        "inspect-feedback",
-        "create-collections",
-        "create-sources",
-        "create-model-connections",
-        "create-processing-profiles",
-        "create-embedding-profiles",
+        ProjectAction.EDIT_PROJECT_METADATA.value,
+        ProjectAction.MANAGE_PROJECT_MEMBERS.value,
+        ProjectAction.CREATE_ACCESS_GROUPS.value,
+        ProjectAction.CREATE_APPLICATION_ACCOUNTS.value,
+        ProjectAction.CREATE_PIPELINES.value,
+        ProjectAction.CREATE_DEPLOYMENTS.value,
+        ProjectAction.MANAGE_UPLOAD_DEFAULTS.value,
+        ProjectAction.DELETE_PROJECT.value,
+        ProjectAction.INSPECT_BUDGET.value,
+        ProjectAction.MANAGE_BUDGET.value,
+        ProjectAction.MANAGE_TRACE_POLICY.value,
+        ProjectAction.DELETE_TRACE_HISTORY.value,
+        ProjectAction.INSPECT_FEEDBACK.value,
+        ProjectAction.CREATE_COLLECTIONS.value,
+        ProjectAction.CREATE_SOURCES.value,
+        ProjectAction.CREATE_MODEL_CONNECTIONS.value,
+        ProjectAction.CREATE_PROCESSING_PROFILES.value,
+        ProjectAction.CREATE_EMBEDDING_PROFILES.value,
     }
 )
 _ORGANIZATION_ACTIONS = frozenset(
-    {"admit-users", "suspend-users", "restore-users", "create-projects"}
+    {
+        OrganizationAction.ADMIT_USERS.value,
+        OrganizationAction.SUSPEND_USERS.value,
+        OrganizationAction.RESTORE_USERS.value,
+        OrganizationAction.CREATE_PROJECTS.value,
+    }
 )
 _GRANT_ROUTE = "/v1/projects/{project_id}/grants"
 
@@ -56,7 +63,7 @@ class OperationLookupAuthority:
                 and method == "POST"
                 and project_id is not None
                 and self.family is family.PROJECT_GRANT_READ
-                and self.action_id.value == "create-access-groups"
+                and self.action_id.value == ProjectAction.CREATE_ACCESS_GROUPS.value
             ):
                 raise InvalidInputError()
             return

@@ -32,8 +32,8 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
     ProjectActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
@@ -89,7 +89,7 @@ async def _invoke(
             command=AssignProjectUseOnlyGrantCommand(
                 seed.project_id, seed.principal_id, seed.action, 0
             ),
-            context=OperationAdmissionContextDTO(
+            context=IdempotencyContextDTO(
                 key=IdempotencyKey("evidence-check"),
                 method="POST",
                 requested_route="/v1/projects/{project_id}/grants",

@@ -15,6 +15,7 @@ from inframeld_backend.access.application.protocols.project_metadata_repository 
     ProjectMetadataRepository,
 )
 from inframeld_backend.access.domain.entities.project_metadata import ProjectMetadata
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
@@ -126,7 +127,8 @@ class PostgresProjectMetadataRepository(ProjectMetadataRepository):
                     IdempotencyReservationRow.principal_id == actor_id.value,
                     IdempotencyReservationRow.state == OperationReservationState.IN_PROGRESS,
                     IdempotencyReservationRow.lookup_authority_family == "project_action_use",
-                    IdempotencyReservationRow.lookup_action_id == "edit-project-metadata",
+                    IdempotencyReservationRow.lookup_action_id
+                    == ProjectAction.EDIT_PROJECT_METADATA.value,
                     IdempotencyReservationRow.method == "PATCH",
                     IdempotencyReservationRow.requested_route
                     == "/v1/projects/{project_id}/metadata",

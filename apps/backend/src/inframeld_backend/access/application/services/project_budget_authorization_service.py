@@ -22,6 +22,7 @@ from inframeld_backend.access.application.protocols.project_budget_authorizer im
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.policies.action_authorization_policy import (
     ActionAuthorizationPolicy,
 )
@@ -39,7 +40,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     ResourceNotFoundError,
 )
 
-_BUDGET_ACTIONS = frozenset({"inspect-budget", "manage-budget"})
+_BUDGET_ACTIONS = frozenset({ProjectAction.INSPECT_BUDGET.value, ProjectAction.MANAGE_BUDGET.value})
 
 
 class ProjectBudgetAuthorizationService(ProjectBudgetAuthorizer):

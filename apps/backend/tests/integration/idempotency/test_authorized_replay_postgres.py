@@ -49,11 +49,11 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
@@ -122,7 +122,7 @@ async def test_organization_scoped_retry_preserves_scope_fingerprint_and_expiry(
         scenario.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
     )
     authorization = MockAuthorizedOrganizationScopeDTO(scenario.organization_id)
-    context = OperationAdmissionContextDTO(
+    context = IdempotencyContextDTO(
         method="PATCH",
         requested_route="/v1/test-organization-operation",
         key=IdempotencyKey("organization-retry-1"),
@@ -131,7 +131,7 @@ async def test_organization_scoped_retry_preserves_scope_fingerprint_and_expiry(
 
     async with database.session() as session, session.begin():
         service = IdempotencyService(PostgresOperationReservationWriter(session))
-        first = await service.find_or_reserve(
+        first = await service.reserve_or_recover(
             context=context,
             access=access,
             authorization=authorization,
@@ -148,7 +148,7 @@ async def test_organization_scoped_retry_preserves_scope_fingerprint_and_expiry(
 
     async with database.session() as session, session.begin():
         service = IdempotencyService(PostgresOperationReservationWriter(session))
-        retry = await service.find_or_reserve(
+        retry = await service.reserve_or_recover(
             context=context,
             access=access,
             authorization=authorization,

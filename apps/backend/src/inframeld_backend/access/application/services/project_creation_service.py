@@ -23,17 +23,18 @@ from inframeld_backend.access.application.protocols.project_creator import Proje
 from inframeld_backend.access.application.services.project_creation_fingerprint_service import (
     ProjectCreationFingerprintService,
 )
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.policies.project_creation_policy import ProjectCreationPolicy
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
@@ -77,7 +78,7 @@ class ProjectCreationService(ProjectCreator):
         *,
         access: AccessContextDTO,
         command: CreateProjectCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectCreationResultDTO:
         if context.method != "POST" or context.requested_route != "/v1/projects":
             raise RuntimeError("Project creation changed its original operation route.")
@@ -90,7 +91,7 @@ class ProjectCreationService(ProjectCreator):
                 if scope.organization_id != command.organization_id or scope.project_id is not None:
                     raise RuntimeError("Creation authorization changed the requested scope.")
 
-                operation = await self._idempotency.find_or_reserve(
+                operation = await self._idempotency.reserve_or_recover(
                     context=context,
                     access=access,
                     authorization=scope,
@@ -98,7 +99,7 @@ class ProjectCreationService(ProjectCreator):
                     expected_replay_kind=OperationReplayKind.SAFE_RESULT,
                     lookup_authority=OperationLookupAuthority(
                         OperationLookupAuthorityFamily.ORGANIZATION_ACTION_USE,
-                        ActionId("create-projects"),
+                        ActionId(OrganizationAction.CREATE_PROJECTS.value),
                     ),
                 )
                 actions = tuple(ActionId(value) for value in ProjectCreationPolicy.INITIAL_ACTIONS)

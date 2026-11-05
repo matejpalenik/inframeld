@@ -13,6 +13,7 @@ from inframeld_backend.access.application.protocols.human_admission_writer impor
     HumanAdmissionWriter,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
@@ -106,7 +107,8 @@ class PostgresHumanAdmissionWriter(HumanAdmissionWriter):
                     IdempotencyReservationRow.requested_route
                     == f"/v1/organizations/{organization_id.value}/human-admissions",
                     IdempotencyReservationRow.lookup_authority_family == "organization_action_use",
-                    IdempotencyReservationRow.lookup_action_id == "admit-users",
+                    IdempotencyReservationRow.lookup_action_id
+                    == OrganizationAction.ADMIT_USERS.value,
                     IdempotencyReservationRow.state == OperationReservationState.IN_PROGRESS,
                     IdempotencyReservationRow.replay_kind.is_(None),
                     IdempotencyReservationRow.expires_at.is_(None),
@@ -234,7 +236,7 @@ class PostgresHumanAdmissionWriter(HumanAdmissionWriter):
                 event_type="human_admitted" if changed else "human_admission_unchanged",
                 target_kind="principal",
                 target_id=principal.id.value,
-                action="admit-users",
+                action=OrganizationAction.ADMIT_USERS.value,
                 before_values={"access_revision": revision, "admitted": not changed},
                 after_values={"access_revision": after_revision, "admitted": True},
                 correlation_id=operation_id.value,

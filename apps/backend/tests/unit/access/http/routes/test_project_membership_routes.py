@@ -27,11 +27,17 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_membership_change_result_dto import (
     ProjectMembershipChangeResultDTO,
 )
+from inframeld_backend.access.application.enums.project_membership_change_kind import (
+    ProjectMembershipChangeKind,
+)
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
 )
 from inframeld_backend.access.application.protocols.human_session_authenticator import (
     HumanSessionAuthenticator,
+)
+from inframeld_backend.access.application.protocols.project_membership_change_service_factory import (
+    ProjectMembershipChangeServiceFactory,
 )
 from inframeld_backend.access.application.protocols.project_membership_changer import (
     ProjectMembershipChanger,
@@ -51,8 +57,8 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
 from inframeld_backend.access.http.routes.project_membership_routes import (
     create_project_membership_router,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.errors.application_error import ApplicationError
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -88,14 +94,13 @@ class MockMembershipChanger(ProjectMembershipChanger):
     def __init__(self, changed: bool = True) -> None:
         self.result = replace(
             MembershipChangeScenario().results.result,
+            change_kind=ProjectMembershipChangeKind.ADD,
             changed=changed,
             access_revision=7 + int(changed),
             status_code=201 if changed else 200,
         )
         self.calls: list[
-            tuple[
-                AddProjectMemberCommand | RemoveProjectMemberCommand, OperationAdmissionContextDTO
-            ]
+            tuple[AddProjectMemberCommand | RemoveProjectMemberCommand, IdempotencyContextDTO]
         ] = []
         self.error: ApplicationError | None = None
 
@@ -105,7 +110,7 @@ class MockMembershipChanger(ProjectMembershipChanger):
         *,
         access: AccessContextDTO,
         command: AddProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMembershipChangeResultDTO:
         self.calls.append((command, context))
         if self.error is not None:
@@ -118,19 +123,25 @@ class MockMembershipChanger(ProjectMembershipChanger):
         *,
         access: AccessContextDTO,
         command: RemoveProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMembershipChangeResultDTO:
         self.calls.append((command, context))
         if self.error is not None:
             raise self.error
-        return replace(self.result, change_kind="remove", status_code=200)
+        return replace(self.result, change_kind=ProjectMembershipChangeKind.REMOVE, status_code=200)
+
+
+class MockMembershipChangeServiceFactory(ProjectMembershipChangeServiceFactory):
+    def __init__(self, service: MockMembershipChanger) -> None:
+        self._service = service
+
+    @override
+    @asynccontextmanager
+    async def open(self) -> AsyncGenerator[ProjectMembershipChanger]:
+        yield self._service
 
 
 def client_for(service: MockMembershipChanger) -> TestClient:
-    @asynccontextmanager
-    async def open_changer() -> AsyncGenerator[ProjectMembershipChanger]:
-        yield service
-
     app = FastAPI()
     configure_problem_openapi(app)
     register_error_handlers(app)
@@ -142,7 +153,7 @@ def client_for(service: MockMembershipChanger) -> TestClient:
                 CSRFProtectionDependency((HttpUrl("https://account.test"),)),
                 access_token_authenticator=authenticator,
             ),
-            open_changer,
+            MockMembershipChangeServiceFactory(service),
         )
     )
     app.add_middleware(RequestContextMiddleware)

@@ -26,6 +26,7 @@ from inframeld_backend.access.application.protocols.project_metadata_repair_writ
     ProjectMetadataRepairWriter,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.infrastructure.rows.host_maintenance_receipt_row import (
     HostMaintenanceReceiptRow,
@@ -140,7 +141,7 @@ class PostgresProjectMetadataRepairWriter(ProjectMetadataRepairWriter):
                 project_id=result.project_id.value,
                 recipient_principal_id=result.recipient_id.value,
                 recipient_kind=PrincipalKind.HUMAN,
-                action="edit-project-metadata",
+                action=ProjectAction.EDIT_PROJECT_METADATA.value,
                 can_grant=True,
                 assigned_by_principal_id=None,
             )

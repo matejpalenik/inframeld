@@ -15,8 +15,8 @@ from inframeld_backend.access.http.responses.project_creation_response import (
 from inframeld_backend.access.http.responses.project_grant_target_response import (
     ProjectGrantTargetResponse,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
@@ -36,8 +36,8 @@ class ProjectCreationMapper:
         )
 
     @staticmethod
-    def context(key: IdempotencyKey) -> OperationAdmissionContextDTO:
-        return OperationAdmissionContextDTO("POST", "/v1/projects", key)
+    def context(key: IdempotencyKey) -> IdempotencyContextDTO:
+        return IdempotencyContextDTO("POST", "/v1/projects", key)
 
     @staticmethod
     def response(result: ProjectCreationResultDTO) -> ProjectCreationResponse:

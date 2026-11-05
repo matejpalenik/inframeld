@@ -10,6 +10,9 @@ from inframeld_backend.access.application.commands.remove_project_member_command
 from inframeld_backend.access.application.dtos.project_membership_change_result_dto import (
     ProjectMembershipChangeResultDTO,
 )
+from inframeld_backend.access.application.enums.project_membership_change_kind import (
+    ProjectMembershipChangeKind,
+)
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.requests.project_membership_request import (
@@ -21,8 +24,8 @@ from inframeld_backend.access.http.responses.project_membership_removal_response
 from inframeld_backend.access.http.responses.project_membership_response import (
     ProjectMembershipResponse,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 
@@ -47,14 +50,14 @@ class ProjectMembershipMapper:
     @staticmethod
     def context(
         project_id: UUID, principal_id: UUID, method: Literal["PUT", "DELETE"], key: IdempotencyKey
-    ) -> OperationAdmissionContextDTO:
-        return OperationAdmissionContextDTO(
+    ) -> IdempotencyContextDTO:
+        return IdempotencyContextDTO(
             method, f"/v1/projects/{project_id}/members/{principal_id}", key
         )
 
     @staticmethod
     def add_response(result: ProjectMembershipChangeResultDTO) -> ProjectMembershipResponse:
-        if result.change_kind != "add":
+        if result.change_kind is not ProjectMembershipChangeKind.ADD:
             raise RuntimeError("Membership addition returned another operation's result.")
         return ProjectMembershipResponse(
             operation_id=result.operation.operation_id.value,
@@ -70,7 +73,7 @@ class ProjectMembershipMapper:
     def remove_response(
         result: ProjectMembershipChangeResultDTO,
     ) -> ProjectMembershipRemovalResponse:
-        if result.change_kind != "remove":
+        if result.change_kind is not ProjectMembershipChangeKind.REMOVE:
             raise RuntimeError("Membership removal returned another operation's result.")
         return ProjectMembershipRemovalResponse(
             operation_id=result.operation.operation_id.value,

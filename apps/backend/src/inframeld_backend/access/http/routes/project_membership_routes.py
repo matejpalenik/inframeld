@@ -1,6 +1,4 @@
 import json
-from collections.abc import Callable
-from contextlib import AbstractAsyncContextManager
 from typing import Annotated, override
 from uuid import UUID
 
@@ -10,8 +8,8 @@ from starlette.requests import Request
 from starlette.types import Message, Receive, Scope, Send
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.protocols.project_membership_changer import (
-    ProjectMembershipChanger,
+from inframeld_backend.access.application.protocols.project_membership_change_service_factory import (
+    ProjectMembershipChangeServiceFactory,
 )
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
@@ -152,7 +150,7 @@ class _ProjectMembershipRoute(APIRoute):
 
 def create_project_membership_router(
     authenticate: HumanSessionDependency,
-    open_changer: Callable[[], AbstractAsyncContextManager[ProjectMembershipChanger]],
+    membership_service_factory: ProjectMembershipChangeServiceFactory,
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", route_class=_ProjectMembershipRoute)
     key_dependency = IdempotencyKeyDependency()
@@ -184,7 +182,7 @@ def create_project_membership_router(
         access: Annotated[AccessContextDTO, Depends(authenticate)],
         key: Annotated[IdempotencyKey, Depends(key_dependency)],
     ) -> ProjectMembershipResponse:
-        async with open_changer() as service:
+        async with membership_service_factory.open() as service:
             result = await service.add_member(
                 access=access,
                 command=ProjectMembershipMapper.add_command(project_id, principal_id, body),
@@ -208,7 +206,7 @@ def create_project_membership_router(
         access: Annotated[AccessContextDTO, Depends(authenticate)],
         key: Annotated[IdempotencyKey, Depends(key_dependency)],
     ) -> ProjectMembershipRemovalResponse:
-        async with open_changer() as service:
+        async with membership_service_factory.open() as service:
             result = await service.remove_member(
                 access=access,
                 command=ProjectMembershipMapper.remove_command(

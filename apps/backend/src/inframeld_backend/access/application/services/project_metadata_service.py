@@ -27,6 +27,7 @@ from inframeld_backend.access.application.services.project_metadata_fingerprint_
     ProjectMetadataFingerprintService,
 )
 from inframeld_backend.access.domain.entities.project_metadata import ProjectMetadata
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.errors.project_metadata_errors import (
     ProjectMetadataStaleRevisionError,
 )
@@ -36,11 +37,11 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
@@ -95,7 +96,7 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
         *,
         access: AccessContextDTO,
         command: UpdateProjectMetadataCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMetadataChangeResultDTO:
         fingerprint = self._fingerprints.for_update(command)
         async with self._transactions.begin():
@@ -104,7 +105,7 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
             )
             if scope.project_id != command.project_id:
                 raise RuntimeError("Metadata authorization changed the Project.")
-            operation = await self._idempotency.find_or_reserve(
+            operation = await self._idempotency.reserve_or_recover(
                 context=context,
                 access=access,
                 authorization=scope,
@@ -112,7 +113,7 @@ class ProjectMetadataService(ProjectMetadataReader, ProjectMetadataChanger):
                 expected_replay_kind=OperationReplayKind.SAFE_RESULT,
                 lookup_authority=OperationLookupAuthority(
                     OperationLookupAuthorityFamily.PROJECT_ACTION_USE,
-                    ActionId("edit-project-metadata"),
+                    ActionId(ProjectAction.EDIT_PROJECT_METADATA.value),
                 ),
             )
             if not isinstance(operation, NewOperationReservationDTO):

@@ -75,8 +75,8 @@ from inframeld_backend.access.http.responses.project_use_only_grant_response imp
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 
@@ -95,8 +95,8 @@ class ProjectUseOnlyGrantMapper:
         )
 
     @staticmethod
-    def to_operation_context(key: IdempotencyKey) -> OperationAdmissionContextDTO:
-        return OperationAdmissionContextDTO(
+    def to_operation_context(key: IdempotencyKey) -> IdempotencyContextDTO:
+        return IdempotencyContextDTO(
             method="POST", requested_route="/v1/projects/{project_id}/grants", key=key
         )
 

@@ -8,8 +8,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_creation_result_dto import (
     ProjectCreationResultDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 
 
@@ -20,7 +20,7 @@ class ProjectCreator(Protocol):
         *,
         access: AccessContextDTO,
         command: CreateProjectCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectCreationResultDTO:
         """Own current authorization and one atomic Project creation transaction.
 

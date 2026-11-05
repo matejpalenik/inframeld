@@ -14,6 +14,7 @@ from inframeld_backend.access.application.dtos.admitted_work_authority_dto impor
     AdmittedWorkAuthorityDTO,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -451,7 +452,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
                     target_kind="model-call",
                     target_id=record.call_id.value,
                     project_id=record.authority.project_id.value,
-                    action="manage-budget",
+                    action=ProjectAction.MANAGE_BUDGET.value,
                     before_values={"call_revision": previous_revision},
                     after_values={
                         "call_revision": record.revision,
@@ -525,7 +526,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
                     target_kind="project",
                     target_id=policy.project_id.value,
                     project_id=policy.project_id.value,
-                    action="manage-budget",
+                    action=ProjectAction.MANAGE_BUDGET.value,
                     correlation_id=operation_id.value,
                     before_values={
                         "revision": expected_revision,
@@ -559,7 +560,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
                     IdempotencyReservationRow.project_id == policy.project_id.value,
                     IdempotencyReservationRow.lookup_authority_family
                     == OperationLookupAuthorityFamily.PROJECT_ACTION_USE.value,
-                    IdempotencyReservationRow.lookup_action_id == "manage-budget",
+                    IdempotencyReservationRow.lookup_action_id == ProjectAction.MANAGE_BUDGET.value,
                 )
             )
             if operation is None:

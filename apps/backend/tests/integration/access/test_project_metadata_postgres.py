@@ -22,8 +22,8 @@ from inframeld_backend.access.infrastructure.rows.project_name_reservation_row i
     ProjectNameReservationRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -43,10 +43,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def context(key: str) -> OperationAdmissionContextDTO:
-    return OperationAdmissionContextDTO(
-        "PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey(key)
-    )
+def context(key: str) -> IdempotencyContextDTO:
+    return IdempotencyContextDTO("PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey(key))
 
 
 @pytest.mark.asyncio

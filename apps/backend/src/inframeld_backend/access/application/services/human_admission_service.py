@@ -42,6 +42,7 @@ from inframeld_backend.access.application.services.principal_access_evaluation_s
     PrincipalAccessEvaluationService,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.policies.human_admission_policy import HumanAdmissionPolicy
@@ -53,11 +54,11 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
@@ -112,7 +113,7 @@ class HumanAdmissionService(HumanAdmitter):
         *,
         access: AccessContextDTO,
         command: AdmitHumanCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> HumanAdmissionResultDTO:
         route = f"/v1/organizations/{command.organization_id.value}/human-admissions"
         if context.method != "POST" or context.requested_route != route:
@@ -183,7 +184,10 @@ class HumanAdmissionService(HumanAdmitter):
             raise HumanOAuthCredentialRejectedError()
         if not HumanAdmissionPolicy.may_authorize(
             eligibility,
-            has_admit_users=any(grant.action_id.value == "admit-users" for grant in facts.grants),
+            has_admit_users=any(
+                grant.action_id.value == OrganizationAction.ADMIT_USERS.value
+                for grant in facts.grants
+            ),
         ):
             raise AccessDeniedError()
         return HumanAdmissionAuthorizationDTO(organization_id, facts.access_revision)
@@ -215,19 +219,20 @@ class HumanAdmissionService(HumanAdmitter):
         *,
         access: AccessContextDTO,
         command: AdmitHumanCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         fingerprint: RequestFingerprint,
         facts: HumanAdmissionFactsDTO,
         scope: HumanAdmissionAuthorizationDTO,
     ) -> HumanAdmissionResultDTO:
-        operation = await self._idempotency.find_or_reserve(
+        operation = await self._idempotency.reserve_or_recover(
             context=context,
             access=access,
             authorization=scope,
             fingerprint=fingerprint,
             expected_replay_kind=OperationReplayKind.SAFE_RESULT,
             lookup_authority=OperationLookupAuthority(
-                OperationLookupAuthorityFamily.ORGANIZATION_ACTION_USE, ActionId("admit-users")
+                OperationLookupAuthorityFamily.ORGANIZATION_ACTION_USE,
+                ActionId(OrganizationAction.ADMIT_USERS.value),
             ),
         )
         if not isinstance(operation, NewOperationReservationDTO):

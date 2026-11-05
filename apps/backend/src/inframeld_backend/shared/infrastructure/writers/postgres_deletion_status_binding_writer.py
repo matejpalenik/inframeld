@@ -8,6 +8,7 @@ from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.shared.application.dtos.deletion_status_binding_dto import (
@@ -119,7 +120,7 @@ class PostgresDeletionStatusBindingWriter(DeletionStatusBindingWriter):
             or authority is None
             or (
                 authority.family is not OperationLookupAuthorityFamily.PROJECT_ACTION_USE
-                or authority.action_id.value != "delete-project"
+                or authority.action_id.value != ProjectAction.DELETE_PROJECT.value
             )
         ):
             raise ConflictError()

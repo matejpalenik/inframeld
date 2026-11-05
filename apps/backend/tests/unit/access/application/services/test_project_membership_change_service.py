@@ -35,6 +35,9 @@ from inframeld_backend.access.application.dtos.project_departure_candidate_dto i
 from inframeld_backend.access.application.dtos.project_departure_responsibility_dto import (
     ProjectDepartureResponsibilityDTO,
 )
+from inframeld_backend.access.application.enums.project_membership_change_kind import (
+    ProjectMembershipChangeKind,
+)
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
 )
@@ -44,9 +47,11 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -141,7 +146,7 @@ async def test_removing_an_inactive_human_does_not_require_restoring_the_account
     ],
 )
 async def test_operation_context_cannot_replace_the_method_or_concrete_target(
-    context: OperationAdmissionContextDTO,
+    context: IdempotencyContextDTO,
 ) -> None:
     s = MembershipChangeScenario()
     with pytest.raises(RuntimeError):
@@ -157,11 +162,10 @@ async def test_unsupported_stored_action_cannot_count_as_remaining_authority(
     s = MembershipChangeScenario()
     candidate = ProjectDepartureCandidateDTO(ALICE, False, True, True, True, False, False)
     responsibility = ProjectDepartureResponsibilityDTO(
-        target_kind, PROJECT.value, ActionId("unsupported-action"), False, False, (candidate,)
+        target_kind, PROJECT.value, ActionId("unsupported-action"), (candidate,)
     )
-    s.facts.facts = replace(
-        FACTS, recipient_is_project_member=True, responsibilities=(responsibility,)
-    )
+    s.member()
+    s.facts.responsibilities = (responsibility,)
     with pytest.raises(ConflictError):
         await s.service.remove_member(access=ACCESS, command=REMOVE, context=REMOVE_CONTEXT)
     assert s.writer.saved is None and s.events[-1] == "rollback"
@@ -172,11 +176,10 @@ async def test_departure_facts_cannot_substitute_another_project_responsibility(
     s = MembershipChangeScenario()
     candidate = ProjectDepartureCandidateDTO(ALICE, False, True, True, True, False, False)
     responsibility = ProjectDepartureResponsibilityDTO(
-        "project", UUID(int=99), ActionId("manage-project-members"), False, False, (candidate,)
+        "project", UUID(int=99), ActionId("manage-project-members"), (candidate,)
     )
-    s.facts.facts = replace(
-        FACTS, recipient_is_project_member=True, responsibilities=(responsibility,)
-    )
+    s.member()
+    s.facts.responsibilities = (responsibility,)
     with pytest.raises(RuntimeError):
         await s.service.remove_member(access=ACCESS, command=REMOVE, context=REMOVE_CONTEXT)
     assert s.writer.saved is None and s.events[-1] == "rollback"
@@ -194,7 +197,7 @@ async def test_add_commits_bare_membership_and_original_changed_status(already: 
     assert result.access_revision == (7 if already else 8)
     assert result.principal_id == BOB.id and result.project_id == PROJECT
     assert s.events == ["begin", "facts", "reserve", "save", "complete", "commit"]
-    assert s.writer.saved is not None and s.writer.saved[2] == "add"
+    assert s.writer.saved is not None and s.writer.saved[2] is ProjectMembershipChangeKind.ADD
     assert s.idempotency.lookup_authority is not None
     assert s.idempotency.lookup_authority.action_id == ActionId("manage-project-members")
 
@@ -210,7 +213,47 @@ async def test_remove_retains_original_changed_result_without_requiring_live_mem
     result = await s.service.remove_member(access=ACCESS, command=REMOVE, context=REMOVE_CONTEXT)
     assert result.changed is member and result.status_code == 200
     assert result.access_revision == 7 + int(member)
-    assert s.writer.saved is not None and s.writer.saved[2] == "remove"
+    assert s.writer.saved is not None and s.writer.saved[2] is ProjectMembershipChangeKind.REMOVE
+    assert ("handover" in s.events) is member
+    if member:
+        assert s.events.index("reserve") < s.events.index("handover") < s.events.index("save")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["replay", "stale", "recipient", "authority"])
+async def test_replay_or_rejected_removal_does_not_load_departure_dependencies(case: str) -> None:
+    s = MembershipChangeScenario()
+    s.member()
+    command = REMOVE
+    error: type[Exception] | None = None
+    if case == "replay":
+        s.idempotency.result = SAVED_RESULT
+        s.results.result = replace(
+            s.results.result, change_kind=ProjectMembershipChangeKind.REMOVE, status_code=200
+        )
+    if case == "stale":
+        command = replace(REMOVE, expected_access_revision=6)
+        error = StaleRevisionError
+    if case == "recipient":
+        assert s.facts.facts is not None
+        s.facts.facts = replace(
+            s.facts.facts, recipient=replace(BOB, kind=PrincipalKind.APPLICATION)
+        )
+        error = InvalidInputError
+    if case == "authority":
+        assert s.facts.facts is not None
+        s.facts.facts = replace(
+            s.facts.facts, action=replace(FACTS.action, has_exact_action_grant=False)
+        )
+        error = AccessDeniedError
+
+    if error is None:
+        await s.service.remove_member(access=ACCESS, command=command, context=REMOVE_CONTEXT)
+    else:
+        with pytest.raises(error):
+            await s.service.remove_member(access=ACCESS, command=command, context=REMOVE_CONTEXT)
+
+    assert "handover" not in s.events and s.writer.saved is None
 
 
 @pytest.mark.asyncio
@@ -258,6 +301,26 @@ async def test_current_actor_authority_precedes_reservation_and_business_replay(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("replay", [False, True])
+async def test_membership_management_requires_a_human_even_with_an_exact_grant(
+    replay: bool,
+) -> None:
+    s = MembershipChangeScenario()
+    access = replace(ACCESS, authentication_evidence=MockAuthenticationEvidence.application_key())
+    s.facts.facts = replace(
+        FACTS,
+        action=replace(FACTS.action, principal=replace(ALICE, kind=PrincipalKind.APPLICATION)),
+    )
+    if replay:
+        s.idempotency.result = SAVED_RESULT
+
+    with pytest.raises(AccessDeniedError):
+        await s.service.add_member(access=access, command=ADD, context=ADD_CONTEXT)
+
+    assert "reserve" not in s.events and s.writer.saved is None and s.events[-1] == "rollback"
+
+
+@pytest.mark.asyncio
 async def test_stale_new_request_leaves_no_saved_membership() -> None:
     s = MembershipChangeScenario()
     with pytest.raises(StaleRevisionError):
@@ -297,13 +360,10 @@ async def test_new_add_requires_an_eligible_admitted_human(case: str) -> None:
 @pytest.mark.asyncio
 async def test_removal_rejects_stranded_exact_responsibility_before_writing() -> None:
     s = MembershipChangeScenario()
-    s.facts.facts = replace(
-        FACTS,
-        recipient_is_project_member=True,
-        responsibilities=(
-            ProjectDepartureResponsibilityDTO(
-                "project", PROJECT.value, ActionId("edit-project-metadata"), False, False, ()
-            ),
+    s.member()
+    s.facts.responsibilities = (
+        ProjectDepartureResponsibilityDTO(
+            "project", PROJECT.value, ActionId("edit-project-metadata"), ()
         ),
     )
     with pytest.raises(ConflictError):
@@ -324,10 +384,46 @@ async def test_save_failure_or_cancellation_rolls_back_without_completion(
 
 
 @pytest.mark.asyncio
-async def test_wrong_scope_facts_fail_before_reservation() -> None:
+@pytest.mark.parametrize("changed", ["project", "actor", "organization", "revision"])
+@pytest.mark.parametrize("replay", [False, True])
+async def test_wrong_scope_facts_fail_before_reservation(changed: str, replay: bool) -> None:
     s = MembershipChangeScenario()
-    s.facts.facts = replace(FACTS, project_id=ProjectId(UUID(int=99)))
+    facts = (
+        replace(FACTS, project_id=ProjectId(UUID(int=99)))
+        if changed == "project"
+        else replace(
+            FACTS,
+            action=replace(FACTS.action, principal=replace(ALICE, id=PrincipalId(UUID(int=99)))),
+        )
+        if changed == "actor"
+        else replace(FACTS, organization_id=OrganizationId(UUID(int=99)))
+        if changed == "organization"
+        else replace(FACTS, access_revision=-1)
+    )
+    s.facts.facts = replace(facts, action=replace(facts.action, has_exact_action_grant=False))
+    if replay:
+        s.idempotency.result = SAVED_RESULT
     with pytest.raises(RuntimeError):
+        await s.service.add_member(access=ACCESS, command=ADD, context=ADD_CONTEXT)
+    assert "reserve" not in s.events and s.events[-1] == "rollback"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recovery", [False, True])
+async def test_hidden_write_project_precedes_ineligible_caller_permission_denial(
+    recovery: bool,
+) -> None:
+    s = MembershipChangeScenario()
+    action = replace(
+        FACTS.action,
+        principal=replace(
+            ALICE, status=PrincipalStatus.ACTIVE if recovery else PrincipalStatus.SUSPENDED
+        ),
+        has_pending_recovery=recovery,
+        is_project_member=False,
+    )
+    s.facts.facts = replace(FACTS, action=action)
+    with pytest.raises(ResourceNotFoundError):
         await s.service.add_member(access=ACCESS, command=ADD, context=ADD_CONTEXT)
     assert "reserve" not in s.events and s.events[-1] == "rollback"
 

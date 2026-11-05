@@ -15,6 +15,7 @@ from inframeld_backend.access.application.dtos.verified_human_identity_dto impor
 from inframeld_backend.access.application.protocols.human_admission_result_reader import (
     HumanAdmissionResultReader,
 )
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.infrastructure.rows.human_admission_operation_result_row import (
@@ -75,7 +76,7 @@ class PostgresHumanAdmissionResultReader(HumanAdmissionResultReader):
                         parent.requested_route
                         == f"/v1/organizations/{organization_id.value}/human-admissions",
                         parent.lookup_authority_family == "organization_action_use",
-                        parent.lookup_action_id == "admit-users",
+                        parent.lookup_action_id == OrganizationAction.ADMIT_USERS.value,
                         parent.state == OperationReservationState.REPLAYABLE,
                         parent.replay_kind == OperationReplayKind.SAFE_RESULT,
                         parent.expires_at == operation.expires_at,

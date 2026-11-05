@@ -22,6 +22,7 @@ from inframeld_backend.access.application.protocols.project_members_facts_reader
     ProjectMembersFactsReader,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
@@ -106,7 +107,7 @@ class PostgresProjectMembersFactsReader(ProjectMembersFactsReader):
                 ProjectActionGrantRow.project_id == ProjectRow.id,
                 ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
                 ProjectActionGrantRow.recipient_kind == PrincipalRow.kind,
-                ProjectActionGrantRow.action == "manage-project-members",
+                ProjectActionGrantRow.action == ProjectAction.MANAGE_PROJECT_MEMBERS.value,
             )
             .correlate(PrincipalRow, ProjectRow)
         )

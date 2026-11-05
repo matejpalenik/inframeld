@@ -15,11 +15,11 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
@@ -66,8 +66,8 @@ class ProjectOperationAdmissionService:
         if authorization.project_id != request.project_id:
             raise RuntimeError("Authorization returned a different project than requested.")
 
-        return await self._idempotency.find_or_reserve(
-            context=OperationAdmissionContextDTO(
+        return await self._idempotency.reserve_or_recover(
+            context=IdempotencyContextDTO(
                 method=request.method,
                 requested_route=request.requested_route,
                 key=request.key,

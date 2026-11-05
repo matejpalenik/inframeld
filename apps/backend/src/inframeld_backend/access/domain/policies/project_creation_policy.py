@@ -1,4 +1,5 @@
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
 from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
     PrincipalAccessPolicyInput,
@@ -7,24 +8,24 @@ from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input
 
 class ProjectCreationPolicy:
     INITIAL_ACTIONS = (
-        "manage-project-members",
-        "create-access-groups",
-        "create-application-accounts",
-        "create-pipelines",
-        "create-deployments",
-        "manage-upload-defaults",
-        "delete-project",
-        "inspect-budget",
-        "manage-budget",
-        "manage-trace-policy",
-        "delete-trace-history",
-        "inspect-feedback",
-        "create-collections",
-        "create-sources",
-        "create-model-connections",
-        "create-processing-profiles",
-        "create-embedding-profiles",
-        "edit-project-metadata",
+        ProjectAction.MANAGE_PROJECT_MEMBERS.value,
+        ProjectAction.CREATE_ACCESS_GROUPS.value,
+        ProjectAction.CREATE_APPLICATION_ACCOUNTS.value,
+        ProjectAction.CREATE_PIPELINES.value,
+        ProjectAction.CREATE_DEPLOYMENTS.value,
+        ProjectAction.MANAGE_UPLOAD_DEFAULTS.value,
+        ProjectAction.DELETE_PROJECT.value,
+        ProjectAction.INSPECT_BUDGET.value,
+        ProjectAction.MANAGE_BUDGET.value,
+        ProjectAction.MANAGE_TRACE_POLICY.value,
+        ProjectAction.DELETE_TRACE_HISTORY.value,
+        ProjectAction.INSPECT_FEEDBACK.value,
+        ProjectAction.CREATE_COLLECTIONS.value,
+        ProjectAction.CREATE_SOURCES.value,
+        ProjectAction.CREATE_MODEL_CONNECTIONS.value,
+        ProjectAction.CREATE_PROCESSING_PROFILES.value,
+        ProjectAction.CREATE_EMBEDDING_PROFILES.value,
+        ProjectAction.EDIT_PROJECT_METADATA.value,
     )
 
     @staticmethod

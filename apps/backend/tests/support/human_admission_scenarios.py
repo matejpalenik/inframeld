@@ -56,8 +56,8 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.protocols.transaction_manager import TransactionManager
@@ -81,7 +81,7 @@ ALICE = Principal(PrincipalId(UUID(int=1)), ORG, PrincipalKind.HUMAN, PrincipalS
 BOB = Principal(PrincipalId(UUID(int=3)), ORG, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE)
 ACCESS = AccessContextDTO(ALICE.id, MockAuthenticationEvidence.browser())
 COMMAND = AdmitHumanCommand(ORG, UUID(IDENTITY.subject.value), 7)
-CONTEXT = OperationAdmissionContextDTO(
+CONTEXT = IdempotencyContextDTO(
     method="POST",
     requested_route=f"/v1/organizations/{ORG.value}/human-admissions",
     key=IdempotencyKey("admit-bob"),

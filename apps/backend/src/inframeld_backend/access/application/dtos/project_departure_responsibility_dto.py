@@ -15,6 +15,4 @@ class ProjectDepartureResponsibilityDTO:
     target_kind: Literal["project", "access_group", "application_account"]
     target_id: UUID
     action_id: ActionId | None
-    requires_group_manager: bool
-    allows_group_manager: bool
     candidates: tuple[ProjectDepartureCandidateDTO, ...]
