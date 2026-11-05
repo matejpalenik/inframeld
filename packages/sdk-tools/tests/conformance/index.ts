@@ -14,5 +14,6 @@ import "./discovery.ts";
 import "./project-metadata.ts";
 import "./project-creation.ts";
 import "./project-members.ts";
+import "./project-action-grants.ts";
 import "./project-membership.ts";
 import "./human-admission.ts";

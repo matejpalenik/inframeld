@@ -355,6 +355,20 @@ export type OwnOrganizationGrantResponse = {
 };
 
 /**
+ * PageResponse[ProjectActionGrantItemResponse]
+ */
+export type PageResponseProjectActionGrantItemResponse = {
+    /**
+     * Items
+     */
+    items: Array<ProjectActionGrantItemResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
  * PrincipalKind
  *
  * Distinguish local human actors from application accounts.
@@ -430,6 +444,28 @@ export type ProblemDetails = {
      * Primary RFC 9457 problem-type URI.
      */
     type: string;
+};
+
+/**
+ * ProjectActionGrantItemResponse
+ */
+export type ProjectActionGrantItemResponse = {
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
 };
 
 /**
@@ -1557,6 +1593,69 @@ export type ResolveProjectNameResponses = {
 };
 
 export type ResolveProjectNameResponse = ResolveProjectNameResponses[keyof ResolveProjectNameResponses];
+
+export type ListProjectActionGrantsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Actionid
+         */
+        actionId: string;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/grants';
+};
+
+export type ListProjectActionGrantsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListProjectActionGrantsError = ListProjectActionGrantsErrors[keyof ListProjectActionGrantsErrors];
+
+export type ListProjectActionGrantsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseProjectActionGrantItemResponse;
+};
+
+export type ListProjectActionGrantsResponse = ListProjectActionGrantsResponses[keyof ListProjectActionGrantsResponses];
 
 export type AssignProjectUseOnlyGrantData = {
     body: ProjectUseOnlyGrantRequest;

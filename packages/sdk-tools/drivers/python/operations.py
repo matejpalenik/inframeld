@@ -289,6 +289,28 @@ async def project_members_async(clients: Clients, call: Call) -> NativeResponse:
     )
 
 
+def project_action_grants_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_project_action_grants_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def project_action_grants_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_project_action_grants_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 def metadata_read_sync(clients: Clients, call: Call) -> NativeResponse:
     return AccessApi(clients.production).get_project_metadata_sync_with_http_info(
         project_id=UUID(call.path["project_id"]),
@@ -523,6 +545,7 @@ BINDINGS: dict[Operation, Binding] = {
     "getMyOrganizationAccess": Binding(organization_access_sync, organization_access_async),
     "createProject": Binding(create_project_sync, create_project_async),
     "listProjectMembers": Binding(project_members_sync, project_members_async),
+    "listProjectActionGrants": Binding(project_action_grants_sync, project_action_grants_async),
     "addProjectMember": Binding(project_member_add_sync, project_member_add_async),
     "removeProjectMember": Binding(project_member_remove_sync, project_member_remove_async),
     "getProtectedResourceMetadata": Binding(discovery_sync, discovery_async),

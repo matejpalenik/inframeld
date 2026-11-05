@@ -82,6 +82,14 @@ Resolution uses an exact selector in the current installation and Organization. 
 
 Require current human `edit-project-metadata` authority, the reviewed metadata revision and the original idempotency key. Omitted fields preserve values. Explicit null does not clear either field. Renaming preserves the permanent ID. [The guide](/guides/name-and-rename-project) shows preparation, the typed write and uncertain-result recovery.
 
+## Read Project action grants
+
+<ApiOperation operationId="listProjectActionGrants" />
+
+Read `GET /v1/projects/{project_id}/grants` with one required supported `actionId`, an optional unchanged cursor and `limit` from 1 to 100, default 25. Require a currently eligible human Project member with both use and grant authority for that exact Project action on every page. Group-manager status and use-only permission do not authorize this Project read.
+
+The page contains only `items` and nullable `nextCursor`. Each stored assignment has flat `projectId`, `recipientPrincipalId`, `actionId` and `canGrant` fields. Suspended recipients remain listed. This is neither effective-permission expansion nor recipient discovery. There is no body, Access revision, total or idempotency key. All responses are no-store. [List Project action grants](/guides/list-project-action-grants) explains setup, paging and failures.
+
 ## Assign a use-only grant
 
 <ApiOperation operationId="assignProjectUseOnlyGrant" />

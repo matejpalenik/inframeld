@@ -388,6 +388,26 @@ impl AsRef<str> for ValidationIssueLocation {
     }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseProjectActionGrantItemResponse {
+    pub items: Vec<ProjectActionGrantItemResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectActionGrantItemResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OriginalOperationLookupRequest {
     #[serde(rename = "expectedAuthority")]
     pub expected_authority: OperationLookupAuthorityRequest,
