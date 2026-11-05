@@ -30,9 +30,15 @@ from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
 from inframeld_backend.shared.application.errors.artifact_errors import (
+    ArtifactIntegrityError,
+    ArtifactReservationError,
+    ArtifactStagingBusyError,
     ArtifactWriteOutcomeUnknownError,
 )
-from inframeld_backend.shared.application.errors.job_errors import JobStoppedError
+from inframeld_backend.shared.application.errors.job_errors import (
+    JobStoppedError,
+    SafeJobRetryError,
+)
 from inframeld_backend.shared.application.protocols.artifact_cleanup_preparer import (
     ArtifactCleanupPreparer,
 )
@@ -113,10 +119,13 @@ class MockLocalCleanup(ArtifactLocalCleanup):
 class MockLocalStaging(ArtifactStaging):
     def __init__(self, events: list[str]) -> None:
         self.events = events
+        self.failure: Exception | None = None
 
     @override
     async def remove(self, target: ArtifactCleanupTargetDTO) -> None:
         assert target == ArtifactCleanupTargetDTO(ARTIFACT, ATTEMPT, SCOPE, None, None)
+        if self.failure is not None:
+            raise self.failure
         self.events.append("local_removed")
 
     @override
@@ -259,24 +268,57 @@ class MockCheckpoints(JobCheckpoints):
         raise AssertionError("The worker owns the original failure outcome.")
 
 
-def _collaborators() -> tuple[
-    ArtifactCleanupJobHandler, MockPreparer, MockArtifactStore, MockCheckpoints, list[str]
-]:
+def _collaborators(
+    *, local_failure: Exception | None = None
+) -> tuple[ArtifactCleanupJobHandler, MockPreparer, MockArtifactStore, MockCheckpoints, list[str]]:
     events: list[str] = []
     preparer, store, checkpoints = (
         MockPreparer(events),
         MockArtifactStore(events),
         MockCheckpoints(events),
     )
+    staging = MockLocalStaging(events)
+    staging.failure = local_failure
     return (
-        ArtifactCleanupJobHandler(
-            preparer, store, MockLocalCleanup(events), MockLocalStaging(events)
-        ),
+        ArtifactCleanupJobHandler(preparer, store, MockLocalCleanup(events), staging),
         preparer,
         store,
         checkpoints,
         events,
     )
+
+
+@pytest.mark.asyncio
+async def test_local_contention_requests_safe_retry_before_settlement_or_remote_work() -> None:
+    contention = ArtifactStagingBusyError("An original local holder remains active.")
+    handler, preparer, store, checkpoints, events = _collaborators(local_failure=contention)
+    with pytest.raises(SafeJobRetryError) as caught:
+        await handler.run(CONTEXT, checkpoints)
+    assert caught.value.__cause__ is contention
+    assert events == ["local_prepared"]
+    assert preparer.calls == [] and store.calls == [] and checkpoints.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure",
+    [
+        ArtifactReservationError("The reservation cannot be confirmed."),
+        ArtifactIntegrityError("The original root changed."),
+        ExceptionGroup(
+            "The original work and closure failed.",
+            [ArtifactStagingBusyError("A holder remains active."), OSError("Closure failed.")],
+        ),
+    ],
+    ids=["reservation", "integrity", "closure-group"],
+)
+async def test_other_local_failures_keep_their_original_error(failure: Exception) -> None:
+    handler, preparer, store, checkpoints, events = _collaborators(local_failure=failure)
+    with pytest.raises(type(failure)) as caught:
+        await handler.run(CONTEXT, checkpoints)
+    assert caught.value is failure
+    assert events == ["local_prepared"]
+    assert preparer.calls == [] and store.calls == [] and checkpoints.calls == []
 
 
 @pytest.mark.asyncio

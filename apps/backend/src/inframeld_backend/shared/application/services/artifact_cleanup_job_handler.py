@@ -9,7 +9,11 @@ from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origi
     UnadmittedStagingArtifactOriginDTO,
 )
 from inframeld_backend.shared.application.enums.artifact_cleanup_kind import ArtifactCleanupKind
-from inframeld_backend.shared.application.errors.job_errors import JobStoppedError
+from inframeld_backend.shared.application.errors.artifact_errors import ArtifactStagingBusyError
+from inframeld_backend.shared.application.errors.job_errors import (
+    JobStoppedError,
+    SafeJobRetryError,
+)
 from inframeld_backend.shared.application.protocols.artifact_cleanup_preparer import (
     ArtifactCleanupPreparer,
 )
@@ -44,7 +48,12 @@ class ArtifactCleanupJobHandler(JobHandler):
     async def run(self, context: JobAttemptContextDTO, checkpoints: JobCheckpoints) -> None:
         local = await self._local.prepare_local(context)
         if local is not None:
-            await self._staging.remove(local)
+            try:
+                await self._staging.remove(local)
+            except ArtifactStagingBusyError as error:
+                raise SafeJobRetryError(
+                    "The retired local target still has an active holder."
+                ) from error
             await self._local.confirm_local(context, local)
         prepared = await self._preparer.prepare(context)
         if prepared is None:

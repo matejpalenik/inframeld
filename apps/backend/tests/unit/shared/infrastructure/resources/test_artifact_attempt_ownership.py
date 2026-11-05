@@ -9,6 +9,7 @@ import pytest
 from inframeld_backend.shared.application.errors.artifact_errors import (
     ArtifactIntegrityError,
     ArtifactReservationError,
+    ArtifactStagingBusyError,
 )
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.infrastructure.resources.artifact_attempt_ownership import (
@@ -25,9 +26,10 @@ async def test_independent_holders_cannot_enter_the_same_attempt(tmp_path: Path)
     await first.startup()
     await second.startup()
     async with first.hold(ATTEMPT):
-        with pytest.raises(ArtifactReservationError):
+        with pytest.raises(ArtifactStagingBusyError) as caught:
             async with second.hold(ATTEMPT):
                 pytest.fail("A live local holder must exclude cleanup.")
+        assert isinstance(caught.value.__cause__, BlockingIOError)
     async with second.hold(ATTEMPT):
         pass
     locks = list((tmp_path / ".locks").iterdir())

@@ -9,6 +9,7 @@ from pathlib import Path
 from inframeld_backend.shared.application.errors.artifact_errors import (
     ArtifactIntegrityError,
     ArtifactReservationError,
+    ArtifactStagingBusyError,
 )
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 
@@ -120,10 +121,10 @@ class ArtifactAttemptOwnership:
                     )
                 try:
                     fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except BlockingIOError:
-                    raise ArtifactReservationError(
+                except BlockingIOError as error:
+                    raise ArtifactStagingBusyError(
                         "An original local holder remains active."
-                    ) from None
+                    ) from error
                 os.fsync(locks)
                 result, descriptor = descriptor, None
                 return result
