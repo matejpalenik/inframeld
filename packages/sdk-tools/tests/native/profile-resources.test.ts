@@ -409,6 +409,7 @@ test(
     await withDeniedFixtureRecovery(work, testDeadline, async () => {
       let check = "SDK_DENIED_COMMAND_EXIT";
       let observation: Readonly<CommandObservation> | undefined;
+      let commandFailure: unknown;
       let settlement: "fulfilled" | "rejected" | "unknown" = "unknown";
       let reportedCleanupConfirmed = false;
       try {
@@ -438,14 +439,42 @@ test(
               return value;
             },
             (error: unknown) => {
+              commandFailure = error;
               settlement = "rejected";
               reportedCleanupConfirmed = hasConfirmedCleanup(error);
               throw error;
             },
           ),
-          /exited 1/,
+          (error: unknown) => {
+            // Nonzero exit and cleanup certainty are separate owner observations.
+            assert.ok(error instanceof Error);
+            assert.equal(settlement, "rejected");
+            assert.equal(observation?.status, 1);
+            assert.equal(observation?.reason, "target-exit");
+            assert.equal(observation?.stopReason, "target-exit");
+            assert.equal(observation?.leaderReaped, true);
+            if (observation?.closeResult === "resolved") {
+              assert.equal(observation.groupState, "quiescent");
+              assert.equal(reportedCleanupConfirmed, true);
+            } else {
+              assert.equal(observation?.closeResult, "rejected");
+              assert.equal(observation?.groupState, "unknown");
+              assert.equal(reportedCleanupConfirmed, false);
+              assert.equal(observation?.helperClosed, true);
+              assert.equal(observation?.streamsEnded, true);
+              assert.equal(observation?.helperCode, 1);
+            }
+            return true;
+          },
         );
-        check = "SDK_DENIED_RECEIPT";
+        check = "SDK_DENIED_UNCERTAIN_READ";
+        const uncertainText = await readFile(
+          join(work, "uncertain.json"),
+          "utf8",
+        );
+        check = "SDK_DENIED_UNCERTAIN_JSON";
+        const uncertainValue: unknown = JSON.parse(uncertainText);
+        check = "SDK_DENIED_UNCERTAIN_SCHEMA";
         const uncertain = z
           .object({
             unknown: z.literal(true),
@@ -453,19 +482,21 @@ test(
             helper: z.number().int().positive(),
             targets: z.array(z.number().int().positive()).min(1),
           })
-          .parse(
-            JSON.parse(await readFile(join(work, "uncertain.json"), "utf8")),
-          );
+          .parse(uncertainValue);
+        check = "SDK_DENIED_MARKER_READ";
         const pid = Number(await readFile(marker, "utf8"));
+        check = "SDK_DENIED_FAILURE_READ";
+        const failureText = await readFile(join(work, "failure.json"), "utf8");
+        check = "SDK_DENIED_FAILURE_JSON";
+        const failureValue: unknown = JSON.parse(failureText);
+        check = "SDK_DENIED_FAILURE_SCHEMA";
         const failures = z
           .object({ primary: z.string(), cleanup: z.string() })
-          .parse(
-            JSON.parse(await readFile(join(work, "failure.json"), "utf8")),
-          );
+          .parse(failureValue);
         check = "SDK_DENIED_ORIGINAL_ERRORS";
         assert.match(failures.primary, /expected fixture cancellation/);
         assert.match(failures.cleanup, /cleanup/i);
-        check = "SDK_DENIED_RECEIPT";
+        check = "SDK_DENIED_TARGET_MATCH";
         assert.ok(uncertain.targets.includes(pid));
         check = "SDK_DENIED_CLOCK_BUDGET";
         assert.ok(
@@ -515,7 +546,13 @@ test(
                   settlement,
                   reportedCleanupConfirmed,
                 },
-                cause: error,
+                cause:
+                  commandFailure === undefined
+                    ? error
+                    : new AggregateError(
+                        [commandFailure, error],
+                        "Command rejection and failed assertion",
+                      ),
               }
             : error;
         throw Object.assign(new Error(check, { cause }), {
