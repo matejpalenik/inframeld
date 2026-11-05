@@ -15,6 +15,14 @@ Alice invites Bob into Support. These design contracts describe the exact reques
 | `POST /v1/invitations/preview` | `previewInvitation` | `InvitationPreviewRequest` / `InvitationPreviewResponse` | Invitation preview profile. 200 for current safe intended scope. No consumption, reservation or admission. |
 | `POST /v1/invitations/activate` | `activateInvitation` | `InvitationActivationRequest` / `InvitationActivationResponse` | Invitation activation profile. 200 after guarded consumption/admission/assignments. |
 
+<a id="invitation-resource-integration"></a>
+
+## Delivery ownership and typed resource integration
+
+The [invitation workflow](admission-and-invitations.md#implementation-status-and-reading-routes) assigns #119 the Access-owned lifecycle and its closed, typed integration boundary. The full accepted `GrantTarget` catalogue below remains unchanged. Each real resource feature supplies authoritative target/Project/action and eligibility facts, safe preview labels and its exact grant application under that boundary. There is no open target registry, arbitrary target acceptance or parallel grant store.
+
+Every integration preserves current issuer delegation and recipient prerequisites, issuance-revision and new-activation current-state checks, and one identity/Organization/Project-coordinated activation transaction for consumption, admission, assignments, audit and the original result. A deleted or wrong-scope target, lost authority or failed write during new activation must leave no partial consumption. Completed same-recipient replay retains current recipient eligibility and returns its original result without regranting after invitation expiry or issuer departure. Integration needs real target behavior and qualification. The typed boundary does not claim that future targets are implemented or allow a missing target to be treated as successful intent.
+
 ## Typed design blocks
 
 **Design notation, not production implementation.** The following blocks replace prose field lists in this reference. They preserve the documented wire names. `GrantTarget` is defined once in [the exact target contract](grant-target-contract.md). No importable module is implied. An annotation, `Never`, or a comment does not perform input validation. In these blocks UUID and datetime denote the corresponding serialized JSON strings.
