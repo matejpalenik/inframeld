@@ -29,7 +29,7 @@ Admission, starter records and runtime health do not establish setup readiness. 
 
 Admission can complete while Bob has no Project or starter resources. Setup must distinguish that state from completed provisioning and from deliberate removal. Separate original results make retries explicit without a distributed coordinator or a second permission model.
 
-This ADR records the accepted split. The private first-administrator consumer and ordinary human admission are implemented. The supported unadmitted-human proof producer, private starter provisioning and complete first-use journey remain unfinished under #27. Human acceptance remains unperformed under #185.
+This ADR records the accepted split. The private first-administrator consumer and ordinary human admission are implemented. The supported unadmitted-human proof integration remains unfinished under Access #27. Private starter provisioning remains unfinished under [Onboarding #8](https://github.com/matejpalenik/inframeld/issues/8). Complete first use remains unfinished, and human acceptance remains unperformed under #185. This current delivery allocation preserves the decision's admission/provisioning separation.
 
 ## Links
 
@@ -38,4 +38,4 @@ This ADR records the accepted split. The private first-administrator consumer an
 - [Identity and recovery coordination](../../.agents/skills/inframeld-access-models/references/identity-admission-coordination.md).
 - [First use and private starters](../../.agents/skills/inframeld-architecture/references/first-use-and-private-defaults.md).
 - [Fixed initial grants](../../.agents/skills/inframeld-access-models/references/actions-and-initial-grants.md#initial-assignments).
-- [Remaining implementation #27](https://github.com/matejpalenik/inframeld/issues/27) and [human qualification #185](https://github.com/matejpalenik/inframeld/issues/185).
+- [Remaining Access implementation #27](https://github.com/matejpalenik/inframeld/issues/27), [starter provisioning under Onboarding #8](https://github.com/matejpalenik/inframeld/issues/8) and [human qualification #185](https://github.com/matejpalenik/inframeld/issues/185).
