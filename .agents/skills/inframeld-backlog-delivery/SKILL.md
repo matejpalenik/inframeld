@@ -26,7 +26,7 @@ Native delivery has one human-requested Goal in the main chat and one coordinato
 
 ## Keep useful safeguards with their owners
 
-The [coordinator](references/coordinator.md#prefer-epic-completion-without-serializing-the-backlog) owns completing issues, useful splits, prerequisites and capacity. The cleared brief permits routine scoped work. Shared contracts, generated outputs and integration have one named owner at a time.
+The [coordinator](references/coordinator.md#prefer-epic-completion-without-serializing-the-backlog) owns finishing existing issues before opening new features, including prerequisite returns and blocked checkpoints. The cleared brief permits complete scoped development stages. Shared contracts, generated outputs and integration have one named owner at a time.
 
 [Review](../inframeld-review/SKILL.md) owns independent assessment and the binding maintainability bar. [Coding Standards](../inframeld-coding-standards/SKILL.md) owns code guidance and behavioral TDD. [Testing](../inframeld-testing/references/isolation-and-evidence.md) owns maintained commands, diagnostics and harness boundaries. Read their applicable guidance for the assigned work.
 

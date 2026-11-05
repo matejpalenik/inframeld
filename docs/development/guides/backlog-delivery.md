@@ -62,7 +62,7 @@ A future native launch template is:
 
 > Use `$inframeld-backlog-delivery` to deliver the launch-time open v1 snapshot in `matejpalenik/inframeld`, excluding Studio and aggregate epics. Create one coordinator Goal. I authorize assigned worktrees, implementation, normal Git commits and feature-branch pushes, PR creation and updates, internal assignment messages, required verification and serial guarded merges into main. The coordinator may create, update and link a human-qualification issue for each human-facing capability. Use published qualification issues to track deferred human work under the existing closure policy. Keep paid-call, sandbox and production restrictions.
 >
-> Start with two independent implementation lanes and one finishing owner per selected issue. Return from each supporting PR to its named consumer. Use the assignment brief and independent review, retain existing failure history, and report the next owner at selection changes. Finish through verified issue acceptance and observed closure. Continue independent work when another lane is blocked.
+> Use up to two implementation lanes and one finishing owner per selected issue. Finish existing issues through verified acceptance and observed closure before replacing them with unrelated new work. Return from each supporting PR to its named consumer. If blocked, preserve the checkpoint and deliver the necessary authorized prerequisite or resume another existing issue that can finish. Ask for reprioritization before opening an unrelated new feature. Keep independent existing work moving, required reviews and checks intact, and cumulative failure history visible.
 
 This is a future human-message template, not authorization from a document. Do not add a token budget unless supplied. A Goal supports continuation within client limits, not an indefinite daemon or scheduled follow-up. No worker Goal is needed.
 
@@ -88,9 +88,13 @@ Before substantive workflow edits, define a few must-pass outcomes. Validate fro
 
 | Raw situation | Expected behavior |
 | --- | --- |
-| A coordinator selects new work after a supporting PR merges, with other active and blocked issues | Emit one selection table with remaining acceptance, verified epic/downstream references and fixed statuses. A partial merge is not Done. |
+| A supporting PR merges while its issue still has achievable acceptance and an unrelated feature is ready | Continue the owning issue. Show its next expected closure and remaining acceptance in the existing selection table. A partial merge is not Done. |
 | A worker reports a passing unit test, CI remains queued, or a turn resumes without a new selection | Use a short event update when useful. Do not repeat the table or invent a selection checkpoint. |
-| A promised operator journey requires an unfinished login/proof producer | Deliver the required capability first or select independent work. Start a component only under its explicit independent acceptance boundary. |
+| A promised operator journey requires an unfinished login/proof producer | Deliver the necessary authorized producer or resume finishable existing work. Preserve the consumer and its return action. An unrelated new feature needs human reprioritization. |
+| An old parked issue's real prerequisites have arrived while a new feature looks easier | Reconcile the checkpoint and assess full acceptance before selecting the new feature. Preserve its owner or make an explicit handoff. |
+| A storage foundation excludes the downstream upload API from its scope | Verify the foundation's own real storage guarantees without requiring the separate upload issue to finish first. Do not weaken either acceptance boundary. |
+| Two candidates use different migration tips against one retained integration database | Inspect the actual database tip and serialize or isolate maintained verification before execution. Do not reset another owner's state. |
+| An assigned isolated development stage reaches expected red, then needs formatting or setup correction | Continue within the existing grant. Reserve only genuinely shared operations and preserve explicit limits and unsafe-cleanup holds. |
 | A producer issue is open, but its required capability has a qualified merged PR | Inspect that increment and reassess the broad blocker without claiming the entire producer issue complete. |
 | A human-facing feature has no qualification issue, or already has one for the same delivery | Create under actual authority or reuse the existing issue. Without publication authority, retain a draft and report the handoff gap. |
 | A qualification procedure has guessed commands or an unavailable handoff | Keep preparation with engineering. Explain the missing capability and owner rather than assigning the procedure to a human. |
@@ -111,15 +115,15 @@ Before substantive workflow edits, define a few must-pass outcomes. Validate fro
 | The developer explicitly broadens earlier one-shot or single-batch limits under this policy | Record that authorization and retained history once, then continue scoped repairs. Keep a separately paused issue stopped and preserve all safety boundaries. |
 | An old approval question remains visible after a later human instruction addresses the same restriction | Record an ordinary coordinator chat update identifying both messages and what is resolved or superseded. The human instruction remains the authority. A generic continuation or late answer does not erase unchanged stops or authorize another cycle. |
 | A prerequisite is already merged while a correction is being prepared | Where practical, adopt the known base at a safe checkpoint before final verification/review. Preserve normal hooks, combined-delta review, affected-evidence checks and final-head CI. |
-| A focused epic has a completable issue and an unrelated partial foundation is available | Prefer the focused completion without withholding independently useful work that can finish using spare capacity. |
+| A focused epic has a completable issue and an unrelated partial foundation is available | Finish the existing issue. Spare capacity alone does not authorize opening the unrelated foundation. |
 | A focused issue needs a capability owned by another epic | Deliver the real prerequisite, retaining the next focused action or return condition. No whole-epic barrier. |
-| A supporting PR merges with feasible implementation acceptance remaining | Reconsider that remaining work before selecting unrelated work. Do not force an oversized PR or false closure. |
+| A supporting PR merges with feasible implementation acceptance remaining | Continue the owning issue's remaining acceptance through closure. Do not force an oversized PR or false closure. |
 | A human-facing delivery lacks a published qualification issue or publication authority | Create or reuse under actual authority before closure. A draft alone is insufficient. |
 | A mixed qualification issue has automated obligations and human cases | Complete the automated work and transfer only human cases to the linked qualification issue before closure. |
-| Two issues with independent paths/contracts | Parallel implementation within real capacity, preferring work within the focused epic. |
+| Two existing issues with independent paths/contracts | Parallel implementation within real capacity, preferring work within the focused epic. Unrelated new work still requires the coordinator's selection gate. |
 | Shared authorization contract or migration | One owner or serial delivery before dependent writes. |
 | Two requests for the fixed integration stack | One named executor and observed cleanup before the next. |
-| Blocked writer with independent eligible work | Preserve checkpoint, stop positively, reconcile and reuse safely. |
+| Blocked writer with independent eligible work | Preserve the checkpoint, stop positively and reconcile resources. Resume existing unfinished work or deliver its authorized prerequisite. Unrelated new work requires explicit human reprioritization, otherwise leave capacity unused. |
 | Useful supporting capability with feature work remaining | Scoped review/checks and no false issue closure. |
 | A small harness repair proposes another general supervisor | Review the demonstrated need and minimal maintained alternative before expansion. |
 | A plan is otherwise highly rated but has 4/10 overengineering risk | Return Changes needed under Review's ceiling. Explain the material cost and smaller alternative without adjusting the score to obtain approval. |
