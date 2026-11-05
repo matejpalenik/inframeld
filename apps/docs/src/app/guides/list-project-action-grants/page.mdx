@@ -1,0 +1,235 @@
+export const pageMetadata = {
+  title: "List Project action grants",
+  description:
+    "Read stored assignments for one Project action under current grant authority.",
+}
+
+# List Project action grants
+
+Find who has a stored assignment for one action on a Project you manage. For example, inspect `create-access-groups` to distinguish people who may use that action from people who may also grant it. This read changes neither assignments nor the Project Access revision.
+
+## Prepare the Project and action
+
+You need a permanent Project ID, one supported Project action and a current human credential. You must be an eligible admitted Project member with both use and grant authority for that exact action on that Project. Use-only permission, Project membership alone and group-manager status are insufficient.
+
+For a small starting case, use a Project you [created through the ordinary API](/guides/create-project). Keep its returned `projectId`. Creation gives the creator membership and eighteen explicit initial assignments, including use and grant of `create-access-groups`.
+
+The cURL example assumes `INFRAMELD_URL` and `INFRAMELD_TOKEN` are already prepared through [HTTP setup](/clients/http#call-protected-operations), with an existing valid human bearer token. Browser sign-in alone does not supply a terminal bearer token. The supported manual account-to-client and disposable setup procedure remains unprepared under [human qualification #336](https://github.com/matejpalenik/inframeld/issues/336). Its preparation, engineering dry run and human execution are deferred to pre-v1 qualification. This guide does not establish human-handoff readiness.
+
+Replace the illustrative UUID with your actual Project ID. Keep the action unchanged while following a continuation cursor:
+
+<CodeGroup>
+
+```shell
+export PROJECT_ID='00000000-0000-4000-8000-000000000003'
+export ACTION_ID='create-access-groups'
+unset GRANTS_CURSOR
+```
+
+</CodeGroup>
+
+## Read one page
+
+Choose cURL or one generated-client program. Each requests one page of up to 25 assignments. The default page size is 25, and `limit` accepts integers from 1 to 100. This GET takes no request body, reviewed revision or idempotency key.
+
+For an SDK alternative, follow the source-package setup for [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) in a separate example project. Use the same prepared human token and Project/action values. Save the complete Python program as `list_project_action_grants.py`, the TypeScript program as `list-project-action-grants.ts`, or the Rust program as `src/main.rs`. There is no delivered CLI command for this read.
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --data-urlencode "actionId=$ACTION_ID" \
+  --data-urlencode 'limit=25' \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/grants" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+```python
+import asyncio
+import os
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+
+
+async def main() -> None:
+    configuration = Configuration(host=os.environ["INFRAMELD_URL"])
+    async with ApiClient(configuration) as client:
+        try:
+            response = await AccessApi(client).list_project_action_grants_with_http_info(
+                project_id=UUID(os.environ["PROJECT_ID"]),
+                action_id=os.environ["ACTION_ID"],
+                limit=25,
+                cursor=os.environ.get("GRANTS_CURSOR"),
+                _headers={
+                    "Authorization": f"Bearer {os.environ['INFRAMELD_TOKEN']}"
+                },
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            print(f"Grant read failed: HTTP {error.status}")
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("No usable grant page.")
+            raise SystemExit(1) from error
+
+        print(f"HTTP {response.status_code}")
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import { createClient, listProjectActionGrants } from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const actionId = process.env.ACTION_ID
+const cursor = process.env.GRANTS_CURSOR
+if (!baseUrl || !token || !projectId || !actionId) {
+  throw new Error(
+    "Set INFRAMELD_URL, INFRAMELD_TOKEN, PROJECT_ID and ACTION_ID"
+  )
+}
+
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const result = await listProjectActionGrants({
+  client,
+  path: { project_id: projectId },
+  query: {
+    actionId,
+    limit: 25,
+    ...(cursor === undefined ? {} : { cursor }),
+  },
+  headers: { Authorization: `Bearer ${token}` },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error) {
+  console.error("No usable grant page:", result.error.kind)
+  console.error("HTTP status:", result.response?.status)
+  if (result.error.kind === "api") {
+    console.error(result.error.body.code, result.error.body.requestId)
+  }
+  process.exitCode = 1
+} else {
+  console.log("HTTP status:", result.response?.status ?? "unavailable")
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+use std::env;
+
+use inframeld_sdk::client::{ApiOpError, HttpClient};
+
+/// Preserve available HTTP context without printing raw upstream content.
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
+    if let Some(context) = error.api() {
+        eprintln!("Grant read failed: HTTP {}", context.status);
+    } else {
+        eprintln!("No usable grant page.");
+    }
+    std::io::Error::other("Resolve the failed read before continuing pagination")
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = env::var("INFRAMELD_URL")?;
+    let token = env::var("INFRAMELD_TOKEN")?;
+    let project_id = env::var("PROJECT_ID")?;
+    let action_id = env::var("ACTION_ID")?;
+    let cursor = env::var("GRANTS_CURSOR").ok();
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+    let response = client
+        .list_project_action_grants(&project_id, &action_id, Some(25), cursor.as_deref())
+        .await
+        .map_err(report_error)?;
+    println!("HTTP {}", response.status);
+    println!("{}", serde_json::to_string_pretty(&response.body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python list_project_action_grants.py`, `node list-project-action-grants.ts` with Node 26 in the ESM project, or `cargo run` in the Cargo project. Each prints the available HTTP status and validated page on success. A failure exits unsuccessfully and does not become an empty page merely because some response context exists.
+
+An illustrative page from a newly created Project is:
+
+<CodeGroup>
+
+```json
+{
+  "items": [
+    {
+      "projectId": "00000000-0000-4000-8000-000000000003",
+      "recipientPrincipalId": "00000000-0000-4000-8000-000000000001",
+      "actionId": "create-access-groups",
+      "canGrant": true
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+</CodeGroup>
+
+Each item identifies the exact Project, recipient and action. `canGrant: true` records use and grant authority. `false` records use-only permission, not an explicit denial. The page contains no names, emails, totals or Access revision.
+
+These are stored assignments, not effective permissions. A suspended recipient's row remains visible even though that person cannot currently act. The read does not expand implied actions or discover eligible recipients. An authorized empty `items` array means no matching stored assignment was returned for that page.
+
+## Continue within the same scope
+
+`nextCursor: null` ends the read. Otherwise copy the returned string unchanged into `GRANTS_CURSOR` and request the next page with the same installation, Project and action:
+
+<CodeGroup>
+
+```shell
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --data-urlencode "actionId=$ACTION_ID" \
+  --data-urlencode 'limit=25' \
+  --data-urlencode "cursor=$GRANTS_CURSOR" \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/grants" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+The SDK programs also request only one page. Set `GRANTS_CURSOR` to the exact returned continuation string before rerunning a program. Clear it before changing scope.
+
+Recipients are ordered by principal ID. Every page checks current credentials, eligibility, Project visibility/membership and exact use-and-grant authority again. The cursor supplies a position, not permission or a snapshot. Assignments can change between requests. Start without a cursor when changing the Project or action, and do not decode or edit a cursor.
+
+## Handle a rejected or incomplete read
+
+| Observation                                  | Meaning and next step                                                                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`                                        | Authentication inputs are malformed or competing. Supply one supported credential context.                                                  |
+| `422`                                        | Check the required supported `actionId`, Project ID, limit and unchanged cursor. Bodies and duplicate or unknown query fields are rejected. |
+| `401`                                        | The human credential is missing, rejected or no longer current. Use the installation's supported authentication procedure.                  |
+| `403`                                        | Current eligibility or exact use-and-grant authority is missing. Use-only access does not permit this inspection.                           |
+| `404`                                        | The Project is missing, hidden or unavailable to the caller. A known ID does not grant visibility.                                          |
+| `503`, transport failure or decoding failure | No usable page was established. Keep earlier pages identified as partial and resolve the failure before continuing.                         |
+
+[The native operation](/api-reference/projects-and-access#read-project-action-grants) defines the exact parameters, page schema and declared problems. A denied or failed read is not an empty success. Responses use `Cache-Control: no-store`. Browser-cookie reads use the installation's actual session configuration and need no cookie-write CSRF header. Keep credentials and raw cursors out of diagnostic logs.
+
+To assign the supported use-only `create-access-groups` permission, follow [Assign a Project grant](/guides/assign-project-grant). Full grant-level changes, removals, other target reads and recipient discovery remain separate unfinished administration capabilities. This read does not perform them.

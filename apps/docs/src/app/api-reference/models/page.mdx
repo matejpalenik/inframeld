@@ -147,6 +147,14 @@ Records the original admission or no-change result, including the local `princip
 
 <ApiSchema name="OwnOrganizationGrantResponse" />
 
+<a id="PageResponse_ProjectActionGrantItemResponse_" />
+
+## Project action-grant page
+
+Contains stored exact-action assignments and a required nullable continuation cursor. It supplies no Access revision or total. [List Project action grants](/guides/list-project-action-grants) explains current authority on every page.
+
+<ApiSchema name="PageResponse_ProjectActionGrantItemResponse_" />
+
 <a id="PrincipalKind" />
 
 ## PrincipalKind
@@ -158,6 +166,14 @@ Records the original admission or no-change result, including the local `princip
 ## ProblemDetails
 
 <ApiSchema name="ProblemDetails" />
+
+<a id="ProjectActionGrantItemResponse" />
+
+## ProjectActionGrantItemResponse
+
+One stored assignment for an exact Project action and recipient. `canGrant` distinguishes use-only from use and grant. The item does not establish the recipient's current eligibility. [The read guide](/guides/list-project-action-grants) explains the surrounding page.
+
+<ApiSchema name="ProjectActionGrantItemResponse" />
 
 <a id="ProjectCreationRequest" />
 

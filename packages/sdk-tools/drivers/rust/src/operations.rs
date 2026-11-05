@@ -151,6 +151,21 @@ pub async fn observe(
                     .await
             )
         }
+        "listProjectActionGrants" => {
+            let query = request.query.as_ref().unwrap();
+            observed!(
+                client
+                    .list_project_action_grants(
+                        request.path.as_ref().unwrap()["project_id"]
+                            .as_str()
+                            .unwrap(),
+                        query["actionId"].as_str().unwrap(),
+                        query["limit"].as_i64(),
+                        query["cursor"].as_str()
+                    )
+                    .await
+            )
+        }
         "createProject" => observed!(
             client
                 .create_project(
