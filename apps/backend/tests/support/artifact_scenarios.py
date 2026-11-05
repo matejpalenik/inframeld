@@ -52,6 +52,7 @@ from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
 from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origin_dto import (
     UnadmittedStagingArtifactOriginDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.protocols.artifact_capacity_reader import (
     ArtifactCapacityReader,
 )
@@ -265,7 +266,7 @@ async def completed_product_origin(
             access=AccessContextDTO(actor, MockAuthenticationEvidence.application_key()),
             authority=authority,
             context=IdempotencyContextDTO(
-                "POST",
+                HttpMethod.POST,
                 "/test/projects/{project_id}/feedback-reports",
                 IdempotencyKey("artifact-work-" + uuid4().hex),
             ),

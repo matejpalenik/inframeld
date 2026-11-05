@@ -14,6 +14,7 @@ from inframeld_backend.shared.http.definitions.problem_catalogue import (
     DEPENDENCY_UNAVAILABLE_PROBLEM,
     VALIDATION_ERROR_PROBLEM,
 )
+from inframeld_backend.shared.http.enums.validation_issue_location import ValidationIssueLocation
 from inframeld_backend.shared.http.responses.validation_issue import ValidationIssue
 
 REQUEST_ID = "c66a2044-4e4f-4c07-983e-a3c221c7b1ad"
@@ -113,7 +114,10 @@ def test_rejects_validation_issues_for_other_problem_types() -> None:
     """Reject validation extensions on an unrelated problem type."""
 
     issue = ValidationIssue(
-        location="body", path=("name",), code="invalid_value", message="Use a valid value."
+        location=ValidationIssueLocation.BODY,
+        path=("name",),
+        code="invalid_value",
+        message="Use a valid value.",
     )
 
     with pytest.raises(ValueError, match="Only validation problems may include validation issues"):

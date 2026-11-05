@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import replace
-from typing import Literal, cast
+from typing import cast
 from uuid import UUID
 
 import pytest
@@ -43,6 +43,9 @@ from inframeld_backend.access.application.errors.human_oauth_credential_rejected
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_departure_target_kind import (
+    ProjectDepartureTargetKind,
+)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
@@ -155,9 +158,16 @@ async def test_operation_context_cannot_replace_the_method_or_concrete_target(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("target_kind", ["project", "access_group", "application_account"])
+@pytest.mark.parametrize(
+    "target_kind",
+    [
+        ProjectDepartureTargetKind.PROJECT,
+        ProjectDepartureTargetKind.ACCESS_GROUP,
+        ProjectDepartureTargetKind.APPLICATION_ACCOUNT,
+    ],
+)
 async def test_unsupported_stored_action_cannot_count_as_remaining_authority(
-    target_kind: Literal["project", "access_group", "application_account"],
+    target_kind: ProjectDepartureTargetKind,
 ) -> None:
     s = MembershipChangeScenario()
     candidate = ProjectDepartureCandidateDTO(ALICE, False, True, True, True, False, False)
@@ -176,7 +186,10 @@ async def test_departure_facts_cannot_substitute_another_project_responsibility(
     s = MembershipChangeScenario()
     candidate = ProjectDepartureCandidateDTO(ALICE, False, True, True, True, False, False)
     responsibility = ProjectDepartureResponsibilityDTO(
-        "project", UUID(int=99), ActionId("manage-project-members"), (candidate,)
+        ProjectDepartureTargetKind.PROJECT,
+        UUID(int=99),
+        ActionId("manage-project-members"),
+        (candidate,),
     )
     s.member()
     s.facts.responsibilities = (responsibility,)
@@ -363,7 +376,7 @@ async def test_removal_rejects_stranded_exact_responsibility_before_writing() ->
     s.member()
     s.facts.responsibilities = (
         ProjectDepartureResponsibilityDTO(
-            "project", PROJECT.value, ActionId("edit-project-metadata"), ()
+            ProjectDepartureTargetKind.PROJECT, PROJECT.value, ActionId("edit-project-metadata"), ()
         ),
     )
     with pytest.raises(ConflictError):
@@ -384,13 +397,15 @@ async def test_save_failure_or_cancellation_rolls_back_without_completion(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("changed", ["project", "actor", "organization", "revision"])
+@pytest.mark.parametrize(
+    "changed", [ProjectDepartureTargetKind.PROJECT, "actor", "organization", "revision"]
+)
 @pytest.mark.parametrize("replay", [False, True])
 async def test_wrong_scope_facts_fail_before_reservation(changed: str, replay: bool) -> None:
     s = MembershipChangeScenario()
     facts = (
         replace(FACTS, project_id=ProjectId(UUID(int=99)))
-        if changed == "project"
+        if changed == ProjectDepartureTargetKind.PROJECT
         else replace(
             FACTS,
             action=replace(FACTS.action, principal=replace(ALICE, id=PrincipalId(UUID(int=99)))),

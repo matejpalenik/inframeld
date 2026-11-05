@@ -1,8 +1,8 @@
 import asyncio
 from collections.abc import Iterator
+from enum import StrEnum
 from threading import Event
 from traceback import format_exception
-from typing import Literal
 from unittest.mock import patch
 from uuid import UUID
 
@@ -39,6 +39,17 @@ from inframeld_backend.shared.application.errors.application_errors import (
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
+
+class DecisionCase(StrEnum):
+    ALLOW = "allow"
+    DENY = "deny"
+
+
+class InterruptionCase(StrEnum):
+    DEADLINE = "deadline"
+    CANCELLATION = "cancellation"
+
+
 BINDING = HumanOAuthCredentialBindingDTO(
     VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySubject("alice")),
     InstallationId(UUID(int=123)),
@@ -58,11 +69,9 @@ def client() -> Iterator[OAuth2Api]:
         sdk.rest_client.pool_manager.clear()
 
 
-async def _decide(
-    client: OAuth2Api, decision: Literal["allow", "deny"]
-) -> OAuthConsentContinuationDTO:
+async def _decide(client: OAuth2Api, decision: DecisionCase) -> OAuthConsentContinuationDTO:
     writer = HydraOAuthConsentDecisionWriter(client, public_url="https://auth.test/base")
-    if decision == "deny":
+    if decision == DecisionCase.DENY:
         return await writer.deny(CHALLENGE, timeout_seconds=1.0)
     return await writer.allow(
         CHALLENGE,
@@ -184,12 +193,12 @@ async def test_an_unconfirmed_decision_is_not_a_confirmed_denial_or_an_automatic
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("decision", ["allow", "deny"])
-@pytest.mark.parametrize("interruption", ["deadline", "cancellation"])
+@pytest.mark.parametrize("decision", [DecisionCase.ALLOW, DecisionCase.DENY])
+@pytest.mark.parametrize("interruption", [InterruptionCase.DEADLINE, InterruptionCase.CANCELLATION])
 async def test_interrupted_decision_does_not_wait_for_or_accept_a_late_sdk_response(
     client: OAuth2Api,
-    decision: Literal["allow", "deny"],
-    interruption: Literal["deadline", "cancellation"],
+    decision: DecisionCase,
+    interruption: InterruptionCase,
 ) -> None:
     """An uncertain approval stays uncertain even if its SDK call later succeeds."""
     loop = asyncio.get_running_loop()
@@ -206,17 +215,19 @@ async def test_interrupted_decision_does_not_wait_for_or_accept_a_late_sdk_respo
             loop.call_soon_threadsafe(finished.set)
 
     expected_error = (
-        DependencyUnavailableError if interruption == "deadline" else asyncio.CancelledError
+        DependencyUnavailableError
+        if interruption == InterruptionCase.DEADLINE
+        else asyncio.CancelledError
     )
     with (
         patch.object(client, "accept_o_auth2_consent_request", side_effect=blocked) as allow,
         patch.object(client, "reject_o_auth2_consent_request", side_effect=blocked) as deny,
     ):
-        selected, opposite = (allow, deny) if decision == "allow" else (deny, allow)
+        selected, opposite = (allow, deny) if decision == DecisionCase.ALLOW else (deny, allow)
         task = asyncio.create_task(_decide(client, decision))
         try:
             await asyncio.wait_for(started.wait(), timeout=5.0)
-            if interruption == "cancellation":
+            if interruption == InterruptionCase.CANCELLATION:
                 task.cancel()
             with pytest.raises(expected_error) as caught:
                 await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
@@ -235,7 +246,7 @@ async def test_interrupted_decision_does_not_wait_for_or_accept_a_late_sdk_respo
                 await finished.wait()
 
         assert finished.is_set()
-        if interruption == "cancellation":
+        if interruption == InterruptionCase.CANCELLATION:
             assert task.cancelled()
         else:
             assert task.exception() is caught.value
@@ -244,9 +255,9 @@ async def test_interrupted_decision_does_not_wait_for_or_accept_a_late_sdk_respo
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("decision", ["allow", "deny"])
+@pytest.mark.parametrize("decision", [DecisionCase.ALLOW, DecisionCase.DENY])
 async def test_sdk_timeout_does_not_retry_reverse_the_decision_or_disclose_secrets(
-    client: OAuth2Api, decision: Literal["allow", "deny"], caplog: pytest.LogCaptureFixture
+    client: OAuth2Api, decision: DecisionCase, caplog: pytest.LogCaptureFixture
 ) -> None:
     with (
         patch.object(
@@ -268,7 +279,7 @@ async def test_sdk_timeout_does_not_retry_reverse_the_decision_or_disclose_secre
     assert "private-state" not in diagnostic
     assert caught.value.__cause__ is None
     assert caught.value.__suppress_context__
-    selected, opposite = (allow, deny) if decision == "allow" else (deny, allow)
+    selected, opposite = (allow, deny) if decision == DecisionCase.ALLOW else (deny, allow)
     selected.assert_called_once()
     opposite.assert_not_called()
     timeout: object = selected.call_args.kwargs["_request_timeout"]

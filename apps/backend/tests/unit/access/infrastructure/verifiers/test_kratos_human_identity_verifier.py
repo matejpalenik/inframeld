@@ -1,8 +1,8 @@
 import asyncio
 from collections.abc import Iterator
+from enum import StrEnum
 from json import JSONDecodeError
 from threading import Event
-from typing import Literal
 from unittest.mock import patch
 from uuid import UUID
 
@@ -26,6 +26,12 @@ from inframeld_backend.access.infrastructure.verifiers.kratos_human_identity_ver
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+
+
+class StateCase(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
 
 AUTHORITY = IdentityAuthority("kratos:test")
 IDENTITY_ID = UUID("00000000-0000-4000-8000-000000000003")
@@ -52,7 +58,7 @@ def client() -> Iterator[IdentityApi]:
         sdk_client.rest_client.pool_manager.clear()
 
 
-def _identity(state: Literal["active", "inactive"] = "active") -> Identity:
+def _identity(state: StateCase = StateCase.ACTIVE) -> Identity:
     return Identity(
         id=IDENTITY_ID,
         schema_id="default",
@@ -83,7 +89,7 @@ async def test_active_identity_returns_the_same_verified_identity(client: Identi
 @pytest.mark.asyncio
 async def test_inactive_identity_returns_no_identity(client: IdentityApi) -> None:
     """Prevent a disabled Kratos account from authenticating after its access token was accepted."""
-    with patch.object(client, "get_identity", return_value=_identity("inactive")):
+    with patch.object(client, "get_identity", return_value=_identity(StateCase.INACTIVE)):
         result = await KratosHumanIdentityVerifier(client, AUTHORITY).verify(
             VERIFIED_IDENTITY,
             timeout_seconds=2.0,
@@ -262,7 +268,7 @@ async def test_next_request_rechecks_kratos_after_identity_is_disabled(client: I
     with patch.object(
         client,
         "get_identity",
-        side_effect=[_identity(), _identity("inactive")],
+        side_effect=[_identity(), _identity(StateCase.INACTIVE)],
     ) as get_identity:
         first = await verifier.verify(VERIFIED_IDENTITY, timeout_seconds=2.0)
         second = await verifier.verify(VERIFIED_IDENTITY, timeout_seconds=2.0)

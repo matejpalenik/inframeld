@@ -71,6 +71,7 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -137,7 +138,7 @@ async def organization_admitted(
         installed,
         seed.organization_id,
         None,
-        "POST",
+        HttpMethod.POST,
         "/v1/original-organization-operation",
         IdempotencyKey("organization-lost-ack"),
         OperationLookupAuthority(OperationLookupAuthorityFamily.ORGANIZATION_ACTION_USE, ACTION),

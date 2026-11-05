@@ -35,6 +35,7 @@ from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
 from inframeld_backend.shared.application.services.job_admission_service import JobAdmissionService
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
@@ -100,7 +101,9 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
             ),
             authority=authority,
             context=IdempotencyContextDTO(
-                "POST", "/test/projects/{project_id}/feedback-reports", IdempotencyKey(str(uuid4()))
+                HttpMethod.POST,
+                "/test/projects/{project_id}/feedback-reports",
+                IdempotencyKey(str(uuid4())),
             ),
             fingerprint=RequestFingerprint(b"B" * 32),
             request_id=RequestId(uuid4()),

@@ -59,6 +59,7 @@ from inframeld_backend.shared.application.dtos.completed_synchronous_operation_d
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.protocols.transaction_manager import TransactionManager
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
@@ -82,7 +83,7 @@ BOB = Principal(PrincipalId(UUID(int=3)), ORG, PrincipalKind.HUMAN, PrincipalSta
 ACCESS = AccessContextDTO(ALICE.id, MockAuthenticationEvidence.browser())
 COMMAND = AdmitHumanCommand(ORG, UUID(IDENTITY.subject.value), 7)
 CONTEXT = IdempotencyContextDTO(
-    method="POST",
+    method=HttpMethod.POST,
     requested_route=f"/v1/organizations/{ORG.value}/human-admissions",
     key=IdempotencyKey("admit-bob"),
 )

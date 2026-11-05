@@ -5,7 +5,7 @@ import hashlib
 import os
 from dataclasses import replace
 from datetime import timedelta
-from typing import Literal
+from enum import StrEnum
 from uuid import uuid4
 
 import pytest
@@ -51,6 +51,12 @@ from inframeld_backend.shared.infrastructure.rows.durable_job_row import Durable
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
 )
+
+
+class CeilingCase(StrEnum):
+    SPOOL = "spool"
+    PROTECTED = "protected"
+
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
@@ -108,16 +114,16 @@ async def _assert_allocation_absent(database: Database, scenario: ArtifactScenar
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("ceiling", ["spool", "protected"])
+@pytest.mark.parametrize("ceiling", [CeilingCase.SPOOL, CeilingCase.PROTECTED])
 async def test_allocation_honors_shared_byte_ceiling_and_rolls_back_overflow(
-    database: Database, ceiling: Literal["spool", "protected"]
+    database: Database, ceiling: CeilingCase
 ) -> None:
     scope, origin = await completed_product_origin(database)
     # Controlled persisted totals stand for other retained installation work.
     # They qualify shared-ledger admission, not measured host occupancy.
-    spool = 2 * 1024**3 - 1 if ceiling == "spool" else 0
-    protected = 2 * spool if ceiling == "spool" else 100 * 1024**3 - 2
-    occupied = 0 if ceiling == "spool" else protected
+    spool = 2 * 1024**3 - 1 if ceiling == CeilingCase.SPOOL else 0
+    protected = 2 * spool if ceiling == CeilingCase.SPOOL else 100 * 1024**3 - 2
+    occupied = 0 if ceiling == CeilingCase.SPOOL else protected
     async with database.session() as session, session.begin():
         session.add(
             ArtifactStorageCapacityRow(
@@ -131,8 +137,8 @@ async def test_allocation_honors_shared_byte_ceiling_and_rolls_back_overflow(
     await allocate_artifact(database, artifact_scenario(scope, origin), limit_bytes=1)
     before = await _allocation_state(database, scope)
     assert before[1] == (spool + 1, protected + 2, occupied)
-    assert before[1][0 if ceiling == "spool" else 1] == (
-        2 * 1024**3 if ceiling == "spool" else 100 * 1024**3
+    assert before[1][0 if ceiling == CeilingCase.SPOOL else 1] == (
+        2 * 1024**3 if ceiling == CeilingCase.SPOOL else 100 * 1024**3
     )
     rejected = artifact_scenario(scope, origin)
     with pytest.raises(ArtifactCapacityError):

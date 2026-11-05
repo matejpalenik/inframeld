@@ -10,6 +10,7 @@ from inframeld_backend.access.http.responses.human_admission_response import Hum
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 
 
@@ -23,7 +24,7 @@ class HumanAdmissionMapper:
     @staticmethod
     def context(organization_id: UUID, key: IdempotencyKey) -> IdempotencyContextDTO:
         return IdempotencyContextDTO(
-            "POST", f"/v1/organizations/{organization_id}/human-admissions", key
+            HttpMethod.POST, f"/v1/organizations/{organization_id}/human-admissions", key
         )
 
     @staticmethod

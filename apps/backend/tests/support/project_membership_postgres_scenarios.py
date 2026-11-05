@@ -32,6 +32,7 @@ from inframeld_backend.bootstrap.postgres_project_membership_change_service_fact
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -74,7 +75,7 @@ async def seed_membership_project(database: Database) -> MembershipProjectSeedDT
             access=actor.access,
             command=AdmitHumanCommand(actor.organization_id, UUID(int=200), actor.access_revision),
             context=IdempotencyContextDTO(
-                "POST",
+                HttpMethod.POST,
                 f"/v1/organizations/{actor.organization_id.value}/human-admissions",
                 IdempotencyKey("admit-bob"),
             ),
@@ -98,7 +99,7 @@ async def change_membership(
 ) -> ProjectMembershipChangeResultDTO:
     project = project_id or seed.project.project_id
     principal = principal_id or seed.bob_id
-    method = "DELETE" if remove else "PUT"
+    method = HttpMethod.DELETE if remove else HttpMethod.PUT
     context = IdempotencyContextDTO(
         method, f"/v1/projects/{project.value}/members/{principal.value}", IdempotencyKey(key)
     )

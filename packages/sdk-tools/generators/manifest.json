@@ -92,9 +92,13 @@
       {
         "file": "py-openapi-generator-patched/0007-encoded-relative-paths.patch",
         "sha256": "5cdde5e53da36a64739d6008e12b041083712d7751b8a44561187350d403fa84"
+      },
+      {
+        "file": "py-openapi-generator-patched/0008-named-auth-metadata.patch",
+        "sha256": "553568af66ec8c12a36045ec17d057fde7fea15fb8c81bac87afa425111b15ea"
       }
     ],
-    "revision": "inframeld.2"
+    "revision": "inframeld.3"
   },
   "rust": {
     "upstreamVersion": "0.23.0",

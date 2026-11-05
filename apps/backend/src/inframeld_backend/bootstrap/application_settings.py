@@ -3,7 +3,7 @@
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Self
+from typing import Self
 
 from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +18,7 @@ from inframeld_backend.access.infrastructure.settings.kratos_settings import Kra
 from inframeld_backend.access.infrastructure.verifiers.pydantic_discovery_url_verifier import (
     PydanticDiscoveryURLVerifier,
 )
+from inframeld_backend.bootstrap.application_environment import ApplicationEnvironment
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 from inframeld_backend.shared.infrastructure.settings.deletion_status_retention_settings import (
     DeletionStatusRetentionSettings,
@@ -25,7 +26,8 @@ from inframeld_backend.shared.infrastructure.settings.deletion_status_retention_
 from inframeld_backend.shared.infrastructure.settings.request_fingerprint_settings import (
     RequestFingerprintSettings,
 )
-from inframeld_backend.shared.infrastructure.types.logging_types import LogFormat, LogLevel
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_ENV_FILE = BACKEND_ROOT / ".env"
@@ -39,9 +41,9 @@ class ApplicationSettings(BaseSettings):
     and tests. This object contains configuration, not opened external resources.
     """
 
-    environment: Literal["local", "test", "production"] = "local"
-    log_level: LogLevel = "INFO"
-    log_format: LogFormat = "console"
+    environment: ApplicationEnvironment = ApplicationEnvironment.LOCAL
+    log_level: LogLevel = LogLevel.INFO
+    log_format: LogFormat = LogFormat.CONSOLE
 
     database: DatabaseSettings
     request_fingerprint: RequestFingerprintSettings
@@ -106,7 +108,7 @@ def _format_validation_error(error: ValidationError) -> str:
 
 def _settings_env_file() -> Path | None:
     """Select the explicit test environment file or the ordinary backend environment file."""
-    if os.getenv("INFRAMELD_ENVIRONMENT") != "test":
+    if os.getenv("INFRAMELD_ENVIRONMENT") != ApplicationEnvironment.TEST:
         return DEFAULT_ENV_FILE
 
     configured_path = os.getenv("INFRAMELD_TEST_ENV_FILE")

@@ -26,6 +26,18 @@ export const zCurrentSessionResponse = z.object({
 });
 
 /**
+ * HttpMethod
+ *
+ * Identify the mutating method bound to an operation and its retry identity.
+ */
+export const zHttpMethod = z.enum([
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE'
+]);
+
+/**
  * HumanAdmissionRequest
  */
 export const zHumanAdmissionRequest = z.object({
@@ -153,18 +165,25 @@ export const zOperationLookupAuthorityRequest = z.object({
 });
 
 /**
+ * OrganizationAction
+ *
+ * Name an action on the installation Organization.
+ */
+export const zOrganizationAction = z.enum([
+    'admit-users',
+    'suspend-users',
+    'restore-users',
+    'create-projects'
+]);
+
+/**
  * OriginalOperationLookupRequest
  */
 export const zOriginalOperationLookupRequest = z.object({
     expectedAuthority: zOperationLookupAuthorityRequest,
     installationId: z.uuid(),
     key: z.string().min(1).max(128),
-    method: z.enum([
-        'POST',
-        'PUT',
-        'PATCH',
-        'DELETE'
-    ]),
+    method: zHttpMethod,
     organizationId: z.uuid(),
     projectId: z.uuid().nullable(),
     requestedRoute: z.string().min(1)
@@ -174,12 +193,7 @@ export const zOriginalOperationLookupRequest = z.object({
  * OwnOrganizationGrantResponse
  */
 export const zOwnOrganizationGrantResponse = z.object({
-    actionId: z.enum([
-        'admit-users',
-        'suspend-users',
-        'restore-users',
-        'create-projects'
-    ]),
+    actionId: zOrganizationAction,
     canGrant: z.boolean()
 });
 
@@ -199,6 +213,32 @@ export const zMyOrganizationAccessResponse = z.object({
  * Distinguish local human actors from application accounts.
  */
 export const zPrincipalKind = z.enum(['human', 'application']);
+
+/**
+ * ProjectAction
+ *
+ * Name an action on a Project without granting it to the caller.
+ */
+export const zProjectAction = z.enum([
+    'manage-project-members',
+    'create-access-groups',
+    'create-application-accounts',
+    'create-pipelines',
+    'create-deployments',
+    'manage-upload-defaults',
+    'delete-project',
+    'inspect-budget',
+    'manage-budget',
+    'manage-trace-policy',
+    'delete-trace-history',
+    'inspect-feedback',
+    'create-collections',
+    'create-sources',
+    'create-model-connections',
+    'create-processing-profiles',
+    'create-embedding-profiles',
+    'edit-project-metadata'
+]);
 
 /**
  * ProjectCreationRequest
@@ -222,26 +262,7 @@ export const zProjectGrantTargetResponse = z.object({
  * InitialProjectGrantResponse
  */
 export const zInitialProjectGrantResponse = z.object({
-    actionId: z.enum([
-        'manage-project-members',
-        'create-access-groups',
-        'create-application-accounts',
-        'create-pipelines',
-        'create-deployments',
-        'manage-upload-defaults',
-        'delete-project',
-        'inspect-budget',
-        'manage-budget',
-        'manage-trace-policy',
-        'delete-trace-history',
-        'inspect-feedback',
-        'create-collections',
-        'create-sources',
-        'create-model-connections',
-        'create-processing-profiles',
-        'create-embedding-profiles',
-        'edit-project-metadata'
-    ]),
+    actionId: zProjectAction,
     canGrant: z.literal(true),
     target: zProjectGrantTargetResponse
 });
@@ -502,6 +523,20 @@ export const zOperationLookupResponse = z.discriminatedUnion('outcome', [
 ]);
 
 /**
+ * ValidationIssueLocation
+ *
+ * Identify the request component that contains an invalid field.
+ */
+export const zValidationIssueLocation = z.enum([
+    'body',
+    'path',
+    'query',
+    'header',
+    'cookie',
+    'request'
+]);
+
+/**
  * ValidationIssue
  *
  * Describe one sanitized issue in an incoming request.
@@ -518,14 +553,7 @@ export const zOperationLookupResponse = z.discriminatedUnion('outcome', [
  */
 export const zValidationIssue = z.object({
     code: z.string().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/),
-    location: z.enum([
-        'body',
-        'path',
-        'query',
-        'header',
-        'cookie',
-        'request'
-    ]),
+    location: zValidationIssueLocation,
     message: z.string().min(1).max(256),
     path: z.array(z.union([z.string().min(1).max(64), z.int().gte(0)])).max(8)
 });

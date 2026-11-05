@@ -14,6 +14,7 @@ import base64
 import copy
 import http.client as httplib
 import logging
+from enum import StrEnum
 from logging import FileHandler
 import sys
 from typing import Any, ClassVar, Dict, List, Literal, Optional, TypedDict, Union
@@ -29,6 +30,35 @@ JSON_SCHEMA_VALIDATION_KEYWORDS = {
 
 ServerVariablesT = Dict[str, str]
 
+class AuthType(StrEnum):
+    """Identify the configured authentication scheme without carrying credentials."""
+
+    OAUTH2 = "oauth2"
+    API_KEY = "api_key"
+    BASIC = "basic"
+    BEARER = "bearer"
+    HTTP_SIGNATURE = "http-signature"
+
+
+class AuthLocation(StrEnum):
+    """Identify where a configured authentication value is sent."""
+
+    HEADER = "header"
+
+
+class AuthHeader(StrEnum):
+    """Name the standard authorization header independently of its secret value."""
+
+    AUTHORIZATION = "Authorization"
+
+
+class BearerTokenFormat(StrEnum):
+    """Name the supported bearer-token format in generated auth metadata."""
+
+    JWT = "JWT"
+
+
+
 GenericAuthSetting = TypedDict(
     "GenericAuthSetting",
     {
@@ -43,9 +73,9 @@ GenericAuthSetting = TypedDict(
 OAuth2AuthSetting = TypedDict(
     "OAuth2AuthSetting",
     {
-        "type": Literal["oauth2"],
-        "in": Literal["header"],
-        "key": Literal["Authorization"],
+        "type": Literal[AuthType.OAUTH2],
+        "in": Literal[AuthLocation.HEADER],
+        "key": Literal[AuthHeader.AUTHORIZATION],
         "value": str,
     },
 )
@@ -54,7 +84,7 @@ OAuth2AuthSetting = TypedDict(
 APIKeyAuthSetting = TypedDict(
     "APIKeyAuthSetting",
     {
-        "type": Literal["api_key"],
+        "type": Literal[AuthType.API_KEY],
         "in": str,
         "key": str,
         "value": Optional[str],
@@ -65,9 +95,9 @@ APIKeyAuthSetting = TypedDict(
 BasicAuthSetting = TypedDict(
     "BasicAuthSetting",
     {
-        "type": Literal["basic"],
-        "in": Literal["header"],
-        "key": Literal["Authorization"],
+        "type": Literal[AuthType.BASIC],
+        "in": Literal[AuthLocation.HEADER],
+        "key": Literal[AuthHeader.AUTHORIZATION],
         "value": Optional[str],
     },
 )
@@ -76,10 +106,10 @@ BasicAuthSetting = TypedDict(
 BearerFormatAuthSetting = TypedDict(
     "BearerFormatAuthSetting",
     {
-        "type": Literal["bearer"],
-        "in": Literal["header"],
-        "format": Literal["JWT"],
-        "key": Literal["Authorization"],
+        "type": Literal[AuthType.BEARER],
+        "in": Literal[AuthLocation.HEADER],
+        "format": Literal[BearerTokenFormat.JWT],
+        "key": Literal[AuthHeader.AUTHORIZATION],
         "value": str,
     },
 )
@@ -88,9 +118,9 @@ BearerFormatAuthSetting = TypedDict(
 BearerAuthSetting = TypedDict(
     "BearerAuthSetting",
     {
-        "type": Literal["bearer"],
-        "in": Literal["header"],
-        "key": Literal["Authorization"],
+        "type": Literal[AuthType.BEARER],
+        "in": Literal[AuthLocation.HEADER],
+        "key": Literal[AuthHeader.AUTHORIZATION],
         "value": str,
     },
 )
@@ -99,9 +129,9 @@ BearerAuthSetting = TypedDict(
 HTTPSignatureAuthSetting = TypedDict(
     "HTTPSignatureAuthSetting",
     {
-        "type": Literal["http-signature"],
-        "in": Literal["header"],
-        "key": Literal["Authorization"],
+        "type": Literal[AuthType.HTTP_SIGNATURE],
+        "in": Literal[AuthLocation.HEADER],
+        "key": Literal[AuthHeader.AUTHORIZATION],
         "value": None,
     },
 )

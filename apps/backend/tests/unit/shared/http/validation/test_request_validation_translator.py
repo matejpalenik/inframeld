@@ -3,6 +3,7 @@
 import pytest
 from fastapi.exceptions import RequestValidationError
 
+from inframeld_backend.shared.http.enums.validation_issue_location import ValidationIssueLocation
 from inframeld_backend.shared.http.responses.validation_issue import ValidationIssue
 from inframeld_backend.shared.http.types.problem_field_types import (
     MAX_VALIDATION_ISSUES,
@@ -32,7 +33,10 @@ def test_unknown_validation_category_uses_safe_fallback() -> None:
 
     assert issues == (
         ValidationIssue(
-            location="body", path=(), code="invalid_value", message="Use a valid value."
+            location=ValidationIssueLocation.BODY,
+            path=(),
+            code="invalid_value",
+            message="Use a valid value.",
         ),
     )
 
@@ -55,7 +59,7 @@ def test_missing_known_field_uses_required_issues() -> None:
 
     assert issues == (
         ValidationIssue(
-            location="body",
+            location=ValidationIssueLocation.BODY,
             path=("displayName",),
             code="required",
             message="This field is required.",
@@ -90,7 +94,7 @@ def test_out_of_range_query_value_uses_fixed_issue(error_type: str, constraint: 
 
     assert issues == (
         ValidationIssue(
-            location="query",
+            location=ValidationIssueLocation.QUERY,
             path=("limit",),
             code="out_of_range",
             message="Use a value within the permitted range.",
@@ -115,7 +119,7 @@ def test_wrong_query_parameter_type_uses_invalid_type_issue() -> None:
 
     assert issues == (
         ValidationIssue(
-            location="query",
+            location=ValidationIssueLocation.QUERY,
             path=("limit",),
             code="invalid_type",
             message="Use a value of the expected type.",
@@ -141,7 +145,7 @@ def test_invalid_json_uses_body_level_issue() -> None:
 
     assert issues == (
         ValidationIssue(
-            location="body",
+            location=ValidationIssueLocation.BODY,
             path=(),
             code="invalid_json",
             message="Use a valid JSON request body.",
@@ -166,7 +170,7 @@ def test_submitted_extra_body_key_is_not_reflected() -> None:
 
     assert issues == (
         ValidationIssue(
-            location="body",
+            location=ValidationIssueLocation.BODY,
             path=(),
             code="invalid_value",
             message="Use a valid value.",
@@ -191,7 +195,7 @@ def test_query_list_index_is_preserved() -> None:
 
     assert issues == (
         ValidationIssue(
-            location="query",
+            location=ValidationIssueLocation.QUERY,
             path=("scores", 1),
             code="invalid_type",
             message="Use a value of the expected type.",
@@ -220,7 +224,7 @@ def test_deep_query_list_path_is_bounded() -> None:
 
     assert issues == (
         ValidationIssue(
-            location="query",
+            location=ValidationIssueLocation.QUERY,
             path=(
                 "scores",
                 *range(MAX_VALIDATION_PATH_SEGMENTS - 1),
@@ -248,7 +252,7 @@ def test_validation_issue_count_is_bounded() -> None:
     issues = validation.issues_from_request_error(error)
 
     expected_issue = ValidationIssue(
-        location="body",
+        location=ValidationIssueLocation.BODY,
         path=(),
         code="invalid_value",
         message="Use a valid value.",

@@ -25,6 +25,7 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -53,7 +54,7 @@ QUERY = LookupOriginalOperationQuery(
     InstallationId(UUID(int=3)),
     ACTOR.organization_id,
     ProjectId(UUID(int=4)),
-    "POST",
+    HttpMethod.POST,
     "/v1/projects/{project_id}/grants",
     IdempotencyKey("lost"),
     OperationLookupAuthority(

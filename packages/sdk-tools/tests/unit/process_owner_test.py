@@ -15,6 +15,7 @@ from unittest.mock import ANY, Mock, call, patch
 from src.system.process_owner import (
     Control,
     OwnedTarget,
+    Phase,
     decode_document,
     executable_members,
     main,
@@ -411,7 +412,7 @@ class GroupObservationTests(unittest.TestCase):
                     ),
                     self.assertRaises(type(failure)) as raised,
                 ):
-                    observe_members(target, 500, "term")
+                    observe_members(target, 500, Phase.TERM)
                 self.assertIs(raised.exception, failure)
                 self.assertEqual(target.errors, [f"ps-term-{step}-{category}"])
 
@@ -432,7 +433,7 @@ class GroupObservationTests(unittest.TestCase):
                     patch("os.read", side_effect=[b"123 123 Z\n", b""]),
                     self.assertRaises(ValueError if nonzero else OSError),
                 ):
-                    observe_members(target, 500, "kill")
+                    observe_members(target, 500, Phase.KILL)
                 self.assertEqual(
                     target.errors, ["ps-kill-wait-nonzero" if nonzero else "ps-kill-reap-os"]
                 )
@@ -442,7 +443,7 @@ class GroupObservationTests(unittest.TestCase):
             with self.subTest(existing=len(existing)):
                 target = OwnedTarget(cast("subprocess.Popen[bytes]", SimpleNamespace(pid=123)))
                 target.errors.extend(existing)
-                for phase in ("initial", "kill"):
+                for phase in (Phase.INITIAL, Phase.KILL):
                     with (
                         patch("subprocess.Popen", side_effect=OSError("private")),
                         patch("src.system.process_owner._clock", return_value=0),

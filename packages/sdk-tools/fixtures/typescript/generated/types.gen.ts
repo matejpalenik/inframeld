@@ -176,11 +176,9 @@ export type ValidationIssue = {
      */
     code: string;
     /**
-     * Location
-     *
      * Request component containing the issue.
      */
-    location: 'body' | 'path' | 'query' | 'header' | 'cookie' | 'request';
+    location: ValidationIssueLocation;
     /**
      * Message
      *
@@ -194,6 +192,13 @@ export type ValidationIssue = {
      */
     path: Array<string | number>;
 };
+
+/**
+ * ValidationIssueLocation
+ *
+ * Identify the request component that contains an invalid field.
+ */
+export type ValidationIssueLocation = 'body' | 'path' | 'query' | 'header' | 'cookie' | 'request';
 
 export type ContractFixtureEmptyData = {
     body?: never;

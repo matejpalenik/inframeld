@@ -34,6 +34,7 @@ from inframeld_backend.shared.application.dtos.operation_reservation_result_dto 
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
@@ -65,7 +66,7 @@ REQUEST = OperationReservationRequestDTO(
     principal_id=PrincipalId(UUID(int=1)),
     organization_id=OrganizationId(UUID(int=2)),
     project_id=None,
-    method="POST",
+    method=HttpMethod.POST,
     requested_route="/v1/test-operation",
     key=IdempotencyKey("retry-1"),
     fingerprint=b"F" * 32,
@@ -136,7 +137,7 @@ async def test_reservation_mapping_preserves_explicit_scope_and_retry_values(
     """Scope and retry values must reach storage unchanged to find the same operation."""
     writer = MockOperationReservations()
     context = IdempotencyContextDTO(
-        method="PATCH",
+        method=HttpMethod.PATCH,
         requested_route="/v1/ExampleOperations/{project_id}/",
         key=IdempotencyKey("Retry-Exact-Case"),
     )

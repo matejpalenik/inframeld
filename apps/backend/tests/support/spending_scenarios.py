@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from hashlib import sha256
-from typing import Literal
 from uuid import uuid4, uuid5
 
 import pytest
@@ -98,6 +97,10 @@ from inframeld_backend.shared.application.dtos.spending_observation_dto import (
 )
 from inframeld_backend.shared.application.dtos.spending_rate_dto import SpendingRateDTO
 from inframeld_backend.shared.application.dtos.spending_usage_dto import SpendingUsageDTO
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.protocols.spending_ledger_writer import (
     SpendingLedgerWriter,
 )
@@ -218,7 +221,7 @@ async def _admit_attempt(
             access=access,
             authority=authority,
             context=IdempotencyContextDTO(
-                "POST", "/v1/projects/{project_id}/sources", IdempotencyKey(key)
+                HttpMethod.POST, "/v1/projects/{project_id}/sources", IdempotencyKey(key)
             ),
             fingerprint=RequestFingerprint(b"S" * 32),
             request_id=RequestId(uuid4()),
@@ -382,7 +385,7 @@ def observation(
     call: SpendingCallContextDTO,
     *,
     number: int = 1,
-    kind: Literal["usage", "charge", "not_sent", "not_billed", "uncertain"] = "charge",
+    kind: SpendingObservationKind = SpendingObservationKind.CHARGE,
     charge: str | None = "0.08",
 ) -> SpendingObservationDTO:
     return SpendingObservationDTO(
@@ -451,7 +454,9 @@ async def change_limit(
             access=scenario.access,
             command=ChangeProjectSpendingPolicyCommand(scenario.project_id, revision, limit),
             context=IdempotencyContextDTO(
-                "PATCH", "/internal/projects/{project_id}/spending-policy", IdempotencyKey(key)
+                HttpMethod.PATCH,
+                "/internal/projects/{project_id}/spending-policy",
+                IdempotencyKey(key),
             ),
         )
 

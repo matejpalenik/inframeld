@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
+from enum import StrEnum
 from json import JSONDecodeError
 from typing import Literal, override
 from uuid import UUID
@@ -245,6 +246,18 @@ from inframeld_backend.shared.http.routes.original_operation_lookup_routes impor
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
+
+class Kind(StrEnum):
+    NONE = "none"
+    JSON = "json"
+    RAW = "raw"
+    MALFORMED = "malformed"
+    UNEXPECTED = "unexpected"
+    REDIRECT = "redirect"
+    SLOW = "slow"
+    DISCONNECT = "disconnect"
+
+
 PRINCIPAL = PrincipalId(UUID("00000000-0000-4000-8000-000000000001"))
 IDENTITY = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySubject("alice"))
 
@@ -252,9 +265,7 @@ IDENTITY = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySu
 class SDKFaultRequestDTO(BaseModel):
     """Arrange an isolated wire fault outside the delivered API contract."""
 
-    kind: Literal[
-        "none", "json", "raw", "malformed", "unexpected", "redirect", "slow", "disconnect"
-    ]
+    kind: Kind
     body: JsonValue = None
     status: int = 200
     body_base64: str = Field(default="", alias="bodyBase64")
@@ -769,7 +780,7 @@ async def _fault_response(fault: SDKFaultRequestDTO | None) -> Response | None:
         return None
 
     headers = {"X-Request-ID": "00000000-0000-4000-8000-000000000099"}
-    if fault.kind == "raw":
+    if fault.kind == Kind.RAW:
         response = Response(
             base64.b64decode(fault.body_base64, validate=True),
             status_code=fault.status,
@@ -780,24 +791,24 @@ async def _fault_response(fault: SDKFaultRequestDTO | None) -> Response | None:
             (name.encode("ascii"), value.encode("latin1")) for name, value in fault.headers
         )
         return response
-    if fault.kind == "json":
+    if fault.kind == Kind.JSON:
         return JSONResponse(
             fault.body, status_code=fault.status, headers=headers, media_type=fault.content_type
         )
-    if fault.kind == "malformed":
+    if fault.kind == Kind.MALFORMED:
         return Response(b"{", media_type="application/json", headers=headers)
-    if fault.kind == "unexpected":
+    if fault.kind == Kind.UNEXPECTED:
         return Response(
             b'{"unrecognized":true}',
             status_code=418,
             media_type="application/json",
             headers=headers,
         )
-    if fault.kind == "redirect":
+    if fault.kind == Kind.REDIRECT:
         return RedirectResponse("/health", status_code=307)
-    if fault.kind == "slow":
+    if fault.kind == Kind.SLOW:
         await asyncio.sleep(0.25)
-    if fault.kind == "disconnect":
+    if fault.kind == Kind.DISCONNECT:
         # Observe one request, then lose its response. This is no persistence proof.
         async def interrupted_body() -> AsyncIterator[bytes]:
             yield b"{"

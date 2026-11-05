@@ -1,8 +1,8 @@
 import asyncio
 from collections.abc import Iterator
+from enum import StrEnum
 from threading import Event
 from traceback import format_exception
-from typing import Literal
 from unittest.mock import patch
 
 import pytest
@@ -24,6 +24,12 @@ from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
     ResourceNotFoundError,
 )
+
+
+class InterruptionCase(StrEnum):
+    DEADLINE = "deadline"
+    CANCELLATION = "cancellation"
+
 
 CHALLENGE = OAuthConsentChallenge("secret-consent-state")
 
@@ -157,9 +163,9 @@ async def test_network_failure_is_unavailable(client: OAuth2Api) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("interruption", ["deadline", "cancellation"])
+@pytest.mark.parametrize("interruption", [InterruptionCase.DEADLINE, InterruptionCase.CANCELLATION])
 async def test_interrupted_read_does_not_wait_for_or_accept_a_late_sdk_response(
-    client: OAuth2Api, interruption: Literal["deadline", "cancellation"]
+    client: OAuth2Api, interruption: InterruptionCase
 ) -> None:
     """Stopping the caller does not stop the SDK thread or make its late response usable."""
     loop = asyncio.get_running_loop()
@@ -176,7 +182,9 @@ async def test_interrupted_read_does_not_wait_for_or_accept_a_late_sdk_response(
             loop.call_soon_threadsafe(finished.set)
 
     expected_error = (
-        DependencyUnavailableError if interruption == "deadline" else asyncio.CancelledError
+        DependencyUnavailableError
+        if interruption == InterruptionCase.DEADLINE
+        else asyncio.CancelledError
     )
     with patch.object(client, "get_o_auth2_consent_request", side_effect=blocked) as read:
         task = asyncio.create_task(
@@ -184,7 +192,7 @@ async def test_interrupted_read_does_not_wait_for_or_accept_a_late_sdk_response(
         )
         try:
             await asyncio.wait_for(started.wait(), timeout=5.0)
-            if interruption == "cancellation":
+            if interruption == InterruptionCase.CANCELLATION:
                 task.cancel()
             with pytest.raises(expected_error) as caught:
                 await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
@@ -202,7 +210,7 @@ async def test_interrupted_read_does_not_wait_for_or_accept_a_late_sdk_response(
                 await finished.wait()
 
         assert finished.is_set()
-        if interruption == "cancellation":
+        if interruption == InterruptionCase.CANCELLATION:
             assert task.cancelled()
         else:
             assert task.exception() is caught.value

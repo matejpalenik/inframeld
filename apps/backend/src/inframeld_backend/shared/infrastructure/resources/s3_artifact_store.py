@@ -62,7 +62,7 @@ class S3ArtifactStore(ArtifactStore):
                 config=Config(
                     signature_version="s3v4",
                     s3={
-                        "addressing_style": settings.addressing_style,
+                        "addressing_style": settings.addressing_style.value,
                         "payload_signing_enabled": True,
                     },
                     retries={"total_max_attempts": 1, "mode": "standard"},

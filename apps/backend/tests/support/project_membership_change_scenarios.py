@@ -50,6 +50,7 @@ from inframeld_backend.shared.application.dtos.completed_synchronous_operation_d
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -76,8 +77,8 @@ ACCESS = AccessContextDTO(ALICE.id, MockAuthenticationEvidence.browser())
 ADD = AddProjectMemberCommand(PROJECT, BOB.id, 7)
 REMOVE = RemoveProjectMemberCommand(PROJECT, BOB.id, 7)
 ROUTE = f"/v1/projects/{PROJECT.value}/members/{BOB.id.value}"
-ADD_CONTEXT = IdempotencyContextDTO("PUT", ROUTE, IdempotencyKey("join-bob"))
-REMOVE_CONTEXT = IdempotencyContextDTO("DELETE", ROUTE, IdempotencyKey("remove-bob"))
+ADD_CONTEXT = IdempotencyContextDTO(HttpMethod.PUT, ROUTE, IdempotencyKey("join-bob"))
+REMOVE_CONTEXT = IdempotencyContextDTO(HttpMethod.DELETE, ROUTE, IdempotencyKey("remove-bob"))
 FACTS = ProjectMembershipChangeFactsDTO(
     INSTALLATION,
     ORG,

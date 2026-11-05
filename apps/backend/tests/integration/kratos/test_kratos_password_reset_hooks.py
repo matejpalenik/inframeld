@@ -160,7 +160,7 @@ async def test_password_change_revokes_sessions_created_after_recovery(
             )
         )
         try:
-            before = await _wait_for_phase(scenario, "before")
+            before = await _wait_for_phase(scenario, SettingsPhase.BEFORE)
             assert before.acknowledged == []
             await _assert_password(scenario, scenario.new_password, accepted=False)
             login = await submit_password_login(
@@ -170,8 +170,8 @@ async def test_password_change_revokes_sessions_created_after_recovery(
             )
             assert login.status_code == 200, "Old password stopped working before persistence."
             assert (await intervening_browser.get("/sessions/whoami")).status_code == 200
-            await _release(scenario, "before")
-            after = await _wait_for_phase(scenario, "after")
+            await _release(scenario, SettingsPhase.BEFORE)
+            after = await _wait_for_phase(scenario, SettingsPhase.AFTER)
             assert after.acknowledged == ["before"]
             assert [event.phase for event in after.received] == ["before", "after"]
             assert (await intervening_browser.get("/sessions/whoami")).status_code == 401
@@ -189,7 +189,7 @@ async def test_password_change_revokes_sessions_created_after_recovery(
             assert after.received[0].session_id == original.id
             assert after.received[1].session_id == original.id
 
-            await _release(scenario, "after")
+            await _release(scenario, SettingsPhase.AFTER)
             completed = await submitted
             assert completed.status_code == 200, "Password setting did not finish."
             settings = SettingsFlowResponse.model_validate_json(completed.text)
@@ -198,8 +198,8 @@ async def test_password_change_revokes_sessions_created_after_recovery(
             assert (await _snapshot(scenario)).acknowledged == ["before", "after"]
         finally:
             try:
-                await _release(scenario, "before")
-                await _release(scenario, "after")
+                await _release(scenario, SettingsPhase.BEFORE)
+                await _release(scenario, SettingsPhase.AFTER)
             finally:
                 if not submitted.done():
                     submitted.cancel()

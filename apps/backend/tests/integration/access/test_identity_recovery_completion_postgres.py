@@ -3,7 +3,8 @@
 import asyncio
 import os
 from dataclasses import replace
-from typing import Literal, override
+from enum import StrEnum
+from typing import override
 from uuid import UUID
 
 import pytest
@@ -86,6 +87,17 @@ from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
 )
+
+
+class ChangedCase(StrEnum):
+    SUBJECT = "subject"
+    KIND = "kind"
+
+
+class OrderCase(StrEnum):
+    OLDER_FIRST = "older-first"
+    NEWER_FIRST = "newer-first"
+
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
@@ -254,14 +266,14 @@ async def test_completion_without_admission_conflicts_without_creating_any_row(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("changed", ["subject", "kind"])
+@pytest.mark.parametrize("changed", [ChangedCase.SUBJECT, ChangedCase.KIND])
 async def test_conflicting_event_keeps_original_pending_binding(
-    database: Database, installation_id: InstallationId, changed: Literal["subject", "kind"]
+    database: Database, installation_id: InstallationId, changed: ChangedCase
 ) -> None:
     operation = await _admit(database, installation_id)
     event = (
         replace(EVENT, identity=replace(EVENT.identity, subject=IdentitySubject("bob")))
-        if changed == "subject"
+        if changed == ChangedCase.SUBJECT
         else replace(EVENT, event_kind=IdentityRecoveryEventKind.PASSWORD_RESET)
     )
     with pytest.raises(ConflictError):
@@ -296,24 +308,24 @@ async def test_released_duplicate_preserves_original_operation_metadata(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("order", ["older-first", "newer-first"])
+@pytest.mark.parametrize("order", [OrderCase.OLDER_FIRST, OrderCase.NEWER_FIRST])
 async def test_overlapping_recoveries_release_only_their_own_block(
     database: Database,
     installation_id: InstallationId,
-    order: Literal["older-first", "newer-first"],
+    order: OrderCase,
 ) -> None:
     await _link(database)
     older = await _admit(database, installation_id)
     newer = await _admit(database, installation_id, LATER_EVENT)
     first_event, second_event = (
-        (EVENT, LATER_EVENT) if order == "older-first" else (LATER_EVENT, EVENT)
+        (EVENT, LATER_EVENT) if order == OrderCase.OLDER_FIRST else (LATER_EVENT, EVENT)
     )
 
     first = await _record(database, installation_id, first_event)
     assert first.has_other_pending_recovery
     assert first.released_at is not None
     assert await _blocked(database)
-    remaining = await _stored(database, newer if order == "older-first" else older)
+    remaining = await _stored(database, newer if order == OrderCase.OLDER_FIRST else older)
     assert remaining.released_at is None
     assert remaining.kratos_cleanup_state is IdentityRecoveryCleanupState.PENDING
 

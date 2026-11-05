@@ -19,6 +19,7 @@ from inframeld_backend.shared.application.dtos.completed_synchronous_operation_d
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 
 
@@ -39,7 +40,7 @@ class ProjectUseOnlyGrantMapper:
     @staticmethod
     def to_operation_context(key: IdempotencyKey) -> IdempotencyContextDTO:
         return IdempotencyContextDTO(
-            method="POST", requested_route="/v1/projects/{project_id}/grants", key=key
+            method=HttpMethod.POST, requested_route="/v1/projects/{project_id}/grants", key=key
         )
 
     @staticmethod
@@ -53,7 +54,7 @@ class ProjectUseOnlyGrantMapper:
             operation_id=result.operation_id.value,
             project_id=command.project_id.value,
             recipient_principal_id=command.recipient_principal_id.value,
-            action_id=action,
+            action_id=ProjectAction.CREATE_ACCESS_GROUPS,
             access_revision=command.expected_access_revision + 1,
             idempotency_expires_at=result.expires_at,
         )

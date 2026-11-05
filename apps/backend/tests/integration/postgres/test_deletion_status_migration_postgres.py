@@ -59,6 +59,7 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -171,7 +172,7 @@ async def _seed_legacy_request(session: AsyncSession) -> DeletionStatusSeedDTO:
         principal_id=principal,
         organization_id=organization,
         project_id=project,
-        method="DELETE",
+        method=HttpMethod.DELETE,
         requested_route="/v1/projects/{project_id}",
         key=IdempotencyKey(str(uuid4())),
         fingerprint=b"F" * 32,

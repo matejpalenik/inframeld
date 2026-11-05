@@ -2,7 +2,7 @@
 
 import os
 from collections.abc import AsyncGenerator, Iterator
-from typing import Literal
+from enum import StrEnum
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -22,12 +22,16 @@ from inframeld_backend.access.infrastructure.revokers.hydra_human_oauth_credenti
     HydraHumanOAuthCredentialRevoker,
 )
 
+
+class Operation(StrEnum):
+    GRANT = "grant"
+    LOGIN = "login"
+
+
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_HYDRA_INTEGRATION") != "1",
     reason="Requires the private integration services",
 )
-
-type Operation = Literal["grant", "login"]
 
 
 @pytest_asyncio.fixture
@@ -63,7 +67,7 @@ def _browser() -> httpx2.AsyncClient:
 async def _revoke(
     revoker: HydraHumanOAuthCredentialRevoker, operation: Operation, subject: IdentitySubject
 ) -> IdentityRecoveryCleanupState:
-    if operation == "grant":
+    if operation == Operation.GRANT:
         return (await revoker.revoke_cli_grants(subject, timeout_seconds=3.0)).state
     return (await revoker.revoke_remembered_logins(subject, timeout_seconds=3.0)).state
 
@@ -190,7 +194,7 @@ async def test_repeating_bulk_cleanup_can_revoke_alices_newer_login(
     """An unfinished cleanup may be retried broadly, then Alice can authenticate again."""
     async with _browser() as browser:
         old = await provider.issue_tokens(alice, browser=browser, remember_login=True)
-        for operation in ("grant", "login"):
+        for operation in (Operation.GRANT, Operation.LOGIN):
             assert await _revoke(revoker, operation, alice.subject) == (
                 IdentityRecoveryCleanupState.CONFIRMED
             )
@@ -201,7 +205,7 @@ async def test_repeating_bulk_cleanup_can_revoke_alices_newer_login(
         assert await provider.token_is_active(later.access_token)
         assert await provider.login_can_skip(browser)
 
-        for operation in ("grant", "login"):
+        for operation in (Operation.GRANT, Operation.LOGIN):
             assert await _revoke(revoker, operation, alice.subject) == (
                 IdentityRecoveryCleanupState.CONFIRMED
             )
@@ -216,7 +220,7 @@ async def test_repeating_bulk_cleanup_can_revoke_alices_newer_login(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["grant", "login"])
+@pytest.mark.parametrize("operation", [Operation.GRANT, Operation.LOGIN])
 async def test_empty_bulk_scope_is_acknowledged_without_affecting_existing_credentials(
     provider: HydraTestProvider,
     alice: RegisteredHumanDTO,
@@ -233,7 +237,7 @@ async def test_empty_bulk_scope_is_acknowledged_without_affecting_existing_crede
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["grant", "login"])
+@pytest.mark.parametrize("operation", [Operation.GRANT, Operation.LOGIN])
 async def test_lost_bulk_response_retry_can_remove_newer_alice_credentials(
     provider: HydraTestProvider,
     alice: RegisteredHumanDTO,
@@ -249,7 +253,7 @@ async def test_lost_bulk_response_retry_can_remove_newer_alice_credentials(
     original_logins = hydra_sdk.revoke_o_auth2_login_sessions_with_http_info
 
     def revoke_then_lose_response(**_kwargs: object) -> None:
-        if operation == "grant":
+        if operation == Operation.GRANT:
             response = original_grants(
                 subject=alice.subject.value, client=CLIENT_ID, _request_timeout=2.0
             )
@@ -260,7 +264,7 @@ async def test_lost_bulk_response_retry_can_remove_newer_alice_credentials(
 
     method = (
         "revoke_o_auth2_consent_sessions_with_http_info"
-        if operation == "grant"
+        if operation == Operation.GRANT
         else "revoke_o_auth2_login_sessions_with_http_info"
     )
     async with _browser() as browser:
@@ -270,7 +274,7 @@ async def test_lost_bulk_response_retry_can_remove_newer_alice_credentials(
                 IdentityRecoveryCleanupState.UNCERTAIN
             )
         revoke.assert_called_once()
-        if operation == "grant":
+        if operation == Operation.GRANT:
             assert not await provider.token_is_active(old.access_token)
             assert await provider.refresh_tokens(old) is None
         else:
@@ -283,7 +287,7 @@ async def test_lost_bulk_response_retry_can_remove_newer_alice_credentials(
             IdentityRecoveryCleanupState.CONFIRMED
         )
 
-        if operation == "grant":
+        if operation == Operation.GRANT:
             assert not await provider.token_is_active(later.access_token)
             assert await provider.refresh_tokens(later) is None
             assert await provider.login_can_skip(browser)

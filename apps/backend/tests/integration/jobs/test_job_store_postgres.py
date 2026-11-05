@@ -78,6 +78,7 @@ from inframeld_backend.shared.application.dtos.operation_reservation_request_dto
     OperationReservationRequestDTO,
 )
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -168,7 +169,7 @@ async def _request(
         principal_id=scenario.principal_id,
         organization_id=authority.organization_id,
         project_id=scenario.project_id,
-        method="POST",
+        method=HttpMethod.POST,
         requested_route="/test/projects/{project_id}/feedback-reports",
         key=IdempotencyKey("job-1"),
         fingerprint=b"F" * 32,
@@ -693,7 +694,7 @@ async def _human_request(
         principal_id=scenario.principal_id,
         organization_id=scenario.organization_id,
         project_id=scenario.project_id,
-        method="POST",
+        method=HttpMethod.POST,
         requested_route="/v1/projects/{project_id}/sources",
         key=IdempotencyKey("human-job"),
         fingerprint=b"H" * 32,

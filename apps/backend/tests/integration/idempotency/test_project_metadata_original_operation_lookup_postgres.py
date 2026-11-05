@@ -32,6 +32,7 @@ from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -68,7 +69,7 @@ async def test_original_request_lookup_preserves_exact_project_installation_and_
         other = await seed_another_metadata_project(session, seed)
     access = AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser())
     context = IdempotencyContextDTO(
-        "PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey("original")
+        HttpMethod.PATCH, "/v1/projects/{project_id}/metadata", IdempotencyKey("original")
     )
     async with database.session() as session:
         admitted = await metadata_service(session).update(
@@ -81,7 +82,7 @@ async def test_original_request_lookup_preserves_exact_project_installation_and_
         installed,
         seed.organization_id,
         seed.project_id,
-        "PATCH",
+        HttpMethod.PATCH,
         context.requested_route,
         context.key,
         OperationLookupAuthority(OperationLookupAuthorityFamily.PROJECT_ACTION_USE, seed.action),

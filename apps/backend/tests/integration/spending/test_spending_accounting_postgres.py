@@ -26,6 +26,9 @@ from inframeld_backend.shared.application.dtos.spending_call_context_dto import 
 )
 from inframeld_backend.shared.application.dtos.spending_call_record_dto import SpendingCallRecordDTO
 from inframeld_backend.shared.application.enums.spending_call_state import SpendingCallState
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.errors.application_errors import ConflictError
 from inframeld_backend.shared.application.errors.spending_errors import (
     IncompleteSpendingFactsError,
@@ -259,7 +262,7 @@ async def test_capped_unknown_pricing_and_missing_usage_never_release_an_unprove
     async with open_spending_accounting(database) as service:
         unresolved = await service.record_observation(
             call=call,
-            observation=observation(call, kind="uncertain", charge=None),
+            observation=observation(call, kind=SpendingObservationKind.UNCERTAIN, charge=None),
             expected_call_revision=0,
         )
     assert unresolved.record.hold_amount == first.record.hold_amount

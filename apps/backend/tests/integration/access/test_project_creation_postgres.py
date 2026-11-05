@@ -71,6 +71,7 @@ from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -206,7 +207,7 @@ async def test_original_result_survives_rename_removed_grants_and_changed_org_re
                 SubmittedDisplayName("Renamed"),
             ),
             context=IdempotencyContextDTO(
-                "PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey("rename")
+                HttpMethod.PATCH, "/v1/projects/{project_id}/metadata", IdempotencyKey("rename")
             ),
         )
     async with database.session() as session, session.begin():
@@ -486,7 +487,7 @@ async def test_current_and_retired_names_conflict_only_within_their_organization
                 first.project.project_id, 0, ResourceName("current")
             ),
             context=IdempotencyContextDTO(
-                "PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey("rename")
+                HttpMethod.PATCH, "/v1/projects/{project_id}/metadata", IdempotencyKey("rename")
             ),
         )
     for name in ("support", "current"):

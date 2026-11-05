@@ -17,8 +17,9 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from typing import Any, ClassVar, Dict, List
+from inframeld_sdk.models.organization_action import OrganizationAction
 from typing import Optional, Set
 from typing_extensions import Self
 from pydantic_core import to_jsonable_python
@@ -28,7 +29,7 @@ class OwnOrganizationGrantResponse(BaseModel):
     """
     OwnOrganizationGrantResponse
     """ # noqa: E501
-    action_id: StrictStr = Field(alias="actionId")
+    action_id: OrganizationAction = Field(alias="actionId")
     can_grant: StrictBool = Field(alias="canGrant")
     additional_properties: Dict[str, Any] = {}
     __properties: ClassVar[List[str]] = ["actionId", "canGrant"]
@@ -37,13 +38,6 @@ class OwnOrganizationGrantResponse(BaseModel):
         """Reject a supplied null without treating an omitted field as supplied."""
         if value is None:
             raise ValueError("actionId cannot be null")
-        return value
-
-    @field_validator('action_id')
-    def action_id_validate_enum(cls, value):
-        """Validates the enum"""
-        if value not in set(['admit-users', 'suspend-users', 'restore-users', 'create-projects']):
-            raise ValueError("must be one of enum values ('admit-users', 'suspend-users', 'restore-users', 'create-projects')")
         return value
     @field_validator('can_grant', mode='before')
     def can_grant_reject_explicit_null(cls, value):

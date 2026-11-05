@@ -76,6 +76,7 @@ from inframeld_backend.shared.application.dtos.retained_deletion_status_dto impo
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -134,7 +135,7 @@ BINDING = DeletionStatusBindingDTO(
     ACTOR.organization_id,
     ProjectId(UUID(int=4)),
     ACTOR.id,
-    "DELETE",
+    HttpMethod.DELETE,
     "/v1/original-project-deletion",
     IdempotencyKey(PRIVATE_VALUE),
     RequestFingerprint(b"F" * 32),

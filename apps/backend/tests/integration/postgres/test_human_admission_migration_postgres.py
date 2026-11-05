@@ -45,6 +45,7 @@ from inframeld_backend.bootstrap.human_admission_composition import open_human_a
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import ConflictError
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
@@ -98,7 +99,7 @@ async def _admitted(database: Database) -> HumanAdmissionResultDTO:
             access=seed.access,
             command=AdmitHumanCommand(seed.organization_id, UUID(int=200), seed.access_revision),
             context=IdempotencyContextDTO(
-                "POST",
+                HttpMethod.POST,
                 f"/v1/organizations/{seed.organization_id.value}/human-admissions",
                 IdempotencyKey("admit-bob"),
             ),

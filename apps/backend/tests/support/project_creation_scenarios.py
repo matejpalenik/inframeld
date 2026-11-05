@@ -52,6 +52,7 @@ from inframeld_backend.access.infrastructure.writers.postgres_project_creation_w
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
 )
@@ -141,7 +142,7 @@ def creation_command(seed: ProjectCreationSeedDTO, name: str = "support") -> Cre
 
 
 def creation_context(key: str = "original") -> IdempotencyContextDTO:
-    return IdempotencyContextDTO("POST", "/v1/projects", IdempotencyKey(key))
+    return IdempotencyContextDTO(HttpMethod.POST, "/v1/projects", IdempotencyKey(key))
 
 
 def creation_fingerprints() -> ProjectCreationFingerprintService:

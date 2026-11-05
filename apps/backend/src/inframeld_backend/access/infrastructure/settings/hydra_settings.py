@@ -4,8 +4,12 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic_settings import NoDecode
 
+from inframeld_backend.access.domain.enums.human_oauth_scope import HumanOAuthScope
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
 from inframeld_backend.access.domain.value_objects.oauth_issuer import OAuthIssuer
+from inframeld_backend.access.infrastructure.types.human_oauth_client_name import (
+    HumanOAuthClientName,
+)
 
 
 def _require_endpoint(value: str) -> None:
@@ -43,8 +47,8 @@ class HydraSettings(BaseModel):
     public_url: HttpUrl | None = None
     issuer: Annotated[OAuthIssuer, NoDecode]
     api_audience: Annotated[HumanAPIAudience, NoDecode]
-    client_id: Literal["inframeld-cli"] = "inframeld-cli"
-    required_scope: Literal["inframeld:api"] = "inframeld:api"
+    client_id: Literal[HumanOAuthClientName.INFRAMELD_CLI] = HumanOAuthClientName.INFRAMELD_CLI
+    required_scope: Literal[HumanOAuthScope.API] = HumanOAuthScope.API
     remember_consent_seconds: int = Field(default=3600, gt=0)
 
     @field_validator("remember_consent_seconds", mode="before")

@@ -27,6 +27,7 @@ from inframeld_backend.access.http.responses.project_membership_response import 
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 
 
@@ -49,7 +50,10 @@ class ProjectMembershipMapper:
 
     @staticmethod
     def context(
-        project_id: UUID, principal_id: UUID, method: Literal["PUT", "DELETE"], key: IdempotencyKey
+        project_id: UUID,
+        principal_id: UUID,
+        method: Literal[HttpMethod.PUT, HttpMethod.DELETE],
+        key: IdempotencyKey,
     ) -> IdempotencyContextDTO:
         return IdempotencyContextDTO(
             method, f"/v1/projects/{project_id}/members/{principal_id}", key

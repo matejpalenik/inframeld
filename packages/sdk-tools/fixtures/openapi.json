@@ -237,17 +237,8 @@
             "type": "string"
           },
           "location": {
-            "description": "Request component containing the issue.",
-            "enum": [
-              "body",
-              "path",
-              "query",
-              "header",
-              "cookie",
-              "request"
-            ],
-            "title": "Location",
-            "type": "string"
+            "$ref": "#/components/schemas/ValidationIssueLocation",
+            "description": "Request component containing the issue."
           },
           "message": {
             "description": "Safe corrective description without submitted values.",
@@ -284,6 +275,19 @@
         ],
         "title": "ValidationIssue",
         "type": "object"
+      },
+      "ValidationIssueLocation": {
+        "description": "Identify the request component that contains an invalid field.",
+        "enum": [
+          "body",
+          "path",
+          "query",
+          "header",
+          "cookie",
+          "request"
+        ],
+        "title": "ValidationIssueLocation",
+        "type": "string"
       }
     }
   },

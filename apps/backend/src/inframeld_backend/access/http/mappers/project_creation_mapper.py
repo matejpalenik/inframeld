@@ -4,6 +4,9 @@ from inframeld_backend.access.application.commands.create_project_command import
 from inframeld_backend.access.application.dtos.project_creation_result_dto import (
     ProjectCreationResultDTO,
 )
+from inframeld_backend.access.domain.enums.project_departure_target_kind import (
+    ProjectDepartureTargetKind,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.http.requests.project_creation_request import ProjectCreationRequest
 from inframeld_backend.access.http.responses.initial_project_grant_response import (
@@ -18,6 +21,7 @@ from inframeld_backend.access.http.responses.project_grant_target_response impor
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
@@ -37,12 +41,14 @@ class ProjectCreationMapper:
 
     @staticmethod
     def context(key: IdempotencyKey) -> IdempotencyContextDTO:
-        return IdempotencyContextDTO("POST", "/v1/projects", key)
+        return IdempotencyContextDTO(HttpMethod.POST, "/v1/projects", key)
 
     @staticmethod
     def response(result: ProjectCreationResultDTO) -> ProjectCreationResponse:
         project = result.project
-        target = ProjectGrantTargetResponse(kind="project", project_id=project.project_id.value)
+        target = ProjectGrantTargetResponse(
+            kind=ProjectDepartureTargetKind.PROJECT, project_id=project.project_id.value
+        )
         return ProjectCreationResponse.model_validate(
             {
                 "operation_id": result.operation.operation_id.value,

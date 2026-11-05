@@ -46,6 +46,9 @@ from inframeld_backend.access.application.services.project_membership_change_fin
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
+from inframeld_backend.access.domain.enums.project_departure_target_kind import (
+    ProjectDepartureTargetKind,
+)
 from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
 from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
     ProjectActionEligibilityPolicy,
@@ -323,7 +326,10 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
         responsibilities: tuple[ProjectDepartureResponsibilityDTO, ...],
     ) -> None:
         for item in responsibilities:
-            if item.target_kind == "project" and item.target_id != facts.project_id.value:
+            if (
+                item.target_kind is ProjectDepartureTargetKind.PROJECT
+                and item.target_id != facts.project_id.value
+            ):
                 raise RuntimeError("Departure facts changed the checked Project responsibility.")
 
         policy_inputs = tuple(

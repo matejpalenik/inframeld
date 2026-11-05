@@ -25,6 +25,7 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
@@ -44,7 +45,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def context(key: str) -> IdempotencyContextDTO:
-    return IdempotencyContextDTO("PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey(key))
+    return IdempotencyContextDTO(
+        HttpMethod.PATCH, "/v1/projects/{project_id}/metadata", IdempotencyKey(key)
+    )
 
 
 @pytest.mark.asyncio

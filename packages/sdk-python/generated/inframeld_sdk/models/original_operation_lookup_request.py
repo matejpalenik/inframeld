@@ -17,10 +17,11 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, Optional
 from typing_extensions import Annotated
 from uuid import UUID
+from inframeld_sdk.models.http_method import HttpMethod
 from inframeld_sdk.models.operation_lookup_authority_request import OperationLookupAuthorityRequest
 from typing import Optional, Set
 from typing_extensions import Self
@@ -34,7 +35,7 @@ class OriginalOperationLookupRequest(BaseModel):
     expected_authority: OperationLookupAuthorityRequest = Field(alias="expectedAuthority")
     installation_id: UUID = Field(alias="installationId")
     key: Annotated[str, Field(min_length=1, strict=True, max_length=128)]
-    method: StrictStr
+    method: HttpMethod
     organization_id: UUID = Field(alias="organizationId")
     project_id: Optional[UUID] = Field(alias="projectId")
     requested_route: Annotated[str, Field(min_length=1, strict=True)] = Field(alias="requestedRoute")
@@ -62,13 +63,6 @@ class OriginalOperationLookupRequest(BaseModel):
         """Reject a supplied null without treating an omitted field as supplied."""
         if value is None:
             raise ValueError("method cannot be null")
-        return value
-
-    @field_validator('method')
-    def method_validate_enum(cls, value):
-        """Validates the enum"""
-        if value not in set(['POST', 'PUT', 'PATCH', 'DELETE']):
-            raise ValueError("must be one of enum values ('POST', 'PUT', 'PATCH', 'DELETE')")
         return value
     @field_validator('organization_id', mode='before')
     def organization_id_reject_explicit_null(cls, value):

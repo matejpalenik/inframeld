@@ -14,7 +14,7 @@ from tests.support.hydra_provider import (
     IssuedHydraTokensDTO,
     hydra_test_provider,
 )
-from tests.support.hydra_token_request_gate import HydraTokenRequestGate
+from tests.support.hydra_token_request_gate import HydraTokenRequestGate, TokenRequestPhase
 from tests.support.integration_services import HYDRA_ADMIN_URL
 from tests.support.kratos_browser import RegisteredHumanDTO, create_browser, register_human
 
@@ -153,7 +153,7 @@ async def test_successful_code_response_delivered_after_cleanup_contains_revoked
         code = await scenario.provider.approve_login_and_consent(
             await scenario.provider.begin_login(scenario.alice)
         )
-        scenario.gate.arm("after_response")
+        scenario.gate.arm(TokenRequestPhase.AFTER_RESPONSE)
         async with asyncio.TaskGroup() as tasks:
             exchange = tasks.create_task(scenario.provider.exchange_authorization_code(code))
             await scenario.gate.wait_until_paused()
@@ -171,7 +171,7 @@ async def test_refresh_dispatched_after_cleanup_is_denied() -> None:
     """The paused request has not reached Hydra when deletion completes."""
     async with _scenario() as scenario:
         previous = await scenario.provider.issue_tokens(scenario.alice)
-        scenario.gate.arm("before_request")
+        scenario.gate.arm(TokenRequestPhase.BEFORE_REQUEST)
         async with asyncio.TaskGroup() as tasks:
             refresh = tasks.create_task(scenario.provider.refresh_tokens(previous))
             await scenario.gate.wait_until_paused()
@@ -188,7 +188,7 @@ async def test_successful_refresh_response_delivered_after_cleanup_is_already_re
     """Cleanup covers rotated descendants even if the CLI receives them afterward."""
     async with _scenario() as scenario:
         previous = await scenario.provider.issue_tokens(scenario.alice)
-        scenario.gate.arm("after_response")
+        scenario.gate.arm(TokenRequestPhase.AFTER_RESPONSE)
         async with asyncio.TaskGroup() as tasks:
             refresh = tasks.create_task(scenario.provider.refresh_tokens(previous))
             await scenario.gate.wait_until_paused()

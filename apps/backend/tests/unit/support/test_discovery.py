@@ -10,6 +10,9 @@ from pydantic import ValidationError
 from inframeld_backend.access.application.dtos.public_discovery_dto import PublicDiscoveryDTO
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
 from inframeld_backend.access.infrastructure.settings.discovery_settings import DiscoverySettings
+from inframeld_backend.access.infrastructure.types.discovery_transport_profile import (
+    DiscoveryTransportProfile,
+)
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
@@ -92,9 +95,15 @@ def test_public_url_rejects_unsafe_identifiers(value: str) -> None:
 
 
 def test_managed_profile_requires_literal_loopback() -> None:
-    DiscoverySettings(public_api_url="http://127.0.0.1:8000", transport_profile="managed-local")
+    DiscoverySettings(
+        public_api_url="http://127.0.0.1:8000",
+        transport_profile=DiscoveryTransportProfile.MANAGED_LOCAL,
+    )
     with pytest.raises(ValidationError):
-        DiscoverySettings(public_api_url="http://localhost:8000", transport_profile="managed-local")
+        DiscoverySettings(
+            public_api_url="http://localhost:8000",
+            transport_profile=DiscoveryTransportProfile.MANAGED_LOCAL,
+        )
 
 
 def test_enabled_discovery_requires_matching_provider_configuration() -> None:
@@ -324,7 +333,9 @@ def test_discovery_url_budget_counts_original_utf8_bytes(character: str, size: i
 )
 def test_managed_discovery_rejects_normalized_loopback_aliases(value: str) -> None:
     with pytest.raises(ValidationError):
-        DiscoverySettings(public_api_url=value, transport_profile="managed-local")
+        DiscoverySettings(
+            public_api_url=value, transport_profile=DiscoveryTransportProfile.MANAGED_LOCAL
+        )
 
 
 @pytest.mark.parametrize("operation", ["public", "admin"])

@@ -27,6 +27,7 @@ from inframeld_backend.access.http.responses.project_membership_removal_response
 from inframeld_backend.access.http.responses.project_membership_response import (
     ProjectMembershipResponse,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.http.builders.problem_response import build_problem_response
 from inframeld_backend.shared.http.definitions.problem_catalogue import (
@@ -186,7 +187,9 @@ def create_project_membership_router(
             result = await service.add_member(
                 access=access,
                 command=ProjectMembershipMapper.add_command(project_id, principal_id, body),
-                context=ProjectMembershipMapper.context(project_id, principal_id, "PUT", key),
+                context=ProjectMembershipMapper.context(
+                    project_id, principal_id, HttpMethod.PUT, key
+                ),
             )
         response.status_code = result.status_code
         return ProjectMembershipMapper.add_response(result)
@@ -212,7 +215,9 @@ def create_project_membership_router(
                 command=ProjectMembershipMapper.remove_command(
                     project_id, principal_id, expected_access_revision
                 ),
-                context=ProjectMembershipMapper.context(project_id, principal_id, "DELETE", key),
+                context=ProjectMembershipMapper.context(
+                    project_id, principal_id, HttpMethod.DELETE, key
+                ),
             )
         return ProjectMembershipMapper.remove_response(result)
 

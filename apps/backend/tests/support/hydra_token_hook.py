@@ -7,14 +7,17 @@ payloads can contain credentials and are never retained or returned.
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from enum import StrEnum
 from json import JSONDecodeError
-from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-type GrantType = Literal["authorization_code", "refresh_token"]
+
+class GrantType(StrEnum):
+    AUTHORIZATION_CODE = "authorization_code"
+    REFRESH_TOKEN = "refresh_token"
 
 
 class _Identity(BaseModel):
@@ -110,7 +113,7 @@ def create_hydra_token_hook_router(
             raise HTTPException(status_code=400, detail="Invalid test hook payload.") from None
         if event.request.client_id != "inframeld-cli":
             return Response(status_code=204)
-        for grant in ("authorization_code", "refresh_token"):
+        for grant in (GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN):
             if grant not in event.request.grant_types:
                 continue
             plan = plans.get((event.session.id_token.subject, grant))

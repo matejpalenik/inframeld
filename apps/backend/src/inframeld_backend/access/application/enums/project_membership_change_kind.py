@@ -1,6 +1,8 @@
 from enum import StrEnum
 from typing import Literal
 
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
+
 
 class ProjectMembershipChangeKind(StrEnum):
     """Identify the intended membership change in commands and retained receipts."""
@@ -9,8 +11,8 @@ class ProjectMembershipChangeKind(StrEnum):
     REMOVE = "remove"
 
     @property
-    def http_method(self) -> Literal["PUT", "DELETE"]:
-        return "PUT" if self is ProjectMembershipChangeKind.ADD else "DELETE"
+    def http_method(self) -> Literal[HttpMethod.PUT, HttpMethod.DELETE]:
+        return HttpMethod.PUT if self is ProjectMembershipChangeKind.ADD else HttpMethod.DELETE
 
     def success_status(self, *, changed: bool) -> int:
         """Only a newly added membership returns 201, including on receipt replay."""

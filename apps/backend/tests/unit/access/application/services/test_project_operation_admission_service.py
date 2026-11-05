@@ -42,6 +42,7 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -72,7 +73,7 @@ ACTION = ActionId("create-access-groups")
 OPERATION = OperationId("original-admission")
 REQUEST = ProjectOperationAdmissionRequestDTO(
     project_id=ProjectId(UUID(int=3)),
-    method="POST",
+    method=HttpMethod.POST,
     requested_route="/v1/projects/{project_id}/builds",
     key=IdempotencyKey("same-admission"),
     fingerprint=RequestFingerprint(b"F" * 32),

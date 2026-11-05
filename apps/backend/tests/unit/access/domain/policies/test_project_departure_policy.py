@@ -6,6 +6,9 @@ import pytest
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_departure_target_kind import (
+    ProjectDepartureTargetKind,
+)
 from inframeld_backend.access.domain.policies.project_departure_policy import ProjectDeparturePolicy
 from inframeld_backend.access.domain.policy_inputs.project_departure_candidate_policy_input import (
     ProjectDepartureCandidatePolicyInput,
@@ -28,7 +31,7 @@ CANDIDATE = ProjectDepartureCandidatePolicyInput(HUMAN, False, True, True, True,
 
 def test_each_exact_responsibility_needs_a_remaining_eligible_human() -> None:
     supported = ProjectDepartureResponsibilityPolicyInput(
-        "project", ActionId("manage-project-members"), (CANDIDATE,)
+        ProjectDepartureTargetKind.PROJECT, ActionId("manage-project-members"), (CANDIDATE,)
     )
     assert ProjectDeparturePolicy.may_depart((supported,))
     assert not ProjectDeparturePolicy.may_depart((supported, replace(supported, candidates=())))
@@ -43,7 +46,7 @@ def test_ineligible_or_incoherent_relationship_cannot_keep_authority(field: str)
     assert not ProjectDeparturePolicy.may_depart(
         (
             ProjectDepartureResponsibilityPolicyInput(
-                "project", ActionId("manage-project-members"), (candidate,)
+                ProjectDepartureTargetKind.PROJECT, ActionId("manage-project-members"), (candidate,)
             ),
         )
     )
@@ -55,7 +58,7 @@ def test_application_cannot_replace_a_human_grantor(kind: PrincipalKind) -> None
     assert not ProjectDeparturePolicy.may_depart(
         (
             ProjectDepartureResponsibilityPolicyInput(
-                "project", ActionId("manage-project-members"), (candidate,)
+                ProjectDepartureTargetKind.PROJECT, ActionId("manage-project-members"), (candidate,)
             ),
         )
     )
@@ -66,7 +69,7 @@ def test_suspended_human_cannot_replace_a_grantor() -> None:
     assert not ProjectDeparturePolicy.may_depart(
         (
             ProjectDepartureResponsibilityPolicyInput(
-                "project", ActionId("manage-project-members"), (candidate,)
+                ProjectDepartureTargetKind.PROJECT, ActionId("manage-project-members"), (candidate,)
             ),
         )
     )
@@ -75,7 +78,7 @@ def test_suspended_human_cannot_replace_a_grantor() -> None:
 def test_document_action_accepts_a_coherent_group_manager_alternative() -> None:
     manager = replace(CANDIDATE, can_grant=False, is_group_member=True, is_group_manager=True)
     responsibility = ProjectDepartureResponsibilityPolicyInput(
-        "access_group", ActionId("add-documents"), (manager,)
+        ProjectDepartureTargetKind.ACCESS_GROUP, ActionId("add-documents"), (manager,)
     )
     assert ProjectDeparturePolicy.may_depart((responsibility,))
     assert not ProjectDeparturePolicy.may_depart(
@@ -91,7 +94,9 @@ def test_document_action_accepts_a_coherent_group_manager_alternative() -> None:
 
 
 def test_group_management_requires_a_member_manager_even_when_another_human_can_grant() -> None:
-    responsibility = ProjectDepartureResponsibilityPolicyInput("access_group", None, (CANDIDATE,))
+    responsibility = ProjectDepartureResponsibilityPolicyInput(
+        ProjectDepartureTargetKind.ACCESS_GROUP, None, (CANDIDATE,)
+    )
     assert not ProjectDeparturePolicy.may_depart((responsibility,))
     manager = replace(CANDIDATE, is_group_member=True, is_group_manager=True)
     assert ProjectDeparturePolicy.may_depart((replace(responsibility, candidates=(manager,)),))
@@ -100,7 +105,9 @@ def test_group_management_requires_a_member_manager_even_when_another_human_can_
 @pytest.mark.parametrize("action", ["add-documents", "update-documents", "delete-documents"])
 def test_manager_substitution_is_decided_from_the_exact_group_action(action: str) -> None:
     manager = replace(CANDIDATE, can_grant=False, is_group_member=True, is_group_manager=True)
-    group = ProjectDepartureResponsibilityPolicyInput("access_group", ActionId(action), (manager,))
+    group = ProjectDepartureResponsibilityPolicyInput(
+        ProjectDepartureTargetKind.ACCESS_GROUP, ActionId(action), (manager,)
+    )
     assert ProjectDeparturePolicy.may_depart((group,))
     assert not ProjectDeparturePolicy.may_depart((replace(group, action_id=ActionId("build")),))
     assert not ProjectDeparturePolicy.may_depart((replace(group, target_kind="project"),))

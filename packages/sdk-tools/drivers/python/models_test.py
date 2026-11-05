@@ -94,6 +94,31 @@ def _rejects_native_null() -> bool:
 
 
 class GeneratedModelTests(unittest.TestCase):
+    def test_configuration_keeps_standard_credentials_and_auth_metadata(self) -> None:
+        configuration = inframeld_sdk.Configuration(
+            access_token="test-only-token",
+            api_key={"KratosSession": "test-only-session"},
+        )
+        self.assertEqual(
+            configuration.auth_settings(),
+            {
+                "HumanBearer": {
+                    "type": "bearer",
+                    "in": "header",
+                    "key": "Authorization",
+                    "value": "Bearer test-only-token",
+                },
+                "KratosSession": {
+                    "type": "api_key",
+                    "in": "cookie",
+                    "key": "ory_kratos_session",
+                    "value": "test-only-session",
+                },
+            },
+        )
+        fixtures = inframeld_sdk_fixtures.Configuration(access_token="test-only-token")
+        self.assertEqual(fixtures.auth_settings(), {})
+
     def test_revision_models_preserve_the_exact_signed_64_bit_bound(self) -> None:
         identifier = "00000000-0000-4000-8000-000000000001"
         cases: tuple[tuple[type[BaseModel], str, dict[str, JsonValue]], ...] = (

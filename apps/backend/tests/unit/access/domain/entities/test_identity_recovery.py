@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Literal
+from enum import StrEnum
 from uuid import UUID
 
 import pytest
@@ -22,8 +22,14 @@ from inframeld_backend.access.domain.value_objects.identity_subject import (
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
+
+class ProviderCase(StrEnum):
+    KRATOS = "kratos"
+    HYDRA = "hydra"
+
+
 INSTALLATION = InstallationId(UUID(int=1))
-AUTHORITY = IdentityAuthority("kratos")
+AUTHORITY = IdentityAuthority(ProviderCase.KRATOS)
 FLOW = IdentityRecoveryFlowId(UUID(int=2))
 SUBJECT = IdentitySubject(str(UUID(int=3)))
 RELEASED_AT = datetime(2026, 10, 23, 12, tzinfo=UTC)
@@ -76,16 +82,16 @@ def test_new_recovery_starts_with_both_cleanup_obligations_pending() -> None:
     assert operation.released_at is None
 
 
-@pytest.mark.parametrize("provider", ["kratos", "hydra"])
+@pytest.mark.parametrize("provider", [ProviderCase.KRATOS, ProviderCase.HYDRA])
 @pytest.mark.parametrize("outcome", [FAILED, UNCERTAIN, CONFIRMED])
 def test_provider_outcomes_are_recorded_independently(
-    provider: Literal["kratos", "hydra"],
+    provider: ProviderCase,
     outcome: IdentityRecoveryCleanupState,
 ) -> None:
     """Success or failure at one provider says nothing about the other."""
     operation = recovery()
 
-    if provider == "kratos":
+    if provider == ProviderCase.KRATOS:
         operation.record_kratos_cleanup(outcome)
         assert operation.kratos_cleanup_state is outcome
         assert operation.hydra_cleanup_state is PENDING
@@ -98,22 +104,24 @@ def test_provider_outcomes_are_recorded_independently(
     assert operation.is_released is False
 
 
-@pytest.mark.parametrize("provider", ["kratos", "hydra"])
+@pytest.mark.parametrize("provider", [ProviderCase.KRATOS, ProviderCase.HYDRA])
 @pytest.mark.parametrize("previous_outcome", [FAILED, UNCERTAIN])
 def test_reconciliation_can_confirm_previously_unfinished_cleanup(
-    provider: Literal["kratos", "hydra"],
+    provider: ProviderCase,
     previous_outcome: IdentityRecoveryCleanupState,
 ) -> None:
     """Later trusted evidence can resolve an earlier failure or unknown outcome."""
     operation = recovery()
     record = (
-        operation.record_kratos_cleanup if provider == "kratos" else operation.record_hydra_cleanup
+        operation.record_kratos_cleanup
+        if provider == ProviderCase.KRATOS
+        else operation.record_hydra_cleanup
     )
 
     record(previous_outcome)
     record(CONFIRMED)
 
-    if provider == "kratos":
+    if provider == ProviderCase.KRATOS:
         assert operation.kratos_cleanup_state is CONFIRMED
         assert operation.hydra_cleanup_state is PENDING
     else:
@@ -121,23 +129,25 @@ def test_reconciliation_can_confirm_previously_unfinished_cleanup(
         assert operation.kratos_cleanup_state is PENDING
 
 
-@pytest.mark.parametrize("provider", ["kratos", "hydra"])
+@pytest.mark.parametrize("provider", [ProviderCase.KRATOS, ProviderCase.HYDRA])
 @pytest.mark.parametrize("later_outcome", [PENDING, FAILED, UNCERTAIN])
 def test_confirmed_cleanup_cannot_regress(
-    provider: Literal["kratos", "hydra"],
+    provider: ProviderCase,
     later_outcome: IdentityRecoveryCleanupState,
 ) -> None:
     """A late unsuccessful report cannot erase confirmed cleanup evidence."""
     operation = recovery()
     record = (
-        operation.record_kratos_cleanup if provider == "kratos" else operation.record_hydra_cleanup
+        operation.record_kratos_cleanup
+        if provider == ProviderCase.KRATOS
+        else operation.record_hydra_cleanup
     )
     record(CONFIRMED)
 
     with pytest.raises(IdentityRecoveryTransitionError):
         record(later_outcome)
 
-    if provider == "kratos":
+    if provider == ProviderCase.KRATOS:
         assert operation.kratos_cleanup_state is CONFIRMED
         assert operation.hydra_cleanup_state is PENDING
     else:
@@ -145,13 +155,15 @@ def test_confirmed_cleanup_cannot_regress(
         assert operation.kratos_cleanup_state is PENDING
 
 
-@pytest.mark.parametrize("provider", ["kratos", "hydra"])
+@pytest.mark.parametrize("provider", [ProviderCase.KRATOS, ProviderCase.HYDRA])
 def test_pending_is_not_a_provider_result(
-    provider: Literal["kratos", "hydra"],
+    provider: ProviderCase,
 ) -> None:
     operation = recovery()
     record = (
-        operation.record_kratos_cleanup if provider == "kratos" else operation.record_hydra_cleanup
+        operation.record_kratos_cleanup
+        if provider == ProviderCase.KRATOS
+        else operation.record_hydra_cleanup
     )
 
     with pytest.raises(IdentityRecoveryTransitionError):
@@ -173,7 +185,7 @@ def test_confirming_both_providers_does_not_automatically_release_the_block() ->
     assert operation.released_at is None
 
 
-@pytest.mark.parametrize(("kratos", "hydra"), INCOMPLETE_STATES)
+@pytest.mark.parametrize((ProviderCase.KRATOS, ProviderCase.HYDRA), INCOMPLETE_STATES)
 def test_incomplete_cleanup_cannot_release_the_block(
     kratos: IdentityRecoveryCleanupState,
     hydra: IdentityRecoveryCleanupState,
@@ -210,7 +222,7 @@ def test_duplicate_completion_preserves_the_original_release_time() -> None:
     assert operation.released_at == RELEASED_AT
 
 
-@pytest.mark.parametrize(("kratos", "hydra"), INCOMPLETE_STATES)
+@pytest.mark.parametrize((ProviderCase.KRATOS, ProviderCase.HYDRA), INCOMPLETE_STATES)
 def test_reconstitution_rejects_release_without_confirmed_cleanup(
     kratos: IdentityRecoveryCleanupState,
     hydra: IdentityRecoveryCleanupState,

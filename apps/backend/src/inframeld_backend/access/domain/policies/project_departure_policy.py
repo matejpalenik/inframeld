@@ -1,4 +1,7 @@
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_departure_target_kind import (
+    ProjectDepartureTargetKind,
+)
 from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
 from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
     ProjectActionEligibilityPolicy,
@@ -21,14 +24,14 @@ class ProjectDeparturePolicy:
     def supports_responsibility(*, target_kind: str, action_id: ActionId | None) -> bool:
         """Reject unusable stored assignments instead of treating them as a grantor."""
         if action_id is None:
-            return target_kind == "access_group"
-        if target_kind == "project":
+            return target_kind == ProjectDepartureTargetKind.ACCESS_GROUP
+        if target_kind == ProjectDepartureTargetKind.PROJECT:
             return ProjectActionEligibilityPolicy.may_use(
                 action_id=action_id, principal_kind=PrincipalKind.HUMAN
             )
-        if target_kind == "access_group":
+        if target_kind == ProjectDepartureTargetKind.ACCESS_GROUP:
             return action_id.value in _GROUP_DOCUMENT_ACTIONS
-        if target_kind == "application_account":
+        if target_kind == ProjectDepartureTargetKind.APPLICATION_ACCOUNT:
             return action_id.value in {
                 "issue-application-keys",
                 "revoke-application-keys",
@@ -48,7 +51,7 @@ class ProjectDeparturePolicy:
 
             requires_group_manager = responsibility.action_id is None
             allows_group_manager = (
-                responsibility.target_kind == "access_group"
+                responsibility.target_kind == ProjectDepartureTargetKind.ACCESS_GROUP
                 and responsibility.action_id is not None
                 and responsibility.action_id.value in _GROUP_DOCUMENT_ACTIONS
             )

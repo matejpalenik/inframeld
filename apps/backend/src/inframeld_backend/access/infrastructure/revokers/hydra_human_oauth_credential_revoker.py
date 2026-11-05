@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from json import JSONDecodeError
 from time import monotonic
-from typing import Literal, cast, override
+from typing import cast, override
 
 from ory_hydra_client import OAuth2Api
 from ory_hydra_client.api_response import ApiResponse
@@ -27,6 +27,9 @@ from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state impor
     IdentityRecoveryCleanupState,
 )
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.infrastructure.types.hydra_cleanup_operation import (
+    HydraCleanupOperation,
+)
 
 
 class HydraHumanOAuthCredentialRevoker(HumanOAuthCredentialRevoker):
@@ -44,14 +47,14 @@ class HydraHumanOAuthCredentialRevoker(HumanOAuthCredentialRevoker):
     def _send(
         self,
         subject: IdentitySubject,
-        operation: Literal["cli_grants", "remembered_logins"],
+        operation: HydraCleanupOperation,
         deadline: float,
     ) -> object:
         remaining = deadline - monotonic()
         if remaining <= 0:
             raise TimeoutError
 
-        if operation == "cli_grants":
+        if operation == HydraCleanupOperation.CLI_GRANTS:
             return self._client.revoke_o_auth2_consent_sessions_with_http_info(
                 subject=subject.value, client="inframeld-cli", _request_timeout=remaining
             )
@@ -62,7 +65,7 @@ class HydraHumanOAuthCredentialRevoker(HumanOAuthCredentialRevoker):
     async def _revoke(
         self,
         subject: IdentitySubject,
-        operation: Literal["cli_grants", "remembered_logins"],
+        operation: HydraCleanupOperation,
         timeout_seconds: float,
     ) -> HumanOAuthCleanupOutcomeDTO:
         if (
@@ -197,10 +200,10 @@ class HydraHumanOAuthCredentialRevoker(HumanOAuthCredentialRevoker):
     async def revoke_cli_grants(
         self, subject: IdentitySubject, *, timeout_seconds: float
     ) -> HumanOAuthCleanupOutcomeDTO:
-        return await self._revoke(subject, "cli_grants", timeout_seconds)
+        return await self._revoke(subject, HydraCleanupOperation.CLI_GRANTS, timeout_seconds)
 
     @override
     async def revoke_remembered_logins(
         self, subject: IdentitySubject, *, timeout_seconds: float
     ) -> HumanOAuthCleanupOutcomeDTO:
-        return await self._revoke(subject, "remembered_logins", timeout_seconds)
+        return await self._revoke(subject, HydraCleanupOperation.REMEMBERED_LOGINS, timeout_seconds)

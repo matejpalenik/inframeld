@@ -48,6 +48,7 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -85,7 +86,7 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint_key 
 from inframeld_backend.shared.application.value_objects.spending_period import SpendingPeriod
 
 CONTEXT = IdempotencyContextDTO(
-    "PATCH", "/projects/fixture/spending-policy", IdempotencyKey("policy-request")
+    HttpMethod.PATCH, "/projects/fixture/spending-policy", IdempotencyKey("policy-request")
 )
 
 

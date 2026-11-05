@@ -11,7 +11,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Literal, override
+from typing import override
 from uuid import UUID
 
 import pytest
@@ -68,6 +68,9 @@ from inframeld_backend.shared.application.dtos.spending_rate_dto import Spending
 from inframeld_backend.shared.application.dtos.spending_totals_dto import SpendingTotalsDTO
 from inframeld_backend.shared.application.dtos.spending_usage_dto import SpendingUsageDTO
 from inframeld_backend.shared.application.enums.spending_call_state import SpendingCallState
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
@@ -164,7 +167,7 @@ def observation(
     call: SpendingCallContextDTO,
     *,
     number: int = 1,
-    kind: Literal["usage", "charge", "not_sent", "not_billed", "uncertain"] = "charge",
+    kind: SpendingObservationKind = SpendingObservationKind.CHARGE,
     charge: str | None = "0.08",
 ) -> SpendingObservationDTO:
     return SpendingObservationDTO(
@@ -676,7 +679,7 @@ async def test_unknown_original_obligation_blocks_new_cap_in_its_month_but_not_a
     await service.reserve(call=call, basis=None, operation_limit=None)
     await service.record_observation(
         call=call,
-        observation=observation(call, kind="uncertain", charge=None),
+        observation=observation(call, kind=SpendingObservationKind.UNCERTAIN, charge=None),
         expected_call_revision=0,
     )
     ledger.state.policy = replace(ledger.state.policy, monthly_limit=money("1"), revision=1)
@@ -789,7 +792,7 @@ async def test_missing_usage_keeps_the_original_hold_and_cannot_approve_redispat
     await service.reserve(call=call, basis=price_basis(), operation_limit=None)
     result = await service.record_observation(
         call=call,
-        observation=observation(call, kind="uncertain", charge=None),
+        observation=observation(call, kind=SpendingObservationKind.UNCERTAIN, charge=None),
         expected_call_revision=0,
     )
 
@@ -808,7 +811,7 @@ async def test_current_call_bound_not_sent_evidence_can_release_unused_hold() ->
 
     result = await service.record_observation(
         call=call,
-        observation=observation(call, kind="not_sent", charge=None),
+        observation=observation(call, kind=SpendingObservationKind.NOT_SENT, charge=None),
         expected_call_revision=0,
     )
 
@@ -822,7 +825,7 @@ async def test_stale_fence_retains_pending_evidence_through_normal_transaction_r
     call = call_context()
     original = await service.reserve(call=call, basis=price_basis(), operation_limit=None)
     ownership.failure = JobFenceLostError()
-    evidence = observation(call, kind="not_billed", charge=None)
+    evidence = observation(call, kind=SpendingObservationKind.NOT_BILLED, charge=None)
 
     result = await service.record_observation(
         call=call, observation=evidence, expected_call_revision=0
@@ -958,7 +961,7 @@ async def test_unknown_usage_categories_preserve_an_unquantified_obligation() ->
     evidence = SpendingObservationDTO(
         UUID(int=701),
         call.call_id,
-        "usage",
+        SpendingObservationKind.USAGE,
         NOW,
         "fixture-unknown-category",
         usage=(SpendingUsageDTO("unsupported", "unit", Decimal("1")),),
@@ -1044,7 +1047,7 @@ async def test_cancellation_stops_new_work_but_does_not_discard_charge_evidence(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("kind", ["uncertain", "usage"])
+@pytest.mark.parametrize("kind", [SpendingObservationKind.UNCERTAIN, SpendingObservationKind.USAGE])
 async def test_human_review_cannot_resolve_pending_evidence_without_accounting_facts(
     kind: str,
 ) -> None:
@@ -1053,12 +1056,12 @@ async def test_human_review_cannot_resolve_pending_evidence_without_accounting_f
     original = await service.reserve(call=call, basis=price_basis(), operation_limit=None)
     ownership.failure = JobFenceLostError()
     evidence = (
-        observation(call, kind="uncertain", charge=None)
-        if kind == "uncertain"
+        observation(call, kind=SpendingObservationKind.UNCERTAIN, charge=None)
+        if kind == SpendingObservationKind.UNCERTAIN
         else SpendingObservationDTO(
             UUID(int=702),
             call.call_id,
-            "usage",
+            SpendingObservationKind.USAGE,
             NOW,
             "fixture-unbounded",
             usage=(SpendingUsageDTO("unsupported", "unit", Decimal("1")),),
@@ -1135,7 +1138,7 @@ async def pending_then_applied_charge() -> tuple[
     call = call_context()
     await service.reserve(call=call, basis=price_basis(), operation_limit=None)
     ownership.failure = JobFenceLostError()
-    pending = observation(call, kind="uncertain", charge=None)
+    pending = observation(call, kind=SpendingObservationKind.UNCERTAIN, charge=None)
     retained = await service.record_observation(
         call=call, observation=pending, expected_call_revision=0
     )
@@ -1165,7 +1168,7 @@ async def test_review_resolution_replays_its_own_receipt_and_preserves_other_pen
     assert ledger.state.evidence[(call.call_id, proof.evidence_id)] == (proof, applied)
     assert ledger.state.resolutions[(call.call_id, pending.evidence_id)].result == resolved.record
     ownership.failure = JobFenceLostError()
-    later_pending = observation(call, number=3, kind="uncertain", charge=None)
+    later_pending = observation(call, number=3, kind=SpendingObservationKind.UNCERTAIN, charge=None)
     retained = await service.record_observation(
         call=call, observation=later_pending, expected_call_revision=resolved.record.revision
     )
@@ -1205,7 +1208,7 @@ async def test_review_resolution_replays_its_own_receipt_and_preserves_other_pen
         old_pending.recovered and not old_pending.pending and old_pending.record == resolved.record
     )
     ownership.failure = JobFenceLostError()
-    new_pending = observation(call, number=5, kind="uncertain", charge=None)
+    new_pending = observation(call, number=5, kind=SpendingObservationKind.UNCERTAIN, charge=None)
     newest = await service.record_observation(
         call=call, observation=new_pending, expected_call_revision=corrected.record.revision
     )
@@ -1420,7 +1423,7 @@ async def test_applying_distinct_pending_proof_does_not_resolve_its_own_marker()
     call = call_context()
     await service.reserve(call=call, basis=price_basis(), operation_limit=None)
     ownership.failure = JobFenceLostError()
-    pending = observation(call, kind="uncertain", charge=None)
+    pending = observation(call, kind=SpendingObservationKind.UNCERTAIN, charge=None)
     first = await service.record_observation(
         call=call, observation=pending, expected_call_revision=0
     )
@@ -1487,7 +1490,7 @@ async def test_resolving_a_marker_does_not_pretend_its_own_charge_was_applied() 
         authoritative_evidence_id=other_proof.evidence_id,
         expected_call_revision=second.record.revision,
     )
-    later_marker = observation(call, number=3, kind="uncertain", charge=None)
+    later_marker = observation(call, number=3, kind=SpendingObservationKind.UNCERTAIN, charge=None)
     later = await service.record_observation(
         call=call, observation=later_marker, expected_call_revision=resolved_first.record.revision
     )

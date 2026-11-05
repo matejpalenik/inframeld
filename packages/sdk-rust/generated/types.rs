@@ -333,7 +333,6 @@ pub struct ValidationIssue {
     ///Stable Inframeld validation category.
     ///Constraint: minLength=1, maxLength=64, pattern=`^[a-z][a-z0-9_]*$`
     pub code: String,
-    ///Request component containing the issue.
     pub location: ValidationIssueLocation,
     ///Safe corrective description without submitted values.
     ///Constraint: minLength=1, maxLength=256
@@ -348,7 +347,7 @@ pub enum ValidationIssuePathItemUnion {
     String(String),
     Integer(i64),
 }
-///Request component containing the issue.
+///Identify the request component that contains an invalid field.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
 pub enum ValidationIssueLocation {
     #[default]
@@ -395,7 +394,7 @@ pub struct OriginalOperationLookupRequest {
     pub installation_id: uuid::Uuid,
     ///Constraint: minLength=1, maxLength=128
     pub key: String,
-    pub method: OriginalOperationLookupRequestMethod,
+    pub method: HttpMethod,
     #[serde(rename = "organizationId")]
     pub organization_id: uuid::Uuid,
     #[serde(
@@ -407,8 +406,9 @@ pub struct OriginalOperationLookupRequest {
     #[serde(rename = "requestedRoute")]
     pub requested_route: String,
 }
+///Identify the mutating method bound to an operation and its retry identity.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
-pub enum OriginalOperationLookupRequestMethod {
+pub enum HttpMethod {
     #[default]
     #[serde(rename = "POST")]
     Post,
@@ -419,7 +419,7 @@ pub enum OriginalOperationLookupRequestMethod {
     #[serde(rename = "DELETE")]
     Delete,
 }
-impl OriginalOperationLookupRequestMethod {
+impl HttpMethod {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Post => "POST",
@@ -429,12 +429,12 @@ impl OriginalOperationLookupRequestMethod {
         }
     }
 }
-impl ::std::fmt::Display for OriginalOperationLookupRequestMethod {
+impl ::std::fmt::Display for HttpMethod {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
-impl AsRef<str> for OriginalOperationLookupRequestMethod {
+impl AsRef<str> for HttpMethod {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
@@ -1333,12 +1333,13 @@ pub struct MyOrganizationAccessResponse {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OwnOrganizationGrantResponse {
     #[serde(rename = "actionId")]
-    pub action_id: OwnOrganizationGrantResponseActionId,
+    pub action_id: OrganizationAction,
     #[serde(rename = "canGrant")]
     pub can_grant: bool,
 }
+///Name an action on the installation Organization.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
-pub enum OwnOrganizationGrantResponseActionId {
+pub enum OrganizationAction {
     #[default]
     #[serde(rename = "admit-users")]
     AdmitUsers,
@@ -1349,7 +1350,7 @@ pub enum OwnOrganizationGrantResponseActionId {
     #[serde(rename = "create-projects")]
     CreateProjects,
 }
-impl OwnOrganizationGrantResponseActionId {
+impl OrganizationAction {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::AdmitUsers => "admit-users",
@@ -1359,12 +1360,12 @@ impl OwnOrganizationGrantResponseActionId {
         }
     }
 }
-impl ::std::fmt::Display for OwnOrganizationGrantResponseActionId {
+impl ::std::fmt::Display for OrganizationAction {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
-impl AsRef<str> for OwnOrganizationGrantResponseActionId {
+impl AsRef<str> for OrganizationAction {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
@@ -1372,7 +1373,7 @@ impl AsRef<str> for OwnOrganizationGrantResponseActionId {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InitialProjectGrantResponse {
     #[serde(rename = "actionId")]
-    pub action_id: InitialProjectGrantResponseActionId,
+    pub action_id: ProjectAction,
     #[serde(rename = "canGrant")]
     pub can_grant: BooleanConstant<true>,
     pub target: ProjectGrantTargetResponse,
@@ -1406,8 +1407,9 @@ impl AsRef<str> for ProjectGrantTargetResponseKind {
         self.as_str()
     }
 }
+///Name an action on a Project without granting it to the caller.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
-pub enum InitialProjectGrantResponseActionId {
+pub enum ProjectAction {
     #[default]
     #[serde(rename = "manage-project-members")]
     ManageProjectMembers,
@@ -1446,7 +1448,7 @@ pub enum InitialProjectGrantResponseActionId {
     #[serde(rename = "edit-project-metadata")]
     EditProjectMetadata,
 }
-impl InitialProjectGrantResponseActionId {
+impl ProjectAction {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::ManageProjectMembers => "manage-project-members",
@@ -1470,12 +1472,12 @@ impl InitialProjectGrantResponseActionId {
         }
     }
 }
-impl ::std::fmt::Display for InitialProjectGrantResponseActionId {
+impl ::std::fmt::Display for ProjectAction {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
-impl AsRef<str> for InitialProjectGrantResponseActionId {
+impl AsRef<str> for ProjectAction {
     fn as_ref(&self) -> &str {
         self.as_str()
     }

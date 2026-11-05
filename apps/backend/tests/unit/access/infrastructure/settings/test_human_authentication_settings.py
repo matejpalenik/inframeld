@@ -1,6 +1,6 @@
 """Check deployment-configured human authentication limits."""
 
-from typing import Literal
+from enum import StrEnum
 
 import pytest
 from pydantic import ValidationError
@@ -8,6 +8,11 @@ from pydantic import ValidationError
 from inframeld_backend.access.infrastructure.settings.human_authentication_settings import (
     HumanAuthenticationSettings,
 )
+
+
+class FieldCase(StrEnum):
+    PROVIDER_TIMEOUT_SECONDS = "provider_timeout_seconds"
+    TOTAL_TIMEOUT_SECONDS = "total_timeout_seconds"
 
 
 def test_default_limits_match_the_accepted_authentication_budget() -> None:
@@ -30,13 +35,15 @@ def test_provider_limit_can_be_shorter_or_longer_than_total_limit(
     assert settings.provider_timeout_seconds == provider_seconds
 
 
-@pytest.mark.parametrize("field", ["provider_timeout_seconds", "total_timeout_seconds"])
+@pytest.mark.parametrize(
+    "field", [FieldCase.PROVIDER_TIMEOUT_SECONDS, FieldCase.TOTAL_TIMEOUT_SECONDS]
+)
 @pytest.mark.parametrize(
     "seconds",
     [True, False, 0.0, -1.0, float("nan"), float("inf"), float("-inf"), "not-a-number"],
 )
 def test_invalid_authentication_limits_are_rejected(
-    field: Literal["provider_timeout_seconds", "total_timeout_seconds"],
+    field: FieldCase,
     seconds: object,
 ) -> None:
     """Reject values that could disable deadlines or accidentally treat True as one second."""

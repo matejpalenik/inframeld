@@ -17,6 +17,7 @@ from inframeld_backend.shared.application.dtos.operation_reservation_request_dto
 from inframeld_backend.shared.application.dtos.operation_reservation_result_dto import (
     OperationReservationResultDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
@@ -62,7 +63,7 @@ async def _request(database: Database) -> OperationReservationRequestDTO:
         principal_id=scenario.principal_id,
         organization_id=OrganizationId(organization_id),
         project_id=scenario.project_id,
-        method="POST",
+        method=HttpMethod.POST,
         requested_route="/v1/projects/{project_id}/builds",
         key=IdempotencyKey("build-request-1"),
         fingerprint=b"\x01" * 32,

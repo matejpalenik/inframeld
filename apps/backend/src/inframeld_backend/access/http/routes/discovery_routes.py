@@ -5,11 +5,18 @@ from urllib.parse import unquote, urlsplit
 from fastapi import APIRouter, HTTPException, Path, Response
 
 from inframeld_backend.access.application.dtos.public_discovery_dto import PublicDiscoveryDTO
+from inframeld_backend.access.domain.enums.human_oauth_scope import HumanOAuthScope
+from inframeld_backend.access.http.enums.credential_transport_location import (
+    CredentialTransportLocation,
+)
 from inframeld_backend.access.http.responses.inframeld_discovery_response import (
     InframeldDiscoveryResponse,
 )
 from inframeld_backend.access.http.responses.protected_resource_metadata_response import (
     ProtectedResourceMetadataResponse,
+)
+from inframeld_backend.access.infrastructure.types.human_oauth_client_name import (
+    HumanOAuthClientName,
 )
 from inframeld_backend.shared.http.definitions.problem_catalogue import (
     DEPENDENCY_UNAVAILABLE_PROBLEM,
@@ -36,11 +43,11 @@ def create_discovery_router(descriptor: Callable[[], PublicDiscoveryDTO | None])
         return ProtectedResourceMetadataResponse(
             resource=snapshot.resource,
             authorization_servers=(snapshot.issuer,),
-            scopes_supported=("inframeld:api",),
-            bearer_methods_supported=("header",),
+            scopes_supported=(HumanOAuthScope.API,),
+            bearer_methods_supported=(CredentialTransportLocation.HEADER,),
             inframeld=InframeldDiscoveryResponse(
                 schema_version=1,
-                client_id="inframeld-cli",
+                client_id=HumanOAuthClientName.INFRAMELD_CLI,
                 installation_id=snapshot.installation_id.value,
             ),
         )

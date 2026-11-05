@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
+from inframeld_backend.shared.http.enums.deletion_status_outcome import DeletionStatusOutcome
 
 
 class RetainedDeletionStatusResponse(BaseModel):
@@ -11,7 +12,7 @@ class RetainedDeletionStatusResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    outcome: Literal["retained"]
+    outcome: Literal[DeletionStatusOutcome.RETAINED]
     operation_id: str = Field(alias="operationId", min_length=1, max_length=128, strict=True)
     job_state: JobStatus | None = Field(alias="jobState")
     admission_confirmed: StrictBool | None = Field(alias="admissionConfirmed")

@@ -1,0 +1,186 @@
+diff --git a/python/configuration.mustache b/python/configuration.mustache
+--- a/python/configuration.mustache
++++ b/python/configuration.mustache
+@@ -10,6 +10,7 @@
+ import copy
+ import http.client as httplib
+ import logging
++from enum import StrEnum
+ from logging import FileHandler
+ {{^async}}
+ import multiprocessing
+@@ -40,6 +41,35 @@
+ }
+ 
+ ServerVariablesT = Dict[str, str]
++
++class AuthType(StrEnum):
++    """Identify the configured authentication scheme without carrying credentials."""
++
++    OAUTH2 = "oauth2"
++    API_KEY = "api_key"
++    BASIC = "basic"
++    BEARER = "bearer"
++    HTTP_SIGNATURE = "http-signature"
++
++
++class AuthLocation(StrEnum):
++    """Identify where a configured authentication value is sent."""
++
++    HEADER = "header"
++
++
++class AuthHeader(StrEnum):
++    """Name the standard authorization header independently of its secret value."""
++
++    AUTHORIZATION = "Authorization"
++
++
++class BearerTokenFormat(StrEnum):
++    """Name the supported bearer-token format in generated auth metadata."""
++
++    JWT = "JWT"
++
++
+ 
+ GenericAuthSetting = TypedDict(
+     "GenericAuthSetting",
+@@ -55,9 +85,9 @@
+ OAuth2AuthSetting = TypedDict(
+     "OAuth2AuthSetting",
+     {
+-        "type": Literal["oauth2"],
+-        "in": Literal["header"],
+-        "key": Literal["Authorization"],
++        "type": Literal[AuthType.OAUTH2],
++        "in": Literal[AuthLocation.HEADER],
++        "key": Literal[AuthHeader.AUTHORIZATION],
+         "value": str,
+     },
+ )
+@@ -66,7 +96,7 @@
+ APIKeyAuthSetting = TypedDict(
+     "APIKeyAuthSetting",
+     {
+-        "type": Literal["api_key"],
++        "type": Literal[AuthType.API_KEY],
+         "in": str,
+         "key": str,
+         "value": Optional[str],
+@@ -77,9 +107,9 @@
+ BasicAuthSetting = TypedDict(
+     "BasicAuthSetting",
+     {
+-        "type": Literal["basic"],
+-        "in": Literal["header"],
+-        "key": Literal["Authorization"],
++        "type": Literal[AuthType.BASIC],
++        "in": Literal[AuthLocation.HEADER],
++        "key": Literal[AuthHeader.AUTHORIZATION],
+         "value": Optional[str],
+     },
+ )
+@@ -88,10 +118,10 @@
+ BearerFormatAuthSetting = TypedDict(
+     "BearerFormatAuthSetting",
+     {
+-        "type": Literal["bearer"],
+-        "in": Literal["header"],
+-        "format": Literal["JWT"],
+-        "key": Literal["Authorization"],
++        "type": Literal[AuthType.BEARER],
++        "in": Literal[AuthLocation.HEADER],
++        "format": Literal[BearerTokenFormat.JWT],
++        "key": Literal[AuthHeader.AUTHORIZATION],
+         "value": str,
+     },
+ )
+@@ -100,9 +130,9 @@
+ BearerAuthSetting = TypedDict(
+     "BearerAuthSetting",
+     {
+-        "type": Literal["bearer"],
+-        "in": Literal["header"],
+-        "key": Literal["Authorization"],
++        "type": Literal[AuthType.BEARER],
++        "in": Literal[AuthLocation.HEADER],
++        "key": Literal[AuthHeader.AUTHORIZATION],
+         "value": str,
+     },
+ )
+@@ -111,9 +141,9 @@
+ HTTPSignatureAuthSetting = TypedDict(
+     "HTTPSignatureAuthSetting",
+     {
+-        "type": Literal["http-signature"],
+-        "in": Literal["header"],
+-        "key": Literal["Authorization"],
++        "type": Literal[AuthType.HTTP_SIGNATURE],
++        "in": Literal[AuthLocation.HEADER],
++        "key": Literal[AuthHeader.AUTHORIZATION],
+         "value": None,
+     },
+ )
+@@ -834,7 +864,7 @@
+ {{#isApiKey}}
+         if '{{name}}' in self.api_key{{#vendorExtensions.x-auth-id-alias}} or '{{.}}' in self.api_key{{/vendorExtensions.x-auth-id-alias}}:
+             auth['{{name}}'] = {
+-                'type': 'api_key',
++                'type': AuthType.API_KEY,
+                 'in': {{#isKeyInCookie}}'cookie'{{/isKeyInCookie}}{{#isKeyInHeader}}'header'{{/isKeyInHeader}}{{#isKeyInQuery}}'query'{{/isKeyInQuery}},
+                 'key': '{{keyParamName}}',
+                 'value': self.get_api_key_with_prefix(
+@@ -847,30 +877,30 @@
+   {{#isBasicBasic}}
+         if self.username is not None and self.password is not None:
+             auth['{{name}}'] = {
+-                'type': 'basic',
+-                'in': 'header',
+-                'key': 'Authorization',
++                'type': AuthType.BASIC,
++                'in': AuthLocation.HEADER,
++                'key': AuthHeader.AUTHORIZATION,
+                 'value': self.get_basic_auth_token()
+             }
+   {{/isBasicBasic}}
+   {{#isBasicBearer}}
+         if self.access_token is not None:
+             auth['{{name}}'] = {
+-                'type': 'bearer',
+-                'in': 'header',
++                'type': AuthType.BEARER,
++                'in': AuthLocation.HEADER,
+                 {{#bearerFormat}}
+-                'format': '{{{.}}}',
++                'format': BearerTokenFormat('{{{.}}}'),
+                 {{/bearerFormat}}
+-                'key': 'Authorization',
++                'key': AuthHeader.AUTHORIZATION,
+                 'value': 'Bearer ' + self.access_token
+             }
+   {{/isBasicBearer}}
+   {{#isHttpSignature}}
+         if self.signing_info is not None:
+             auth['{{name}}'] = {
+-                'type': 'http-signature',
+-                'in': 'header',
+-                'key': 'Authorization',
++                'type': AuthType.HTTP_SIGNATURE,
++                'in': AuthLocation.HEADER,
++                'key': AuthHeader.AUTHORIZATION,
+                 'value': None  # Signature headers are calculated for every HTTP request
+             }
+   {{/isHttpSignature}}
+@@ -878,9 +908,9 @@
+ {{#isOAuth}}
+         if self.access_token is not None:
+             auth['{{name}}'] = {
+-                'type': 'oauth2',
+-                'in': 'header',
+-                'key': 'Authorization',
++                'type': AuthType.OAUTH2,
++                'in': AuthLocation.HEADER,
++                'key': AuthHeader.AUTHORIZATION,
+                 'value': 'Bearer ' + self.access_token
+             }
+ {{/isOAuth}}

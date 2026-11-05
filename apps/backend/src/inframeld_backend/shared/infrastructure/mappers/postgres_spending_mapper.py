@@ -1,7 +1,7 @@
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, cast
+from typing import cast
 
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
     AdmittedWorkAuthorityDTO,
@@ -38,6 +38,9 @@ from inframeld_backend.shared.application.dtos.spending_observation_dto import (
 from inframeld_backend.shared.application.dtos.spending_rate_dto import SpendingRateDTO
 from inframeld_backend.shared.application.dtos.spending_usage_dto import SpendingUsageDTO
 from inframeld_backend.shared.application.enums.spending_call_state import SpendingCallState
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.model_call_id import ModelCallId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
@@ -171,9 +174,15 @@ class PostgresSpendingMapper:
         row: ModelCallAccountingEvidenceRow, record: SpendingCallRecordDTO
     ) -> tuple[SpendingObservationDTO, SpendingCallRecordDTO | None, bool]:
         PostgresSpendingMapper._evidence_scope(row, record)
-        if row.kind not in ("usage", "charge", "not_sent", "not_billed", "uncertain"):
+        if row.kind not in (
+            SpendingObservationKind.USAGE,
+            SpendingObservationKind.CHARGE,
+            SpendingObservationKind.NOT_SENT,
+            SpendingObservationKind.NOT_BILLED,
+            SpendingObservationKind.UNCERTAIN,
+        ):
             raise ValueError("Stored spending evidence has an unsupported kind.")
-        kind: Literal["usage", "charge", "not_sent", "not_billed", "uncertain"] = row.kind
+        kind = SpendingObservationKind(row.kind)
         observation = SpendingObservationDTO(
             row.evidence_id,
             record.call_id,

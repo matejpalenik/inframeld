@@ -58,6 +58,7 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
@@ -123,7 +124,7 @@ async def test_organization_scoped_retry_preserves_scope_fingerprint_and_expiry(
     )
     authorization = MockAuthorizedOrganizationScopeDTO(scenario.organization_id)
     context = IdempotencyContextDTO(
-        method="PATCH",
+        method=HttpMethod.PATCH,
         requested_route="/v1/test-organization-operation",
         key=IdempotencyKey("organization-retry-1"),
     )
@@ -207,7 +208,7 @@ async def _authorized_request(
         ActionId("create-access-groups"),
         ProjectOperationAdmissionRequestDTO(
             project_id=scenario.project_id,
-            method="POST",
+            method=HttpMethod.POST,
             requested_route="/v1/projects/{project_id}/builds",
             key=IdempotencyKey("build-request-1"),
             fingerprint=RequestFingerprint(b"\x01" * 32),

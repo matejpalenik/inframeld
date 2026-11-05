@@ -1,6 +1,6 @@
 """Follow a real recovery redirect and submit its password-settings form."""
 
-from typing import Literal
+from enum import StrEnum
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
@@ -11,10 +11,15 @@ from tests.support.integration_services import KRATOS_PUBLIC_URL
 from tests.support.kratos_browser import BrowserFlow, IdentityResponse
 
 
+class State(StrEnum):
+    SHOW_FORM = "show_form"
+    SUCCESS = "success"
+
+
 class SettingsFlowResponse(BrowserFlow):
     id: UUID
     identity: IdentityResponse
-    state: Literal["show_form", "success"]
+    state: State
 
 
 async def read_recovery_settings(

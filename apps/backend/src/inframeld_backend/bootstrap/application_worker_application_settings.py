@@ -3,14 +3,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 from inframeld_backend.shared.infrastructure.settings.job_settings import JobSettings
-from inframeld_backend.shared.infrastructure.types.logging_types import LogFormat, LogLevel
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 
 
 class ApplicationWorkerApplicationSettings(BaseSettings):
     database: DatabaseSettings
     jobs: JobSettings = Field(default_factory=JobSettings)
-    log_level: LogLevel = "INFO"
-    log_format: LogFormat = "console"
+    log_level: LogLevel = LogLevel.INFO
+    log_format: LogFormat = LogFormat.CONSOLE
 
     model_config = SettingsConfigDict(
         env_prefix="INFRAMELD_",

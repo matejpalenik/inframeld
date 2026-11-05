@@ -43,6 +43,9 @@ from inframeld_backend.access.application.protocols.project_membership_change_fa
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
+from inframeld_backend.access.domain.enums.project_departure_target_kind import (
+    ProjectDepartureTargetKind,
+)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
@@ -306,7 +309,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
             )
             result.append(
                 ProjectDepartureResponsibilityDTO(
-                    "project",
+                    ProjectDepartureTargetKind.PROJECT,
                     project,
                     ActionId(action),
                     await self._candidates(facts, departing, grant),
@@ -341,7 +344,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
             )
             result.append(
                 ProjectDepartureResponsibilityDTO(
-                    "access_group",
+                    ProjectDepartureTargetKind.ACCESS_GROUP,
                     group,
                     ActionId(action),
                     await self._candidates(facts, departing, grant, group),
@@ -379,7 +382,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
             )
             result.append(
                 ProjectDepartureResponsibilityDTO(
-                    "application_account",
+                    ProjectDepartureTargetKind.APPLICATION_ACCOUNT,
                     application,
                     ActionId(action),
                     await self._candidates(facts, departing, grant),
@@ -397,7 +400,7 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
         for group in managed:
             result.append(
                 ProjectDepartureResponsibilityDTO(
-                    "access_group",
+                    ProjectDepartureTargetKind.ACCESS_GROUP,
                     group,
                     None,
                     await self._candidates(facts, departing, literal(False), group),
