@@ -61,12 +61,19 @@ from inframeld_backend.shared.application.services.artifact_allocation_service i
 from inframeld_backend.shared.application.services.artifact_cleanup_admission_service import (
     ArtifactCleanupAdmissionService,
 )
+from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
+    ArtifactCleanupAuthorizationService,
+)
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
 from inframeld_backend.shared.application.services.job_admission_service import JobAdmissionService
 from inframeld_backend.shared.application.services.job_checkpoint_service import (
     JobCheckpointService,
 )
+from inframeld_backend.shared.application.services.job_continuation_eligibility_service import (
+    JobContinuationEligibilityService,
+)
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
+from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.application.value_objects.artifact_cleanup_obligation_id import (
     ArtifactCleanupObligationId,
@@ -82,6 +89,9 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 )
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
+    PostgresArtifactCleanupFactsReader,
+)
 from inframeld_backend.shared.infrastructure.repositories.postgres_artifact_attempt_repository import (
     PostgresArtifactAttemptRepository,
 )
@@ -274,11 +284,26 @@ async def completed_product_origin(
             payload=JobPayload("test.progress", 1, b"1"),
         )
     async with database.session() as session:
+        recovery_store = PostgresJobStore(session)
+        product_authority = AdmittedWorkAuthorizationService(
+            PostgresAdmittedWorkFactsReader(session)
+        )
+        recovery_service = JobRecoveryService(
+            recovery_store,
+            JobContinuationEligibilityService(
+                recovery_store,
+                product_authority,
+                ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
+                supported_payloads=(("test.progress", 1),),
+            ),
+        )
         context = await JobExecutionService(
             SqlAlchemyTransactionManager(session),
-            PostgresJobStore(session),
+            recovery_store,
             supported_payloads=(("test.progress", 1),),
             worker_id=uuid4(),
+            product=product_authority,
+            recovery=recovery_service,
         ).claim_next()
         assert context is not None and context.job_id == admission.job_id
         await JobCheckpointService(

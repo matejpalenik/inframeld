@@ -1,11 +1,11 @@
 import asyncio
 import hashlib
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
-from typing import BinaryIO, cast
-from uuid import UUID
+from typing import BinaryIO, cast, override
+from uuid import UUID, uuid4
 
 import boto3
 import pytest
@@ -14,22 +14,35 @@ from botocore.exceptions import EndpointConnectionError
 from botocore.response import StreamingBody
 from botocore.stub import ANY, Stubber
 from mypy_boto3_s3.client import S3Client
-from mypy_boto3_s3.type_defs import GetObjectOutputTypeDef, PutObjectOutputTypeDef
+from mypy_boto3_s3.type_defs import (
+    DeleteObjectOutputTypeDef,
+    GetObjectOutputTypeDef,
+    PutObjectOutputTypeDef,
+)
 
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
+from inframeld_backend.shared.application.errors.application_errors import (
+    ConflictError,
+    DependencyUnavailableError,
+)
 from inframeld_backend.shared.application.errors.artifact_errors import (
     ArtifactIntegrityError,
     ArtifactStoreUnavailableError,
     ArtifactWriteOutcomeUnknownError,
+)
+from inframeld_backend.shared.application.errors.job_errors import SafeJobRetryError
+from inframeld_backend.shared.application.protocols.job_effect_observation_recorder import (
+    JobEffectObservationRecorder,
 )
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
     ArtifactContentDigest,
 )
 from inframeld_backend.shared.application.value_objects.artifact_id import ArtifactId
+from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.resources.s3_artifact_store import S3ArtifactStore
 from inframeld_backend.shared.infrastructure.settings.artifact_storage_settings import (
@@ -511,3 +524,343 @@ async def test_canceling_close_keeps_native_put_owned_until_repeated_close_drain
             return_exceptions=True,
         )
         await store.close()
+
+
+class MockInvocationRecorder(JobEffectObservationRecorder):
+    """Control admission and commit observations without claiming database qualification."""
+
+    def __init__(self) -> None:
+        self.admitted: set[JobEffectId] = set()
+        self.aborted: list[tuple[str, JobEffectId]] = []
+        self.failure: Exception | None = None
+        self.abort_failure: Exception | None = None
+        self.admitting = asyncio.Event()
+        self.release: asyncio.Event | None = None
+
+    async def _admit(self, observation: JobEffectId) -> None:
+        self.admitting.set()
+        if self.release is not None:
+            await self.release.wait()
+        if self.failure is not None:
+            raise self.failure
+        if observation in self.admitted:
+            raise ConflictError("The invocation was already admitted.")
+        self.admitted.add(observation)
+
+    @override
+    async def admit_put(self, observation: JobEffectId, attempt: ArtifactAttemptDTO) -> None:
+        assert attempt == ATTEMPT
+        await self._admit(observation)
+
+    @override
+    async def admit_delete(
+        self, observation: JobEffectId, scope: ArtifactScopeDTO, attempt_id: ArtifactAttemptId
+    ) -> None:
+        assert (scope, attempt_id) == (SCOPE, ATTEMPT.attempt_id)
+        await self._admit(observation)
+
+    @override
+    async def record_put_abort(self, observation: JobEffectId, attempt: ArtifactAttemptDTO) -> None:
+        assert attempt == ATTEMPT and observation in self.admitted
+        self.aborted.append(("put", observation))
+        if self.abort_failure is not None:
+            raise self.abort_failure
+
+    @override
+    async def record_delete_abort(
+        self, observation: JobEffectId, scope: ArtifactScopeDTO, attempt_id: ArtifactAttemptId
+    ) -> None:
+        assert (scope, attempt_id) == (SCOPE, ATTEMPT.attempt_id)
+        assert observation in self.admitted
+        self.aborted.append(("delete", observation))
+        if self.abort_failure is not None:
+            raise self.abort_failure
+
+
+def _capture_mutations(client: S3Client, monkeypatch: pytest.MonkeyPatch, sends: list[str]) -> None:
+    def put(**_values: object) -> PutObjectOutputTypeDef:
+        sends.append("put")
+        return cast(PutObjectOutputTypeDef, {})
+
+    def delete(**_values: object) -> DeleteObjectOutputTypeDef:
+        sends.append("delete")
+        return cast(DeleteObjectOutputTypeDef, {})
+
+    monkeypatch.setattr(client, "put_object", put)
+    monkeypatch.setattr(client, "delete_object", delete)
+
+
+async def _invoke_bound(store: S3ArtifactStore, action: str, observation: JobEffectId) -> None:
+    if action == "put":
+        await store.put(ATTEMPT, BytesIO(b"abc"), observation=observation)
+    else:
+        await store.delete(SCOPE, ATTEMPT.attempt_id, observation=observation)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["put", "delete"])
+async def test_bound_mutation_requires_a_recorder_before_scheduling(
+    tmp_path: Path, client: S3Client, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    sends: list[str] = []
+    _capture_mutations(client, monkeypatch, sends)
+    store = S3ArtifactStore(settings(tmp_path), client=client)
+    try:
+        with pytest.raises(ArtifactStoreUnavailableError):
+            await _invoke_bound(store, action, JobEffectId(uuid4()))
+        assert sends == []
+    finally:
+        await store.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["put", "delete"])
+async def test_duplicate_invocation_cannot_enter_again_in_a_fresh_adapter(
+    tmp_path: Path, client: S3Client, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    sends: list[str] = []
+    _capture_mutations(client, monkeypatch, sends)
+    recorder = MockInvocationRecorder()
+    observation = JobEffectId(uuid4())
+    first = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    second = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    try:
+        await _invoke_bound(first, action, observation)
+        with pytest.raises(ConflictError):
+            await _invoke_bound(second, action, observation)
+        assert sends == [action] and recorder.aborted == []
+    finally:
+        await first.close()
+        await second.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["put", "delete"])
+async def test_ambiguous_admission_never_schedules_or_records_abort(
+    tmp_path: Path, client: S3Client, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    sends: list[str] = []
+    _capture_mutations(client, monkeypatch, sends)
+    recorder = MockInvocationRecorder()
+    recorder.failure = DependencyUnavailableError("The admission commit acknowledgment was lost.")
+    store = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    try:
+        with pytest.raises(DependencyUnavailableError):
+            await _invoke_bound(store, action, JobEffectId(uuid4()))
+        assert sends == [] and recorder.aborted == []
+    finally:
+        await store.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["put", "delete"])
+async def test_waiting_abort_excludes_the_late_callable_and_retains_exact_observation(
+    tmp_path: Path, client: S3Client, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    sends: list[str] = []
+    _capture_mutations(client, monkeypatch, sends)
+    recorder = MockInvocationRecorder()
+    observation = JobEffectId(uuid4())
+    scheduled = asyncio.Event()
+    release = asyncio.Event()
+    original = asyncio.to_thread
+
+    async def delayed(function: Callable[[], None]) -> None:
+        scheduled.set()
+        await release.wait()
+        await original(function)
+
+    monkeypatch.setattr(asyncio, "to_thread", delayed)
+    store = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    task = asyncio.create_task(_invoke_bound(store, action, observation))
+    try:
+        await asyncio.wait_for(scheduled.wait(), 1)
+        task.cancel()
+        with pytest.raises(SafeJobRetryError):
+            await task
+        release.set()
+        await asyncio.wait_for(store.close(), 1)
+        assert sends == []
+        assert recorder.admitted == {observation}
+        assert recorder.aborted == [(action, observation)]
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+        await store.close()
+
+
+@pytest.mark.asyncio
+async def test_admission_wait_spends_the_original_storage_deadline(
+    tmp_path: Path, client: S3Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sends: list[str] = []
+    _capture_mutations(client, monkeypatch, sends)
+    recorder = MockInvocationRecorder()
+    recorder.release = asyncio.Event()
+    store = S3ArtifactStore(
+        settings(tmp_path, operation_timeout_seconds=0.02), client=client, observations=recorder
+    )
+    task = asyncio.create_task(_invoke_bound(store, "put", JobEffectId(uuid4())))
+    try:
+        with pytest.raises(TimeoutError):
+            await task
+        assert sends == [] and recorder.aborted == []
+    finally:
+        recorder.release.set()
+        await asyncio.gather(task, return_exceptions=True)
+        await store.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["put", "delete"])
+async def test_entered_invocation_cancellation_keeps_unknown_without_abort_proof(
+    tmp_path: Path, client: S3Client, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    entered = threading.Event()
+    release = threading.Event()
+    sends: list[str] = []
+
+    def native() -> None:
+        sends.append(action)
+        entered.set()
+        assert release.wait(2)
+
+    def put(**_values: object) -> PutObjectOutputTypeDef:
+        native()
+        return cast(PutObjectOutputTypeDef, {})
+
+    def delete(**_values: object) -> DeleteObjectOutputTypeDef:
+        native()
+        return cast(DeleteObjectOutputTypeDef, {})
+
+    monkeypatch.setattr(client, "put_object", put)
+    monkeypatch.setattr(client, "delete_object", delete)
+    recorder = MockInvocationRecorder()
+    observation = JobEffectId(uuid4())
+    store = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    task = asyncio.create_task(_invoke_bound(store, action, observation))
+    try:
+        assert await asyncio.to_thread(entered.wait, 1)
+        task.cancel()
+        with pytest.raises(ArtifactWriteOutcomeUnknownError):
+            await task
+        assert sends == [action] and recorder.aborted == []
+        assert recorder.admitted == {observation}
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+        await asyncio.wait_for(store.close(), 1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["put", "delete"])
+async def test_abort_recording_acknowledgment_loss_cannot_report_safe_retry(
+    tmp_path: Path, client: S3Client, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    sends: list[str] = []
+    _capture_mutations(client, monkeypatch, sends)
+    recorder = MockInvocationRecorder()
+    recorder.abort_failure = DependencyUnavailableError("The proof commit acknowledgment was lost.")
+    observation = JobEffectId(uuid4())
+    scheduled = asyncio.Event()
+    release = asyncio.Event()
+    original = asyncio.to_thread
+
+    async def delayed(function: Callable[[], None]) -> None:
+        scheduled.set()
+        await release.wait()
+        await original(function)
+
+    monkeypatch.setattr(asyncio, "to_thread", delayed)
+    store = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    task = asyncio.create_task(_invoke_bound(store, action, observation))
+    try:
+        await asyncio.wait_for(scheduled.wait(), 1)
+        task.cancel()
+        with pytest.raises(DependencyUnavailableError):
+            await task
+        release.set()
+        await asyncio.wait_for(store.close(), 1)
+        assert sends == []
+        assert recorder.aborted == [(action, observation)]
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+        await store.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["put", "delete"])
+@pytest.mark.parametrize("interruption", ["cancel", "timeout"])
+async def test_abort_recording_cannot_outlive_the_original_operation_deadline(
+    tmp_path: Path,
+    client: S3Client,
+    monkeypatch: pytest.MonkeyPatch,
+    action: str,
+    interruption: str,
+) -> None:
+    sends: list[str] = []
+    _capture_mutations(client, monkeypatch, sends)
+    recorder = MockInvocationRecorder()
+    observation = JobEffectId(uuid4())
+    scheduled = asyncio.Event()
+    native_release = asyncio.Event()
+    recording_started = asyncio.Event()
+    record_release = asyncio.Event()
+    original = asyncio.to_thread
+
+    async def delayed(function: Callable[[], None]) -> None:
+        scheduled.set()
+        await native_release.wait()
+        await original(function)
+
+    async def record_put(bound: JobEffectId, attempt: ArtifactAttemptDTO) -> None:
+        assert (bound, attempt) == (observation, ATTEMPT)
+        recording_started.set()
+        await record_release.wait()
+
+    async def record_delete(
+        bound: JobEffectId, scope: ArtifactScopeDTO, attempt_id: ArtifactAttemptId
+    ) -> None:
+        assert (bound, scope, attempt_id) == (observation, SCOPE, ATTEMPT.attempt_id)
+        recording_started.set()
+        await record_release.wait()
+
+    monkeypatch.setattr(asyncio, "to_thread", delayed)
+    monkeypatch.setattr(recorder, "record_put_abort", record_put)
+    monkeypatch.setattr(recorder, "record_delete_abort", record_delete)
+    store = S3ArtifactStore(
+        settings(tmp_path, operation_timeout_seconds=1), client=client, observations=recorder
+    )
+    task = asyncio.create_task(_invoke_bound(store, action, observation))
+    operation_completed = False
+    outcome: BaseException | None = None
+    try:
+        await asyncio.wait_for(scheduled.wait(), 1)
+        if interruption == "cancel":
+            task.cancel()
+            await asyncio.wait_for(recording_started.wait(), 1)
+        done, _ = await asyncio.wait((task,), timeout=3)
+        operation_completed = task in done
+        if operation_completed:
+            result = (await asyncio.gather(task, return_exceptions=True))[0]
+            assert isinstance(result, BaseException)
+            outcome = result
+    finally:
+        record_release.set()
+        native_release.set()
+        await asyncio.wait_for(asyncio.gather(task, return_exceptions=True), 1)
+        await asyncio.wait_for(store.close(), 1)
+
+    assert operation_completed, "Only the independent test watchdog completed."
+    assert sends == [] and recorder.aborted == []
+    assert recording_started.is_set() == (interruption == "cancel")
+    assert isinstance(outcome, ArtifactWriteOutcomeUnknownError)
+    cause = outcome.__cause__
+    assert isinstance(cause, BaseExceptionGroup)
+    failures = cast(BaseExceptionGroup[BaseException], cause).exceptions
+    assert len(failures) == 2
+    assert isinstance(
+        failures[0], asyncio.CancelledError if interruption == "cancel" else TimeoutError
+    )
+    assert isinstance(failures[1], TimeoutError)

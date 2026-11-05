@@ -8,8 +8,13 @@ from inframeld_backend.access.application.dtos.admitted_work_authority_dto impor
 )
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
+from inframeld_backend.shared.application.dtos.job_effect_binding_dto import JobEffectBindingDTO
+from inframeld_backend.shared.application.dtos.job_effect_observation_dto import (
+    JobEffectObservationDTO,
+)
 from inframeld_backend.shared.application.dtos.job_snapshot_dto import JobSnapshotDTO
 from inframeld_backend.shared.application.protocols.job_ownership import JobOwnership
+from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
@@ -24,6 +29,46 @@ class JobStore(JobOwnership, Protocol):
     idempotency transaction. Every authoritative attempt save must match its
     original job and live fence. This capability grants no product authority.
     """
+
+    @abstractmethod
+    async def register_effect(self, binding: JobEffectBindingDTO) -> None:
+        """Save invocation intent and pending unit under the original live fence."""
+        ...
+
+    @abstractmethod
+    async def effect(self, effect_id: JobEffectId) -> JobEffectObservationDTO | None: ...
+
+    @abstractmethod
+    async def validate_effect_target(self, binding: JobEffectBindingDTO) -> None:
+        """Match the original target and actual sealed expectation without inventing bytes."""
+        ...
+
+    @abstractmethod
+    async def admit_effect(self, observation: JobEffectObservationDTO) -> None:
+        """Claim physical admission once, without replaying a successful grant."""
+        ...
+
+    @abstractmethod
+    async def record_effect_abort(self, observation: JobEffectObservationDTO) -> None: ...
+
+    @abstractmethod
+    async def pending_observation(self, job: JobSnapshotDTO) -> JobEffectObservationDTO | None: ...
+
+    @abstractmethod
+    async def consume_effect(
+        self, job: JobSnapshotDTO, observation: JobEffectObservationDTO
+    ) -> None:
+        """Consume exact historical proof and clear its pending unit during atomic retirement.
+
+        The caller holds owner, queue and job coordination. Match the expired
+        original attempt without pretending that its former fence is live.
+        """
+        ...
+
+    @abstractmethod
+    async def peek_candidate(self) -> JobSnapshotDTO | None:
+        """Observe without queue locks so product owner coordination can come first."""
+        ...
 
     @abstractmethod
     async def admit(

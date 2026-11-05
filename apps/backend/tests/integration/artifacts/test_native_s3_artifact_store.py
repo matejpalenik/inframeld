@@ -38,7 +38,15 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(scope="module")
 def seaweed() -> Iterator[SeaweedFixture]:
     with closing(create_client(bootstrap=True)) as bootstrap:
-        bootstrap.create_bucket(Bucket=BUCKET)
+        try:
+            bootstrap.create_bucket(Bucket=BUCKET)
+        except ClientError as error:
+            response_error = error.response.get("Error")
+            if (
+                not isinstance(response_error, dict)
+                or response_error.get("Code") != "BucketAlreadyOwnedByYou"
+            ):
+                raise
     yield SeaweedFixture()
 
 

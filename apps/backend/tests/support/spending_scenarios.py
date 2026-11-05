@@ -101,9 +101,16 @@ from inframeld_backend.shared.application.dtos.spending_usage_dto import Spendin
 from inframeld_backend.shared.application.protocols.spending_ledger_writer import (
     SpendingLedgerWriter,
 )
+from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
+    ArtifactCleanupAuthorizationService,
+)
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
 from inframeld_backend.shared.application.services.job_admission_service import JobAdmissionService
+from inframeld_backend.shared.application.services.job_continuation_eligibility_service import (
+    JobContinuationEligibilityService,
+)
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
+from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
 from inframeld_backend.shared.application.services.project_spending_policy_fingerprint_service import (
     ProjectSpendingPolicyFingerprintService,
 )
@@ -128,6 +135,9 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint_key 
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.usd_amount import UsdAmount
+from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
+    PostgresArtifactCleanupFactsReader,
+)
 from inframeld_backend.shared.infrastructure.readers.postgres_spending_ledger_reader import (
     PostgresSpendingLedgerReader,
 )
@@ -225,11 +235,26 @@ async def _admit_attempt(
             payload=JobPayload("test.spending", 1, b""),
         )
     async with database.session() as session:
+        recovery_store = PostgresJobStore(session)
+        product_authority = AdmittedWorkAuthorizationService(
+            PostgresAdmittedWorkFactsReader(session)
+        )
+        recovery_service = JobRecoveryService(
+            recovery_store,
+            JobContinuationEligibilityService(
+                recovery_store,
+                product_authority,
+                ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
+                supported_payloads=(("test.spending", 1),),
+            ),
+        )
         attempt = await JobExecutionService(
             SqlAlchemyTransactionManager(session),
-            PostgresJobStore(session),
+            recovery_store,
             supported_payloads=(("test.spending", 1),),
             worker_id=uuid4(),
+            product=product_authority,
+            recovery=recovery_service,
         ).claim_next()
     assert attempt is not None and isinstance(attempt.binding, ProductJobBindingDTO)
     assert attempt.job_id == admitted.job_id

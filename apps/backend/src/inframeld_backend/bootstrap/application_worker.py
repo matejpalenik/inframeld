@@ -9,6 +9,12 @@ from pydantic import ValidationError
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 
+from inframeld_backend.access.application.services.admitted_work_authorization_service import (
+    AdmittedWorkAuthorizationService,
+)
+from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_facts_reader import (
+    PostgresAdmittedWorkFactsReader,
+)
 from inframeld_backend.bootstrap.application_worker_application_settings import (
     ApplicationWorkerApplicationSettings,
 )
@@ -26,9 +32,22 @@ from inframeld_backend.shared.application.errors.job_errors import (
     SafeJobRetryError,
 )
 from inframeld_backend.shared.application.protocols.job_handler import JobHandler
+from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
+    ArtifactCleanupAuthorizationService,
+)
+from inframeld_backend.shared.application.services.artifact_cleanup_job_handler import (
+    ArtifactCleanupJobHandler,
+)
+from inframeld_backend.shared.application.services.job_continuation_eligibility_service import (
+    JobContinuationEligibilityService,
+)
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
+from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
+from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
+    PostgresArtifactCleanupFactsReader,
+)
 from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
     PostgresInstallationIdentityReader,
 )
@@ -37,6 +56,7 @@ from inframeld_backend.shared.infrastructure.readers.postgres_job_queue_status_r
 )
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.resources.s3_artifact_store import S3ArtifactStore
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
 )
@@ -58,13 +78,30 @@ async def _claim(
             asyncio.timeout(settings.jobs.database_timeout_seconds),
             database.session() as session,
         ):
+            recovery_store = PostgresJobStore(session)
+            product_authority = AdmittedWorkAuthorizationService(
+                PostgresAdmittedWorkFactsReader(session)
+            )
+            recovery_service = JobRecoveryService(
+                recovery_store,
+                JobContinuationEligibilityService(
+                    recovery_store,
+                    product_authority,
+                    ArtifactCleanupAuthorizationService(
+                        PostgresArtifactCleanupFactsReader(session)
+                    ),
+                    supported_payloads=supported,
+                ),
+            )
             return await JobExecutionService(
                 SqlAlchemyTransactionManager(session),
-                PostgresJobStore(session),
+                recovery_store,
                 supported_payloads=supported,
                 worker_id=worker_id,
                 lease_seconds=settings.jobs.lease_seconds,
                 work_seconds=settings.jobs.work_seconds,
+                product=product_authority,
+                recovery=recovery_service,
             ).claim_next()
     except (TimeoutError, OperationalError, InterfaceError, SqlAlchemyTimeoutError):
         raise DependencyUnavailableError("The ordinary job claim could not be confirmed.") from None
@@ -137,16 +174,13 @@ async def _execute(
 async def run_application_worker(
     settings: ApplicationWorkerApplicationSettings,
     stopped: asyncio.Event,
-    handlers: tuple[JobHandler, ...] = (),
+    handlers: tuple[JobHandler, ...],
+    *,
+    database: Database,
+    operations: ApplicationWorkerOperations,
 ) -> None:
     """Run one fenced ordinary attempt, preserving accepted work on bounded shutdown."""
-    supported = tuple(handler.payload_type() for handler in handlers)
-    for kind, version in supported:
-        JobPayload(kind, version, b"")
-    if len(set(supported)) != len(supported):
-        raise ValueError("A job payload must have one trusted handler registration.")
-    database = Database(settings.database)
-    operations = ApplicationWorkerOperations(database, settings.jobs, stopped)
+    supported: tuple[tuple[str, int], ...] = ()
     worker_id = uuid4()
     log = structlog.get_logger()
     startup: asyncio.Task[None] | None = None
@@ -203,6 +237,11 @@ async def run_application_worker(
                 await _wait(stopped, settings.jobs.poll_seconds)
 
     try:
+        supported = tuple(handler.payload_type() for handler in handlers)
+        for kind, version in supported:
+            JobPayload(kind, version, b"")
+        if len(set(supported)) != len(supported):
+            raise ValueError("A job payload must have one trusted handler registration.")
         if stopped.is_set():
             return
         stop_wait = asyncio.create_task(stopped.wait())
@@ -241,11 +280,30 @@ async def _serve(settings: ApplicationWorkerApplicationSettings) -> None:
     loop = asyncio.get_running_loop()
     for signum in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(signum, stopped.set)
+    database: Database | None = None
+    artifacts: S3ArtifactStore | None = None
+    delegated = False
     try:
-        await run_application_worker(settings, stopped)
+        database = Database(settings.database)
+        operations = ApplicationWorkerOperations(database, settings.jobs, stopped)
+        artifacts = S3ArtifactStore(settings.artifact_storage, observations=operations)
+        handler = ArtifactCleanupJobHandler(operations, artifacts)
+        # Transfer the one pool to the runtime before validation or startup.
+        delegated = True
+        await run_application_worker(
+            settings, stopped, (handler,), database=database, operations=operations
+        )
     finally:
-        for signum in (signal.SIGINT, signal.SIGTERM):
-            loop.remove_signal_handler(signum)
+        try:
+            if artifacts is not None:
+                await artifacts.close()
+        finally:
+            try:
+                if database is not None and not delegated:
+                    await database.shutdown()
+            finally:
+                for signum in (signal.SIGINT, signal.SIGTERM):
+                    loop.remove_signal_handler(signum)
 
 
 def main() -> int:
