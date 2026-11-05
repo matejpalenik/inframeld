@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import type { CommandObservation } from "../../src/system/process.ts";
 import { setTimeout as delay } from "node:timers/promises";
 import { withDeniedFixtureRecovery } from "./fixtures/denied-cleanup.ts";
 import { execFile } from "node:child_process";
@@ -400,12 +401,16 @@ test(
   async () => {
     const testDeadline = performance.now() + 60000;
     const { z } = await import("zod");
-    const { command } = await import("../../src/system/process.ts");
+    const { command, hasConfirmedCleanup } =
+      await import("../../src/system/process.ts");
     const { home } = await import("../../src/config.ts");
     const work = await mkdtemp(join(tmpdir(), "sdk-denied-exit-"));
     const marker = join(work, "pid");
     await withDeniedFixtureRecovery(work, testDeadline, async () => {
       let check = "SDK_DENIED_COMMAND_EXIT";
+      let observation: Readonly<CommandObservation> | undefined;
+      let settlement: "fulfilled" | "rejected" | "unknown" = "unknown";
+      let reportedCleanupConfirmed = false;
       try {
         const began = performance.now();
         await assert.rejects(
@@ -421,6 +426,21 @@ test(
               timeout: 45000,
               cleanupTimeout: 100,
               env: { NODE_TEST_CONTEXT: undefined },
+              observeOutcome(value) {
+                observation = value;
+              },
+            },
+          ).then(
+            (value) => {
+              settlement = "fulfilled";
+              reportedCleanupConfirmed =
+                observation?.closeResult === "resolved";
+              return value;
+            },
+            (error: unknown) => {
+              settlement = "rejected";
+              reportedCleanupConfirmed = hasConfirmedCleanup(error);
+              throw error;
             },
           ),
           /exited 1/,
@@ -482,7 +502,23 @@ test(
           "The independent safety fuse must not satisfy the cleanup assertion",
         );
       } catch (error) {
-        throw Object.assign(new Error(check, { cause: error }), {
+        const cause =
+          check === "SDK_DENIED_COMMAND_EXIT"
+            ? {
+                command: {
+                  status: null,
+                  reason: "unknown",
+                  stopReason: "unknown",
+                  groupState: "unknown",
+                  closeResult: "unknown",
+                  ...observation,
+                  settlement,
+                  reportedCleanupConfirmed,
+                },
+                cause: error,
+              }
+            : error;
+        throw Object.assign(new Error(check, { cause }), {
           code: check,
         });
       }

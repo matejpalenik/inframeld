@@ -32,6 +32,11 @@ import {
   acquireProtectedFixtureDirectory,
 } from "../native/fixtures/fixture-diagnostics.ts";
 import nativeTestReporter from "../native/fixtures/fixture-diagnostics.ts";
+import {
+  describeError,
+  stage,
+  type Stage,
+} from "../../src/workflows/stages.ts";
 
 const nativeCases = [
   [
@@ -79,6 +84,38 @@ const deniedCheckCodes = [
   "SDK_DENIED_PS_OBSERVATION",
   "SDK_DENIED_TARGET_LIVE",
   "SDK_DENIED_INDEPENDENT_RECOVERY",
+] as const;
+
+const commandOutcomes = [
+  {
+    settlement: "rejected",
+    status: 2,
+    reason: "target-exit",
+    stopReason: "target-exit",
+    leaderReaped: true,
+    groupState: "quiescent",
+    closeResult: "resolved",
+    reportedCleanupConfirmed: true,
+  },
+  {
+    settlement: "fulfilled",
+    status: 0,
+    reason: "target-exit",
+    stopReason: "target-exit",
+    leaderReaped: true,
+    groupState: "quiescent",
+    closeResult: "resolved",
+    reportedCleanupConfirmed: true,
+  },
+  {
+    settlement: "rejected",
+    status: null,
+    reason: "timeout",
+    stopReason: "timeout",
+    groupState: "unknown",
+    closeResult: "rejected",
+    reportedCleanupConfirmed: false,
+  },
 ] as const;
 
 function nativeFailure(
@@ -258,9 +295,10 @@ test(
             destination = join(work, "controller-status.json"),
             log = join(work, "controller.raw.log");
           const testName = JSON.stringify(nativeCases[6][1]);
-          const checks = deniedCheckCodes.map(
-            (code) =>
-              `test(${testName}, () => { try { assert.equal(1, 0, "fake-private-marker"); } catch (error) { throw Object.assign(new Error(${JSON.stringify(code)}, { cause: error }), { code: ${JSON.stringify(code)} }); } });`,
+          const checks = deniedCheckCodes.map((code) =>
+            code === "SDK_DENIED_COMMAND_EXIT"
+              ? `test(${testName}, async () => { try { await assert.rejects(Promise.reject(new Error("fake-private-marker")), /exited 1/); } catch (error) { throw Object.assign(new Error(${JSON.stringify(code)}, { cause: { command: ${JSON.stringify(commandOutcomes[0])}, cause: error } }), { code: ${JSON.stringify(code)} }); } });`
+              : `test(${testName}, () => { try { assert.equal(1, 0, "fake-private-marker"); } catch (error) { throw Object.assign(new Error(${JSON.stringify(code)}, { cause: error }), { code: ${JSON.stringify(code)} }); } });`,
           );
           await writeFile(
             input,
@@ -271,6 +309,12 @@ test(
                     ...checks,
                     `test(${testName}, () => { throw Object.assign(new Error("fake-private-marker"), { code: "fake-private-marker" }); });`,
                     `test(${testName}, () => { throw new AggregateError([Object.assign(new Error("SDK_DENIED_ORIGINAL_ERRORS", { cause: new Error("fake-private-marker") }), { code: "SDK_DENIED_ORIGINAL_ERRORS" }), Object.assign(new Error("SDK_DENIED_INDEPENDENT_RECOVERY", { cause: new Error("fake-private-marker") }), { code: "SDK_DENIED_INDEPENDENT_RECOVERY" })], "fake-private-marker"); });`,
+                    ...commandOutcomes
+                      .slice(1)
+                      .map(
+                        (outcome, index) =>
+                          `test(${testName}, async () => { try { await assert.rejects(${index === 0 ? "Promise.resolve()" : 'Promise.reject(new Error("fake-private-marker"))'}, /exited 1/); } catch (error) { throw Object.assign(new Error("SDK_DENIED_COMMAND_EXIT", { cause: { command: ${JSON.stringify(outcome)}, cause: error } }), { code: "SDK_DENIED_COMMAND_EXIT" }); } });`,
+                      ),
                   ]
                 : [
                     `test(${testName}, () => { assert.equal(0, 0, "fake-private-marker"); });`,
@@ -332,7 +376,10 @@ test(
               !bytes.includes(work) &&
               !bytes.includes(".test.ts"),
           );
-          assert.equal(rows.length, fails ? deniedCheckCodes.length + 2 : 0);
+          assert.equal(
+            rows.length,
+            fails ? deniedCheckCodes.length + 1 + commandOutcomes.length : 0,
+          );
           assert.ok(rows.length <= 32);
           if (fails) {
             assert.ok(
@@ -378,6 +425,19 @@ test(
               aggregate.errors[1]?.code,
               "SDK_DENIED_INDEPENDENT_RECOVERY",
             );
+            for (const [index, outcome] of commandOutcomes.entries()) {
+              const failure =
+                rows[index === 0 ? 0 : deniedCheckCodes.length + 1 + index]
+                  ?.failure;
+              const projected = [
+                failure,
+                failure?.cause,
+                failure?.cause?.cause,
+                failure?.cause?.cause?.cause,
+              ].find((error) => error?.code === "SDK_DENIED_COMMAND_EXIT");
+              assert.deepEqual(projected?.command, outcome);
+              assert.equal(hasConfirmedCleanup(projected), false);
+            }
           }
         }
       },
@@ -391,6 +451,81 @@ test(
     );
   },
 );
+
+test("command outcome carrier is exact, private and never grants admission", async () => {
+  const original = new Error("fake-private-marker");
+  const carrier = { command: commandOutcomes[0], cause: original };
+  const failure = Object.assign(
+    new Error("SDK_DENIED_COMMAND_EXIT", { cause: carrier }),
+    { code: "SDK_DENIED_COMMAND_EXIT" },
+  );
+  const projected = JSON.parse(describeError(failure));
+  assert.deepEqual(projected.command, commandOutcomes[0]);
+  assert.ok(
+    projected.cause &&
+      !JSON.stringify(projected).includes("fake-private-marker"),
+  );
+  assert.equal(hasConfirmedCleanup(structuredClone(projected)), false);
+  const stages: Stage[] = [];
+  const result = await stage(stages, "reported-command", async () => {
+    throw failure;
+  });
+  assert.equal(result.mayStartProcess, false);
+  let getters = 0;
+  const hostile = { ...commandOutcomes[0] };
+  Object.defineProperty(hostile, "status", {
+    get() {
+      getters++;
+      throw original;
+    },
+  });
+  for (const [code, cause] of [
+    ["SDK_DENIED_RECEIPT", carrier],
+    ["SDK_DENIED_COMMAND_EXIT", { ...carrier, extra: "fake-private-marker" }],
+    [
+      "SDK_DENIED_COMMAND_EXIT",
+      {
+        command: { ...commandOutcomes[0], extra: "fake-private-marker" },
+        cause: original,
+      },
+    ],
+    ["SDK_DENIED_COMMAND_EXIT", { command: hostile, cause: original }],
+  ] as const) {
+    const error = Object.assign(new Error(code, { cause }), { code });
+    const bytes = describeError(error);
+    assert.equal(JSON.parse(bytes).command, undefined);
+    assert.ok(!bytes.includes("fake-private-marker"));
+  }
+  assert.equal(getters, 0);
+  const cycle = Object.assign(new Error("SDK_DENIED_COMMAND_EXIT"), {
+    code: "SDK_DENIED_COMMAND_EXIT",
+  });
+  Object.defineProperty(cycle, "cause", {
+    value: { command: commandOutcomes[0], cause: cycle },
+  });
+  assert.ok(describeError(cycle).includes("cycle"));
+  for (const [status, reason, expectedStatus, expectedReason] of [
+    [-15, "timeout", -15, "timeout"],
+    [9999, "fake-private-marker", null, "unknown"],
+  ] as const) {
+    const error = Object.assign(
+      new Error("SDK_DENIED_COMMAND_EXIT", {
+        cause: {
+          command: { ...commandOutcomes[0], status, reason },
+          cause: original,
+        },
+      }),
+      { code: "SDK_DENIED_COMMAND_EXIT" },
+    );
+    const detail = JSON.parse(describeError(error));
+    assert.equal(detail.command.status, expectedStatus);
+    assert.equal(detail.command.reason, expectedReason);
+    assert.ok(
+      Buffer.byteLength(describeError(error)) <= 4096 &&
+        !describeError(error).includes("fake-private-marker"),
+    );
+  }
+});
 
 function publicationClock() {
   let time = 100;
