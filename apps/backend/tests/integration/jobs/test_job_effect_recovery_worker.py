@@ -206,8 +206,8 @@ async def _claim(
             jobs,
             worker_id=uuid4(),
             supported_payloads=(("artifact.cleanup", 1),),
-            product=product,
-            recovery=recovery,
+            admitted_work_authorizer=product,
+            job_recovery=recovery,
             lease_seconds=settings.jobs.lease_seconds,
             work_seconds=settings.jobs.work_seconds,
         ).claim_next()
@@ -255,7 +255,7 @@ async def test_actual_handler_abort_is_consumed_before_registered_worker_retries
     operations = ApplicationWorkerOperations(
         database, _settings(temporary_postgres_settings).jobs, asyncio.Event()
     )
-    store = S3ArtifactStore(storage_settings(), observations=operations)
+    store = S3ArtifactStore(storage_settings(), effect_observation_recorder=operations)
     scheduled, release = asyncio.Event(), asyncio.Event()
     to_thread = asyncio.to_thread
 
@@ -352,7 +352,9 @@ async def test_sql_pool_is_free_during_native_delete_and_committed_ack_prevents_
         return native_delete(**arguments)
 
     monkeypatch.setattr(client, "delete_object", delayed_delete)
-    store = S3ArtifactStore(storage_settings(), client=client, observations=operations)
+    store = S3ArtifactStore(
+        storage_settings(), client=client, effect_observation_recorder=operations
+    )
     work: asyncio.Task[None] | None = None
     try:
         context = await _context(owner, settings)

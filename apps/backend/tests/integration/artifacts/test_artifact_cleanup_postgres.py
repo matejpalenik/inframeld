@@ -95,8 +95,8 @@ async def _claimed_cleanup(database: Database) -> JobAttemptContextDTO:
             recovery_store,
             supported_payloads=(("artifact.cleanup", 1),),
             worker_id=uuid4(),
-            product=product_authority,
-            recovery=recovery_service,
+            admitted_work_authorizer=product_authority,
+            job_recovery=recovery_service,
         ).claim_next()
     assert context is not None and context.job_id == allocated.cleanup_job_id
     assert isinstance(context.binding, ArtifactCleanupJobBindingDTO)

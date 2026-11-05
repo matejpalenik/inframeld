@@ -113,6 +113,13 @@ export type DeletionStatusResponse = ({
 } & UnresolvedDeletionStatusResponse);
 
 /**
+ * HttpMethod
+ *
+ * Identify the mutating method bound to an operation and its retry identity.
+ */
+export type HttpMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+/**
  * HumanAdmissionRequest
  */
 export type HumanAdmissionRequest = {
@@ -260,10 +267,7 @@ export type InframeldDiscoveryResponse = {
  * InitialProjectGrantResponse
  */
 export type InitialProjectGrantResponse = {
-    /**
-     * Actionid
-     */
-    actionId: 'manage-project-members' | 'create-access-groups' | 'create-application-accounts' | 'create-pipelines' | 'create-deployments' | 'manage-upload-defaults' | 'delete-project' | 'inspect-budget' | 'manage-budget' | 'manage-trace-policy' | 'delete-trace-history' | 'inspect-feedback' | 'create-collections' | 'create-sources' | 'create-model-connections' | 'create-processing-profiles' | 'create-embedding-profiles' | 'edit-project-metadata';
+    actionId: ProjectAction;
     /**
      * Cangrant
      */
@@ -414,6 +418,13 @@ export type OperationLookupResponse = ({
 } & UnresolvedOperationLookupResponse);
 
 /**
+ * OrganizationAction
+ *
+ * Name an action on the installation Organization.
+ */
+export type OrganizationAction = 'admit-users' | 'suspend-users' | 'restore-users' | 'create-projects';
+
+/**
  * OriginalOperationLookupRequest
  */
 export type OriginalOperationLookupRequest = {
@@ -426,10 +437,7 @@ export type OriginalOperationLookupRequest = {
      * Key
      */
     key: string;
-    /**
-     * Method
-     */
-    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+    method: HttpMethod;
     /**
      * Organizationid
      */
@@ -448,10 +456,7 @@ export type OriginalOperationLookupRequest = {
  * OwnOrganizationGrantResponse
  */
 export type OwnOrganizationGrantResponse = {
-    /**
-     * Actionid
-     */
-    actionId: 'admit-users' | 'suspend-users' | 'restore-users' | 'create-projects';
+    actionId: OrganizationAction;
     /**
      * Cangrant
      */
@@ -549,6 +554,13 @@ export type ProblemDetails = {
      */
     type: string;
 };
+
+/**
+ * ProjectAction
+ *
+ * Name an action on a Project without granting it to the caller.
+ */
+export type ProjectAction = 'manage-project-members' | 'create-access-groups' | 'create-application-accounts' | 'create-pipelines' | 'create-deployments' | 'manage-upload-defaults' | 'delete-project' | 'inspect-budget' | 'manage-budget' | 'manage-trace-policy' | 'delete-trace-history' | 'inspect-feedback' | 'create-collections' | 'create-sources' | 'create-model-connections' | 'create-processing-profiles' | 'create-embedding-profiles' | 'edit-project-metadata';
 
 /**
  * ProjectActionGrantItemResponse
@@ -1220,11 +1232,9 @@ export type ValidationIssue = {
      */
     code: string;
     /**
-     * Location
-     *
      * Request component containing the issue.
      */
-    location: 'body' | 'path' | 'query' | 'header' | 'cookie' | 'request';
+    location: ValidationIssueLocation;
     /**
      * Message
      *
@@ -1238,6 +1248,13 @@ export type ValidationIssue = {
      */
     path: Array<string | number>;
 };
+
+/**
+ * ValidationIssueLocation
+ *
+ * Identify the request component that contains an invalid field.
+ */
+export type ValidationIssueLocation = 'body' | 'path' | 'query' | 'header' | 'cookie' | 'request';
 
 /**
  * HumanOAuthConsentRequest

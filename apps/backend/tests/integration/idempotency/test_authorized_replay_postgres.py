@@ -49,15 +49,16 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
@@ -122,8 +123,8 @@ async def test_organization_scoped_retry_preserves_scope_fingerprint_and_expiry(
         scenario.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
     )
     authorization = MockAuthorizedOrganizationScopeDTO(scenario.organization_id)
-    context = OperationAdmissionContextDTO(
-        method="PATCH",
+    context = IdempotencyContextDTO(
+        method=HttpMethod.PATCH,
         requested_route="/v1/test-organization-operation",
         key=IdempotencyKey("organization-retry-1"),
     )
@@ -131,7 +132,7 @@ async def test_organization_scoped_retry_preserves_scope_fingerprint_and_expiry(
 
     async with database.session() as session, session.begin():
         service = IdempotencyService(PostgresOperationReservationWriter(session))
-        first = await service.find_or_reserve(
+        first = await service.reserve_or_recover(
             context=context,
             access=access,
             authorization=authorization,
@@ -148,7 +149,7 @@ async def test_organization_scoped_retry_preserves_scope_fingerprint_and_expiry(
 
     async with database.session() as session, session.begin():
         service = IdempotencyService(PostgresOperationReservationWriter(session))
-        retry = await service.find_or_reserve(
+        retry = await service.reserve_or_recover(
             context=context,
             access=access,
             authorization=authorization,
@@ -207,7 +208,7 @@ async def _authorized_request(
         ActionId("create-access-groups"),
         ProjectOperationAdmissionRequestDTO(
             project_id=scenario.project_id,
-            method="POST",
+            method=HttpMethod.POST,
             requested_route="/v1/projects/{project_id}/builds",
             key=IdempotencyKey("build-request-1"),
             fingerprint=RequestFingerprint(b"\x01" * 32),
@@ -220,8 +221,8 @@ def _service_and_writer(
 ) -> tuple[ProjectOperationAdmissionService, PostgresOperationReservationWriter]:
     writer = PostgresOperationReservationWriter(session)
     service = ProjectOperationAdmissionService(
-        authorizer=ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
-        idempotency=IdempotencyService(writer),
+        action_authorizer=ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+        operation_idempotency=IdempotencyService(writer),
     )
     return service, writer
 
@@ -269,11 +270,13 @@ async def test_mismatched_admission_scope_preserves_records_and_caller_transacti
         with pytest.raises(RuntimeError, match="The caller requested rollback"):
             async with session.begin():
                 service = ProjectOperationAdmissionService(
-                    authorizer=MockMismatchedActionAuthorizer(
+                    action_authorizer=MockMismatchedActionAuthorizer(
                         ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
                         wrong_project_id,
                     ),
-                    idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+                    operation_idempotency=IdempotencyService(
+                        PostgresOperationReservationWriter(session)
+                    ),
                 )
                 with pytest.raises(
                     RuntimeError, match="Authorization returned a different project"

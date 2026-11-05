@@ -14,6 +14,7 @@ from inframeld_backend.access.application.dtos.admitted_work_authority_dto impor
     AdmittedWorkAuthorityDTO,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -77,6 +78,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
 
     @asynccontextmanager
     async def _stage(self) -> AsyncGenerator[None]:
+        """Bound the database write and translate its availability failures."""
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Spending writes require the caller's active transaction.")
         try:
@@ -163,6 +165,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
         authority: AdmittedWorkAuthorityDTO,
         operation_limit: UsdAmount | None,
     ) -> None:
+        """Require the original operation identity and checked authority before accounting writes."""
         binding = authority.human_binding
         stored = (
             row.job_id,
@@ -231,6 +234,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
     async def _locked_call(
         self, record: SpendingCallRecordDTO
     ) -> tuple[ModelCallAccountingRow, SpendingCallRecordDTO]:
+        """Lock the original model call before checking and updating its accounting state."""
         operation = await self._operation(record.operation_id)
         self._require_operation_binding(
             operation, record.job_id, record.authority, record.operation_limit
@@ -256,6 +260,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
     def _require_immutable_call(
         original: SpendingCallRecordDTO, candidate: SpendingCallRecordDTO
     ) -> None:
+        """Prevent an accounting update from changing the original call identity or rate basis."""
         if (
             original.call_id,
             original.operation_id,
@@ -451,7 +456,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
                     target_kind="model-call",
                     target_id=record.call_id.value,
                     project_id=record.authority.project_id.value,
-                    action="manage-budget",
+                    action=ProjectAction.MANAGE_BUDGET.value,
                     before_values={"call_revision": previous_revision},
                     after_values={
                         "call_revision": record.revision,
@@ -465,6 +470,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
     async def _require_human_actor(
         self, actor_id: PrincipalId, organization_id: OrganizationId
     ) -> None:
+        """Require the retained human credential binding when the actor is human."""
         actor = await self._session.scalar(
             select(PrincipalRow.id).where(
                 PrincipalRow.id == actor_id.value,
@@ -525,7 +531,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
                     target_kind="project",
                     target_id=policy.project_id.value,
                     project_id=policy.project_id.value,
-                    action="manage-budget",
+                    action=ProjectAction.MANAGE_BUDGET.value,
                     correlation_id=operation_id.value,
                     before_values={
                         "revision": expected_revision,
@@ -559,7 +565,7 @@ class PostgresSpendingLedgerWriter(SpendingLedgerWriter):
                     IdempotencyReservationRow.project_id == policy.project_id.value,
                     IdempotencyReservationRow.lookup_authority_family
                     == OperationLookupAuthorityFamily.PROJECT_ACTION_USE.value,
-                    IdempotencyReservationRow.lookup_action_id == "manage-budget",
+                    IdempotencyReservationRow.lookup_action_id == ProjectAction.MANAGE_BUDGET.value,
                 )
             )
             if operation is None:

@@ -4,7 +4,7 @@ import asyncio
 import os
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, replace
-from typing import Literal
+from enum import StrEnum
 from uuid import uuid4
 
 import httpx2
@@ -18,7 +18,7 @@ from tests.support.hydra_provider import (
     PKCEChallenge,
     hydra_test_provider,
 )
-from tests.support.hydra_token_request_gate import HydraTokenRequestGate
+from tests.support.hydra_token_request_gate import HydraTokenRequestGate, TokenRequestPhase
 from tests.support.integration_services import KRATOS_PUBLIC_URL
 from tests.support.kratos_browser import RegisteredHumanDTO, WhoamiResponse, register_human
 
@@ -33,6 +33,13 @@ from inframeld_backend.access.domain.value_objects.human_credential_version impo
 )
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+
+
+class ProofCase(StrEnum):
+    MISSING = "missing"
+    INCORRECT = "incorrect"
+    ANOTHER_FLOW = "another_flow"
+
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_HYDRA_INTEGRATION") != "1",
@@ -116,7 +123,7 @@ async def test_s256_code_exchange_preserves_the_bound_human_and_installation(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("pkce", ["missing", "plain", "missing_method"])
+@pytest.mark.parametrize("pkce", [ProofCase.MISSING, "plain", "missing_method"])
 async def test_invalid_pkce_authorization_is_rejected_by_hydra(
     scenario: CLICredentialScenario, pkce: PKCEChallenge
 ) -> None:
@@ -128,20 +135,22 @@ async def test_invalid_pkce_authorization_is_rejected_by_hydra(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("proof", ["missing", "incorrect", "another_flow"])
+@pytest.mark.parametrize("proof", [ProofCase.MISSING, ProofCase.INCORRECT, ProofCase.ANOTHER_FLOW])
 async def test_code_exchange_rejects_missing_incorrect_or_other_flow_proof(
-    scenario: CLICredentialScenario, proof: Literal["missing", "incorrect", "another_flow"]
+    scenario: CLICredentialScenario, proof: ProofCase
 ) -> None:
     code = await scenario.provider.approve_login_and_consent(
         await scenario.provider.begin_login(scenario.alice)
     )
-    if proof == "incorrect":
+    if proof == ProofCase.INCORRECT:
         code = replace(code, verifier=SecretStr("W" * 64))
-    elif proof == "another_flow":
+    elif proof == ProofCase.ANOTHER_FLOW:
         other = await scenario.provider.begin_login(scenario.alice)
         code = replace(code, verifier=other.verifier)
     assert (
-        await scenario.provider.exchange_authorization_code(code, omit_verifier=proof == "missing")
+        await scenario.provider.exchange_authorization_code(
+            code, omit_verifier=proof == ProofCase.MISSING
+        )
         is None
     )
 
@@ -214,7 +223,7 @@ async def test_lost_successful_refresh_response_requires_a_fresh_login(
     original = await scenario.provider.issue_tokens(
         scenario.alice, browser=scenario.laptop_browser, remember_login=True
     )
-    scenario.gate.arm("after_response")
+    scenario.gate.arm(TokenRequestPhase.AFTER_RESPONSE)
     refresh = asyncio.create_task(scenario.provider.refresh_tokens(original))
     try:
         await scenario.gate.wait_until_paused()

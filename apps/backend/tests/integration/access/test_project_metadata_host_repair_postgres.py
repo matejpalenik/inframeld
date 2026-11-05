@@ -66,14 +66,14 @@ def command(
     operation: str = "operator-original",
 ) -> RepairProjectMetadataAuthorityCommand:
     return RepairProjectMetadataAuthorityCommand(
-        binding.installation_id,
-        OperationId(operation),
-        project_id,
-        0,
-        UUID(binding.identity.subject.value),
-        "Host operator",
-        "Repair exact metadata responsibility",
-        HumanAccessTokenCredential("opaque-unit-boundary-proof"),
+        expected_installation_id=binding.installation_id,
+        operation_id=OperationId(operation),
+        project_id=project_id,
+        expected_access_revision=0,
+        expected_identity_id=UUID(binding.identity.subject.value),
+        operator_label="Host operator",
+        reason="Repair exact metadata responsibility",
+        identity_proof=HumanAccessTokenCredential("opaque-unit-boundary-proof"),
     )
 
 

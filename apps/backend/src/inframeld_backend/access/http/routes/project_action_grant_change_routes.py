@@ -29,6 +29,7 @@ from inframeld_backend.access.http.responses.project_action_grant_removal_respon
 from inframeld_backend.access.http.responses.project_action_grant_response import (
     ProjectActionGrantResponse,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.http.builders.problem_response import build_problem_response
 from inframeld_backend.shared.http.definitions.problem_catalogue import (
@@ -193,7 +194,7 @@ def create_project_action_grant_change_router(
         command = ProjectActionGrantChangeMapper.set_command(
             project_id, recipient_principal_id, action_id, body
         )
-        context = ProjectActionGrantChangeMapper.context(command, "PUT", key)
+        context = ProjectActionGrantChangeMapper.context(command, HttpMethod.PUT, key)
         async with open_changer() as service:
             result = await service.set_action_grant(access=access, command=command, context=context)
         response.status_code = result.status_code
@@ -218,7 +219,7 @@ def create_project_action_grant_change_router(
         command = ProjectActionGrantChangeMapper.remove_command(
             project_id, recipient_principal_id, action_id, expected_access_revision
         )
-        context = ProjectActionGrantChangeMapper.context(command, "DELETE", key)
+        context = ProjectActionGrantChangeMapper.context(command, HttpMethod.DELETE, key)
         async with open_changer() as service:
             result = await service.remove_action_grant(
                 access=access, command=command, context=context

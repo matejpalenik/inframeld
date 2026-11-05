@@ -44,8 +44,8 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
@@ -100,7 +100,7 @@ class MockMetadataOperations(ProjectMetadataReader, ProjectMetadataChanger, Proj
         *,
         access: AccessContextDTO,
         command: UpdateProjectMetadataCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMetadataChangeResultDTO:
         self.commands.append(command)
         return ProjectMetadataChangeResultDTO(self.result, SAVED_RESULT)

@@ -24,8 +24,8 @@ _ASSIGN_USE_ONLY_PURPOSE = "access.project-grant.assign-use-only:v1"
 class ProjectGrantChangeFingerprintService:
     """Define grant-command meaning before the shared keyed fingerprint is made."""
 
-    def __init__(self, fingerprints: RequestFingerprintService) -> None:
-        self._fingerprints = fingerprints
+    def __init__(self, request_fingerprint_service: RequestFingerprintService) -> None:
+        self._request_fingerprint_service = request_fingerprint_service
 
     def for_set(self, command: SetProjectActionGrantCommand) -> RequestFingerprint:
         canonical_request = dumps(
@@ -40,7 +40,7 @@ class ProjectGrantChangeFingerprintService:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
-        return self._fingerprints.fingerprint(
+        return self._request_fingerprint_service.fingerprint(
             purpose="access.project-grant.set:v1", canonical_request=canonical_request
         )
 
@@ -56,7 +56,7 @@ class ProjectGrantChangeFingerprintService:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
-        return self._fingerprints.fingerprint(
+        return self._request_fingerprint_service.fingerprint(
             purpose="access.project-grant.remove:v1", canonical_request=canonical_request
         )
 
@@ -73,6 +73,6 @@ class ProjectGrantChangeFingerprintService:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
-        return self._fingerprints.fingerprint(
+        return self._request_fingerprint_service.fingerprint(
             purpose=_ASSIGN_USE_ONLY_PURPOSE, canonical_request=canonical_request
         )

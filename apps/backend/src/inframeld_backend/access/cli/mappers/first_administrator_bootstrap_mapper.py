@@ -59,13 +59,15 @@ class FirstAdministratorBootstrapMapper:
             if type(revision) is not int:
                 raise ValueError("A whole-number review revision is required.")
             return BootstrapFirstAdministratorCommand(
-                InstallationId(UUID(_text(values["expectedInstallationId"]))),
-                OperationId(_text(values["operationId"])),
-                revision,
-                UUID(_text(values["expectedIdentityId"])),
-                _text(values["operatorLabel"]),
-                _text(values["reason"]),
-                HumanAccessTokenCredential(_text(proof["accessToken"])),
+                expected_installation_id=InstallationId(
+                    UUID(_text(values["expectedInstallationId"]))
+                ),
+                operation_id=OperationId(_text(values["operationId"])),
+                expected_access_revision=revision,
+                expected_identity_id=UUID(_text(values["expectedIdentityId"])),
+                operator_label=_text(values["operatorLabel"]),
+                reason=_text(values["reason"]),
+                identity_proof=HumanAccessTokenCredential(_text(proof["accessToken"])),
             )
         except (ValueError, TypeError, UnicodeError, RecursionError):
             raise ProjectMetadataMaintenanceInputError(operation_id) from None

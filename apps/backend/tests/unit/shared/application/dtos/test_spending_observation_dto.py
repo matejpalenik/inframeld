@@ -9,6 +9,9 @@ from inframeld_backend.shared.application.dtos.spending_observation_dto import (
     SpendingObservationDTO,
 )
 from inframeld_backend.shared.application.dtos.spending_usage_dto import SpendingUsageDTO
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.value_objects.model_call_id import ModelCallId
 
 
@@ -16,7 +19,7 @@ def _observation() -> SpendingObservationDTO:
     return SpendingObservationDTO(
         UUID(int=1),
         ModelCallId(UUID(int=2)),
-        "charge",
+        SpendingObservationKind.CHARGE,
         datetime(2026, 11, 1, tzinfo=UTC),
         "fixture-charge",
         charge=Decimal("0.000000000000001"),

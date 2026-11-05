@@ -10,6 +10,9 @@ from inframeld_backend.access.application.commands.set_project_action_grant_comm
 from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
     ProjectActionGrantChangeResultDTO,
 )
+from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
+    ProjectActionGrantChangeKind,
+)
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
     ProjectActionEligibilityPolicy,
@@ -26,9 +29,10 @@ from inframeld_backend.access.http.responses.project_action_grant_removal_respon
 from inframeld_backend.access.http.responses.project_action_grant_response import (
     ProjectActionGrantResponse,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import InvalidInputError
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 
@@ -72,10 +76,10 @@ class ProjectActionGrantChangeMapper:
     @staticmethod
     def context(
         command: SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
-        method: Literal["PUT", "DELETE"],
+        method: Literal[HttpMethod.PUT, HttpMethod.DELETE],
         key: IdempotencyKey,
-    ) -> OperationAdmissionContextDTO:
-        return OperationAdmissionContextDTO(
+    ) -> IdempotencyContextDTO:
+        return IdempotencyContextDTO(
             method,
             f"/v1/projects/{command.project_id.value}/grants/{command.recipient_principal_id.value}/{command.action_id.value}",
             key,
@@ -83,7 +87,7 @@ class ProjectActionGrantChangeMapper:
 
     @staticmethod
     def set_response(result: ProjectActionGrantChangeResultDTO) -> ProjectActionGrantResponse:
-        if result.change_kind != "set" or result.can_grant is None:
+        if result.change_kind != ProjectActionGrantChangeKind.SET or result.can_grant is None:
             raise RuntimeError("Assignment returned a different original operation result.")
         return ProjectActionGrantResponse(
             operation_id=result.operation.operation_id.value,
@@ -100,7 +104,10 @@ class ProjectActionGrantChangeMapper:
     def remove_response(
         result: ProjectActionGrantChangeResultDTO,
     ) -> ProjectActionGrantRemovalResponse:
-        if result.change_kind != "remove" or result.can_grant is not None:
+        if (
+            result.change_kind != ProjectActionGrantChangeKind.REMOVE
+            or result.can_grant is not None
+        ):
             raise RuntimeError("Removal returned a different original operation result.")
         return ProjectActionGrantRemovalResponse(
             operation_id=result.operation.operation_id.value,

@@ -33,14 +33,14 @@ from inframeld_backend.shared.application.errors.application_errors import Acces
 class DeletionStatusAuthorizationService(DeletionStatusAuthorizer):
     """Check current human eligibility before permitting original-initiator matching."""
 
-    def __init__(self, reader: DeletionStatusFactsReader) -> None:
-        self._reader = reader
+    def __init__(self, deletion_status_facts_reader: DeletionStatusFactsReader) -> None:
+        self._deletion_status_facts_reader = deletion_status_facts_reader
 
     @override
     async def require_authorization(
         self, *, access: AccessContextDTO, request: DeletionStatusAuthorizationRequestDTO
     ) -> DeletionStatusAuthorizationDTO:
-        facts = await self._reader.read(access=access)
+        facts = await self._deletion_status_facts_reader.read(access=access)
         if facts is None:
             raise AccessDeniedError()
         if facts.principal.id != access.actor_principal_id:

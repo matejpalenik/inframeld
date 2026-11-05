@@ -39,9 +39,10 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
@@ -86,17 +87,17 @@ INITIAL_ACTIONS = tuple(
 COMMAND = CreateProjectCommand(
     OrganizationId(UUID(int=2)), 7, ResourceName("production"), SubmittedDisplayName("Production")
 )
-CONTEXT = OperationAdmissionContextDTO("POST", "/v1/projects", IdempotencyKey("create-original"))
+CONTEXT = IdempotencyContextDTO(HttpMethod.POST, "/v1/projects", IdempotencyKey("create-original"))
 ORIGINAL = CreatedProjectDTO(
-    SAVED_RESULT.operation_id,
-    COMMAND.organization_id,
-    ProjectId(UUID(int=3)),
-    ACCESS.actor_principal_id,
-    COMMAND.name,
-    COMMAND.display_name.value,
-    1,
-    0,
-    INITIAL_ACTIONS,
+    operation_id=SAVED_RESULT.operation_id,
+    organization_id=COMMAND.organization_id,
+    project_id=ProjectId(UUID(int=3)),
+    creator_principal_id=ACCESS.actor_principal_id,
+    name=COMMAND.name,
+    display_name=COMMAND.display_name.value,
+    access_revision=1,
+    metadata_revision=0,
+    initial_actions=INITIAL_ACTIONS,
 )
 
 
@@ -177,12 +178,12 @@ def scenario() -> CreationScenarioDTO:
     idempotency, transactions = MockOperationIdempotency(events), MockTransactions(events)
     return CreationScenarioDTO(
         ProjectCreationService(
-            transactions=transactions,
-            authorizer=authorizer,
-            writer=writer,
-            results=results,
-            idempotency=idempotency,
-            fingerprints=ProjectCreationFingerprintService(
+            transaction_manager=transactions,
+            creation_authorizer=authorizer,
+            creation_writer=writer,
+            creation_result_reader=results,
+            operation_idempotency=idempotency,
+            creation_fingerprint_service=ProjectCreationFingerprintService(
                 RequestFingerprintService(RequestFingerprintKey(b"k" * 32))
             ),
         ),

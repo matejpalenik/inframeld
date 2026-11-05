@@ -142,7 +142,7 @@ async def test_unsupported_approval_creates_no_credential_version(
         MockUnexpectedConsentDecisionWriter(),
         MockInvalidBrowserVerifier(calls),
         PostgresIdentityRecoveryBlockReader(database),
-        credential_states=PostgresHumanCredentialStateReader(database),
+        credential_state_reader=PostgresHumanCredentialStateReader(database),
         credential_initializer=PostgresHumanCredentialStateInitializer(database),
         authority=IdentityAuthority("kratos:test"),
         api_audience=AUDIENCE,

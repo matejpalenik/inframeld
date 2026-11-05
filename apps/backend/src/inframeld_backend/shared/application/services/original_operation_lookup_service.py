@@ -39,10 +39,12 @@ from inframeld_backend.shared.application.queries.lookup_original_operation_quer
 
 class OriginalOperationLookupService(OriginalOperationLookup):
     def __init__(
-        self, authorizer: OperationLookupAuthorizer, reader: OperationLookupReader
+        self,
+        operation_lookup_authorizer: OperationLookupAuthorizer,
+        operation_lookup_reader: OperationLookupReader,
     ) -> None:
-        self._authorizer = authorizer
-        self._reader = reader
+        self._operation_lookup_authorizer = operation_lookup_authorizer
+        self._operation_lookup_reader = operation_lookup_reader
 
     @override
     async def lookup(
@@ -57,14 +59,18 @@ class OriginalOperationLookupService(OriginalOperationLookup):
         query.expected_authority.require_supported_scope(
             project_id=query.project_id, method=query.method, requested_route=query.requested_route
         )
-        authorized = await self._authorizer.require_authorization(access=access, request=query)
+        authorized = await self._operation_lookup_authorizer.require_authorization(
+            access=access, request=query
+        )
         if (authorized.organization_id, authorized.project_id) != (
             query.organization_id,
             query.project_id,
         ):
             raise RuntimeError("Lookup authorization returned a different scope.")
 
-        record = await self._reader.read(principal_id=access.actor_principal_id, query=query)
+        record = await self._operation_lookup_reader.read(
+            principal_id=access.actor_principal_id, query=query
+        )
         if record is None:
             return UnresolvedOperationDTO()
         stored = record.operation

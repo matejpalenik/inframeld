@@ -4,6 +4,9 @@ from uuid import UUID
 
 import pytest
 
+from inframeld_backend.access.application.enums.my_project_access_item_kind import (
+    MyProjectAccessItemKind,
+)
 from inframeld_backend.access.application.value_objects.my_project_access_cursor import (
     MyProjectAccessCursor,
 )
@@ -20,9 +23,11 @@ from inframeld_backend.shared.domain.value_objects.installation_id import Instal
 @pytest.mark.parametrize(
     "position",
     [
-        MyProjectAccessPosition("grant", UUID(int=5), ActionId("inspect-budget")),
-        MyProjectAccessPosition("membership", UUID(int=5), None),
-        MyProjectAccessPosition("management", UUID(int=5), None),
+        MyProjectAccessPosition(
+            MyProjectAccessItemKind.GRANT, UUID(int=5), ActionId("inspect-budget")
+        ),
+        MyProjectAccessPosition(MyProjectAccessItemKind.MEMBERSHIP, UUID(int=5), None),
+        MyProjectAccessPosition(MyProjectAccessItemKind.MANAGEMENT, UUID(int=5), None),
     ],
 )
 def test_cursor_round_trip_preserves_person_scope_and_relationship_position(
@@ -65,7 +70,9 @@ def test_malformed_token_is_rejected(token: str) -> None:
 
 
 def test_combined_order_does_not_reset_the_limit_at_each_relationship_array() -> None:
-    grant = MyProjectAccessPosition("grant", UUID(int=999), ActionId("inspect-budget"))
-    membership = MyProjectAccessPosition("membership", UUID(int=1), None)
-    management = MyProjectAccessPosition("management", UUID(int=1), None)
+    grant = MyProjectAccessPosition(
+        MyProjectAccessItemKind.GRANT, UUID(int=999), ActionId("inspect-budget")
+    )
+    membership = MyProjectAccessPosition(MyProjectAccessItemKind.MEMBERSHIP, UUID(int=1), None)
+    management = MyProjectAccessPosition(MyProjectAccessItemKind.MANAGEMENT, UUID(int=1), None)
     assert grant.sort_key < membership.sort_key < management.sort_key

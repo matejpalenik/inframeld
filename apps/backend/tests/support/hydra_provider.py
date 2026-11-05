@@ -12,7 +12,7 @@ import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Literal
+from enum import StrEnum
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
@@ -36,13 +36,19 @@ from tests.support.kratos_browser import (
     read_browser_csrf_token,
 )
 
+
+class PKCEChallenge(StrEnum):
+    S256 = "S256"
+    MISSING = "missing"
+    PLAIN = "plain"
+    MISSING_METHOD = "missing_method"
+
+
 HYDRA_ISSUER = OAuthIssuer(f"{HYDRA_PUBLIC_URL}/")
 API_AUDIENCE = HumanAPIAudience("http://inframeld-api.test")
 CLIENT_ID = "inframeld-cli"
 REDIRECT_URI = "http://127.0.0.1:49152/oauth/callback"
 UI_ORIGIN = "http://hydra-test-ui.invalid"
-
-type PKCEChallenge = Literal["S256", "missing", "plain", "missing_method"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,7 +260,7 @@ class HydraTestProvider:
         *,
         include_audience: bool = True,
         browser: httpx2.AsyncClient | None = None,
-        pkce: PKCEChallenge = "S256",
+        pkce: PKCEChallenge = PKCEChallenge.S256,
     ) -> PendingHydraLoginDTO:
         """Verify Kratos once, then stop before approving the Hydra login.
 
@@ -282,7 +288,7 @@ class HydraTestProvider:
         *,
         include_audience: bool,
         browser: httpx2.AsyncClient | None,
-        pkce: PKCEChallenge = "S256",
+        pkce: PKCEChallenge = PKCEChallenge.S256,
     ) -> PendingHydraLoginDTO:
         verifier = secrets.token_urlsafe(48)
         challenge = (
@@ -299,17 +305,17 @@ class HydraTestProvider:
             "scope": "inframeld:api offline_access",
             "state": state,
             "code_challenge": challenge,
-            "code_challenge_method": "S256",
+            "code_challenge_method": PKCEChallenge.S256,
         }
         if include_audience:
             params["audience"] = API_AUDIENCE.value
-        if pkce == "missing":
+        if pkce == PKCEChallenge.MISSING:
             del params["code_challenge"]
             del params["code_challenge_method"]
-        elif pkce in {"plain", "missing_method"}:
+        elif pkce in {PKCEChallenge.PLAIN, PKCEChallenge.MISSING_METHOD}:
             params["code_challenge"] = verifier
-            if pkce == "plain":
-                params["code_challenge_method"] = "plain"
+            if pkce == PKCEChallenge.PLAIN:
+                params["code_challenge_method"] = PKCEChallenge.PLAIN
             else:
                 del params["code_challenge_method"]
 
@@ -710,7 +716,7 @@ class HydraTestProvider:
                 "audience": API_AUDIENCE.value,
                 "state": secrets.token_urlsafe(32),
                 "code_challenge": secrets.token_urlsafe(32),
-                "code_challenge_method": "S256",
+                "code_challenge_method": PKCEChallenge.S256,
             },
         )
         return (await self._read_login(_challenge(started, "login"))).skip

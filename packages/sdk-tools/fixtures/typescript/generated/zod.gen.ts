@@ -49,6 +49,20 @@ export const zPageResponseInt = z.object({
 });
 
 /**
+ * ValidationIssueLocation
+ *
+ * Identify the request component that contains an invalid field.
+ */
+export const zValidationIssueLocation = z.enum([
+    'body',
+    'path',
+    'query',
+    'header',
+    'cookie',
+    'request'
+]);
+
+/**
  * ValidationIssue
  *
  * Describe one sanitized issue in an incoming request.
@@ -65,14 +79,7 @@ export const zPageResponseInt = z.object({
  */
 export const zValidationIssue = z.object({
     code: z.string().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/),
-    location: z.enum([
-        'body',
-        'path',
-        'query',
-        'header',
-        'cookie',
-        'request'
-    ]),
+    location: zValidationIssueLocation,
     message: z.string().min(1).max(256),
     path: z.array(z.union([z.string().min(1).max(64), z.int().gte(0)])).max(8)
 });

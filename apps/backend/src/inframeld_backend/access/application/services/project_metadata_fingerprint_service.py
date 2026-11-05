@@ -18,11 +18,11 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 
 
 class ProjectMetadataFingerprintService:
-    def __init__(self, fingerprints: RequestFingerprintService) -> None:
-        self._fingerprints = fingerprints
+    def __init__(self, request_fingerprint_service: RequestFingerprintService) -> None:
+        self._request_fingerprint_service = request_fingerprint_service
 
     def for_update(self, command: UpdateProjectMetadataCommand) -> RequestFingerprint:
-        return self._fingerprints.fingerprint(
+        return self._request_fingerprint_service.fingerprint(
             purpose="project-metadata-update",
             canonical_request=json.dumps(
                 [
@@ -39,7 +39,7 @@ class ProjectMetadataFingerprintService:
     def for_repair(
         self, command: "RepairProjectMetadataAuthorityCommand", identity: "VerifiedHumanIdentityDTO"
     ) -> RequestFingerprint:
-        return self._fingerprints.fingerprint(
+        return self._request_fingerprint_service.fingerprint(
             purpose="project-metadata-repair",
             canonical_request=json.dumps(
                 [

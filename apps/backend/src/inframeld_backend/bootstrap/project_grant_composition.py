@@ -38,21 +38,22 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
 
 @asynccontextmanager
 async def open_project_grant_change(
-    database: Database, fingerprints: ProjectGrantChangeFingerprintService
+    database: Database,
+    project_grant_change_fingerprint_service: ProjectGrantChangeFingerprintService,
 ) -> AsyncGenerator[ProjectGrantChanger]:
     """Close one request-local session after the application operation owns its transaction."""
     async with database.session() as session:
         yield ProjectGrantChangeService(
-            transactions=SqlAlchemyTransactionManager(session),
-            authorizer=ProjectGrantAuthorizationService(
+            transaction_manager=SqlAlchemyTransactionManager(session),
+            project_grant_authorizer=ProjectGrantAuthorizationService(
                 PostgresProjectGrantChangeFactsReader(session)
             ),
-            idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-            memberships=PostgresProjectMembershipRepository(
+            operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+            membership_repository=PostgresProjectMembershipRepository(
                 session, PostgresAuditEventWriter(session)
             ),
-            fingerprints=fingerprints,
-            management_facts=PostgresProjectGrantChangeFactsReader(session),
-            results=PostgresProjectActionGrantResultReader(session),
-            result_writer=PostgresProjectActionGrantResultWriter(session),
+            project_grant_change_fingerprint_service=project_grant_change_fingerprint_service,
+            grant_management_facts_reader=PostgresProjectGrantChangeFactsReader(session),
+            grant_result_reader=PostgresProjectActionGrantResultReader(session),
+            grant_result_writer=PostgresProjectActionGrantResultWriter(session),
         )

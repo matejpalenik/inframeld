@@ -47,6 +47,7 @@ class RecoveryCleanupSettings(BaseModel):
 
     @model_validator(mode="after")
     def _consistent_bounds(self) -> Self:
+        """Reject stage limits that cannot fit inside the authorized cleanup allowance."""
         if (
             self.lease_seconds
             < 2 * self.provider_timeout_seconds + 6 * self.database_timeout_seconds + 5

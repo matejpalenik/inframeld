@@ -179,6 +179,17 @@
           }
         ]
       },
+      "HttpMethod": {
+        "description": "Identify the mutating method bound to an operation and its retry identity.",
+        "enum": [
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE"
+        ],
+        "title": "HttpMethod",
+        "type": "string"
+      },
       "HumanAdmissionRequest": {
         "additionalProperties": false,
         "properties": {
@@ -393,28 +404,7 @@
       "InitialProjectGrantResponse": {
         "properties": {
           "actionId": {
-            "enum": [
-              "manage-project-members",
-              "create-access-groups",
-              "create-application-accounts",
-              "create-pipelines",
-              "create-deployments",
-              "manage-upload-defaults",
-              "delete-project",
-              "inspect-budget",
-              "manage-budget",
-              "manage-trace-policy",
-              "delete-trace-history",
-              "inspect-feedback",
-              "create-collections",
-              "create-sources",
-              "create-model-connections",
-              "create-processing-profiles",
-              "create-embedding-profiles",
-              "edit-project-metadata"
-            ],
-            "title": "Actionid",
-            "type": "string"
+            "$ref": "#/components/schemas/ProjectAction"
           },
           "canGrant": {
             "const": true,
@@ -682,6 +672,17 @@
           }
         ]
       },
+      "OrganizationAction": {
+        "description": "Name an action on the installation Organization.",
+        "enum": [
+          "admit-users",
+          "suspend-users",
+          "restore-users",
+          "create-projects"
+        ],
+        "title": "OrganizationAction",
+        "type": "string"
+      },
       "OriginalOperationLookupRequest": {
         "additionalProperties": false,
         "properties": {
@@ -700,14 +701,7 @@
             "type": "string"
           },
           "method": {
-            "enum": [
-              "POST",
-              "PUT",
-              "PATCH",
-              "DELETE"
-            ],
-            "title": "Method",
-            "type": "string"
+            "$ref": "#/components/schemas/HttpMethod"
           },
           "organizationId": {
             "format": "uuid",
@@ -747,14 +741,7 @@
       "OwnOrganizationGrantResponse": {
         "properties": {
           "actionId": {
-            "enum": [
-              "admit-users",
-              "suspend-users",
-              "restore-users",
-              "create-projects"
-            ],
-            "title": "Actionid",
-            "type": "string"
+            "$ref": "#/components/schemas/OrganizationAction"
           },
           "canGrant": {
             "title": "Cangrant",
@@ -892,6 +879,31 @@
         ],
         "title": "ProblemDetails",
         "type": "object"
+      },
+      "ProjectAction": {
+        "description": "Name an action on a Project without granting it to the caller.",
+        "enum": [
+          "manage-project-members",
+          "create-access-groups",
+          "create-application-accounts",
+          "create-pipelines",
+          "create-deployments",
+          "manage-upload-defaults",
+          "delete-project",
+          "inspect-budget",
+          "manage-budget",
+          "manage-trace-policy",
+          "delete-trace-history",
+          "inspect-feedback",
+          "create-collections",
+          "create-sources",
+          "create-model-connections",
+          "create-processing-profiles",
+          "create-embedding-profiles",
+          "edit-project-metadata"
+        ],
+        "title": "ProjectAction",
+        "type": "string"
       },
       "ProjectActionGrantItemResponse": {
         "properties": {
@@ -1844,17 +1856,8 @@
             "type": "string"
           },
           "location": {
-            "description": "Request component containing the issue.",
-            "enum": [
-              "body",
-              "path",
-              "query",
-              "header",
-              "cookie",
-              "request"
-            ],
-            "title": "Location",
-            "type": "string"
+            "$ref": "#/components/schemas/ValidationIssueLocation",
+            "description": "Request component containing the issue."
           },
           "message": {
             "description": "Safe corrective description without submitted values.",
@@ -1891,6 +1894,19 @@
         ],
         "title": "ValidationIssue",
         "type": "object"
+      },
+      "ValidationIssueLocation": {
+        "description": "Identify the request component that contains an invalid field.",
+        "enum": [
+          "body",
+          "path",
+          "query",
+          "header",
+          "cookie",
+          "request"
+        ],
+        "title": "ValidationIssueLocation",
+        "type": "string"
       }
     },
     "securitySchemes": {

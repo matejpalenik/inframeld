@@ -622,8 +622,10 @@ async def test_duplicate_invocation_cannot_enter_again_in_a_fresh_adapter(
     _capture_mutations(client, monkeypatch, sends)
     recorder = MockInvocationRecorder()
     observation = JobEffectId(uuid4())
-    first = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
-    second = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    first = S3ArtifactStore(settings(tmp_path), client=client, effect_observation_recorder=recorder)
+    second = S3ArtifactStore(
+        settings(tmp_path), client=client, effect_observation_recorder=recorder
+    )
     try:
         await _invoke_bound(first, action, observation)
         with pytest.raises(ConflictError):
@@ -643,7 +645,7 @@ async def test_ambiguous_admission_never_schedules_or_records_abort(
     _capture_mutations(client, monkeypatch, sends)
     recorder = MockInvocationRecorder()
     recorder.failure = DependencyUnavailableError("The admission commit acknowledgment was lost.")
-    store = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    store = S3ArtifactStore(settings(tmp_path), client=client, effect_observation_recorder=recorder)
     try:
         with pytest.raises(DependencyUnavailableError):
             await _invoke_bound(store, action, JobEffectId(uuid4()))
@@ -671,7 +673,7 @@ async def test_waiting_abort_excludes_the_late_callable_and_retains_exact_observ
         await original(function)
 
     monkeypatch.setattr(asyncio, "to_thread", delayed)
-    store = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    store = S3ArtifactStore(settings(tmp_path), client=client, effect_observation_recorder=recorder)
     task = asyncio.create_task(_invoke_bound(store, action, observation))
     try:
         await asyncio.wait_for(scheduled.wait(), 1)
@@ -698,7 +700,9 @@ async def test_admission_wait_spends_the_original_storage_deadline(
     recorder = MockInvocationRecorder()
     recorder.release = asyncio.Event()
     store = S3ArtifactStore(
-        settings(tmp_path, operation_timeout_seconds=0.02), client=client, observations=recorder
+        settings(tmp_path, operation_timeout_seconds=0.02),
+        client=client,
+        effect_observation_recorder=recorder,
     )
     task = asyncio.create_task(_invoke_bound(store, "put", JobEffectId(uuid4())))
     try:
@@ -737,7 +741,7 @@ async def test_entered_invocation_cancellation_keeps_unknown_without_abort_proof
     monkeypatch.setattr(client, "delete_object", delete)
     recorder = MockInvocationRecorder()
     observation = JobEffectId(uuid4())
-    store = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    store = S3ArtifactStore(settings(tmp_path), client=client, effect_observation_recorder=recorder)
     task = asyncio.create_task(_invoke_bound(store, action, observation))
     try:
         assert await asyncio.to_thread(entered.wait, 1)
@@ -772,7 +776,7 @@ async def test_abort_recording_acknowledgment_loss_cannot_report_safe_retry(
         await original(function)
 
     monkeypatch.setattr(asyncio, "to_thread", delayed)
-    store = S3ArtifactStore(settings(tmp_path), client=client, observations=recorder)
+    store = S3ArtifactStore(settings(tmp_path), client=client, effect_observation_recorder=recorder)
     task = asyncio.create_task(_invoke_bound(store, action, observation))
     try:
         await asyncio.wait_for(scheduled.wait(), 1)
@@ -830,7 +834,9 @@ async def test_abort_recording_cannot_outlive_the_original_operation_deadline(
     monkeypatch.setattr(recorder, "record_put_abort", record_put)
     monkeypatch.setattr(recorder, "record_delete_abort", record_delete)
     store = S3ArtifactStore(
-        settings(tmp_path, operation_timeout_seconds=1), client=client, observations=recorder
+        settings(tmp_path, operation_timeout_seconds=1),
+        client=client,
+        effect_observation_recorder=recorder,
     )
     task = asyncio.create_task(_invoke_bound(store, action, observation))
     operation_completed = False

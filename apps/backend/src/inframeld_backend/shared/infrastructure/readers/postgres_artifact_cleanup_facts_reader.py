@@ -72,13 +72,14 @@ class PostgresArtifactCleanupFactsReader(ArtifactCleanupFactsReader):
             for target in targets
         )
         return ArtifactCleanupFactsDTO(
-            binding,
-            JobId(job.id),
-            tuple(ArtifactAttemptId(target.id) for target in targets),
-            owned,
-            obligation.retirement_authorized and all(target.retired for target in targets),
-            not any(target.retention_protected for target in targets),
-            any(target.published for target in targets),
-            any(target.put_pending for target in targets),
-            obligation.physically_complete,
+            binding=binding,
+            job_id=JobId(job.id),
+            targets=tuple(ArtifactAttemptId(target.id) for target in targets),
+            owns_targets=owned,
+            retirement_authorized=obligation.retirement_authorized
+            and all(target.retired for target in targets),
+            retention_allows_cleanup=not any(target.retention_protected for target in targets),
+            published=any(target.published for target in targets),
+            pending_write=any(target.put_pending for target in targets),
+            physically_complete=obligation.physically_complete,
         )

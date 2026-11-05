@@ -1,43 +1,81 @@
 """Strict records for the native driver's private JSON boundary, not HTTP models."""
 
-from typing import Literal, TypeAlias
+from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, JsonValue
 
-Operation: TypeAlias = Literal[
-    "getProtectedResourceMetadata",
-    "getProtectedResourceMetadataForPath",
-    "getHealth",
-    "getCurrentSession",
-    "getMyOrganizationAccess",
-    "admitHuman",
-    "createProject",
-    "listProjectMembers",
-    "listProjectActionGrants",
-    "getMyProjectAccess",
-    "setProjectActionGrant",
-    "removeProjectActionGrant",
-    "addProjectMember",
-    "removeProjectMember",
-    "inspectHumanOAuthConsent",
-    "decideHumanOAuthConsent",
-    "assignProjectUseOnlyGrant",
-    "lookupOriginalOperation",
-    "getDeletionStatus",
-    "resolveProjectName",
-    "getProjectMetadata",
-    "updateProjectMetadata",
-    "contractFixturePayload",
-    "contractFixturePage",
-    "contractFixtureUpload",
-    "contractFixtureNullable",
-    "contractFixtureEmpty",
-    "contractFixtureVariants",
-    "contractFixtureMedia",
-    "contractFixtureFallback",
-]
-Profile: TypeAlias = Literal["python-sync", "python-async"]
-Validation: TypeAlias = Literal["generated-model", "generated-schema", "parsed-json", "none"]
+
+class Operation(StrEnum):
+    """Identify a generated operation supported by the native driver."""
+
+    GET_PROTECTED_RESOURCE_METADATA = "getProtectedResourceMetadata"
+    GET_PROTECTED_RESOURCE_METADATA_FOR_PATH = "getProtectedResourceMetadataForPath"
+    GET_HEALTH = "getHealth"
+    GET_CURRENT_SESSION = "getCurrentSession"
+    GET_MY_ORGANIZATION_ACCESS = "getMyOrganizationAccess"
+    ADMIT_HUMAN = "admitHuman"
+    CREATE_PROJECT = "createProject"
+    LIST_PROJECT_MEMBERS = "listProjectMembers"
+    LIST_PROJECT_ACTION_GRANTS = "listProjectActionGrants"
+    GET_MY_PROJECT_ACCESS = "getMyProjectAccess"
+    SET_PROJECT_ACTION_GRANT = "setProjectActionGrant"
+    REMOVE_PROJECT_ACTION_GRANT = "removeProjectActionGrant"
+    ADD_PROJECT_MEMBER = "addProjectMember"
+    REMOVE_PROJECT_MEMBER = "removeProjectMember"
+    INSPECT_HUMAN_OAUTH_CONSENT = "inspectHumanOAuthConsent"
+    DECIDE_HUMAN_OAUTH_CONSENT = "decideHumanOAuthConsent"
+    ASSIGN_PROJECT_USE_ONLY_GRANT = "assignProjectUseOnlyGrant"
+    LOOKUP_ORIGINAL_OPERATION = "lookupOriginalOperation"
+    GET_DELETION_STATUS = "getDeletionStatus"
+    RESOLVE_PROJECT_NAME = "resolveProjectName"
+    GET_PROJECT_METADATA = "getProjectMetadata"
+    UPDATE_PROJECT_METADATA = "updateProjectMetadata"
+    CONTRACT_FIXTURE_PAYLOAD = "contractFixturePayload"
+    CONTRACT_FIXTURE_PAGE = "contractFixturePage"
+    CONTRACT_FIXTURE_UPLOAD = "contractFixtureUpload"
+    CONTRACT_FIXTURE_NULLABLE = "contractFixtureNullable"
+    CONTRACT_FIXTURE_EMPTY = "contractFixtureEmpty"
+    CONTRACT_FIXTURE_VARIANTS = "contractFixtureVariants"
+    CONTRACT_FIXTURE_MEDIA = "contractFixtureMedia"
+    CONTRACT_FIXTURE_FALLBACK = "contractFixtureFallback"
+
+
+class Profile(StrEnum):
+    """Select the synchronous or asynchronous generated Python API."""
+
+    PYTHON_SYNC = "python-sync"
+    PYTHON_ASYNC = "python-async"
+
+
+class Validation(StrEnum):
+    """State which native decoder or validator established the returned value."""
+
+    GENERATED_MODEL = "generated-model"
+    GENERATED_SCHEMA = "generated-schema"
+    PARSED_JSON = "parsed-json"
+    NONE = "none"
+
+
+class WireEncoding(StrEnum):
+    """Describe how captured bytes are represented in the driver document."""
+
+    UTF8 = "utf8"
+    BASE64 = "base64"
+
+
+class ObservationKind(StrEnum):
+    """Separate a successful SDK call from an SDK-reported failure."""
+
+    SUCCESS = "success"
+    SDK_ERROR = "sdk-error"
+
+
+class DriverEnvelopeKind(StrEnum):
+    """Separate ordinary call observations from a defect in the driver itself."""
+
+    OBSERVATIONS = "observations"
+    DRIVER_ERROR = "driver-error"
 
 
 class Record(BaseModel):
@@ -64,7 +102,7 @@ class DriverRequest(Record):
 
 
 class WireValue(Record):
-    encoding: Literal["utf8", "base64"]
+    encoding: WireEncoding
     value: str
 
 
@@ -73,7 +111,7 @@ class Header(WireValue):
 
 
 class Observation(Record):
-    kind: Literal["success", "sdk-error"]
+    kind: ObservationKind
     call_id: str = Field(alias="callId")
     validation: Validation
     headers: list[Header]
@@ -88,7 +126,7 @@ class Observations(Record):
     version: Literal[2] = 2
     profile: Profile
     case_id: str = Field(alias="caseId")
-    kind: Literal["observations"] = "observations"
+    kind: Literal[DriverEnvelopeKind.OBSERVATIONS] = DriverEnvelopeKind.OBSERVATIONS
     observations: list[Observation]
 
 
@@ -96,5 +134,5 @@ class DriverFailure(Record):
     version: Literal[2] = 2
     profile: Profile
     case_id: str = Field(alias="caseId")
-    kind: Literal["driver-error"] = "driver-error"
+    kind: Literal[DriverEnvelopeKind.DRIVER_ERROR] = DriverEnvelopeKind.DRIVER_ERROR
     error: str

@@ -9,6 +9,7 @@ from inframeld_backend.access.application.dtos.created_project_dto import Create
 from inframeld_backend.access.application.protocols.project_creation_writer import (
     ProjectCreationWriter,
 )
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
@@ -65,7 +66,8 @@ class PostgresProjectCreationWriter(ProjectCreationWriter):
                 IdempotencyReservationRow.method == "POST",
                 IdempotencyReservationRow.requested_route == "/v1/projects",
                 IdempotencyReservationRow.lookup_authority_family == "organization_action_use",
-                IdempotencyReservationRow.lookup_action_id == "create-projects",
+                IdempotencyReservationRow.lookup_action_id
+                == OrganizationAction.CREATE_PROJECTS.value,
                 IdempotencyReservationRow.state == OperationReservationState.IN_PROGRESS,
             )
         )

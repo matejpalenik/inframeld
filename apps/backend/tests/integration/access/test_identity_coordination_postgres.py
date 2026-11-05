@@ -3,7 +3,7 @@
 import asyncio
 import os
 from dataclasses import replace
-from typing import Literal
+from enum import StrEnum
 from unittest.mock import patch
 from uuid import UUID
 
@@ -75,6 +75,13 @@ from inframeld_backend.shared.infrastructure.rows.installation_identity_row impo
     InstallationIdentityRow,
 )
 
+
+class Participant(StrEnum):
+    ADMISSION = "admission"
+    COMPLETION = "completion"
+    INITIALIZATION = "initialization"
+
+
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
     reason="Requires PostgreSQL integration services",
@@ -83,7 +90,7 @@ IDENTITY = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySu
 EVENT = IdentityRecoveryEventDTO(
     IdentityRecoveryFlowId(UUID(int=1)), IDENTITY, IdentityRecoveryEventKind.RECOVERY
 )
-Participant = Literal["admission", "completion", "initialization"]
+
 _PID = column("pid", Integer)
 _DATABASE = column("datname", String)
 _ACTIVITY = table("pg_stat_activity", _PID, _DATABASE)
@@ -106,10 +113,10 @@ async def _reserve(
 async def _operation(
     database: Database, installation: InstallationId, participant: Participant
 ) -> HumanCredentialStateDTO | IdentityRecoveryAdmissionDTO | IdentityRecoveryCompletionFactsDTO:
-    if participant == "initialization":
+    if participant == Participant.INITIALIZATION:
         return await PostgresHumanCredentialStateInitializer(database).initialize(IDENTITY)
     async with database.session() as session, session.begin():
-        if participant == "admission":
+        if participant == Participant.ADMISSION:
             return await _reserve(session, installation)
         return await PostgresIdentityRecoveryCompletionFactsReader(session).read(
             installation_id=installation, authority=IDENTITY.authority, flow_id=EVENT.flow_id
@@ -216,20 +223,23 @@ async def test_independent_identity_scopes_do_not_share_a_turn(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("participant", ["admission", "completion", "initialization"])
+@pytest.mark.parametrize(
+    "participant",
+    [Participant.ADMISSION, Participant.COMPLETION, Participant.INITIALIZATION],
+)
 async def test_each_participant_waits_and_reads_the_preceding_commit(
     database: Database, participant: Participant
 ) -> None:
     """Do not reuse the picture from before Alice's competing transaction finished."""
     installation = await PostgresInstallationIdentityReader(database).read()
-    if participant == "completion":
-        await _operation(database, installation, "admission")
+    if participant == Participant.COMPLETION:
+        await _operation(database, installation, Participant.ADMISSION)
     async with asyncio.timeout(30), asyncio.TaskGroup() as tasks, database.session() as holder:
         async with holder.begin():
             await _acquire(holder, installation)
             task = tasks.create_task(_operation(database, installation, participant))
             await _wait_for_waiter(database, await _pid(holder), task)
-            if participant == "admission":
+            if participant == Participant.ADMISSION:
                 await MockAccessScenarios.seed_linked_human(holder, IDENTITY)
             else:
                 await _reserve(
@@ -250,15 +260,18 @@ async def test_each_participant_waits_and_reads_the_preceding_commit(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("participant", ["admission", "completion", "initialization"])
+@pytest.mark.parametrize(
+    "participant",
+    [Participant.ADMISSION, Participant.COMPLETION, Participant.INITIALIZATION],
+)
 @pytest.mark.parametrize("cancel", [False, True])
 async def test_interrupted_lock_wait_leaves_no_partial_effects(
     database: Database, participant: Participant, cancel: bool
 ) -> None:
     """A timeout or cancellation must roll back and leave the identity turn usable."""
     installation = await PostgresInstallationIdentityReader(database).read()
-    if participant == "completion":
-        await _operation(database, installation, "admission")
+    if participant == Participant.COMPLETION:
+        await _operation(database, installation, Participant.ADMISSION)
     before = await _counts(database)
     async with asyncio.timeout(30), database.session() as holder:
         async with holder.begin():
@@ -308,11 +321,11 @@ async def test_link_creation_waits_then_observes_the_pending_recovery(database: 
 async def test_completion_observes_an_account_linked_while_it_waits(database: Database) -> None:
     """Release eligibility must use Alice's newly committed account status."""
     installation = await PostgresInstallationIdentityReader(database).read()
-    await _operation(database, installation, "admission")
+    await _operation(database, installation, Participant.ADMISSION)
     async with asyncio.timeout(30), asyncio.TaskGroup() as tasks, database.session() as holder:
         async with holder.begin():
             await _acquire(holder, installation)
-            task = tasks.create_task(_operation(database, installation, "completion"))
+            task = tasks.create_task(_operation(database, installation, Participant.COMPLETION))
             await _wait_for_waiter(database, await _pid(holder), task)
             await MockAccessScenarios.seed_linked_human(
                 holder, IDENTITY, status=PrincipalStatus.SUSPENDED
@@ -364,7 +377,7 @@ async def test_initialization_takes_the_first_turn_before_recovery(
                 PostgresHumanCredentialStateInitializer(database).initialize(IDENTITY)
             )
             await entered.wait()
-            admitting = tasks.create_task(_operation(database, installation, "admission"))
+            admitting = tasks.create_task(_operation(database, installation, Participant.ADMISSION))
             await _wait_for_waiter(database, None, admitting)
             if cancel_initializer:
                 initializing.cancel()
@@ -399,11 +412,11 @@ async def test_database_snapshot_isolation_cannot_silently_use_this_protocol(
 async def test_completion_rejects_a_changed_original_lock_binding(database: Database) -> None:
     """Corrupted admission data cannot redirect completion to another identity's turn."""
     installation = await PostgresInstallationIdentityReader(database).read()
-    await _operation(database, installation, "admission")
+    await _operation(database, installation, Participant.ADMISSION)
     async with asyncio.timeout(30), database.session() as holder:
         async with holder.begin():
             await _acquire(holder, installation)
-            task = asyncio.create_task(_operation(database, installation, "completion"))
+            task = asyncio.create_task(_operation(database, installation, Participant.COMPLETION))
             try:
                 await _wait_for_waiter(database, await _pid(holder), task)
                 await holder.execute(
@@ -434,7 +447,9 @@ async def test_initialization_rechecks_installation_after_waiting(database: Data
     async with asyncio.timeout(30), database.session() as holder:
         async with holder.begin():
             await _acquire(holder, installation)
-            task = asyncio.create_task(_operation(database, installation, "initialization"))
+            task = asyncio.create_task(
+                _operation(database, installation, Participant.INITIALIZATION)
+            )
             try:
                 await _wait_for_waiter(database, await _pid(holder), task)
                 await holder.execute(

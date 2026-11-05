@@ -16,6 +16,9 @@ from inframeld_backend.access.application.dtos.my_project_access_page_dto import
 from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
     IdentityRecoveryEventKind,
 )
+from inframeld_backend.access.application.enums.my_project_access_item_kind import (
+    MyProjectAccessItemKind,
+)
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
 )
@@ -213,7 +216,7 @@ async def test_empty_continuation_still_observes_current_member_credential_and_r
         seed.actor.organization_id,
         seed.project.project_id,
         seed.actor.access.actor_principal_id,
-        MyProjectAccessPosition("management", UUID(int=2**128 - 1), None),
+        MyProjectAccessPosition(MyProjectAccessItemKind.MANAGEMENT, UUID(int=2**128 - 1), None),
     ).to_token()
     assert (
         await _read(database, seed.actor.access, seed.project.project_id, cursor=cursor)

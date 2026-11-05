@@ -12,6 +12,7 @@ from inframeld_backend.access.application.dtos.project_metadata_changed_audit_ev
 from inframeld_backend.access.application.protocols.project_metadata_audit_writer import (
     ProjectMetadataAuditWriter,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 
 
@@ -32,7 +33,7 @@ class PostgresProjectMetadataAuditWriter(ProjectMetadataAuditWriter):
                 event_type="project_metadata_changed",
                 target_kind="project",
                 target_id=event.project_id.value,
-                action="edit-project-metadata",
+                action=ProjectAction.EDIT_PROJECT_METADATA.value,
                 before_values={"metadata_revision": event.before_revision},
                 after_values={
                     "metadata_revision": event.after_revision,
@@ -58,7 +59,7 @@ class PostgresProjectMetadataAuditWriter(ProjectMetadataAuditWriter):
                 event_type="project_metadata_authority_repaired",
                 target_kind="project",
                 target_id=event.project_id.value,
-                action="edit-project-metadata",
+                action=ProjectAction.EDIT_PROJECT_METADATA.value,
                 before_values={"access_revision": event.before_revision},
                 after_values={"access_revision": event.after_revision, "can_grant": True},
                 reason=event.reason,

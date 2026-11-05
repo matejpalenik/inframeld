@@ -6,8 +6,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.human_admission_result_dto import (
     HumanAdmissionResultDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 
 
@@ -26,5 +26,5 @@ class HumanAdmitter(Protocol):
         *,
         access: AccessContextDTO,
         command: AdmitHumanCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> HumanAdmissionResultDTO: ...

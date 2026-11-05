@@ -31,10 +31,11 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 from inframeld_backend.access.infrastructure.writers.postgres_job_admission_audit_writer import (
     PostgresJobAdmissionAuditWriter,
 )
-from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
     ArtifactCleanupAuthorizationService,
 )
@@ -88,13 +89,13 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
         installation = await session.scalar(select(InstallationIdentityRow.installation_id))
         assert installation is not None
         authority = AdmittedWorkAuthorityDTO(
-            seed.principal_id,
-            PrincipalKind.APPLICATION,
-            InstallationId(installation),
-            seed.organization_id,
-            seed.project_id,
-            ActionId("inspect-feedback"),
-            None,
+            principal_id=seed.principal_id,
+            principal_kind=PrincipalKind.APPLICATION,
+            installation_id=InstallationId(installation),
+            organization_id=seed.organization_id,
+            project_id=seed.project_id,
+            action_id=ActionId("inspect-feedback"),
+            human_binding=None,
         )
         service = JobAdmissionService(
             ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
@@ -109,8 +110,10 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
                 seed.principal_id, MockAuthenticationEvidence.application_key()
             ),
             authority=authority,
-            context=OperationAdmissionContextDTO(
-                "POST", "/test/projects/{project_id}/feedback-reports", IdempotencyKey(str(uuid4()))
+            context=IdempotencyContextDTO(
+                HttpMethod.POST,
+                "/test/projects/{project_id}/feedback-reports",
+                IdempotencyKey(str(uuid4())),
             ),
             fingerprint=RequestFingerprint(b"B" * 32),
             request_id=RequestId(uuid4()),
@@ -137,8 +140,8 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
             worker_id=uuid4(),
             lease_seconds=120,
             work_seconds=600,
-            product=product_authority,
-            recovery=recovery_service,
+            admitted_work_authorizer=product_authority,
+            job_recovery=recovery_service,
         ).claim_next()
     assert context is not None and context.job_id == admission.job_id
 

@@ -2,7 +2,7 @@
 
 import os
 from collections.abc import AsyncGenerator
-from typing import Literal
+from enum import StrEnum
 from uuid import uuid4
 
 import pytest
@@ -65,6 +65,12 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
 )
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
+
+class UnavailableCase(StrEnum):
+    HYDRA = "hydra"
+    KRATOS = "kratos"
+
+
 AUTHORITY = IdentityAuthority("kratos:test")
 PATH = "/v1/deletions/status"
 SAFE_FIELDS = {
@@ -99,21 +105,25 @@ async def human(provider: HydraTestProvider) -> RegisteredHumanDTO:
 
 
 def _settings(
-    database: DatabaseSettings, *, unavailable: Literal["hydra", "kratos"] | None = None
+    database: DatabaseSettings, *, unavailable: UnavailableCase | None = None
 ) -> ApplicationSettings:
     return get_settings().model_copy(
         update={
             "database": database,
-            "kratos": KratosSettings(
+            UnavailableCase.KRATOS: KratosSettings(
                 public_url=HttpUrl(KRATOS_PUBLIC_URL),
                 admin_url=HttpUrl(
-                    "http://127.0.0.1:1" if unavailable == "kratos" else KRATOS_ADMIN_URL
+                    "http://127.0.0.1:1"
+                    if unavailable == UnavailableCase.KRATOS
+                    else KRATOS_ADMIN_URL
                 ),
                 authority=AUTHORITY,
             ),
-            "hydra": HydraSettings(
+            UnavailableCase.HYDRA: HydraSettings(
                 admin_url=HttpUrl(
-                    "http://127.0.0.1:1" if unavailable == "hydra" else HYDRA_ADMIN_URL
+                    "http://127.0.0.1:1"
+                    if unavailable == UnavailableCase.HYDRA
+                    else HYDRA_ADMIN_URL
                 ),
                 issuer=HYDRA_ISSUER,
                 api_audience=API_AUDIENCE,
@@ -324,13 +334,13 @@ async def test_real_credentials_and_current_ineligibility_cannot_read_retained_h
     assert response.headers["cache-control"] == "no-store"
 
 
-@pytest.mark.parametrize("unavailable", ["hydra", "kratos"])
+@pytest.mark.parametrize("unavailable", [UnavailableCase.HYDRA, UnavailableCase.KRATOS])
 async def test_real_registered_route_preserves_provider_unavailability(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
     provider: HydraTestProvider,
     human: RegisteredHumanDTO,
-    unavailable: Literal["hydra", "kratos"],
+    unavailable: UnavailableCase,
 ) -> None:
     seed = await _history(database, human)
     tokens = await provider.issue_tokens(human, credential_binding=_binding(seed))

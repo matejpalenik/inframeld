@@ -23,6 +23,9 @@ from inframeld_backend.access.application.dtos.project_grant_authorization_dto i
 from inframeld_backend.access.application.dtos.project_use_only_grant_authorization_request_dto import (
     ProjectUseOnlyGrantAuthorizationRequestDTO,
 )
+from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
+    ProjectActionGrantChangeKind,
+)
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
 )
@@ -49,6 +52,9 @@ from inframeld_backend.access.application.services.project_grant_change_fingerpr
     ProjectGrantChangeFingerprintService,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_departure_target_kind import (
+    ProjectDepartureTargetKind,
+)
 from inframeld_backend.access.domain.enums.project_grant_level import ProjectGrantLevel
 from inframeld_backend.access.domain.errors.project_grant_errors import (
     ProjectGrantAlreadyExistsError,
@@ -76,11 +82,11 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
@@ -112,24 +118,24 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 class ProjectGrantChangeService(ProjectGrantChanger):
     def __init__(
         self,
-        transactions: TransactionManager,
-        authorizer: ProjectGrantAuthorizer,
-        idempotency: OperationIdempotency,
-        memberships: ProjectMembershipRepository,
-        fingerprints: ProjectGrantChangeFingerprintService,
+        transaction_manager: TransactionManager,
+        project_grant_authorizer: ProjectGrantAuthorizer,
+        operation_idempotency: OperationIdempotency,
+        membership_repository: ProjectMembershipRepository,
+        project_grant_change_fingerprint_service: ProjectGrantChangeFingerprintService,
         *,
-        management_facts: ProjectGrantManagementFactsReader,
-        results: ProjectActionGrantResultReader,
-        result_writer: ProjectActionGrantResultWriter,
+        grant_management_facts_reader: ProjectGrantManagementFactsReader,
+        grant_result_reader: ProjectActionGrantResultReader,
+        grant_result_writer: ProjectActionGrantResultWriter,
     ) -> None:
-        self._transactions = transactions
-        self._authorizer = authorizer
-        self._idempotency = idempotency
-        self._memberships = memberships
-        self._fingerprints = fingerprints
-        self._management_facts = management_facts
-        self._results = results
-        self._result_writer = result_writer
+        self._transaction_manager = transaction_manager
+        self._project_grant_authorizer = project_grant_authorizer
+        self._operation_idempotency = operation_idempotency
+        self._membership_repository = membership_repository
+        self._project_grant_change_fingerprint_service = project_grant_change_fingerprint_service
+        self._grant_management_facts_reader = grant_management_facts_reader
+        self._grant_result_reader = grant_result_reader
+        self._grant_result_writer = grant_result_writer
 
     @override
     async def set_action_grant(
@@ -137,13 +143,13 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: SetProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectActionGrantChangeResultDTO:
         return await self._manage(
             access=access,
             command=command,
             context=context,
-            fingerprint=self._fingerprints.for_set(command),
+            fingerprint=self._project_grant_change_fingerprint_service.for_set(command),
         )
 
     @override
@@ -152,13 +158,13 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: RemoveProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectActionGrantChangeResultDTO:
         return await self._manage(
             access=access,
             command=command,
             context=context,
-            fingerprint=self._fingerprints.for_remove(command),
+            fingerprint=self._project_grant_change_fingerprint_service.for_remove(command),
         )
 
     async def _manage(
@@ -166,9 +172,13 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         fingerprint: RequestFingerprint,
     ) -> ProjectActionGrantChangeResultDTO:
+        """Set or remove one exact grant after current authorization, preserving replay semantics.
+
+        Only fresh work evaluates the requested revision and remaining grantor responsibilities.
+        """
         setting = isinstance(command, SetProjectActionGrantCommand)
         method = "PUT" if setting else "DELETE"
         route = f"/v1/projects/{command.project_id.value}/grants/{command.recipient_principal_id.value}/{command.action_id.value}"
@@ -180,8 +190,8 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             raise InvalidInputError("This action does not belong to the Project catalogue.")
 
         try:
-            async with asyncio.timeout(5), self._transactions.begin():
-                facts = await self._management_facts.read_for_management(
+            async with asyncio.timeout(5), self._transaction_manager.begin():
+                facts = await self._grant_management_facts_reader.read_for_management(
                     access=access,
                     project_id=command.project_id,
                     recipient_principal_id=command.recipient_principal_id,
@@ -199,7 +209,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                 ):
                     raise RuntimeError("Grant management facts changed actor, scope or revision.")
                 scope = self._authorize_management(access, facts)
-                operation = await self._idempotency.find_or_reserve(
+                operation = await self._operation_idempotency.reserve_or_recover(
                     context=context,
                     access=access,
                     authorization=scope,
@@ -210,11 +220,11 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                     ),
                 )
                 if not isinstance(operation, NewOperationReservationDTO):
-                    completed = self._require_completed_result(operation)
-                    original = await self._results.original(
+                    completed = self._require_safe_completed_operation(operation)
+                    original = await self._grant_result_reader.original(
                         facts=facts, command=command, context=context, operation=completed
                     )
-                    self._require_original(facts, command, completed, original)
+                    self._require_matching_grant_receipt(facts, command, completed, original)
                     return original
 
                 if command.expected_access_revision != scope.project_access_revision:
@@ -247,7 +257,9 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                     command, SetProjectActionGrantCommand
                 ) and not ProjectGrantDelegationPolicy.may_assign_to_recipient(
                     recipient_access=PrincipalAccessPolicyInput(
-                        recipient, facts.recipient_has_pending_recovery, True
+                        principal=recipient,
+                        has_pending_recovery=facts.recipient_has_pending_recovery,
+                        credential_is_current=True,
                     ),
                     is_project_member=facts.grant.recipient_is_project_member,
                     has_coherent_identity=facts.recipient_has_coherent_identity,
@@ -260,7 +272,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                 before_can_grant: bool | None = None
                 changed = False
                 if facts.grant.recipient_is_project_member:
-                    membership = await self._memberships.get(
+                    membership = await self._membership_repository.get(
                         organization_id=scope.organization_id,
                         project_id=scope.project_id,
                         principal_id=command.recipient_principal_id,
@@ -297,7 +309,13 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                                 "An alternate grantor belongs to another Organization."
                             )
                         if not ProjectDeparturePolicy.may_depart(
-                            (ProjectDepartureResponsibilityPolicyInput(False, False, candidates),)
+                            (
+                                ProjectDepartureResponsibilityPolicyInput(
+                                    target_kind=ProjectDepartureTargetKind.PROJECT,
+                                    action_id=command.action_id,
+                                    candidates=candidates,
+                                ),
+                            )
                         ):
                             raise ConflictError(
                                 "The change would remove the last eligible exact-action grantor."
@@ -318,7 +336,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                         )
                     else:
                         changed = membership.remove_action_grant(action_id=command.action_id)
-                    await self._memberships.save_action_grant_change(
+                    await self._membership_repository.save_action_grant_change(
                         membership,
                         action_id=command.action_id,
                         actor_principal_id=access.actor_principal_id,
@@ -326,30 +344,32 @@ class ProjectGrantChangeService(ProjectGrantChanger):
                         operation_id=operation.operation_id,
                     )
 
-                completed = self._require_completed_result(
-                    await self._idempotency.record_completed_result(
+                completed = self._require_safe_completed_operation(
+                    await self._operation_idempotency.record_completed_result(
                         operation, replay_kind=OperationReplayKind.SAFE_RESULT
                     )
                 )
                 if completed.operation_id != operation.operation_id:
                     raise ConflictError("Completion changed the original grant operation.")
                 result = ProjectActionGrantChangeResultDTO(
-                    facts.installation_id,
-                    scope.organization_id,
-                    scope.project_id,
-                    access.actor_principal_id,
-                    command.recipient_principal_id,
-                    command.action_id,
-                    "set" if setting else "remove",
-                    command.can_grant
+                    installation_id=facts.installation_id,
+                    organization_id=scope.organization_id,
+                    project_id=scope.project_id,
+                    actor_principal_id=access.actor_principal_id,
+                    recipient_principal_id=command.recipient_principal_id,
+                    action_id=command.action_id,
+                    change_kind=ProjectActionGrantChangeKind.SET
+                    if setting
+                    else ProjectActionGrantChangeKind.REMOVE,
+                    can_grant=command.can_grant
                     if isinstance(command, SetProjectActionGrantCommand)
                     else None,
-                    scope.project_access_revision + int(changed),
-                    changed,
-                    201 if setting and before_can_grant is None and changed else 200,
-                    completed,
+                    access_revision=scope.project_access_revision + int(changed),
+                    changed=changed,
+                    status_code=201 if setting and before_can_grant is None and changed else 200,
+                    operation=completed,
                 )
-                await self._result_writer.save(
+                await self._grant_result_writer.save(
                     result,
                     before_revision=scope.project_access_revision,
                     before_can_grant=before_can_grant,
@@ -362,6 +382,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
     def _authorize_management(
         access: AccessContextDTO, facts: ProjectActionGrantManagementFactsDTO
     ) -> ProjectGrantAuthorizationDTO:
+        """Check current exact-action delegation from the facts held under the Project lock."""
         grant = facts.grant
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
@@ -392,12 +413,13 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         )
 
     @staticmethod
-    def _require_original(
+    def _require_matching_grant_receipt(
         facts: ProjectActionGrantManagementFactsDTO,
         command: SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
         completed: CompletedSynchronousOperationDTO,
         original: ProjectActionGrantChangeResultDTO,
     ) -> None:
+        """Reject a retained grant receipt whose actor, target or outcome differs from this retry."""
         setting = isinstance(command, SetProjectActionGrantCommand)
         if (
             original.operation != completed
@@ -407,7 +429,10 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             or original.actor_principal_id != facts.grant.actor.id
             or original.recipient_principal_id != command.recipient_principal_id
             or original.action_id != command.action_id
-            or original.change_kind != ("set" if setting else "remove")
+            or original.change_kind
+            != (
+                ProjectActionGrantChangeKind.SET if setting else ProjectActionGrantChangeKind.REMOVE
+            )
             or original.can_grant
             != (command.can_grant if isinstance(command, SetProjectActionGrantCommand) else None)
             or type(original.access_revision) is not int
@@ -424,12 +449,12 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: AssignProjectUseOnlyGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> CompletedSynchronousOperationDTO:
-        fingerprint = self._fingerprints.for_assign_use_only(command)
+        fingerprint = self._project_grant_change_fingerprint_service.for_assign_use_only(command)
 
-        async with self._transactions.begin():
-            authorization = await self._authorizer.require_authorization(
+        async with self._transaction_manager.begin():
+            authorization = await self._project_grant_authorizer.require_authorization(
                 access=access,
                 request=ProjectUseOnlyGrantAuthorizationRequestDTO(
                     project_id=command.project_id,
@@ -441,7 +466,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             if authorization.project_id != command.project_id:
                 raise RuntimeError("Authorization returned a different project than requested.")
 
-            operation = await self._idempotency.find_or_reserve(
+            operation = await self._operation_idempotency.reserve_or_recover(
                 context=context,
                 access=access,
                 authorization=authorization,
@@ -453,13 +478,13 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             )
 
             if not isinstance(operation, NewOperationReservationDTO):
-                return self._require_completed_result(operation)
+                return self._require_safe_completed_operation(operation)
 
             # A replay keeps its original revision. Only new work checks current state.
             if authorization.project_access_revision != command.expected_access_revision:
                 raise StaleRevisionError()
 
-            membership = await self._memberships.get(
+            membership = await self._membership_repository.get(
                 organization_id=authorization.organization_id,
                 project_id=authorization.project_id,
                 principal_id=command.recipient_principal_id,
@@ -481,22 +506,23 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             except ProjectGrantAlreadyExistsError as error:
                 raise ConflictError("This project action grant already exists.") from error
 
-            await self._memberships.save(
+            await self._membership_repository.save(
                 membership,
                 expected_project_access_revision=authorization.project_access_revision,
                 operation_id=operation.operation_id,
             )
-            completed = await self._idempotency.record_completed_result(
+            completed = await self._operation_idempotency.record_completed_result(
                 operation, replay_kind=OperationReplayKind.SAFE_RESULT
             )
-            return self._require_completed_result(completed)
+            return self._require_safe_completed_operation(completed)
 
     @staticmethod
-    def _require_completed_result(
+    def _require_safe_completed_operation(
         operation: CompletedSynchronousOperationDTO
         | AcceptedAsyncOperationDTO
         | RecoveryRequiredOperationDTO,
     ) -> CompletedSynchronousOperationDTO:
+        """Accept only the safe synchronous result supported by this grant operation."""
         if (
             not isinstance(operation, CompletedSynchronousOperationDTO)
             or operation.replay_kind is not OperationReplayKind.SAFE_RESULT

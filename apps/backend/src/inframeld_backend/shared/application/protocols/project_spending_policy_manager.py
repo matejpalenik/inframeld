@@ -6,8 +6,8 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.commands.change_project_spending_policy_command import (
     ChangeProjectSpendingPolicyCommand,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.project_spending_policy_result_dto import (
     ProjectSpendingPolicyResultDTO,
@@ -25,7 +25,7 @@ class ProjectSpendingPolicyManager(Protocol):
         *,
         access: AccessContextDTO,
         command: ChangeProjectSpendingPolicyCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectSpendingPolicyResultDTO: ...
 
     @abstractmethod

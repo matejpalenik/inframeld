@@ -15,12 +15,12 @@ NOW = datetime(2026, 11, 1, tzinfo=UTC)
 
 def _basis() -> CapturedSpendingBasisDTO:
     return CapturedSpendingBasisDTO(
-        "basis-1",
-        "fixture-pricing",
-        "revision-1",
-        NOW,
-        (SpendingRateDTO("input", "unit", Decimal("0.000000000000001")),),
-        (SpendingUsageDTO("input", "unit", Decimal("1000.00000000000001")),),
+        basis_id="basis-1",
+        source_reference="fixture-pricing",
+        source_revision="revision-1",
+        captured_at=NOW,
+        rates=(SpendingRateDTO("input", "unit", Decimal("0.000000000000001")),),
+        maximum_usage=(SpendingUsageDTO("input", "unit", Decimal("1000.00000000000001")),),
     )
 
 

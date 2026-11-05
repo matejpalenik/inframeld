@@ -275,7 +275,7 @@ async def test_preloop_failure_closes_constructed_storage_and_pool(
     def storage_factory(
         settings: ArtifactStorageSettings,
         *,
-        observations: JobEffectObservationRecorder | None = None,
+        effect_observation_recorder: JobEffectObservationRecorder | None = None,
     ) -> S3ArtifactStore:
         return storage
 

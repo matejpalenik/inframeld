@@ -94,13 +94,13 @@ async def bootstrap_scenario(
     return FirstAdministratorScenarioDTO(
         binding,
         BootstrapFirstAdministratorCommand(
-            binding.installation_id,
-            OperationId(operation),
-            0,
-            UUID(identity.subject.value),
-            "Host operator",
-            "First admission",
-            HumanAccessTokenCredential("controlled-provider-proof"),
+            expected_installation_id=binding.installation_id,
+            operation_id=OperationId(operation),
+            expected_access_revision=0,
+            expected_identity_id=UUID(identity.subject.value),
+            operator_label="Host operator",
+            reason="First admission",
+            identity_proof=HumanAccessTokenCredential("controlled-provider-proof"),
         ),
     )
 
@@ -111,10 +111,10 @@ def bootstrap_service(
     return FirstAdministratorBootstrapService(
         token_verifier=MockBootstrapTokenVerifier(binding),
         identity_verifier=MockBootstrapIdentityVerifier(),
-        transactions=SqlAlchemyTransactionManager(session),
-        facts=PostgresFirstAdministratorBootstrapFactsReader(session),
-        writer=PostgresFirstAdministratorBootstrapWriter(session),
-        fingerprints=FirstAdministratorBootstrapFingerprintService(
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        bootstrap_facts_reader=PostgresFirstAdministratorBootstrapFactsReader(session),
+        bootstrap_writer=PostgresFirstAdministratorBootstrapWriter(session),
+        bootstrap_fingerprint_service=FirstAdministratorBootstrapFingerprintService(
             RequestFingerprintService(RequestFingerprintKey(b"k" * 32))
         ),
     )

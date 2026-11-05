@@ -103,10 +103,10 @@ class MockOwnAccessReader(MyProjectAccessReader):
         if self.error is not None:
             raise self.error
         return MyProjectAccessPageDTO(
-            PROJECT,
-            PRINCIPAL,
-            7,
-            (
+            project_id=PROJECT,
+            principal_id=PRINCIPAL,
+            access_revision=7,
+            grants=(
                 MyProjectAccessGrantDTO(
                     ProjectGrantTargetDTO(PROJECT), ActionId("inspect-budget"), False
                 ),
@@ -119,9 +119,9 @@ class MockOwnAccessReader(MyProjectAccessReader):
                     True,
                 ),
             ),
-            (GROUP,),
-            (GROUP,),
-            "next_page",
+            group_memberships=(GROUP,),
+            group_managements=(GROUP,),
+            next_cursor="next_page",
         )
 
 

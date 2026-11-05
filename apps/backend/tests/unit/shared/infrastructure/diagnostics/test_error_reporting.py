@@ -27,6 +27,8 @@ from inframeld_backend.shared.infrastructure.diagnostics.error_reporting import 
 )
 from inframeld_backend.shared.infrastructure.logging.command_logging import command_logging_scope
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 
 SECRET = "synthetic-command-secret"
 OPERATION_ID = OperationId("synthetic-operation-id")
@@ -121,7 +123,7 @@ def test_request_boundary_owns_nested_command_diagnostic(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Record one command outcome and one request-owned diagnostic."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
     application = _create_nested_failure_app()
 
     with TestClient(application, raise_server_exceptions=False) as client:
@@ -163,7 +165,7 @@ def test_unregistered_application_error_receives_unexpected_diagnostic(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Report an unmapped handled application failure exactly once."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
     application = _create_nested_failure_app()
 
     with TestClient(application) as client:
@@ -193,7 +195,7 @@ def test_same_exception_instance_is_reported_only_once(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Suppress duplicate diagnostics only for the exact reported exception."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
 
     reported_error = RuntimeError(SECRET)
     separate_error = RuntimeError(SECRET)
@@ -228,7 +230,7 @@ def test_frozen_exception_is_reported_once_without_exposing_message(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Preserve the original diagnostic when an exception rejects setattr."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
     error = _FrozenFailure(SECRET)
 
     report_unexpected_error(error, event="first_boundary_failed")
@@ -249,7 +251,7 @@ def test_outer_handler_reports_unreported_error_with_response_request_id(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Correlate an outer-handler diagnostic with its safe 500 response."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
     application = _create_outer_handler_only_app()
 
     with TestClient(application, raise_server_exceptions=False) as client:
@@ -276,7 +278,7 @@ def test_dependency_failure_is_reported_only_when_cause_is_available(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Report one actionable dependency diagnostic when a cause exists."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
     application = _create_nested_failure_app()
 
     with TestClient(application) as client:
@@ -308,7 +310,7 @@ def test_uvicorn_suppresses_only_the_exact_reported_exception(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Keep Uvicorn logs except for an already-reported exception instance."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
 
     reported_error = _captured_runtime_error(SECRET)
     unreported_error = _captured_runtime_error(SECRET)

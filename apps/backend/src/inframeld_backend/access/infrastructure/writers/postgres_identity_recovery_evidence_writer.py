@@ -233,6 +233,7 @@ class PostgresIdentityRecoveryEvidenceWriter(IdentityRecoveryEvidenceWriter):
         admission: IdentityRecoveryAdmissionDTO,
         kind: IdentityRecoveryEvidenceType,
     ) -> IdentityRecoveryEvidenceReceiptRow:
+        """Load the retained settings receipt for the exact native flow."""
         return await self._receipt(
             identity=evidence.identity,
             operation_id=admission.operation_id,
@@ -256,6 +257,7 @@ class PostgresIdentityRecoveryEvidenceWriter(IdentityRecoveryEvidenceWriter):
         source: UUID | None,
         event_kind: IdentityRecoveryEventKind | None,
     ) -> IdentityRecoveryEvidenceReceiptRow:
+        """Require the original recovery binding before recording callback evidence."""
         await self._session.execute(
             insert(IdentityRecoveryEvidenceReceiptRow)
             .values(

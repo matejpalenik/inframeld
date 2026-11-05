@@ -10,9 +10,60 @@ Alice's project ID and Bob's principal ID are both UUIDs. Passing one in place o
 
 Use a dedicated value object when identity, invariants, secrecy or accidental mixing matter. Value objects express immutable meaning and validate their own invariants. Entities have stable identity and cohesive state. Do not introduce a wrapper just to make every field look alike.
 
-Use application-owned enums or `Literal` types for closed vocabularies. Meaningful open values, such as identity authorities and subjects, need distinct types when mixing them would be harmful. Free-form text and vocabularies whose values are not yet defined may remain strings.
+Meaningful open values, such as identity authorities and subjects, need distinct types when mixing them would be harmful. Free-form text and vocabularies whose values are not yet defined may remain strings.
 
 Parse and validate at HTTP, provider, configuration and persistence boundaries. Serialize back to primitives there. Preserve existing wire/database values and real ORM conversion. An annotation alone performs no runtime validation.
+
+<a id="closed-string-vocabularies"></a>
+
+## Closed string vocabularies
+
+Use a scoped `StrEnum` for a closed string vocabulary. Reuse an existing enum only when both its meaning and allowed values match. A genuine choice uses the enum type. An exact tag or restricted subset uses `Literal[Enum.MEMBER]`, including discriminated-union fields. Do not put raw string members in `Literal`. Numeric and boolean Literals retain their existing meaning.
+
+Place each enum with its owning component. This string-vocabulary convention also applies to authored tooling and test support, using their package structure rather than backend role folders. Generated SDK output remains governed by its owning generator workflow.
+
+**Inspected teaching excerpt:** the complete existing module [apps/backend/src/inframeld_backend/access/domain/enums/project_departure_target_kind.py](../../../../apps/backend/src/inframeld_backend/access/domain/enums/project_departure_target_kind.py), shown for explanation rather than replacement or insertion.
+
+```python
+from enum import StrEnum
+
+
+class ProjectDepartureTargetKind(StrEnum):
+    """Identify the resource whose remaining human responsibility must be preserved."""
+
+    PROJECT = "project"
+    ACCESS_GROUP = "access_group"
+    APPLICATION_ACCOUNT = "application_account"
+```
+
+A departure target can use any of these three kinds. A request that supports only one Project action needs a narrower field.
+
+**Inspected teaching excerpt:** the complete existing module [apps/backend/src/inframeld_backend/access/http/requests/project_use_only_grant_request.py](../../../../apps/backend/src/inframeld_backend/access/http/requests/project_use_only_grant_request.py), shown for explanation rather than replacement or insertion.
+
+```python
+"""Parse the supported use-only project grant command."""
+
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
+
+
+class ProjectUseOnlyGrantRequest(BaseModel):
+    recipient_principal_id: UUID = Field(alias="recipientPrincipalId")
+    action_id: Literal[ProjectAction.CREATE_ACCESS_GROUPS] = Field(alias="actionId")
+    expected_access_revision: int = Field(
+        alias="expectedAccessRevision",
+        strict=True,
+        ge=0,
+    )
+```
+
+Replacing this field with unrestricted `ProjectAction` would also admit actions this request does not support. Preserve explicit permission allowlists when converting vocabulary, rather than automatically admitting future enum members. Use named `ProjectAction` constants for known actions while keeping `ActionId` at boundaries that read stored identifiers.
+
+Convert accepted external strings into enum members at their existing parsing boundaries and serialize their existing string values on output. Preserve rejection of unknown input and the established handling of corrupt stored data. Check both supported and unsupported values. Type annotations alone do not convert dataclass fields or validate persistence results.
 
 <a id="runtime-identifiers"></a>
 
@@ -51,6 +102,28 @@ Use `Principal` when a workflow needs ID, organization, kind and status together
 Use standard `@dataclass(frozen=True, slots=True)` for Commands, Queries, DTOs, dedicated policy inputs and immutable value objects. Preserve entity-specific equality and secret-safe representations. Do not add custom record decorators, marker bases, empty protocols or generic DTO/value-object frameworks.
 
 A Command describes a requested change. A Query describes a requested read. Other DTOs carry results, projections and caller/operation metadata. Dedicated `PolicyInput` records carry decision inputs. Create a named Command or Query only when useful. Direct typed parameters remain valid.
+
+Use keyword arguments when positional values would obscure meaning, especially several booleans or similarly typed policy inputs. Keep straightforward positional calls where their meaning is clear.
+
+**Inspected teaching excerpt:** the candidate construction inside `ProjectMembershipChangeService._require_handover()` in [apps/backend/src/inframeld_backend/access/application/services/project_membership_change_service.py](../../../../apps/backend/src/inframeld_backend/access/application/services/project_membership_change_service.py). Here `candidate` is a `ProjectDepartureCandidateDTO` from the surrounding responsibility's candidate iteration. The linked method supplies that iteration and the scope and policy checks. This selected constructor expression and its import do not replace the complete workflow.
+
+```python
+from inframeld_backend.access.domain.policy_inputs.project_departure_candidate_policy_input import (
+    ProjectDepartureCandidatePolicyInput,
+)
+
+ProjectDepartureCandidatePolicyInput(
+    principal=candidate.principal,
+    has_pending_recovery=candidate.has_pending_recovery,
+    is_project_member=candidate.is_project_member,
+    has_coherent_identity=candidate.has_coherent_identity,
+    can_grant=candidate.can_grant,
+    is_group_member=candidate.is_group_member,
+    is_group_manager=candidate.is_group_manager,
+)
+```
+
+Each boolean's meaning is visible where the policy input is constructed. Named arguments do not replace current authorization or the domain policy's decision.
 
 `ProjectActionFactsDTO` is a persistence read result despite “Facts” in its name. The service converts it to `ActionAuthorizationPolicyInput`. A policy can also consume an existing entity or typed parameters. Commands and Queries may validate their own input without I/O, but current authorization, state checks and execution remain with services and domain rules.
 
@@ -111,7 +184,7 @@ class AssignProjectUseOnlyGrantCommand(Command, ProjectCommand):
 
 **Walkthrough.** The Command describes requested work. Its revision is an integer because this published counter already has a defined representation and local validation. The exact `int` check rejects booleans as well as other types, and the next check rejects negative values. This is a documented primitive choice, not a reason to wrap every scalar or remove useful value objects.
 
-The service separately receives `AccessContextDTO` and `OperationAdmissionContextDTO`. Access carries the authenticated actor and complete authentication evidence. Operation context carries retry metadata. Current authorization returns checked scope. None of those roles belongs on this Command, and local revision validation does not check current state. See [the complete service signature and workflow](services-and-use-cases.md).
+The service separately receives `AccessContextDTO` and `IdempotencyContextDTO`. Access carries the authenticated actor and complete authentication evidence. Operation context carries retry metadata. Current authorization returns checked scope. None of those roles belongs on this Command, and local revision validation does not check current state. See [the complete service signature and workflow](services-and-use-cases.md).
 
 **Alternatives.** Use a Query for a useful named read input. Keep results, projections and contexts as DTOs. `ProjectActionFactsDTO` becomes policy input only when the application selects the values for that domain decision. Direct typed parameters are valid when a named input adds no value.
 

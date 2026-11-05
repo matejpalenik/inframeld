@@ -1,6 +1,8 @@
 from dataclasses import dataclass
-from typing import Literal
 
+from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
+    ProjectActionGrantChangeKind,
+)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
@@ -21,7 +23,7 @@ class ProjectActionGrantChangeResultDTO:
     actor_principal_id: PrincipalId
     recipient_principal_id: PrincipalId
     action_id: ActionId
-    change_kind: Literal["set", "remove"]
+    change_kind: ProjectActionGrantChangeKind
     can_grant: bool | None
     access_revision: int
     changed: bool

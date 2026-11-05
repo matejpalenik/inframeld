@@ -1,13 +1,17 @@
 """Control one token request at the HTTP boundary without pausing Hydra internally."""
 
 import asyncio
-from typing import Literal, override
+from enum import StrEnum
+from typing import override
 
 import httpx2
 
 from tests.support.integration_services import HYDRA_PUBLIC_URL
 
-type TokenRequestPhase = Literal["before_request", "after_response"]
+
+class TokenRequestPhase(StrEnum):
+    BEFORE_REQUEST = "before_request"
+    AFTER_RESPONSE = "after_response"
 
 
 class HydraTokenRequestGate(httpx2.AsyncBaseTransport):
@@ -78,10 +82,10 @@ class HydraTokenRequestGate(httpx2.AsyncBaseTransport):
         phase = self._phase if matches else None
         if phase is not None:
             self._phase = None
-        if phase == "before_request":
+        if phase == TokenRequestPhase.BEFORE_REQUEST:
             await self._pause()
         response = await self._transport.handle_async_request(request)
-        if phase == "after_response":
+        if phase == TokenRequestPhase.AFTER_RESPONSE:
             try:
                 await response.aread()
                 self._response_status = response.status_code

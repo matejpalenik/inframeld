@@ -24,9 +24,10 @@ from inframeld_backend.access.http.responses.project_metadata_response import (
 from inframeld_backend.access.http.responses.project_name_resolution_response import (
     ProjectNameResolutionResponse,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
@@ -60,8 +61,8 @@ class ProjectMetadataMapper:
         )
 
     @staticmethod
-    def context(key: IdempotencyKey) -> OperationAdmissionContextDTO:
-        return OperationAdmissionContextDTO("PATCH", "/v1/projects/{project_id}/metadata", key)
+    def context(key: IdempotencyKey) -> IdempotencyContextDTO:
+        return IdempotencyContextDTO(HttpMethod.PATCH, "/v1/projects/{project_id}/metadata", key)
 
     @staticmethod
     def metadata(result: ProjectMetadataDTO) -> ProjectMetadataResponse:

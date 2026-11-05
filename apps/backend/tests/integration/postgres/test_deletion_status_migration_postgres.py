@@ -50,15 +50,16 @@ from inframeld_backend.access.infrastructure.rows.project_membership_row import 
 from inframeld_backend.access.infrastructure.writers.postgres_project_metadata_audit_writer import (
     PostgresProjectMetadataAuditWriter,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -171,7 +172,7 @@ async def _seed_legacy_request(session: AsyncSession) -> DeletionStatusSeedDTO:
         principal_id=principal,
         organization_id=organization,
         project_id=project,
-        method="DELETE",
+        method=HttpMethod.DELETE,
         requested_route="/v1/projects/{project_id}",
         key=IdempotencyKey(str(uuid4())),
         fingerprint=b"F" * 32,
@@ -179,8 +180,8 @@ async def _seed_legacy_request(session: AsyncSession) -> DeletionStatusSeedDTO:
     )
     reservation = await IdempotencyService(
         PostgresOperationReservationWriter(session)
-    ).find_or_reserve(
-        context=OperationAdmissionContextDTO(request.method, request.requested_route, request.key),
+    ).reserve_or_recover(
+        context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
         access=access,
         authorization=ProjectActionAuthorizationDTO(organization, project),
         fingerprint=RequestFingerprint(request.fingerprint),

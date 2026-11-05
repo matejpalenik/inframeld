@@ -74,13 +74,15 @@ class MockConsentHandler(HumanOAuthConsentHandler):
         if self.error:
             raise self.error
         return HumanOAuthConsentDetailsDTO(
-            VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySubject("alice")),
-            OAuthClientId("inframeld-cli"),
-            HumanAPIAudience("https://api.test"),
-            (HumanOAuthScope.API,),
-            (HumanAPIAudience("https://api.test"),),
-            True,
-            3600,
+            identity=VerifiedHumanIdentityDTO(
+                IdentityAuthority("kratos:test"), IdentitySubject("alice")
+            ),
+            client_id=OAuthClientId("inframeld-cli"),
+            installation=HumanAPIAudience("https://api.test"),
+            scopes=(HumanOAuthScope.API,),
+            audiences=(HumanAPIAudience("https://api.test"),),
+            approval_required=True,
+            remember_consent_seconds=3600,
         )
 
     @override

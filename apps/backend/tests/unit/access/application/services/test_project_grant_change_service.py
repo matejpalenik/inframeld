@@ -3,7 +3,8 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Literal, override
+from enum import StrEnum
+from typing import override
 from uuid import UUID
 
 import pytest
@@ -33,6 +34,9 @@ from inframeld_backend.access.application.dtos.project_grant_change_facts_dto im
 )
 from inframeld_backend.access.application.dtos.project_use_only_grant_authorization_request_dto import (
     ProjectUseOnlyGrantAuthorizationRequestDTO,
+)
+from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
+    ProjectActionGrantChangeKind,
 )
 from inframeld_backend.access.application.protocols.authorized_operation_scope import (
     AuthorizedOperationScope,
@@ -81,15 +85,16 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -121,6 +126,14 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint_key 
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
+
+class Phase(StrEnum):
+    RESERVATION = "reservation"
+    WRITE = "write"
+    COMPLETION = "completion"
+    COMMIT = "commit"
+
+
 ACTOR_ID = PrincipalId(UUID(int=1))
 RECIPIENT_ID = PrincipalId(UUID(int=2))
 ORGANIZATION_ID = OrganizationId(UUID(int=3))
@@ -133,8 +146,8 @@ AUTHORIZATION = ProjectGrantAuthorizationDTO(
     organization_id=ORGANIZATION_ID, project_id=PROJECT_ID, project_access_revision=7
 )
 COMMAND = AssignProjectUseOnlyGrantCommand(PROJECT_ID, RECIPIENT_ID, ACTION_ID, 7)
-CONTEXT = OperationAdmissionContextDTO(
-    method="POST",
+CONTEXT = IdempotencyContextDTO(
+    method=HttpMethod.POST,
     requested_route="/v1/projects/{project_id}/grants",
     key=IdempotencyKey("assign-bob-1"),
 )
@@ -149,44 +162,52 @@ INSTALLATION = InstallationId(UUID(int=5))
 ACTOR = Principal(ACTOR_ID, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE)
 RECIPIENT = Principal(RECIPIENT_ID, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE)
 OTHER = ProjectDepartureCandidatePolicyInput(
-    Principal(
+    principal=Principal(
         PrincipalId(UUID(int=6)), ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
     ),
-    False,
-    True,
-    True,
-    True,
-    False,
-    False,
+    has_pending_recovery=False,
+    is_project_member=True,
+    has_coherent_identity=True,
+    can_grant=True,
+    is_group_member=False,
+    is_group_manager=False,
 )
 MANAGEMENT = ProjectActionGrantManagementFactsDTO(
-    INSTALLATION,
-    ORGANIZATION_ID,
-    PROJECT_ID,
-    ACTION_ID,
-    ProjectGrantChangeFactsDTO(
-        ACTOR, False, None, RECIPIENT, ProjectStatus.ACTIVE, 7, True, True, True
+    installation_id=INSTALLATION,
+    organization_id=ORGANIZATION_ID,
+    project_id=PROJECT_ID,
+    action_id=ACTION_ID,
+    grant=ProjectGrantChangeFactsDTO(
+        actor=ACTOR,
+        has_pending_recovery=False,
+        oauth_credential_facts=None,
+        recipient=RECIPIENT,
+        project_status=ProjectStatus.ACTIVE,
+        project_access_revision=7,
+        actor_is_project_member=True,
+        recipient_is_project_member=True,
+        actor_can_grant_action=True,
     ),
-    False,
-    True,
-    False,
-    (OTHER,),
+    recipient_has_pending_recovery=False,
+    recipient_has_coherent_identity=True,
+    recipient_application_is_project_bound=False,
+    other_grantors=(OTHER,),
 )
 SET_COMMAND = SetProjectActionGrantCommand(PROJECT_ID, RECIPIENT_ID, ACTION_ID, False, 7)
 REMOVE_COMMAND = RemoveProjectActionGrantCommand(PROJECT_ID, RECIPIENT_ID, ACTION_ID, 7)
 ORIGINAL = ProjectActionGrantChangeResultDTO(
-    INSTALLATION,
-    ORGANIZATION_ID,
-    PROJECT_ID,
-    ACTOR_ID,
-    RECIPIENT_ID,
-    ACTION_ID,
-    "set",
-    False,
-    8,
-    True,
-    201,
-    SAVED_RESULT,
+    installation_id=INSTALLATION,
+    organization_id=ORGANIZATION_ID,
+    project_id=PROJECT_ID,
+    actor_principal_id=ACTOR_ID,
+    recipient_principal_id=RECIPIENT_ID,
+    action_id=ACTION_ID,
+    change_kind=ProjectActionGrantChangeKind.SET,
+    can_grant=False,
+    access_revision=8,
+    changed=True,
+    status_code=201,
+    operation=SAVED_RESULT,
 )
 
 
@@ -207,7 +228,7 @@ class MockTransactions(TransactionManager):
             self.events.append("rollback")
             raise
         else:
-            self.events.append("commit")
+            self.events.append(Phase.COMMIT)
 
 
 class MockProjectGrantAuthorizer(ProjectGrantAuthorizer):
@@ -252,7 +273,7 @@ class MockOperationIdempotency(OperationIdempotency):
         self.error: Exception | None = None
         self.completion_error: Exception | None = None
         self.calls = 0
-        self.context: OperationAdmissionContextDTO | None = None
+        self.context: IdempotencyContextDTO | None = None
         self.access: AccessContextDTO | None = None
         self.authorization: object | None = None
         self.fingerprint: RequestFingerprint | None = None
@@ -260,10 +281,10 @@ class MockOperationIdempotency(OperationIdempotency):
         self.expected_kind: OperationReplayKind | None = None
 
     @override
-    async def find_or_reserve[ProjectScope: ProjectId | None](
+    async def reserve_or_recover[ProjectScope: ProjectId | None](
         self,
         *,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         access: AccessContextDTO,
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,
@@ -361,7 +382,7 @@ class MockProjectMembershipRepository(ProjectMembershipRepository):
         expected_project_access_revision: int,
         operation_id: OperationId,
     ) -> None:
-        self.events.append("write")
+        self.events.append(Phase.WRITE)
         self.calls += 1
         assert membership is self.result
         grant = membership.grants[0]
@@ -434,7 +455,7 @@ class MockGrantResults(ProjectActionGrantResultReader, ProjectActionGrantResultW
         *,
         facts: ProjectActionGrantManagementFactsDTO,
         command: SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         operation: CompletedSynchronousOperationDTO,
     ) -> ProjectActionGrantChangeResultDTO:
         self.events.append("read_result")
@@ -467,14 +488,14 @@ class GrantScenario:
         self.management = MockManagementFacts(self.events)
         self.results = MockGrantResults(self.events)
         self.service = ProjectGrantChangeService(
-            transactions=self.transactions,
-            authorizer=self.authorizer,
-            idempotency=self.idempotency,
-            memberships=self.memberships,
-            fingerprints=self.fingerprints,
-            management_facts=self.management,
-            results=self.results,
-            result_writer=self.results,
+            transaction_manager=self.transactions,
+            project_grant_authorizer=self.authorizer,
+            operation_idempotency=self.idempotency,
+            membership_repository=self.memberships,
+            project_grant_change_fingerprint_service=self.fingerprints,
+            grant_management_facts_reader=self.management,
+            grant_result_reader=self.results,
+            grant_result_writer=self.results,
         )
 
     async def assign(
@@ -488,8 +509,8 @@ class GrantScenario:
         return await self.service.set_action_grant(
             access=ACCESS,
             command=command,
-            context=OperationAdmissionContextDTO(
-                "PUT",
+            context=IdempotencyContextDTO(
+                HttpMethod.PUT,
                 f"/v1/projects/{command.project_id.value}/grants/{command.recipient_principal_id.value}/{command.action_id.value}",
                 IdempotencyKey("manage-bob"),
             ),
@@ -501,8 +522,8 @@ class GrantScenario:
         return await self.service.remove_action_grant(
             access=ACCESS,
             command=command,
-            context=OperationAdmissionContextDTO(
-                "DELETE",
+            context=IdempotencyContextDTO(
+                HttpMethod.DELETE,
                 f"/v1/projects/{command.project_id.value}/grants/{command.recipient_principal_id.value}/{command.action_id.value}",
                 IdempotencyKey("manage-bob"),
             ),
@@ -908,7 +929,7 @@ async def test_replay_rechecks_authorization_before_returning_saved_result() -> 
     assert scenario.idempotency.authorization is AUTHORIZATION
     assert scenario.idempotency.fingerprint == expected_fingerprint
     assert scenario.idempotency.expected_kind is OperationReplayKind.SAFE_RESULT
-    assert scenario.events == ["fingerprint", "begin", "authorize", "reserve", "commit"]
+    assert scenario.events == ["fingerprint", "begin", "authorize", "reserve", Phase.COMMIT]
     assert scenario.memberships.calls == 0
     assert scenario.memberships.loads == 0
     scenario.authorizer.error = AccessDeniedError()
@@ -946,31 +967,31 @@ async def test_new_assignment_completes_before_transaction_commit() -> None:
         "authorize",
         "reserve",
         "load_membership",
-        "write",
+        Phase.WRITE,
         "complete",
-        "commit",
+        Phase.COMMIT,
     ]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("phase", ["reservation", "write", "completion", "commit"])
+@pytest.mark.parametrize("phase", [Phase.RESERVATION, Phase.WRITE, Phase.COMPLETION, Phase.COMMIT])
 async def test_failures_never_return_a_successful_result(
-    phase: Literal["reservation", "write", "completion", "commit"],
+    phase: Phase,
 ) -> None:
     scenario = GrantScenario()
     scenario.idempotency.result = NEW_RESERVATION
     error = RuntimeError("injected failure")
-    if phase == "reservation":
+    if phase == Phase.RESERVATION:
         scenario.idempotency.error = error
-    elif phase == "write":
+    elif phase == Phase.WRITE:
         scenario.memberships.error = error
-    elif phase == "completion":
+    elif phase == Phase.COMPLETION:
         scenario.idempotency.completion_error = error
     else:
         scenario.transactions.error = error
     with pytest.raises(RuntimeError, match="injected failure"):
         await scenario.assign()
-    assert "commit" not in scenario.events
+    assert Phase.COMMIT not in scenario.events
     assert scenario.events[-1] == "rollback"
 
 
@@ -1008,7 +1029,7 @@ async def test_unexpected_async_completion_cannot_commit_a_grant() -> None:
     with pytest.raises(ConflictError):
         await scenario.assign()
     assert scenario.memberships.calls == 1
-    assert "commit" not in scenario.events
+    assert Phase.COMMIT not in scenario.events
     assert scenario.events[-1] == "rollback"
 
 
@@ -1087,7 +1108,7 @@ async def test_duplicate_conflict_message_is_independent_of_domain_wording(
     assert scenario.memberships.calls == 0
     assert scenario.memberships.result.grants == ()
     assert "complete" not in scenario.events
-    assert "commit" not in scenario.events
+    assert Phase.COMMIT not in scenario.events
     assert scenario.events[-1] == "rollback"
 
 

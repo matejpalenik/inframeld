@@ -34,15 +34,15 @@ from inframeld_backend.shared.domain.enums.job_status import JobStatus
 class JobContinuationEligibilityService(JobContinuationEligibility):
     def __init__(
         self,
-        jobs: JobStore,
-        product: AdmittedWorkAuthorizer,
-        cleanup: ArtifactCleanupAuthorizer,
+        job_store: JobStore,
+        admitted_work_authorizer: AdmittedWorkAuthorizer,
+        artifact_cleanup_authorizer: ArtifactCleanupAuthorizer,
         *,
         supported_payloads: tuple[tuple[str, int], ...],
     ) -> None:
-        self._jobs = jobs
-        self._product = product
-        self._cleanup = cleanup
+        self._job_store = job_store
+        self._admitted_work_authorizer = admitted_work_authorizer
+        self._artifact_cleanup_authorizer = artifact_cleanup_authorizer
         self._supported_payloads = supported_payloads
 
     @override
@@ -51,9 +51,11 @@ class JobContinuationEligibilityService(JobContinuationEligibility):
         complete = False
         try:
             if isinstance(job.binding, ProductJobBindingDTO):
-                await self._product.require_current(job.binding.authority)
+                await self._admitted_work_authorizer.require_current(job.binding.authority)
             else:
-                facts = await self._cleanup.require_current(job.job_id, job.binding)
+                facts = await self._artifact_cleanup_authorizer.require_current(
+                    job.job_id, job.binding
+                )
                 if facts.binding != job.binding or facts.job_id != job.job_id:
                     raise ConflictError("Cleanup observations changed the original binding.")
                 complete = facts.physically_complete
@@ -68,14 +70,14 @@ class JobContinuationEligibilityService(JobContinuationEligibility):
 
         observation = None
         if job.pending_effect is not None:
-            observation = await self._jobs.pending_observation(job)
+            observation = await self._job_store.pending_observation(job)
             if not self._matches(job, observation):
                 return JobContinuationEligibilityDTO(
                     job, Disposition.NOT_ESTABLISHED, "unknown_external_effect"
                 )
             assert observation is not None
             try:
-                await self._jobs.validate_effect_target(observation.binding)
+                await self._job_store.validate_effect_target(observation.binding)
             except ConflictError:
                 return JobContinuationEligibilityDTO(
                     job, Disposition.NOT_ESTABLISHED, "artifact_evidence_unavailable"
@@ -102,6 +104,7 @@ class JobContinuationEligibilityService(JobContinuationEligibility):
 
     @staticmethod
     def _matches(job: JobSnapshotDTO, observation: JobEffectObservationDTO | None) -> bool:
+        """Require unused proof of non-dispatch for this exact attempt and pending effect."""
         if observation is None:
             return False
         binding = observation.binding

@@ -67,6 +67,7 @@ async def _open_operations(
     worker_id: UUID,
     stopped: asyncio.Event,
 ) -> AsyncGenerator[tuple[IdentityRecoveryCleanupExecutor, IdentityRecoveryCleanupReconciler]]:
+    """Construct cleanup collaborators on one bounded database session."""
     cleanup = settings.recovery_cleanup
     try:
         async with database.session() as session:
@@ -175,6 +176,7 @@ async def run_recovery_worker(
 
 
 async def _serve(settings: RecoveryWorkerApplicationSettings) -> None:
+    """Install cleanup-worker stop handlers only for this process lifetime."""
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for signum in (signal.SIGINT, signal.SIGTERM):

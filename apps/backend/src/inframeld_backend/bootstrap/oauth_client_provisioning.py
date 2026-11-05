@@ -28,6 +28,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 async def _provision(settings: OAuthClientProvisioningSettings) -> str:
+    """Own the provider client lifetime for the explicitly requested host reconciliation."""
     sdk = ApiClient(
         Configuration(host=str(settings.hydra.admin_url).rstrip("/"), retries=0, debug=False)
     )

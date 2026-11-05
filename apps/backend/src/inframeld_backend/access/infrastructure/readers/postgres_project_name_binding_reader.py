@@ -49,12 +49,12 @@ class PostgresProjectNameBindingReader(ResourceNameBindingReader):
         )
         return tuple(
             ResourceNameBindingDTO(
-                ResourceNameKind.PROJECT,
-                row.project_id,
-                query.scope,
-                ResourceName(row.name),
-                row.binding_revision,
-                row.retired,
+                kind=ResourceNameKind.PROJECT,
+                resource_id=row.project_id,
+                scope=query.scope,
+                name=ResourceName(row.name),
+                revision=row.binding_revision,
+                retired=row.retired,
             )
             for row in rows
         )

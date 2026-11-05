@@ -8,8 +8,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_metadata_change_result_dto import (
     ProjectMetadataChangeResultDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 
 
@@ -25,5 +25,5 @@ class ProjectMetadataChanger(Protocol):
         *,
         access: AccessContextDTO,
         command: UpdateProjectMetadataCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMetadataChangeResultDTO: ...

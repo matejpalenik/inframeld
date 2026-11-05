@@ -37,6 +37,7 @@ __all__ = [
     "CompletedOperationLookupResponse",
     "CurrentSessionResponse",
     "DeletionStatusResponse",
+    "HttpMethod",
     "HumanAdmissionRequest",
     "HumanAdmissionResponse",
     "HumanOAuthConsentDecisionResponse",
@@ -57,12 +58,14 @@ __all__ = [
     "OperationLookupAuthorityFamily",
     "OperationLookupAuthorityRequest",
     "OperationLookupResponse",
+    "OrganizationAction",
     "OriginalOperationLookupRequest",
     "OwnOrganizationGrantResponse",
     "PageResponseProjectActionGrantItemResponse",
     "PathInner",
     "PrincipalKind",
     "ProblemDetails",
+    "ProjectAction",
     "ProjectActionGrantItemResponse",
     "ProjectActionGrantRemovalResponse",
     "ProjectActionGrantRequest",
@@ -89,6 +92,7 @@ __all__ = [
     "UnresolvedDeletionStatusResponse",
     "UnresolvedOperationLookupResponse",
     "ValidationIssue",
+    "ValidationIssueLocation",
 ]
 
 # import apis into sdk package
@@ -115,6 +119,7 @@ from inframeld_sdk.models.application_account_grant_target_response import Appli
 from inframeld_sdk.models.completed_operation_lookup_response import CompletedOperationLookupResponse as CompletedOperationLookupResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse as CurrentSessionResponse
 from inframeld_sdk.models.deletion_status_response import DeletionStatusResponse as DeletionStatusResponse
+from inframeld_sdk.models.http_method import HttpMethod as HttpMethod
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest as HumanAdmissionRequest
 from inframeld_sdk.models.human_admission_response import HumanAdmissionResponse as HumanAdmissionResponse
 from inframeld_sdk.models.human_o_auth_consent_decision_response import HumanOAuthConsentDecisionResponse as HumanOAuthConsentDecisionResponse
@@ -135,12 +140,14 @@ from inframeld_sdk.models.o_auth_consent_decision import OAuthConsentDecision as
 from inframeld_sdk.models.operation_lookup_authority_family import OperationLookupAuthorityFamily as OperationLookupAuthorityFamily
 from inframeld_sdk.models.operation_lookup_authority_request import OperationLookupAuthorityRequest as OperationLookupAuthorityRequest
 from inframeld_sdk.models.operation_lookup_response import OperationLookupResponse as OperationLookupResponse
+from inframeld_sdk.models.organization_action import OrganizationAction as OrganizationAction
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest as OriginalOperationLookupRequest
 from inframeld_sdk.models.own_organization_grant_response import OwnOrganizationGrantResponse as OwnOrganizationGrantResponse
 from inframeld_sdk.models.page_response_project_action_grant_item_response import PageResponseProjectActionGrantItemResponse as PageResponseProjectActionGrantItemResponse
 from inframeld_sdk.models.path_inner import PathInner as PathInner
 from inframeld_sdk.models.principal_kind import PrincipalKind as PrincipalKind
 from inframeld_sdk.models.problem_details import ProblemDetails as ProblemDetails
+from inframeld_sdk.models.project_action import ProjectAction as ProjectAction
 from inframeld_sdk.models.project_action_grant_item_response import ProjectActionGrantItemResponse as ProjectActionGrantItemResponse
 from inframeld_sdk.models.project_action_grant_removal_response import ProjectActionGrantRemovalResponse as ProjectActionGrantRemovalResponse
 from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest as ProjectActionGrantRequest
@@ -167,4 +174,5 @@ from inframeld_sdk.models.unknown_job_reference import UnknownJobReference as Un
 from inframeld_sdk.models.unresolved_deletion_status_response import UnresolvedDeletionStatusResponse as UnresolvedDeletionStatusResponse
 from inframeld_sdk.models.unresolved_operation_lookup_response import UnresolvedOperationLookupResponse as UnresolvedOperationLookupResponse
 from inframeld_sdk.models.validation_issue import ValidationIssue as ValidationIssue
+from inframeld_sdk.models.validation_issue_location import ValidationIssueLocation as ValidationIssueLocation
 

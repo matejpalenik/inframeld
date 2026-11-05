@@ -11,6 +11,7 @@ from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origi
     UnadmittedStagingArtifactOriginDTO,
 )
 from inframeld_backend.shared.application.enums.artifact_cleanup_kind import ArtifactCleanupKind
+from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
@@ -38,19 +39,19 @@ class ArtifactCleanupPreparationService(ArtifactCleanupPreparer):
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        jobs: JobStore,
-        cleanup: ArtifactCleanupAuthorizer,
-        targets: ArtifactCleanupTargetReader,
+        transaction_manager: TransactionManager,
+        job_store: JobStore,
+        artifact_cleanup_authorizer: ArtifactCleanupAuthorizer,
+        artifact_cleanup_target_reader: ArtifactCleanupTargetReader,
     ) -> None:
-        self._transactions = transactions
-        self._jobs = jobs
-        self._cleanup = cleanup
-        self._targets = targets
+        self._transaction_manager = transaction_manager
+        self._job_store = job_store
+        self._artifact_cleanup_authorizer = artifact_cleanup_authorizer
+        self._artifact_cleanup_target_reader = artifact_cleanup_target_reader
 
     @override
     async def prepare(self, context: JobAttemptContextDTO) -> JobEffectBindingDTO | None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             binding = context.binding
             if (
                 not isinstance(binding, ArtifactCleanupJobBindingDTO)
@@ -60,14 +61,14 @@ class ArtifactCleanupPreparationService(ArtifactCleanupPreparer):
             ):
                 raise JobStoppedError("Cleanup requires its original abandoned-staging payload.")
 
-            current = await self._jobs.require_current(context)
+            current = await self._job_store.require_current(context)
             if (current.binding, current.payload, current.work_deadline) != (
                 binding,
                 context.payload,
                 context.work_deadline,
             ):
                 raise JobFenceLostError("The original cleanup work changed.")
-            facts = await self._cleanup.require_current(context.job_id, binding)
+            facts = await self._artifact_cleanup_authorizer.require_current(context.job_id, binding)
             if (
                 facts.binding != binding
                 or facts.job_id != context.job_id
@@ -85,7 +86,7 @@ class ArtifactCleanupPreparationService(ArtifactCleanupPreparer):
             if current.pending_effect is not None:
                 raise ConflictError("An original physical invocation remains unresolved.")
 
-            target = await self._targets.read(binding, facts.targets[0])
+            target = await self._artifact_cleanup_target_reader.read(binding, facts.targets[0])
             if (
                 target is None
                 or target.attempt_id != facts.targets[0]
@@ -111,15 +112,15 @@ class ArtifactCleanupPreparationService(ArtifactCleanupPreparer):
                 )
 
             prepared = JobEffectBindingDTO(
-                JobEffectId(uuid4()),
-                replace(context, checkpoint=current.checkpoint),
-                "artifact.cleanup:" + target.attempt_id.value.hex,
-                "delete",
-                target.artifact_id,
-                target.attempt_id,
-                target.scope,
-                target.length,
-                target.digest,
+                effect_id=JobEffectId(uuid4()),
+                context=replace(context, checkpoint=current.checkpoint),
+                unit="artifact.cleanup:" + target.attempt_id.value.hex,
+                action=JobEffectAction.DELETE,
+                artifact_id=target.artifact_id,
+                artifact_attempt_id=target.attempt_id,
+                scope=target.scope,
+                length=target.length,
+                digest=target.digest,
             )
-            await self._jobs.register_effect(prepared)
+            await self._job_store.register_effect(prepared)
             return prepared

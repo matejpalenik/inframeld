@@ -16,12 +16,12 @@ from inframeld_backend.shared.application.queries.resolve_resource_name_query im
 
 
 class ResourceNameResolutionService(ResourceNameResolver):
-    def __init__(self, reader: ResourceNameBindingReader) -> None:
-        self._reader = reader
+    def __init__(self, resource_name_binding_reader: ResourceNameBindingReader) -> None:
+        self._resource_name_binding_reader = resource_name_binding_reader
 
     @override
     async def resolve(self, query: ResolveResourceNameQuery) -> ResourceNameBindingDTO:
-        bindings = await self._reader.read(query)
+        bindings = await self._resource_name_binding_reader.read(query)
         if len(bindings) != 1:
             raise ResourceNotFoundError()
 

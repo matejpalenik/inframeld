@@ -39,6 +39,7 @@ from inframeld_backend.shared.application.dtos.job_snapshot_dto import JobSnapsh
 from inframeld_backend.shared.application.enums.job_continuation_disposition import (
     JobContinuationDisposition,
 )
+from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.errors.application_errors import ConflictError
 from inframeld_backend.shared.application.errors.job_errors import (
     JobFenceLostError,
@@ -119,20 +120,22 @@ async def test_registered_unsealed_cleanup_invocation_is_admitted_once(database:
             PostgresJobStore(session),
             supported_payloads=(("artifact.cleanup", 1),),
             worker_id=uuid4(),
-            product=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-            recovery=_recovery_service(session),
+            admitted_work_authorizer=AdmittedWorkAuthorizationService(
+                PostgresAdmittedWorkFactsReader(session)
+            ),
+            job_recovery=_recovery_service(session),
         ).claim_next()
         assert context is not None and context.job_id == allocation.cleanup_job_id
         binding = JobEffectBindingDTO(
-            JobEffectId(uuid4()),
-            context,
-            "delete-original",
-            "delete",
-            scenario.artifact_id,
-            scenario.attempt_id,
-            scope,
-            None,
-            None,
+            effect_id=JobEffectId(uuid4()),
+            context=context,
+            unit="delete-original",
+            action=JobEffectAction.DELETE,
+            artifact_id=scenario.artifact_id,
+            artifact_attempt_id=scenario.attempt_id,
+            scope=scope,
+            length=None,
+            digest=None,
         )
         operation = JobEffectObservationService(
             SqlAlchemyTransactionManager(session),
@@ -172,8 +175,10 @@ async def _cleanup_context(
             PostgresJobStore(session),
             supported_payloads=(("artifact.cleanup", 1),),
             worker_id=uuid4(),
-            product=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-            recovery=_recovery_service(session),
+            admitted_work_authorizer=AdmittedWorkAuthorizationService(
+                PostgresAdmittedWorkFactsReader(session)
+            ),
+            job_recovery=_recovery_service(session),
         ).claim_next()
         assert context is not None and context.job_id == allocation.cleanup_job_id
         return allocation, context
@@ -193,15 +198,15 @@ async def _registered_invocation(
             await checkpoints.save(context, saved_checkpoint)
             assert context.checkpoint == b""
         binding = JobEffectBindingDTO(
-            JobEffectId(uuid4()),
-            context,
-            "delete-original",
-            "delete",
-            allocation.reservation.artifact_id,
-            allocation.reservation.attempt_id,
-            allocation.reservation.scope,
-            None,
-            None,
+            effect_id=JobEffectId(uuid4()),
+            context=context,
+            unit="delete-original",
+            action=JobEffectAction.DELETE,
+            artifact_id=allocation.reservation.artifact_id,
+            artifact_attempt_id=allocation.reservation.attempt_id,
+            scope=allocation.reservation.scope,
+            length=None,
+            digest=None,
         )
         await _recording_service(session).register(binding)
         return binding
@@ -433,7 +438,7 @@ async def _produced_abort(
             }
         ),
         client=sdk,
-        observations=_PostgresEffectRecorder(database),
+        effect_observation_recorder=_PostgresEffectRecorder(database),
     )
     work = asyncio.create_task(
         store.delete(binding.scope, binding.artifact_attempt_id, observation=binding.effect_id)
@@ -481,8 +486,10 @@ async def test_claim_requeues_exact_adapter_abort_in_the_original_transaction(
             jobs,
             supported_payloads=(("artifact.cleanup", 1),),
             worker_id=uuid4(),
-            product=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-            recovery=_recovery_service(session),
+            admitted_work_authorizer=AdmittedWorkAuthorizationService(
+                PostgresAdmittedWorkFactsReader(session)
+            ),
+            job_recovery=_recovery_service(session),
         )
         assert await execution.claim_next() is None
         async with session.begin():
@@ -567,8 +574,10 @@ async def test_historical_abort_recovery_consumes_once_without_a_live_old_fence(
             PostgresJobStore(session),
             supported_payloads=(("artifact.cleanup", 1),),
             worker_id=uuid4(),
-            product=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-            recovery=_recovery_service(session),
+            admitted_work_authorizer=AdmittedWorkAuthorizationService(
+                PostgresAdmittedWorkFactsReader(session)
+            ),
+            job_recovery=_recovery_service(session),
         ).claim_next()
         assert replacement is not None and replacement.job_id == binding.context.job_id
         assert replacement.attempt == binding.context.attempt + 1
@@ -601,8 +610,10 @@ async def test_saved_checkpoint_with_unchanged_context_recovers_actual_adapter_a
             PostgresJobStore(session),
             supported_payloads=(("artifact.cleanup", 1),),
             worker_id=uuid4(),
-            product=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-            recovery=_recovery_service(session),
+            admitted_work_authorizer=AdmittedWorkAuthorizationService(
+                PostgresAdmittedWorkFactsReader(session)
+            ),
+            job_recovery=_recovery_service(session),
         ).claim_next()
         assert claimed is None
     async with database.session() as session, session.begin():
@@ -635,8 +646,10 @@ async def test_saved_checkpoint_with_unchanged_context_recovers_actual_adapter_a
                 PostgresJobStore(session),
                 supported_payloads=(("artifact.cleanup", 1),),
                 worker_id=uuid4(),
-                product=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-                recovery=_recovery_service(session),
+                admitted_work_authorizer=AdmittedWorkAuthorizationService(
+                    PostgresAdmittedWorkFactsReader(session)
+                ),
+                job_recovery=_recovery_service(session),
             ).claim_next()
             is None
         )
@@ -693,8 +706,10 @@ async def test_changed_checkpoint_after_abort_requires_recovery_without_blocking
                 PostgresJobStore(session),
                 supported_payloads=(("artifact.cleanup", 1),),
                 worker_id=uuid4(),
-                product=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-                recovery=_recovery_service(session),
+                admitted_work_authorizer=AdmittedWorkAuthorizationService(
+                    PostgresAdmittedWorkFactsReader(session)
+                ),
+                job_recovery=_recovery_service(session),
             ).claim_next()
             is None
         )
@@ -729,8 +744,10 @@ async def test_changed_checkpoint_after_abort_requires_recovery_without_blocking
             PostgresJobStore(session),
             supported_payloads=(("artifact.cleanup", 1),),
             worker_id=uuid4(),
-            product=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-            recovery=_recovery_service(session),
+            admitted_work_authorizer=AdmittedWorkAuthorizationService(
+                PostgresAdmittedWorkFactsReader(session)
+            ),
+            job_recovery=_recovery_service(session),
         ).claim_next()
         assert next_attempt is not None and next_attempt.job_id == next_allocation.cleanup_job_id
         assert next_attempt.binding == next_allocation.cleanup_binding

@@ -41,8 +41,8 @@ class HumanSessionAuthenticationService(HumanSessionAuthenticator):
 
     def __init__(
         self,
-        verifier: BrowserSessionVerifier,
-        reader: HumanIdentityLinkReader,
+        browser_session_verifier: BrowserSessionVerifier,
+        human_identity_link_reader: HumanIdentityLinkReader,
         *,
         recovery_block_reader: IdentityRecoveryBlockReader,
         provider_timeout_seconds: float = 5.0,
@@ -52,8 +52,8 @@ class HumanSessionAuthenticationService(HumanSessionAuthenticator):
             if isinstance(seconds, bool) or not math.isfinite(seconds) or seconds <= 0:
                 raise ValueError("Authentication timeouts must be finite and positive.")
 
-        self._verifier = verifier
-        self._reader = reader
+        self._browser_session_verifier = browser_session_verifier
+        self._human_identity_link_reader = human_identity_link_reader
         self._recovery_block_reader = recovery_block_reader
         self._provider_timeout_seconds = provider_timeout_seconds
         self._total_timeout_seconds = total_timeout_seconds
@@ -73,7 +73,7 @@ class HumanSessionAuthenticationService(HumanSessionAuthenticator):
                     loop.time() + self._provider_timeout_seconds,
                 )
                 async with asyncio.timeout_at(provider_deadline):
-                    identity = await self._verifier.verify(credential)
+                    identity = await self._browser_session_verifier.verify(credential)
 
                 # A dependency might return after swallowing cancellation.
                 # Its late result cannot establish either success or rejection.
@@ -83,7 +83,7 @@ class HumanSessionAuthenticationService(HumanSessionAuthenticator):
                 if identity is None:
                     raise AuthenticationRequiredError()
 
-                principal = await self._reader.find_principal(identity)
+                principal = await self._human_identity_link_reader.find_principal(identity)
 
                 if loop.time() >= deadline:
                     raise TimeoutError()

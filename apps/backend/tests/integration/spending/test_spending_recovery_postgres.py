@@ -35,6 +35,9 @@ from inframeld_backend.shared.application.dtos.spending_call_record_dto import S
 from inframeld_backend.shared.application.dtos.spending_evidence_resolution_dto import (
     SpendingEvidenceResolutionDTO,
 )
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
@@ -78,7 +81,7 @@ async def test_stale_fence_commits_pending_evidence_without_changing_financial_f
     call = call_context(scenario)
     original = await reserve(database, call, basis=price_basis())
     await finish_fixture_job(database, scenario, pending_effect=f"call:{call.call_id.value}")
-    evidence = observation(call, kind="not_billed", charge=None)
+    evidence = observation(call, kind=SpendingObservationKind.NOT_BILLED, charge=None)
     async with open_spending_accounting(database) as service:
         pending = await service.record_observation(
             call=call, observation=evidence, expected_call_revision=0
@@ -149,7 +152,7 @@ async def test_resolution_and_financial_receipts_remain_independent_after_later_
     call = call_context(scenario)
     await reserve(database, call, basis=price_basis())
     await finish_fixture_job(database, scenario, pending_effect=f"call:{call.call_id.value}")
-    uncertain = observation(call, kind="uncertain", charge=None)
+    uncertain = observation(call, kind=SpendingObservationKind.UNCERTAIN, charge=None)
     proof = observation(call, number=2, charge="0.15")
     async with open_spending_accounting(database) as service:
         pending = await service.record_observation(
@@ -367,7 +370,7 @@ async def test_older_stale_evidence_and_newer_current_work_share_accounting_lock
     new_call = call_context(newer)
     if transition == "approval":
         await reserve(database, new_call, basis=price_basis())
-    evidence = observation(old_call, kind="uncertain", charge=None)
+    evidence = observation(old_call, kind=SpendingObservationKind.UNCERTAIN, charge=None)
 
     async def retain() -> SpendingAccountingResultDTO:
         async with open_spending_accounting(database) as service:

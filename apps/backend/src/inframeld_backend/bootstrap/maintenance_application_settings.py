@@ -1,13 +1,14 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
-from inframeld_backend.shared.infrastructure.types.logging_types import LogFormat, LogLevel
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 
 
 class MaintenanceApplicationSettings(BaseSettings):
     database: DatabaseSettings
-    log_level: LogLevel = "INFO"
-    log_format: LogFormat = "console"
+    log_level: LogLevel = LogLevel.INFO
+    log_format: LogFormat = LogFormat.CONSOLE
 
     model_config = SettingsConfigDict(
         env_prefix="INFRAMELD_",

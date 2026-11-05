@@ -102,6 +102,7 @@ class PostgresIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFa
         authority: IdentityAuthority,
         flow_id: IdentityRecoveryFlowId,
     ) -> IdentityRecoveryCompletionFactsDTO:
+        """Observe the original recovery and current credential facts before completion."""
         installation_statement = select(InstallationIdentityRow.installation_id).where(
             InstallationIdentityRow.singleton_key == 1
         )

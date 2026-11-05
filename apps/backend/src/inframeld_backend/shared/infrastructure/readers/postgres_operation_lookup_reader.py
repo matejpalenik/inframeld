@@ -166,6 +166,7 @@ class PostgresOperationLookupReader(OperationLookupReader):
         version: int | None,
         linked_principal: UUID | None,
     ) -> JobId | None:
+        """Expose a retained job reference only when it matches the original operation binding."""
         if (
             job_id is None
             or authority is None

@@ -278,6 +278,7 @@ async fn serve_connection(
     Err(CallbackError::InvalidResponse)
 }
 
+/// Reject unexpected HTTP framing before checking the original callback binding.
 fn validate_request(
     request: &Request<Incoming>,
     binding: &CallbackBinding,
@@ -311,6 +312,7 @@ struct ReplaySocket {
 }
 
 impl ReplaySocket {
+    /// Bound the wire prelude while retaining its bytes for the maintained HTTP parser.
     async fn read_headers(mut socket: TcpStream) -> Result<Self, CallbackError> {
         let mut prefix = Zeroizing::new(Vec::new());
         let mut chunk = [0_u8; 4096];

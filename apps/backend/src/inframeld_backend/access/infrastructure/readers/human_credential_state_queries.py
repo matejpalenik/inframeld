@@ -110,6 +110,7 @@ class HumanCredentialStateQueries:
     def _actor_binding_conditions(
         binding: HumanOAuthCredentialBindingDTO,
     ) -> tuple[ColumnElement[bool], ...]:
+        """Bind credential queries to the admitted human authority, subject and version."""
         return (
             InstallationIdentityRow.singleton_key == 1,
             InstallationIdentityRow.installation_id == binding.installation_id.value,

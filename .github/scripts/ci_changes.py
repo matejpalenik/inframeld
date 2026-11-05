@@ -132,6 +132,7 @@ def _selection(enabled: set[str], reasons: tuple[str, ...]) -> Selection:
 
 
 def _affects_sdk(path: str) -> bool:
+    """Keep runtime and contract inputs selecting SDK qualification even before schema regeneration."""
     if path in SDK_INPUTS or path.startswith("packages/sdk-tools/fixtures/"):
         return True
     if path.startswith("packages/sdk-") and "/generated/" in path:
@@ -140,6 +141,7 @@ def _affects_sdk(path: str) -> bool:
 
 
 def _families(path: str) -> set[str]:
+    """Select required verification families conservatively for the complete changed-path set."""
     if (
         path.startswith(".github/scripts/") and not path.endswith((".md", ".mdx"))
     ) or path == ".github/workflows/changes.yml":

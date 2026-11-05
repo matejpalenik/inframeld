@@ -24,6 +24,9 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
     ProjectActionGrantChangeResultDTO,
 )
+from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
+    ProjectActionGrantChangeKind,
+)
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
 )
@@ -54,8 +57,8 @@ from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -92,18 +95,18 @@ OPERATION = CompletedSynchronousOperationDTO(
     datetime(2030, 1, 1, tzinfo=UTC),
 )
 RESULT = ProjectActionGrantChangeResultDTO(
-    InstallationId(UUID(int=5)),
-    OrganizationId(UUID(int=4)),
-    PROJECT,
-    ACTOR,
-    RECIPIENT,
-    ACTION,
-    "set",
-    False,
-    8,
-    True,
-    201,
-    OPERATION,
+    installation_id=InstallationId(UUID(int=5)),
+    organization_id=OrganizationId(UUID(int=4)),
+    project_id=PROJECT,
+    actor_principal_id=ACTOR,
+    recipient_principal_id=RECIPIENT,
+    action_id=ACTION,
+    change_kind=ProjectActionGrantChangeKind.SET,
+    can_grant=False,
+    access_revision=8,
+    changed=True,
+    status_code=201,
+    operation=OPERATION,
 )
 
 
@@ -121,7 +124,7 @@ class MockGrantChanger(ProjectGrantChanger):
         self.calls: list[
             tuple[
                 SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
-                OperationAdmissionContextDTO,
+                IdempotencyContextDTO,
             ]
         ] = []
         self.closed = 0
@@ -133,7 +136,7 @@ class MockGrantChanger(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: AssignProjectUseOnlyGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> CompletedSynchronousOperationDTO:
         raise NotImplementedError
 
@@ -143,7 +146,7 @@ class MockGrantChanger(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: SetProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectActionGrantChangeResultDTO:
         self.calls.append((command, context))
         if self.error is not None:
@@ -156,7 +159,7 @@ class MockGrantChanger(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: RemoveProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectActionGrantChangeResultDTO:
         self.calls.append((command, context))
         if self.error is not None:

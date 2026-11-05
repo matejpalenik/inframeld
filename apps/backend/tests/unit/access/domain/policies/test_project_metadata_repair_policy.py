@@ -16,14 +16,14 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 
 def test_only_an_eligible_human_member_can_receive_a_definitely_stranded_responsibility() -> None:
     eligible = PrincipalAccessPolicyInput(
-        Principal(
+        principal=Principal(
             PrincipalId(UUID(int=1)),
             OrganizationId(UUID(int=2)),
             PrincipalKind.HUMAN,
             PrincipalStatus.ACTIVE,
         ),
-        False,
-        True,
+        has_pending_recovery=False,
+        credential_is_current=True,
     )
     assert ProjectMetadataRepairPolicy.may_assign(
         recipient_access=eligible,

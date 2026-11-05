@@ -1,27 +1,30 @@
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 
 _HUMAN_ONLY_ACTIONS = frozenset(
     {
-        "edit-project-metadata",
-        "manage-project-members",
-        "create-access-groups",
-        "create-application-accounts",
-        "create-pipelines",
-        "create-deployments",
-        "manage-upload-defaults",
-        "delete-project",
-        "manage-budget",
-        "manage-trace-policy",
-        "delete-trace-history",
-        "create-collections",
-        "create-sources",
-        "create-model-connections",
-        "create-processing-profiles",
-        "create-embedding-profiles",
+        ProjectAction.EDIT_PROJECT_METADATA.value,
+        ProjectAction.MANAGE_PROJECT_MEMBERS.value,
+        ProjectAction.CREATE_ACCESS_GROUPS.value,
+        ProjectAction.CREATE_APPLICATION_ACCOUNTS.value,
+        ProjectAction.CREATE_PIPELINES.value,
+        ProjectAction.CREATE_DEPLOYMENTS.value,
+        ProjectAction.MANAGE_UPLOAD_DEFAULTS.value,
+        ProjectAction.DELETE_PROJECT.value,
+        ProjectAction.MANAGE_BUDGET.value,
+        ProjectAction.MANAGE_TRACE_POLICY.value,
+        ProjectAction.DELETE_TRACE_HISTORY.value,
+        ProjectAction.CREATE_COLLECTIONS.value,
+        ProjectAction.CREATE_SOURCES.value,
+        ProjectAction.CREATE_MODEL_CONNECTIONS.value,
+        ProjectAction.CREATE_PROCESSING_PROFILES.value,
+        ProjectAction.CREATE_EMBEDDING_PROFILES.value,
     }
 )
-_SHARED_ACTIONS = frozenset({"inspect-budget", "inspect-feedback"})
+_SHARED_ACTIONS = frozenset(
+    {ProjectAction.INSPECT_BUDGET.value, ProjectAction.INSPECT_FEEDBACK.value}
+)
 
 
 class ProjectActionEligibilityPolicy:

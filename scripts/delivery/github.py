@@ -67,6 +67,7 @@ def _gh(query: str, variables: dict[str, object]) -> dict[str, object]:
 
 
 def _connection(value: object) -> tuple[list[dict[str, object]], str | None]:
+    """Validate a GitHub connection before consuming its nodes and continuation cursor."""
     connection = object_value(value, "connection")
     nodes = [
         object_value(item, "connection node")
@@ -109,6 +110,7 @@ class GitHubClient:
         *,
         pull_request: bool = False,
     ) -> list[dict[str, object]]:
+        """Read the complete native relationship while rejecting repeated pagination cursors."""
         nodes, cursor = _connection(initial)
         seen: set[str] = set()
         entity = "pullRequest" if pull_request else "issue"
@@ -130,6 +132,7 @@ class GitHubClient:
         return nodes
 
     def _issues(self) -> tuple[list[dict[str, object]], dict[str, object]]:
+        """Capture the finite milestone issue graph with its current native relationships."""
         issues: list[dict[str, object]] = []
         cursor: str | None = None
         seen: set[str] = set()
@@ -195,6 +198,7 @@ class GitHubClient:
         return issues, metadata
 
     def _prs(self) -> list[dict[str, object]]:
+        """Observe PR state and native closing references for the captured delivery scope."""
         prs: list[dict[str, object]] = []
         cursor: str | None = None
         seen: set[str] = set()

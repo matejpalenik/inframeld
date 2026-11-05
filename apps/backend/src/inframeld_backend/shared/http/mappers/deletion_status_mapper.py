@@ -8,6 +8,7 @@ from inframeld_backend.shared.application.queries.get_deletion_status_query impo
     GetDeletionStatusQuery,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.http.enums.deletion_status_outcome import DeletionStatusOutcome
 from inframeld_backend.shared.http.responses.retained_deletion_status_response import (
     RetainedDeletionStatusResponse,
 )
@@ -31,7 +32,7 @@ class DeletionStatusMapper:
         match result:
             case RetainedDeletionStatusDTO():
                 return RetainedDeletionStatusResponse(
-                    outcome="retained",
+                    outcome=DeletionStatusOutcome.RETAINED,
                     operationId=result.operation_id.value,
                     jobState=result.job_status,
                     admissionConfirmed=result.admission_confirmed,
@@ -41,4 +42,4 @@ class DeletionStatusMapper:
                     retentionExpiresAt=result.expires_at,
                 )
             case UnresolvedOperationDTO():
-                return UnresolvedDeletionStatusResponse(outcome="unresolved")
+                return UnresolvedDeletionStatusResponse(outcome=DeletionStatusOutcome.UNRESOLVED)

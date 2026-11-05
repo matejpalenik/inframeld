@@ -2,6 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
@@ -9,7 +10,23 @@ import httpx2
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
-Phase = Literal["admit", "settings", "password-saved"]
+
+class Phase(StrEnum):
+    ADMIT = "admit"
+    SETTINGS = "settings"
+    PASSWORD_SAVED = "password-saved"
+
+
+class Position(StrEnum):
+    BEFORE = "before"
+    AFTER = "after"
+
+
+class Action(StrEnum):
+    PAUSE = "pause"
+    FAIL = "fail"
+
+
 _KEY = "inframeld-native-recovery-hook-test-only"
 
 
@@ -26,8 +43,8 @@ class NativeEvidenceObservation(BaseModel):
 
 
 class NativeDeliveryPlan(BaseModel):
-    position: Literal["before", "after"] = "before"
-    action: Literal["pause", "fail"] = "pause"
+    position: Position = Position.BEFORE
+    action: Action = Action.PAUSE
 
 
 @dataclass(slots=True)
@@ -108,7 +125,7 @@ def create_native_recovery_forwarder_router() -> APIRouter:
         state.observations.append(evidence)
         plan = (
             state.plan
-            if not state.used or (state.plan is not None and state.plan.action == "fail")
+            if not state.used or (state.plan is not None and state.plan.action == Action.FAIL)
             else None
         )
         state.used = True
@@ -117,14 +134,14 @@ def create_native_recovery_forwarder_router() -> APIRouter:
             if plan is None or plan.position != position:
                 return
             state.arrived.set()
-            if plan.action == "fail":
+            if plan.action == Action.FAIL:
                 raise HTTPException(503)
             try:
                 await asyncio.wait_for(state.release.wait(), 10)
             except TimeoutError:
                 raise HTTPException(504) from None
 
-        await gate("before")
+        await gate(Position.BEFORE)
         try:
             async with httpx2.AsyncClient(
                 timeout=5.0, trust_env=False, follow_redirects=False
@@ -137,7 +154,7 @@ def create_native_recovery_forwarder_router() -> APIRouter:
         except httpx2.TransportError:
             raise HTTPException(503) from None
         state.statuses.append(response.status_code)
-        await gate("after")
+        await gate(Position.AFTER)
         return Response(
             status_code=response.status_code,
             content=response.content,

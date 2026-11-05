@@ -214,11 +214,13 @@ class PostgresArtifactCleanupObligationRepository(ArtifactCleanupObligationRepos
             select(DurableJobRow.id).where(DurableJobRow.cleanup_obligation_id == row.id)
         )
         return ArtifactCleanupObligationDTO(
-            PostgresJobBindingMapper.cleanup(row),
-            targets,
-            row.transfer_deadline,
-            observed,
-            JobId(job_id) if job_id is not None else None,
-            row.physically_complete,
-            JobStatus(row.execution_status) if row.execution_status is not None else None,
+            binding=PostgresJobBindingMapper.cleanup(row),
+            targets=targets,
+            transfer_deadline=row.transfer_deadline,
+            observed_at=observed,
+            job_id=JobId(job_id) if job_id is not None else None,
+            physically_complete=row.physically_complete,
+            execution_status=JobStatus(row.execution_status)
+            if row.execution_status is not None
+            else None,
         )

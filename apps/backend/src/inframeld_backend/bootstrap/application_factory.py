@@ -105,13 +105,13 @@ from inframeld_backend.bootstrap.organization_access_composition import open_my_
 from inframeld_backend.bootstrap.original_operation_lookup_composition import (
     open_original_operation_lookup,
 )
+from inframeld_backend.bootstrap.postgres_project_membership_change_service_factory import (
+    PostgresProjectMembershipChangeServiceFactory,
+)
 from inframeld_backend.bootstrap.project_action_grants_composition import open_project_action_grants
 from inframeld_backend.bootstrap.project_creation_composition import open_project_creation
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.bootstrap.project_members_composition import open_project_members
-from inframeld_backend.bootstrap.project_membership_composition import (
-    open_project_membership_change,
-)
 from inframeld_backend.bootstrap.project_metadata_composition import (
     open_project_metadata,
     open_project_name_resolution,
@@ -273,7 +273,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_project_membership_router(
                 human_session,
-                partial(open_project_membership_change, database, membership_fingerprints),
+                PostgresProjectMembershipChangeServiceFactory(database, membership_fingerprints),
             )
         )
         application.include_router(

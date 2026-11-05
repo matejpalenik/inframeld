@@ -150,7 +150,7 @@ def create_access_components(
                     ),
                     browser_verifier,
                     recovery_block_reader,
-                    credential_states=PostgresHumanCredentialStateReader(database),
+                    credential_state_reader=PostgresHumanCredentialStateReader(database),
                     credential_initializer=PostgresHumanCredentialStateInitializer(database),
                     authority=kratos_settings.authority,
                     api_audience=hydra_settings.api_audience,

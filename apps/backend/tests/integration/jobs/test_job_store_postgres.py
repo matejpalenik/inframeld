@@ -70,16 +70,17 @@ from inframeld_backend.bootstrap.application_worker_application_settings import 
     ApplicationWorkerApplicationSettings,
 )
 from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_queue_status_dto import JobQueueStatusDTO
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
-)
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
 )
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -168,19 +169,19 @@ async def _request(
         installation = await session.scalar(select(InstallationIdentityRow.installation_id))
         assert organization is not None and installation is not None
     authority = AdmittedWorkAuthorityDTO(
-        scenario.principal_id,
-        PrincipalKind.APPLICATION,
-        InstallationId(installation),
-        OrganizationId(organization),
-        scenario.project_id,
-        ActionId("inspect-feedback"),
-        None,
+        principal_id=scenario.principal_id,
+        principal_kind=PrincipalKind.APPLICATION,
+        installation_id=InstallationId(installation),
+        organization_id=OrganizationId(organization),
+        project_id=scenario.project_id,
+        action_id=ActionId("inspect-feedback"),
+        human_binding=None,
     )
     request = OperationReservationRequestDTO(
         principal_id=scenario.principal_id,
         organization_id=authority.organization_id,
         project_id=scenario.project_id,
-        method="POST",
+        method=HttpMethod.POST,
         requested_route="/test/projects/{project_id}/feedback-reports",
         key=IdempotencyKey("job-1"),
         fingerprint=b"F" * 32,
@@ -252,8 +253,8 @@ async def _claim(database: Database) -> JobAttemptContextDTO | None:
             recovery_store,
             supported_payloads=(("test.progress", 1),),
             worker_id=uuid4(),
-            product=product_authority,
-            recovery=recovery_service,
+            admitted_work_authorizer=product_authority,
+            job_recovery=recovery_service,
         ).claim_next()
 
 
@@ -378,9 +379,7 @@ async def test_lost_admission_response_recovers_original_job_request_and_one_aud
                     authority.principal_id, MockAuthenticationEvidence.application_key()
                 ),
                 authority=authority,
-                context=OperationAdmissionContextDTO(
-                    request.method, request.requested_route, request.key
-                ),
+                context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
                 request_id=request_id,
                 payload=JobPayload("test.progress", 1, b"fixed"),
@@ -607,9 +606,7 @@ async def test_rejected_admission_leaves_no_job_audit_or_reservation(
                     authority.principal_id, MockAuthenticationEvidence.application_key()
                 ),
                 authority=authority,
-                context=OperationAdmissionContextDTO(
-                    request.method, request.requested_route, request.key
-                ),
+                context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
                 request_id=RequestId(uuid4()),
                 payload=JobPayload("test.progress", 1 if audit_failure else 2, b"fixed"),
@@ -712,19 +709,19 @@ async def _human_request(
         identity, InstallationId(installation), HumanCredentialVersion(1)
     )
     authority = AdmittedWorkAuthorityDTO(
-        scenario.principal_id,
-        PrincipalKind.HUMAN,
-        InstallationId(installation),
-        scenario.organization_id,
-        scenario.project_id,
-        ActionId("create-sources"),
-        binding,
+        principal_id=scenario.principal_id,
+        principal_kind=PrincipalKind.HUMAN,
+        installation_id=InstallationId(installation),
+        organization_id=scenario.organization_id,
+        project_id=scenario.project_id,
+        action_id=ActionId("create-sources"),
+        human_binding=binding,
     )
     request = OperationReservationRequestDTO(
         principal_id=scenario.principal_id,
         organization_id=scenario.organization_id,
         project_id=scenario.project_id,
-        method="POST",
+        method=HttpMethod.POST,
         requested_route="/v1/projects/{project_id}/sources",
         key=IdempotencyKey("human-job"),
         fingerprint=b"H" * 32,
@@ -753,9 +750,7 @@ async def _human_admit(
         return await _admission_service(session).admit(
             access=access,
             authority=authority,
-            context=OperationAdmissionContextDTO(
-                request.method, request.requested_route, request.key
-            ),
+            context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
             fingerprint=RequestFingerprint(request.fingerprint),
             request_id=RequestId(uuid4()),
             payload=JobPayload("test.progress", 1, b"3"),
@@ -1001,9 +996,7 @@ async def test_application_human_only_action_is_denied_before_admission_effects(
                     authority.principal_id, MockAuthenticationEvidence.application_key()
                 ),
                 authority=authority,
-                context=OperationAdmissionContextDTO(
-                    request.method, request.requested_route, request.key
-                ),
+                context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
                 request_id=RequestId(uuid4()),
                 payload=JobPayload("test.progress", 1, b"fixed"),
@@ -1078,9 +1071,7 @@ async def test_aged_unresolved_effect_replay_preserves_original_job_and_operatio
                     authority.principal_id, MockAuthenticationEvidence.application_key()
                 ),
                 authority=authority,
-                context=OperationAdmissionContextDTO(
-                    request.method, request.requested_route, request.key
-                ),
+                context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
                 request_id=RequestId(uuid4()),
                 payload=JobPayload("test.progress", 1, b"fixed"),

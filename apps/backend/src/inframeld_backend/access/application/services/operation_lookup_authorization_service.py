@@ -34,8 +34,8 @@ from inframeld_backend.shared.application.queries.lookup_original_operation_quer
 
 
 class OperationLookupAuthorizationService(OperationLookupAuthorizer):
-    def __init__(self, reader: OperationLookupFactsReader) -> None:
-        self._reader = reader
+    def __init__(self, operation_lookup_facts_reader: OperationLookupFactsReader) -> None:
+        self._operation_lookup_facts_reader = operation_lookup_facts_reader
 
     @override
     async def require_authorization(
@@ -46,7 +46,7 @@ class OperationLookupAuthorizationService(OperationLookupAuthorizer):
             method=request.method,
             requested_route=request.requested_route,
         )
-        facts = await self._reader.read(access=access, query=request)
+        facts = await self._operation_lookup_facts_reader.read(access=access, query=request)
         if facts is None:
             raise ResourceNotFoundError()
         if facts.principal.id != access.actor_principal_id:

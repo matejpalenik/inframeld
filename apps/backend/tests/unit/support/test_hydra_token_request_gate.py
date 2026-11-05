@@ -103,7 +103,7 @@ async def test_gate_pauses_the_selected_boundary_and_forwards_only_once(
 async def test_unrelated_requests_do_not_consume_the_armed_gate(method: str, url: str) -> None:
     transport = MockTransport()
     gate = HydraTokenRequestGate(transport)
-    gate.arm("before_request")
+    gate.arm(TokenRequestPhase.BEFORE_REQUEST)
     response = await gate.handle_async_request(httpx2.Request(method, url))
     await response.aclose()
     async with _pending_request(gate) as task:
@@ -151,7 +151,7 @@ async def test_cancellation_propagates_and_closes_an_observed_response(
 @pytest.mark.asyncio
 async def test_waiting_for_a_request_that_never_arrives_is_bounded() -> None:
     gate = HydraTokenRequestGate(MockTransport(), timeout_seconds=0.01)
-    gate.arm("before_request")
+    gate.arm(TokenRequestPhase.BEFORE_REQUEST)
     with pytest.raises(TimeoutError):
         await gate.wait_until_paused()
     await gate.aclose()
@@ -162,7 +162,7 @@ async def test_waiting_for_a_request_that_never_arrives_is_bounded() -> None:
 async def test_provider_failure_is_propagated_without_retry(stream_fails: bool) -> None:
     transport = MockTransport(fail=not stream_fails, stream_fails=stream_fails)
     gate = HydraTokenRequestGate(transport)
-    gate.arm("after_response")
+    gate.arm(TokenRequestPhase.AFTER_RESPONSE)
     with pytest.raises(httpx2.TransportError):
         await gate.handle_async_request(_token_request())
     assert len(transport.requests) == 1
@@ -176,7 +176,7 @@ async def test_provider_failure_is_propagated_without_retry(stream_fails: bool) 
 async def test_closing_a_paused_gate_does_not_dispatch_the_request() -> None:
     transport = MockTransport()
     gate = HydraTokenRequestGate(transport)
-    gate.arm("before_request")
+    gate.arm(TokenRequestPhase.BEFORE_REQUEST)
     task = asyncio.create_task(gate.handle_async_request(_token_request()))
     try:
         await gate.wait_until_paused()
@@ -186,7 +186,7 @@ async def test_closing_a_paused_gate_does_not_dispatch_the_request() -> None:
         with pytest.raises(RuntimeError, match="closed"):
             await gate.handle_async_request(_token_request())
         with pytest.raises(RuntimeError, match="closed"):
-            gate.arm("before_request")
+            gate.arm(TokenRequestPhase.BEFORE_REQUEST)
     finally:
         if not task.done():
             task.cancel()
@@ -199,13 +199,13 @@ async def test_closing_a_paused_gate_does_not_dispatch_the_request() -> None:
 @pytest.mark.asyncio
 async def test_rearming_an_armed_or_paused_gate_is_rejected() -> None:
     gate = HydraTokenRequestGate(MockTransport())
-    gate.arm("before_request")
+    gate.arm(TokenRequestPhase.BEFORE_REQUEST)
     with pytest.raises(RuntimeError, match="armed"):
-        gate.arm("after_response")
+        gate.arm(TokenRequestPhase.AFTER_RESPONSE)
     async with _pending_request(gate) as task:
         await gate.wait_until_paused()
         with pytest.raises(RuntimeError, match="paused"):
-            gate.arm("after_response")
+            gate.arm(TokenRequestPhase.AFTER_RESPONSE)
         gate.release()
         await (await task).aclose()
 
@@ -216,7 +216,7 @@ async def test_response_status_is_observed_only_after_reading_and_resets_on_rear
     transport = MockTransport()
     gate = HydraTokenRequestGate(transport)
     assert gate.response_status is None
-    gate.arm("after_response")
+    gate.arm(TokenRequestPhase.AFTER_RESPONSE)
     async with _pending_request(gate) as task:
         await gate.wait_until_paused()
         assert gate.response_status == 200
@@ -225,7 +225,7 @@ async def test_response_status_is_observed_only_after_reading_and_resets_on_rear
         with pytest.raises(asyncio.CancelledError):
             await task
         assert len(transport.requests) == 1
-        gate.arm("before_request")
+        gate.arm(TokenRequestPhase.BEFORE_REQUEST)
         assert gate.response_status is None
 
 
@@ -233,7 +233,7 @@ async def test_response_status_is_observed_only_after_reading_and_resets_on_rear
 async def test_unrelated_response_does_not_replace_the_observed_token_status() -> None:
     transport = MockTransport()
     gate = HydraTokenRequestGate(transport)
-    gate.arm("after_response")
+    gate.arm(TokenRequestPhase.AFTER_RESPONSE)
     async with _pending_request(gate) as task:
         await gate.wait_until_paused()
         transport.status_code = 503

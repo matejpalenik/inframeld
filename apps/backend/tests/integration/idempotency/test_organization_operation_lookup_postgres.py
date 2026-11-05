@@ -62,15 +62,16 @@ from inframeld_backend.access.infrastructure.rows.project_membership_row import 
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -137,15 +138,15 @@ async def organization_admitted(
         installed,
         seed.organization_id,
         None,
-        "POST",
+        HttpMethod.POST,
         "/v1/original-organization-operation",
         IdempotencyKey("organization-lost-ack"),
         OperationLookupAuthority(OperationLookupAuthorityFamily.ORGANIZATION_ACTION_USE, ACTION),
     )
     async with database.session() as session, session.begin():
         service = IdempotencyService(PostgresOperationReservationWriter(session))
-        original = await service.find_or_reserve(
-            context=OperationAdmissionContextDTO(query.method, query.requested_route, query.key),
+        original = await service.reserve_or_recover(
+            context=IdempotencyContextDTO(query.method, query.requested_route, query.key),
             access=access,
             authorization=OperationLookupAuthorizationDTO(seed.organization_id, None),
             fingerprint=RequestFingerprint(b"O" * 32),

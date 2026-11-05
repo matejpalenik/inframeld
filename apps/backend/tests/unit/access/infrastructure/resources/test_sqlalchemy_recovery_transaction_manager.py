@@ -2,7 +2,7 @@ import asyncio
 import traceback
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Literal
+from enum import StrEnum
 from unittest.mock import patch
 
 import pytest
@@ -22,8 +22,15 @@ from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_ma
 )
 
 
+class Stage(StrEnum):
+    ENTRY = "entry"
+    WORK = "work"
+    COMMIT = "commit"
+    ROLLBACK = "rollback"
+
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stage", ["entry", "work", "commit", "rollback"])
+@pytest.mark.parametrize("stage", [Stage.ENTRY, Stage.WORK, Stage.COMMIT, Stage.ROLLBACK])
 @pytest.mark.parametrize(
     "failure",
     [
@@ -34,7 +41,7 @@ from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_ma
     ids=["connection", "interface", "pool"],
 )
 async def test_database_availability_failure_is_safe_and_never_retried(
-    stage: Literal["entry", "work", "commit", "rollback"], failure: Exception
+    stage: Stage, failure: Exception
 ) -> None:
     entries = 0
 
@@ -45,17 +52,17 @@ async def test_database_availability_failure_is_safe_and_never_retried(
     ) -> AsyncGenerator[None]:
         nonlocal entries
         entries += 1
-        if stage == "entry":
+        if stage == Stage.ENTRY:
             raise failure
 
         try:
             yield
         except BaseException:
-            if stage == "rollback":
+            if stage == Stage.ROLLBACK:
                 raise failure from None
             raise
 
-        if stage == "commit":
+        if stage == Stage.COMMIT:
             raise failure
 
     async with AsyncSession() as session:
@@ -65,9 +72,9 @@ async def test_database_availability_failure_is_safe_and_never_retried(
             pytest.raises(DependencyUnavailableError) as caught,
         ):
             async with manager.begin():
-                if stage == "work":
+                if stage == Stage.WORK:
                     raise failure
-                if stage == "rollback":
+                if stage == Stage.ROLLBACK:
                     raise OperationalError(
                         "private-original", None, ConnectionError("Unavailable.")
                     )
@@ -107,7 +114,7 @@ async def test_unrelated_failures_propagate_unchanged(
             except BaseException:
                 if rollback_unavailable:
                     raise OperationalError(
-                        "rollback", None, ConnectionError("Unavailable.")
+                        Stage.ROLLBACK, None, ConnectionError("Unavailable.")
                     ) from None
                 raise
 

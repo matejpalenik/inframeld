@@ -15,6 +15,7 @@ inframeld_sdk/models/application_account_grant_target_response.py
 inframeld_sdk/models/completed_operation_lookup_response.py
 inframeld_sdk/models/current_session_response.py
 inframeld_sdk/models/deletion_status_response.py
+inframeld_sdk/models/http_method.py
 inframeld_sdk/models/human_admission_request.py
 inframeld_sdk/models/human_admission_response.py
 inframeld_sdk/models/human_o_auth_consent_decision_response.py
@@ -35,12 +36,14 @@ inframeld_sdk/models/o_auth_consent_decision.py
 inframeld_sdk/models/operation_lookup_authority_family.py
 inframeld_sdk/models/operation_lookup_authority_request.py
 inframeld_sdk/models/operation_lookup_response.py
+inframeld_sdk/models/organization_action.py
 inframeld_sdk/models/original_operation_lookup_request.py
 inframeld_sdk/models/own_organization_grant_response.py
 inframeld_sdk/models/page_response_project_action_grant_item_response.py
 inframeld_sdk/models/path_inner.py
 inframeld_sdk/models/principal_kind.py
 inframeld_sdk/models/problem_details.py
+inframeld_sdk/models/project_action.py
 inframeld_sdk/models/project_action_grant_item_response.py
 inframeld_sdk/models/project_action_grant_removal_response.py
 inframeld_sdk/models/project_action_grant_request.py
@@ -67,6 +70,7 @@ inframeld_sdk/models/unknown_job_reference.py
 inframeld_sdk/models/unresolved_deletion_status_response.py
 inframeld_sdk/models/unresolved_operation_lookup_response.py
 inframeld_sdk/models/validation_issue.py
+inframeld_sdk/models/validation_issue_location.py
 inframeld_sdk/py.typed
 inframeld_sdk/rest.py
 inframeld_sdk/sync_helper.py

@@ -5,6 +5,9 @@ from inframeld_backend.access.application.dtos.project_creation_result_dto impor
     ProjectCreationResultDTO,
 )
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
+from inframeld_backend.access.http.enums.grant_target_kind import (
+    GrantTargetKind,
+)
 from inframeld_backend.access.http.requests.project_creation_request import ProjectCreationRequest
 from inframeld_backend.access.http.responses.initial_project_grant_response import (
     InitialProjectGrantResponse,
@@ -15,9 +18,10 @@ from inframeld_backend.access.http.responses.project_creation_response import (
 from inframeld_backend.access.http.responses.project_grant_target_response import (
     ProjectGrantTargetResponse,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
@@ -36,13 +40,15 @@ class ProjectCreationMapper:
         )
 
     @staticmethod
-    def context(key: IdempotencyKey) -> OperationAdmissionContextDTO:
-        return OperationAdmissionContextDTO("POST", "/v1/projects", key)
+    def context(key: IdempotencyKey) -> IdempotencyContextDTO:
+        return IdempotencyContextDTO(HttpMethod.POST, "/v1/projects", key)
 
     @staticmethod
     def response(result: ProjectCreationResultDTO) -> ProjectCreationResponse:
         project = result.project
-        target = ProjectGrantTargetResponse(kind="project", project_id=project.project_id.value)
+        target = ProjectGrantTargetResponse(
+            kind=GrantTargetKind.PROJECT, project_id=project.project_id.value
+        )
         return ProjectCreationResponse.model_validate(
             {
                 "operation_id": result.operation.operation_id.value,

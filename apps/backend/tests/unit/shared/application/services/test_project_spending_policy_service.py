@@ -39,15 +39,16 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -84,8 +85,8 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint_key 
 )
 from inframeld_backend.shared.application.value_objects.spending_period import SpendingPeriod
 
-CONTEXT = OperationAdmissionContextDTO(
-    "PATCH", "/projects/fixture/spending-policy", IdempotencyKey("policy-request")
+CONTEXT = IdempotencyContextDTO(
+    HttpMethod.PATCH, "/projects/fixture/spending-policy", IdempotencyKey("policy-request")
 )
 
 
@@ -98,10 +99,10 @@ class MockIdempotency(OperationIdempotency):
         self.lookup_authorities: list[OperationLookupAuthority | None] = []
 
     @override
-    async def find_or_reserve[ProjectScope: ProjectId | None](
+    async def reserve_or_recover[ProjectScope: ProjectId | None](
         self,
         *,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         access: AccessContextDTO,
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,
@@ -142,12 +143,12 @@ def manager(
     authorizer = MockBudgetAuthorizer(ledger)
     idempotency = MockIdempotency(ledger)
     service = ProjectSpendingPolicyService(
-        transactions=MockTransactions(ledger),
-        authorizer=authorizer,
-        reader=ledger,
-        writer=ledger,
-        idempotency=idempotency,
-        fingerprints=ProjectSpendingPolicyFingerprintService(
+        transaction_manager=MockTransactions(ledger),
+        project_budget_authorizer=authorizer,
+        spending_ledger_reader=ledger,
+        spending_ledger_writer=ledger,
+        operation_idempotency=idempotency,
+        spending_policy_fingerprint_service=ProjectSpendingPolicyFingerprintService(
             RequestFingerprintService(RequestFingerprintKey(b"k" * 32))
         ),
     )

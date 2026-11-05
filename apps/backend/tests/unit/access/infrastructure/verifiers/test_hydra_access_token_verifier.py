@@ -1,9 +1,9 @@
 import asyncio
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from enum import StrEnum
 from json import JSONDecodeError
 from threading import Event
-from typing import Literal
 from unittest.mock import patch
 from uuid import UUID
 
@@ -41,9 +41,17 @@ from inframeld_backend.shared.application.errors.application_errors import (
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
-type RequiredTokenField = Literal[
-    "iss", "client_id", "aud", "scope", "exp", "sub", "token_type", "token_use"
-]
+
+class RequiredTokenField(StrEnum):
+    ISS = "iss"
+    CLIENT_ID = "client_id"
+    AUD = "aud"
+    SCOPE = "scope"
+    EXP = "exp"
+    SUB = "sub"
+    TOKEN_TYPE = "token_type"
+    TOKEN_USE = "token_use"
+
 
 SETTINGS = HydraSettings(
     admin_url=HttpUrl("http://hydra-admin.test:4445"),
@@ -109,7 +117,7 @@ async def test_valid_access_token_returns_the_existing_kratos_identity(
     )
     introspect.assert_called_once()
     assert introspect.call_args.kwargs["token"] == CREDENTIAL.value
-    assert introspect.call_args.kwargs["scope"] == "inframeld:api"
+    assert introspect.call_args.kwargs[RequiredTokenField.SCOPE] == "inframeld:api"
 
     request_timeout: object = introspect.call_args.kwargs["_request_timeout"]
     assert isinstance(request_timeout, float)
@@ -135,18 +143,26 @@ async def test_inactive_response_needs_no_additional_claims(client: OAuth2Api) -
 @pytest.mark.parametrize(
     "updates",
     [
-        pytest.param({"iss": "https://other.example.test/"}, id="wrong-issuer"),
-        pytest.param({"iss": "https://login.example.test"}, id="issuer-slash-differs"),
-        pytest.param({"client_id": "another-client"}, id="wrong-client"),
-        pytest.param({"aud": ["https://other-api.example.test"]}, id="wrong-audience"),
-        pytest.param({"aud": ["https://api.example.test/"]}, id="audience-slash-differs"),
-        pytest.param({"aud": []}, id="no-audience-granted"),
-        pytest.param({"scope": "openid offline_access"}, id="missing-api-scope"),
-        pytest.param({"scope": "inframeld:api-extra"}, id="scope-prefix-is-insufficient"),
-        pytest.param({"token_use": "refresh_token"}, id="refresh-token"),
-        pytest.param({"token_use": "id_token"}, id="wrong-token-use"),
-        pytest.param({"token_type": "MAC"}, id="wrong-token-type"),
-        pytest.param({"exp": 0}, id="expired"),
+        pytest.param({RequiredTokenField.ISS: "https://other.example.test/"}, id="wrong-issuer"),
+        pytest.param(
+            {RequiredTokenField.ISS: "https://login.example.test"}, id="issuer-slash-differs"
+        ),
+        pytest.param({RequiredTokenField.CLIENT_ID: "another-client"}, id="wrong-client"),
+        pytest.param(
+            {RequiredTokenField.AUD: ["https://other-api.example.test"]}, id="wrong-audience"
+        ),
+        pytest.param(
+            {RequiredTokenField.AUD: ["https://api.example.test/"]}, id="audience-slash-differs"
+        ),
+        pytest.param({RequiredTokenField.AUD: []}, id="no-audience-granted"),
+        pytest.param({RequiredTokenField.SCOPE: "openid offline_access"}, id="missing-api-scope"),
+        pytest.param(
+            {RequiredTokenField.SCOPE: "inframeld:api-extra"}, id="scope-prefix-is-insufficient"
+        ),
+        pytest.param({RequiredTokenField.TOKEN_USE: "refresh_token"}, id="refresh-token"),
+        pytest.param({RequiredTokenField.TOKEN_USE: "id_token"}, id="wrong-token-use"),
+        pytest.param({RequiredTokenField.TOKEN_TYPE: "MAC"}, id="wrong-token-type"),
+        pytest.param({RequiredTokenField.EXP: 0}, id="expired"),
         pytest.param({"nbf": 4_102_444_800}, id="not-yet-valid"),
         pytest.param({"iat": 4_102_444_800}, id="future-issuance"),
         pytest.param({"obfuscated_subject": "pairwise-subject"}, id="pairwise-mapping"),
@@ -171,7 +187,16 @@ async def test_unusable_token_returns_no_identity(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "field",
-    ["iss", "client_id", "aud", "scope", "exp", "sub", "token_type", "token_use"],
+    [
+        RequiredTokenField.ISS,
+        RequiredTokenField.CLIENT_ID,
+        RequiredTokenField.AUD,
+        RequiredTokenField.SCOPE,
+        RequiredTokenField.EXP,
+        RequiredTokenField.SUB,
+        RequiredTokenField.TOKEN_TYPE,
+        RequiredTokenField.TOKEN_USE,
+    ],
 )
 async def test_active_response_missing_required_metadata_is_unconfirmed(
     client: OAuth2Api,
@@ -191,7 +216,7 @@ async def test_active_response_missing_required_metadata_is_unconfirmed(
 
 @pytest.mark.asyncio
 async def test_non_uuid_subject_cannot_be_resolved_by_email(client: OAuth2Api) -> None:
-    token = _token().model_copy(update={"sub": "alice@example.test"})
+    token = _token().model_copy(update={RequiredTokenField.SUB: "alice@example.test"})
 
     with (
         patch.object(client, "introspect_o_auth2_token", return_value=token),

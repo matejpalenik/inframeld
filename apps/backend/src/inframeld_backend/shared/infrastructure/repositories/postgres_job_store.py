@@ -27,6 +27,7 @@ from inframeld_backend.shared.application.dtos.job_effect_observation_dto import
 )
 from inframeld_backend.shared.application.dtos.job_snapshot_dto import JobSnapshotDTO
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
+from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.enums.job_effect_observation_kind import (
     JobEffectObservationKind,
 )
@@ -96,7 +97,11 @@ class PostgresJobStore(JobStore):
             return
         if row.pending_effect is not None:
             raise ConflictError("An original physical invocation is still unresolved.")
-        if not binding.unit or len(binding.unit) > 100 or binding.action not in ("put", "delete"):
+        if (
+            not binding.unit
+            or len(binding.unit) > 100
+            or binding.action not in (JobEffectAction.PUT, JobEffectAction.DELETE)
+        ):
             raise ConflictError("The original physical invocation is unsupported.")
         row.pending_effect = binding.unit
         self._session.add(
@@ -132,43 +137,43 @@ class PostgresJobStore(JobStore):
         if row is None:
             return None
         original = await self._session.get(DurableJobRow, row.job_id, populate_existing=True)
-        if original is None or row.action not in ("put", "delete"):
+        if original is None or row.action not in (JobEffectAction.PUT, JobEffectAction.DELETE):
             raise ConflictError("The original invocation binding is unavailable.")
         now = await self._now()
         job = await self._snapshot(original, now)
         context = JobAttemptContextDTO(
-            job.job_id,
-            job.binding,
-            job.payload,
-            row.attempt,
-            JobFence(row.fence),
-            row.work_deadline,
-            row.checkpoint,
+            job_id=job.job_id,
+            binding=job.binding,
+            payload=job.payload,
+            attempt=row.attempt,
+            fence=JobFence(row.fence),
+            work_deadline=row.work_deadline,
+            checkpoint=row.checkpoint,
         )
         binding = JobEffectBindingDTO(
-            effect_id,
-            context,
-            row.unit,
-            row.action,
-            ArtifactId(row.artifact_id),
-            ArtifactAttemptId(row.artifact_attempt_id),
-            ArtifactScopeDTO(
+            effect_id=effect_id,
+            context=context,
+            unit=row.unit,
+            action=JobEffectAction(row.action),
+            artifact_id=ArtifactId(row.artifact_id),
+            artifact_attempt_id=ArtifactAttemptId(row.artifact_attempt_id),
+            scope=ArtifactScopeDTO(
                 InstallationId(row.installation_id),
                 OrganizationId(row.organization_id),
                 ProjectId(row.project_id),
             ),
-            row.length,
-            ArtifactContentDigest(row.digest) if row.digest is not None else None,
+            length=row.length,
+            digest=ArtifactContentDigest(row.digest) if row.digest is not None else None,
         )
         if self._effect_fingerprint(binding) != row.binding_fingerprint:
             raise ConflictError("The retained invocation no longer matches its original work.")
         return JobEffectObservationDTO(
-            binding,
-            now,
-            row.admitted_at,
-            JobEffectObservationKind.NOT_DISPATCHED if row.aborted_at is not None else None,
-            row.aborted_at,
-            row.consumed_at,
+            binding=binding,
+            observed_at=now,
+            admitted_at=row.admitted_at,
+            kind=JobEffectObservationKind.NOT_DISPATCHED if row.aborted_at is not None else None,
+            aborted_at=row.aborted_at,
+            consumed_at=row.consumed_at,
         )
 
     @override
@@ -196,11 +201,11 @@ class PostgresJobStore(JobStore):
             binding.digest.value if binding.digest is not None else None,
         ):
             raise ConflictError("The original artifact target or sealed expectation changed.")
-        if binding.action == "put" and (
+        if binding.action == JobEffectAction.PUT and (
             binding.length is None or binding.digest is None or target.retired
         ):
             raise ConflictError("The original PUT has no usable sealed expectation.")
-        if binding.action == "delete" and (target.published or target.put_pending):
+        if binding.action == JobEffectAction.DELETE and (target.published or target.put_pending):
             raise ConflictError(
                 "The original target still requires publication or write reconciliation."
             )
@@ -454,6 +459,7 @@ class PostgresJobStore(JobStore):
         return await self._candidate(lock=False)
 
     async def _candidate(self, *, lock: bool) -> JobSnapshotDTO | None:
+        """Observe the next running or due job, optionally locking it for queue coordination."""
         self._require_transaction()
         now = await self._now()
         query = (
@@ -669,13 +675,13 @@ class PostgresJobStore(JobStore):
         await self._session.flush()
         saved = await self._snapshot(row, now)
         return JobAttemptContextDTO(
-            saved.job_id,
-            saved.binding,
-            saved.payload,
-            saved.attempt,
-            fence,
-            deadline,
-            saved.checkpoint,
+            job_id=saved.job_id,
+            binding=saved.binding,
+            payload=saved.payload,
+            attempt=saved.attempt,
+            fence=fence,
+            work_deadline=deadline,
+            checkpoint=saved.checkpoint,
         )
 
     @override
@@ -789,6 +795,7 @@ class PostgresJobStore(JobStore):
             raise RuntimeError("Job persistence requires its caller-owned transaction.")
 
     async def _queue_turn(self) -> None:
+        """Serialize ordinary queue decisions using the shared queue-row lock."""
         self._require_transaction()
         row = await self._session.scalar(
             select(ApplicationJobQueueRow)
@@ -799,6 +806,7 @@ class PostgresJobStore(JobStore):
             raise RuntimeError("The ordinary queue is not initialized.")
 
     async def _now(self) -> datetime:
+        """Use the database clock for lease and attempt decisions."""
         now = await self._session.scalar(
             select(func.clock_timestamp(type_=DateTime(timezone=True)))
         )
@@ -807,6 +815,7 @@ class PostgresJobStore(JobStore):
         return now
 
     async def _owned_row(self, context: JobAttemptContextDTO) -> tuple[DurableJobRow, datetime]:
+        """Lock the exact active attempt and reject an expired or superseded claim."""
         self._require_transaction()
         row = await self._session.scalar(
             select(DurableJobRow)
@@ -839,6 +848,7 @@ class PostgresJobStore(JobStore):
             raise ValueError("A job checkpoint may contain at most 64 KiB.")
 
     async def _end_attempt(self, row: DurableJobRow, now: datetime, reason: str | None) -> None:
+        """Record the end of the owned attempt without committing the caller transaction."""
         if row.fence is not None:
             await self._session.execute(
                 update(DurableJobAttemptRow)
@@ -853,6 +863,7 @@ class PostgresJobStore(JobStore):
     async def _complete(
         self, row: DurableJobRow, now: datetime, status: JobStatus, reason: str | None
     ) -> None:
+        """Persist the terminal job outcome with the original operation result."""
         if reason is not None and len(reason) > 100:
             raise ValueError("A job outcome reason must be bounded.")
         binding = (await self._snapshot(row, now)).binding
@@ -888,6 +899,7 @@ class PostgresJobStore(JobStore):
         await self._session.flush()
 
     async def _snapshot(self, row: DurableJobRow, now: datetime) -> JobSnapshotDTO:
+        """Reconstruct job state and its original authority from persisted facts."""
         binding: ProductJobBindingDTO | ArtifactCleanupJobBindingDTO
         if row.binding_kind == "product":
             binding = PostgresJobBindingMapper.product(row)
@@ -919,20 +931,20 @@ class PostgresJobStore(JobStore):
         else:
             raise ConflictError("The original job binding kind is unsupported.")
         return JobSnapshotDTO(
-            JobId(row.id),
-            binding,
-            JobPayload(row.payload_kind, row.payload_version, row.payload),
-            JobStatus(row.status),
-            row.admitted_at,
-            row.queued_deadline,
-            row.due_at,
-            now,
-            row.attempt_count,
-            row.work_deadline,
-            JobFence(row.fence) if row.fence is not None else None,
-            row.lease_expires_at,
-            row.cancel_requested,
-            row.pending_effect,
-            row.reason,
-            row.checkpoint,
+            job_id=JobId(row.id),
+            binding=binding,
+            payload=JobPayload(row.payload_kind, row.payload_version, row.payload),
+            status=JobStatus(row.status),
+            admitted_at=row.admitted_at,
+            queued_deadline=row.queued_deadline,
+            due_at=row.due_at,
+            observed_at=now,
+            attempt=row.attempt_count,
+            work_deadline=row.work_deadline,
+            fence=JobFence(row.fence) if row.fence is not None else None,
+            lease_expires_at=row.lease_expires_at,
+            cancel_requested=row.cancel_requested,
+            pending_effect=row.pending_effect,
+            reason=row.reason,
+            checkpoint=row.checkpoint,
         )

@@ -21,14 +21,14 @@ from inframeld_backend.shared.application.value_objects.job_id import JobId
 
 
 class ArtifactCleanupAuthorizationService(ArtifactCleanupAuthorizer):
-    def __init__(self, facts: ArtifactCleanupFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, artifact_cleanup_facts_reader: ArtifactCleanupFactsReader) -> None:
+        self._artifact_cleanup_facts_reader = artifact_cleanup_facts_reader
 
     @override
     async def require_current(
         self, job_id: JobId, binding: ArtifactCleanupJobBindingDTO
     ) -> ArtifactCleanupFactsDTO:
-        facts = await self._facts.read(binding.obligation_id)
+        facts = await self._artifact_cleanup_facts_reader.read(binding.obligation_id)
         if (
             facts is None
             or facts.binding != binding

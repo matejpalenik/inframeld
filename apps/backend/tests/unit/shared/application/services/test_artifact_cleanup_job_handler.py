@@ -22,6 +22,7 @@ from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origi
     UnadmittedStagingArtifactOriginDTO,
 )
 from inframeld_backend.shared.application.enums.artifact_cleanup_kind import ArtifactCleanupKind
+from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -62,24 +63,24 @@ CLEANUP = ArtifactCleanupJobBindingDTO(
     UnadmittedStagingArtifactOriginDTO(ATTEMPT, RequestId(UUID(int=7))),
 )
 CONTEXT = JobAttemptContextDTO(
-    JobId(UUID(int=8)),
-    CLEANUP,
-    JobPayload("artifact.cleanup", 1, OBLIGATION.value.bytes),
-    1,
-    JobFence(UUID(int=9)),
-    datetime(2030, 1, 1, tzinfo=UTC),
-    b"original resume context",
+    job_id=JobId(UUID(int=8)),
+    binding=CLEANUP,
+    payload=JobPayload("artifact.cleanup", 1, OBLIGATION.value.bytes),
+    attempt=1,
+    fence=JobFence(UUID(int=9)),
+    work_deadline=datetime(2030, 1, 1, tzinfo=UTC),
+    checkpoint=b"original resume context",
 )
 PREPARED = JobEffectBindingDTO(
-    JobEffectId(UUID(int=10)),
-    replace(CONTEXT, checkpoint=b"latest durable progress"),
-    "artifact.cleanup:" + ATTEMPT.value.hex,
-    "delete",
-    ARTIFACT,
-    ATTEMPT,
-    SCOPE,
-    None,
-    None,
+    effect_id=JobEffectId(UUID(int=10)),
+    context=replace(CONTEXT, checkpoint=b"latest durable progress"),
+    unit="artifact.cleanup:" + ATTEMPT.value.hex,
+    action=JobEffectAction.DELETE,
+    artifact_id=ARTIFACT,
+    artifact_attempt_id=ATTEMPT,
+    scope=SCOPE,
+    length=None,
+    digest=None,
 )
 
 

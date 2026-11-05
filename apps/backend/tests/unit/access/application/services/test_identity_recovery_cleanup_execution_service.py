@@ -91,8 +91,8 @@ class Scenario(
     def __init__(self) -> None:
         now = datetime.now(UTC)
         self.work: IdentityRecoveryCleanupWorkDTO | None = IdentityRecoveryCleanupWorkDTO(
-            InstallationId(uuid4()),
-            IdentityRecoveryAdmissionDTO(
+            installation_id=InstallationId(uuid4()),
+            admission=IdentityRecoveryAdmissionDTO(
                 IdentityRecoveryEventDTO(
                     IdentityRecoveryFlowId(uuid4()),
                     VerifiedHumanIdentityDTO(
@@ -102,20 +102,27 @@ class Scenario(
                 ),
                 OperationId("original"),
             ),
-            uuid4(),
-            True,
-            HumanCredentialVersion(2),
-            State.CONFIRMED,
-            None,
-            State.PENDING,
-            State.PENDING,
-            None,
-            None,
-            IdentityRecoveryCleanupRunDTO(
-                uuid4(), now, now + timedelta(hours=1), now, 12, 0, None, None
+            evidence_receipt_id=uuid4(),
+            has_original_password_receipt=True,
+            credential_version=HumanCredentialVersion(2),
+            kratos_cleanup_state=State.CONFIRMED,
+            released_at=None,
+            cli_grants_state=State.PENDING,
+            remembered_logins_state=State.PENDING,
+            cli_confirmation_attempt_id=None,
+            login_confirmation_attempt_id=None,
+            run=IdentityRecoveryCleanupRunDTO(
+                id=uuid4(),
+                authorized_at=now,
+                deadline=now + timedelta(hours=1),
+                next_attempt_at=now,
+                max_attempts=12,
+                consumed_attempts=0,
+                ended_at=None,
+                terminal_reason=None,
             ),
-            None,
-            (),
+            claim=None,
+            steps=(),
         )
         self.in_transaction = False
         self.calls: list[str] = []

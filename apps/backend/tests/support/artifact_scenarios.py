@@ -46,12 +46,13 @@ from inframeld_backend.shared.application.dtos.artifact_scope_dto import Artifac
 from inframeld_backend.shared.application.dtos.business_operation_artifact_origin_dto import (
     BusinessOperationArtifactOriginDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origin_dto import (
     UnadmittedStagingArtifactOriginDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.protocols.artifact_capacity_reader import (
     ArtifactCapacityReader,
 )
@@ -254,13 +255,13 @@ async def completed_product_origin(
             assert principal is not None
             actor = PrincipalId(principal)
     authority = AdmittedWorkAuthorityDTO(
-        actor,
-        PrincipalKind.APPLICATION,
-        scope.installation_id,
-        scope.organization_id,
-        scope.project_id,
-        ActionId("inspect-feedback"),
-        None,
+        principal_id=actor,
+        principal_kind=PrincipalKind.APPLICATION,
+        installation_id=scope.installation_id,
+        organization_id=scope.organization_id,
+        project_id=scope.project_id,
+        action_id=ActionId("inspect-feedback"),
+        human_binding=None,
     )
     request_id = RequestId(uuid4())
     async with database.session() as session, session.begin():
@@ -274,8 +275,8 @@ async def completed_product_origin(
         ).admit(
             access=AccessContextDTO(actor, MockAuthenticationEvidence.application_key()),
             authority=authority,
-            context=OperationAdmissionContextDTO(
-                "POST",
+            context=IdempotencyContextDTO(
+                HttpMethod.POST,
                 "/test/projects/{project_id}/feedback-reports",
                 IdempotencyKey("artifact-work-" + uuid4().hex),
             ),
@@ -302,8 +303,8 @@ async def completed_product_origin(
             recovery_store,
             supported_payloads=(("test.progress", 1),),
             worker_id=uuid4(),
-            product=product_authority,
-            recovery=recovery_service,
+            admitted_work_authorizer=product_authority,
+            job_recovery=recovery_service,
         ).claim_next()
         assert context is not None and context.job_id == admission.job_id
         await JobCheckpointService(

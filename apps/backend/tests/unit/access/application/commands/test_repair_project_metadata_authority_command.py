@@ -16,14 +16,14 @@ from inframeld_backend.shared.domain.value_objects.installation_id import Instal
 
 def command() -> RepairProjectMetadataAuthorityCommand:
     return RepairProjectMetadataAuthorityCommand(
-        InstallationId(UUID(int=4)),
-        OperationId("operator-original"),
-        ProjectId(UUID(int=3)),
-        0,
-        UUID(int=5),
-        "Operator",
-        "Repair metadata authority",
-        HumanAccessTokenCredential("private-transient-token"),
+        expected_installation_id=InstallationId(UUID(int=4)),
+        operation_id=OperationId("operator-original"),
+        project_id=ProjectId(UUID(int=3)),
+        expected_access_revision=0,
+        expected_identity_id=UUID(int=5),
+        operator_label="Operator",
+        reason="Repair metadata authority",
+        identity_proof=HumanAccessTokenCredential("private-transient-token"),
     )
 
 

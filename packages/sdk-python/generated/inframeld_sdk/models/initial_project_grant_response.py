@@ -17,8 +17,9 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 from typing import Any, ClassVar, Dict, List
+from inframeld_sdk.models.project_action import ProjectAction
 from inframeld_sdk.models.project_grant_target_response import ProjectGrantTargetResponse
 from typing import Optional, Set
 from typing_extensions import Self
@@ -29,7 +30,7 @@ class InitialProjectGrantResponse(BaseModel):
     """
     InitialProjectGrantResponse
     """ # noqa: E501
-    action_id: StrictStr = Field(alias="actionId")
+    action_id: ProjectAction = Field(alias="actionId")
     can_grant: StrictBool = Field(alias="canGrant")
     target: ProjectGrantTargetResponse
     additional_properties: Dict[str, Any] = {}
@@ -39,13 +40,6 @@ class InitialProjectGrantResponse(BaseModel):
         """Reject a supplied null without treating an omitted field as supplied."""
         if value is None:
             raise ValueError("actionId cannot be null")
-        return value
-
-    @field_validator('action_id')
-    def action_id_validate_enum(cls, value):
-        """Validates the enum"""
-        if value not in set(['manage-project-members', 'create-access-groups', 'create-application-accounts', 'create-pipelines', 'create-deployments', 'manage-upload-defaults', 'delete-project', 'inspect-budget', 'manage-budget', 'manage-trace-policy', 'delete-trace-history', 'inspect-feedback', 'create-collections', 'create-sources', 'create-model-connections', 'create-processing-profiles', 'create-embedding-profiles', 'edit-project-metadata']):
-            raise ValueError("must be one of enum values ('manage-project-members', 'create-access-groups', 'create-application-accounts', 'create-pipelines', 'create-deployments', 'manage-upload-defaults', 'delete-project', 'inspect-budget', 'manage-budget', 'manage-trace-policy', 'delete-trace-history', 'inspect-feedback', 'create-collections', 'create-sources', 'create-model-connections', 'create-processing-profiles', 'create-embedding-profiles', 'edit-project-metadata')")
         return value
     @field_validator('can_grant', mode='before')
     def can_grant_reject_explicit_null(cls, value):

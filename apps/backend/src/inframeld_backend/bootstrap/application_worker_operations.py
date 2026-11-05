@@ -74,6 +74,7 @@ class ApplicationWorkerOperations(
 
     @asynccontextmanager
     async def _session(self) -> AsyncGenerator[AsyncSession]:
+        """Open one bounded database scope and translate availability failures for the worker."""
         try:
             async with (
                 asyncio.timeout(self._settings.database_timeout_seconds),
@@ -87,6 +88,7 @@ class ApplicationWorkerOperations(
 
     @asynccontextmanager
     async def _open(self, context: JobAttemptContextDTO) -> AsyncGenerator[JobCheckpoints]:
+        """Choose checkpoints for the original product or cleanup binding on this session."""
         async with self._session() as session:
             transactions = SqlAlchemyTransactionManager(session)
             jobs = PostgresJobStore(session)
@@ -109,6 +111,7 @@ class ApplicationWorkerOperations(
 
     @asynccontextmanager
     async def _observations(self) -> AsyncGenerator[JobEffectObservationService]:
+        """Bind physical-effect recording to one bounded database session."""
         async with self._session() as session:
             yield JobEffectObservationService(
                 SqlAlchemyTransactionManager(session),

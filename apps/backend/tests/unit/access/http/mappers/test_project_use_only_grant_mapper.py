@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -23,7 +24,9 @@ from inframeld_backend.shared.application.value_objects.operation_id import Oper
 
 def test_http_fields_become_typed_command_values_and_canonical_retry_scope() -> None:
     request = ProjectUseOnlyGrantRequest(
-        recipientPrincipalId=UUID(int=2), actionId="create-access-groups", expectedAccessRevision=7
+        recipientPrincipalId=UUID(int=2),
+        actionId=ProjectAction.CREATE_ACCESS_GROUPS,
+        expectedAccessRevision=7,
     )
     command = ProjectUseOnlyGrantMapper.to_command(project_id=UUID(int=1), request=request)
     assert command.project_id == ProjectId(UUID(int=1))
@@ -43,7 +46,7 @@ def test_response_preserves_original_operation_revision_and_expiry() -> None:
         project_id=UUID(int=1),
         request=ProjectUseOnlyGrantRequest(
             recipientPrincipalId=UUID(int=2),
-            actionId="create-access-groups",
+            actionId=ProjectAction.CREATE_ACCESS_GROUPS,
             expectedAccessRevision=7,
         ),
     )
@@ -72,7 +75,7 @@ def test_response_rejects_an_unsupported_internal_action() -> None:
         project_id=UUID(int=1),
         request=ProjectUseOnlyGrantRequest(
             recipientPrincipalId=UUID(int=2),
-            actionId="create-access-groups",
+            actionId=ProjectAction.CREATE_ACCESS_GROUPS,
             expectedAccessRevision=7,
         ),
     )

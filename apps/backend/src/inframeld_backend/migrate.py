@@ -6,6 +6,8 @@ from inframeld_backend.shared.infrastructure.diagnostics.error_reporting import 
 )
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
 from inframeld_backend.shared.infrastructure.migrations.migration_runner import run_migrations
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 
 
 def main() -> int:
@@ -19,8 +21,8 @@ def main() -> int:
         # Alembic's env.py installs its own logging configuration. Restore our
         # sanitized formatter before reporting the failure.
         configure_logging(
-            level="ERROR",
-            log_format=settings.log_format if settings is not None else "json",
+            level=LogLevel.ERROR,
+            log_format=settings.log_format if settings is not None else LogFormat.JSON,
         )
         report_unexpected_error(error, event="migration_failed")
         return 1

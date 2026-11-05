@@ -7,6 +7,7 @@ does not block product access, revoke Hydra grants, or implement reconciliation.
 import asyncio
 import secrets
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -17,9 +18,22 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from tests.support.hydra_token_hook import create_hydra_token_hook_router
 from tests.support.native_recovery_forwarder import create_native_recovery_forwarder_router
 
-RecoveryPhase = Literal["admit", "complete"]
+
+class RecoveryPhase(StrEnum):
+    ADMIT = "admit"
+    COMPLETE = "complete"
+
+
+class SettingsPhase(StrEnum):
+    BEFORE = "before"
+    AFTER = "after"
+
+
+class EventKind(StrEnum):
+    RECOVERY = "recovery"
+
+
 TEST_RECOVERY_KEY = SecretStr("inframeld-recovery-hook-test-only")
-SettingsPhase = Literal["before", "after"]
 
 
 class SettingsEventRequest(BaseModel):
@@ -52,7 +66,7 @@ class RecoveryEventRequest(BaseModel):
     schema_version: Literal[1] = Field(alias="schemaVersion")
     flow_id: UUID = Field(alias="flowId")
     identity_id: UUID = Field(alias="identityId")
-    event_kind: Literal["recovery"] = Field(alias="eventKind")
+    event_kind: Literal[EventKind.RECOVERY] = Field(alias="eventKind")
     phase: RecoveryPhase
 
 
@@ -72,7 +86,7 @@ class MockRecoverySnapshotResponse(BaseModel):
 
 def _gates() -> dict[RecoveryPhase, asyncio.Event]:
     """Create separate, initially closed release gates for one flow."""
-    return {"admit": asyncio.Event(), "complete": asyncio.Event()}
+    return {RecoveryPhase.ADMIT: asyncio.Event(), RecoveryPhase.COMPLETE: asyncio.Event()}
 
 
 @dataclass(slots=True)
@@ -91,7 +105,7 @@ _observations: dict[UUID, _FlowObservation] = {}
 
 
 def _settings_gates() -> dict[SettingsPhase, asyncio.Event]:
-    return {"before": asyncio.Event(), "after": asyncio.Event()}
+    return {SettingsPhase.BEFORE: asyncio.Event(), SettingsPhase.AFTER: asyncio.Event()}
 
 
 @dataclass(slots=True)
@@ -192,7 +206,7 @@ async def receive(phase: RecoveryPhase, event: RecoveryEventRequest, request: Re
     return JSONResponse(
         content={
             "operationId": str(observation.operation_id),
-            "eventKind": "recovery",
+            "eventKind": EventKind.RECOVERY,
             "phase": phase,
             "recorded": True,
         },

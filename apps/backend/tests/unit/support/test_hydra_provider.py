@@ -4,7 +4,8 @@ import asyncio
 import base64
 import hashlib
 from dataclasses import replace
-from typing import Literal, override
+from enum import StrEnum
+from typing import override
 from urllib.parse import parse_qs, urlencode
 from uuid import UUID
 
@@ -22,7 +23,7 @@ from tests.support.hydra_provider import (
     IssuedHydraTokensDTO,
     PKCEChallenge,
 )
-from tests.support.hydra_token_request_gate import HydraTokenRequestGate
+from tests.support.hydra_token_request_gate import HydraTokenRequestGate, TokenRequestPhase
 from tests.support.integration_services import HYDRA_PUBLIC_URL, KRATOS_PUBLIC_URL
 from tests.support.kratos_browser import RegisteredHumanDTO
 
@@ -34,36 +35,44 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
 )
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 
+
+class Fault(StrEnum):
+    NONE = "none"
+    IDENTITY = "identity"
+    CALLBACK_DESTINATION = "callback_destination"
+    CALLBACK_STATE = "callback_state"
+    DUPLICATE_CODE = "duplicate_code"
+    OAUTH_ERROR = "oauth_error"
+    CLIENT = "client"
+    SUBJECT = "subject"
+    SESSION = "session"
+    SCOPES = "scopes"
+    AUDIENCE = "audience"
+    ADMIN_REDIRECT = "admin_redirect"
+
+
+class Stage(StrEnum):
+    START = "start"
+    LOGIN = "login"
+    CONSENT = "consent"
+
+
 SUBJECT = IdentitySubject("1d786a3b-b130-43ec-8cec-52afef9c7772")
 SESSION = UUID("2d786a3b-b130-43ec-8cec-52afef9c7772")
 HUMAN = RegisteredHumanDTO(
     SUBJECT, "alice@example.test", "password-secret", BrowserSessionCredential("cookie-secret")
 )
-type Fault = Literal[
-    "none",
-    "identity",
-    "callback_destination",
-    "callback_state",
-    "duplicate_code",
-    "oauth_error",
-    "client",
-    "subject",
-    "session",
-    "scopes",
-    "audience",
-    "admin_redirect",
-]
 
 
 class MockHydraTransport(httpx2.AsyncBaseTransport):
     def __init__(
         self,
         *,
-        fault: Fault = "none",
+        fault: Fault = Fault.NONE,
         token_status: int = 200,
         error: str = "invalid_grant",
         authorization_error: str | None = None,
-        error_stage: Literal["start", "login", "consent"] = "consent",
+        error_stage: Stage = Stage.CONSENT,
     ) -> None:
         self.fault = fault
         self.token_status = token_status
@@ -81,14 +90,16 @@ class MockHydraTransport(httpx2.AsyncBaseTransport):
             return httpx2.Response(
                 200,
                 json={
-                    "identity": {"id": str(SESSION) if self.fault == "identity" else SUBJECT.value}
+                    Fault.IDENTITY: {
+                        "id": str(SESSION) if self.fault == Fault.IDENTITY else SUBJECT.value
+                    }
                 },
             )
         if path == "/oauth2/auth":
             params = dict(request.url.params)
             if "response_type" in params:
                 self.authorization = params
-                if self.authorization_error is not None and self.error_stage == "start":
+                if self.authorization_error is not None and self.error_stage == Stage.START:
                     return self._error_callback()
                 return httpx2.Response(
                     302,
@@ -97,7 +108,7 @@ class MockHydraTransport(httpx2.AsyncBaseTransport):
                     },
                 )
             if "login_verifier" in params:
-                if self.authorization_error is not None and self.error_stage == "login":
+                if self.authorization_error is not None and self.error_stage == Stage.LOGIN:
                     return self._error_callback()
                 return httpx2.Response(
                     302,
@@ -110,22 +121,22 @@ class MockHydraTransport(httpx2.AsyncBaseTransport):
                 "code": "authorization-code-secret",
             }
             destination = REDIRECT_URI
-            if self.fault == "callback_destination":
+            if self.fault == Fault.CALLBACK_DESTINATION:
                 destination = "http://unexpected.test/callback"
-            if self.fault == "callback_state":
+            if self.fault == Fault.CALLBACK_STATE:
                 callback_params["state"] = "wrong-state-secret"
-            if self.fault == "oauth_error":
+            if self.fault == Fault.OAUTH_ERROR:
                 callback_params = {"state": self.authorization["state"], "error": "access_denied"}
             callback = f"{destination}?{urlencode(callback_params)}"
-            if self.fault == "duplicate_code":
+            if self.fault == Fault.DUPLICATE_CODE:
                 callback += "&code=second-code-secret"
             return httpx2.Response(302, headers={"location": callback})
         if path == "/admin/oauth2/auth/requests/login":
             return httpx2.Response(200, json={"session_id": str(SESSION), "skip": False})
         if path.endswith("/login/accept") or path.endswith("/consent/accept"):
-            phase = "login" if path.endswith("/login/accept") else "consent"
+            phase = Stage.LOGIN if path.endswith("/login/accept") else Stage.CONSENT
             origin = (
-                "http://unexpected.test" if self.fault == "admin_redirect" else HYDRA_PUBLIC_URL
+                "http://unexpected.test" if self.fault == Fault.ADMIN_REDIRECT else HYDRA_PUBLIC_URL
             )
             return httpx2.Response(
                 200, json={"redirect_to": f"{origin}/oauth2/auth?{phase}_verifier=private-verifier"}
@@ -134,18 +145,20 @@ class MockHydraTransport(httpx2.AsyncBaseTransport):
             return httpx2.Response(
                 200,
                 json={
-                    "client": {
-                        "client_id": "other-client" if self.fault == "client" else CLIENT_ID
+                    Fault.CLIENT: {
+                        "client_id": "other-client" if self.fault == Fault.CLIENT else CLIENT_ID
                     },
-                    "subject": "other-subject" if self.fault == "subject" else SUBJECT.value,
+                    Fault.SUBJECT: "other-subject"
+                    if self.fault == Fault.SUBJECT
+                    else SUBJECT.value,
                     "requested_scope": []
-                    if self.fault == "scopes"
+                    if self.fault == Fault.SCOPES
                     else ["inframeld:api", "offline_access"],
                     "requested_access_token_audience": []
-                    if self.fault == "audience"
+                    if self.fault == Fault.AUDIENCE
                     else [API_AUDIENCE.value],
                     "login_session_id": str(UUID(int=0))
-                    if self.fault == "session"
+                    if self.fault == Fault.SESSION
                     else str(SESSION),
                     "skip": False,
                 },
@@ -169,7 +182,7 @@ class MockHydraTransport(httpx2.AsyncBaseTransport):
     def _error_callback(self) -> httpx2.Response:
         params = {
             "state": "wrong-state-secret"
-            if self.fault == "callback_state"
+            if self.fault == Fault.CALLBACK_STATE
             else self.authorization["state"],
             "error": self.authorization_error,
             "error_description": "provider-detail-secret",
@@ -228,16 +241,16 @@ async def test_stages_stop_before_approval_and_exchange_with_the_original_pkce_v
 @pytest.mark.parametrize(
     "fault",
     [
-        "callback_destination",
-        "callback_state",
-        "duplicate_code",
-        "oauth_error",
-        "client",
-        "subject",
-        "session",
-        "scopes",
-        "audience",
-        "admin_redirect",
+        Fault.CALLBACK_DESTINATION,
+        Fault.CALLBACK_STATE,
+        Fault.DUPLICATE_CODE,
+        Fault.OAUTH_ERROR,
+        Fault.CLIENT,
+        Fault.SUBJECT,
+        Fault.SESSION,
+        Fault.SCOPES,
+        Fault.AUDIENCE,
+        Fault.ADMIN_REDIRECT,
     ],
 )
 async def test_invalid_provider_binding_or_callback_never_reaches_token_exchange(
@@ -262,7 +275,7 @@ async def test_invalid_provider_binding_or_callback_never_reaches_token_exchange
 
 @pytest.mark.asyncio
 async def test_wrong_kratos_identity_is_rejected_before_starting_authorization() -> None:
-    transport = MockHydraTransport(fault="identity")
+    transport = MockHydraTransport(fault=Fault.IDENTITY)
     async with httpx2.AsyncClient(transport=transport) as client:
         with pytest.raises(AssertionError):
             await HydraTestProvider(client).begin_login(HUMAN)
@@ -407,7 +420,7 @@ async def test_only_explicit_binding_is_written_to_test_consent_metadata() -> No
     accepted = next(
         request for request in transport.requests if request.url.path.endswith("/consent/accept")
     )
-    assert json.loads(accepted.content)["session"]["access_token"] == {
+    assert json.loads(accepted.content)[Fault.SESSION]["access_token"] == {
         "inframeld_installation_id": str(binding.installation_id.value),
         "inframeld_credential_version": 6,
     }
@@ -433,9 +446,9 @@ async def test_negative_pkce_parameters_reach_hydra(pkce: PKCEChallenge) -> None
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stage", ["start", "login", "consent"])
+@pytest.mark.parametrize("stage", [Stage.START, Stage.LOGIN, Stage.CONSENT])
 async def test_expected_authorization_rejection_keeps_only_the_error_category(
-    stage: Literal["start", "login", "consent"],
+    stage: Stage,
 ) -> None:
     transport = MockHydraTransport(authorization_error="invalid_request", error_stage=stage)
     async with httpx2.AsyncClient(transport=transport) as client:
@@ -448,11 +461,11 @@ async def test_expected_authorization_rejection_keeps_only_the_error_category(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("fault", ["none", "callback_state"])
+@pytest.mark.parametrize("fault", [Fault.NONE, Fault.CALLBACK_STATE])
 async def test_unknown_or_unbound_oauth_error_is_not_an_expected_rejection(fault: Fault) -> None:
     transport = MockHydraTransport(
         fault=fault,
-        authorization_error="provider-detail-secret" if fault == "none" else "invalid_request",
+        authorization_error="provider-detail-secret" if fault == Fault.NONE else "invalid_request",
     )
     async with httpx2.AsyncClient(transport=transport) as client:
         provider = HydraTestProvider(client)
@@ -598,7 +611,7 @@ async def test_losing_a_refresh_response_propagates_cancellation_without_retryin
         HumanAccessTokenCredential("old-access-secret"), SecretStr("old-refresh-secret")
     )
     async with asyncio.timeout(5.0), httpx2.AsyncClient(transport=gate) as client:
-        gate.arm("after_response")
+        gate.arm(TokenRequestPhase.AFTER_RESPONSE)
         refresh = asyncio.create_task(HydraTestProvider(client).refresh_tokens(original))
         try:
             await gate.wait_until_paused()

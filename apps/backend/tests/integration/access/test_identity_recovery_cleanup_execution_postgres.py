@@ -3,7 +3,8 @@
 import os
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from typing import Literal, override
+from enum import StrEnum
+from typing import override
 from uuid import uuid4
 
 import pytest
@@ -116,6 +117,12 @@ from inframeld_backend.shared.infrastructure.readers.postgres_installation_ident
     PostgresInstallationIdentityReader,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
+
+
+class WhenCase(StrEnum):
+    BEFORE_COMMIT = "before_commit"
+    AFTER_COMMIT = "after_commit"
+
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
@@ -765,7 +772,7 @@ async def test_temporary_read_failure_after_confirmations_keeps_proof_work_recov
 async def _interrupt_proof_commit(
     database: Database,
     revoker: MockCredentialRevoker,
-    when: Literal["before_commit", "after_commit"],
+    when: WhenCase,
 ) -> None:
     installation = await PostgresInstallationIdentityReader(database).read()
     async with database.session() as session:
@@ -799,7 +806,7 @@ async def test_failed_proof_commit_keeps_confirmations_and_original_budget(
     original = await _prepare(database)
     revoker = MockCredentialRevoker()
     with pytest.raises(DependencyUnavailableError):
-        await _interrupt_proof_commit(database, revoker, "before_commit")
+        await _interrupt_proof_commit(database, revoker, WhenCase.BEFORE_COMMIT)
 
     async with database.session() as session:
         assert (
@@ -827,7 +834,7 @@ async def test_lost_proof_commit_acknowledgement_reloads_the_committed_result(
     original = await _prepare(database)
     revoker = MockCredentialRevoker()
     with pytest.raises(DependencyUnavailableError):
-        await _interrupt_proof_commit(database, revoker, "after_commit")
+        await _interrupt_proof_commit(database, revoker, WhenCase.AFTER_COMMIT)
 
     async with database.session() as session:
         proof = await session.get(IdentityRecoveryCleanupProofRow, original.operation_id.value)

@@ -6,6 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
     ProjectActionGrantChangeResultDTO,
 )
+from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
+    ProjectActionGrantChangeKind,
+)
 from inframeld_backend.access.application.protocols.project_action_grant_result_writer import (
     ProjectActionGrantResultWriter,
 )
@@ -49,12 +52,19 @@ class PostgresProjectActionGrantResultWriter(ProjectActionGrantResultWriter):
         ):
             raise RuntimeError("The original grant levels are invalid.")
         if (
-            result.change_kind not in {"set", "remove"}
-            or (result.change_kind == "set") != (result.can_grant is not None)
+            result.change_kind
+            not in {ProjectActionGrantChangeKind.SET, ProjectActionGrantChangeKind.REMOVE}
+            or (result.change_kind == ProjectActionGrantChangeKind.SET)
+            != (result.can_grant is not None)
             or result.changed != (before_can_grant is not result.can_grant)
             or result.access_revision != before_revision + int(result.changed)
             or result.status_code
-            != (201 if result.change_kind == "set" and before_can_grant is None else 200)
+            != (
+                201
+                if result.change_kind == ProjectActionGrantChangeKind.SET
+                and before_can_grant is None
+                else 200
+            )
         ):
             raise RuntimeError("The original grant outcome is incoherent.")
         parent = IdempotencyReservationRow
@@ -65,7 +75,8 @@ class PostgresProjectActionGrantResultWriter(ProjectActionGrantResultWriter):
                 parent.organization_id == result.organization_id.value,
                 parent.project_id == result.project_id.value,
                 parent.principal_id == result.actor_principal_id.value,
-                parent.method == ("PUT" if result.change_kind == "set" else "DELETE"),
+                parent.method
+                == ("PUT" if result.change_kind == ProjectActionGrantChangeKind.SET else "DELETE"),
                 parent.requested_route == route,
                 parent.lookup_authority_family == "project_grant_read",
                 parent.lookup_action_id == result.action_id.value,
@@ -86,7 +97,7 @@ class PostgresProjectActionGrantResultWriter(ProjectActionGrantResultWriter):
                 actor_principal_id=result.actor_principal_id.value,
                 recipient_principal_id=result.recipient_principal_id.value,
                 action_id=result.action_id.value,
-                change_kind=result.change_kind,
+                change_kind=result.change_kind.value,
                 before_revision=before_revision,
                 access_revision=result.access_revision,
                 changed=result.changed,

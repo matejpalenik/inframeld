@@ -56,9 +56,10 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.protocols.transaction_manager import TransactionManager
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
@@ -81,8 +82,8 @@ ALICE = Principal(PrincipalId(UUID(int=1)), ORG, PrincipalKind.HUMAN, PrincipalS
 BOB = Principal(PrincipalId(UUID(int=3)), ORG, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE)
 ACCESS = AccessContextDTO(ALICE.id, MockAuthenticationEvidence.browser())
 COMMAND = AdmitHumanCommand(ORG, UUID(IDENTITY.subject.value), 7)
-CONTEXT = OperationAdmissionContextDTO(
-    method="POST",
+CONTEXT = IdempotencyContextDTO(
+    method=HttpMethod.POST,
     requested_route=f"/v1/organizations/{ORG.value}/human-admissions",
     key=IdempotencyKey("admit-bob"),
 )
@@ -90,12 +91,12 @@ ACTOR_FACTS = OrganizationAccessFactsDTO(
     ALICE, 7, (OrganizationActionGrantDTO(ActionId("admit-users"), False),), False, None
 )
 FACTS = HumanAdmissionFactsDTO(
-    INSTALLATION,
-    IDENTITY,
-    ACTOR_FACTS,
-    None,
-    HumanCredentialStateDTO(INSTALLATION, IDENTITY, None, False),
-    False,
+    installation_id=INSTALLATION,
+    identity=IDENTITY,
+    actor=ACTOR_FACTS,
+    principal=None,
+    credential_state=HumanCredentialStateDTO(INSTALLATION, IDENTITY, None, False),
+    has_credential_history=False,
 )
 
 
@@ -212,14 +213,14 @@ class MockAdmissionResults(HumanAdmissionResultReader):
     def __init__(self, owner: MockAdmissionTransactions) -> None:
         self.owner = owner
         self.result = HumanAdmissionResultDTO(
-            INSTALLATION,
-            IDENTITY,
-            ORG,
-            ALICE.id,
-            BOB.id,
-            8,
-            True,
-            CompletedSynchronousOperationDTO(
+            installation_id=INSTALLATION,
+            identity=IDENTITY,
+            organization_id=ORG,
+            actor_principal_id=ALICE.id,
+            principal_id=BOB.id,
+            access_revision=8,
+            changed=True,
+            operation=CompletedSynchronousOperationDTO(
                 OperationId("metadata-original"),
                 False,
                 OperationReplayKind.SAFE_RESULT,
@@ -261,12 +262,12 @@ class HumanAdmissionScenario:
             RequestFingerprintService(RequestFingerprintKey(b"a" * 32))
         )
         self.service = HumanAdmissionService(
-            transactions=self.transactions,
-            facts=self.facts,
-            writer=self.writer,
-            results=self.results,
-            idempotency=self.idempotency,
-            fingerprints=self.fingerprints,
+            transaction_manager=self.transactions,
+            admission_facts_reader=self.facts,
+            admission_writer=self.writer,
+            admission_result_reader=self.results,
+            operation_idempotency=self.idempotency,
+            admission_fingerprint_service=self.fingerprints,
             identity_verifier=self.verifier,
             identity_authority=AUTHORITY,
             identity_timeout_seconds=5,

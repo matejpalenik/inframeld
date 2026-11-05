@@ -86,6 +86,32 @@ const deniedCheckCodes = [
   "SDK_DENIED_INDEPENDENT_RECOVERY",
 ] as const;
 
+test("denied receipt checkpoints distinguish operations without publishing receipt contents", () => {
+  for (const code of [
+    ...deniedCheckCodes,
+    "SDK_DENIED_OUTER_CUSTODY",
+    "SDK_DENIED_UNCERTAIN_READ",
+    "SDK_DENIED_UNCERTAIN_JSON",
+    "SDK_DENIED_UNCERTAIN_SCHEMA",
+    "SDK_DENIED_MARKER_READ",
+    "SDK_DENIED_FAILURE_READ",
+    "SDK_DENIED_FAILURE_JSON",
+    "SDK_DENIED_FAILURE_SCHEMA",
+    "SDK_DENIED_TARGET_MATCH",
+  ]) {
+    const error = Object.assign(
+      new Error("fake-private-marker", {
+        cause: new Error("fake-private-receipt"),
+      }),
+      { code },
+    );
+    const bytes = describeError(error);
+    assert.equal(JSON.parse(bytes).code, code);
+    assert.ok(!bytes.includes("fake-private"));
+    assert.equal(hasConfirmedCleanup(JSON.parse(bytes)), false);
+  }
+});
+
 const commandOutcomes = [
   {
     settlement: "rejected",
@@ -525,6 +551,49 @@ test("command outcome carrier is exact, private and never grants admission", asy
         !describeError(error).includes("fake-private-marker"),
     );
   }
+});
+
+test("native command diagnostics retain owner failure alongside the failed assertion", async () => {
+  const owner = new ProcessFailure("fake-private-owner", false, {
+    terminal: {
+      status: 1,
+      reason: "target-exit",
+      leaderReaped: true,
+      groupState: "unknown",
+      errors: ["group-shutdown-unconfirmed"],
+    },
+    helperCode: 1,
+    helperClosed: true,
+    streamsEnded: true,
+  });
+  const failure = Object.assign(new Error("SDK_DENIED_COMMAND_EXIT"), {
+    code: "SDK_DENIED_COMMAND_EXIT",
+    cause: {
+      command: {
+        ...commandOutcomes[0],
+        status: 1,
+        groupState: "unknown",
+        closeResult: "rejected",
+        reportedCleanupConfirmed: false,
+      },
+      cause: new AggregateError(
+        [owner, new Error("fake-private-assertion")],
+        "fake-private-message",
+      ),
+    },
+  });
+  const bytes = await nativeReport([
+    nativeFailure(nativeCases[6][0], nativeCases[6][1], failure),
+  ]);
+  const detail = JSON.parse(bytes)[0].failure.cause;
+  assert.equal(detail.cause.kind, "aggregate");
+  assert.equal(detail.cause.errors[0].kind, "cleanup-unconfirmed");
+  assert.deepEqual(detail.cause.errors[0].errors, [
+    "group-shutdown-unconfirmed",
+  ]);
+  assert.equal(detail.cause.errors[1].kind, "error");
+  assert.ok(!bytes.includes("fake-private"));
+  assert.equal(hasConfirmedCleanup(JSON.parse(bytes)), false);
 });
 
 function publicationClock() {

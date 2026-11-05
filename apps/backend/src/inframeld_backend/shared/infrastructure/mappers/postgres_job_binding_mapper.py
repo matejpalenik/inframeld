@@ -109,13 +109,13 @@ class PostgresJobBindingMapper:
                 HumanCredentialVersion(row.human_version),
             )
         authority = AdmittedWorkAuthorityDTO(
-            PrincipalId(row.principal_id),
-            PrincipalKind(row.principal_kind),
-            InstallationId(row.installation_id),
-            OrganizationId(row.organization_id),
-            ProjectId(row.project_id),
-            ActionId(row.action_id),
-            human,
+            principal_id=PrincipalId(row.principal_id),
+            principal_kind=PrincipalKind(row.principal_kind),
+            installation_id=InstallationId(row.installation_id),
+            organization_id=OrganizationId(row.organization_id),
+            project_id=ProjectId(row.project_id),
+            action_id=ActionId(row.action_id),
+            human_binding=human,
         )
         return ProductJobBindingDTO(
             OperationId(row.operation_id), RequestId(row.request_id), authority

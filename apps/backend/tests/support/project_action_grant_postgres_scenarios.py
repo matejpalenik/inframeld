@@ -12,9 +12,10 @@ from inframeld_backend.access.application.dtos.project_action_grant_change_resul
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from tests.support.project_grant_changes import create_project_grant_change_service
@@ -47,8 +48,8 @@ async def change_project_grant(
 ) -> ProjectActionGrantChangeResultDTO:
     project = seed.project.project_id
     principal = recipient or seed.bob_id
-    context = OperationAdmissionContextDTO(
-        "DELETE" if removing else "PUT",
+    context = IdempotencyContextDTO(
+        HttpMethod.DELETE if removing else HttpMethod.PUT,
         f"/v1/projects/{project.value}/grants/{principal.value}/{action_id.value}",
         IdempotencyKey(key),
     )

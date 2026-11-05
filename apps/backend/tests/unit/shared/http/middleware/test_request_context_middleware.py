@@ -16,6 +16,8 @@ from inframeld_backend.shared.http.middleware.request_context_middleware import 
     RequestContextMiddleware,
 )
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 
 SECRET = "synthetic-private-path-value"
 
@@ -39,7 +41,7 @@ def test_request_logs_use_route_template_without_raw_path(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Keep path values out of logs for matched and unmatched requests."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
 
     with TestClient(_create_app()) as client:
         matched = client.get(f"/_test/resources/{SECRET}")
@@ -85,7 +87,7 @@ async def test_overlapping_requests_keep_distinct_log_context(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Correlate sync and async dependency logs with the correct request."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
 
     app = FastAPI(debug=False)
     register_error_handlers(app)
@@ -161,7 +163,7 @@ async def test_late_failure_reports_status_without_starting_another_response(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Record a failure after headers are sent without replacing the response."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
     sent: list[Message] = []
 
     async def failing_app(_scope: Scope, _receive: Receive, send: Send) -> None:
@@ -208,7 +210,7 @@ async def test_cancelled_request_does_not_send_or_report_a_failure(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Let cancellation propagate without fabricating an HTTP failure."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
     started = asyncio.Event()
     blocked = asyncio.Event()
     sent: list[Message] = []

@@ -569,7 +569,9 @@ def test_project_creation_contract_keeps_strict_input_and_exact_original_grant_r
     grants = response["properties"]["initialGrants"]
     assert grants["minItems"] == grants["maxItems"] == 18
     assert components["InitialProjectGrantResponse"]["properties"]["canGrant"]["const"] is True
-    assert len(components["InitialProjectGrantResponse"]["properties"]["actionId"]["enum"]) == 18
+    action = components["InitialProjectGrantResponse"]["properties"]["actionId"]
+    assert action == {"$ref": "#/components/schemas/ProjectAction"}
+    assert len(components["ProjectAction"]["enum"]) == 18
     assert components["ProjectGrantTargetResponse"]["properties"]["kind"]["const"] == "project"
     operation = schema["paths"]["/v1/projects"]["post"]
     assert operation["operationId"] == "createProject"
@@ -593,7 +595,8 @@ def test_own_organization_contract_exposes_only_bounded_supported_assignments() 
     }
     assert response["properties"]["grants"]["maxItems"] == 4
     grants = schema["components"]["schemas"]["OwnOrganizationGrantResponse"]
-    assert set(grants["properties"]["actionId"]["enum"]) == {
+    assert grants["properties"]["actionId"] == {"$ref": "#/components/schemas/OrganizationAction"}
+    assert set(schema["components"]["schemas"]["OrganizationAction"]["enum"]) == {
         "admit-users",
         "suspend-users",
         "restore-users",

@@ -73,6 +73,7 @@ async def _claim(
     worker_id: UUID,
     supported: tuple[tuple[str, int], ...],
 ) -> JobAttemptContextDTO | None:
+    """Acquire one job attempt in a short database scope before executing its handler."""
     try:
         async with (
             asyncio.timeout(settings.jobs.database_timeout_seconds),
@@ -100,8 +101,8 @@ async def _claim(
                 worker_id=worker_id,
                 lease_seconds=settings.jobs.lease_seconds,
                 work_seconds=settings.jobs.work_seconds,
-                product=product_authority,
-                recovery=recovery_service,
+                admitted_work_authorizer=product_authority,
+                job_recovery=recovery_service,
             ).claim_next()
     except (TimeoutError, OperationalError, InterfaceError, SqlAlchemyTimeoutError):
         raise DependencyUnavailableError("The ordinary job claim could not be confirmed.") from None
@@ -113,6 +114,7 @@ async def _execute(
     operations: ApplicationWorkerOperations,
     lease_seconds: float,
 ) -> None:
+    """Run the handler while renewing ownership and retaining the original work deadline."""
     log = structlog.get_logger()
     work: asyncio.Task[None] | None = None
     renew: asyncio.Task[None] | None = None
@@ -276,6 +278,7 @@ async def run_application_worker(
 
 
 async def _serve(settings: ApplicationWorkerApplicationSettings) -> None:
+    """Install worker stop handlers for this lifetime and remove them on exit."""
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for signum in (signal.SIGINT, signal.SIGTERM):
@@ -286,7 +289,9 @@ async def _serve(settings: ApplicationWorkerApplicationSettings) -> None:
     try:
         database = Database(settings.database)
         operations = ApplicationWorkerOperations(database, settings.jobs, stopped)
-        artifacts = S3ArtifactStore(settings.artifact_storage, observations=operations)
+        artifacts = S3ArtifactStore(
+            settings.artifact_storage, effect_observation_recorder=operations
+        )
         handler = ArtifactCleanupJobHandler(operations, artifacts)
         # Transfer the one pool to the runtime before validation or startup.
         delegated = True

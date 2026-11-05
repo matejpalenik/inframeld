@@ -65,15 +65,15 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        facts: IdentityRecoveryCleanupResumeFactsReader,
-        coordination: IdentityRecoveryCompletionFactsReader,
-        writer: IdentityRecoveryCleanupResumeWriter,
+        transaction_manager: TransactionManager,
+        recovery_cleanup_resume_facts_reader: IdentityRecoveryCleanupResumeFactsReader,
+        recovery_completion_facts_reader: IdentityRecoveryCompletionFactsReader,
+        recovery_cleanup_resume_writer: IdentityRecoveryCleanupResumeWriter,
     ) -> None:
-        self._transactions = transactions
-        self._facts = facts
-        self._coordination = coordination
-        self._writer = writer
+        self._transaction_manager = transaction_manager
+        self._recovery_cleanup_resume_facts_reader = recovery_cleanup_resume_facts_reader
+        self._recovery_completion_facts_reader = recovery_completion_facts_reader
+        self._recovery_cleanup_resume_writer = recovery_cleanup_resume_writer
 
     @override
     async def resume(
@@ -81,7 +81,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
     ) -> IdentityRecoveryCleanupResumeResultDTO:
         try:
             async with asyncio.timeout(5):
-                async with self._transactions.begin():
+                async with self._transaction_manager.begin():
                     return await self._resume(command)
         except TimeoutError:
             raise DependencyUnavailableError(
@@ -91,26 +91,27 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
     async def _resume(
         self, command: ResumeIdentityRecoveryCleanupCommand
     ) -> IdentityRecoveryCleanupResumeResultDTO:
-        installed = await self._facts.installation()
+        """Reconcile the host request with current recovery work before authorizing further cleanup."""
+        installed = await self._recovery_cleanup_resume_facts_reader.installation()
         if installed is None:
             raise RecoveryMaintenanceError(Code.DEPENDENCY_UNAVAILABLE)
 
         if installed != command.expected_installation_id:
             raise RecoveryMaintenanceError(Code.INSTALLATION_MISMATCH)
 
-        recorded = await self._facts.receipt(
+        recorded = await self._recovery_cleanup_resume_facts_reader.receipt(
             installation_id=installed, operation_id=command.operation_id
         )
         if recorded is not None:
             return self._replay(command, recorded)
 
-        original = await self._facts.original(
+        original = await self._recovery_cleanup_resume_facts_reader.original(
             installation_id=installed, operation_id=command.recovery_operation_id
         )
         if original is None:
             raise RecoveryMaintenanceError(Code.NOT_FOUND)
 
-        coordinated = await self._coordination.read(
+        coordinated = await self._recovery_completion_facts_reader.read(
             installation_id=installed,
             authority=original.event.identity.authority,
             flow_id=original.event.flow_id,
@@ -119,13 +120,15 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
             raise RuntimeError("Recovery maintenance facts changed their original binding.")
 
         # A same-identity request may have committed while this request waited.
-        recorded = await self._facts.receipt(
+        recorded = await self._recovery_cleanup_resume_facts_reader.receipt(
             installation_id=installed, operation_id=command.operation_id
         )
         if recorded is not None:
             return self._replay(command, recorded)
 
-        facts = await self._facts.read(installation_id=installed, admission=original)
+        facts = await self._recovery_cleanup_resume_facts_reader.read(
+            installation_id=installed, admission=original
+        )
         now = datetime.now(UTC)
         outcome = self._outcome(facts)
         terminal_reason = None
@@ -146,18 +149,18 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
         run_id = uuid4() if outcome is Outcome.AUTHORIZED else None
         budget = IdentityRecoveryCleanupRunBudget(now) if run_id is not None else None
         result = IdentityRecoveryCleanupResumeResultDTO(
-            command.operation_id,
-            installed,
-            command.recovery_operation_id,
-            outcome,
-            facts.released_at is not None,
-            run_id,
-            None if budget is None else budget.deadline,
+            operation_id=command.operation_id,
+            installation_id=installed,
+            recovery_operation_id=command.recovery_operation_id,
+            outcome=outcome,
+            released=facts.released_at is not None,
+            run_id=run_id,
+            deadline=None if budget is None else budget.deadline,
         )
         receipt = IdentityRecoveryMaintenanceReceiptDTO(command, now, result)
 
-        if not await self._writer.record(receipt):
-            winner = await self._facts.receipt(
+        if not await self._recovery_cleanup_resume_writer.record(receipt):
+            winner = await self._recovery_cleanup_resume_facts_reader.receipt(
                 installation_id=installed, operation_id=command.operation_id
             )
             if winner is None:
@@ -176,14 +179,18 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
             ):
                 raise RecoveryMaintenanceError(Code.EVIDENCE_MISSING)
             self._require_work_binding(work, command)
-            await self._writer.save_complete_proof(work, at=now)
+            await self._recovery_cleanup_resume_writer.save_complete_proof(work, at=now)
             if work.run.ended_at is None:
-                await self._writer.settle(work, at=now, terminal_reason="cleanup_confirmed")
+                await self._recovery_cleanup_resume_writer.settle(
+                    work, at=now, terminal_reason="cleanup_confirmed"
+                )
 
         if outcome is Outcome.AUTHORIZED:
             if terminal_reason is not None and facts.work is not None:
-                await self._writer.settle(facts.work, at=now, terminal_reason=terminal_reason)
-            await self._writer.authorize_run(receipt)
+                await self._recovery_cleanup_resume_writer.settle(
+                    facts.work, at=now, terminal_reason=terminal_reason
+                )
+            await self._recovery_cleanup_resume_writer.authorize_run(receipt)
 
         return result
 
@@ -192,6 +199,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
         command: ResumeIdentityRecoveryCleanupCommand,
         receipt: IdentityRecoveryMaintenanceReceiptDTO,
     ) -> IdentityRecoveryCleanupResumeResultDTO:
+        """Recover the prior maintenance result only for the same request meaning."""
         if (
             receipt.mode is not RecoveryMaintenanceMode.RESUME_RECOVERY_CLEANUP
             or receipt.command != command
@@ -202,6 +210,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
 
     @staticmethod
     def _outcome(facts: IdentityRecoveryCleanupResumeFactsDTO) -> Outcome:
+        """Distinguish completed recovery from confirmed cleanup and remaining authorized work."""
         if facts.released_at is not None:
             return Outcome.ALREADY_COMPLETED
 
@@ -225,6 +234,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
     def _require_work_binding(
         work: IdentityRecoveryCleanupWorkDTO, command: ResumeIdentityRecoveryCleanupCommand
     ) -> None:
+        """Keep the selected cleanup work bound to the requested installation and recovery."""
         if (
             work.installation_id != command.expected_installation_id
             or work.admission.operation_id != command.recovery_operation_id
@@ -237,6 +247,7 @@ class IdentityRecoveryCleanupResumeService(IdentityRecoveryCleanupResumer):
 
     @staticmethod
     def _terminal_reason(work: IdentityRecoveryCleanupWorkDTO, now: datetime) -> str | None:
+        """Determine whether existing ownership and consumed budget allow another attempt."""
         if work.run.ended_at is not None:
             if work.claim is not None:
                 raise RuntimeError("An ended run retains execution ownership.")
