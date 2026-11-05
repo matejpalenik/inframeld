@@ -42,9 +42,10 @@ from inframeld_backend.access.infrastructure.rows.organization_action_grant_row 
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import ConflictError
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
@@ -97,8 +98,8 @@ async def _admitted(database: Database) -> HumanAdmissionResultDTO:
         return await service.admit(
             access=seed.access,
             command=AdmitHumanCommand(seed.organization_id, UUID(int=200), seed.access_revision),
-            context=OperationAdmissionContextDTO(
-                "POST",
+            context=IdempotencyContextDTO(
+                HttpMethod.POST,
                 f"/v1/organizations/{seed.organization_id.value}/human-admissions",
                 IdempotencyKey("admit-bob"),
             ),

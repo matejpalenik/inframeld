@@ -42,7 +42,12 @@ def binding() -> ResourceNameBindingDTO:
         InstallationId(uuid4()), OrganizationId(uuid4()), ProjectId(uuid4())
     )
     return ResourceNameBindingDTO(
-        ResourceNameKind.PROCESSING_PROFILE, uuid4(), scope, ResourceName("support"), 1, False
+        kind=ResourceNameKind.PROCESSING_PROFILE,
+        resource_id=uuid4(),
+        scope=scope,
+        name=ResourceName("support"),
+        revision=1,
+        retired=False,
     )
 
 

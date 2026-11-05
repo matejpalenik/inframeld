@@ -9,6 +9,7 @@ from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origi
     UnadmittedStagingArtifactOriginDTO,
 )
 from inframeld_backend.shared.application.enums.artifact_cleanup_kind import ArtifactCleanupKind
+from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.errors.artifact_errors import ArtifactStagingBusyError
 from inframeld_backend.shared.application.errors.job_errors import (
     JobStoppedError,
@@ -31,14 +32,15 @@ class ArtifactCleanupJobHandler(JobHandler):
 
     def __init__(
         self,
-        preparer: ArtifactCleanupPreparer,
-        artifacts: ArtifactStore,
-        local: ArtifactLocalCleanup,
-        staging: ArtifactStaging,
+        artifact_cleanup_preparer: ArtifactCleanupPreparer,
+        artifact_store: ArtifactStore,
+        artifact_local_cleanup: ArtifactLocalCleanup,
+        artifact_staging: ArtifactStaging,
     ) -> None:
-        self._preparer = preparer
-        self._artifacts = artifacts
-        self._local, self._staging = local, staging
+        self._artifact_cleanup_preparer = artifact_cleanup_preparer
+        self._artifact_store = artifact_store
+        self._artifact_local_cleanup = artifact_local_cleanup
+        self._artifact_staging = artifact_staging
 
     @override
     def payload_type(self) -> tuple[str, int]:
@@ -46,22 +48,22 @@ class ArtifactCleanupJobHandler(JobHandler):
 
     @override
     async def run(self, context: JobAttemptContextDTO, checkpoints: JobCheckpoints) -> None:
-        local = await self._local.prepare_local(context)
+        local = await self._artifact_local_cleanup.prepare_local(context)
         if local is not None:
             try:
-                await self._staging.remove(local)
+                await self._artifact_staging.remove(local)
             except ArtifactStagingBusyError as error:
                 raise SafeJobRetryError(
                     "The retired local target still has an active holder."
                 ) from error
-            await self._local.confirm_local(context, local)
-        prepared = await self._preparer.prepare(context)
+            await self._artifact_local_cleanup.confirm_local(context, local)
+        prepared = await self._artifact_cleanup_preparer.prepare(context)
         if prepared is None:
             return
 
         binding = prepared.context.binding
         if (
-            prepared.action != "delete"
+            prepared.action != JobEffectAction.DELETE
             or not isinstance(binding, ArtifactCleanupJobBindingDTO)
             or binding.kind is not ArtifactCleanupKind.ABANDONED_STAGING
             or replace(prepared.context, checkpoint=context.checkpoint) != context
@@ -79,7 +81,7 @@ class ArtifactCleanupJobHandler(JobHandler):
         ):
             raise JobStoppedError("The prepared DELETE differs from the original cleanup work.")
 
-        await self._artifacts.delete(
+        await self._artifact_store.delete(
             prepared.scope, prepared.artifact_attempt_id, observation=prepared.effect_id
         )
         acknowledgment = (

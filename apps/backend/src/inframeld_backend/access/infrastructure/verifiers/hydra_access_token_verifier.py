@@ -54,6 +54,7 @@ class HydraAccessTokenVerifier(HumanAccessTokenVerifier):
     def _introspect(
         self, credential: HumanAccessTokenCredential, deadline: float
     ) -> IntrospectedOAuth2Token:
+        """Ask Hydra about the supplied token under the caller deadline."""
         remaining = deadline - monotonic()
 
         if remaining <= 0:
@@ -65,6 +66,7 @@ class HydraAccessTokenVerifier(HumanAccessTokenVerifier):
 
     def _read_identity(self, token: object) -> HumanOAuthCredentialBindingDTO | None:
         # Narrow SDK output here: a null or unexpected body is not confirmation of identity.
+        """Validate the token claims required for this first-party human API credential."""
         if not isinstance(token, IntrospectedOAuth2Token):
             raise DependencyUnavailableError
 

@@ -226,8 +226,8 @@ async def _claim(
             jobs,
             worker_id=uuid4(),
             supported_payloads=(("artifact.cleanup", 1),),
-            product=product,
-            recovery=recovery,
+            admitted_work_authorizer=product,
+            job_recovery=recovery,
             lease_seconds=settings.jobs.lease_seconds,
             work_seconds=settings.jobs.work_seconds,
         ).claim_next()
@@ -300,7 +300,7 @@ async def test_actual_handler_abort_is_consumed_before_registered_worker_retries
             finally:
                 inside_delete = False
 
-    store = MockScheduledDeleteStore(storage_settings(), observations=operations)
+    store = MockScheduledDeleteStore(storage_settings(), effect_observation_recorder=operations)
 
     async def delayed[T](function: Callable[[], T]) -> T:
         if inside_delete:
@@ -402,7 +402,9 @@ async def test_sql_pool_is_free_during_native_delete_and_committed_ack_prevents_
         settings.artifact_staging.root, PostgresArtifactStagingReservationReader(owner)
     )
     await staging.startup()
-    store = S3ArtifactStore(storage_settings(), client=client, observations=operations)
+    store = S3ArtifactStore(
+        storage_settings(), client=client, effect_observation_recorder=operations
+    )
     work: asyncio.Task[None] | None = None
     try:
         context = await _context(owner, settings)

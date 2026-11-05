@@ -3,9 +3,12 @@ import binascii
 import json
 import re
 from dataclasses import dataclass
-from typing import Literal, Self
+from typing import Self
 from uuid import UUID
 
+from inframeld_backend.access.application.enums.my_project_access_item_kind import (
+    MyProjectAccessItemKind,
+)
 from inframeld_backend.access.application.value_objects.my_project_access_position import (
     MyProjectAccessPosition,
 )
@@ -47,15 +50,7 @@ class MyProjectAccessCursor:
                     str() as kind,
                     (str() | None) as action,
                 ] if type(version) is int and version == 1:
-                    relationship: Literal["grant", "membership", "management"]
-                    if kind == "grant":
-                        relationship = "grant"
-                    elif kind == "membership":
-                        relationship = "membership"
-                    elif kind == "management":
-                        relationship = "management"
-                    else:
-                        raise ValueError("Unsupported own-access relationship kind.")
+                    relationship = MyProjectAccessItemKind(kind)
                     return cls(
                         InstallationId(UUID(installation)),
                         OrganizationId(UUID(organization)),
@@ -82,7 +77,7 @@ class MyProjectAccessCursor:
             str(self.project_id.value),
             str(self.principal_id.value),
             str(self.after.target_id),
-            self.after.kind,
+            self.after.kind.value,
             self.after.action_id.value if self.after.action_id is not None else None,
         ]
         return (

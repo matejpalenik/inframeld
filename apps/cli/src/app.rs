@@ -51,6 +51,7 @@ struct Intent {
 }
 
 impl Intent {
+    /// Recover safe output intent even when clap later rejects the invocation.
     fn inspect(arguments: &[OsString]) -> Self {
         let before_delimiter = arguments.iter().skip(1).take_while(|value| *value != "--");
         let mut json = false;
@@ -386,6 +387,7 @@ fn plain(bytes: &[u8], stdout: &mut impl Write, stderr: &mut impl Write) -> io::
     Ok(0)
 }
 
+/// Emit a fixed local diagnostic without echoing submitted arguments or causes.
 fn diagnostic(error: LocalError, stderr: &mut impl Write) -> io::Result<()> {
     // At most two fixed reviewed lines can be attempted, together below 1 KiB.
     writeln!(stderr, "error: {}", error.message())?;

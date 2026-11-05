@@ -49,9 +49,10 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.access.infrastructure.writers.postgres_project_creation_writer import (
     PostgresProjectCreationWriter,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
 )
@@ -140,8 +141,8 @@ def creation_command(seed: ProjectCreationSeedDTO, name: str = "support") -> Cre
     )
 
 
-def creation_context(key: str = "original") -> OperationAdmissionContextDTO:
-    return OperationAdmissionContextDTO("POST", "/v1/projects", IdempotencyKey(key))
+def creation_context(key: str = "original") -> IdempotencyContextDTO:
+    return IdempotencyContextDTO(HttpMethod.POST, "/v1/projects", IdempotencyKey(key))
 
 
 def creation_fingerprints() -> ProjectCreationFingerprintService:
@@ -154,16 +155,16 @@ def creation_service(
     session: AsyncSession, idempotency: OperationIdempotency | None = None
 ) -> ProjectCreationService:
     return ProjectCreationService(
-        transactions=SqlAlchemyTransactionManager(session),
-        authorizer=ProjectCreationAuthorizationService(
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        creation_authorizer=ProjectCreationAuthorizationService(
             PostgresOrganizationAccessFactsReader(session)
         ),
-        writer=PostgresProjectCreationWriter(session),
-        results=PostgresProjectCreationResultReader(session),
-        idempotency=IdempotencyService(PostgresOperationReservationWriter(session))
+        creation_writer=PostgresProjectCreationWriter(session),
+        creation_result_reader=PostgresProjectCreationResultReader(session),
+        operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session))
         if idempotency is None
         else idempotency,
-        fingerprints=creation_fingerprints(),
+        creation_fingerprint_service=creation_fingerprints(),
     )
 
 

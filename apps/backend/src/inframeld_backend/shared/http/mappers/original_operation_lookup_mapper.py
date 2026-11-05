@@ -16,6 +16,9 @@ from inframeld_backend.shared.application.dtos.recovery_required_operation_dto i
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
+from inframeld_backend.shared.application.enums.operation_lookup_outcome import (
+    OperationLookupOutcome,
+)
 from inframeld_backend.shared.application.queries.lookup_original_operation_query import (
     LookupOriginalOperationQuery,
 )
@@ -24,6 +27,13 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
     OperationLookupAuthority,
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.http.enums.operation_admission_confirmation import (
+    OperationAdmissionConfirmation,
+)
+from inframeld_backend.shared.http.enums.operation_dispatch_establishment import (
+    OperationDispatchEstablishment,
+)
+from inframeld_backend.shared.http.enums.operation_recovery_reason import OperationRecoveryReason
 from inframeld_backend.shared.http.enums.unknown_job_reference import UnknownJobReference
 from inframeld_backend.shared.http.requests.original_operation_lookup_request import (
     OriginalOperationLookupRequest,
@@ -77,31 +87,32 @@ class OriginalOperationLookupMapper:
         match result:
             case CompletedSynchronousOperationDTO():
                 return CompletedOperationLookupResponse(
-                    outcome="completed_synchronous",
+                    outcome=OperationLookupOutcome.COMPLETED_SYNCHRONOUS,
                     operationId=result.operation_id.value,
-                    classification=result.replay_kind.value,
+                    classification=result.replay_kind,
                     idempotencyExpiresAt=result.expires_at,
                 )
             case AcceptedOperationLookupDTO():
                 return AcceptedOperationLookupResponse(
-                    outcome="accepted_asynchronous",
-                    admission="confirmed",
+                    outcome=OperationLookupOutcome.ACCEPTED_ASYNCHRONOUS,
+                    admission=OperationAdmissionConfirmation.CONFIRMED,
                     jobReference=KnownJobReferenceResponse(jobId=result.job_id.value)
                     if result.job_id is not None
                     else UnknownJobReference.UNKNOWN,
-                    dispatch="not_established",
+                    dispatch=OperationDispatchEstablishment.NOT_ESTABLISHED,
                     operationId=result.operation_id.value,
                     idempotencyExpiresAt=result.expires_at,
                 )
             case InProgressOperationDTO():
                 return InProgressOperationLookupResponse(
-                    outcome="in_progress", operationId=result.operation_id.value
+                    outcome=OperationLookupOutcome.IN_PROGRESS,
+                    operationId=result.operation_id.value,
                 )
             case RecoveryRequiredOperationDTO():
                 return RecoveryRequiredOperationLookupResponse(
-                    outcome="recovery_required",
-                    reason="original_outcome_requires_recovery",
+                    outcome=OperationLookupOutcome.RECOVERY_REQUIRED,
+                    reason=OperationRecoveryReason.ORIGINAL_OUTCOME_REQUIRES_RECOVERY,
                     operationId=result.operation_id.value,
                 )
             case UnresolvedOperationDTO():
-                return UnresolvedOperationLookupResponse(outcome="unresolved")
+                return UnresolvedOperationLookupResponse(outcome=OperationLookupOutcome.UNRESOLVED)

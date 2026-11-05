@@ -36,6 +36,7 @@ __all__ = [
     "PathInner",
     "ProblemDetails",
     "ValidationIssue",
+    "ValidationIssueLocation",
 ]
 
 # import apis into sdk package
@@ -61,4 +62,5 @@ from inframeld_sdk_fixtures.models.page_response_int import PageResponseInt as P
 from inframeld_sdk_fixtures.models.path_inner import PathInner as PathInner
 from inframeld_sdk_fixtures.models.problem_details import ProblemDetails as ProblemDetails
 from inframeld_sdk_fixtures.models.validation_issue import ValidationIssue as ValidationIssue
+from inframeld_sdk_fixtures.models.validation_issue_location import ValidationIssueLocation as ValidationIssueLocation
 

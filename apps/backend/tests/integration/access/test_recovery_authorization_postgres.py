@@ -105,12 +105,13 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
-)
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -259,8 +260,8 @@ async def _assign(
         or AccessContextDTO(
             scenario.seed.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
         ),
-        context=OperationAdmissionContextDTO(
-            method="POST", requested_route="/v1/projects/{project_id}/grants", key=key
+        context=IdempotencyContextDTO(
+            method=HttpMethod.POST, requested_route="/v1/projects/{project_id}/grants", key=key
         ),
         command=AssignProjectUseOnlyGrantCommand(
             project_id=scenario.seed.project_id,
@@ -819,7 +820,11 @@ async def test_captured_credential_cannot_resume_after_recovery_release(
         HumanOAuthCredentialBindingDTO(scenario.identity, state.installation_id, state.version),
     )
     request = ProjectOperationAdmissionRequestDTO(
-        scenario.seed.project_id, "POST", "/v1/test-operation", KEY, RequestFingerprint(b"F" * 32)
+        scenario.seed.project_id,
+        HttpMethod.POST,
+        "/v1/test-operation",
+        KEY,
+        RequestFingerprint(b"F" * 32),
     )
     if replay:
         async with database.session() as session:

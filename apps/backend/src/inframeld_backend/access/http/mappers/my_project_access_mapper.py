@@ -14,6 +14,7 @@ from inframeld_backend.access.application.queries.get_my_project_access_query im
     GetMyProjectAccessQuery,
 )
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.http.enums.grant_target_kind import GrantTargetKind
 from inframeld_backend.access.http.responses.access_group_grant_target_response import (
     AccessGroupGrantTargetResponse,
 )
@@ -57,15 +58,17 @@ class MyProjectAccessMapper:
         | ApplicationAccountGrantTargetResponse
     ):
         if isinstance(target, ProjectGrantTargetDTO):
-            return ProjectGrantTargetResponse(kind="project", project_id=target.project_id.value)
+            return ProjectGrantTargetResponse(
+                kind=GrantTargetKind.PROJECT, project_id=target.project_id.value
+            )
         if isinstance(target, AccessGroupGrantTargetDTO):
             return AccessGroupGrantTargetResponse(
-                kind="access-group",
+                kind=GrantTargetKind.ACCESS_GROUP,
                 project_id=target.project_id.value,
                 access_group_id=target.access_group_id.value,
             )
         return ApplicationAccountGrantTargetResponse(
-            kind="application-account",
+            kind=GrantTargetKind.APPLICATION_ACCOUNT,
             project_id=target.project_id.value,
             application_principal_id=target.application_principal_id.value,
         )

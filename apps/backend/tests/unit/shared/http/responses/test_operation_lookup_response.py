@@ -6,6 +6,9 @@ from pydantic import ValidationError
 from inframeld_backend.shared.http.responses.accepted_operation_lookup_response import (
     AcceptedOperationLookupResponse,
 )
+from inframeld_backend.shared.http.responses.completed_operation_lookup_response import (
+    CompletedOperationLookupResponse,
+)
 
 ACCEPTED = {
     "outcome": "accepted_asynchronous",
@@ -48,3 +51,32 @@ def test_accepted_lookup_rejects_malformed_or_overbroad_job_reference(reference:
 def test_accepted_lookup_forbids_an_extra_job_identifier(value: str | None) -> None:
     with pytest.raises(ValidationError):
         AcceptedOperationLookupResponse.model_validate(ACCEPTED | {"jobId": value})
+
+
+@pytest.mark.parametrize("classification", ["safe_result", "issued_secret", "answer_receipt"])
+def test_completed_lookup_keeps_each_supported_classification_on_the_wire(
+    classification: str,
+) -> None:
+    body = {
+        "outcome": "completed_synchronous",
+        "operationId": "original-operation",
+        "classification": classification,
+        "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
+    }
+    result = CompletedOperationLookupResponse.model_validate(body)
+    assert result.model_dump(by_alias=True, mode="json") == body
+
+
+@pytest.mark.parametrize("classification", ["async_job", "unknown", None])
+def test_completed_lookup_rejects_classifications_outside_its_exact_subset(
+    classification: str | None,
+) -> None:
+    with pytest.raises(ValidationError):
+        CompletedOperationLookupResponse.model_validate(
+            {
+                "outcome": "completed_synchronous",
+                "operationId": "original-operation",
+                "classification": classification,
+                "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
+            }
+        )

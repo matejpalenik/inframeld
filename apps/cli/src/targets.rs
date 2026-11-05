@@ -343,6 +343,7 @@ fn private_permissions(metadata: &fs::Metadata) -> bool {
     metadata.permissions().mode() & 0o077 == 0
 }
 
+/// Reject shared or substituted directories before reading private target state.
 fn private_directory(path: &Path) -> Result<(), TargetError> {
     let metadata = fs::symlink_metadata(path).map_err(|_| TargetError::Io)?;
     if !metadata.is_dir() || !private_permissions(&metadata) {
@@ -409,6 +410,7 @@ pub(crate) fn validate_label(label: &str) -> Result<(), TargetError> {
     Ok(())
 }
 
+/// Atomically replace target state and retain uncertainty if durability cannot be confirmed.
 fn publish(
     directory: &Path,
     state: &State,

@@ -99,8 +99,8 @@ async def test_cleanup_terminal_routes_preserve_original_business_job_and_replay
             recovery_store,
             supported_payloads=() if route == "unsupported" else (("artifact.cleanup", 1),),
             worker_id=uuid4(),
-            product=product_authority,
-            recovery=recovery_service,
+            admitted_work_authorizer=product_authority,
+            job_recovery=recovery_service,
         )
         if route == "queue_deadline":
             async with session.begin():

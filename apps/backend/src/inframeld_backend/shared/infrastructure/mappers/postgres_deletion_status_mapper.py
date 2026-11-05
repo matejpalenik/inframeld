@@ -13,6 +13,7 @@ from inframeld_backend.shared.application.dtos.deletion_status_obligation_proven
 from inframeld_backend.shared.application.dtos.deletion_status_observation_dto import (
     DeletionStatusObservationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -39,7 +40,7 @@ class PostgresDeletionStatusMapper:
     def to_binding(row: DeletionStatusBindingRow) -> DeletionStatusBindingDTO:
         if row.method not in ("POST", "PUT", "PATCH", "DELETE"):
             raise ValueError("The retained request method is not supported.")
-        method = row.method
+        method = HttpMethod(row.method)
         return DeletionStatusBindingDTO(
             operation_id=OperationId(row.operation_id),
             request_id=RequestId(row.request_id),
@@ -87,6 +88,7 @@ class PostgresDeletionStatusMapper:
     def _to_unfinished_obligation(
         row: DeletionStatusObservationRow,
     ) -> DeletionStatusObligationProvenanceDTO | None:
+        """Decode an unfinished cleanup obligation while retaining its original scope and deadline."""
         obligation_id = row.unfinished_obligation_id
         operation_id = row.unfinished_operation_id
         installation_id = row.unfinished_installation_id

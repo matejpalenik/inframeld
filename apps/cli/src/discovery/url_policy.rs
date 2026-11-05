@@ -104,6 +104,7 @@ fn parse_url(value: &str, max_bytes: usize) -> Result<Url, DiscoveryError> {
     Ok(url)
 }
 
+/// Apply the HTTPS requirement after the shared spelling and size checks.
 fn validate_url(value: &str, max_bytes: usize) -> Result<Url, DiscoveryError> {
     let url = parse_url(value, max_bytes)?;
     if url.scheme() != "https" {
@@ -112,6 +113,7 @@ fn validate_url(value: &str, max_bytes: usize) -> Result<Url, DiscoveryError> {
     Ok(url)
 }
 
+/// Confine managed HTTP discovery to the exact advertised loopback origin.
 fn managed_url(value: &str, expected: &Origin, max_bytes: usize) -> Result<Url, DiscoveryError> {
     let url = parse_url(value, max_bytes)?;
     let literal_host = value

@@ -15,6 +15,9 @@ from inframeld_backend.access.application.dtos.my_project_access_relationship_dt
     MyProjectAccessRelationshipDTO,
 )
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
+from inframeld_backend.access.application.enums.my_project_access_item_kind import (
+    MyProjectAccessItemKind,
+)
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
 )
@@ -52,6 +55,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
 def _position(
     item: MyProjectAccessGrantDTO | MyProjectAccessRelationshipDTO,
 ) -> MyProjectAccessPosition:
+    """Carry the item's stable combined-page order into the next cursor without granting access."""
     if isinstance(item, MyProjectAccessRelationshipDTO):
         return MyProjectAccessPosition(item.kind, item.access_group_id.value, None)
 
@@ -62,12 +66,12 @@ def _position(
         target_id = target.access_group_id.value
     else:
         target_id = target.application_principal_id.value
-    return MyProjectAccessPosition("grant", target_id, item.action_id)
+    return MyProjectAccessPosition(MyProjectAccessItemKind.GRANT, target_id, item.action_id)
 
 
 class MyProjectAccessService(MyProjectAccessReader):
-    def __init__(self, facts: MyProjectAccessFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, project_access_facts_reader: MyProjectAccessFactsReader) -> None:
+        self._project_access_facts_reader = project_access_facts_reader
 
     @override
     async def get_access(
@@ -82,7 +86,7 @@ class MyProjectAccessService(MyProjectAccessReader):
 
         try:
             async with asyncio.timeout(5):
-                facts = await self._facts.read_page(
+                facts = await self._project_access_facts_reader.read_page(
                     access=access,
                     project_id=query.project_id,
                     after=cursor.after if cursor is not None else None,
@@ -170,11 +174,11 @@ class MyProjectAccessService(MyProjectAccessReader):
             if isinstance(item, MyProjectAccessRelationshipDTO) and item.kind == "management"
         )
         return MyProjectAccessPageDTO(
-            facts.project_id,
-            facts.actor.id,
-            facts.access_revision,
-            grants,
-            memberships,
-            managements,
-            continuation,
+            project_id=facts.project_id,
+            principal_id=facts.actor.id,
+            access_revision=facts.access_revision,
+            grants=grants,
+            group_memberships=memberships,
+            group_managements=managements,
+            next_cursor=continuation,
         )

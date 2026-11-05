@@ -192,7 +192,13 @@ class PostgresFirstAdministratorBootstrapFactsReader(FirstAdministratorBootstrap
         ):
             raise FirstAdministratorBootstrapError(Code.DEPENDENCY_UNAVAILABLE)
         return FirstAdministratorBootstrapFactsDTO(
-            installation_id, identity, credential, principal, business, claimed, observed
+            installation_id=installation_id,
+            identity=identity,
+            credential_state=credential,
+            principal=principal,
+            has_business_state=business,
+            has_bootstrap_claim=claimed,
+            observed_at=observed,
         )
 
     @override
@@ -229,16 +235,16 @@ class PostgresFirstAdministratorBootstrapFactsReader(FirstAdministratorBootstrap
         ):
             raise RuntimeError("The stored first-administrator claim has no valid typed result.")
         return FirstAdministratorBootstrapReceiptDTO(
-            RequestFingerprint(row.request_fingerprint),
-            VerifiedHumanIdentityDTO(
+            fingerprint=RequestFingerprint(row.request_fingerprint),
+            identity=VerifiedHumanIdentityDTO(
                 IdentityAuthority(parent.authority), IdentitySubject(parent.subject)
             ),
-            row.expected_identity_id,
-            parent.operator_label,
-            parent.reason,
-            row.before_revision,
-            parent.authorized_at,
-            FirstAdministratorBootstrapResultDTO(
+            expected_identity_id=row.expected_identity_id,
+            operator_label=parent.operator_label,
+            reason=parent.reason,
+            before_revision=row.before_revision,
+            authorized_at=parent.authorized_at,
+            result=FirstAdministratorBootstrapResultDTO(
                 operation_id,
                 installation_id,
                 OrganizationId(row.organization_id),

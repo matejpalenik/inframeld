@@ -9,6 +9,8 @@ from inframeld_backend.bootstrap.application_worker_application_settings import 
 from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
 from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 from tests.support.application_job_handler import BoundedJobHandler
 
 
@@ -16,7 +18,7 @@ async def _run() -> None:
     import signal
 
     settings = ApplicationWorkerApplicationSettings.model_validate({})
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     loop.add_signal_handler(signal.SIGTERM, stopped.set)

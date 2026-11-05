@@ -16,8 +16,8 @@ from inframeld_backend.access.application.dtos.project_action_grant_management_f
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 
 
@@ -28,7 +28,7 @@ class ProjectActionGrantResultReader(Protocol):
         *,
         facts: ProjectActionGrantManagementFactsDTO,
         command: SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         operation: CompletedSynchronousOperationDTO,
     ) -> ProjectActionGrantChangeResultDTO:
         """Read immutable business facts under the exact live original reservation.

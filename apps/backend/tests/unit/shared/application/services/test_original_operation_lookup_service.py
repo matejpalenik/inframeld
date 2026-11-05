@@ -40,6 +40,7 @@ from inframeld_backend.shared.application.dtos.recovery_required_operation_dto i
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -76,7 +77,7 @@ QUERY = LookupOriginalOperationQuery(
     InstallationId(UUID(int=2)),
     OrganizationId(UUID(int=3)),
     ProjectId(UUID(int=4)),
-    "POST",
+    HttpMethod.POST,
     "/v1/projects/{project_id}/grants",
     IdempotencyKey("lost-ack"),
     OperationLookupAuthority(

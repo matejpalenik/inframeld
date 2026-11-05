@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import replace
-from typing import Literal, override
+from enum import StrEnum
+from typing import override
 from uuid import UUID
 
 import pytest
@@ -44,7 +45,22 @@ from inframeld_backend.shared.application.errors.application_errors import (
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
-type AuthenticationStep = Literal["token", "identity", "principal"]
+
+class AuthenticationStep(StrEnum):
+    TOKEN = "token"
+    IDENTITY = "identity"
+    PRINCIPAL = "principal"
+
+
+class StepCase(StrEnum):
+    TOKEN = "token"
+    IDENTITY = "identity"
+
+
+class SettingCase(StrEnum):
+    PROVIDER = "provider"
+    TOTAL = "total"
+
 
 IDENTITY = VerifiedHumanIdentityDTO(
     authority=IdentityAuthority("kratos:test"),
@@ -95,7 +111,9 @@ class MockTokenVerifier(HumanAccessTokenVerifier):
         self.credentials.append(credential)
         self.budgets.append(timeout_seconds)
 
-        await _record_call(self.events, "token", failure=self.failure, blocked=self.blocked)
+        await _record_call(
+            self.events, AuthenticationStep.TOKEN, failure=self.failure, blocked=self.blocked
+        )
 
         return self.result
 
@@ -116,7 +134,9 @@ class MockIdentityVerifier(HumanIdentityVerifier):
         self.identities.append(identity)
         self.budgets.append(timeout_seconds)
 
-        await _record_call(self.events, "identity", failure=self.failure, blocked=self.blocked)
+        await _record_call(
+            self.events, AuthenticationStep.IDENTITY, failure=self.failure, blocked=self.blocked
+        )
 
         return self.result
 
@@ -139,7 +159,7 @@ class MockPrincipalReader(HumanIdentityLinkReader):
         try:
             await _record_call(
                 self.events,
-                "principal",
+                AuthenticationStep.PRINCIPAL,
                 failure=self.failure,
                 blocked=self.blocked,
             )
@@ -181,7 +201,7 @@ async def test_valid_token_resolves_active_local_human() -> None:
 
     assert context.actor_principal_id == PRINCIPAL.id
     assert context.authentication_evidence is scenario.token.result
-    assert scenario.events == ["token", "identity", "principal"]
+    assert scenario.events == ["token", "identity", AuthenticationStep.PRINCIPAL]
     assert scenario.token.credentials == [CREDENTIAL]
     assert scenario.identity.identities == [IDENTITY]
     assert scenario.reader.identities == [IDENTITY]
@@ -244,7 +264,7 @@ async def test_current_identity_must_match_verified_token_identity(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "principal",
+    AuthenticationStep.PRINCIPAL,
     [
         pytest.param(None, id="missing-local-link"),
         pytest.param(
@@ -270,7 +290,7 @@ async def test_local_admission_requires_an_active_human(
     with pytest.raises(AccessDeniedError):
         await scenario.service.authenticate(CREDENTIAL)
 
-    assert scenario.events == ["token", "identity", "principal"]
+    assert scenario.events == ["token", "identity", AuthenticationStep.PRINCIPAL]
     assert scenario.reader.identities == [IDENTITY]
 
 
@@ -281,7 +301,7 @@ async def test_local_admission_requires_an_active_human(
     [DependencyUnavailableError, TimeoutError],
 )
 async def test_provider_failure_stops_authentication(
-    step: Literal["token", "identity"],
+    step: StepCase,
     failure_type: type[DependencyUnavailableError | TimeoutError],
 ) -> None:
     scenario = AuthenticationScenario()
@@ -289,10 +309,10 @@ async def test_provider_failure_stops_authentication(
 
     if step == "token":
         scenario.token.failure = failure
-        expected_events: list[AuthenticationStep] = ["token"]
+        expected_events: list[AuthenticationStep] = [AuthenticationStep.TOKEN]
     else:
         scenario.identity.failure = failure
-        expected_events = ["token", "identity"]
+        expected_events = [AuthenticationStep.TOKEN, AuthenticationStep.IDENTITY]
 
     with pytest.raises(DependencyUnavailableError) as caught:
         await scenario.service.authenticate(CREDENTIAL)
@@ -314,11 +334,11 @@ async def test_unexpected_local_read_failure_propagates() -> None:
         await scenario.service.authenticate(CREDENTIAL)
 
     assert caught.value is failure
-    assert scenario.events == ["token", "identity", "principal"]
+    assert scenario.events == ["token", "identity", AuthenticationStep.PRINCIPAL]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("step", ["token", "identity", "principal"])
+@pytest.mark.parametrize("step", ["token", "identity", AuthenticationStep.PRINCIPAL])
 async def test_total_deadline_bounds_every_dependency(
     step: AuthenticationStep,
 ) -> None:
@@ -326,13 +346,17 @@ async def test_total_deadline_bounds_every_dependency(
 
     if step == "token":
         scenario.token.blocked = True
-        expected_events: list[AuthenticationStep] = ["token"]
+        expected_events: list[AuthenticationStep] = [AuthenticationStep.TOKEN]
     elif step == "identity":
         scenario.identity.blocked = True
-        expected_events = ["token", "identity"]
+        expected_events = [AuthenticationStep.TOKEN, AuthenticationStep.IDENTITY]
     else:
         scenario.reader.blocked = True
-        expected_events = ["token", "identity", "principal"]
+        expected_events = [
+            AuthenticationStep.TOKEN,
+            AuthenticationStep.IDENTITY,
+            AuthenticationStep.PRINCIPAL,
+        ]
 
     # The outer guard makes a missing service deadline fail instead of hanging.
     async with asyncio.timeout(1.0):
@@ -354,7 +378,7 @@ async def test_result_returned_after_deadline_cannot_authenticate() -> None:
             await scenario.service.authenticate(CREDENTIAL)
 
     assert isinstance(caught.value.__cause__, TimeoutError)
-    assert scenario.events == ["token", "identity", "principal"]
+    assert scenario.events == ["token", "identity", AuthenticationStep.PRINCIPAL]
 
 
 @pytest.mark.asyncio
@@ -382,7 +406,7 @@ async def test_provider_budgets_respect_provider_and_total_limits(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("changed_step", ["token", "identity", "principal"])
+@pytest.mark.parametrize("changed_step", ["token", "identity", AuthenticationStep.PRINCIPAL])
 async def test_each_request_rechecks_current_admission(
     changed_step: AuthenticationStep,
 ) -> None:
@@ -395,18 +419,22 @@ async def test_each_request_rechecks_current_admission(
     if changed_step == "token":
         scenario.token.result = None
         expected_error = AuthenticationRequiredError
-        expected_events: list[AuthenticationStep] = ["token"]
+        expected_events: list[AuthenticationStep] = [AuthenticationStep.TOKEN]
     elif changed_step == "identity":
         scenario.identity.result = None
         expected_error = AuthenticationRequiredError
-        expected_events = ["token", "identity"]
+        expected_events = [AuthenticationStep.TOKEN, AuthenticationStep.IDENTITY]
     else:
         scenario.reader.result = replace(
             PRINCIPAL,
             status=PrincipalStatus.SUSPENDED,
         )
         expected_error = AccessDeniedError
-        expected_events = ["token", "identity", "principal"]
+        expected_events = [
+            AuthenticationStep.TOKEN,
+            AuthenticationStep.IDENTITY,
+            AuthenticationStep.PRINCIPAL,
+        ]
 
     with pytest.raises(expected_error):
         await scenario.service.authenticate(CREDENTIAL)
@@ -415,17 +443,17 @@ async def test_each_request_rechecks_current_admission(
     assert scenario.token.credentials == [CREDENTIAL, CREDENTIAL]
 
 
-@pytest.mark.parametrize("setting", ["provider", "total"])
+@pytest.mark.parametrize("setting", [SettingCase.PROVIDER, SettingCase.TOTAL])
 @pytest.mark.parametrize(
     "seconds",
     [True, 0.0, -1.0, float("nan"), float("inf"), float("-inf")],
 )
 def test_timeouts_must_be_finite_positive_numbers(
-    setting: Literal["provider", "total"],
+    setting: SettingCase,
     seconds: float,
 ) -> None:
-    provider_timeout = seconds if setting == "provider" else 5.0
-    total_timeout = seconds if setting == "total" else 10.0
+    provider_timeout = seconds if setting == SettingCase.PROVIDER else 5.0
+    total_timeout = seconds if setting == SettingCase.TOTAL else 10.0
 
     with pytest.raises(ValueError, match="finite and positive"):
         AuthenticationScenario(

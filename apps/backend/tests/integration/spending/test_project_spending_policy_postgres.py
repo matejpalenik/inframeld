@@ -37,8 +37,8 @@ from inframeld_backend.bootstrap.spending_accounting_composition import (
 from inframeld_backend.shared.application.commands.change_project_spending_policy_command import (
     ChangeProjectSpendingPolicyCommand,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.project_spending_policy_dto import (
     ProjectSpendingPolicyDTO,
@@ -49,7 +49,11 @@ from inframeld_backend.shared.application.dtos.project_spending_policy_result_dt
 from inframeld_backend.shared.application.dtos.spending_accounting_result_dto import (
     SpendingAccountingResultDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.spending_call_state import SpendingCallState
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     ResourceNotFoundError,
     StaleRevisionError,
@@ -164,7 +168,7 @@ async def test_unknown_original_obligation_survives_a_new_cap_in_its_captured_mo
     async with open_spending_accounting(database) as service:
         unresolved = await service.record_observation(
             call=call,
-            observation=observation(call, kind="uncertain", charge=None),
+            observation=observation(call, kind=SpendingObservationKind.UNCERTAIN, charge=None),
             expected_call_revision=0,
         )
     await change_limit(database, scenario, money("2"))
@@ -279,8 +283,8 @@ async def test_required_receipt_failure_rolls_back_policy_audit_and_replay(
             await service.change_limit(
                 access=scenario.access,
                 command=ChangeProjectSpendingPolicyCommand(scenario.project_id, 0, money("2")),
-                context=OperationAdmissionContextDTO(
-                    "PATCH",
+                context=IdempotencyContextDTO(
+                    HttpMethod.PATCH,
                     "/internal/projects/{project_id}/spending-policy",
                     IdempotencyKey("failed-policy"),
                 ),

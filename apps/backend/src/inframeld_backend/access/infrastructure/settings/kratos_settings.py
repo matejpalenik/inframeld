@@ -23,6 +23,7 @@ class KratosSettings(BaseModel):
     @field_validator("admin_url", mode="before")
     @classmethod
     def _validate_admin_url(cls, value: object) -> object:
+        """Reject ambiguous endpoint inputs before URL normalization can hide credentials or controls."""
         if value is None:
             return None
 

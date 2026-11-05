@@ -3,7 +3,8 @@
 import asyncio
 from contextlib import suppress
 from dataclasses import replace
-from typing import Literal, override
+from enum import StrEnum
+from typing import override
 from uuid import uuid4
 
 import pytest
@@ -39,6 +40,18 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
     DependencyUnavailableError,
 )
+
+
+class SettingCase(StrEnum):
+    PROVIDER = "provider"
+    TOTAL = "total"
+
+
+class Stage(StrEnum):
+    MISSING_CREDENTIAL = "missing-credential"
+    PROVIDER = "provider"
+    LOCAL_LINK = "local-link"
+
 
 IDENTITY = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySubject("alice"))
 PRINCIPAL = Principal(
@@ -324,13 +337,13 @@ async def test_external_cancellation_remains_cancellation() -> None:
     assert not reader.called
 
 
-@pytest.mark.parametrize("setting", ["provider", "total"])
+@pytest.mark.parametrize("setting", ["provider", SettingCase.TOTAL])
 @pytest.mark.parametrize(
     "seconds",
     [True, 0.0, -1.0, float("nan"), float("inf"), float("-inf")],
 )
 def test_cookie_service_rejects_invalid_timeout_arguments(
-    setting: Literal["provider", "total"],
+    setting: SettingCase,
     seconds: float,
 ) -> None:
     """Direct service construction must be safe even when settings parsing is bypassed."""
@@ -340,7 +353,7 @@ def test_cookie_service_rejects_invalid_timeout_arguments(
             MockDeadlinePrincipalReader(),
             recovery_block_reader=MockIdentityRecoveryBlockReader(),
             provider_timeout_seconds=seconds if setting == "provider" else 5.0,
-            total_timeout_seconds=seconds if setting == "total" else 10.0,
+            total_timeout_seconds=seconds if setting == SettingCase.TOTAL else 10.0,
         )
 
 
@@ -419,20 +432,20 @@ async def test_cookie_total_deadline_includes_recovery_read(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stage", ["missing-credential", "provider", "local-link"])
+@pytest.mark.parametrize("stage", [Stage.MISSING_CREDENTIAL, "provider", Stage.LOCAL_LINK])
 async def test_cookie_rejection_before_admission_skips_recovery_read(
-    stage: Literal["missing-credential", "provider", "local-link"],
+    stage: Stage,
 ) -> None:
     """Read recovery state only after a credential resolves to a local principal."""
     recovery = MockIdentityRecoveryBlockReader()
     service = HumanSessionAuthenticationService(
         FixedVerifier(None if stage == "provider" else IDENTITY),
-        FixedPrincipalReader(None if stage == "local-link" else PRINCIPAL),
+        FixedPrincipalReader(None if stage == Stage.LOCAL_LINK else PRINCIPAL),
         recovery_block_reader=recovery,
     )
-    expected = AccessDeniedError if stage == "local-link" else AuthenticationRequiredError
+    expected = AccessDeniedError if stage == Stage.LOCAL_LINK else AuthenticationRequiredError
 
     with pytest.raises(expected):
-        await service.authenticate(None if stage == "missing-credential" else CREDENTIAL)
+        await service.authenticate(None if stage == Stage.MISSING_CREDENTIAL else CREDENTIAL)
 
     assert recovery.identities == []

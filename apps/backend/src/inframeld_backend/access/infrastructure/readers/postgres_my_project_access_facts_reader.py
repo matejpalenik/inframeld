@@ -43,6 +43,9 @@ from inframeld_backend.access.application.dtos.my_project_access_relationship_dt
     MyProjectAccessRelationshipDTO,
 )
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
+from inframeld_backend.access.application.enums.my_project_access_item_kind import (
+    MyProjectAccessItemKind,
+)
 from inframeld_backend.access.application.protocols.my_project_access_facts_reader import (
     MyProjectAccessFactsReader,
 )
@@ -335,7 +338,9 @@ class PostgresMyProjectAccessFactsReader(MyProjectAccessFactsReader):
             elif item_kind in (1, 2) and item_target == "access_group":
                 items.append(
                     MyProjectAccessRelationshipDTO(
-                        "membership" if item_kind == 1 else "management",
+                        MyProjectAccessItemKind.MEMBERSHIP
+                        if item_kind == 1
+                        else MyProjectAccessItemKind.MANAGEMENT,
                         project_id,
                         AccessGroupId(item_id),
                     )
@@ -343,18 +348,18 @@ class PostgresMyProjectAccessFactsReader(MyProjectAccessFactsReader):
             else:
                 raise RuntimeError("The own relationship observation has an unsupported kind.")
         return MyProjectAccessFactsDTO(
-            InstallationId(installation),
-            OrganizationId(principal.organization_id),
-            project_id,
-            project.access_revision,
-            Principal(
+            installation_id=InstallationId(installation),
+            organization_id=OrganizationId(principal.organization_id),
+            project_id=project_id,
+            access_revision=project.access_revision,
+            actor=Principal(
                 PrincipalId(principal.id),
                 OrganizationId(principal.organization_id),
                 principal.kind,
                 principal.status,
             ),
-            recovering,
-            HumanOAuthCredentialFactsDTO(
+            has_pending_recovery=recovering,
+            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
                 linked,
                 HumanCredentialVersion(credential_version)
                 if credential_version is not None
@@ -362,7 +367,7 @@ class PostgresMyProjectAccessFactsReader(MyProjectAccessFactsReader):
             )
             if isinstance(evidence, HumanOAuthCredentialBindingDTO)
             else None,
-            project.status,
-            membership,
-            tuple(items),
+            project_status=project.status,
+            is_project_member=membership,
+            items=tuple(items),
         )

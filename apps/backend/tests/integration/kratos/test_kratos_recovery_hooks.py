@@ -129,13 +129,13 @@ async def test_native_revocation_runs_between_admission_and_completion(
         redeem_recovery_code(scenario.recovering_browser, scenario.flow, scenario.code)
     )
     try:
-        admitted = await _wait_for_phase(scenario, "admit")
+        admitted = await _wait_for_phase(scenario, RecoveryPhase.ADMIT)
         assert [event.phase for event in admitted.received] == ["admit"]
         assert admitted.acknowledged == []
         assert (await scenario.old_browser.get("/sessions/whoami")).status_code == 200
 
-        await _release(scenario, "admit")
-        completing = await _wait_for_phase(scenario, "complete")
+        await _release(scenario, RecoveryPhase.ADMIT)
+        completing = await _wait_for_phase(scenario, RecoveryPhase.COMPLETE)
         assert [event.phase for event in completing.received] == ["admit", "complete"]
         assert completing.acknowledged == ["admit"]
         assert (await scenario.old_browser.get("/sessions/whoami")).status_code == 401
@@ -145,7 +145,7 @@ async def test_native_revocation_runs_between_admission_and_completion(
             assert str(event.identity_id) == scenario.human.subject.value
             assert event.event_kind == "recovery"
 
-        await _release(scenario, "complete")
+        await _release(scenario, RecoveryPhase.COMPLETE)
         completed = await submitted
         assert completed.status_code in {302, 303}, "Recovery did not finish."
 
@@ -156,8 +156,8 @@ async def test_native_revocation_runs_between_admission_and_completion(
         assert (await _snapshot(scenario)).acknowledged == ["admit", "complete"]
     finally:
         try:
-            await _release(scenario, "admit")
-            await _release(scenario, "complete")
+            await _release(scenario, RecoveryPhase.ADMIT)
+            await _release(scenario, RecoveryPhase.COMPLETE)
         finally:
             if not submitted.done():
                 submitted.cancel()
@@ -169,7 +169,7 @@ async def test_failed_admission_prevents_revocation_and_new_session(
     scenario: RecoveryScenarioDTO,
 ) -> None:
     """Kratos must stop before cleanup if admission was not acknowledged."""
-    await _configure(scenario, MockRecoveryPlanRequest(reject_phase="admit"))
+    await _configure(scenario, MockRecoveryPlanRequest(reject_phase=RecoveryPhase.ADMIT))
     await redeem_recovery_code(scenario.recovering_browser, scenario.flow, scenario.code)
 
     snapshot = await _snapshot(scenario)
@@ -185,7 +185,7 @@ async def test_failed_completion_does_not_undo_native_revocation(
     scenario: RecoveryScenarioDTO,
 ) -> None:
     """Native cleanup may succeed even though completion remains unconfirmed."""
-    await _configure(scenario, MockRecoveryPlanRequest(reject_phase="complete"))
+    await _configure(scenario, MockRecoveryPlanRequest(reject_phase=RecoveryPhase.COMPLETE))
     await redeem_recovery_code(scenario.recovering_browser, scenario.flow, scenario.code)
 
     snapshot = await _snapshot(scenario)

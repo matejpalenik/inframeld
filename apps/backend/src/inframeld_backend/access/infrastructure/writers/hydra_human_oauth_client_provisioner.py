@@ -57,6 +57,7 @@ class _ProvisioningCallState:
             return self._write_admitted
 
     def _remaining(self) -> float:
+        """Keep every provisioning step inside the original host-operation deadline."""
         remaining = self._deadline - monotonic()
         if self._stopped or remaining <= 0:
             raise TimeoutError
@@ -121,6 +122,7 @@ class HydraHumanOAuthClientProvisioner(HumanOAuthClientProvisioner):
 
     @staticmethod
     def _profile(audience: HumanAPIAudience, issuer: OAuthIssuer) -> OAuth2Client:
+        """Describe the fixed first-party client registration accepted by this installer."""
         issuer_digest = sha256(issuer.value.encode("utf-8")).hexdigest()
 
         return OAuth2Client(
@@ -140,6 +142,7 @@ class HydraHumanOAuthClientProvisioner(HumanOAuthClientProvisioner):
     @staticmethod
     def _changes(current: OAuth2Client, desired: OAuth2Client) -> list[JsonPatch]:
         # SDK JSON stays at this adapter boundary. Metadata and display names are not policy.
+        """Select supported registration differences without replacing unrelated provider state."""
         observed: dict[str, object] = current.to_dict()
         expected: dict[str, object] = desired.to_dict()
         changes = [
@@ -157,6 +160,8 @@ class HydraHumanOAuthClientProvisioner(HumanOAuthClientProvisioner):
     def _ensure(
         self, audience: HumanAPIAudience, issuer: OAuthIssuer, state: _ProvisioningCallState
     ) -> HumanOAuthClientProvisioningOutcome:
+        """Reconcile the fixed client registration and verify the resulting provider state."""
+
         def read() -> OAuth2Client | None:
             try:
                 response = self._read_client(state.remaining())

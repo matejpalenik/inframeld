@@ -13,7 +13,8 @@ from inframeld_backend.shared.infrastructure.diagnostics.error_reporting import 
 from inframeld_backend.shared.infrastructure.diagnostics.safe_exception_diagnostic import (
     build_safe_exception_diagnostic,
 )
-from inframeld_backend.shared.infrastructure.types.logging_types import LogFormat, LogLevel
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 
 _SAFE_EXCEPTION_ATTRIBUTE = "_inframeld_safe_exception"
 

@@ -17,10 +17,11 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Any, ClassVar, Dict, List
 from typing_extensions import Annotated
 from inframeld_sdk.models.path_inner import PathInner
+from inframeld_sdk.models.validation_issue_location import ValidationIssueLocation
 from typing import Optional, Set
 from typing_extensions import Self
 from pydantic_core import to_jsonable_python
@@ -31,7 +32,7 @@ class ValidationIssue(BaseModel):
     Describe one sanitized issue in an incoming request.  Attributes:     location: Request component containing the issue.     path: Verified public field names or array indices, relative to that         component. An empty path identifies the component as a whole.     code: Product-owned validation category, independent of library names.     message: Reviewed corrective description without submitted values.  This model checks the output shape, not whether a string contains a secret. The validation translator must sanitize locations and messages first.
     """ # noqa: E501
     code: Annotated[str, Field(min_length=1, strict=True, max_length=64)] = Field(description="Stable Inframeld validation category.")
-    location: StrictStr = Field(description="Request component containing the issue.")
+    location: ValidationIssueLocation = Field(description="Request component containing the issue.")
     message: Annotated[str, Field(min_length=1, strict=True, max_length=256)] = Field(description="Safe corrective description without submitted values.")
     path: Annotated[List[PathInner], Field(max_length=8)] = Field(description="Verified public fields and indices relative to the request component.")
     __properties: ClassVar[List[str]] = ["code", "location", "message", "path"]
@@ -53,13 +54,6 @@ class ValidationIssue(BaseModel):
         """Reject a supplied null without treating an omitted field as supplied."""
         if value is None:
             raise ValueError("location cannot be null")
-        return value
-
-    @field_validator('location')
-    def location_validate_enum(cls, value):
-        """Validates the enum"""
-        if value not in set(['body', 'path', 'query', 'header', 'cookie', 'request']):
-            raise ValueError("must be one of enum values ('body', 'path', 'query', 'header', 'cookie', 'request')")
         return value
     @field_validator('message', mode='before')
     def message_reject_explicit_null(cls, value):

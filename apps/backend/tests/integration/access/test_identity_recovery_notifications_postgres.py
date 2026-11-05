@@ -404,7 +404,7 @@ async def test_cancellation_after_handoff_writes_rolls_back_all_password_progres
             ),
             PostgresIdentityRecoveryRepository(session),
             installation_id=installation,
-            facts=PostgresIdentityRecoveryAssociationFactsReader(
+            recovery_association_facts_reader=PostgresIdentityRecoveryAssociationFactsReader(
                 session, installation_id=installation, authority=AUTHORITY
             ),
         )

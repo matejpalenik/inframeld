@@ -80,9 +80,10 @@ from inframeld_backend.access.infrastructure.verifiers.kratos_human_identity_ver
 )
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import get_settings
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     InvalidInputError,
@@ -275,8 +276,8 @@ async def test_delivered_admission_membership_and_use_only_grant_are_readable(
         await create_project_grant_change_service(session).assign_use_only(
             access=seed.actor.access,
             command=AssignProjectUseOnlyGrantCommand(project, seed.bob_id, action, 2),
-            context=OperationAdmissionContextDTO(
-                "POST", "/v1/projects/{project_id}/grants", IdempotencyKey("grant-bob")
+            context=IdempotencyContextDTO(
+                HttpMethod.POST, "/v1/projects/{project_id}/grants", IdempotencyKey("grant-bob")
             ),
         )
     page = await _read(database, seed.actor.access, project, action=action)

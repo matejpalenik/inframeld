@@ -21,19 +21,22 @@ class PrivateArtifactPreparation(ArtifactPreparationIO):
     """Own a separate PUT client inside the permanent local attempt lock."""
 
     def __init__(
-        self, staging: ArtifactStaging, store_factory: Callable[[], S3ArtifactStore]
+        self,
+        artifact_staging: ArtifactStaging,
+        artifact_store_factory: Callable[[], S3ArtifactStore],
     ) -> None:
-        self._staging, self._store_factory = staging, store_factory
-        self._store: S3ArtifactStore | None = None
+        self._artifact_staging = artifact_staging
+        self._artifact_store_factory = artifact_store_factory
+        self._artifact_store: S3ArtifactStore | None = None
         self._handles = AsyncExitStack()
 
     @override
     @asynccontextmanager
     async def hold(self, allocation: ArtifactAllocationDTO) -> AsyncGenerator[None]:
-        if self._store is not None:
+        if self._artifact_store is not None:
             raise ArtifactReservationError("The private preparation resource is already active.")
-        async with self._staging.hold(allocation.reservation.attempt_id):
-            self._store = self._store_factory()
+        async with self._artifact_staging.hold(allocation.reservation.attempt_id):
+            self._artifact_store = self._artifact_store_factory()
             errors: list[BaseException] = []
             try:
                 yield
@@ -41,7 +44,7 @@ class PrivateArtifactPreparation(ArtifactPreparationIO):
                 errors.append(error)
             finally:
                 # One close task retains native ownership despite cancellation of a waiter.
-                closing = asyncio.create_task(self._store.close())
+                closing = asyncio.create_task(self._artifact_store.close())
                 interrupted = False
                 while not closing.done():
                     try:
@@ -61,7 +64,7 @@ class PrivateArtifactPreparation(ArtifactPreparationIO):
                 except BaseException as error:
                     errors.append(error)
                 finally:
-                    self._store = None
+                    self._artifact_store = None
                     self._handles = AsyncExitStack()
             if len(errors) == 1:
                 raise errors[0]
@@ -75,7 +78,7 @@ class PrivateArtifactPreparation(ArtifactPreparationIO):
         self, allocation: ArtifactAllocationDTO, chunks: AsyncIterable[bytes]
     ) -> ArtifactAttemptDTO:
         original = allocation.reservation
-        return await self._staging.stage(
+        return await self._artifact_staging.stage(
             original.reservation_id,
             artifact_id=original.artifact_id,
             attempt_id=original.attempt_id,
@@ -85,10 +88,10 @@ class PrivateArtifactPreparation(ArtifactPreparationIO):
 
     @override
     async def verify(self, attempt: ArtifactAttemptDTO, *, upload: bool) -> VerifiedArtifactDTO:
-        store = self._store
+        store = self._artifact_store
         if store is None:
             raise ArtifactReservationError("Private preparation requires its owned lifetime.")
         if upload:
-            content = await self._handles.enter_async_context(self._staging.open(attempt))
+            content = await self._handles.enter_async_context(self._artifact_staging.open(attempt))
             await store.put(attempt, content)
         return await ArtifactVerificationService(store).verify(attempt)

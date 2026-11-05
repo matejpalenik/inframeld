@@ -35,7 +35,9 @@ def test_only_current_human_with_use_authority_may_admit(
     )
     assert (
         HumanAdmissionPolicy.may_authorize(
-            PrincipalAccessPolicyInput(principal, recovery, current),
+            PrincipalAccessPolicyInput(
+                principal=principal, has_pending_recovery=recovery, credential_is_current=current
+            ),
             has_admit_users=grant,
         )
         is expected
@@ -44,7 +46,11 @@ def test_only_current_human_with_use_authority_may_admit(
 
 def test_application_cannot_admit_humans() -> None:
     assert not HumanAdmissionPolicy.may_authorize(
-        PrincipalAccessPolicyInput(replace(ALICE, kind=PrincipalKind.APPLICATION), False, True),
+        PrincipalAccessPolicyInput(
+            principal=replace(ALICE, kind=PrincipalKind.APPLICATION),
+            has_pending_recovery=False,
+            credential_is_current=True,
+        ),
         has_admit_users=True,
     )
 

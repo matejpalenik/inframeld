@@ -31,6 +31,7 @@ class RecoveryNotificationSettings(BaseModel):
 
     @model_validator(mode="after")
     def _rotation(self) -> Self:
+        """Require a finite overlap when a retiring callback key is configured."""
         if (self.retiring_key_file is None) != (self.retiring_key_accept_until is None):
             raise ValueError("A retiring key requires an explicit acceptance deadline.")
         if (

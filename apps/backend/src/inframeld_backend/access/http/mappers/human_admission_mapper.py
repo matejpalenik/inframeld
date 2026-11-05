@@ -7,9 +7,10 @@ from inframeld_backend.access.application.dtos.human_admission_result_dto import
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
 from inframeld_backend.access.http.responses.human_admission_response import HumanAdmissionResponse
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 
 
@@ -21,9 +22,9 @@ class HumanAdmissionMapper:
         )
 
     @staticmethod
-    def context(organization_id: UUID, key: IdempotencyKey) -> OperationAdmissionContextDTO:
-        return OperationAdmissionContextDTO(
-            "POST", f"/v1/organizations/{organization_id}/human-admissions", key
+    def context(organization_id: UUID, key: IdempotencyKey) -> IdempotencyContextDTO:
+        return IdempotencyContextDTO(
+            HttpMethod.POST, f"/v1/organizations/{organization_id}/human-admissions", key
         )
 
     @staticmethod

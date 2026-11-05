@@ -26,6 +26,7 @@ from inframeld_backend.access.application.protocols.project_metadata_repair_writ
     ProjectMetadataRepairWriter,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.infrastructure.rows.host_maintenance_receipt_row import (
     HostMaintenanceReceiptRow,
@@ -42,9 +43,11 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 class PostgresProjectMetadataRepairWriter(ProjectMetadataRepairWriter):
     """Save one typed operator receipt and its exact assignment in the caller transaction."""
 
-    def __init__(self, session: AsyncSession, audit: ProjectMetadataAuditWriter) -> None:
+    def __init__(
+        self, session: AsyncSession, metadata_audit_writer: ProjectMetadataAuditWriter
+    ) -> None:
         self._session = session
-        self._audit = audit
+        self._metadata_audit_writer = metadata_audit_writer
         self._recorded: ProjectMetadataRepairReceiptDTO | None = None
 
     def _require_transaction(self) -> None:
@@ -140,7 +143,7 @@ class PostgresProjectMetadataRepairWriter(ProjectMetadataRepairWriter):
                 project_id=result.project_id.value,
                 recipient_principal_id=result.recipient_id.value,
                 recipient_kind=PrincipalKind.HUMAN,
-                action="edit-project-metadata",
+                action=ProjectAction.EDIT_PROJECT_METADATA.value,
                 can_grant=True,
                 assigned_by_principal_id=None,
             )
@@ -157,16 +160,16 @@ class PostgresProjectMetadataRepairWriter(ProjectMetadataRepairWriter):
                 },
             )
         )
-        await self._audit.repaired(
+        await self._metadata_audit_writer.repaired(
             ProjectMetadataAuthorityRepairedAuditEventDTO(
-                result.organization_id,
-                result.project_id,
-                result.recipient_id,
-                result.operation_id,
-                receipt.operator_label,
-                receipt.reason,
-                receipt.before_revision,
-                result.access_revision,
+                organization_id=result.organization_id,
+                project_id=result.project_id,
+                recipient_id=result.recipient_id,
+                operation_id=result.operation_id,
+                operator_label=receipt.operator_label,
+                reason=receipt.reason,
+                before_revision=receipt.before_revision,
+                after_revision=result.access_revision,
             )
         )
         self._recorded = None

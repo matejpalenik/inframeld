@@ -57,6 +57,7 @@ class MergeAssessment:
 
 
 def _current(receipt: dict[str, object], assignment: dict[str, object]) -> bool:
+    """Require evidence to identify the current source pair and accepted issue revision."""
     return all(
         receipt.get(field) == assignment.get(field)
         for field in ("base_sha", "head_sha", "issue_updated_at")
@@ -97,6 +98,7 @@ def _finding_blocks(
     assignment: dict[str, object],
     observation: dict[str, object],
 ) -> bool:
+    """Keep unresolved material findings blocking unless their exact bounded risk was accepted."""
     blocked = False
     identifiers: set[str] = set()
     review_reference = string_value(review.get("reference"), "review reference")
@@ -119,6 +121,7 @@ def _finding_blocks(
 
 
 def _check_result(check: dict[str, object], *, coderabbit_required: bool = False) -> str:
+    """Distinguish passing evidence from pending or failed applicable checks."""
     string_value(check.get("reference"), "check reference")
     conclusion = check.get("conclusion")
     if coderabbit_required:

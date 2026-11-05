@@ -39,16 +39,22 @@ ACTOR = Principal(
     PrincipalStatus.ACTIVE,
 )
 AUTHORITY = AdmittedWorkAuthorityDTO(
-    ACTOR.id,
-    ACTOR.kind,
-    InstallationId(UUID(int=3)),
-    ACTOR.organization_id,
-    ProjectId(UUID(int=4)),
-    ActionId("inspect-feedback"),
-    None,
+    principal_id=ACTOR.id,
+    principal_kind=ACTOR.kind,
+    installation_id=InstallationId(UUID(int=3)),
+    organization_id=ACTOR.organization_id,
+    project_id=ProjectId(UUID(int=4)),
+    action_id=ActionId("inspect-feedback"),
+    human_binding=None,
 )
 FACTS = AdmittedWorkFactsDTO(
-    ACTOR, AUTHORITY.installation_id, ProjectStatus.ACTIVE, True, True, False, None
+    principal=ACTOR,
+    installation_id=AUTHORITY.installation_id,
+    project_status=ProjectStatus.ACTIVE,
+    is_project_member=True,
+    has_exact_action_grant=True,
+    has_pending_recovery=False,
+    human_generation=None,
 )
 
 

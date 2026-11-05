@@ -64,10 +64,10 @@ class RecoveryCompletionOperation(IdentityRecoveryCompletionReconciler):
                     PostgresIdentityRecoveryRepository(session),
                     installation_id=self._installation_id,
                     authority=self._authority,
-                    proofs=PostgresIdentityRecoveryCleanupProofReader(
+                    recovery_cleanup_proof_reader=PostgresIdentityRecoveryCleanupProofReader(
                         session, installation_id=self._installation_id, authority=self._authority
                     ),
-                    proof_writer=PostgresIdentityRecoveryCleanupProofWriter(
+                    recovery_cleanup_proof_writer=PostgresIdentityRecoveryCleanupProofWriter(
                         session, installation_id=self._installation_id, authority=self._authority
                     ),
                     database_timeout_seconds=self._database_timeout_seconds,

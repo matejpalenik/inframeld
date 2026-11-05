@@ -32,8 +32,8 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
     ProjectActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
@@ -41,6 +41,7 @@ from inframeld_backend.shared.application.dtos.operation_reservation_request_dto
 from inframeld_backend.shared.application.dtos.operation_reservation_result_dto import (
     OperationReservationResultDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import AccessDeniedError
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
@@ -89,9 +90,9 @@ async def _invoke(
             command=AssignProjectUseOnlyGrantCommand(
                 seed.project_id, seed.principal_id, seed.action, 0
             ),
-            context=OperationAdmissionContextDTO(
+            context=IdempotencyContextDTO(
                 key=IdempotencyKey("evidence-check"),
-                method="POST",
+                method=HttpMethod.POST,
                 requested_route="/v1/projects/{project_id}/grants",
             ),
         )
@@ -105,7 +106,7 @@ async def _invoke(
                 action_id=seed.action,
                 request=ProjectOperationAdmissionRequestDTO(
                     seed.project_id,
-                    "POST",
+                    HttpMethod.POST,
                     "/v1/test-operation",
                     IdempotencyKey("evidence-check"),
                     RequestFingerprint(b"F" * 32),

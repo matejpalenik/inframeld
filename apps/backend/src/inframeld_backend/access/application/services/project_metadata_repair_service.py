@@ -63,15 +63,15 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
     def __init__(
         self,
         *,
-        transactions: TransactionManager,
-        facts: ProjectMetadataRepairFactsReader,
-        writer: ProjectMetadataRepairWriter,
-        fingerprints: ProjectMetadataFingerprintService,
+        transaction_manager: TransactionManager,
+        metadata_repair_facts_reader: ProjectMetadataRepairFactsReader,
+        metadata_repair_writer: ProjectMetadataRepairWriter,
+        metadata_fingerprint_service: ProjectMetadataFingerprintService,
     ) -> None:
-        self._transactions = transactions
-        self._facts = facts
-        self._writer = writer
-        self._fingerprints = fingerprints
+        self._transaction_manager = transaction_manager
+        self._metadata_repair_facts_reader = metadata_repair_facts_reader
+        self._metadata_repair_writer = metadata_repair_writer
+        self._metadata_fingerprint_service = metadata_fingerprint_service
 
     @override
     async def repair(
@@ -89,10 +89,10 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
             raise ProjectMetadataMaintenanceError(code.INVALID_IDENTITY_PROOF)
         if binding.installation_id != command.expected_installation_id:
             raise ProjectMetadataMaintenanceError(code.INSTALLATION_MISMATCH)
-        fingerprint = self._fingerprints.for_repair(command, binding.identity)
+        fingerprint = self._metadata_fingerprint_service.for_repair(command, binding.identity)
         try:
             async with asyncio.timeout(5):
-                async with self._transactions.begin():
+                async with self._transaction_manager.begin():
                     return await self._repair(access, command, binding.identity, fingerprint)
         except TimeoutError:
             raise ProjectMetadataMaintenanceError(code.DEPENDENCY_UNAVAILABLE) from None
@@ -104,8 +104,9 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
         identity: VerifiedHumanIdentityDTO,
         fingerprint: RequestFingerprint,
     ) -> ProjectMetadataRepairResultDTO:
+        """Check the host request against current Project facts before recording an authority repair."""
         code = ProjectMetadataMaintenanceErrorCode
-        facts = await self._facts.read(access=access, command=command)
+        facts = await self._metadata_repair_facts_reader.read(access=access, command=command)
         if facts is None:
             raise ProjectMetadataMaintenanceError(code.IDENTITY_INELIGIBLE)
         if facts.installation_id != command.expected_installation_id:
@@ -132,7 +133,7 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
         ):
             raise ProjectMetadataMaintenanceError(code.IDENTITY_INELIGIBLE)
 
-        recorded = await self._facts.receipt(
+        recorded = await self._metadata_repair_facts_reader.receipt(
             installation_id=facts.installation_id, operation_id=command.operation_id
         )
         if recorded is not None:
@@ -152,31 +153,31 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
             raise RuntimeError("Repair authorization requires aware database time.")
 
         result = ProjectMetadataRepairResultDTO(
-            command.operation_id,
-            facts.installation_id,
-            facts.recipient.organization_id,
-            facts.project_id,
-            facts.recipient.id,
-            facts.access_revision + 1,
+            operation_id=command.operation_id,
+            installation_id=facts.installation_id,
+            organization_id=facts.recipient.organization_id,
+            project_id=facts.project_id,
+            recipient_id=facts.recipient.id,
+            access_revision=facts.access_revision + 1,
         )
         receipt = ProjectMetadataRepairReceiptDTO(
-            fingerprint,
-            identity,
-            command.expected_identity_id,
-            command.operator_label,
-            command.reason,
-            facts.access_revision,
-            facts.observed_at.astimezone(UTC),
-            result,
+            fingerprint=fingerprint,
+            identity=identity,
+            expected_identity_id=command.expected_identity_id,
+            operator_label=command.operator_label,
+            reason=command.reason,
+            before_revision=facts.access_revision,
+            authorized_at=facts.observed_at.astimezone(UTC),
+            result=result,
         )
-        if not await self._writer.record(receipt):
-            winner = await self._facts.receipt(
+        if not await self._metadata_repair_writer.record(receipt):
+            winner = await self._metadata_repair_facts_reader.receipt(
                 installation_id=facts.installation_id, operation_id=command.operation_id
             )
             if winner is None:
                 raise RuntimeError("The winning repair receipt is unavailable.")
             return self._replay(winner, facts, command, identity, fingerprint)
-        await self._writer.assign(facts=facts, receipt=receipt)
+        await self._metadata_repair_writer.assign(facts=facts, receipt=receipt)
         return result
 
     @staticmethod
@@ -187,6 +188,7 @@ class ProjectMetadataRepairService(ProjectMetadataRepairer):
         identity: VerifiedHumanIdentityDTO,
         fingerprint: RequestFingerprint,
     ) -> ProjectMetadataRepairResultDTO:
+        """Return a prior repair only when its retained request meaning still matches."""
         result = receipt.result
         if (
             not compare_digest(receipt.fingerprint.value, fingerprint.value)

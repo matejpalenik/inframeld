@@ -23,6 +23,7 @@ from inframeld_backend.access.application.protocols.organization_access_facts_re
     OrganizationAccessFactsReader,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
@@ -50,7 +51,12 @@ from inframeld_backend.shared.infrastructure.rows.installation_identity_row impo
     InstallationIdentityRow,
 )
 
-_SUPPORTED_ACTIONS = ("admit-users", "suspend-users", "restore-users", "create-projects")
+_SUPPORTED_ACTIONS = (
+    OrganizationAction.ADMIT_USERS.value,
+    OrganizationAction.SUSPEND_USERS.value,
+    OrganizationAction.RESTORE_USERS.value,
+    OrganizationAction.CREATE_PROJECTS.value,
+)
 
 
 class PostgresOrganizationAccessFactsReader(OrganizationAccessFactsReader):

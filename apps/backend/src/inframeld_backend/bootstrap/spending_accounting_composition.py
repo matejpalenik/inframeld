@@ -47,12 +47,14 @@ from inframeld_backend.shared.infrastructure.writers.postgres_spending_ledger_wr
 async def open_spending_accounting(database: Database) -> AsyncGenerator[SpendingAccountant]:
     async with database.session() as session:
         yield SpendingAccountingService(
-            transactions=SqlAlchemyTransactionManager(session),
-            authorizer=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-            ownership=PostgresJobStore(session),
-            reader=PostgresSpendingLedgerReader(session),
-            writer=PostgresSpendingLedgerWriter(session),
-            budget_authorizer=ProjectBudgetAuthorizationService(
+            transaction_manager=SqlAlchemyTransactionManager(session),
+            admitted_work_authorizer=AdmittedWorkAuthorizationService(
+                PostgresAdmittedWorkFactsReader(session)
+            ),
+            job_ownership=PostgresJobStore(session),
+            spending_ledger_reader=PostgresSpendingLedgerReader(session),
+            spending_ledger_writer=PostgresSpendingLedgerWriter(session),
+            project_budget_authorizer=ProjectBudgetAuthorizationService(
                 PostgresProjectBudgetFactsReader(session)
             ),
         )
@@ -60,14 +62,16 @@ async def open_spending_accounting(database: Database) -> AsyncGenerator[Spendin
 
 @asynccontextmanager
 async def open_project_spending_policy(
-    database: Database, fingerprints: ProjectSpendingPolicyFingerprintService
+    database: Database, spending_policy_fingerprint_service: ProjectSpendingPolicyFingerprintService
 ) -> AsyncGenerator[ProjectSpendingPolicyManager]:
     async with database.session() as session:
         yield ProjectSpendingPolicyService(
-            transactions=SqlAlchemyTransactionManager(session),
-            authorizer=ProjectBudgetAuthorizationService(PostgresProjectBudgetFactsReader(session)),
-            reader=PostgresSpendingLedgerReader(session),
-            writer=PostgresSpendingLedgerWriter(session),
-            idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-            fingerprints=fingerprints,
+            transaction_manager=SqlAlchemyTransactionManager(session),
+            project_budget_authorizer=ProjectBudgetAuthorizationService(
+                PostgresProjectBudgetFactsReader(session)
+            ),
+            spending_ledger_reader=PostgresSpendingLedgerReader(session),
+            spending_ledger_writer=PostgresSpendingLedgerWriter(session),
+            operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+            spending_policy_fingerprint_service=spending_policy_fingerprint_service,
         )

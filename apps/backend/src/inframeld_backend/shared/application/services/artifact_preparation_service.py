@@ -19,9 +19,10 @@ class ArtifactPreparationService:
     """Prepare one private original artifact, without granting source admission."""
 
     def __init__(
-        self, attempts: ArtifactPreparationRecords, content: ArtifactPreparationIO
+        self, preparation_records: ArtifactPreparationRecords, preparation_io: ArtifactPreparationIO
     ) -> None:
-        self._attempts, self._content = attempts, content
+        self._preparation_records = preparation_records
+        self._preparation_io = preparation_io
 
     async def prepare(
         self, allocation: ArtifactAllocationDTO, chunks: AsyncIterable[bytes]
@@ -34,8 +35,8 @@ class ArtifactPreparationService:
     async def _prepare(
         self, allocation: ArtifactAllocationDTO, chunks: AsyncIterable[bytes] | None
     ) -> VerifiedArtifactDTO:
-        async with self._content.hold(allocation):
-            facts = await self._attempts.inspect(allocation)
+        async with self._preparation_io.hold(allocation):
+            facts = await self._preparation_records.inspect(allocation)
             original = allocation.reservation
             if (
                 (
@@ -62,7 +63,7 @@ class ArtifactPreparationService:
             if facts.length is None or facts.digest is None:
                 if facts.length is not None or facts.digest is not None or chunks is None:
                     raise ArtifactIntegrityError("The original complete seal cannot be confirmed.")
-                attempt = await self._content.stage(allocation, chunks)
+                attempt = await self._preparation_io.stage(allocation, chunks)
                 if (
                     (attempt.artifact_id, attempt.attempt_id, attempt.scope)
                     != (original.artifact_id, original.attempt_id, original.scope)
@@ -70,7 +71,7 @@ class ArtifactPreparationService:
                     or not 0 <= attempt.length <= original.limit_bytes
                 ):
                     raise ArtifactIntegrityError("Staging returned another original target.")
-                await self._attempts.seal(allocation, attempt)
+                await self._preparation_records.seal(allocation, attempt)
             else:
                 if chunks is not None:
                     raise ArtifactReservationError(
@@ -79,9 +80,9 @@ class ArtifactPreparationService:
                 attempt = ArtifactAttemptDTO(
                     facts.artifact_id, facts.attempt_id, facts.scope, facts.length, facts.digest
                 )
-            upload = await self._attempts.begin_put(allocation, attempt)
-            verified = await self._content.verify(attempt, upload=upload)
+            upload = await self._preparation_records.begin_put(allocation, attempt)
+            verified = await self._preparation_io.verify(attempt, upload=upload)
             if verified.attempt != attempt:
                 raise ArtifactIntegrityError("Readback verified another original target.")
-            await self._attempts.confirm_verified(allocation, verified)
+            await self._preparation_records.confirm_verified(allocation, verified)
             return verified

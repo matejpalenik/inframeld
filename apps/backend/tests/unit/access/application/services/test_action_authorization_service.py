@@ -101,6 +101,22 @@ async def test_allows_current_member_with_exact_grant() -> None:
 
 
 @pytest.mark.asyncio
+async def test_general_action_authorization_keeps_application_callers_eligible() -> None:
+    principal = replace(PRINCIPAL, kind=PrincipalKind.APPLICATION)
+    reader = MockProjectActionFactsReader(replace(ALLOWED_FACTS, principal=principal))
+    access = replace(ACCESS, authentication_evidence=MockAuthenticationEvidence.application_key())
+
+    authorization = await ActionAuthorizationService(reader).require_authorization(
+        access=access,
+        request=ProjectActionAuthorizationRequestDTO(
+            project_id=TARGET.project_id, action_id=ACTION
+        ),
+    )
+
+    assert authorization == ProjectActionAuthorizationDTO(ORGANIZATION_ID, TARGET.project_id)
+
+
+@pytest.mark.asyncio
 async def test_visible_project_without_grant_is_forbidden() -> None:
     """Return access denied when visibility holds but the exact action grant is absent."""
     reader = MockProjectActionFactsReader(replace(ALLOWED_FACTS, has_exact_action_grant=False))

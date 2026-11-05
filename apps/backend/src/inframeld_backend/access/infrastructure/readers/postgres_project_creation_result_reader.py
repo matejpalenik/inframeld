@@ -7,6 +7,7 @@ from inframeld_backend.access.application.dtos.created_project_dto import Create
 from inframeld_backend.access.application.protocols.project_creation_result_reader import (
     ProjectCreationResultReader,
 )
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.policies.project_creation_policy import ProjectCreationPolicy
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -52,7 +53,7 @@ class PostgresProjectCreationResultReader(ProjectCreationResultReader):
                 parent.method == "POST",
                 parent.requested_route == "/v1/projects",
                 parent.lookup_authority_family == "organization_action_use",
-                parent.lookup_action_id == "create-projects",
+                parent.lookup_action_id == OrganizationAction.CREATE_PROJECTS.value,
                 parent.state == OperationReservationState.REPLAYABLE,
                 parent.replay_kind == OperationReplayKind.SAFE_RESULT,
                 parent.expires_at.is_not(None),
@@ -70,15 +71,15 @@ class PostgresProjectCreationResultReader(ProjectCreationResultReader):
             raise ConflictError("The original creation result is incoherent.")
         try:
             return CreatedProjectDTO(
-                operation_id,
-                organization_id,
-                ProjectId(row.project_id),
-                actor_id,
-                ResourceName(row.name),
-                row.display_name,
-                row.access_revision,
-                row.metadata_revision,
-                tuple(ActionId(action) for action in row.initial_actions),
+                operation_id=operation_id,
+                organization_id=organization_id,
+                project_id=ProjectId(row.project_id),
+                creator_principal_id=actor_id,
+                name=ResourceName(row.name),
+                display_name=row.display_name,
+                access_revision=row.access_revision,
+                metadata_revision=row.metadata_revision,
+                initial_actions=tuple(ActionId(action) for action in row.initial_actions),
             )
         except (ValueError, TypeError):
             raise ConflictError("The original creation result is incoherent.") from None

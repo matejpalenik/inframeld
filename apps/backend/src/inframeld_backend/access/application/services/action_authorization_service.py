@@ -7,6 +7,7 @@ from inframeld_backend.access.application.dtos.project_action_authorization_dto 
 from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
     ProjectActionAuthorizationRequestDTO,
 )
+from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
 )
@@ -52,6 +53,21 @@ class ActionAuthorizationService(ActionAuthorizer):
         if facts is None:
             raise ResourceNotFoundError()
 
+        self.require_authorization_from_facts(access=access, facts=facts)
+
+        return ProjectActionAuthorizationDTO(
+            organization_id=facts.principal.organization_id,
+            project_id=request.project_id,
+        )
+
+    @staticmethod
+    def require_authorization_from_facts(
+        *, access: AccessContextDTO, facts: ProjectActionFactsDTO
+    ) -> None:
+        """Check current authority using already-scoped observations, without another read.
+
+        The caller retains its action-specific human or application restrictions.
+        """
         principal_access = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=facts.principal,
@@ -76,8 +92,3 @@ class ActionAuthorizationService(ActionAuthorizer):
 
         if not ActionAuthorizationPolicy.may_perform_action(policy_input):
             raise AccessDeniedError()
-
-        return ProjectActionAuthorizationDTO(
-            organization_id=facts.principal.organization_id,
-            project_id=request.project_id,
-        )

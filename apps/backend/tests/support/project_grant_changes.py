@@ -56,20 +56,20 @@ def create_project_grant_change_service(
     idempotency: OperationIdempotency | None = None,
 ) -> ProjectGrantChangeService:
     return ProjectGrantChangeService(
-        transactions=SqlAlchemyTransactionManager(session),
-        authorizer=authorizer
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        project_grant_authorizer=authorizer
         if authorizer is not None
         else ProjectGrantAuthorizationService(PostgresProjectGrantChangeFactsReader(session)),
-        idempotency=idempotency
+        operation_idempotency=idempotency
         if idempotency is not None
         else IdempotencyService(PostgresOperationReservationWriter(session)),
-        memberships=PostgresProjectMembershipRepository(
+        membership_repository=PostgresProjectMembershipRepository(
             session, audit_events if audit_events is not None else PostgresAuditEventWriter(session)
         ),
-        fingerprints=ProjectGrantChangeFingerprintService(
+        project_grant_change_fingerprint_service=ProjectGrantChangeFingerprintService(
             RequestFingerprintService(RequestFingerprintKey(b"T" * 32))
         ),
-        management_facts=PostgresProjectGrantChangeFactsReader(session),
-        results=PostgresProjectActionGrantResultReader(session),
-        result_writer=PostgresProjectActionGrantResultWriter(session),
+        grant_management_facts_reader=PostgresProjectGrantChangeFactsReader(session),
+        grant_result_reader=PostgresProjectActionGrantResultReader(session),
+        grant_result_writer=PostgresProjectActionGrantResultWriter(session),
     )

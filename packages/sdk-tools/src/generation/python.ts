@@ -19,6 +19,7 @@ const runtimeSupport = [
 ];
 
 const patchedResources = [
+  "python/configuration.mustache",
   "python/model_generic.mustache",
   "python/api_client.mustache",
   "python/api_response.mustache",

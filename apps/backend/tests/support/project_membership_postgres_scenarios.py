@@ -26,12 +26,13 @@ from inframeld_backend.access.application.services.project_membership_change_fin
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
-from inframeld_backend.bootstrap.project_membership_composition import (
-    open_project_membership_change,
+from inframeld_backend.bootstrap.postgres_project_membership_change_service_factory import (
+    PostgresProjectMembershipChangeServiceFactory,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -73,8 +74,8 @@ async def seed_membership_project(database: Database) -> MembershipProjectSeedDT
         admitted = await service.admit(
             access=actor.access,
             command=AdmitHumanCommand(actor.organization_id, UUID(int=200), actor.access_revision),
-            context=OperationAdmissionContextDTO(
-                "POST",
+            context=IdempotencyContextDTO(
+                HttpMethod.POST,
                 f"/v1/organizations/{actor.organization_id.value}/human-admissions",
                 IdempotencyKey("admit-bob"),
             ),
@@ -98,11 +99,12 @@ async def change_membership(
 ) -> ProjectMembershipChangeResultDTO:
     project = project_id or seed.project.project_id
     principal = principal_id or seed.bob_id
-    method = "DELETE" if remove else "PUT"
-    context = OperationAdmissionContextDTO(
+    method = HttpMethod.DELETE if remove else HttpMethod.PUT
+    context = IdempotencyContextDTO(
         method, f"/v1/projects/{project.value}/members/{principal.value}", IdempotencyKey(key)
     )
-    async with open_project_membership_change(database, membership_fingerprints()) as service:
+    factory = PostgresProjectMembershipChangeServiceFactory(database, membership_fingerprints())
+    async with factory.open() as service:
         if remove:
             return await service.remove_member(
                 access=access or seed.actor.access,

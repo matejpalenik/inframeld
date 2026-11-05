@@ -85,45 +85,46 @@ class PostgresIdentityRecoveryCleanupWorkMapper:
             if job.worker_id is None or job.ownership_token is None or job.lease_expires_at is None:
                 raise RuntimeError("The cleanup ownership record is incomplete.")
             claim = IdentityRecoveryCleanupClaimDTO(
-                operation_id,
-                run.id,
-                job.active_attempt_id,
-                job.worker_id,
-                job.ownership_token,
-                job.lease_expires_at,
+                operation_id=operation_id,
+                run_id=run.id,
+                attempt_id=job.active_attempt_id,
+                worker_id=job.worker_id,
+                token=job.ownership_token,
+                lease_expires_at=job.lease_expires_at,
             )
 
         return IdentityRecoveryCleanupWorkDTO(
-            installation_id,
-            IdentityRecoveryAdmissionDTO(
+            installation_id=installation_id,
+            admission=IdentityRecoveryAdmissionDTO(
                 IdentityRecoveryEventDTO(
                     IdentityRecoveryFlowId(admission.flow_id), identity, admission.event_kind
                 ),
                 operation_id,
             ),
-            receipt.id,
-            receipt.event_type is IdentityRecoveryEvidenceType.PASSWORD_SETTINGS_SAVED
+            evidence_receipt_id=receipt.id,
+            has_original_password_receipt=receipt.event_type
+            is IdentityRecoveryEvidenceType.PASSWORD_SETTINGS_SAVED
             and (receipt.installation_id, receipt.authority, receipt.subject, receipt.operation_id)
             == (*binding, operation_id.value),
-            None if version is None else HumanCredentialVersion(version.version),
-            admission.kratos_cleanup_state,
-            admission.released_at,
-            job.cli_grants_state,
-            job.remembered_logins_state,
-            job.cli_confirmation_attempt_id,
-            job.login_confirmation_attempt_id,
-            IdentityRecoveryCleanupRunDTO(
-                run.id,
-                run.authorized_at,
-                run.deadline,
-                run.next_attempt_at,
-                run.max_attempts,
-                run.consumed_attempts,
-                run.ended_at,
-                run.terminal_reason,
+            credential_version=None if version is None else HumanCredentialVersion(version.version),
+            kratos_cleanup_state=admission.kratos_cleanup_state,
+            released_at=admission.released_at,
+            cli_grants_state=job.cli_grants_state,
+            remembered_logins_state=job.remembered_logins_state,
+            cli_confirmation_attempt_id=job.cli_confirmation_attempt_id,
+            login_confirmation_attempt_id=job.login_confirmation_attempt_id,
+            run=IdentityRecoveryCleanupRunDTO(
+                id=run.id,
+                authorized_at=run.authorized_at,
+                deadline=run.deadline,
+                next_attempt_at=run.next_attempt_at,
+                max_attempts=run.max_attempts,
+                consumed_attempts=run.consumed_attempts,
+                ended_at=run.ended_at,
+                terminal_reason=run.terminal_reason,
             ),
-            claim,
-            steps,
+            claim=claim,
+            steps=steps,
         )
 
     @staticmethod

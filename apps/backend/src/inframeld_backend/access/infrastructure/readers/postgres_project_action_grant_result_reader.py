@@ -17,6 +17,9 @@ from inframeld_backend.access.application.dtos.project_action_grant_change_resul
 from inframeld_backend.access.application.dtos.project_action_grant_management_facts_dto import (
     ProjectActionGrantManagementFactsDTO,
 )
+from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
+    ProjectActionGrantChangeKind,
+)
 from inframeld_backend.access.application.protocols.project_action_grant_result_reader import (
     ProjectActionGrantResultReader,
 )
@@ -26,8 +29,8 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_operation
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
@@ -52,14 +55,18 @@ class PostgresProjectActionGrantResultReader(ProjectActionGrantResultReader):
         *,
         facts: ProjectActionGrantManagementFactsDTO,
         command: SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         operation: CompletedSynchronousOperationDTO,
     ) -> ProjectActionGrantChangeResultDTO:
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Grant replay requires the active caller transaction.")
         if operation.replay_kind is not OperationReplayKind.SAFE_RESULT:
             raise ConflictError("The original grant result is unavailable.")
-        kind = "set" if isinstance(command, SetProjectActionGrantCommand) else "remove"
+        kind = (
+            ProjectActionGrantChangeKind.SET
+            if isinstance(command, SetProjectActionGrantCommand)
+            else ProjectActionGrantChangeKind.REMOVE
+        )
         result, parent = ProjectActionGrantOperationResultRow, IdempotencyReservationRow
         try:
             row = await self._session.scalar(
@@ -100,20 +107,25 @@ class PostgresProjectActionGrantResultReader(ProjectActionGrantResultReader):
             row.can_grant is not expected_level
             or row.changed != (row.before_can_grant is not row.can_grant)
             or row.access_revision != row.before_revision + int(row.changed)
-            or row.status_code != (201 if kind == "set" and row.before_can_grant is None else 200)
+            or row.status_code
+            != (
+                201
+                if kind == ProjectActionGrantChangeKind.SET and row.before_can_grant is None
+                else 200
+            )
         ):
             raise ConflictError("The original grant result is incoherent.")
         return ProjectActionGrantChangeResultDTO(
-            facts.installation_id,
-            facts.organization_id,
-            facts.project_id,
-            facts.grant.actor.id,
-            command.recipient_principal_id,
-            command.action_id,
-            kind,
-            row.can_grant,
-            row.access_revision,
-            row.changed,
-            row.status_code,
-            operation,
+            installation_id=facts.installation_id,
+            organization_id=facts.organization_id,
+            project_id=facts.project_id,
+            actor_principal_id=facts.grant.actor.id,
+            recipient_principal_id=command.recipient_principal_id,
+            action_id=command.action_id,
+            change_kind=kind,
+            can_grant=row.can_grant,
+            access_revision=row.access_revision,
+            changed=row.changed,
+            status_code=row.status_code,
+            operation=operation,
         )

@@ -10,7 +10,14 @@ import sys
 import time
 from contextlib import suppress
 from dataclasses import dataclass, field
-from typing import Literal, cast
+from enum import StrEnum
+from typing import cast
+
+
+class Phase(StrEnum):
+    INITIAL = "initial"
+    TERM = "term"
+    KILL = "kill"
 
 
 @dataclass(frozen=True)
@@ -139,6 +146,7 @@ class OwnedTarget:
 
 
 def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate control fields before accepting process ownership or stop instructions."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -148,6 +156,7 @@ def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _invalid_constant(value: str) -> object:
+    """Reject non-finite numbers in the process-owner control protocol."""
     raise ValueError("Non-finite control number.")
 
 
@@ -191,9 +200,7 @@ def _observation_deadlines(cutoff: int, now: int) -> tuple[int, int]:
     return deadline, read_deadline
 
 
-def observe_members(
-    target: OwnedTarget, deadline: int, phase: Literal["initial", "term", "kill"] = "initial"
-) -> bool:
+def observe_members(target: OwnedTarget, deadline: int, phase: Phase = Phase.INITIAL) -> bool:
     """Read a checked, byte-bounded ps result within the existing stop deadline."""
 
     def record(step: str, category: str) -> None:
@@ -286,7 +293,7 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
     observation_valid = True
     term_observed = False
 
-    def check(cutoff: int, phase: Literal["initial", "term", "kill"]) -> bool:
+    def check(cutoff: int, phase: Phase) -> bool:
         nonlocal observation_valid, term_observed
         # Do not start a new ps child when its read/kill/wait slice no longer fits.
         # Skipping reports no quiescence and leaves owned escalation intact.
@@ -294,14 +301,14 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
             return False
         if not target.observe():
             return False
-        if phase == "term" and term_observed:
+        if phase == Phase.TERM and term_observed:
             return False
         started = _clock()
         _, read_deadline = _observation_deadlines(cutoff, started)
         if read_deadline <= started:
             return False
         try:
-            if phase == "term":
+            if phase == Phase.TERM:
                 term_observed = True
             return not observe_members(target, cutoff, phase)
         except (OSError, ValueError, subprocess.SubprocessError, TimeoutError):
@@ -310,7 +317,7 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
                 target.errors.append("group-observation-failed")
             return False
 
-    quiescent = check(term_deadline, "initial")
+    quiescent = check(term_deadline, Phase.INITIAL)
     for number, phase_deadline in (
         (signal.SIGTERM, term_deadline),
         (signal.SIGKILL, final_deadline),
@@ -319,7 +326,9 @@ def stop_target(target: OwnedTarget, deadline: int, cleanup_ms: int, mode: str) 
             break
         target.signal_group(number)
         while target.owned and _clock() < phase_deadline:
-            quiescent = check(phase_deadline, "term" if number == signal.SIGTERM else "kill")
+            quiescent = check(
+                phase_deadline, Phase.TERM if number == signal.SIGTERM else Phase.KILL
+            )
             if quiescent:
                 break
             time.sleep(min(0.01, max(0, phase_deadline - _clock()) / 1000))
@@ -404,6 +413,7 @@ class Control:
 
 
 def _stop_document(value: dict[str, object]) -> tuple[str, int]:
+    """Validate one stop instruction without extending the existing cleanup deadline."""
     if (
         set(value) != {"version", "type", "reason", "deadline"}
         or type(value["version"]) is not int

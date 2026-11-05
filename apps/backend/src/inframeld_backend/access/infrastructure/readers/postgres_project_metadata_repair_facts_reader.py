@@ -37,6 +37,7 @@ from inframeld_backend.access.application.protocols.project_metadata_repair_fact
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
@@ -135,7 +136,7 @@ class PostgresProjectMetadataRepairFactsReader(ProjectMetadataRepairFactsReader)
 
         facts = await PostgresProjectActionFactsReader(self._session).read_action_facts(
             access=access,
-            action_id=ActionId("edit-project-metadata"),
+            action_id=ActionId(ProjectAction.EDIT_PROJECT_METADATA.value),
             target=ProjectActionTargetDTO(command.project_id),
         )
         if facts is None:
@@ -151,21 +152,22 @@ class PostgresProjectMetadataRepairFactsReader(ProjectMetadataRepairFactsReader)
         if not isinstance(observed, datetime):
             raise RuntimeError("Repair authorization has no database timestamp.")
         return ProjectMetadataRepairFactsDTO(
-            InstallationId(installed),
-            facts.principal,
-            command.project_id,
-            facts.project_status,
-            project.access_revision,
-            facts.is_project_member,
-            facts.has_pending_recovery,
-            facts.oauth_credential_facts,
-            grantor,
-            observed,
+            installation_id=InstallationId(installed),
+            recipient=facts.principal,
+            project_id=command.project_id,
+            project_status=facts.project_status,
+            access_revision=project.access_revision,
+            is_project_member=facts.is_project_member,
+            has_pending_recovery=facts.has_pending_recovery,
+            oauth_credential_facts=facts.oauth_credential_facts,
+            eligible_grantor_exists=grantor,
+            observed_at=observed,
         )
 
     async def _eligible_grantor(
         self, project_id: ProjectId, installation_id: InstallationId
     ) -> bool | None:
+        """Find currently eligible humans for the exact stored Project action."""
         linked = exists().where(HumanIdentityLinkRow.principal_id == PrincipalRow.id)
         pending = (
             select(IdentityRecoveryAdmissionRow.operation_id)
@@ -205,7 +207,7 @@ class PostgresProjectMetadataRepairFactsReader(ProjectMetadataRepairFactsReader)
                 ProjectMembershipRow.project_id == project_id.value,
                 PrincipalRow.kind == PrincipalKind.HUMAN,
                 PrincipalRow.status == PrincipalStatus.ACTIVE,
-                ProjectActionGrantRow.action == "edit-project-metadata",
+                ProjectActionGrantRow.action == ProjectAction.EDIT_PROJECT_METADATA.value,
                 ProjectActionGrantRow.can_grant.is_(True),
             )
         )
@@ -244,21 +246,21 @@ class PostgresProjectMetadataRepairFactsReader(ProjectMetadataRepairFactsReader)
         ):
             raise RuntimeError("The stored repair receipt has no valid typed result.")
         return ProjectMetadataRepairReceiptDTO(
-            RequestFingerprint(row.request_fingerprint),
-            VerifiedHumanIdentityDTO(
+            fingerprint=RequestFingerprint(row.request_fingerprint),
+            identity=VerifiedHumanIdentityDTO(
                 IdentityAuthority(parent.authority), IdentitySubject(parent.subject)
             ),
-            row.expected_identity_id,
-            parent.operator_label,
-            parent.reason,
-            row.before_revision,
-            parent.authorized_at,
-            ProjectMetadataRepairResultDTO(
-                operation_id,
-                installation_id,
-                OrganizationId(row.organization_id),
-                ProjectId(row.project_id),
-                PrincipalId(row.recipient_id),
-                row.after_revision,
+            expected_identity_id=row.expected_identity_id,
+            operator_label=parent.operator_label,
+            reason=parent.reason,
+            before_revision=row.before_revision,
+            authorized_at=parent.authorized_at,
+            result=ProjectMetadataRepairResultDTO(
+                operation_id=operation_id,
+                installation_id=installation_id,
+                organization_id=OrganizationId(row.organization_id),
+                project_id=ProjectId(row.project_id),
+                recipient_id=PrincipalId(row.recipient_id),
+                access_revision=row.after_revision,
             ),
         )

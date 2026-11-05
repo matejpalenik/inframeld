@@ -17,13 +17,15 @@ from inframeld_backend.shared.domain.enums.job_status import JobStatus
 
 
 class JobRecoveryService(JobRecovery):
-    def __init__(self, jobs: JobStore, eligibility: JobContinuationEligibility) -> None:
-        self._jobs = jobs
-        self._eligibility = eligibility
+    def __init__(
+        self, job_store: JobStore, continuation_eligibility: JobContinuationEligibility
+    ) -> None:
+        self._job_store = job_store
+        self._continuation_eligibility = continuation_eligibility
 
     @override
     async def recover_in_transaction(self, job: JobSnapshotDTO) -> JobContinuationEligibilityDTO:
-        result = await self._eligibility.assess_in_transaction(job)
+        result = await self._continuation_eligibility.assess_in_transaction(job)
         if result.job != job:
             raise RuntimeError("Recovery assessment returned another original attempt.")
         if job.status is not JobStatus.RUNNING or (
@@ -34,7 +36,7 @@ class JobRecoveryService(JobRecovery):
             status = JobStatus.RECOVERY_REQUIRED
         else:
             if result.observation is not None:
-                await self._jobs.consume_effect(job, result.observation)
+                await self._job_store.consume_effect(job, result.observation)
             status = (
                 JobStatus.QUEUED
                 if result.disposition is JobContinuationDisposition.ELIGIBLE
@@ -44,7 +46,7 @@ class JobRecoveryService(JobRecovery):
                 if result.reason == "cleanup_already_complete"
                 else JobStatus.FAILED
             )
-        await self._jobs.retire_attempt(
+        await self._job_store.retire_attempt(
             job,
             status=status,
             reason=result.reason,

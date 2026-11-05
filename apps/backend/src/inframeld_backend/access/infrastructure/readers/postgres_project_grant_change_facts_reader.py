@@ -219,23 +219,29 @@ class PostgresProjectGrantChangeFactsReader(
                         .all()
                     )
                     return ProjectActionGrantManagementFactsDTO(
-                        installation,
-                        organization,
-                        project_id,
-                        action_id,
-                        grant,
-                        recipient[0] if recipient is not None else False,
-                        recipient[1] if recipient is not None else False,
-                        recipient[2] if recipient is not None else False,
-                        tuple(
+                        installation_id=installation,
+                        organization_id=organization,
+                        project_id=project_id,
+                        action_id=action_id,
+                        grant=grant,
+                        recipient_has_pending_recovery=recipient[0]
+                        if recipient is not None
+                        else False,
+                        recipient_has_coherent_identity=recipient[1]
+                        if recipient is not None
+                        else False,
+                        recipient_application_is_project_bound=recipient[2]
+                        if recipient is not None
+                        else False,
+                        other_grantors=tuple(
                             ProjectDepartureCandidatePolicyInput(
-                                _to_principal(principal),
-                                pending,
-                                member,
-                                coherent,
-                                can_grant,
-                                False,
-                                False,
+                                principal=_to_principal(principal),
+                                has_pending_recovery=pending,
+                                is_project_member=member,
+                                has_coherent_identity=coherent,
+                                can_grant=can_grant,
+                                is_group_member=False,
+                                is_group_manager=False,
                             )
                             for principal, pending, member, coherent, can_grant in candidates
                         ),
@@ -333,6 +339,7 @@ class PostgresProjectGrantChangeFactsReader(
         recipient_principal_id: PrincipalId,
         action_id: ActionId,
     ) -> ProjectGrantChangeFactsDTO | None:
+        """Observe the actor and target under the grant workflow coordination locks."""
         actor_organization_id = await self._session.scalar(
             select(PrincipalRow.organization_id).where(
                 PrincipalRow.id == access.actor_principal_id.value

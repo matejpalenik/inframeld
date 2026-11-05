@@ -19,6 +19,7 @@ from inframeld_backend.access.application.protocols.project_metadata_facts_reade
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
 from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
     ProjectActionEligibilityPolicy,
@@ -35,21 +36,23 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class ProjectMetadataAuthorizationService(ProjectMetadataAuthorizer):
-    def __init__(self, facts: ProjectMetadataFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, metadata_facts_reader: ProjectMetadataFactsReader) -> None:
+        self._metadata_facts_reader = metadata_facts_reader
 
     @override
     async def require_read(
         self, *, access: AccessContextDTO, project_id: ProjectId
     ) -> ProjectActionAuthorizationDTO:
-        facts = await self._facts.read(access=access, project_id=project_id)
+        facts = await self._metadata_facts_reader.read(access=access, project_id=project_id)
         return self._require(facts, access, project_id, change=False)
 
     @override
     async def require_change(
         self, *, access: AccessContextDTO, project_id: ProjectId
     ) -> ProjectActionAuthorizationDTO:
-        facts = await self._facts.read_for_change(access=access, project_id=project_id)
+        facts = await self._metadata_facts_reader.read_for_change(
+            access=access, project_id=project_id
+        )
         return self._require(facts, access, project_id, change=True)
 
     @staticmethod
@@ -60,6 +63,7 @@ class ProjectMetadataAuthorizationService(ProjectMetadataAuthorizer):
         *,
         change: bool,
     ) -> ProjectActionAuthorizationDTO:
+        """Authorize from the requested Project facts before exposing or changing metadata."""
         if facts is None:
             raise ResourceNotFoundError()
         if facts.project_id != project_id or facts.action.principal.id != access.actor_principal_id:
@@ -85,7 +89,8 @@ class ProjectMetadataAuthorizationService(ProjectMetadataAuthorizer):
         if change and (
             not action.has_exact_action_grant
             or not ProjectActionEligibilityPolicy.may_use(
-                action_id=ActionId("edit-project-metadata"), principal_kind=action.principal.kind
+                action_id=ActionId(ProjectAction.EDIT_PROJECT_METADATA.value),
+                principal_kind=action.principal.kind,
             )
         ):
             raise AccessDeniedError()

@@ -8,6 +8,8 @@ export const pageMetadata = {
 
 Alice adds Bob to Support so he can see the Project. Membership supplies no action grants or document access. Later, removing Bob clears the access he received within Support while preserving permissions he assigned to other people.
 
+Project membership commands are not yet available in the [CLI](/clients/cli/commands). Use the HTTP requests or generated SDK examples below.
+
 ## Review the people, Project and current revision
 
 Alice must be an eligible admitted human, a current Project member and able to use `manage-project-members` on that Project. Permission to delegate the action is unnecessary. Removing yourself requires the same authority and departure checks.
@@ -22,7 +24,7 @@ Obtain the inputs without substituting one kind of identity for another:
 - For a new member, Bob can read his own `/v1/session` under his current credentials and share only `principalId`. With the configured account origin, he can sign in at `/login` and open `/v1/session` in his own browser profile. This local principal ID is different from his Kratos identity UUID. For removal, use the exact human `principalId` from the [stored-member list](/guides/list-project-members).
 - Read the member list and review its `accessRevision`. This is the Project's Access revision, not its metadata revision. The server checks current authority and the reviewed revision again when saving.
 
-Replace these illustrative UUIDs and revision with your reviewed values. Choose and retain a unique add key with the exact inputs before sending:
+Replace these illustrative UUIDs and revision with your reviewed values. Save a unique add key with the exact request inputs before sending. The environment variables below supply those saved values to the examples:
 
 <CodeGroup>
 
@@ -110,99 +112,111 @@ Removal preserves Bob's installation admission, other Projects, Project-owned re
 
 ## Use a generated client
 
-Use one program instead of the corresponding cURL request. Follow the source-package setup for [Python](/clients/python#install-from-a-checkout), [TypeScript](/clients/typescript#build-and-install-the-package) or [Rust](/clients/rust#set-up-an-example-project) in a separate example project. The Rust setup supplies the local SDK path, Tokio and Serde JSON dependencies. The TypeScript setup supplies the ESM project and locally built package.
+These are operation snippets for an existing async application. Follow the package and client setup for [Python](/clients/python#install-from-a-checkout), [TypeScript](/clients/typescript#build-and-install-the-package) or [Rust](/clients/rust#set-up-an-example-project). The [shared setup below](#prepare-the-sdk-context-once) supplies imports, configured clients and error handling.
 
-Keep the same reviewed URL, human credential, Project ID, recipient ID and Access revision. Select the add operation and its saved key before running your chosen program:
+Prepare the same Project ID, recipient ID and current human credential as the HTTP examples. Python uses `UUID` IDs, while TypeScript and Rust use their string forms. Take `add_revision` or `addRevision` from the generated member-list response you reviewed. Keep the independently saved add key in `add_key` or `addKey`, with the original IDs and revision. The snippets reuse these values and do not generate keys or retry automatically.
 
-<CodeGroup>
+### Add a member
 
-```shell
-export MEMBERSHIP_CHANGE='add'
-export MEMBERSHIP_KEY="$ADD_MEMBER_KEY"
-```
-
-</CodeGroup>
-
-For removal, first complete the departure review and read the current revision as described above. Then select the removal operation and its saved key:
-
-<CodeGroup>
-
-```shell
-export MEMBERSHIP_CHANGE='remove'
-export MEMBERSHIP_KEY="$REMOVE_MEMBER_KEY"
-```
-
-</CodeGroup>
-
-For an exact replay, retain the original choice, revision and key. None of the programs retries automatically.
-
-Save the Python program as `manage_project_members.py`, the TypeScript program as `manage-project-members.ts`, or the Rust program as `src/main.rs`:
+Python's `add_project_member()` returns a typed receipt directly. Its IDs fill the route, `ProjectMembershipRequest` supplies the JSON body, and `idempotency_key` supplies the header:
 
 <CodeGroup>
 
 ```python
-import asyncio
-import os
-from uuid import UUID
+receipt: ProjectMembershipResponse = await api.add_project_member(
+    project_id=project_id,
+    principal_id=principal_id,
+    idempotency_key=add_key,
+    project_membership_request=ProjectMembershipRequest(
+        expectedAccessRevision=add_revision
+    ),
+)
+```
 
-import httpx
+```typescript
+const result = await addProjectMember({
+  client,
+  path: { project_id: projectId, principal_id: principalId },
+  headers: { "Idempotency-Key": addKey },
+  body: { expectedAccessRevision: addRevision },
+})
+```
+
+```rust
+let response = client
+    .add_project_member(
+        &project_id,
+        &principal_id,
+        &add_key,
+        ProjectMembershipRequest {
+            expected_access_revision: add_revision,
+        },
+    )
+    .await
+    .map_err(report_error)?;
+```
+
+</CodeGroup>
+
+Keep the returned receipt with the saved request. Python returns the model itself. TypeScript exposes validated receipt data after the error check below, and Rust keeps the typed body in `response.body`. Use Python's `add_project_member_with_http_info()` only when you also need HTTP status or response headers. Status alone does not override a decoding failure.
+
+For an exact retry after uncertainty, pass the saved add key with the same IDs and original reviewed revision again. Do not generate a new key or read a newer revision for that retry.
+
+### Remove a member
+
+Complete the departure review, then [read the member list again](/guides/list-project-members). Keep its newly reviewed revision in `remove_revision` or `removeRevision`, and save a separate `remove_key` or `removeKey`. Other access changes may have occurred since the add, so do not assume its receipt contains the revision for a new removal.
+
+Use the same configured client and exact Project and recipient IDs. Removal supplies the revision as a query argument and sends no body:
+
+<CodeGroup>
+
+```python
+receipt: ProjectMembershipRemovalResponse = await api.remove_project_member(
+    project_id=project_id,
+    principal_id=principal_id,
+    expected_access_revision=remove_revision,
+    idempotency_key=remove_key,
+)
+```
+
+```typescript
+const result = await removeProjectMember({
+  client,
+  path: { project_id: projectId, principal_id: principalId },
+  headers: { "Idempotency-Key": removeKey },
+  query: { expectedAccessRevision: removeRevision },
+})
+```
+
+```rust
+let response = client
+    .remove_project_member(&project_id, &principal_id, remove_revision, &remove_key)
+    .await
+    .map_err(report_error)?;
+```
+
+</CodeGroup>
+
+Exact replay passes the original removal key and that removal's original reviewed revision again. Replaying a retained receipt does not repeat the membership change.
+
+## Prepare the SDK context once
+
+Configure the reviewed `backend_url` or `backendUrl` and current `human_token` or `humanToken` once. In Python, import the models below and place either operation snippet inside the open `async with` block of your async application. The block closes the client when the operation finishes or raises. In TypeScript and Rust, use the configured `client` for either operation. Rust's setup belongs in an async function returning `Result`.
+
+<CodeGroup>
+
+```python
 from inframeld_sdk import ApiClient, Configuration
 from inframeld_sdk.api.access_api import AccessApi
-from inframeld_sdk.exceptions import ApiException
 from inframeld_sdk.models.project_membership_request import ProjectMembershipRequest
+from inframeld_sdk.models.project_membership_response import ProjectMembershipResponse
+from inframeld_sdk.models.project_membership_removal_response import (
+    ProjectMembershipRemovalResponse,
+)
 
-
-async def main() -> None:
-    change = os.environ["MEMBERSHIP_CHANGE"]
-    if change not in {"add", "remove"}:
-        raise ValueError("MEMBERSHIP_CHANGE must be add or remove")
-
-    project_id = UUID(os.environ["PROJECT_ID"])
-    principal_id = UUID(os.environ["RECIPIENT_ID"])
-    revision = int(os.environ["EXPECTED_ACCESS_REVISION"])
-    if not 0 <= revision <= 2**63 - 1:
-        raise ValueError("Review an exact nonnegative Project Access revision")
-
-    key = os.environ["MEMBERSHIP_KEY"]
-    headers = {"Authorization": f"Bearer {os.environ['INFRAMELD_TOKEN']}"}
-    configuration = Configuration(host=os.environ["INFRAMELD_URL"])
-    async with ApiClient(configuration) as client:
-        api = AccessApi(client)
-        try:
-            if change == "add":
-                response = await api.add_project_member_with_http_info(
-                    project_id=project_id,
-                    principal_id=principal_id,
-                    idempotency_key=key,
-                    project_membership_request=ProjectMembershipRequest(
-                        expectedAccessRevision=revision
-                    ),
-                    _headers=headers,
-                    _request_timeout=5.0,
-                )
-            else:
-                response = await api.remove_project_member_with_http_info(
-                    project_id=project_id,
-                    principal_id=principal_id,
-                    expected_access_revision=revision,
-                    idempotency_key=key,
-                    _headers=headers,
-                    _request_timeout=5.0,
-                )
-        except ApiException as error:
-            print(f"Membership change failed: HTTP {error.status}")
-            print("Keep the original request before deciding what to do next.")
-            raise SystemExit(1) from error
-        except httpx.HTTPError as error:
-            print("No usable membership response. Keep the original request.")
-            raise SystemExit(1) from error
-
-        print(f"HTTP {response.status_code}")
-        print(response.data.to_json())
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+configuration = Configuration(host=backend_url, access_token=human_token)
+async with ApiClient(configuration) as api_client:
+    api = AccessApi(api_client)
 ```
 
 ```typescript
@@ -212,52 +226,42 @@ import {
   removeProjectMember,
 } from "@inframeld/sdk"
 
-const baseUrl = process.env.INFRAMELD_URL
-const token = process.env.INFRAMELD_TOKEN
-const projectId = process.env.PROJECT_ID
-const principalId = process.env.RECIPIENT_ID
-const key = process.env.MEMBERSHIP_KEY
-const change = process.env.MEMBERSHIP_CHANGE
-const revision = Number(process.env.EXPECTED_ACCESS_REVISION)
-
-if (
-  !baseUrl ||
-  !token ||
-  !projectId ||
-  !principalId ||
-  !key ||
-  (change !== "add" && change !== "remove") ||
-  !Number.isSafeInteger(revision) ||
-  revision < 0
-) {
-  throw new Error("Review the exact membership inputs and an add/remove choice")
-}
-
 const client = createClient({
-  baseUrl,
-  timeoutMs: 5000,
+  baseUrl: backendUrl,
+  headers: { Authorization: "Bearer " + humanToken },
   responseStyle: "fields",
   throwOnError: false,
 })
-const options = {
-  client,
-  path: { project_id: projectId, principal_id: principalId },
-  headers: {
-    Authorization: "Bearer " + token,
-    "Idempotency-Key": key,
-  },
-}
-const result =
-  change === "add"
-    ? await addProjectMember({
-        ...options,
-        body: { expectedAccessRevision: revision },
-      })
-    : await removeProjectMember({
-        ...options,
-        query: { expectedAccessRevision: revision },
-      })
+```
 
+```rust
+use inframeld_sdk::client::{ApiOpError, HttpClient};
+use inframeld_sdk::types::ProjectMembershipRequest;
+
+/// Preserve uncertainty without printing protected response content.
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
+    if let Some(context) = error.api() {
+        eprintln!("No usable membership receipt: HTTP {}", context.status);
+    }
+    std::io::Error::other("Keep the original request before deciding what to do next")
+}
+
+let client = HttpClient::new()
+    .with_base_url(backend_url)
+    .with_header("Authorization", format!("Bearer {human_token}"));
+```
+
+</CodeGroup>
+
+Use the typed revision from the reviewed member-list response. Python and Rust retain the signed 64-bit integer. TypeScript's generated response validation requires an exact safe integer. Use Python, Rust or cURL if the server revision exceeds JavaScript's safe integer range. Do not convert revision text through JavaScript's `Number()` before validating its exact decimal representation.
+
+At the Python application boundary, handle `inframeld_sdk.exceptions.ApiException` and `httpx.HTTPError` without printing their raw bodies or exception text. Report the available HTTP status and preserve the original request. Rust's `report_error` similarly returns a safe error and ends the operation unsuccessfully. Neither an HTTP error nor a transport or decoding failure supplies a usable receipt.
+
+In TypeScript, check the typed error branch after either operation. Only `kind === "api"` supplies a validated problem body. The other kinds can represent transport, decoding or local request failures:
+
+<CodeGroup>
+
+```typescript
 if (result.error !== undefined) {
   console.error({
     httpStatus: result.response?.status,
@@ -269,80 +273,16 @@ if (result.error !== undefined) {
       requestId: result.error.body.requestId,
     })
   }
-  console.error("Keep the original request before deciding what to do next.")
   process.exitCode = 1
-} else if (result.data !== undefined) {
-  console.info("HTTP", result.response?.status)
-  console.info(JSON.stringify(result.data, null, 2))
 } else {
-  throw new Error("No usable membership response. Keep the original request")
-}
-```
-
-```rust
-use std::env;
-
-use inframeld_sdk::{
-    client::{ApiOpError, HttpClient},
-    types::ProjectMembershipRequest,
-};
-
-/// Report available HTTP context without printing raw upstream content.
-fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
-    if let Some(context) = error.api() {
-        eprintln!("Membership change failed: HTTP {}", context.status);
-    } else {
-        eprintln!("No usable membership response.");
-    }
-    std::io::Error::other("Keep the original request before deciding what to do next")
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let base_url = env::var("INFRAMELD_URL")?;
-    let token = env::var("INFRAMELD_TOKEN")?;
-    let project_id = env::var("PROJECT_ID")?;
-    let principal_id = env::var("RECIPIENT_ID")?;
-    let key = env::var("MEMBERSHIP_KEY")?;
-    let change = env::var("MEMBERSHIP_CHANGE")?;
-    if change != "add" && change != "remove" {
-        return Err(std::io::Error::other("MEMBERSHIP_CHANGE must be add or remove").into());
-    }
-    let revision: u64 = env::var("EXPECTED_ACCESS_REVISION")?.parse()?;
-    let signed_revision = i64::try_from(revision)?;
-    let client = HttpClient::new()
-        .with_base_url(base_url)
-        .with_header("Authorization", format!("Bearer {token}"));
-
-    let (status, body) = if change == "add" {
-        let response = client
-            .add_project_member(
-                &project_id,
-                &principal_id,
-                &key,
-                ProjectMembershipRequest {
-                    expected_access_revision: signed_revision,
-                },
-            )
-            .await
-            .map_err(report_error)?;
-        (response.status, serde_json::to_value(response.body)?)
-    } else {
-        let response = client
-            .remove_project_member(&project_id, &principal_id, signed_revision, &key)
-            .await
-            .map_err(report_error)?;
-        (response.status, serde_json::to_value(response.body)?)
-    };
-    println!("HTTP {status}");
-    println!("{}", serde_json::to_string_pretty(&body)?);
-    Ok(())
+  const receipt = result.data
+  console.info(JSON.stringify(receipt, null, 2))
 }
 ```
 
 </CodeGroup>
 
-Run `.venv/bin/python manage_project_members.py`, `node manage-project-members.ts` with Node 26 in the ESM project, or `cargo run` in the Cargo project. On success, each prints the available HTTP status and validated original receipt. A failure exits unsuccessfully and preserves the need to reconcile the original request. The TypeScript program rejects revisions it cannot represent as exact safe integers rather than rounding them.
+The failure branch logs no submitted inputs, credential or raw response body. Preserve the original request after an unavailable or unusable response, even when an HTTP status is available.
 
 ## Preserve the original request after uncertainty
 

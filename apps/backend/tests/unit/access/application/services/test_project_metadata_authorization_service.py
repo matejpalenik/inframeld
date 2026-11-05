@@ -45,7 +45,14 @@ class MockMetadataFacts(ProjectMetadataFactsReader):
         self.facts = ProjectMetadataAuthorizationFactsDTO(
             ProjectId(uuid4()),
             InstallationId(uuid4()),
-            ProjectActionFactsDTO(actor, False, None, ProjectStatus.ACTIVE, True, granted),
+            ProjectActionFactsDTO(
+                principal=actor,
+                has_pending_recovery=False,
+                oauth_credential_facts=None,
+                project_status=ProjectStatus.ACTIVE,
+                is_project_member=True,
+                has_exact_action_grant=granted,
+            ),
         )
 
     @override

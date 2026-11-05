@@ -24,59 +24,59 @@ class ArtifactCleanupCheckpointService(JobCheckpoints):
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        jobs: JobStore,
-        authorizer: ArtifactCleanupAuthorizer,
+        transaction_manager: TransactionManager,
+        job_store: JobStore,
+        artifact_cleanup_authorizer: ArtifactCleanupAuthorizer,
         *,
         lease_seconds: float = 30,
     ) -> None:
-        self._transactions = transactions
-        self._jobs = jobs
-        self._authorizer = authorizer
+        self._transaction_manager = transaction_manager
+        self._job_store = job_store
+        self._artifact_cleanup_authorizer = artifact_cleanup_authorizer
         self._lease_seconds = lease_seconds
 
     @override
     async def check(self, context: JobAttemptContextDTO) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.checkpoint(
+                await self._job_store.checkpoint(
                     context, current[0].checkpoint, lease_seconds=self._lease_seconds
                 )
         self._require_continuation(current)
 
     @override
     async def save(self, context: JobAttemptContextDTO, data: bytes) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.checkpoint(context, data, lease_seconds=self._lease_seconds)
+                await self._job_store.checkpoint(context, data, lease_seconds=self._lease_seconds)
         self._require_continuation(current)
 
     @override
     async def begin_effect(self, context: JobAttemptContextDTO, effect_id: str) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.begin_effect(context, effect_id)
+                await self._job_store.begin_effect(context, effect_id)
         self._require_continuation(current)
 
     @override
     async def confirm_effect(
         self, context: JobAttemptContextDTO, effect_id: str, data: bytes
     ) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.confirm_effect(context, effect_id, data)
+                await self._job_store.confirm_effect(context, effect_id, data)
         self._require_continuation(current)
 
     @override
     async def succeed(self, context: JobAttemptContextDTO) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.finish(
+                await self._job_store.finish(
                     context,
                     status=JobStatus.SUCCEEDED
                     if current[1].physically_complete
@@ -91,10 +91,10 @@ class ArtifactCleanupCheckpointService(JobCheckpoints):
 
     @override
     async def fail(self, context: JobAttemptContextDTO) -> None:
-        async with self._transactions.begin():
+        async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
-                await self._jobs.finish(
+                await self._job_store.finish(
                     context, status=JobStatus.FAILED, reason="cleanup_handler_failed"
                 )
         self._require_continuation(current)
@@ -102,15 +102,18 @@ class ArtifactCleanupCheckpointService(JobCheckpoints):
     async def _guard(
         self, context: JobAttemptContextDTO
     ) -> tuple[JobSnapshotDTO, ArtifactCleanupFactsDTO] | None:
+        """Check current cleanup ownership and authority before another storage effect."""
         if not isinstance(context.binding, ArtifactCleanupJobBindingDTO):
             raise JobStoppedError("Cleanup checkpoints require the original cleanup binding.")
         # Lock the live job before its obligation and exact target rows. No
         # product principal, Project status or grant can replace this authority.
-        current = await self._jobs.require_current(context)
+        current = await self._job_store.require_current(context)
         try:
-            facts = await self._authorizer.require_current(context.job_id, context.binding)
+            facts = await self._artifact_cleanup_authorizer.require_current(
+                context.job_id, context.binding
+            )
         except AccessDeniedError:
-            await self._jobs.finish(
+            await self._job_store.finish(
                 context, status=JobStatus.FAILED, reason="cleanup_authority_changed"
             )
             return None
@@ -120,5 +123,6 @@ class ArtifactCleanupCheckpointService(JobCheckpoints):
     def _require_continuation(
         current: tuple[JobSnapshotDTO, ArtifactCleanupFactsDTO] | None,
     ) -> None:
+        """Reject cleanup work whose checked continuation is no longer valid."""
         if current is None:
             raise JobStoppedError("The original cleanup authority cannot be confirmed.")

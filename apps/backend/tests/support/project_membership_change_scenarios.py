@@ -1,5 +1,5 @@
 from dataclasses import replace
-from typing import Literal, override
+from typing import override
 from uuid import UUID
 
 from inframeld_backend.access.application.commands.add_project_member_command import (
@@ -10,11 +10,17 @@ from inframeld_backend.access.application.commands.remove_project_member_command
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
+from inframeld_backend.access.application.dtos.project_departure_responsibility_dto import (
+    ProjectDepartureResponsibilityDTO,
+)
 from inframeld_backend.access.application.dtos.project_membership_change_facts_dto import (
     ProjectMembershipChangeFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_membership_change_result_dto import (
     ProjectMembershipChangeResultDTO,
+)
+from inframeld_backend.access.application.enums.project_membership_change_kind import (
+    ProjectMembershipChangeKind,
 )
 from inframeld_backend.access.application.protocols.project_membership_change_facts_reader import (
     ProjectMembershipChangeFactsReader,
@@ -41,9 +47,10 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -70,18 +77,25 @@ ACCESS = AccessContextDTO(ALICE.id, MockAuthenticationEvidence.browser())
 ADD = AddProjectMemberCommand(PROJECT, BOB.id, 7)
 REMOVE = RemoveProjectMemberCommand(PROJECT, BOB.id, 7)
 ROUTE = f"/v1/projects/{PROJECT.value}/members/{BOB.id.value}"
-ADD_CONTEXT = OperationAdmissionContextDTO("PUT", ROUTE, IdempotencyKey("join-bob"))
-REMOVE_CONTEXT = OperationAdmissionContextDTO("DELETE", ROUTE, IdempotencyKey("remove-bob"))
+ADD_CONTEXT = IdempotencyContextDTO(HttpMethod.PUT, ROUTE, IdempotencyKey("join-bob"))
+REMOVE_CONTEXT = IdempotencyContextDTO(HttpMethod.DELETE, ROUTE, IdempotencyKey("remove-bob"))
 FACTS = ProjectMembershipChangeFactsDTO(
-    INSTALLATION,
-    ORG,
-    PROJECT,
-    7,
-    ProjectActionFactsDTO(ALICE, False, None, ProjectStatus.ACTIVE, True, True),
-    BOB,
-    False,
-    True,
-    False,
+    installation_id=INSTALLATION,
+    organization_id=ORG,
+    project_id=PROJECT,
+    access_revision=7,
+    action=ProjectActionFactsDTO(
+        principal=ALICE,
+        has_pending_recovery=False,
+        oauth_credential_facts=None,
+        project_status=ProjectStatus.ACTIVE,
+        is_project_member=True,
+        has_exact_action_grant=True,
+    ),
+    recipient=BOB,
+    recipient_has_pending_recovery=False,
+    recipient_has_coherent_identity=True,
+    recipient_is_project_member=False,
 )
 
 
@@ -89,15 +103,15 @@ class MockMembershipFacts(ProjectMembershipChangeFactsReader):
     def __init__(self, events: list[str]) -> None:
         self.events = events
         self.facts: ProjectMembershipChangeFactsDTO | None = FACTS
+        self.responsibilities: tuple[ProjectDepartureResponsibilityDTO, ...] = ()
 
     @override
-    async def read_for_change(
+    async def lock_and_load_membership_state(
         self,
         *,
         access: AccessContextDTO,
         project_id: ProjectId,
         principal_id: PrincipalId,
-        removing: bool,
     ) -> ProjectMembershipChangeFactsDTO | None:
         self.events.append("facts")
         assert (
@@ -107,13 +121,27 @@ class MockMembershipFacts(ProjectMembershipChangeFactsReader):
         )
         return self.facts
 
+    @override
+    async def load_departure_responsibilities(
+        self, *, facts: ProjectMembershipChangeFactsDTO, principal_id: PrincipalId
+    ) -> tuple[ProjectDepartureResponsibilityDTO, ...]:
+        self.events.append("handover")
+        assert facts is self.facts and principal_id == BOB.id
+        return self.responsibilities
+
 
 class MockMembershipWriter(ProjectMembershipChangeWriter):
     def __init__(self, events: list[str]) -> None:
         self.events = events
-        self.saved: tuple[ProjectMembershipChangeFactsDTO, PrincipalId, str, OperationId] | None = (
-            None
-        )
+        self.saved: (
+            tuple[
+                ProjectMembershipChangeFactsDTO,
+                PrincipalId,
+                ProjectMembershipChangeKind,
+                OperationId,
+            ]
+            | None
+        ) = None
         self.error: BaseException | None = None
 
     @override
@@ -122,7 +150,7 @@ class MockMembershipWriter(ProjectMembershipChangeWriter):
         *,
         facts: ProjectMembershipChangeFactsDTO,
         principal_id: PrincipalId,
-        change_kind: Literal["add", "remove"],
+        change_kind: ProjectMembershipChangeKind,
         operation_id: OperationId,
     ) -> None:
         self.events.append("save")
@@ -135,16 +163,25 @@ class MockMembershipResults(ProjectMembershipChangeResultReader):
     def __init__(self, events: list[str]) -> None:
         self.events = events
         self.result = ProjectMembershipChangeResultDTO(
-            INSTALLATION, ORG, PROJECT, ALICE.id, BOB.id, "add", 8, True, 201, SAVED_RESULT
+            installation_id=INSTALLATION,
+            organization_id=ORG,
+            project_id=PROJECT,
+            actor_principal_id=ALICE.id,
+            principal_id=BOB.id,
+            change_kind=ProjectMembershipChangeKind.ADD,
+            access_revision=8,
+            changed=True,
+            status_code=201,
+            operation=SAVED_RESULT,
         )
 
     @override
-    async def original(
+    async def load_original_membership_result(
         self,
         *,
         facts: ProjectMembershipChangeFactsDTO,
         principal_id: PrincipalId,
-        change_kind: Literal["add", "remove"],
+        change_kind: ProjectMembershipChangeKind,
         operation: CompletedSynchronousOperationDTO,
     ) -> ProjectMembershipChangeResultDTO:
         self.events.append("original")
@@ -164,12 +201,12 @@ class MembershipChangeScenario:
             RequestFingerprintService(RequestFingerprintKey(b"m" * 32))
         )
         self.service = ProjectMembershipChangeService(
-            transactions=self.transactions,
-            facts=self.facts,
-            writer=self.writer,
-            results=self.results,
-            idempotency=self.idempotency,
-            fingerprints=self.fingerprints,
+            transaction_manager=self.transactions,
+            membership_facts_reader=self.facts,
+            membership_change_writer=self.writer,
+            membership_result_reader=self.results,
+            operation_idempotency=self.idempotency,
+            membership_fingerprint_service=self.fingerprints,
         )
 
     def member(self) -> None:

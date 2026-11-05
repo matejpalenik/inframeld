@@ -11,6 +11,7 @@ from inframeld_backend.access.application.dtos.deletion_status_authorization_req
 from inframeld_backend.access.application.protocols.deletion_status_authorizer import (
     DeletionStatusAuthorizer,
 )
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.shared.application.dtos.deletion_status_binding_dto import (
     DeletionStatusBindingDTO,
 )
@@ -48,16 +49,18 @@ class DeletionStatusReadService(DeletionStatusLookup):
     """Authorize current initiator scope and interpret retained content-free facts."""
 
     def __init__(
-        self, authorizer: DeletionStatusAuthorizer, reader: DeletionStatusProjectionReader
+        self,
+        deletion_status_authorizer: DeletionStatusAuthorizer,
+        deletion_status_projection_reader: DeletionStatusProjectionReader,
     ) -> None:
-        self._authorizer = authorizer
-        self._reader = reader
+        self._deletion_status_authorizer = deletion_status_authorizer
+        self._deletion_status_projection_reader = deletion_status_projection_reader
 
     @override
     async def lookup(
         self, *, access: AccessContextDTO, query: GetDeletionStatusQuery
     ) -> RetainedDeletionStatusDTO | UnresolvedOperationDTO:
-        authorized = await self._authorizer.require_authorization(
+        authorized = await self._deletion_status_authorizer.require_authorization(
             access=access,
             request=DeletionStatusAuthorizationRequestDTO(query.operation_id),
         )
@@ -67,7 +70,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
         ):
             raise RuntimeError("Deletion status authorization returned a different scope.")
 
-        stored = await self._reader.read(authorization=authorized)
+        stored = await self._deletion_status_projection_reader.read(authorization=authorized)
         if stored is None or not self._matches_binding(stored.binding, authorized):
             return UnresolvedOperationDTO()
         if not self._has_owner_observation(stored):
@@ -78,19 +81,20 @@ class DeletionStatusReadService(DeletionStatusLookup):
             return UnresolvedOperationDTO()
 
         return RetainedDeletionStatusDTO(
-            stored.binding.operation_id,
-            stored.job_status,
-            stored.admission_confirmed,
-            stored.access_blocked,
-            stored.application_shutdown_complete,
-            stored.physical_cleanup_complete,
-            expiry,
+            operation_id=stored.binding.operation_id,
+            job_status=stored.job_status,
+            admission_confirmed=stored.admission_confirmed,
+            access_blocked=stored.access_blocked,
+            application_shutdown_complete=stored.application_shutdown_complete,
+            physical_cleanup_complete=stored.physical_cleanup_complete,
+            expires_at=expiry,
         )
 
     @staticmethod
     def _matches_binding(
         binding: DeletionStatusBindingDTO, authorization: DeletionStatusAuthorizationDTO
     ) -> bool:
+        """Keep retained deletion facts bound to the authorized original operation."""
         return (
             binding.operation_id == authorization.operation_id
             and binding.installation_id == authorization.installation_id
@@ -98,11 +102,12 @@ class DeletionStatusReadService(DeletionStatusLookup):
             and binding.initiator_principal_id == authorization.principal_id
             and binding.authority_family is OperationLookupAuthorityFamily.PROJECT_ACTION_USE
             and binding.action_id is not None
-            and binding.action_id.value == "delete-project"
+            and binding.action_id.value == ProjectAction.DELETE_PROJECT.value
         )
 
     @staticmethod
     def _has_owner_observation(stored: DeletionStatusObservationDTO) -> bool:
+        """Distinguish absent owner evidence from a partial or incoherent observation."""
         if stored.owner_revision is None:
             if any(
                 value is not None
@@ -127,6 +132,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
 
     @staticmethod
     def _retention(stored: DeletionStatusObservationDTO) -> datetime | None:
+        """Validate retained timing and completion evidence before reporting an expiry."""
         binding = stored.binding
         if binding.retention_days is None or binding.retention_policy_version is None:
             raise DependencyUnavailableError()
@@ -185,6 +191,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
 
     @staticmethod
     def _require_unfinished_obligation(stored: DeletionStatusObservationDTO) -> None:
+        """Reject cleanup obligations that disagree with their retained deletion scope."""
         obligation = stored.unfinished_obligation
         binding = stored.binding
         if obligation is None or (
@@ -203,6 +210,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
 
     @staticmethod
     def _require_utc(value: datetime | None) -> datetime:
+        """Require an aware timestamp before comparing retained deletion evidence."""
         if not isinstance(value, datetime) or value.utcoffset() != timedelta(0):
             raise DependencyUnavailableError()
         return value

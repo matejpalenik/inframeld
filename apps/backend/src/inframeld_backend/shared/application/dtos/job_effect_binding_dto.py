@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from typing import Literal
 
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
+from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
     ArtifactContentDigest,
@@ -18,7 +18,7 @@ class JobEffectBindingDTO:
     effect_id: JobEffectId
     context: JobAttemptContextDTO
     unit: str
-    action: Literal["put", "delete"]
+    action: JobEffectAction
     artifact_id: ArtifactId
     artifact_attempt_id: ArtifactAttemptId
     scope: ArtifactScopeDTO

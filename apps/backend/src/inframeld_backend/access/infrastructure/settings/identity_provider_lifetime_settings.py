@@ -17,6 +17,7 @@ class IdentityProviderLifetimeSettings(BaseSettings):
     @field_validator("access_token", "refresh_token", "auth_code", "browser_session")
     @classmethod
     def _require_positive_duration(cls, value: str) -> str:
+        """Reject invalid provider lifetimes before constructing the external SDK client."""
         message = "Provider lifetimes require a positive finite duration within signed 64-bit nanoseconds."
         if re.fullmatch(r"(?:[0-9]+(?:ns|us|ms|s|m|h))+", value) is None:
             raise ValueError(message)

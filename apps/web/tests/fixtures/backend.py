@@ -82,6 +82,7 @@ def write_proof_inputs(
 
 
 def _unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate fixture fields so the independently observed result has one meaning."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -91,6 +92,7 @@ def _unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _object(value: object, keys: set[str]) -> dict[str, object]:
+    """Require the exact fixture response fields before trusting its proof observations."""
     if not isinstance(value, dict) or set(cast("dict[str, object]", value)) != keys:
         raise ValueError("Unexpected fixture response shape.")
     return cast("dict[str, object]", value)

@@ -33,35 +33,37 @@ class ProjectNameResolutionService(ProjectNameResolver):
     def __init__(
         self,
         *,
-        transactions: TransactionManager,
-        facts: ProjectMetadataFactsReader,
-        resolver: ResourceNameResolver,
-        authorizer: ProjectMetadataAuthorizer,
-        repository: ProjectMetadataRepository,
+        transaction_manager: TransactionManager,
+        metadata_facts_reader: ProjectMetadataFactsReader,
+        resource_name_resolver: ResourceNameResolver,
+        metadata_authorizer: ProjectMetadataAuthorizer,
+        metadata_repository: ProjectMetadataRepository,
     ) -> None:
-        self._transactions = transactions
-        self._facts = facts
-        self._resolver = resolver
-        self._authorizer = authorizer
-        self._repository = repository
+        self._transaction_manager = transaction_manager
+        self._metadata_facts_reader = metadata_facts_reader
+        self._resource_name_resolver = resource_name_resolver
+        self._metadata_authorizer = metadata_authorizer
+        self._metadata_repository = metadata_repository
 
     @override
     async def resolve(
         self, *, access: AccessContextDTO, query: ResolveProjectNameQuery
     ) -> ProjectMetadataDTO:
-        async with self._transactions.begin():
-            scope = await self._facts.scope(access=access)
-            binding = await self._resolver.resolve(
+        async with self._transaction_manager.begin():
+            scope = await self._metadata_facts_reader.scope(access=access)
+            binding = await self._resource_name_resolver.resolve(
                 ResolveResourceNameQuery(scope, ResourceNameKind.PROJECT, query.name)
             )
             project_id = ProjectId(binding.resource_id)
-            authorized = await self._authorizer.require_read(access=access, project_id=project_id)
+            authorized = await self._metadata_authorizer.require_read(
+                access=access, project_id=project_id
+            )
             if (authorized.organization_id, authorized.project_id) != (
                 scope.organization_id,
                 project_id,
             ):
                 raise RuntimeError("Project resolution changed its authorized scope.")
-            metadata = await self._repository.get(
+            metadata = await self._metadata_repository.get(
                 organization_id=scope.organization_id, project_id=project_id
             )
             if (metadata.organization_id, metadata.project_id) != (

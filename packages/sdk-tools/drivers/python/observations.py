@@ -4,7 +4,7 @@ import base64
 from typing import Protocol, runtime_checkable
 
 import httpx
-from protocol import Header, Observation, WireValue
+from protocol import Header, Observation, ObservationKind, Validation, WireEncoding, WireValue
 from pydantic import JsonValue, TypeAdapter
 
 _JSON = TypeAdapter(JsonValue)
@@ -28,11 +28,13 @@ class NativeResponse(Protocol):
 
 def wire(value: str | bytes) -> WireValue:
     if isinstance(value, str):
-        return WireValue(encoding="utf8", value=value)
+        return WireValue(encoding=WireEncoding.UTF8, value=value)
     try:
-        return WireValue(encoding="utf8", value=value.decode("utf-8"))
+        return WireValue(encoding=WireEncoding.UTF8, value=value.decode("utf-8"))
     except UnicodeDecodeError:
-        return WireValue(encoding="base64", value=base64.b64encode(value).decode("ascii"))
+        return WireValue(
+            encoding=WireEncoding.BASE64, value=base64.b64encode(value).decode("ascii")
+        )
 
 
 def headers(value: httpx.Headers | None) -> list[Header]:
@@ -57,10 +59,10 @@ def json_value(value: object) -> JsonValue:
 def success(call_id: str, response: NativeResponse, has_body: bool) -> Observation:
     has_body = has_body and not (response.data is None and response.raw_data == b"")
     result = Observation(
-        kind="success",
+        kind=ObservationKind.SUCCESS,
         callId=call_id,
         status=response.status_code,
-        validation="generated-model" if has_body else "none",
+        validation=Validation.GENERATED_MODEL if has_body else Validation.NONE,
         headers=headers(response.headers),
         raw=wire(response.raw_data),
     )
@@ -79,9 +81,9 @@ def failure(
     raw: str | bytes | None = None,
 ) -> Observation:
     result = Observation(
-        kind="sdk-error",
+        kind=ObservationKind.SDK_ERROR,
         callId=call_id,
-        validation="generated-model" if isinstance(data, NativeModel) else "none",
+        validation=Validation.GENERATED_MODEL if isinstance(data, NativeModel) else Validation.NONE,
         headers=headers(response_headers),
         error=f"{type(error).__name__}: {error}",
     )

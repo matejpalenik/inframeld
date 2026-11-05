@@ -1,8 +1,9 @@
 """Exercise human bearer authentication through HTTP and real PostgreSQL reads."""
 
 import os
+from enum import StrEnum
 from functools import partial
-from typing import Literal, override
+from typing import override
 from uuid import uuid4
 
 import httpx2
@@ -104,6 +105,17 @@ from inframeld_backend.shared.infrastructure.readers.postgres_installation_ident
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
+
+
+class ProviderCase(StrEnum):
+    HYDRA = "hydra"
+    KRATOS = "kratos"
+
+
+class FamilyCase(StrEnum):
+    COOKIE = "cookie"
+    BEARER = "bearer"
+
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
@@ -305,11 +317,11 @@ async def test_next_bearer_request_rechecks_kratos_eligibility(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider", ["hydra", "kratos"])
+@pytest.mark.parametrize("provider", [ProviderCase.HYDRA, ProviderCase.KRATOS])
 async def test_provider_outage_cannot_reuse_an_earlier_success(
     temporary_postgres_settings: DatabaseSettings,
     linked_human: Principal,
-    provider: Literal["hydra", "kratos"],
+    provider: ProviderCase,
 ) -> None:
     """Losing either provider must stop the next request instead of trusting an old success."""
 
@@ -320,7 +332,7 @@ async def test_provider_outage_cannot_reuse_an_earlier_success(
         assert first.status_code == 200, first.text
         assert first.json() == {"principalId": str(linked_human.id.value)}
 
-        if provider == "hydra":
+        if provider == ProviderCase.HYDRA:
             scenario.token.unavailable = True
         else:
             scenario.identity.unavailable = True
@@ -331,7 +343,7 @@ async def test_provider_outage_cannot_reuse_an_earlier_success(
     assert second.json()["code"] == "dependency_unavailable"
     assert "WWW-Authenticate" not in second.headers
     assert scenario.token.calls == 2
-    assert scenario.identity.calls == (1 if provider == "hydra" else 2)
+    assert scenario.identity.calls == (1 if provider == ProviderCase.HYDRA else 2)
     assert scenario.browser.calls == 0
 
 
@@ -410,21 +422,21 @@ async def _seed_recovery_outcome(
         )
 
 
-def _get_session(client: TestClient, family: Literal["cookie", "bearer"]) -> httpx2.Response:
+def _get_session(client: TestClient, family: FamilyCase) -> httpx2.Response:
     client.cookies.clear()
-    if family == "cookie":
+    if family == FamilyCase.COOKIE:
         client.cookies.set("ory_kratos_session", COOKIE.value)
         return client.get("/v1/session")
     return client.get("/v1/session", headers=BEARER_HEADERS)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("family", ["cookie", "bearer"])
+@pytest.mark.parametrize("family", [FamilyCase.COOKIE, FamilyCase.BEARER])
 async def test_recovery_block_changes_are_enforced_on_the_next_http_request(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
     linked_human: Principal,
-    family: Literal["cookie", "bearer"],
+    family: FamilyCase,
 ) -> None:
     """Each credential follows committed recovery state without clearing suspension."""
     fresh = HumanAccessTokenCredential("synthetic-fresh-human-token")
@@ -437,16 +449,20 @@ async def test_recovery_block_changes_are_enforced_on_the_next_http_request(
 
         operation_id = await _admit_recovery(database)
         blocked = _get_session(client, family)
-        assert blocked.status_code == (401 if family == "bearer" else 403), blocked.text
-        assert blocked.json()["code"] == ("http_error" if family == "bearer" else "access_denied")
+        assert blocked.status_code == (401 if family == FamilyCase.BEARER else 403), blocked.text
+        assert blocked.json()["code"] == (
+            "http_error" if family == FamilyCase.BEARER else "access_denied"
+        )
 
         await _seed_recovery_outcome(database, operation_id, release_block=False)
         unreleased = _get_session(client, family)
-        assert unreleased.status_code == (401 if family == "bearer" else 403), unreleased.text
+        assert unreleased.status_code == (401 if family == FamilyCase.BEARER else 403), (
+            unreleased.text
+        )
 
         await _seed_recovery_outcome(database, operation_id, release_block=True)
         released = _get_session(client, family)
-        if family == "bearer":
+        if family == FamilyCase.BEARER:
             assert released.status_code == 401
             # Model a fresh provider grant explicitly, not an upgrade of the old one.
             scenario.token.tokens[fresh] = HumanCredentialVersion(2)
@@ -463,7 +479,7 @@ async def test_recovery_block_changes_are_enforced_on_the_next_http_request(
 
         suspended = (
             client.get("/v1/session", headers={"Authorization": f"Bearer {fresh.value}"})
-            if family == "bearer"
+            if family == FamilyCase.BEARER
             else _get_session(client, family)
         )
         assert suspended.status_code == 403, suspended.text
@@ -471,11 +487,11 @@ async def test_recovery_block_changes_are_enforced_on_the_next_http_request(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("family", ["cookie", "bearer"])
+@pytest.mark.parametrize("family", [FamilyCase.COOKIE, FamilyCase.BEARER])
 async def test_later_local_admission_does_not_bypass_an_existing_recovery_block(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
-    family: Literal["cookie", "bearer"],
+    family: FamilyCase,
 ) -> None:
     """Linking a new local account cannot remove its provider identity's pending block."""
     await _admit_recovery(database)
@@ -483,7 +499,9 @@ async def test_later_local_admission_does_not_bypass_an_existing_recovery_block(
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
         before_link = _get_session(client, family)
-        assert before_link.status_code == (401 if family == "bearer" else 403), before_link.text
+        assert before_link.status_code == (401 if family == FamilyCase.BEARER else 403), (
+            before_link.text
+        )
 
         async with database.session() as session, session.begin():
             principal = await MockAccessScenarios.seed_linked_human(session, IDENTITY)
@@ -491,8 +509,10 @@ async def test_later_local_admission_does_not_bypass_an_existing_recovery_block(
         assert principal.status is PrincipalStatus.ACTIVE
         after_link = _get_session(client, family)
 
-    assert after_link.status_code == (401 if family == "bearer" else 403), after_link.text
-    assert after_link.json()["code"] == ("http_error" if family == "bearer" else "access_denied")
+    assert after_link.status_code == (401 if family == FamilyCase.BEARER else 403), after_link.text
+    assert after_link.json()["code"] == (
+        "http_error" if family == FamilyCase.BEARER else "access_denied"
+    )
 
 
 @pytest_asyncio.fixture(autouse=True)

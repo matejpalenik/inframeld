@@ -4,7 +4,7 @@ import asyncio
 import os
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Literal
+from enum import StrEnum
 from uuid import UUID
 
 import pytest
@@ -59,6 +59,35 @@ from inframeld_backend.shared.infrastructure.readers.postgres_installation_ident
     PostgresInstallationIdentityReader,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
+
+
+class ChangedScopeCase(StrEnum):
+    INSTALLATION = "installation"
+    AUTHORITY = "authority"
+    FLOW = "flow"
+
+
+class ProviderCase(StrEnum):
+    KRATOS = "kratos"
+    HYDRA = "hydra"
+
+
+class SourceCase(StrEnum):
+    ANOTHER_REPOSITORY = "another-repository"
+    RECONSTITUTED = "reconstituted"
+
+
+class Operation(StrEnum):
+    GET = "get"
+    SAVE = "save"
+
+
+class ChangedBindingCase(StrEnum):
+    SUBJECT = "subject"
+    EVENT_KIND = "event-kind"
+    OPERATION = "operation"
+    ADMITTED_AT = "admitted-at"
+
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
@@ -138,12 +167,15 @@ async def test_load_existing_recovery_without_provisioning_a_principal(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("changed_scope", ["installation", "authority", "flow"])
+@pytest.mark.parametrize(
+    "changed_scope",
+    [ChangedScopeCase.INSTALLATION, ChangedScopeCase.AUTHORITY, ChangedScopeCase.FLOW],
+)
 async def test_load_requires_the_exact_original_scope(
     database: Database,
     installation_id: InstallationId,
     operation_id: OperationId,
-    changed_scope: Literal["installation", "authority", "flow"],
+    changed_scope: ChangedScopeCase,
 ) -> None:
     """The same flow value cannot retrieve an admission from another trusted scope."""
     async with database.session() as session, session.begin():
@@ -151,13 +183,13 @@ async def test_load_requires_the_exact_original_scope(
         with pytest.raises(ResourceNotFoundError):
             await repository.get(
                 installation_id=InstallationId(UUID(int=0))
-                if changed_scope == "installation"
+                if changed_scope == ChangedScopeCase.INSTALLATION
                 else installation_id,
                 authority=IdentityAuthority("https://other.example.test")
-                if changed_scope == "authority"
+                if changed_scope == ChangedScopeCase.AUTHORITY
                 else AUTHORITY,
                 flow_id=IdentityRecoveryFlowId(UUID(int=0))
-                if changed_scope == "flow"
+                if changed_scope == ChangedScopeCase.FLOW
                 else EVENT.flow_id,
             )
 
@@ -169,7 +201,7 @@ async def test_load_requires_the_exact_original_scope(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider", ["kratos", "hydra"])
+@pytest.mark.parametrize("provider", [ProviderCase.KRATOS, ProviderCase.HYDRA])
 @pytest.mark.parametrize(
     "outcome",
     [
@@ -182,7 +214,7 @@ async def test_save_provider_progress_preserves_original_admission(
     database: Database,
     installation_id: InstallationId,
     operation_id: OperationId,
-    provider: Literal["kratos", "hydra"],
+    provider: ProviderCase,
     outcome: IdentityRecoveryCleanupState,
 ) -> None:
     """Recording one provider must preserve the other result and original event binding."""
@@ -191,7 +223,7 @@ async def test_save_provider_progress_preserves_original_admission(
     async with database.session() as session, session.begin():
         repository = PostgresIdentityRecoveryRepository(session)
         recovery = await _load(repository, installation_id)
-        if provider == "kratos":
+        if provider == ProviderCase.KRATOS:
             recovery.record_kratos_cleanup(outcome)
         else:
             recovery.record_hydra_cleanup(outcome)
@@ -207,10 +239,10 @@ async def test_save_provider_progress_preserves_original_admission(
     assert stored.admitted_at == original.admitted_at
     assert stored.released_at is None
     assert stored.kratos_cleanup_state is (
-        outcome if provider == "kratos" else IdentityRecoveryCleanupState.PENDING
+        outcome if provider == ProviderCase.KRATOS else IdentityRecoveryCleanupState.PENDING
     )
     assert stored.hydra_cleanup_state is (
-        outcome if provider == "hydra" else IdentityRecoveryCleanupState.PENDING
+        outcome if provider == ProviderCase.HYDRA else IdentityRecoveryCleanupState.PENDING
     )
 
 
@@ -376,12 +408,12 @@ async def test_task_cancellation_rolls_back_saved_progress(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("source", ["another-repository", "reconstituted"])
+@pytest.mark.parametrize("source", [SourceCase.ANOTHER_REPOSITORY, SourceCase.RECONSTITUTED])
 async def test_save_rejects_an_instance_not_loaded_here(
     database: Database,
     installation_id: InstallationId,
     operation_id: OperationId,
-    source: Literal["another-repository", "reconstituted"],
+    source: SourceCase,
 ) -> None:
     """Equal recovery identity does not make an untracked object safe to save."""
     async with database.session() as session, session.begin():
@@ -389,7 +421,7 @@ async def test_save_rejects_an_instance_not_loaded_here(
         original = await _load(repository, installation_id)
         other = (
             await _load(PostgresIdentityRecoveryRepository(session), installation_id)
-            if source == "another-repository"
+            if source == SourceCase.ANOTHER_REPOSITORY
             else IdentityRecovery(
                 installation_id=installation_id,
                 authority=AUTHORITY,
@@ -412,17 +444,17 @@ async def test_save_rejects_an_instance_not_loaded_here(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["get", "save"])
+@pytest.mark.parametrize(ChangedBindingCase.OPERATION, [Operation.GET, Operation.SAVE])
 async def test_repository_requires_an_active_caller_transaction(
     database: Database,
     installation_id: InstallationId,
     operation_id: OperationId,
-    operation: Literal["get", "save"],
+    operation: Operation,
 ) -> None:
     async with database.session() as session:
         repository = PostgresIdentityRecoveryRepository(session)
         with pytest.raises(RuntimeError, match="active transaction"):
-            if operation == "get":
+            if operation == Operation.GET:
                 await _load(repository, installation_id)
             else:
                 await repository.save(
@@ -437,12 +469,12 @@ async def test_repository_requires_an_active_caller_transaction(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["get", "save"])
+@pytest.mark.parametrize(ChangedBindingCase.OPERATION, [Operation.GET, Operation.SAVE])
 async def test_repository_cannot_follow_an_aggregate_into_another_transaction(
     database: Database,
     installation_id: InstallationId,
     operation_id: OperationId,
-    operation: Literal["get", "save"],
+    operation: Operation,
 ) -> None:
     async with database.session() as session:
         repository = PostgresIdentityRecoveryRepository(session)
@@ -451,7 +483,7 @@ async def test_repository_cannot_follow_an_aggregate_into_another_transaction(
 
         async with session.begin():
             with pytest.raises(RuntimeError, match="another transaction"):
-                if operation == "get":
+                if operation == Operation.GET:
                     await _load(repository, installation_id)
                 else:
                     await repository.save(recovery)
@@ -465,12 +497,12 @@ async def test_concurrent_provider_updates_conflict_then_reload_without_lost_pro
     """Both workers start from pending - the loser reloads instead of erasing the winner."""
     loaded = asyncio.Barrier(2)
 
-    async def record(provider: Literal["kratos", "hydra"]) -> bool:
+    async def record(provider: ProviderCase) -> bool:
         try:
             async with database.session() as session, session.begin():
                 repository = PostgresIdentityRecoveryRepository(session)
                 recovery = await _load(repository, installation_id)
-                if provider == "kratos":
+                if provider == ProviderCase.KRATOS:
                     recovery.record_kratos_cleanup(IdentityRecoveryCleanupState.CONFIRMED)
                 else:
                     recovery.record_hydra_cleanup(IdentityRecoveryCleanupState.CONFIRMED)
@@ -481,7 +513,7 @@ async def test_concurrent_provider_updates_conflict_then_reload_without_lost_pro
             return False
 
     async with asyncio.timeout(30):
-        results = await asyncio.gather(record("kratos"), record("hydra"))
+        results = await asyncio.gather(record(ProviderCase.KRATOS), record(ProviderCase.HYDRA))
     assert sorted(results) == [False, True]
     stored = await _stored(database, operation_id)
     assert (stored.kratos_cleanup_state is IdentityRecoveryCleanupState.CONFIRMED) != (
@@ -503,12 +535,20 @@ async def test_concurrent_provider_updates_conflict_then_reload_without_lost_pro
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("changed_binding", ["subject", "event-kind", "operation", "admitted-at"])
+@pytest.mark.parametrize(
+    "changed_binding",
+    [
+        ChangedBindingCase.SUBJECT,
+        ChangedBindingCase.EVENT_KIND,
+        ChangedBindingCase.OPERATION,
+        ChangedBindingCase.ADMITTED_AT,
+    ],
+)
 async def test_changed_original_metadata_prevents_a_stale_save(
     database: Database,
     installation_id: InstallationId,
     operation_id: OperationId,
-    changed_binding: Literal["subject", "event-kind", "operation", "admitted-at"],
+    changed_binding: ChangedBindingCase,
 ) -> None:
     """A loaded checklist cannot write through a changed admission binding."""
     async with database.session() as session, session.begin():
@@ -519,11 +559,11 @@ async def test_changed_original_metadata_prevents_a_stale_save(
         statement = update(IdentityRecoveryAdmissionRow).where(
             IdentityRecoveryAdmissionRow.operation_id == operation_id.value
         )
-        if changed_binding == "subject":
+        if changed_binding == ChangedBindingCase.SUBJECT:
             statement = statement.values(subject="another-identity")
-        elif changed_binding == "event-kind":
+        elif changed_binding == ChangedBindingCase.EVENT_KIND:
             statement = statement.values(event_kind=IdentityRecoveryEventKind.PASSWORD_RESET)
-        elif changed_binding == "operation":
+        elif changed_binding == ChangedBindingCase.OPERATION:
             statement = statement.values(operation_id="replacement-operation")
         else:
             statement = statement.values(admitted_at=RELEASED_AT)

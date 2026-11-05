@@ -98,9 +98,21 @@ SETTINGS_BINDING = IdentityRecoverySettingsBindingDTO(
     EVENT.identity, EVIDENCE.settings_flow_id, EVIDENCE.session_id, OPERATION, EVENT.flow_id
 )
 FACTS = IdentityRecoveryAssociationFactsDTO(
-    ADMISSION, SESSION_BINDING, ADMISSION, SETTINGS_BINDING, ADMISSION, HumanCredentialVersion(2)
+    source_admission=ADMISSION,
+    session_binding=SESSION_BINDING,
+    session_admission=ADMISSION,
+    settings_binding=SETTINGS_BINDING,
+    settings_admission=ADMISSION,
+    current_version=HumanCredentialVersion(2),
 )
-EMPTY_FACTS = IdentityRecoveryAssociationFactsDTO(None, None, None, None, None, None)
+EMPTY_FACTS = IdentityRecoveryAssociationFactsDTO(
+    source_admission=None,
+    session_binding=None,
+    session_admission=None,
+    settings_binding=None,
+    settings_admission=None,
+    current_version=None,
+)
 
 
 class Scenario(
@@ -128,7 +140,12 @@ class Scenario(
             subject=EVENT.identity.subject,
         )
         self.service = IdentityRecoveryNotificationService(
-            self, self, self, self, facts=self, installation_id=INSTALLATION
+            self,
+            self,
+            self,
+            self,
+            recovery_association_facts_reader=self,
+            installation_id=INSTALLATION,
         )
 
     @override
@@ -286,7 +303,13 @@ async def test_database_deadline_includes_transaction_exit() -> None:
     s = Scenario()
     s.commit_gate = asyncio.Event()
     s.service = IdentityRecoveryNotificationService(
-        s, s, s, s, facts=s, installation_id=INSTALLATION, database_timeout_seconds=0.02
+        s,
+        s,
+        s,
+        s,
+        recovery_association_facts_reader=s,
+        installation_id=INSTALLATION,
+        database_timeout_seconds=0.02,
     )
     with pytest.raises(DependencyUnavailableError):
         await s.service.admit(EVENT)

@@ -14,6 +14,7 @@ inframeld_sdk_fixtures/models/page_response_int.py
 inframeld_sdk_fixtures/models/path_inner.py
 inframeld_sdk_fixtures/models/problem_details.py
 inframeld_sdk_fixtures/models/validation_issue.py
+inframeld_sdk_fixtures/models/validation_issue_location.py
 inframeld_sdk_fixtures/py.typed
 inframeld_sdk_fixtures/rest.py
 inframeld_sdk_fixtures/sync_helper.py

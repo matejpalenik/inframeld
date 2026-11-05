@@ -195,7 +195,6 @@ pub struct ValidationIssue {
     ///Stable Inframeld validation category.
     ///Constraint: minLength=1, maxLength=64, pattern=`^[a-z][a-z0-9_]*$`
     pub code: String,
-    ///Request component containing the issue.
     pub location: ValidationIssueLocation,
     ///Safe corrective description without submitted values.
     ///Constraint: minLength=1, maxLength=256
@@ -210,7 +209,7 @@ pub enum ValidationIssuePathItemUnion {
     String(String),
     Integer(i64),
 }
-///Request component containing the issue.
+///Identify the request component that contains an invalid field.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
 pub enum ValidationIssueLocation {
     #[default]

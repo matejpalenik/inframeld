@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from hashlib import sha256
-from typing import Literal
 from uuid import uuid4, uuid5
 
 import pytest
@@ -79,10 +78,10 @@ from inframeld_backend.shared.application.commands.change_project_spending_polic
 from inframeld_backend.shared.application.dtos.captured_spending_basis_dto import (
     CapturedSpendingBasisDTO,
 )
-from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.dtos.project_spending_policy_result_dto import (
     ProjectSpendingPolicyResultDTO,
@@ -98,6 +97,10 @@ from inframeld_backend.shared.application.dtos.spending_observation_dto import (
 )
 from inframeld_backend.shared.application.dtos.spending_rate_dto import SpendingRateDTO
 from inframeld_backend.shared.application.dtos.spending_usage_dto import SpendingUsageDTO
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.protocols.spending_ledger_writer import (
     SpendingLedgerWriter,
 )
@@ -191,13 +194,13 @@ async def seed_spending_scenario(
     project = await create_project(database, creator)
     access = AccessContextDTO(creator.access.actor_principal_id, creator.binding)
     authority = AdmittedWorkAuthorityDTO(
-        access.actor_principal_id,
-        PrincipalKind.HUMAN,
-        creator.binding.installation_id,
-        creator.organization_id,
-        project.project.project_id,
-        ActionId("create-sources"),
-        creator.binding,
+        principal_id=access.actor_principal_id,
+        principal_kind=PrincipalKind.HUMAN,
+        installation_id=creator.binding.installation_id,
+        organization_id=creator.organization_id,
+        project_id=project.project.project_id,
+        action_id=ActionId("create-sources"),
+        human_binding=creator.binding,
     )
     if create_account:
         async with database.session() as session, session.begin():
@@ -227,8 +230,8 @@ async def _admit_attempt(
         ).admit(
             access=access,
             authority=authority,
-            context=OperationAdmissionContextDTO(
-                "POST", "/v1/projects/{project_id}/sources", IdempotencyKey(key)
+            context=IdempotencyContextDTO(
+                HttpMethod.POST, "/v1/projects/{project_id}/sources", IdempotencyKey(key)
             ),
             fingerprint=RequestFingerprint(b"S" * 32),
             request_id=RequestId(uuid4()),
@@ -253,8 +256,8 @@ async def _admit_attempt(
             recovery_store,
             supported_payloads=(("test.spending", 1),),
             worker_id=uuid4(),
-            product=product_authority,
-            recovery=recovery_service,
+            admitted_work_authorizer=product_authority,
+            job_recovery=recovery_service,
         ).claim_next()
     assert attempt is not None and isinstance(attempt.binding, ProductJobBindingDTO)
     assert attempt.job_id == admitted.job_id
@@ -297,13 +300,13 @@ async def seed_human_work(
     binding = access.authentication_evidence
     assert isinstance(binding, HumanOAuthCredentialBindingDTO)
     authority = AdmittedWorkAuthorityDTO(
-        access.actor_principal_id,
-        PrincipalKind.HUMAN,
-        binding.installation_id,
-        original.organization_id,
-        original.project_id,
-        ActionId("create-sources"),
-        binding,
+        principal_id=access.actor_principal_id,
+        principal_kind=PrincipalKind.HUMAN,
+        installation_id=binding.installation_id,
+        organization_id=original.organization_id,
+        project_id=original.project_id,
+        action_id=ActionId("create-sources"),
+        human_binding=binding,
     )
     attempt = await _admit_attempt(database, access, authority, key)
     return SpendingScenarioDTO(access, original.organization_id, original.project_id, attempt)
@@ -394,12 +397,12 @@ def call_context(scenario: SpendingScenarioDTO, number: int = 1) -> SpendingCall
 
 def price_basis(amount: str = "0.1", maximum: str = "1") -> CapturedSpendingBasisDTO:
     return CapturedSpendingBasisDTO(
-        "controlled-basis",
-        "accounting-fixture",
-        "v1",
-        datetime.now(UTC),
-        (SpendingRateDTO("input", "unit", Decimal(amount)),),
-        (SpendingUsageDTO("input", "unit", Decimal(maximum)),),
+        basis_id="controlled-basis",
+        source_reference="accounting-fixture",
+        source_revision="v1",
+        captured_at=datetime.now(UTC),
+        rates=(SpendingRateDTO("input", "unit", Decimal(amount)),),
+        maximum_usage=(SpendingUsageDTO("input", "unit", Decimal(maximum)),),
     )
 
 
@@ -407,7 +410,7 @@ def observation(
     call: SpendingCallContextDTO,
     *,
     number: int = 1,
-    kind: Literal["usage", "charge", "not_sent", "not_billed", "uncertain"] = "charge",
+    kind: SpendingObservationKind = SpendingObservationKind.CHARGE,
     charge: str | None = "0.08",
 ) -> SpendingObservationDTO:
     return SpendingObservationDTO(
@@ -424,12 +427,14 @@ def accounting_service(
     session: AsyncSession, writer: SpendingLedgerWriter | None = None
 ) -> SpendingAccountingService:
     return SpendingAccountingService(
-        transactions=SqlAlchemyTransactionManager(session),
-        authorizer=AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
-        ownership=PostgresJobStore(session),
-        reader=PostgresSpendingLedgerReader(session),
-        writer=PostgresSpendingLedgerWriter(session) if writer is None else writer,
-        budget_authorizer=ProjectBudgetAuthorizationService(
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        admitted_work_authorizer=AdmittedWorkAuthorizationService(
+            PostgresAdmittedWorkFactsReader(session)
+        ),
+        job_ownership=PostgresJobStore(session),
+        spending_ledger_reader=PostgresSpendingLedgerReader(session),
+        spending_ledger_writer=PostgresSpendingLedgerWriter(session) if writer is None else writer,
+        project_budget_authorizer=ProjectBudgetAuthorizationService(
             PostgresProjectBudgetFactsReader(session)
         ),
     )
@@ -439,12 +444,14 @@ def policy_service(
     session: AsyncSession, writer: SpendingLedgerWriter | None = None
 ) -> ProjectSpendingPolicyService:
     return ProjectSpendingPolicyService(
-        transactions=SqlAlchemyTransactionManager(session),
-        authorizer=ProjectBudgetAuthorizationService(PostgresProjectBudgetFactsReader(session)),
-        reader=PostgresSpendingLedgerReader(session),
-        writer=PostgresSpendingLedgerWriter(session) if writer is None else writer,
-        idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-        fingerprints=fingerprints(),
+        transaction_manager=SqlAlchemyTransactionManager(session),
+        project_budget_authorizer=ProjectBudgetAuthorizationService(
+            PostgresProjectBudgetFactsReader(session)
+        ),
+        spending_ledger_reader=PostgresSpendingLedgerReader(session),
+        spending_ledger_writer=PostgresSpendingLedgerWriter(session) if writer is None else writer,
+        operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+        spending_policy_fingerprint_service=fingerprints(),
     )
 
 
@@ -471,8 +478,10 @@ async def change_limit(
         return await policy.change_limit(
             access=scenario.access,
             command=ChangeProjectSpendingPolicyCommand(scenario.project_id, revision, limit),
-            context=OperationAdmissionContextDTO(
-                "PATCH", "/internal/projects/{project_id}/spending-policy", IdempotencyKey(key)
+            context=IdempotencyContextDTO(
+                HttpMethod.PATCH,
+                "/internal/projects/{project_id}/spending-policy",
+                IdempotencyKey(key),
             ),
         )
 

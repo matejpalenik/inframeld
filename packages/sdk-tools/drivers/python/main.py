@@ -13,7 +13,14 @@ from inframeld_sdk_fixtures.exceptions import ApiException as FixtureApiExceptio
 from inframeld_sdk_fixtures.sync_helper import run_sync as fixture_sync
 from observations import failure, success
 from operations import BINDINGS, Clients
-from protocol import DriverFailure, DriverRequest, Observation, Observations
+from protocol import (
+    DriverEnvelopeKind,
+    DriverFailure,
+    DriverRequest,
+    Observation,
+    Observations,
+    Profile,
+)
 from pydantic import ValidationError
 
 
@@ -34,7 +41,7 @@ async def execute(request: DriverRequest) -> Observations | DriverFailure:
             try:
                 response = (
                     binding.sync(clients, call)
-                    if request.profile == "python-sync"
+                    if request.profile is Profile.PYTHON_SYNC
                     else await binding.asynchronous(clients, call)
                 )
             except (ApiException, FixtureApiException) as error:
@@ -60,7 +67,7 @@ async def execute(request: DriverRequest) -> Observations | DriverFailure:
         # Attempt both owned clients, even if execution or the first close fails.
         for close in [clients.production.close, clients.fixtures.close]:
             try:
-                if request.profile == "python-sync":
+                if request.profile is Profile.PYTHON_SYNC:
                     bridge = production_sync if close == clients.production.close else fixture_sync
                     await asyncio.wait_for(asyncio.to_thread(bridge, close()), timeout=5)
                 else:
@@ -70,14 +77,14 @@ async def execute(request: DriverRequest) -> Observations | DriverFailure:
     if failures:
         return DriverFailure(
             version=2,
-            kind="driver-error",
+            kind=DriverEnvelopeKind.DRIVER_ERROR,
             profile=request.profile,
             caseId=request.case_id,
             error="\n".join(failures),
         )
     return Observations(
         version=2,
-        kind="observations",
+        kind=DriverEnvelopeKind.OBSERVATIONS,
         profile=request.profile,
         caseId=request.case_id,
         observations=observations,

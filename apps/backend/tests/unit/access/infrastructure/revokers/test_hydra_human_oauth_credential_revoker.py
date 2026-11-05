@@ -1,8 +1,8 @@
 import asyncio
 from collections.abc import Iterator
+from enum import StrEnum
 from json import JSONDecodeError
 from threading import Event
-from typing import Literal
 from unittest.mock import patch
 
 import pytest
@@ -19,11 +19,16 @@ from inframeld_backend.access.infrastructure.revokers.hydra_human_oauth_credenti
     HydraHumanOAuthCredentialRevoker,
 )
 
-type Operation = Literal["grant", "login"]
+
+class Operation(StrEnum):
+    GRANT = "grant"
+    LOGIN = "login"
+
+
 SUBJECT = IdentitySubject("alice-provider-subject")
 METHODS: dict[Operation, str] = {
-    "grant": "revoke_o_auth2_consent_sessions_with_http_info",
-    "login": "revoke_o_auth2_login_sessions_with_http_info",
+    Operation.GRANT: "revoke_o_auth2_consent_sessions_with_http_info",
+    Operation.LOGIN: "revoke_o_auth2_login_sessions_with_http_info",
 }
 
 
@@ -39,13 +44,13 @@ def client() -> Iterator[OAuth2Api]:
 async def _revoke(
     revoker: HydraHumanOAuthCredentialRevoker, operation: Operation, timeout_seconds: float = 1.0
 ) -> IdentityRecoveryCleanupState:
-    if operation == "grant":
+    if operation == Operation.GRANT:
         return (await revoker.revoke_cli_grants(SUBJECT, timeout_seconds=timeout_seconds)).state
     return (await revoker.revoke_remembered_logins(SUBJECT, timeout_seconds=timeout_seconds)).state
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["grant", "login"])
+@pytest.mark.parametrize("operation", [Operation.GRANT, Operation.LOGIN])
 @pytest.mark.parametrize("subject", [SUBJECT, IdentitySubject(" Alice/provider:subject ")])
 async def test_acknowledged_cleanup_sends_the_exact_subject_and_required_client_scope(
     client: OAuth2Api, operation: Operation, subject: IdentitySubject
@@ -54,7 +59,7 @@ async def test_acknowledged_cleanup_sends_the_exact_subject_and_required_client_
     response = ApiResponse[None](status_code=204, headers=None, data=None, raw_data=b"")
     with patch.object(client, METHODS[operation], return_value=response) as revoke:
         revoker = HydraHumanOAuthCredentialRevoker(client)
-        if operation == "grant":
+        if operation == Operation.GRANT:
             outcome = (await revoker.revoke_cli_grants(subject, timeout_seconds=1.0)).state
         else:
             outcome = (await revoker.revoke_remembered_logins(subject, timeout_seconds=1.0)).state
@@ -67,13 +72,13 @@ async def test_acknowledged_cleanup_sends_the_exact_subject_and_required_client_
     assert 0 < timeout <= 1.0
     assert arguments == (
         {"subject": subject.value, "client": "inframeld-cli"}
-        if operation == "grant"
+        if operation == Operation.GRANT
         else {"subject": subject.value}
     )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["grant", "login"])
+@pytest.mark.parametrize("operation", [Operation.GRANT, Operation.LOGIN])
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 409, 422, 429])
 async def test_explicit_rejection_is_failed_without_exposing_provider_details(
     client: OAuth2Api, operation: Operation, status: int, caplog: pytest.LogCaptureFixture
@@ -89,7 +94,7 @@ async def test_explicit_rejection_is_failed_without_exposing_provider_details(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["grant", "login"])
+@pytest.mark.parametrize("operation", [Operation.GRANT, Operation.LOGIN])
 @pytest.mark.parametrize(
     "error",
     [
@@ -116,7 +121,7 @@ async def test_unconfirmed_provider_outcome_is_uncertain_and_never_retried(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["grant", "login"])
+@pytest.mark.parametrize("operation", [Operation.GRANT, Operation.LOGIN])
 @pytest.mark.parametrize(
     "response",
     [
@@ -136,7 +141,7 @@ async def test_only_an_expected_empty_204_confirms_cleanup(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["grant", "login"])
+@pytest.mark.parametrize("operation", [Operation.GRANT, Operation.LOGIN])
 @pytest.mark.parametrize("timeout_seconds", [True, 0.0, -1.0, float("nan"), float("inf")])
 async def test_invalid_deadline_prevents_the_provider_call(
     client: OAuth2Api, operation: Operation, timeout_seconds: float
@@ -150,7 +155,7 @@ async def test_invalid_deadline_prevents_the_provider_call(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["grant", "login"])
+@pytest.mark.parametrize("operation", [Operation.GRANT, Operation.LOGIN])
 async def test_deadline_does_not_wait_for_a_blocked_sdk_thread(
     client: OAuth2Api, operation: Operation
 ) -> None:
@@ -173,7 +178,7 @@ async def test_deadline_does_not_wait_for_a_blocked_sdk_thread(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["grant", "login"])
+@pytest.mark.parametrize("operation", [Operation.GRANT, Operation.LOGIN])
 async def test_cancellation_propagates_without_retrying_the_remote_operation(
     client: OAuth2Api, operation: Operation
 ) -> None:

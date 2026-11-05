@@ -46,8 +46,8 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
 from inframeld_backend.access.http.routes.human_admission_routes import (
     create_human_admission_router,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.errors.application_error import ApplicationError
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -89,7 +89,7 @@ class MockHumanAdmitter(HumanAdmitter):
         self.result = replace(
             original, changed=changed, operation=replace(original.operation, created=not replay)
         )
-        self.calls: list[tuple[AdmitHumanCommand, OperationAdmissionContextDTO]] = []
+        self.calls: list[tuple[AdmitHumanCommand, IdempotencyContextDTO]] = []
         self.error: ApplicationError | None = None
 
     @override
@@ -98,7 +98,7 @@ class MockHumanAdmitter(HumanAdmitter):
         *,
         access: AccessContextDTO,
         command: AdmitHumanCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> HumanAdmissionResultDTO:
         assert access.actor_principal_id == ALICE.id
         self.calls.append((command, context))

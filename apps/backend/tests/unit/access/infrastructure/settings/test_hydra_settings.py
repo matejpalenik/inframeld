@@ -1,4 +1,4 @@
-from typing import Literal
+from enum import StrEnum
 
 import pytest
 from pydantic import ValidationError
@@ -8,11 +8,22 @@ from inframeld_backend.access.domain.value_objects.oauth_issuer import OAuthIssu
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 
 
+class FieldCase(StrEnum):
+    ADMIN_URL = "admin_url"
+    ISSUER = "issuer"
+    API_AUDIENCE = "api_audience"
+
+
+class FieldCaseVariant(StrEnum):
+    CLIENT_ID = "client_id"
+    REQUIRED_SCOPE = "required_scope"
+
+
 def _settings_input() -> dict[str, object]:
     return {
-        "admin_url": "http://hydra:4445",
-        "issuer": "https://login.example.test",
-        "api_audience": "https://api.example.test/base",
+        FieldCase.ADMIN_URL: "http://hydra:4445",
+        FieldCase.ISSUER: "https://login.example.test",
+        FieldCase.API_AUDIENCE: "https://api.example.test/base",
     }
 
 
@@ -25,7 +36,7 @@ def test_configuration_preserves_exact_issuer_and_audience_text() -> None:
     assert settings.required_scope == "inframeld:api"
 
 
-@pytest.mark.parametrize("field", ["admin_url", "issuer", "api_audience"])
+@pytest.mark.parametrize("field", [FieldCase.ADMIN_URL, FieldCase.ISSUER, FieldCase.API_AUDIENCE])
 @pytest.mark.parametrize(
     "url",
     [
@@ -37,7 +48,7 @@ def test_configuration_preserves_exact_issuer_and_audience_text() -> None:
     ],
 )
 def test_rejects_invalid_or_credential_bearing_urls(
-    field: Literal["admin_url", "issuer", "api_audience"],
+    field: FieldCase,
     url: str,
 ) -> None:
     inputs = _settings_input()
@@ -50,12 +61,12 @@ def test_rejects_invalid_or_credential_bearing_urls(
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("client_id", "another-client"),
-        ("required_scope", "openid"),
+        (FieldCaseVariant.CLIENT_ID, "another-client"),
+        (FieldCaseVariant.REQUIRED_SCOPE, "openid"),
     ],
 )
 def test_requires_the_accepted_first_party_client_and_api_scope(
-    field: Literal["client_id", "required_scope"],
+    field: FieldCaseVariant,
     value: str,
 ) -> None:
     inputs = _settings_input()

@@ -39,17 +39,17 @@ class ArtifactAllocationService:
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        attempts: ArtifactAttemptRepository,
-        obligations: ArtifactCleanupObligationRepository,
-        admission: ArtifactCleanupAdmissionService,
-        capacity: ArtifactCapacityReader,
+        transaction_manager: TransactionManager,
+        artifact_attempt_repository: ArtifactAttemptRepository,
+        artifact_cleanup_obligation_repository: ArtifactCleanupObligationRepository,
+        artifact_cleanup_admission_service: ArtifactCleanupAdmissionService,
+        artifact_capacity_reader: ArtifactCapacityReader,
     ) -> None:
-        self._transactions = transactions
-        self._attempts = attempts
-        self._obligations = obligations
-        self._admission = admission
-        self._capacity = capacity
+        self._transaction_manager = transaction_manager
+        self._artifact_attempt_repository = artifact_attempt_repository
+        self._artifact_cleanup_obligation_repository = artifact_cleanup_obligation_repository
+        self._artifact_cleanup_admission_service = artifact_cleanup_admission_service
+        self._artifact_capacity_reader = artifact_capacity_reader
 
     async def allocate(
         self,
@@ -69,12 +69,12 @@ class ArtifactAllocationService:
             raise ArtifactReservationError(
                 "Unadmitted source staging reserves its exact full allowance."
             )
-        capacity = await self._capacity.read()
+        capacity = await self._artifact_capacity_reader.read()
         binding = ArtifactCleanupJobBindingDTO(
             obligation_id, scope, ArtifactCleanupKind.ABANDONED_STAGING, origin
         )
-        async with self._transactions.begin():
-            reservation = await self._attempts.reserve(
+        async with self._transaction_manager.begin():
+            reservation = await self._artifact_attempt_repository.reserve(
                 scope=scope,
                 artifact_id=artifact_id,
                 attempt_id=attempt_id,
@@ -83,9 +83,9 @@ class ArtifactAllocationService:
                 transfer_seconds=transfer_seconds,
                 capacity=capacity,
             )
-            await self._obligations.create_staging(
+            await self._artifact_cleanup_obligation_repository.create_staging(
                 binding, targets=(attempt_id,), transfer_deadline=reservation.expires_at
             )
-            admission = await self._admission.admit(binding)
+            admission = await self._artifact_cleanup_admission_service.admit(binding)
             result = ArtifactAllocationDTO(reservation, binding, admission.job_id)
         return result

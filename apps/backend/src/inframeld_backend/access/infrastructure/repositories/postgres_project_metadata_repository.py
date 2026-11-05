@@ -15,6 +15,7 @@ from inframeld_backend.access.application.protocols.project_metadata_repository 
     ProjectMetadataRepository,
 )
 from inframeld_backend.access.domain.entities.project_metadata import ProjectMetadata
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
@@ -51,9 +52,11 @@ class PostgresProjectMetadataRepository(ProjectMetadataRepository):
     The application owns current authorization and commit or rollback.
     """
 
-    def __init__(self, session: AsyncSession, audit: ProjectMetadataAuditWriter) -> None:
+    def __init__(
+        self, session: AsyncSession, metadata_audit_writer: ProjectMetadataAuditWriter
+    ) -> None:
         self._session = session
-        self._audit = audit
+        self._metadata_audit_writer = metadata_audit_writer
         self._transaction: AsyncSessionTransaction | None = None
         self._failed = False
         self._tracked: dict[
@@ -126,7 +129,8 @@ class PostgresProjectMetadataRepository(ProjectMetadataRepository):
                     IdempotencyReservationRow.principal_id == actor_id.value,
                     IdempotencyReservationRow.state == OperationReservationState.IN_PROGRESS,
                     IdempotencyReservationRow.lookup_authority_family == "project_action_use",
-                    IdempotencyReservationRow.lookup_action_id == "edit-project-metadata",
+                    IdempotencyReservationRow.lookup_action_id
+                    == ProjectAction.EDIT_PROJECT_METADATA.value,
                     IdempotencyReservationRow.method == "PATCH",
                     IdempotencyReservationRow.requested_route
                     == "/v1/projects/{project_id}/metadata",
@@ -166,16 +170,16 @@ class PostgresProjectMetadataRepository(ProjectMetadataRepository):
                     metadata_revision=metadata.revision,
                 )
             )
-            await self._audit.changed(
+            await self._metadata_audit_writer.changed(
                 ProjectMetadataChangedAuditEventDTO(
-                    metadata.organization_id,
-                    metadata.project_id,
-                    actor_id,
-                    operation_id,
-                    old_revision,
-                    metadata.revision,
-                    metadata.name != old_name,
-                    metadata.display_name != old_label,
+                    organization_id=metadata.organization_id,
+                    project_id=metadata.project_id,
+                    actor_id=actor_id,
+                    operation_id=operation_id,
+                    before_revision=old_revision,
+                    after_revision=metadata.revision,
+                    name_changed=metadata.name != old_name,
+                    display_name_changed=metadata.display_name != old_label,
                 )
             )
             await self._session.flush()
@@ -190,6 +194,7 @@ class PostgresProjectMetadataRepository(ProjectMetadataRepository):
             raise
 
     async def _change_name(self, metadata: ProjectMetadata, old_name: ResourceName | None) -> None:
+        """Replace the active name binding without losing its original Project ownership."""
         name = metadata.name
         if name is None:
             raise RuntimeError("A Project selector cannot be silently removed.")

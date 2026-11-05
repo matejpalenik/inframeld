@@ -74,6 +74,7 @@ def _operation_fields(record: dict[str, object], kind: str) -> None:
 
 
 def _stop_cleanup(receipt: dict[str, object], assignment: dict[str, object]) -> None:
+    """Require positive stop and cleanup evidence for the exact previous owner before reassignment."""
     fields = (
         BINDING_FIELDS
         | OWNER_FIELDS
@@ -106,6 +107,7 @@ def occupied_assignments(state: dict[str, object]) -> list[dict[str, object]]:
 def _archive(
     assignment: dict[str, object], state: dict[str, object], operation: dict[str, object]
 ) -> None:
+    """Preserve the previous binding before replacing current assignment fields."""
     previous = deepcopy({field: value for field, value in assignment.items() if field != "history"})
     history = list_value(assignment.setdefault("history", []), "assignment history")
     history.append(
@@ -118,6 +120,7 @@ def _archive(
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate state fields rather than silently selecting a conflicting value."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -127,6 +130,7 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _invalid_constant(value: str) -> object:
+    """Reject non-finite values in persisted coordination records."""
     raise ValueError(f"invalid JSON constant: {value}")
 
 
@@ -146,6 +150,7 @@ def read_json(path: Path) -> dict[str, object]:
 
 
 def _paths(value: object) -> list[str]:
+    """Require normalized repository-relative claims without globs or traversal."""
     result: list[str] = []
     for item in list_value(value, "paths"):
         path = string_value(item, "path")
@@ -173,6 +178,7 @@ def _strings(value: object, name: str, *, nonempty: bool = False) -> list[str]:
 
 
 def _binding(record: dict[str, object]) -> tuple[str, str, str]:
+    """Identify the exact source pair and issue revision covered by a receipt."""
     return (
         sha_value(record.get("base_sha"), "base_sha"),
         sha_value(record.get("head_sha"), "head_sha"),
@@ -181,6 +187,7 @@ def _binding(record: dict[str, object]) -> tuple[str, str, str]:
 
 
 def _assignment(record: dict[str, object]) -> None:
+    """Validate assignment identity and ownership fields before admitting its record."""
     integer_value(record.get("issue"), "issue", 1)
     string_value(record.get("worker_id"), "worker_id")
     worktree = string_value(record.get("worktree"), "worktree")
@@ -221,6 +228,7 @@ def _assignment(record: dict[str, object]) -> None:
 
 
 def _exclusive(records: dict[str, object]) -> None:
+    """Reject overlapping issue, worker, worktree or branch claims that remain occupied."""
     assignments = [
         object_value(value, "assignment")
         for value in records.values()
@@ -304,6 +312,7 @@ def validate_state(state: dict[str, object]) -> None:
 
 
 def _validate_merge_observation(record: dict[str, object]) -> None:
+    """Bind a claimed merge to its observed PR head and merged result."""
     status = record.get("status")
     if status not in ("uncertain", "merged", "not_merged"):
         raise ValueError("invalid observed merge status")
@@ -330,6 +339,7 @@ class StateStore:
 
     @contextmanager
     def _lock(self) -> Generator[None]:
+        """Serialize state readers and writers using the adjacent private lock file."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         lock_path = self.path.with_suffix(self.path.suffix + ".lock")
         flags = os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW
@@ -342,6 +352,7 @@ class StateStore:
             os.close(descriptor)
 
     def _write(self, state: dict[str, object]) -> None:
+        """Validate and atomically replace the run record, flushing it before publication."""
         validate_state(state)
         descriptor, temporary = tempfile.mkstemp(
             prefix=".delivery-", suffix=".tmp", dir=self.path.parent
@@ -422,6 +433,7 @@ class StateStore:
         return updated
 
     def _operate(self, state: dict[str, object], operation: dict[str, object]) -> None:
+        """Apply one validated transition without discarding earlier ownership or failure evidence."""
         kind = string_value(operation.get("op"), "op")
         _operation_fields(operation, kind)
         assignments = object_value(state["assignments"], "assignments")

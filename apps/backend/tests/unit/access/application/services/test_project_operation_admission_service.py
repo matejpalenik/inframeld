@@ -33,15 +33,16 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -72,7 +73,7 @@ ACTION = ActionId("create-access-groups")
 OPERATION = OperationId("original-admission")
 REQUEST = ProjectOperationAdmissionRequestDTO(
     project_id=ProjectId(UUID(int=3)),
-    method="POST",
+    method=HttpMethod.POST,
     requested_route="/v1/projects/{project_id}/builds",
     key=IdempotencyKey("same-admission"),
     fingerprint=RequestFingerprint(b"F" * 32),
@@ -111,7 +112,7 @@ class MockOperationIdempotency(OperationIdempotency):
         ) = NewOperationReservationDTO(OPERATION)
         self.error: Exception | None = None
         self.calls = 0
-        self.context: OperationAdmissionContextDTO | None = None
+        self.context: IdempotencyContextDTO | None = None
         self.access: AccessContextDTO | None = None
         self.authorization: object | None = None
         self.fingerprint: RequestFingerprint | None = None
@@ -119,10 +120,10 @@ class MockOperationIdempotency(OperationIdempotency):
         self.expected_kind: OperationReplayKind | None = None
 
     @override
-    async def find_or_reserve[ProjectScope: ProjectId | None](
+    async def reserve_or_recover[ProjectScope: ProjectId | None](
         self,
         *,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         access: AccessContextDTO,
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,
@@ -236,7 +237,7 @@ async def test_admission_passes_trusted_scope_and_preserves_the_outcome(
     ).reserve(access=ACCESS, action_id=ACTION, request=REQUEST, expected_replay_kind=kind)
     assert result == outcome
     assert idempotency.expected_kind is kind
-    assert idempotency.context == OperationAdmissionContextDTO(
+    assert idempotency.context == IdempotencyContextDTO(
         method=REQUEST.method, requested_route=REQUEST.requested_route, key=REQUEST.key
     )
     assert idempotency.access is ACCESS

@@ -43,8 +43,8 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class ProjectActionGrantsService(ProjectActionGrantsReader):
-    def __init__(self, facts: ProjectActionGrantsFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, grants_facts_reader: ProjectActionGrantsFactsReader) -> None:
+        self._grants_facts_reader = grants_facts_reader
 
     @override
     async def list_grants(
@@ -71,7 +71,7 @@ class ProjectActionGrantsService(ProjectActionGrantsReader):
 
         try:
             async with asyncio.timeout(5):
-                facts = await self._facts.read_page(
+                facts = await self._grants_facts_reader.read_page(
                     access=access,
                     project_id=query.project_id,
                     action_id=query.action_id,

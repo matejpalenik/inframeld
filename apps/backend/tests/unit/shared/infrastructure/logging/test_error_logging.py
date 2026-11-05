@@ -9,7 +9,8 @@ import structlog
 from sqlalchemy.exc import DBAPIError
 
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
-from inframeld_backend.shared.infrastructure.types.logging_types import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 
 LOCAL_SECRET = "synthetic-local-secret"
 CAUSE_SECRET = "synthetic-cause-secret"
@@ -72,7 +73,7 @@ def test_standard_and_structured_logs_use_selected_stream(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     configure_logging(
-        level="ERROR", log_format=log_format, stream=sys.stderr if use_stderr else None
+        level=LogLevel.ERROR, log_format=log_format, stream=sys.stderr if use_stderr else None
     )
     logging.getLogger("test.error_logging.stdlib").error("standard_channel_event")
     structlog.get_logger("test.error_logging.structured").error("structured_channel_event")
@@ -90,7 +91,7 @@ def test_exception_diagnostic_excludes_sensitive_data(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Retain useful stack identity without rendering sensitive values."""
-    configure_logging(level="ERROR", log_format=log_format)
+    configure_logging(level=LogLevel.ERROR, log_format=log_format)
     logger = structlog.get_logger("test.error_logging")
 
     try:
@@ -122,7 +123,7 @@ def test_exception_diagnostic_has_bounded_size(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Bound exception depth, group breadth, and total rendered nodes."""
-    configure_logging(level="ERROR", log_format="json")
+    configure_logging(level=LogLevel.ERROR, log_format=LogFormat.JSON)
     logger = structlog.get_logger("test.error_logging")
 
     logger.error(
@@ -144,7 +145,7 @@ def test_standard_library_exception_is_sanitized_and_cleared(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Sanitize stdlib diagnostics and remove raw exception information."""
-    configure_logging(level="ERROR", log_format=log_format)
+    configure_logging(level=LogLevel.ERROR, log_format=log_format)
 
     root_logger = logging.getLogger()
     capture_handler = _RecordCaptureHandler()
@@ -189,7 +190,7 @@ def test_sql_driver_text_is_excluded_from_diagnostic(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Hide both bound values and unsafe driver text in rendered logs."""
-    configure_logging(level="ERROR", log_format=log_format)
+    configure_logging(level=LogLevel.ERROR, log_format=log_format)
 
     private_parameter = "synthetic-private-sql-parameter"
     private_driver_text = "synthetic-private-driver-text"

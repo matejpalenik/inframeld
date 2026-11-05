@@ -2,7 +2,7 @@
 
 import asyncio
 import re
-from typing import Literal
+from enum import StrEnum
 from uuid import UUID
 
 import httpx2
@@ -12,11 +12,17 @@ from tests.support.integration_services import MAILPIT_URL
 from tests.support.kratos_browser import BrowserFlow
 
 
+class State(StrEnum):
+    CHOOSE_METHOD = "choose_method"
+    SENT_EMAIL = "sent_email"
+    PASSED_CHALLENGE = "passed_challenge"
+
+
 class RecoveryFlowResponse(BrowserFlow):
     """Read the recovery flow's ID, state and CSRF-protected browser form."""
 
     id: UUID
-    state: Literal["choose_method", "sent_email", "passed_challenge"]
+    state: State
 
 
 def _csrf_token(flow: BrowserFlow) -> str:
@@ -54,7 +60,7 @@ async def request_recovery_code(browser: httpx2.AsyncClient, email: str) -> Reco
 
     pending = RecoveryFlowResponse.model_validate_json(requested.text)
     assert pending.id == flow.id, "Kratos changed the recovery flow."
-    assert pending.state == "sent_email", "Kratos did not reach the email-sent state."
+    assert pending.state == State.SENT_EMAIL, "Kratos did not reach the email-sent state."
 
     return pending
 

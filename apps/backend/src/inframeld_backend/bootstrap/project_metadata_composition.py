@@ -41,19 +41,19 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
 
 @asynccontextmanager
 async def open_project_metadata(
-    database: Database, fingerprints: ProjectMetadataFingerprintService
+    database: Database, metadata_fingerprint_service: ProjectMetadataFingerprintService
 ) -> AsyncGenerator[ProjectMetadataService]:
     async with database.session() as session:
         yield ProjectMetadataService(
-            transactions=SqlAlchemyTransactionManager(session),
-            authorizer=ProjectMetadataAuthorizationService(
+            transaction_manager=SqlAlchemyTransactionManager(session),
+            metadata_authorizer=ProjectMetadataAuthorizationService(
                 PostgresProjectMetadataFactsReader(session)
             ),
-            repository=PostgresProjectMetadataRepository(
+            metadata_repository=PostgresProjectMetadataRepository(
                 session, PostgresProjectMetadataAuditWriter(session)
             ),
-            idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
-            fingerprints=fingerprints,
+            operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
+            metadata_fingerprint_service=metadata_fingerprint_service,
         )
 
 
@@ -62,11 +62,13 @@ async def open_project_name_resolution(database: Database) -> AsyncGenerator[Pro
     async with database.session() as session:
         facts = PostgresProjectMetadataFactsReader(session)
         yield ProjectNameResolutionService(
-            transactions=SqlAlchemyTransactionManager(session),
-            facts=facts,
-            resolver=ResourceNameResolutionService(PostgresProjectNameBindingReader(session)),
-            authorizer=ProjectMetadataAuthorizationService(facts),
-            repository=PostgresProjectMetadataRepository(
+            transaction_manager=SqlAlchemyTransactionManager(session),
+            metadata_facts_reader=facts,
+            resource_name_resolver=ResourceNameResolutionService(
+                PostgresProjectNameBindingReader(session)
+            ),
+            metadata_authorizer=ProjectMetadataAuthorizationService(facts),
+            metadata_repository=PostgresProjectMetadataRepository(
                 session, PostgresProjectMetadataAuditWriter(session)
             ),
         )

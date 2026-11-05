@@ -1,6 +1,8 @@
 from dataclasses import dataclass
-from typing import Literal
 
+from inframeld_backend.access.application.enums.project_membership_change_kind import (
+    ProjectMembershipChangeKind,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -19,7 +21,7 @@ class ProjectMembershipChangeResultDTO:
     project_id: ProjectId
     actor_principal_id: PrincipalId
     principal_id: PrincipalId
-    change_kind: Literal["add", "remove"]
+    change_kind: ProjectMembershipChangeKind
     access_revision: int
     changed: bool
     status_code: int

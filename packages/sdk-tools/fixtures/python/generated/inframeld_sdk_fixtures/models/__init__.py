@@ -21,4 +21,5 @@ from inframeld_sdk_fixtures.models.page_response_int import PageResponseInt
 from inframeld_sdk_fixtures.models.path_inner import PathInner
 from inframeld_sdk_fixtures.models.problem_details import ProblemDetails
 from inframeld_sdk_fixtures.models.validation_issue import ValidationIssue
+from inframeld_sdk_fixtures.models.validation_issue_location import ValidationIssueLocation
 

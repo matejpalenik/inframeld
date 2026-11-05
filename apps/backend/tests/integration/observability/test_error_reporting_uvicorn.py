@@ -15,6 +15,8 @@ from inframeld_backend.shared.http.middleware.request_context_middleware import 
     RequestContextMiddleware,
 )
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
@@ -43,7 +45,7 @@ async def test_uvicorn_emits_one_diagnostic_for_failed_request(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Suppress Uvicorn's duplicate while preserving the safe 500 response."""
-    configure_logging(level="INFO", log_format="json")
+    configure_logging(level=LogLevel.INFO, log_format=LogFormat.JSON)
 
     server = uvicorn.Server(
         uvicorn.Config(

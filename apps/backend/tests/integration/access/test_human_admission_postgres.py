@@ -4,7 +4,7 @@ import asyncio
 import os
 from contextlib import ExitStack
 from dataclasses import replace
-from typing import Literal
+from enum import StrEnum
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
@@ -89,9 +89,10 @@ from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_
     PostgresIdentityRecoveryAdmissionWriter,
 )
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
@@ -118,6 +119,12 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
 from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservation_writer import (
     PostgresOperationReservationWriter,
 )
+
+
+class TurnCase(StrEnum):
+    IDENTITY = "identity"
+    ORGANIZATION = "organization"
+
 
 pytestmark = [
     pytest.mark.asyncio,
@@ -163,8 +170,8 @@ async def _admit(
                 BOB_IDENTITY_ID,
                 seed.access_revision if revision is None else revision,
             ),
-            context=OperationAdmissionContextDTO(
-                "POST",
+            context=IdempotencyContextDTO(
+                HttpMethod.POST,
                 f"/v1/organizations/{seed.organization_id.value}/human-admissions",
                 IdempotencyKey(key),
             ),
@@ -795,14 +802,14 @@ async def test_completed_history_is_not_a_permanent_ban_but_missing_generation_f
             assert version is not None and version.version == 8
 
 
-@pytest.mark.parametrize("turn", ["identity", "organization"])
+@pytest.mark.parametrize("turn", [TurnCase.IDENTITY, TurnCase.ORGANIZATION])
 async def test_waiters_reread_recovery_and_authority_after_coordination(
-    database: Database, turn: Literal["identity", "organization"]
+    database: Database, turn: TurnCase
 ) -> None:
     seed = await seed_project_creator(database)
     async with asyncio.timeout(30), asyncio.TaskGroup() as tasks, database.session() as holder:
         async with holder.begin():
-            if turn == "identity":
+            if turn == TurnCase.IDENTITY:
                 await PostgresIdentityCoordinator(holder).acquire(
                     installation_id=seed.binding.installation_id, identity=_identity(seed)
                 )
@@ -816,7 +823,7 @@ async def test_waiters_reread_recovery_and_authority_after_coordination(
             assert pid is not None
             waiter = tasks.create_task(_attempt(database, seed))
             await _wait_for_waiter(database, pid, waiter)
-            if turn == "identity":
+            if turn == TurnCase.IDENTITY:
                 await _recover(holder, seed)
             else:
                 await holder.execute(
@@ -825,7 +832,7 @@ async def test_waiters_reread_recovery_and_authority_after_coordination(
                     )
                 )
         outcome = await waiter
-    assert isinstance(outcome, ConflictError if turn == "identity" else AccessDeniedError)
+    assert isinstance(outcome, ConflictError if turn == TurnCase.IDENTITY else AccessDeniedError)
     async with database.session() as session:
         assert (
             await session.get(
@@ -859,7 +866,7 @@ async def test_identity_lock_wait_stays_within_the_existing_database_deadline(
     await _assert_no_bob(database, seed)
 
 
-@pytest.mark.parametrize("scope", ["actor", "identity", "installation"])
+@pytest.mark.parametrize("scope", ["actor", TurnCase.IDENTITY, "installation"])
 async def test_result_reader_refuses_a_different_original_binding(
     database: Database, scope: str
 ) -> None:
@@ -872,7 +879,7 @@ async def test_result_reader_refuses_a_different_original_binding(
                 if scope == "installation"
                 else first.installation_id,
                 identity=replace(first.identity, subject=IdentitySubject(str(uuid4())))
-                if scope == "identity"
+                if scope == TurnCase.IDENTITY
                 else first.identity,
                 organization_id=first.organization_id,
                 actor_id=PrincipalId(uuid4()) if scope == "actor" else first.actor_principal_id,

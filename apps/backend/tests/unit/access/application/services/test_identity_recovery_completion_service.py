@@ -2,7 +2,8 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Literal, override
+from enum import StrEnum
+from typing import override
 from uuid import UUID
 
 import pytest
@@ -62,6 +63,21 @@ from inframeld_backend.shared.application.protocols.transaction_manager import T
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
+
+class ScopeCase(StrEnum):
+    INSTALLATION = "installation"
+    AUTHORITY = "authority"
+    FLOW = "flow"
+    SUBJECT = "subject"
+
+
+class Stage(StrEnum):
+    FACTS = "facts"
+    LOAD = "load"
+    SAVE = "save"
+    COMMIT = "commit"
+
+
 INSTALLATION = InstallationId(UUID(int=1))
 AUTHORITY = IdentityAuthority("kratos")
 EVENT = IdentityRecoveryEventDTO(
@@ -96,7 +112,7 @@ class MockTransactionManager(TransactionManager):
             if self.commit_error is not None:
                 self.events.append("commit-failed")
                 raise self.commit_error
-            self.events.append("commit")
+            self.events.append(Stage.COMMIT)
 
 
 class MockIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFactsReader):
@@ -120,7 +136,7 @@ class MockIdentityRecoveryCompletionFactsReader(IdentityRecoveryCompletionFactsR
         authority: IdentityAuthority,
         flow_id: IdentityRecoveryFlowId,
     ) -> IdentityRecoveryCompletionFactsDTO:
-        self.events.append("facts")
+        self.events.append(Stage.FACTS)
         self.calls.append((installation_id, authority, flow_id))
         if self.error is not None:
             raise self.error
@@ -149,7 +165,7 @@ class MockIdentityRecoveryRepository(IdentityRecoveryRepository):
         authority: IdentityAuthority,
         flow_id: IdentityRecoveryFlowId,
     ) -> IdentityRecovery:
-        self.events.append("load")
+        self.events.append(Stage.LOAD)
         self.calls.append((installation_id, authority, flow_id))
         if self.get_error is not None:
             raise self.get_error
@@ -157,7 +173,7 @@ class MockIdentityRecoveryRepository(IdentityRecoveryRepository):
 
     @override
     async def save(self, recovery: IdentityRecovery) -> None:
-        self.events.append("save")
+        self.events.append(Stage.SAVE)
         if self.save_error is not None:
             raise self.save_error
         self.saved.append(recovery)
@@ -176,8 +192,8 @@ class MockCompletionScenario:
             self.recoveries,
             installation_id=INSTALLATION,
             authority=AUTHORITY,
-            proofs=self.proofs,
-            proof_writer=self.proofs,
+            recovery_cleanup_proof_reader=self.proofs,
+            recovery_cleanup_proof_writer=self.proofs,
         )
 
 
@@ -192,7 +208,7 @@ async def test_confirmed_cleanup_commits_before_returning_original_operation() -
         hydra_outcome=IdentityRecoveryCleanupState.CONFIRMED,
     )
 
-    assert scenario.events == ["begin", "facts", "load", "save", "commit"]
+    assert scenario.events == ["begin", Stage.FACTS, Stage.LOAD, Stage.SAVE, Stage.COMMIT]
     assert scenario.facts.calls == [(INSTALLATION, AUTHORITY, EVENT.flow_id)]
     assert scenario.recoveries.calls == [(INSTALLATION, AUTHORITY, EVENT.flow_id)]
     assert scenario.recoveries.saved == [scenario.recoveries.recovery]
@@ -221,7 +237,7 @@ async def test_partial_cleanup_preserves_omitted_provider_and_keeps_block(
     assert result.kratos_cleanup_state is outcome
     assert result.hydra_cleanup_state is IdentityRecoveryCleanupState.PENDING
     assert result.released_at is None
-    assert scenario.events[-1] == "commit"
+    assert scenario.events[-1] == Stage.COMMIT
 
 
 @pytest.mark.asyncio
@@ -285,7 +301,7 @@ async def test_released_duplicate_preserves_results_and_does_not_save() -> None:
     assert result.released_at == released_at
     assert result.hydra_cleanup_state is IdentityRecoveryCleanupState.CONFIRMED
     assert scenario.recoveries.saved == []
-    assert scenario.events == ["begin", "facts", "load", "commit"]
+    assert scenario.events == ["begin", Stage.FACTS, Stage.LOAD, Stage.COMMIT]
 
 
 @pytest.mark.asyncio
@@ -351,7 +367,7 @@ async def test_missing_admission_conflicts_without_creating_an_obligation() -> N
             event=EVENT, hydra_outcome=IdentityRecoveryCleanupState.CONFIRMED
         )
     assert isinstance(error.value.__cause__, ResourceNotFoundError)
-    assert scenario.events == ["begin", "facts", "rollback"]
+    assert scenario.events == ["begin", Stage.FACTS, "rollback"]
 
 
 @pytest.mark.asyncio
@@ -370,7 +386,7 @@ async def test_conflicting_event_cannot_load_or_change_the_checklist(
         await scenario.service.record_cleanup(
             event=event, kratos_outcome=IdentityRecoveryCleanupState.CONFIRMED
         )
-    assert scenario.events == ["begin", "facts", "rollback"]
+    assert scenario.events == ["begin", Stage.FACTS, "rollback"]
 
 
 @pytest.mark.asyncio
@@ -383,26 +399,30 @@ async def test_facts_from_another_installation_fail_before_loading() -> None:
         await scenario.service.record_cleanup(
             event=EVENT, hydra_outcome=IdentityRecoveryCleanupState.CONFIRMED
         )
-    assert scenario.events == ["begin", "facts", "rollback"]
+    assert scenario.events == ["begin", Stage.FACTS, "rollback"]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("scope", ["installation", "authority", "flow", "subject"])
+@pytest.mark.parametrize(
+    "scope", [ScopeCase.INSTALLATION, ScopeCase.AUTHORITY, ScopeCase.FLOW, ScopeCase.SUBJECT]
+)
 async def test_loaded_checklist_must_match_the_original_target(
-    scope: Literal["installation", "authority", "flow", "subject"],
+    scope: ScopeCase,
 ) -> None:
     scenario = MockCompletionScenario()
     scenario.recoveries.recovery = IdentityRecovery(
-        installation_id=InstallationId(UUID(int=99)) if scope == "installation" else INSTALLATION,
-        authority=IdentityAuthority("other") if scope == "authority" else AUTHORITY,
-        flow_id=IdentityRecoveryFlowId(UUID(int=99)) if scope == "flow" else EVENT.flow_id,
-        subject=IdentitySubject("bob") if scope == "subject" else EVENT.identity.subject,
+        installation_id=InstallationId(UUID(int=99))
+        if scope == ScopeCase.INSTALLATION
+        else INSTALLATION,
+        authority=IdentityAuthority("other") if scope == ScopeCase.AUTHORITY else AUTHORITY,
+        flow_id=IdentityRecoveryFlowId(UUID(int=99)) if scope == ScopeCase.FLOW else EVENT.flow_id,
+        subject=IdentitySubject("bob") if scope == ScopeCase.SUBJECT else EVENT.identity.subject,
     )
     with pytest.raises(RuntimeError):
         await scenario.service.record_cleanup(
             event=EVENT, hydra_outcome=IdentityRecoveryCleanupState.CONFIRMED
         )
-    assert scenario.events == ["begin", "facts", "load", "rollback"]
+    assert scenario.events == ["begin", Stage.FACTS, Stage.LOAD, "rollback"]
 
 
 @pytest.mark.asyncio
@@ -420,17 +440,17 @@ async def test_confirmed_state_cannot_regress_and_error_text_is_application_owne
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stage", ["facts", "load", "save", "commit"])
+@pytest.mark.parametrize("stage", [Stage.FACTS, Stage.LOAD, Stage.SAVE, Stage.COMMIT])
 async def test_dependency_failures_propagate_without_a_success_result(
-    stage: Literal["facts", "load", "save", "commit"],
+    stage: Stage,
 ) -> None:
     scenario = MockCompletionScenario()
     failure = DependencyUnavailableError("Simulated dependency failure.")
-    if stage == "facts":
+    if stage == Stage.FACTS:
         scenario.facts.error = failure
-    elif stage == "load":
+    elif stage == Stage.LOAD:
         scenario.recoveries.get_error = failure
-    elif stage == "save":
+    elif stage == Stage.SAVE:
         scenario.recoveries.save_error = failure
     else:
         scenario.transactions.commit_error = failure
@@ -439,7 +459,7 @@ async def test_dependency_failures_propagate_without_a_success_result(
             event=EVENT, hydra_outcome=IdentityRecoveryCleanupState.CONFIRMED
         )
     assert error.value is failure
-    assert scenario.events[-1] == ("commit-failed" if stage == "commit" else "rollback")
+    assert scenario.events[-1] == ("commit-failed" if stage == Stage.COMMIT else "rollback")
 
 
 @pytest.mark.asyncio

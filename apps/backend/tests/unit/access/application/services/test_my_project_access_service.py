@@ -26,6 +26,9 @@ from inframeld_backend.access.application.dtos.my_project_access_relationship_dt
     MyProjectAccessRelationshipDTO,
 )
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
+from inframeld_backend.access.application.enums.my_project_access_item_kind import (
+    MyProjectAccessItemKind,
+)
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
 )
@@ -82,19 +85,19 @@ GRANTS = (
         ApplicationAccountGrantTargetDTO(PROJECT, APP), ActionId("revoke-application-keys"), True
     ),
 )
-MEMBERSHIP = MyProjectAccessRelationshipDTO("membership", PROJECT, GROUP)
-MANAGEMENT = MyProjectAccessRelationshipDTO("management", PROJECT, GROUP)
+MEMBERSHIP = MyProjectAccessRelationshipDTO(MyProjectAccessItemKind.MEMBERSHIP, PROJECT, GROUP)
+MANAGEMENT = MyProjectAccessRelationshipDTO(MyProjectAccessItemKind.MANAGEMENT, PROJECT, GROUP)
 FACTS = MyProjectAccessFactsDTO(
-    INSTALLATION,
-    ORGANIZATION,
-    PROJECT,
-    7,
-    ACTOR,
-    False,
-    None,
-    ProjectStatus.ACTIVE,
-    True,
-    (*GRANTS, MEMBERSHIP, MANAGEMENT),
+    installation_id=INSTALLATION,
+    organization_id=ORGANIZATION,
+    project_id=PROJECT,
+    access_revision=7,
+    actor=ACTOR,
+    has_pending_recovery=False,
+    oauth_credential_facts=None,
+    project_status=ProjectStatus.ACTIVE,
+    is_project_member=True,
+    items=(*GRANTS, MEMBERSHIP, MANAGEMENT),
 )
 
 
@@ -125,7 +128,7 @@ def _cursor() -> MyProjectAccessCursor:
         ORGANIZATION,
         PROJECT,
         ACTOR.id,
-        MyProjectAccessPosition("membership", GROUP.value, None),
+        MyProjectAccessPosition(MyProjectAccessItemKind.MEMBERSHIP, GROUP.value, None),
     )
 
 

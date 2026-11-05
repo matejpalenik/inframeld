@@ -1,7 +1,7 @@
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, cast
+from typing import cast
 
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
     AdmittedWorkAuthorityDTO,
@@ -38,6 +38,9 @@ from inframeld_backend.shared.application.dtos.spending_observation_dto import (
 from inframeld_backend.shared.application.dtos.spending_rate_dto import SpendingRateDTO
 from inframeld_backend.shared.application.dtos.spending_usage_dto import SpendingUsageDTO
 from inframeld_backend.shared.application.enums.spending_call_state import SpendingCallState
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.model_call_id import ModelCallId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
@@ -111,30 +114,30 @@ class PostgresSpendingMapper:
         ):
             raise ValueError("Stored human authority is incomplete.")
         authority = AdmittedWorkAuthorityDTO(
-            PrincipalId(operation.principal_id),
-            PrincipalKind(operation.principal_kind),
-            installation,
-            OrganizationId(operation.organization_id),
-            ProjectId(operation.project_id),
-            ActionId(operation.action_id),
-            binding,
+            principal_id=PrincipalId(operation.principal_id),
+            principal_kind=PrincipalKind(operation.principal_kind),
+            installation_id=installation,
+            organization_id=OrganizationId(operation.organization_id),
+            project_id=ProjectId(operation.project_id),
+            action_id=ActionId(operation.action_id),
+            human_binding=binding,
         )
         return SpendingCallRecordDTO(
-            ModelCallId(row.call_id),
-            OperationId(operation.operation_id),
-            authority,
-            JobId(operation.job_id),
-            RequestFingerprint(row.meaning_fingerprint),
-            SpendingPeriod(row.period_year, row.period_month),
-            PostgresSpendingMapper.amount(operation.operation_limit),
-            PostgresSpendingMapper._basis(row.basis),
-            PostgresSpendingMapper.amount(row.reserved_amount),
-            PostgresSpendingMapper.amount(row.hold_amount),
-            PostgresSpendingMapper.amount(row.settled_amount),
-            SpendingCallState(row.state),
-            row.revision,
-            row.reservation_policy_revision,
-            row.approved_policy_revision,
+            call_id=ModelCallId(row.call_id),
+            operation_id=OperationId(operation.operation_id),
+            authority=authority,
+            job_id=JobId(operation.job_id),
+            meaning_fingerprint=RequestFingerprint(row.meaning_fingerprint),
+            period=SpendingPeriod(row.period_year, row.period_month),
+            operation_limit=PostgresSpendingMapper.amount(operation.operation_limit),
+            basis=PostgresSpendingMapper._basis(row.basis),
+            reserved_amount=PostgresSpendingMapper.amount(row.reserved_amount),
+            hold_amount=PostgresSpendingMapper.amount(row.hold_amount),
+            settled_amount=PostgresSpendingMapper.amount(row.settled_amount),
+            state=SpendingCallState(row.state),
+            revision=row.revision,
+            reservation_policy_revision=row.reservation_policy_revision,
+            approved_policy_revision=row.approved_policy_revision,
         )
 
     @staticmethod
@@ -171,17 +174,23 @@ class PostgresSpendingMapper:
         row: ModelCallAccountingEvidenceRow, record: SpendingCallRecordDTO
     ) -> tuple[SpendingObservationDTO, SpendingCallRecordDTO | None, bool]:
         PostgresSpendingMapper._evidence_scope(row, record)
-        if row.kind not in ("usage", "charge", "not_sent", "not_billed", "uncertain"):
+        if row.kind not in (
+            SpendingObservationKind.USAGE,
+            SpendingObservationKind.CHARGE,
+            SpendingObservationKind.NOT_SENT,
+            SpendingObservationKind.NOT_BILLED,
+            SpendingObservationKind.UNCERTAIN,
+        ):
             raise ValueError("Stored spending evidence has an unsupported kind.")
-        kind: Literal["usage", "charge", "not_sent", "not_billed", "uncertain"] = row.kind
+        kind = SpendingObservationKind(row.kind)
         observation = SpendingObservationDTO(
-            row.evidence_id,
-            record.call_id,
-            kind,
-            row.observed_at,
-            row.source_reference,
-            PostgresSpendingMapper._usage(row.usage),
-            row.charge,
+            evidence_id=row.evidence_id,
+            call_id=record.call_id,
+            kind=kind,
+            observed_at=row.observed_at,
+            source_reference=row.source_reference,
+            usage=PostgresSpendingMapper._usage(row.usage),
+            charge=row.charge,
         )
         applied = PostgresSpendingMapper._receipt(
             record,
@@ -223,6 +232,7 @@ class PostgresSpendingMapper:
         revision: int | None,
         approval_revision: int | None,
     ) -> SpendingCallRecordDTO | None:
+        """Reconstruct the accounting result recorded for this call without inventing missing fields."""
         if state is None:
             if any(value is not None for value in (hold, settled, revision, approval_revision)):
                 raise ValueError("Stored financial receipt is incomplete.")
@@ -240,6 +250,7 @@ class PostgresSpendingMapper:
 
     @staticmethod
     def _evidence_scope(row: ModelCallAccountingEvidenceRow, record: SpendingCallRecordDTO) -> None:
+        """Reject accounting evidence stored against another model call or tenant scope."""
         if (row.call_id, row.organization_id, row.project_id) != (
             record.call_id.value,
             record.authority.organization_id.value,
@@ -249,6 +260,7 @@ class PostgresSpendingMapper:
 
     @staticmethod
     def _basis(value: dict[str, object] | None) -> CapturedSpendingBasisDTO | None:
+        """Decode the rate basis retained when the model call was reserved."""
         if value is None:
             return None
         rates: list[SpendingRateDTO] = []
@@ -262,16 +274,19 @@ class PostgresSpendingMapper:
                 )
             )
         return CapturedSpendingBasisDTO(
-            PostgresSpendingMapper._text(value.get("basis_id")),
-            PostgresSpendingMapper._text(value.get("source_reference")),
-            PostgresSpendingMapper._text(value.get("source_revision")),
-            datetime.fromisoformat(PostgresSpendingMapper._text(value.get("captured_at"))),
-            tuple(rates),
-            PostgresSpendingMapper._usage(value.get("maximum_usage")),
+            basis_id=PostgresSpendingMapper._text(value.get("basis_id")),
+            source_reference=PostgresSpendingMapper._text(value.get("source_reference")),
+            source_revision=PostgresSpendingMapper._text(value.get("source_revision")),
+            captured_at=datetime.fromisoformat(
+                PostgresSpendingMapper._text(value.get("captured_at"))
+            ),
+            rates=tuple(rates),
+            maximum_usage=PostgresSpendingMapper._usage(value.get("maximum_usage")),
         )
 
     @staticmethod
     def _usage(value: object) -> tuple[SpendingUsageDTO, ...] | None:
+        """Decode retained usage quantities without accepting an untyped accounting payload."""
         if value is None:
             return None
         result: list[SpendingUsageDTO] = []

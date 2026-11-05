@@ -2,8 +2,8 @@
 
 import asyncio
 from collections.abc import Iterator
+from enum import StrEnum
 from threading import Event
-from typing import Literal
 from unittest.mock import patch
 from uuid import UUID
 
@@ -38,17 +38,23 @@ from inframeld_backend.shared.application.errors.application_errors import (
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
+
+class Operation(StrEnum):
+    READ = "read"
+    ALLOW = "allow"
+    DENY = "deny"
+
+
 BINDING = HumanOAuthCredentialBindingDTO(
     VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySubject("alice")),
     InstallationId(UUID(int=123)),
     HumanCredentialVersion(6),
 )
 
-type Operation = Literal["read", "allow", "deny"]
 METHODS: dict[Operation, str] = {
-    "read": "get_o_auth2_consent_request",
-    "allow": "accept_o_auth2_consent_request",
-    "deny": "reject_o_auth2_consent_request",
+    Operation.READ: "get_o_auth2_consent_request",
+    Operation.ALLOW: "accept_o_auth2_consent_request",
+    Operation.DENY: "reject_o_auth2_consent_request",
 }
 
 
@@ -63,11 +69,11 @@ def client() -> Iterator[OAuth2Api]:
 
 async def _call(client: OAuth2Api, operation: Operation, seconds: float) -> None:
     challenge = OAuthConsentChallenge("private-challenge")
-    if operation == "read":
+    if operation == Operation.READ:
         await HydraOAuthConsentRequestReader(client).read(challenge, timeout_seconds=seconds)
     else:
         writer = HydraOAuthConsentDecisionWriter(client, public_url="https://auth.test")
-        if operation == "deny":
+        if operation == Operation.DENY:
             await writer.deny(challenge, timeout_seconds=seconds)
         else:
             await writer.allow(
@@ -81,7 +87,7 @@ async def _call(client: OAuth2Api, operation: Operation, seconds: float) -> None
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["read", "allow", "deny"])
+@pytest.mark.parametrize("operation", [Operation.READ, Operation.ALLOW, Operation.DENY])
 @pytest.mark.parametrize("seconds", [True, 0, -1, float("inf"), float("nan")])
 async def test_invalid_timeout_never_contacts_hydra(
     client: OAuth2Api, operation: Operation, seconds: float
@@ -92,7 +98,7 @@ async def test_invalid_timeout_never_contacts_hydra(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["read", "allow", "deny"])
+@pytest.mark.parametrize("operation", [Operation.READ, Operation.ALLOW, Operation.DENY])
 async def test_deadline_stops_waiting_without_retrying_the_sdk_thread(
     client: OAuth2Api, operation: Operation
 ) -> None:
@@ -114,7 +120,7 @@ async def test_deadline_stops_waiting_without_retrying_the_sdk_thread(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["read", "allow", "deny"])
+@pytest.mark.parametrize("operation", [Operation.READ, Operation.ALLOW, Operation.DENY])
 async def test_cancellation_propagates_while_the_remote_call_may_still_finish(
     client: OAuth2Api, operation: Operation
 ) -> None:
@@ -140,7 +146,7 @@ async def test_cancellation_propagates_while_the_remote_call_may_still_finish(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["allow", "deny"])
+@pytest.mark.parametrize("operation", [Operation.ALLOW, Operation.DENY])
 async def test_lost_acknowledgement_is_unavailable_and_does_not_replay_the_decision(
     client: OAuth2Api, operation: Operation
 ) -> None:

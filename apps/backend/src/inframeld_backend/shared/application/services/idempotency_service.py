@@ -12,11 +12,11 @@ from inframeld_backend.shared.application.dtos.accepted_async_operation_dto impo
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
@@ -51,14 +51,14 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 
 
 class IdempotencyService(OperationIdempotency):
-    def __init__(self, reservations: OperationReservationWriter) -> None:
-        self._reservations = reservations
+    def __init__(self, operation_reservation_writer: OperationReservationWriter) -> None:
+        self._operation_reservation_writer = operation_reservation_writer
 
     @override
-    async def find_or_reserve[ProjectScope: ProjectId | None](
+    async def reserve_or_recover[ProjectScope: ProjectId | None](
         self,
         *,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
         access: AccessContextDTO,
         authorization: AuthorizedOperationScope[ProjectScope],
         fingerprint: RequestFingerprint,
@@ -77,7 +77,7 @@ class IdempotencyService(OperationIdempotency):
                 requested_route=context.requested_route,
             )
 
-        stored = await self._reservations.reserve(
+        stored = await self._operation_reservation_writer.reserve(
             OperationReservationRequestDTO(
                 principal_id=access.actor_principal_id,
                 organization_id=authorization.organization_id,
@@ -129,7 +129,9 @@ class IdempotencyService(OperationIdempotency):
         replay_kind: OperationReplayKind,
     ) -> CompletedSynchronousOperationDTO | AcceptedAsyncOperationDTO:
         reserved = self._require_new_operation(operation)
-        expiry = await self._reservations.mark_replayable(reserved.operation_id, replay_kind)
+        expiry = await self._operation_reservation_writer.mark_replayable(
+            reserved.operation_id, replay_kind
+        )
         return self._completed(
             operation_id=reserved.operation_id,
             created=True,
@@ -139,12 +141,14 @@ class IdempotencyService(OperationIdempotency):
 
     @staticmethod
     def _require_new_operation(operation: object) -> NewOperationReservationDTO:
+        """Reject replay results where the caller requires newly reserved work."""
         if not isinstance(operation, NewOperationReservationDTO):
             raise ConflictError("The operation is not newly reserved work.")
         return operation
 
     @staticmethod
     def _require_incomplete_shape(stored: OperationReservationResultDTO) -> None:
+        """Reject unfinished reservations that already contain completion-only metadata."""
         if stored.replay_kind is not None or stored.expires_at is not None:
             raise ConflictError("An unfinished operation has unexpected replay metadata.")
 
@@ -156,6 +160,10 @@ class IdempotencyService(OperationIdempotency):
         replay_kind: OperationReplayKind,
         expires_at: datetime | None,
     ) -> CompletedSynchronousOperationDTO | AcceptedAsyncOperationDTO:
+        """Reconstruct the supported retained outcome without repeating its effects.
+
+        Synchronous results require their original replay deadline.
+        """
         if replay_kind is OperationReplayKind.ASYNC_JOB:
             return AcceptedAsyncOperationDTO(operation_id, created, expires_at)
         if (

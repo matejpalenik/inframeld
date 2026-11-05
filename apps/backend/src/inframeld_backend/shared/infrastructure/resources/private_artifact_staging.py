@@ -44,19 +44,21 @@ class PrivateArtifactStaging(ArtifactStaging):
     The reservation's remaining authoritative allowance fixes one deadline.
     """
 
-    def __init__(self, root: Path, reservations: ArtifactStagingReservationReader) -> None:
+    def __init__(
+        self, root: Path, staging_reservation_reader: ArtifactStagingReservationReader
+    ) -> None:
         if not root.is_absolute():
             raise ValueError("Private staging requires an absolute operator-owned root.")
         self._root = root
-        self._reservations = reservations
-        self._ownership = ArtifactAttemptOwnership(root)
+        self._staging_reservation_reader = staging_reservation_reader
+        self._attempt_ownership = ArtifactAttemptOwnership(root)
 
     async def startup(self) -> None:
-        await self._ownership.startup()
+        await self._attempt_ownership.startup()
 
     @override
     def hold(self, attempt_id: ArtifactAttemptId) -> AbstractAsyncContextManager[None]:
-        return self._ownership.hold(attempt_id)
+        return self._attempt_ownership.hold(attempt_id)
 
     @override
     async def stage(
@@ -70,7 +72,7 @@ class PrivateArtifactStaging(ArtifactStaging):
     ) -> ArtifactAttemptDTO:
         async with self.hold(attempt_id):
             started = time.monotonic()
-            facts = await self._reservations.read(reservation_id)
+            facts = await self._staging_reservation_reader.read(reservation_id)
             if facts is None or (
                 facts.reservation_id != reservation_id
                 or facts.artifact_id != artifact_id
@@ -151,7 +153,7 @@ class PrivateArtifactStaging(ArtifactStaging):
     @asynccontextmanager
     async def open(self, attempt: ArtifactAttemptDTO) -> AsyncGenerator[BinaryIO]:
         async with self.hold(attempt.attempt_id):
-            facts = await self._reservations.read_attempt(attempt.attempt_id)
+            facts = await self._staging_reservation_reader.read_attempt(attempt.attempt_id)
             if (
                 facts is None
                 or facts.retired
@@ -184,7 +186,7 @@ class PrivateArtifactStaging(ArtifactStaging):
     @override
     async def remove(self, target: ArtifactCleanupTargetDTO) -> None:
         async with self.hold(target.attempt_id):
-            facts = await self._reservations.read_attempt(target.attempt_id)
+            facts = await self._staging_reservation_reader.read_attempt(target.attempt_id)
             if (
                 facts is None
                 or not facts.retired

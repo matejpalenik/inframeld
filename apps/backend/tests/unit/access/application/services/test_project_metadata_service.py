@@ -19,9 +19,10 @@ from inframeld_backend.access.application.services.project_metadata_fingerprint_
 from inframeld_backend.access.application.services.project_metadata_service import (
     ProjectMetadataService,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import AccessDeniedError
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
@@ -40,11 +41,11 @@ class Scenario:
         self.repository = MockMetadataRepository(self.events)
         self.idempotency = MockOperationIdempotency(self.events)
         self.service = ProjectMetadataService(
-            transactions=MockTransactions(self.events),
-            authorizer=self.authorizer,
-            repository=self.repository,
-            idempotency=self.idempotency,
-            fingerprints=ProjectMetadataFingerprintService(
+            transaction_manager=MockTransactions(self.events),
+            metadata_authorizer=self.authorizer,
+            metadata_repository=self.repository,
+            operation_idempotency=self.idempotency,
+            metadata_fingerprint_service=ProjectMetadataFingerprintService(
                 RequestFingerprintService(RequestFingerprintKey(b"K" * 32))
             ),
         )
@@ -53,8 +54,10 @@ class Scenario:
         return await self.service.update(
             access=ACCESS,
             command=UpdateProjectMetadataCommand(PROJECT_ID, revision, ResourceName("support")),
-            context=OperationAdmissionContextDTO(
-                "PATCH", "/v1/projects/{project_id}/metadata", IdempotencyKey("same-request")
+            context=IdempotencyContextDTO(
+                HttpMethod.PATCH,
+                "/v1/projects/{project_id}/metadata",
+                IdempotencyKey("same-request"),
             ),
         )
 

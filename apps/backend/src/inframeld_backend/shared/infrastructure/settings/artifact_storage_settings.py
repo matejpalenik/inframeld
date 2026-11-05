@@ -1,10 +1,13 @@
 import re
 from pathlib import Path
-from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from inframeld_backend.shared.infrastructure.types.object_storage_addressing_style import (
+    ObjectStorageAddressingStyle,
+)
 
 
 class ArtifactStorageSettings(BaseSettings):
@@ -16,7 +19,7 @@ class ArtifactStorageSettings(BaseSettings):
     secret_access_key: SecretStr = Field(min_length=1, repr=False)
     region: str = Field(default="us-east-1", min_length=1)
     ca_bundle: Path | None = None
-    addressing_style: Literal["path", "virtual"] = "path"
+    addressing_style: ObjectStorageAddressingStyle = ObjectStorageAddressingStyle.PATH
     connect_timeout_seconds: float = Field(default=5, gt=0, le=30)
     read_timeout_seconds: float = Field(default=30, gt=0, le=30)
     operation_timeout_seconds: float = Field(default=30, gt=0, le=30)

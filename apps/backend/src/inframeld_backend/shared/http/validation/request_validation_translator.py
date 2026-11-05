@@ -11,6 +11,7 @@ from typing import Self, cast
 
 from fastapi.exceptions import RequestValidationError
 
+from inframeld_backend.shared.http.enums.validation_issue_location import ValidationIssueLocation
 from inframeld_backend.shared.http.responses.validation_issue import ValidationIssue
 from inframeld_backend.shared.http.types.problem_field_types import (
     MAX_VALIDATION_ISSUES,
@@ -22,12 +23,12 @@ from inframeld_backend.shared.http.types.problem_field_types import (
 _MAX_PUBLIC_FIELD_NAME_LENGTH = 64
 
 _ISSUE_LOCATION_BY_RAW_VALUE: dict[str, IssueLocation] = {
-    "body": "body",
-    "path": "path",
-    "query": "query",
-    "header": "header",
-    "cookie": "cookie",
-    "request": "request",
+    "body": ValidationIssueLocation.BODY,
+    "path": ValidationIssueLocation.PATH,
+    "query": ValidationIssueLocation.QUERY,
+    "header": ValidationIssueLocation.HEADER,
+    "cookie": ValidationIssueLocation.COOKIE,
+    "request": ValidationIssueLocation.REQUEST,
 }
 
 
@@ -95,7 +96,7 @@ class _ValidationFailure:
         if not isinstance(raw_error, Mapping):
             return cls(
                 pydantic_type=None,
-                location="request",
+                location=ValidationIssueLocation.REQUEST,
                 candidate_path=(),
             )
 
@@ -109,7 +110,7 @@ class _ValidationFailure:
         if not isinstance(raw_location, (list, tuple)) or not raw_location:
             return cls(
                 pydantic_type=pydantic_type,
-                location="request",
+                location=ValidationIssueLocation.REQUEST,
                 candidate_path=(),
             )
 
@@ -128,7 +129,7 @@ class _ValidationFailure:
         if location is None:
             return cls(
                 pydantic_type=pydantic_type,
-                location="request",
+                location=ValidationIssueLocation.REQUEST,
                 candidate_path=(),
             )
 
@@ -176,7 +177,7 @@ class _ValidationFailure:
 
             case "json_invalid":
                 return ValidationIssue(
-                    location="body",
+                    location=ValidationIssueLocation.BODY,
                     path=(),
                     code="invalid_json",
                     message="Use a valid JSON request body.",
@@ -217,7 +218,12 @@ class _ValidationFailure:
         Returns:
             A bounded public parameter path, or an empty path when unsafe.
         """
-        if self.location not in ("path", "query", "header", "cookie"):
+        if self.location not in (
+            ValidationIssueLocation.PATH,
+            ValidationIssueLocation.QUERY,
+            ValidationIssueLocation.HEADER,
+            ValidationIssueLocation.COOKIE,
+        ):
             return ()
 
         field_name = self._first_bounded_field_name()

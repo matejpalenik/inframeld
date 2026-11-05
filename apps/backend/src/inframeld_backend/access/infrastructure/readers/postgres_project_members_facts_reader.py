@@ -22,6 +22,7 @@ from inframeld_backend.access.application.protocols.project_members_facts_reader
     ProjectMembersFactsReader,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
@@ -106,7 +107,7 @@ class PostgresProjectMembersFactsReader(ProjectMembersFactsReader):
                 ProjectActionGrantRow.project_id == ProjectRow.id,
                 ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
                 ProjectActionGrantRow.recipient_kind == PrincipalRow.kind,
-                ProjectActionGrantRow.action == "manage-project-members",
+                ProjectActionGrantRow.action == ProjectAction.MANAGE_PROJECT_MEMBERS.value,
             )
             .correlate(PrincipalRow, ProjectRow)
         )
@@ -186,26 +187,26 @@ class PostgresProjectMembersFactsReader(ProjectMembersFactsReader):
                     )
                 )
         return ProjectMembersPageFactsDTO(
-            InstallationId(installed),
-            OrganizationId(principal.organization_id),
-            ProjectId(project.id),
-            project.access_revision,
-            ProjectActionFactsDTO(
-                Principal(
+            installation_id=InstallationId(installed),
+            organization_id=OrganizationId(principal.organization_id),
+            project_id=ProjectId(project.id),
+            access_revision=project.access_revision,
+            action=ProjectActionFactsDTO(
+                principal=Principal(
                     PrincipalId(principal.id),
                     OrganizationId(principal.organization_id),
                     principal.kind,
                     principal.status,
                 ),
-                recovering,
-                HumanOAuthCredentialFactsDTO(
+                has_pending_recovery=recovering,
+                oauth_credential_facts=HumanOAuthCredentialFactsDTO(
                     linked, HumanCredentialVersion(version) if version is not None else None
                 )
                 if isinstance(evidence, HumanOAuthCredentialBindingDTO)
                 else None,
-                project.status,
-                membership,
-                granted,
+                project_status=project.status,
+                is_project_member=membership,
+                has_exact_action_grant=granted,
             ),
-            tuple(members),
+            members=tuple(members),
         )

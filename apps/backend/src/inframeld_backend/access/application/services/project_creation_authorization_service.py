@@ -16,6 +16,7 @@ from inframeld_backend.access.application.protocols.project_creation_authorizer 
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
 )
+from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.policies.project_creation_policy import ProjectCreationPolicy
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -25,14 +26,16 @@ from inframeld_backend.shared.application.errors.application_errors import (
 
 
 class ProjectCreationAuthorizationService(ProjectCreationAuthorizer):
-    def __init__(self, facts: OrganizationAccessFactsReader) -> None:
-        self._facts = facts
+    def __init__(self, organization_access_facts_reader: OrganizationAccessFactsReader) -> None:
+        self._organization_access_facts_reader = organization_access_facts_reader
 
     @override
     async def require_creation(
         self, *, access: AccessContextDTO, organization_id: OrganizationId
     ) -> ProjectCreationAuthorizationDTO:
-        facts = await self._facts.read_for_creation(access=access, organization_id=organization_id)
+        facts = await self._organization_access_facts_reader.read_for_creation(
+            access=access, organization_id=organization_id
+        )
         if facts is None:
             raise ResourceNotFoundError()
         if facts.principal.id != access.actor_principal_id:
@@ -51,7 +54,8 @@ class ProjectCreationAuthorizationService(ProjectCreationAuthorizer):
         if not ProjectCreationPolicy.may_create(
             eligibility,
             has_create_projects=any(
-                grant.action_id.value == "create-projects" for grant in facts.grants
+                grant.action_id.value == OrganizationAction.CREATE_PROJECTS.value
+                for grant in facts.grants
             ),
         ):
             raise AccessDeniedError()

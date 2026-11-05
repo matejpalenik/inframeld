@@ -2,7 +2,7 @@
 
 import asyncio
 import os
-from typing import Literal
+from enum import StrEnum
 
 import httpx2
 import pytest
@@ -19,6 +19,12 @@ from inframeld_backend.access.infrastructure.revokers.hydra_human_oauth_credenti
     HydraHumanOAuthCredentialRevoker,
 )
 
+
+class GrantCase(StrEnum):
+    AUTHORIZATION_CODE = "authorization_code"
+    REFRESH_TOKEN = "refresh_token"
+
+
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_HYDRA_INTEGRATION") != "1",
     reason="Requires the private integration services",
@@ -29,13 +35,13 @@ pytestmark = pytest.mark.skipif(
 @pytest.mark.parametrize(
     "grant,skipped_consent,expected_status,expected_error",
     [
-        ("authorization_code", False, 500, "server_error"),
-        ("authorization_code", True, 500, "server_error"),
-        ("refresh_token", False, 400, "invalid_request"),
+        (GrantCase.AUTHORIZATION_CODE, False, 500, "server_error"),
+        (GrantCase.AUTHORIZATION_CODE, True, 500, "server_error"),
+        (GrantCase.REFRESH_TOKEN, False, 400, "invalid_request"),
     ],
 )
 async def test_cleanup_after_credential_validation_cannot_return_usable_credentials(
-    grant: Literal["authorization_code", "refresh_token"],
+    grant: GrantCase,
     skipped_consent: bool,
     expected_status: int,
     expected_error: str,
@@ -59,7 +65,7 @@ async def test_cleanup_after_credential_validation_cannot_return_usable_credenti
             alice = await register_human(alice_browser)
             bob = await register_human(bob_browser)
             bobs_tokens = await provider.issue_tokens(bob, browser=bob_browser, remember_login=True)
-            if grant == "authorization_code":
+            if grant == GrantCase.AUTHORIZATION_CODE:
                 if skipped_consent:
                     await provider.issue_tokens(
                         alice, browser=alice_browser, remember_login=True, remember_consent=True
@@ -83,7 +89,7 @@ async def test_cleanup_after_credential_validation_cannot_return_usable_credenti
                 data = {
                     "client_id": CLIENT_ID,
                     "grant_type": grant,
-                    "refresh_token": tokens.refresh_token.get_secret_value(),
+                    GrantCase.REFRESH_TOKEN: tokens.refresh_token.get_secret_value(),
                 }
             plan = f"/hydra/token-plans/{alice.subject.value}/{grant}"
             assert (await hook.put(plan)).status_code == 204
@@ -111,7 +117,7 @@ async def test_cleanup_after_credential_validation_cannot_return_usable_credenti
                 assert response.status_code == expected_status
                 assert response.json()["error"] == expected_error
                 assert "access_token" not in response.json()
-                assert "refresh_token" not in response.json()
+                assert GrantCase.REFRESH_TOKEN not in response.json()
                 fresh = await provider.issue_tokens(
                     alice, browser=alice_browser, remember_login=True
                 )

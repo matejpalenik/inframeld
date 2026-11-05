@@ -64,8 +64,22 @@ MEMBERS = (
     ProjectMemberDTO(PrincipalId(UUID(int=20)), "Alias", PrincipalKind.APPLICATION),
     ProjectMemberDTO(PrincipalId(UUID(int=30)), "Alias", PrincipalKind.HUMAN),
 )
-ACTION = ProjectActionFactsDTO(ACTOR, False, None, ProjectStatus.ACTIVE, True, True)
-FACTS = ProjectMembersPageFactsDTO(INSTALLATION, ORGANIZATION, PROJECT, 7, ACTION, MEMBERS)
+ACTION = ProjectActionFactsDTO(
+    principal=ACTOR,
+    has_pending_recovery=False,
+    oauth_credential_facts=None,
+    project_status=ProjectStatus.ACTIVE,
+    is_project_member=True,
+    has_exact_action_grant=True,
+)
+FACTS = ProjectMembersPageFactsDTO(
+    installation_id=INSTALLATION,
+    organization_id=ORGANIZATION,
+    project_id=PROJECT,
+    access_revision=7,
+    action=ACTION,
+    members=MEMBERS,
+)
 
 
 def _cursor(
@@ -155,7 +169,7 @@ async def test_scope_header_absence_is_not_an_empty_success() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("changed", ["project", "actor", "organization"])
+@pytest.mark.parametrize("changed", ["project", "actor", "organization", "revision"])
 async def test_substituted_observation_cannot_disclose_members(changed: str) -> None:
     result = (
         replace(FACTS, project_id=ProjectId(UUID(int=99)))
@@ -165,9 +179,31 @@ async def test_substituted_observation_cannot_disclose_members(changed: str) -> 
         )
         if changed == "actor"
         else replace(FACTS, organization_id=OrganizationId(UUID(int=99)))
+        if changed == "organization"
+        else replace(FACTS, access_revision=-1)
     )
+    result = replace(result, action=replace(result.action, has_exact_action_grant=False))
     with pytest.raises(RuntimeError, match="scope|actor|Project"):
         await ProjectMembersService(MockMembersFacts(result)).list_members(
+            access=ACCESS, query=ListProjectMembersQuery(PROJECT)
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recovery", [False, True])
+async def test_ineligible_list_caller_is_forbidden_before_hidden_project_check(
+    recovery: bool,
+) -> None:
+    action = replace(
+        ACTION,
+        principal=replace(
+            ACTOR, status=PrincipalStatus.ACTIVE if recovery else PrincipalStatus.SUSPENDED
+        ),
+        has_pending_recovery=recovery,
+        is_project_member=False,
+    )
+    with pytest.raises(AccessDeniedError):
+        await ProjectMembersService(MockMembersFacts(replace(FACTS, action=action))).list_members(
             access=ACCESS, query=ListProjectMembersQuery(PROJECT)
         )
 

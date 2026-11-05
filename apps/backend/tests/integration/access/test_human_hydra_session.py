@@ -2,7 +2,7 @@
 
 import os
 from collections.abc import AsyncGenerator
-from typing import Literal
+from enum import StrEnum
 
 import pytest
 import pytest_asyncio
@@ -40,6 +40,22 @@ from inframeld_backend.bootstrap.application_settings import ApplicationSettings
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
+
+class ChangeCase(StrEnum):
+    REVOKE_TOKEN = "revoke-token"
+    DISABLE_IDENTITY = "disable-identity"
+
+
+class CredentialKind(StrEnum):
+    REFRESH_TOKEN = "refresh-token"
+    MISSING_API_AUDIENCE = "missing-api-audience"
+
+
+class UnavailableCase(StrEnum):
+    HYDRA = "hydra"
+    KRATOS = "kratos"
+
+
 AUTHORITY = IdentityAuthority("kratos:test")
 
 pytestmark = pytest.mark.skipif(
@@ -71,21 +87,25 @@ async def _admit_human(database: Database, human: RegisteredHumanDTO) -> Princip
 def _application_settings(
     database_settings: DatabaseSettings,
     *,
-    unavailable: Literal["hydra", "kratos"] | None = None,
+    unavailable: UnavailableCase | None = None,
 ) -> ApplicationSettings:
     return get_settings().model_copy(
         update={
             "database": database_settings,
-            "kratos": KratosSettings(
+            UnavailableCase.KRATOS: KratosSettings(
                 public_url=HttpUrl(KRATOS_PUBLIC_URL),
                 admin_url=HttpUrl(
-                    "http://127.0.0.1:1" if unavailable == "kratos" else KRATOS_ADMIN_URL
+                    "http://127.0.0.1:1"
+                    if unavailable == UnavailableCase.KRATOS
+                    else KRATOS_ADMIN_URL
                 ),
                 authority=AUTHORITY,
             ),
-            "hydra": HydraSettings(
+            UnavailableCase.HYDRA: HydraSettings(
                 admin_url=HttpUrl(
-                    "http://127.0.0.1:1" if unavailable == "hydra" else HYDRA_ADMIN_URL
+                    "http://127.0.0.1:1"
+                    if unavailable == UnavailableCase.HYDRA
+                    else HYDRA_ADMIN_URL
                 ),
                 issuer=HYDRA_ISSUER,
                 api_audience=API_AUDIENCE,
@@ -180,13 +200,13 @@ async def test_real_token_rechecks_local_suspension(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("change", ["revoke-token", "disable-identity"])
+@pytest.mark.parametrize("change", [ChangeCase.REVOKE_TOKEN, ChangeCase.DISABLE_IDENTITY])
 async def test_real_provider_changes_stop_the_next_request(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
     provider: HydraTestProvider,
     human: RegisteredHumanDTO,
-    change: Literal["revoke-token", "disable-identity"],
+    change: ChangeCase,
 ) -> None:
     """Each request must observe token revocation and current Kratos eligibility."""
     await _admit_human(database, human)
@@ -200,7 +220,7 @@ async def test_real_provider_changes_stop_the_next_request(
         raise_server_exceptions=False,
     ) as client:
         assert client.get("/v1/session", headers=headers).status_code == 200
-        if change == "revoke-token":
+        if change == ChangeCase.REVOKE_TOKEN:
             await provider.revoke_access_token(tokens.access_token)
         else:
             await disable_identity(human.subject)
@@ -211,24 +231,26 @@ async def test_real_provider_changes_stop_the_next_request(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("credential_kind", ["refresh-token", "missing-api-audience"])
+@pytest.mark.parametrize(
+    "credential_kind", [CredentialKind.REFRESH_TOKEN, CredentialKind.MISSING_API_AUDIENCE]
+)
 async def test_real_wrong_token_kind_or_audience_is_rejected(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
     provider: HydraTestProvider,
     human: RegisteredHumanDTO,
-    credential_kind: Literal["refresh-token", "missing-api-audience"],
+    credential_kind: CredentialKind,
 ) -> None:
     """A real refresh token or an access token without this API's audience cannot authenticate."""
     await _admit_human(database, human)
     tokens = await provider.issue_tokens(
         human,
-        include_audience=credential_kind != "missing-api-audience",
+        include_audience=credential_kind != CredentialKind.MISSING_API_AUDIENCE,
         credential_binding=await _credential_binding(database, human),
     )
     credential = (
         tokens.refresh_token.get_secret_value()
-        if credential_kind == "refresh-token"
+        if credential_kind == CredentialKind.REFRESH_TOKEN
         else tokens.access_token.value
     )
 
@@ -245,13 +267,13 @@ async def test_real_wrong_token_kind_or_audience_is_rejected(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("unavailable", ["hydra", "kratos"])
+@pytest.mark.parametrize("unavailable", [UnavailableCase.HYDRA, UnavailableCase.KRATOS])
 async def test_real_provider_connection_failures_return_503(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
     provider: HydraTestProvider,
     human: RegisteredHumanDTO,
-    unavailable: Literal["hydra", "kratos"],
+    unavailable: UnavailableCase,
 ) -> None:
     """Exercise each SDK's transport failure without stopping shared test services."""
     await _admit_human(database, human)

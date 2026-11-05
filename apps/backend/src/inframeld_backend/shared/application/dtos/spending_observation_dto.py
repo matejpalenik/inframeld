@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
 from uuid import UUID
 
 from inframeld_backend.shared.application.dtos.spending_usage_dto import SpendingUsageDTO
+from inframeld_backend.shared.application.enums.spending_observation_kind import (
+    SpendingObservationKind,
+)
 from inframeld_backend.shared.application.value_objects.model_call_id import ModelCallId
 from inframeld_backend.shared.domain.validation.value_validation import ValueValidation
 
@@ -19,7 +21,7 @@ class SpendingObservationDTO:
 
     evidence_id: UUID
     call_id: ModelCallId
-    kind: Literal["usage", "charge", "not_sent", "not_billed", "uncertain"]
+    kind: SpendingObservationKind
     observed_at: datetime
     source_reference: str
     usage: tuple[SpendingUsageDTO, ...] | None = None
@@ -32,18 +34,22 @@ class SpendingObservationDTO:
             raise ValueError("An observation requires a call-bound source reference.")
         if self.observed_at.tzinfo is None or self.observed_at.utcoffset() is None:
             raise ValueError("An observation requires an aware observation time.")
-        if self.kind == "charge":
+        if self.kind == SpendingObservationKind.CHARGE:
             if not isinstance(self.charge, Decimal) or self.usage is not None:
                 raise ValueError("Charge evidence requires only an exact monetary amount.")
             if not self.charge.is_finite() or self.charge < 0:
                 raise ValueError("A charge must be finite and nonnegative.")
-        elif self.kind == "usage":
+        elif self.kind == SpendingObservationKind.USAGE:
             if self.usage is None or self.charge is not None:
                 raise ValueError("Usage evidence requires only canonical usage.")
             keys = {(usage.category, usage.unit) for usage in self.usage}
             if not keys or len(keys) != len(self.usage):
                 raise ValueError("Usage evidence requires unique category and unit keys.")
-        elif self.kind in ("not_sent", "not_billed", "uncertain"):
+        elif self.kind in (
+            SpendingObservationKind.NOT_SENT,
+            SpendingObservationKind.NOT_BILLED,
+            SpendingObservationKind.UNCERTAIN,
+        ):
             if self.usage is not None or self.charge is not None:
                 raise ValueError("Outcome evidence cannot carry an accounting amount.")
         else:

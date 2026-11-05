@@ -40,7 +40,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
 from inframeld_backend.shared.infrastructure.diagnostics.error_reporting import (
     report_unexpected_error,
 )
-from inframeld_backend.shared.infrastructure.types.logging_types import LogFormat
+from inframeld_backend.shared.infrastructure.types.log_format import LogFormat
 
 
 def _payload() -> bytes:

@@ -24,6 +24,7 @@ class FileRecoveryHookCredentialsReader:
         )
 
     def _read_key(self, path: Path) -> bytes:
+        """Read a protected operator-owned key file without exposing its contents in failures."""
         try:
             mode = path.stat().st_mode
             if not stat.S_ISREG(mode) or mode & 0o077:

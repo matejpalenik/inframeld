@@ -76,6 +76,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _worktrees() -> list[dict[str, str]]:
+    """Observe actual local checkouts before judging exclusive delivery ownership."""
     try:
         result = subprocess.run(
             ["git", "worktree", "list", "--porcelain", "-z"],
@@ -101,6 +102,7 @@ def _worktrees() -> list[dict[str, str]]:
 
 
 def _snapshot(value: dict[str, object]) -> None:
+    """Require the captured repository and finite authorized issue scope."""
     if value.get("schema_version") != 1 or value.get("repository") != REPOSITORY:
         raise ValueError("unexpected snapshot schema or repository")
     milestone = object_value(value.get("milestone"), "milestone")
@@ -212,6 +214,7 @@ def _merge_summary(observation: dict[str, object]) -> dict[str, object]:
 
 
 def _execute(arguments: argparse.Namespace) -> dict[str, object]:
+    """Dispatch the selected helper operation while leaving atomic state changes to the store."""
     command = cast("str", arguments.command)
     if command == "rehearse":
         return rehearse()

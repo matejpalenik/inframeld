@@ -48,8 +48,8 @@ from inframeld_backend.access.http.routes.project_creation_routes import (
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -94,7 +94,7 @@ class MockCreationAuthenticator(HumanSessionAuthenticator, HumanAccessTokenAuthe
 class MockProjectCreator(ProjectCreator):
     def __init__(self) -> None:
         self.commands: list[CreateProjectCommand] = []
-        self.contexts: list[OperationAdmissionContextDTO] = []
+        self.contexts: list[IdempotencyContextDTO] = []
 
     @override
     async def create(
@@ -102,7 +102,7 @@ class MockProjectCreator(ProjectCreator):
         *,
         access: AccessContextDTO,
         command: CreateProjectCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectCreationResultDTO:
         self.commands.append(command)
         self.contexts.append(context)
@@ -114,15 +114,17 @@ class MockProjectCreator(ProjectCreator):
         )
         return ProjectCreationResultDTO(
             CreatedProjectDTO(
-                operation.operation_id,
-                command.organization_id,
-                ProjectId(UUID(int=3)),
-                access.actor_principal_id,
-                command.name,
-                command.display_name.value,
-                1,
-                0,
-                tuple(ActionId(value) for value in ProjectCreationPolicy.INITIAL_ACTIONS),
+                operation_id=operation.operation_id,
+                organization_id=command.organization_id,
+                project_id=ProjectId(UUID(int=3)),
+                creator_principal_id=access.actor_principal_id,
+                name=command.name,
+                display_name=command.display_name.value,
+                access_revision=1,
+                metadata_revision=0,
+                initial_actions=tuple(
+                    ActionId(value) for value in ProjectCreationPolicy.INITIAL_ACTIONS
+                ),
             ),
             operation,
         )

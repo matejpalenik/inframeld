@@ -57,6 +57,7 @@ class KratosHumanIdentityVerifier(HumanIdentityVerifier):
         subject: UUID,
         identity: VerifiedHumanIdentityDTO,
     ) -> VerifiedHumanIdentityDTO | None:
+        """Validate the provider identity observation before treating it as an admitted human."""
         if not isinstance(response, Identity):
             raise DependencyUnavailableError()
 

@@ -13,10 +13,12 @@ from inframeld_backend.shared.application.protocols.artifact_store import Artifa
 class ArtifactVerificationService:
     """Compare complete readback with the original trusted expectation outside SQL."""
 
-    def __init__(self, store: ArtifactStore, *, max_bytes: int = 256 * 1024 * 1024) -> None:
+    def __init__(
+        self, artifact_store: ArtifactStore, *, max_bytes: int = 256 * 1024 * 1024
+    ) -> None:
         if type(max_bytes) is not int or not 0 < max_bytes <= 256 * 1024 * 1024:
             raise ValueError("The artifact verification bound is outside the supported profile.")
-        self._store = store
+        self._artifact_store = artifact_store
         self._max_bytes = max_bytes
 
     async def verify(self, attempt: ArtifactAttemptDTO) -> VerifiedArtifactDTO:
@@ -27,7 +29,7 @@ class ArtifactVerificationService:
 
         digest = hashlib.sha256()
         length = 0
-        async with aclosing(self._store.read(attempt)) as content:
+        async with aclosing(self._artifact_store.read(attempt)) as content:
             async for chunk in content:
                 if type(chunk) is not bytes:
                     raise ArtifactIntegrityError("Readback did not provide immutable bytes.")

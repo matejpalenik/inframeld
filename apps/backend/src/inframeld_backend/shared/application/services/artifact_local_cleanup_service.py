@@ -40,32 +40,39 @@ class ArtifactLocalCleanupService(ArtifactLocalCleanup):
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        jobs: JobStore,
-        authority: ArtifactCleanupAuthorizer,
-        targets: ArtifactCleanupTargetReader,
-        attempts: ArtifactAttemptRepository,
+        transaction_manager: TransactionManager,
+        job_store: JobStore,
+        artifact_cleanup_authorizer: ArtifactCleanupAuthorizer,
+        cleanup_target_reader: ArtifactCleanupTargetReader,
+        artifact_attempt_repository: ArtifactAttemptRepository,
     ) -> None:
-        self._transactions, self._jobs, self._authority = transactions, jobs, authority
-        self._targets, self._attempts = targets, attempts
+        self._transaction_manager = transaction_manager
+        self._job_store = job_store
+        self._artifact_cleanup_authorizer = artifact_cleanup_authorizer
+        self._cleanup_target_reader = cleanup_target_reader
+        self._artifact_attempt_repository = artifact_attempt_repository
 
     @override
     async def prepare_local(self, context: JobAttemptContextDTO) -> ArtifactCleanupTargetDTO | None:
-        async with self._transactions.begin():
-            binding, target = await self._guard(context)
-            return target if await self._attempts.retire_local(binding, target) else None
+        async with self._transaction_manager.begin():
+            binding, target = await self._require_current_target(context)
+            return (
+                target
+                if await self._artifact_attempt_repository.retire_local(binding, target)
+                else None
+            )
 
     @override
     async def confirm_local(
         self, context: JobAttemptContextDTO, target: ArtifactCleanupTargetDTO
     ) -> None:
-        async with self._transactions.begin():
-            binding, current = await self._guard(context)
+        async with self._transaction_manager.begin():
+            binding, current = await self._require_current_target(context)
             if target != current:
                 raise ConflictError("The original local target changed during removal.")
-            await self._attempts.confirm_local_removed(binding, target)
+            await self._artifact_attempt_repository.confirm_local_removed(binding, target)
 
-    async def _guard(
+    async def _require_current_target(
         self, context: JobAttemptContextDTO
     ) -> tuple[ArtifactCleanupJobBindingDTO, ArtifactCleanupTargetDTO]:
         binding = context.binding
@@ -76,14 +83,14 @@ class ArtifactLocalCleanupService(ArtifactLocalCleanup):
             != ("artifact.cleanup", 1, binding.obligation_id.value.bytes)
         ):
             raise JobStoppedError("Local cleanup requires its original abandoned-staging payload.")
-        current = await self._jobs.require_current(context)
+        current = await self._job_store.require_current(context)
         if (current.binding, current.payload, current.work_deadline) != (
             binding,
             context.payload,
             context.work_deadline,
         ):
             raise JobFenceLostError("The original cleanup work changed.")
-        facts = await self._authority.require_current(context.job_id, binding)
+        facts = await self._artifact_cleanup_authorizer.require_current(context.job_id, binding)
         if (
             facts.binding != binding
             or facts.job_id != context.job_id
@@ -97,7 +104,7 @@ class ArtifactLocalCleanupService(ArtifactLocalCleanup):
             )
         ):
             raise AccessDeniedError("The original single local target cannot be retired.")
-        target = await self._targets.read(binding, facts.targets[0])
+        target = await self._cleanup_target_reader.read(binding, facts.targets[0])
         if (
             target is None
             or target.attempt_id != facts.targets[0]

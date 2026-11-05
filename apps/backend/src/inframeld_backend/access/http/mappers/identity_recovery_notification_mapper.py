@@ -37,6 +37,7 @@ from inframeld_backend.access.http.responses.identity_recovery_notification_resp
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate JSON fields so the submitted request has one unambiguous meaning."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -46,6 +47,7 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _reject_constant(_value: str) -> object:
+    """Reject non-finite JSON constants before mapping the submitted request."""
     raise ValueError("Invalid JSON constant.")
 
 

@@ -2,8 +2,9 @@
 
 import os
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import partial
-from typing import Literal, override
+from typing import override
 from uuid import uuid4
 
 import pytest
@@ -111,6 +112,17 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
     IdempotencyReservationRow,
 )
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
+
+
+class CredentialKind(StrEnum):
+    BEARER = "bearer"
+    COOKIE = "cookie"
+
+
+class ProviderCase(StrEnum):
+    HYDRA = "hydra"
+    KRATOS = "kratos"
+
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
@@ -380,19 +392,19 @@ async def _read_state(database: Database, seed: GrantSeedDTO) -> GrantStateDTO:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("credential_kind", ["bearer", "cookie"])
+@pytest.mark.parametrize("credential_kind", [CredentialKind.BEARER, CredentialKind.COOKIE])
 async def test_authorized_human_can_save_a_project_grant(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
     grant_seed: GrantSeedDTO,
-    credential_kind: Literal["bearer", "cookie"],
+    credential_kind: CredentialKind,
 ) -> None:
     """Both login paths save the same grant - bearer writes need no cookie or CSRF headers."""
     scenario = GrantScenario(temporary_postgres_settings)
     path = f"/v1/projects/{grant_seed.project_id.value}/grants"
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
-        if credential_kind == "bearer":
+        if credential_kind == CredentialKind.BEARER:
             headers = _bearer_headers("grant-bob-success")
         else:
             client.cookies.set("ory_kratos_session", COOKIE.value)
@@ -423,9 +435,9 @@ async def test_authorized_human_can_save_a_project_grant(
         response.json()["operationId"],
     )
     assert state.access_revision == 1
-    assert scenario.token.calls == (1 if credential_kind == "bearer" else 0)
-    assert scenario.identity.calls == (1 if credential_kind == "bearer" else 0)
-    assert scenario.browser.calls == (1 if credential_kind == "cookie" else 0)
+    assert scenario.token.calls == (1 if credential_kind == CredentialKind.BEARER else 0)
+    assert scenario.identity.calls == (1 if credential_kind == CredentialKind.BEARER else 0)
+    assert scenario.browser.calls == (1 if credential_kind == CredentialKind.COOKIE else 0)
 
 
 @pytest.mark.asyncio
@@ -512,12 +524,12 @@ async def test_revoked_authority_denies_both_replay_and_new_request(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider", ["hydra", "kratos"])
+@pytest.mark.parametrize("provider", [ProviderCase.HYDRA, ProviderCase.KRATOS])
 async def test_provider_outage_stops_a_write_after_successful_authentication(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
     grant_seed: GrantSeedDTO,
-    provider: Literal["hydra", "kratos"],
+    provider: ProviderCase,
 ) -> None:
     """A prior session check cannot authorize a write when either provider is now unavailable."""
     before = await _read_state(database, grant_seed)
@@ -529,7 +541,7 @@ async def test_provider_outage_stops_a_write_after_successful_authentication(
         assert first.status_code == 200, first.text
         assert first.json() == {"principalId": str(grant_seed.actor_id.value)}
 
-        if provider == "hydra":
+        if provider == ProviderCase.HYDRA:
             scenario.token.unavailable = True
         else:
             scenario.identity.unavailable = True
@@ -543,7 +555,7 @@ async def test_provider_outage_stops_a_write_after_successful_authentication(
     assert response.status_code == 503, response.text
     assert response.json()["code"] == "dependency_unavailable"
     assert scenario.token.calls == 2
-    assert scenario.identity.calls == (1 if provider == "hydra" else 2)
+    assert scenario.identity.calls == (1 if provider == ProviderCase.HYDRA else 2)
     assert scenario.browser.calls == 0
     assert await _read_state(database, grant_seed) == before
 

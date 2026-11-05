@@ -149,6 +149,7 @@ class IdentityRecovery:
         current: IdentityRecoveryCleanupState,
         outcome: IdentityRecoveryCleanupState,
     ) -> IdentityRecoveryCleanupState:
+        """Keep confirmed provider cleanup monotonic and reject pending as an attempted outcome."""
         if outcome is IdentityRecoveryCleanupState.PENDING:
             raise IdentityRecoveryTransitionError("Pending is not a provider cleanup outcome.")
 

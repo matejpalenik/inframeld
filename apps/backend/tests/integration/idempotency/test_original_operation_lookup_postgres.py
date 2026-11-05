@@ -7,7 +7,7 @@ an upload, build or Organization business endpoint.
 import os
 from dataclasses import replace
 from datetime import timedelta
-from typing import Literal
+from enum import StrEnum
 from uuid import uuid4
 
 import pytest
@@ -86,12 +86,12 @@ from inframeld_backend.shared.application.dtos.artifact_scope_dto import Artifac
 from inframeld_backend.shared.application.dtos.business_operation_artifact_origin_dto import (
     BusinessOperationArtifactOriginDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
     NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
@@ -99,6 +99,7 @@ from inframeld_backend.shared.application.dtos.operation_reservation_request_dto
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -154,6 +155,17 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
     PostgresOperationReservationWriter,
 )
 
+
+class ChangedCase(StrEnum):
+    INSTALLATION = "installation"
+    PRINCIPAL = "principal"
+    ORGANIZATION = "organization"
+    PROJECT = "project"
+    METHOD = "method"
+    ROUTE = "route"
+    KEY = "key"
+
+
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
     reason="Requires PostgreSQL integration services",
@@ -207,7 +219,7 @@ async def admitted_job(
         installed,
         seed.organization_id,
         seed.project_id,
-        "POST",
+        HttpMethod.POST,
         "/v1/original-project-operation",
         IdempotencyKey("job-reference-" + uuid4().hex),
         OperationLookupAuthority(OperationLookupAuthorityFamily.PROJECT_ACTION_USE, ACTION),
@@ -223,15 +235,15 @@ async def admitted_job(
         ).admit(
             access=access,
             authority=AdmittedWorkAuthorityDTO(
-                seed.principal_id,
-                PrincipalKind.HUMAN,
-                installed,
-                seed.organization_id,
-                seed.project_id,
-                ACTION,
-                binding,
+                principal_id=seed.principal_id,
+                principal_kind=PrincipalKind.HUMAN,
+                installation_id=installed,
+                organization_id=seed.organization_id,
+                project_id=seed.project_id,
+                action_id=ACTION,
+                human_binding=binding,
             ),
-            context=OperationAdmissionContextDTO(query.method, query.requested_route, query.key),
+            context=IdempotencyContextDTO(query.method, query.requested_route, query.key),
             fingerprint=RequestFingerprint(b"R" * 32),
             request_id=RequestId(uuid4()),
             payload=JobPayload("test.lookup-reference", 1, b"private-worker-input"),
@@ -323,11 +335,11 @@ async def test_known_reference_does_not_claim_current_job_state(
 @pytest.mark.parametrize(
     "changed",
     [
-        "installation",
+        ChangedCase.INSTALLATION,
         "actor",
         "kind",
-        "organization",
-        "project",
+        ChangedCase.ORGANIZATION,
+        ChangedCase.PROJECT,
         "action",
         "missing_authority",
         "bad_authority",
@@ -347,15 +359,15 @@ async def test_optional_job_binding_failure_preserves_confirmed_admission(
         job = await session.get(DurableJobRow, admission.job_id.value)
         assert job is not None
         match changed:
-            case "installation":
+            case ChangedCase.INSTALLATION:
                 job.installation_id = uuid4()
             case "actor":
                 job.principal_id = uuid4()
             case "kind":
                 job.principal_kind = PrincipalKind.APPLICATION.value
-            case "organization":
+            case ChangedCase.ORGANIZATION:
                 job.organization_id = uuid4()
-            case "project":
+            case ChangedCase.PROJECT:
                 job.project_id = uuid4()
             case "action":
                 job.action_id = "inspect-budget"
@@ -535,7 +547,7 @@ async def admitted(
         installed,
         seed.organization_id,
         seed.project_id,
-        "POST",
+        HttpMethod.POST,
         "/v1/original-project-operation",
         IdempotencyKey("lost-ack"),
         OperationLookupAuthority(OperationLookupAuthorityFamily.PROJECT_ACTION_USE, ACTION),
@@ -751,31 +763,38 @@ async def test_in_progress_and_recovery_remain_distinct(database: Database) -> N
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "changed", ["installation", "principal", "organization", "project", "method", "route", "key"]
+    "changed",
+    [
+        ChangedCase.INSTALLATION,
+        ChangedCase.PRINCIPAL,
+        ChangedCase.ORGANIZATION,
+        ChangedCase.PROJECT,
+        ChangedCase.METHOD,
+        ChangedCase.ROUTE,
+        ChangedCase.KEY,
+    ],
 )
 async def test_retained_history_never_substitutes_another_original_identity(
     database: Database,
-    changed: Literal[
-        "installation", "principal", "organization", "project", "method", "route", "key"
-    ],
+    changed: ChangedCase,
 ) -> None:
     """Every original identity component must match before any outcome is projected."""
     access, query, _operation = await admitted(database)
     principal_id = access.actor_principal_id
     match changed:
-        case "installation":
+        case ChangedCase.INSTALLATION:
             query = replace(query, installation_id=InstallationId(uuid4()))
-        case "principal":
+        case ChangedCase.PRINCIPAL:
             principal_id = PrincipalId(uuid4())
-        case "organization":
+        case ChangedCase.ORGANIZATION:
             query = replace(query, organization_id=OrganizationId(uuid4()))
-        case "project":
+        case ChangedCase.PROJECT:
             query = replace(query, project_id=ProjectId(uuid4()))
-        case "method":
+        case ChangedCase.METHOD:
             query = replace(query, method="PATCH")
-        case "route":
+        case ChangedCase.ROUTE:
             query = replace(query, requested_route="/v1/another-original-operation")
-        case "key":
+        case ChangedCase.KEY:
             query = replace(query, key=IdempotencyKey("another-original-key"))
     async with database.session() as session:
         assert (

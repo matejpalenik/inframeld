@@ -18,38 +18,38 @@ class JobExecutionService:
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        jobs: JobStore,
+        transaction_manager: TransactionManager,
+        job_store: JobStore,
         *,
         supported_payloads: tuple[tuple[str, int], ...],
         worker_id: UUID,
-        product: AdmittedWorkAuthorizer,
-        recovery: JobRecovery,
+        admitted_work_authorizer: AdmittedWorkAuthorizer,
+        job_recovery: JobRecovery,
         lease_seconds: float = 30,
         work_seconds: float = 7200,
     ) -> None:
-        self._transactions = transactions
-        self._jobs = jobs
+        self._transaction_manager = transaction_manager
+        self._job_store = job_store
         self._supported_payloads = supported_payloads
         self._worker_id = worker_id
         self._lease_seconds = lease_seconds
         self._work_seconds = work_seconds
-        self._product = product
-        self._recovery = recovery
+        self._admitted_work_authorizer = admitted_work_authorizer
+        self._job_recovery = job_recovery
 
     async def claim_next(self) -> JobAttemptContextDTO | None:
-        async with self._transactions.begin():
-            observed = await self._jobs.peek_candidate()
+        async with self._transaction_manager.begin():
+            observed = await self._job_store.peek_candidate()
             if observed is None:
                 return None
             authority_changed = False
             if isinstance(observed.binding, ProductJobBindingDTO):
                 try:
-                    await self._product.require_current(observed.binding.authority)
+                    await self._admitted_work_authorizer.require_current(observed.binding.authority)
                 except AccessDeniedError:
                     authority_changed = True
 
-            job = await self._jobs.next_candidate()
+            job = await self._job_store.next_candidate()
             if job is None:
                 return None
             if replace(observed, observed_at=job.observed_at) != job:
@@ -59,7 +59,7 @@ class JobExecutionService:
             if job.status is JobStatus.RUNNING:
                 if job.lease_expires_at is not None and job.lease_expires_at > now:
                     return None
-                await self._recovery.recover_in_transaction(job)
+                await self._job_recovery.recover_in_transaction(job)
                 return None
             reason = None
             status = JobStatus.FAILED
@@ -74,9 +74,9 @@ class JobExecutionService:
             elif (job.payload.kind, job.payload.version) not in self._supported_payloads:
                 reason = "unsupported_payload"
             if reason is not None:
-                await self._jobs.retire_attempt(job, status=status, reason=reason, due_at=now)
+                await self._job_store.retire_attempt(job, status=status, reason=reason, due_at=now)
                 return None
-            return await self._jobs.start_attempt(
+            return await self._job_store.start_attempt(
                 job,
                 worker_id=self._worker_id,
                 lease_seconds=self._lease_seconds,

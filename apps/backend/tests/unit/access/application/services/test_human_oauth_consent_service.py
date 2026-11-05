@@ -2,7 +2,8 @@
 
 import asyncio
 from dataclasses import dataclass, field, replace
-from typing import Literal, override
+from enum import StrEnum
+from typing import override
 
 import pytest
 from tests.support.mock_human_credential_state_reader import MockHumanCredentialStateReader
@@ -67,6 +68,18 @@ from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
     ResourceNotFoundError,
 )
+
+
+class Operation(StrEnum):
+    INSPECT = "inspect"
+    ALLOW = "allow"
+    DENY = "deny"
+
+
+class OperationVariant(StrEnum):
+    INSPECT = "inspect"
+    DENY = "deny"
+
 
 AUTHORITY = IdentityAuthority("kratos:test")
 IDENTITY = VerifiedHumanIdentityDTO(AUTHORITY, IdentitySubject("alice"))
@@ -164,7 +177,7 @@ class MockConsentDecisionWriter(OAuthConsentDecisionWriter):
         assert scopes == REQUEST.scopes
         assert audiences == (AUDIENCE,)
         assert 0 < timeout_seconds <= 5
-        self.calls.append("allow")
+        self.calls.append(Operation.ALLOW)
         self.remembered.append(remember_for_seconds)
         self.bindings.append(binding)
         if self.wait:
@@ -197,7 +210,7 @@ class MockConsentScenario:
             self.writer,
             self.verifier,
             self.blocks,
-            credential_states=self.states,
+            credential_state_reader=self.states,
             credential_initializer=self.states,
             authority=AUTHORITY,
             api_audience=AUDIENCE,
@@ -245,7 +258,7 @@ async def test_allow_uses_checked_access_and_server_remember_duration(
 ) -> None:
     scenario = MockConsentScenario()
     assert await scenario.allow(remember=remember) is CONTINUATION
-    assert scenario.calls == ["read", "initialize", "verify", "block", "allow"]
+    assert scenario.calls == ["read", "initialize", "verify", "block", Operation.ALLOW]
     assert scenario.writer.remembered == [seconds]
 
 
@@ -270,7 +283,7 @@ async def test_remembered_consent_is_rechecked_without_extending_its_lifetime() 
         "initialize",
         "verify",
         "block",
-        "allow",
+        Operation.ALLOW,
     ]
     assert scenario.writer.remembered == [None]
 
@@ -286,7 +299,7 @@ async def test_deny_returns_only_the_provider_continuation() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["inspect", "allow", "deny"])
+@pytest.mark.parametrize("operation", ["inspect", Operation.ALLOW, "deny"])
 @pytest.mark.parametrize(
     "failure",
     [
@@ -300,7 +313,7 @@ async def test_deny_returns_only_the_provider_continuation() -> None:
     ],
 )
 async def test_rejected_requests_cannot_approve_or_reject_someone_elses_consent(
-    operation: Literal["inspect", "allow", "deny"], failure: str
+    operation: Operation, failure: str
 ) -> None:
     scenario = MockConsentScenario()
     error_type = AccessDeniedError
@@ -331,20 +344,20 @@ async def test_rejected_requests_cannot_approve_or_reject_someone_elses_consent(
             await scenario.deny()
         else:
             await scenario.allow()
-    assert "allow" not in scenario.calls
+    assert Operation.ALLOW not in scenario.calls
     assert "deny" not in scenario.calls
     if failure == "invalid_session":
         assert scenario.calls == (
-            ["read", "initialize", "verify"] if operation == "allow" else ["read", "verify"]
+            ["read", "initialize", "verify"] if operation == Operation.ALLOW else ["read", "verify"]
         )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["inspect", "allow", "deny"])
+@pytest.mark.parametrize("operation", ["inspect", Operation.ALLOW, "deny"])
 @pytest.mark.parametrize("unsupported", ["client", "scope", "audience"])
 @pytest.mark.parametrize("invalid_cookie", [False, True])
 async def test_unsupported_access_stops_before_browser_checks_or_state_initialization(
-    operation: Literal["inspect", "allow", "deny"], unsupported: str, invalid_cookie: bool
+    operation: Operation, unsupported: str, invalid_cookie: bool
 ) -> None:
     """An unrelated OAuth request cannot initialize Alice's credential state."""
     scenario = MockConsentScenario()
@@ -383,7 +396,7 @@ async def test_inspection_does_not_authorize_a_later_decision_after_recovery_sta
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stage", ["read", "block", "allow"])
+@pytest.mark.parametrize("stage", ["read", "block", Operation.ALLOW])
 async def test_availability_failures_propagate_without_an_automatic_retry(stage: str) -> None:
     scenario = MockConsentScenario()
     error = DependencyUnavailableError()
@@ -409,7 +422,7 @@ async def test_unusable_challenge_keeps_its_safe_not_found_outcome() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stage", ["read", "initialize", "verify", "block", "allow"])
+@pytest.mark.parametrize("stage", ["read", "initialize", "verify", "block", Operation.ALLOW])
 async def test_total_deadline_bounds_each_stage_without_retry(stage: str) -> None:
     scenario = MockConsentScenario(total_timeout_seconds=0.01)
     if stage == "read":
@@ -425,7 +438,7 @@ async def test_total_deadline_bounds_each_stage_without_retry(stage: str) -> Non
     with pytest.raises(DependencyUnavailableError):
         await scenario.allow()
     assert scenario.calls.count(stage) == 1
-    stages = ["read", "initialize", "verify", "block", "allow"]
+    stages = ["read", "initialize", "verify", "block", Operation.ALLOW]
     assert scenario.calls == stages[: stages.index(stage) + 1]
 
 
@@ -433,7 +446,7 @@ async def test_total_deadline_bounds_each_stage_without_retry(stage: str) -> Non
 @pytest.mark.parametrize("operation", ["inspect", "deny"])
 @pytest.mark.parametrize("failure", ["unavailable", "deadline"])
 async def test_read_only_checks_fail_without_initializing_or_submitting_a_decision(
-    operation: Literal["inspect", "deny"], failure: str
+    operation: OperationVariant, failure: str
 ) -> None:
     scenario = MockConsentScenario(total_timeout_seconds=0.01)
     if failure == "unavailable":
@@ -450,7 +463,7 @@ async def test_read_only_checks_fail_without_initializing_or_submitting_a_decisi
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("stage", ["read", "initialize", "verify", "block", "allow"])
+@pytest.mark.parametrize("stage", ["read", "initialize", "verify", "block", Operation.ALLOW])
 async def test_cancellation_propagates_without_retrying_the_interrupted_stage(stage: str) -> None:
     scenario = MockConsentScenario()
     if stage == "read":
@@ -468,7 +481,7 @@ async def test_cancellation_propagates_without_retrying_the_interrupted_stage(st
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    stages = ["read", "initialize", "verify", "block", "allow"]
+    stages = ["read", "initialize", "verify", "block", Operation.ALLOW]
     assert scenario.calls == stages[: stages.index(stage) + 1]
 
 

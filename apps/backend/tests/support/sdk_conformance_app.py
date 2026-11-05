@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
+from enum import StrEnum
 from json import JSONDecodeError
 from typing import Literal, override
 from uuid import UUID
@@ -112,6 +113,15 @@ from inframeld_backend.access.application.dtos.public_discovery_dto import Publi
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
+from inframeld_backend.access.application.enums.my_project_access_item_kind import (
+    MyProjectAccessItemKind,
+)
+from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
+    ProjectActionGrantChangeKind,
+)
+from inframeld_backend.access.application.enums.project_membership_change_kind import (
+    ProjectMembershipChangeKind,
+)
 from inframeld_backend.access.application.errors.retired_project_name_error import (
     RetiredProjectNameError,
 )
@@ -138,6 +148,9 @@ from inframeld_backend.access.application.protocols.project_creator import Proje
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
 from inframeld_backend.access.application.protocols.project_members_facts_reader import (
     ProjectMembersFactsReader,
+)
+from inframeld_backend.access.application.protocols.project_membership_change_service_factory import (
+    ProjectMembershipChangeServiceFactory,
 )
 from inframeld_backend.access.application.protocols.project_membership_changer import (
     ProjectMembershipChanger,
@@ -239,11 +252,11 @@ from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto imp
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+    IdempotencyContextDTO,
+)
 from inframeld_backend.shared.application.dtos.in_progress_operation_dto import (
     InProgressOperationDTO,
-)
-from inframeld_backend.shared.application.dtos.operation_admission_context_dto import (
-    OperationAdmissionContextDTO,
 )
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
@@ -294,6 +307,18 @@ from inframeld_backend.shared.http.routes.original_operation_lookup_routes impor
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
+
+class Kind(StrEnum):
+    NONE = "none"
+    JSON = "json"
+    RAW = "raw"
+    MALFORMED = "malformed"
+    UNEXPECTED = "unexpected"
+    REDIRECT = "redirect"
+    SLOW = "slow"
+    DISCONNECT = "disconnect"
+
+
 PRINCIPAL = PrincipalId(UUID("00000000-0000-4000-8000-000000000001"))
 IDENTITY = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySubject("alice"))
 
@@ -301,9 +326,7 @@ IDENTITY = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySu
 class SDKFaultRequestDTO(BaseModel):
     """Arrange an isolated wire fault outside the delivered API contract."""
 
-    kind: Literal[
-        "none", "json", "raw", "malformed", "unexpected", "redirect", "slow", "disconnect"
-    ]
+    kind: Kind
     body: JsonValue = None
     status: int = 200
     body_base64: str = Field(default="", alias="bodyBase64")
@@ -344,13 +367,13 @@ class MockSDKConsentHandler(HumanOAuthConsentHandler):
             raise ValueError("The SDK changed the challenge query parameter.")
 
         return HumanOAuthConsentDetailsDTO(
-            IDENTITY,
-            OAuthClientId("inframeld-cli"),
-            HumanAPIAudience("https://api.test"),
-            (HumanOAuthScope.API,),
-            (HumanAPIAudience("https://api.test"),),
-            True,
-            3600,
+            identity=IDENTITY,
+            client_id=OAuthClientId("inframeld-cli"),
+            installation=HumanAPIAudience("https://api.test"),
+            scopes=(HumanOAuthScope.API,),
+            audiences=(HumanAPIAudience("https://api.test"),),
+            approval_required=True,
+            remember_consent_seconds=3600,
         )
 
     @override
@@ -374,9 +397,9 @@ class MockSDKGrantChanger(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: SetProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectActionGrantChangeResultDTO:
-        return self._outcome(access, command, context, "set")
+        return self._outcome(access, command, context, ProjectActionGrantChangeKind.SET)
 
     @override
     async def remove_action_grant(
@@ -384,16 +407,16 @@ class MockSDKGrantChanger(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: RemoveProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectActionGrantChangeResultDTO:
-        return self._outcome(access, command, context, "remove")
+        return self._outcome(access, command, context, ProjectActionGrantChangeKind.REMOVE)
 
     @staticmethod
     def _outcome(
         access: AccessContextDTO,
         command: SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
-        context: OperationAdmissionContextDTO,
-        kind: Literal["set", "remove"],
+        context: IdempotencyContextDTO,
+        kind: ProjectActionGrantChangeKind,
     ) -> ProjectActionGrantChangeResultDTO:
         if command.project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
             raise ResourceNotFoundError()
@@ -416,20 +439,23 @@ class MockSDKGrantChanger(ProjectGrantChanger):
             raise ValueError("The SDK changed the grant idempotency header.")
         changed = recipient != UUID("00000000-0000-4000-8000-000000000005")
         return ProjectActionGrantChangeResultDTO(
-            InstallationId(UUID(int=123)),
-            OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
-            command.project_id,
-            access.actor_principal_id,
-            command.recipient_principal_id,
-            command.action_id,
-            kind,
-            command.can_grant if isinstance(command, SetProjectActionGrantCommand) else None,
-            7 + int(changed),
-            changed,
-            201
-            if kind == "set" and recipient == UUID("00000000-0000-4000-8000-000000000004")
+            installation_id=InstallationId(UUID(int=123)),
+            organization_id=OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            project_id=command.project_id,
+            actor_principal_id=access.actor_principal_id,
+            recipient_principal_id=command.recipient_principal_id,
+            action_id=command.action_id,
+            change_kind=kind,
+            can_grant=command.can_grant
+            if isinstance(command, SetProjectActionGrantCommand)
+            else None,
+            access_revision=7 + int(changed),
+            changed=changed,
+            status_code=201
+            if kind == ProjectActionGrantChangeKind.SET
+            and recipient == UUID("00000000-0000-4000-8000-000000000004")
             else 200,
-            CompletedSynchronousOperationDTO(
+            operation=CompletedSynchronousOperationDTO(
                 OperationId("sdk-project-grant-" + kind),
                 False,
                 OperationReplayKind.SAFE_RESULT,
@@ -443,7 +469,7 @@ class MockSDKGrantChanger(ProjectGrantChanger):
         *,
         access: AccessContextDTO,
         command: AssignProjectUseOnlyGrantCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> CompletedSynchronousOperationDTO:
         if context.key.value != "sdk-key":
             raise ValueError("The SDK changed the idempotency header.")
@@ -481,20 +507,22 @@ class MockSDKProjectCreator(ProjectCreator):
         *,
         access: AccessContextDTO,
         command: CreateProjectCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectCreationResultDTO:
         operation_id = OperationId("sdk-project-creation")
         return ProjectCreationResultDTO(
             CreatedProjectDTO(
-                operation_id,
-                command.organization_id,
-                ProjectId(UUID("00000000-0000-4000-8000-000000000004")),
-                access.actor_principal_id,
-                command.name,
-                command.display_name.value,
-                1,
-                0,
-                tuple(ActionId(action) for action in ProjectCreationPolicy.INITIAL_ACTIONS),
+                operation_id=operation_id,
+                organization_id=command.organization_id,
+                project_id=ProjectId(UUID("00000000-0000-4000-8000-000000000004")),
+                creator_principal_id=access.actor_principal_id,
+                name=command.name,
+                display_name=command.display_name.value,
+                access_revision=1,
+                metadata_revision=0,
+                initial_actions=tuple(
+                    ActionId(action) for action in ProjectCreationPolicy.INITIAL_ACTIONS
+                ),
             ),
             CompletedSynchronousOperationDTO(
                 operation_id,
@@ -524,7 +552,7 @@ class MockSDKHumanAdmitter(HumanAdmitter):
         *,
         access: AccessContextDTO,
         command: AdmitHumanCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> HumanAdmissionResultDTO:
         if command.organization_id.value != UUID("00000000-0000-4000-8000-000000000002"):
             raise ResourceNotFoundError()
@@ -535,14 +563,16 @@ class MockSDKHumanAdmitter(HumanAdmitter):
         changed = command.identity_id != UUID("00000000-0000-4000-8000-000000000005")
         operation_id = OperationId("sdk-human-admission")
         return HumanAdmissionResultDTO(
-            InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
-            VerifiedHumanIdentityDTO(IDENTITY.authority, IdentitySubject(str(command.identity_id))),
-            command.organization_id,
-            access.actor_principal_id,
-            PrincipalId(command.identity_id),
-            8 if changed else 7,
-            changed,
-            CompletedSynchronousOperationDTO(
+            installation_id=InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            identity=VerifiedHumanIdentityDTO(
+                IDENTITY.authority, IdentitySubject(str(command.identity_id))
+            ),
+            organization_id=command.organization_id,
+            actor_principal_id=access.actor_principal_id,
+            principal_id=PrincipalId(command.identity_id),
+            access_revision=8 if changed else 7,
+            changed=changed,
+            operation=CompletedSynchronousOperationDTO(
                 operation_id,
                 True,
                 OperationReplayKind.SAFE_RESULT,
@@ -565,9 +595,9 @@ class MockSDKMembershipChanger(ProjectMembershipChanger):
         *,
         access: AccessContextDTO,
         command: AddProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMembershipChangeResultDTO:
-        return self._outcome(access, command, context, "add")
+        return self._outcome(access, command, context, ProjectMembershipChangeKind.ADD)
 
     @override
     async def remove_member(
@@ -575,16 +605,16 @@ class MockSDKMembershipChanger(ProjectMembershipChanger):
         *,
         access: AccessContextDTO,
         command: RemoveProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMembershipChangeResultDTO:
-        return self._outcome(access, command, context, "remove")
+        return self._outcome(access, command, context, ProjectMembershipChangeKind.REMOVE)
 
     @staticmethod
     def _outcome(
         access: AccessContextDTO,
         command: AddProjectMemberCommand | RemoveProjectMemberCommand,
-        context: OperationAdmissionContextDTO,
-        kind: Literal["add", "remove"],
+        context: IdempotencyContextDTO,
+        kind: ProjectMembershipChangeKind,
     ) -> ProjectMembershipChangeResultDTO:
         if command.project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
             raise ResourceNotFoundError()
@@ -601,16 +631,16 @@ class MockSDKMembershipChanger(ProjectMembershipChanger):
             raise ValueError("The SDK changed the membership idempotency header.")
         changed = command.principal_id.value != UUID("00000000-0000-4000-8000-000000000005")
         return ProjectMembershipChangeResultDTO(
-            InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
-            OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
-            command.project_id,
-            access.actor_principal_id,
-            command.principal_id,
-            kind,
-            8 if changed else 7,
-            changed,
-            201 if kind == "add" and changed else 200,
-            CompletedSynchronousOperationDTO(
+            installation_id=InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            organization_id=OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            project_id=command.project_id,
+            actor_principal_id=access.actor_principal_id,
+            principal_id=command.principal_id,
+            change_kind=kind,
+            access_revision=8 if changed else 7,
+            changed=changed,
+            status_code=201 if kind is ProjectMembershipChangeKind.ADD and changed else 200,
+            operation=CompletedSynchronousOperationDTO(
                 OperationId("sdk-project-membership-" + kind),
                 True,
                 OperationReplayKind.SAFE_RESULT,
@@ -619,9 +649,11 @@ class MockSDKMembershipChanger(ProjectMembershipChanger):
         )
 
 
-@asynccontextmanager
-async def _open_membership_changer() -> AsyncGenerator[ProjectMembershipChanger]:
-    yield MockSDKMembershipChanger()
+class MockSDKMembershipChangeServiceFactory(ProjectMembershipChangeServiceFactory):
+    @override
+    @asynccontextmanager
+    async def open(self) -> AsyncGenerator[ProjectMembershipChanger]:
+        yield MockSDKMembershipChanger()
 
 
 class MockSDKProjectMembersFacts(ProjectMembersFactsReader):
@@ -658,26 +690,26 @@ class MockSDKProjectMembersFacts(ProjectMembersFactsReader):
             if after is None or member.principal_id.value.int > after.value.int
         )[: limit + 1]
         return ProjectMembersPageFactsDTO(
-            InstallationId(UUID(int=123)),
-            organization,
-            project_id,
-            12,
-            ProjectActionFactsDTO(
-                Principal(
+            installation_id=InstallationId(UUID(int=123)),
+            organization_id=organization,
+            project_id=project_id,
+            access_revision=12,
+            action=ProjectActionFactsDTO(
+                principal=Principal(
                     access.actor_principal_id,
                     organization,
                     PrincipalKind.HUMAN,
                     PrincipalStatus.ACTIVE,
                 ),
-                False,
-                HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+                has_pending_recovery=False,
+                oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
                 if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
                 else None,
-                ProjectStatus.ACTIVE,
-                True,
-                True,
+                project_status=ProjectStatus.ACTIVE,
+                is_project_member=True,
+                has_exact_action_grant=True,
             ),
-            bounded,
+            members=bounded,
         )
 
 
@@ -716,27 +748,27 @@ class MockSDKProjectActionGrantsFacts(ProjectActionGrantsFactsReader):
             if after is None or item.recipient_principal_id.value.int > after.value.int
         )[: limit + 1]
         return ProjectActionGrantsPageFactsDTO(
-            InstallationId(UUID(int=123)),
-            organization,
-            project_id,
-            action_id,
-            ProjectActionFactsDTO(
-                Principal(
+            installation_id=InstallationId(UUID(int=123)),
+            organization_id=organization,
+            project_id=project_id,
+            action_id=action_id,
+            action=ProjectActionFactsDTO(
+                principal=Principal(
                     access.actor_principal_id,
                     organization,
                     PrincipalKind.HUMAN,
                     PrincipalStatus.ACTIVE,
                 ),
-                False,
-                HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+                has_pending_recovery=False,
+                oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
                 if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
                 else None,
-                ProjectStatus.ACTIVE,
-                True,
-                True,
+                project_status=ProjectStatus.ACTIVE,
+                is_project_member=True,
+                has_exact_action_grant=True,
             ),
-            can_grant,
-            bounded,
+            actor_can_grant_action=can_grant,
+            items=bounded,
         )
 
 
@@ -769,20 +801,26 @@ class MockSDKMyProjectAccessFacts(MyProjectAccessFactsReader):
             ...,
         ] = (
             (
-                MyProjectAccessPosition("grant", project_id.value, ActionId("inspect-budget")),
+                MyProjectAccessPosition(
+                    MyProjectAccessItemKind.GRANT, project_id.value, ActionId("inspect-budget")
+                ),
                 MyProjectAccessGrantDTO(
                     ProjectGrantTargetDTO(project_id), ActionId("inspect-budget"), True
                 ),
             ),
             (
-                MyProjectAccessPosition("grant", group.value, ActionId("add-documents")),
+                MyProjectAccessPosition(
+                    MyProjectAccessItemKind.GRANT, group.value, ActionId("add-documents")
+                ),
                 MyProjectAccessGrantDTO(
                     AccessGroupGrantTargetDTO(project_id, group), ActionId("add-documents"), False
                 ),
             ),
             (
                 MyProjectAccessPosition(
-                    "grant", application.value, ActionId("issue-application-keys")
+                    MyProjectAccessItemKind.GRANT,
+                    application.value,
+                    ActionId("issue-application-keys"),
                 ),
                 MyProjectAccessGrantDTO(
                     ApplicationAccountGrantTargetDTO(project_id, application),
@@ -791,12 +829,16 @@ class MockSDKMyProjectAccessFacts(MyProjectAccessFactsReader):
                 ),
             ),
             (
-                MyProjectAccessPosition("membership", group.value, None),
-                MyProjectAccessRelationshipDTO("membership", project_id, group),
+                MyProjectAccessPosition(MyProjectAccessItemKind.MEMBERSHIP, group.value, None),
+                MyProjectAccessRelationshipDTO(
+                    MyProjectAccessItemKind.MEMBERSHIP, project_id, group
+                ),
             ),
             (
-                MyProjectAccessPosition("management", group.value, None),
-                MyProjectAccessRelationshipDTO("management", project_id, group),
+                MyProjectAccessPosition(MyProjectAccessItemKind.MANAGEMENT, group.value, None),
+                MyProjectAccessRelationshipDTO(
+                    MyProjectAccessItemKind.MANAGEMENT, project_id, group
+                ),
             ),
         )
         items = tuple(
@@ -805,20 +847,20 @@ class MockSDKMyProjectAccessFacts(MyProjectAccessFactsReader):
             if after is None or position.sort_key > after.sort_key
         )[: limit + 1]
         return MyProjectAccessFactsDTO(
-            InstallationId(UUID(int=123)),
-            organization,
-            project_id,
-            7,
-            Principal(
+            installation_id=InstallationId(UUID(int=123)),
+            organization_id=organization,
+            project_id=project_id,
+            access_revision=7,
+            actor=Principal(
                 access.actor_principal_id, organization, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
             ),
-            False,
-            HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+            has_pending_recovery=False,
+            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
             if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
             else None,
-            ProjectStatus.ACTIVE,
-            True,
-            items,
+            project_status=ProjectStatus.ACTIVE,
+            is_project_member=True,
+            items=items,
         )
 
 
@@ -866,7 +908,7 @@ class MockSDKProjectMetadata(ProjectMetadataReader, ProjectMetadataChanger, Proj
         *,
         access: AccessContextDTO,
         command: UpdateProjectMetadataCommand,
-        context: OperationAdmissionContextDTO,
+        context: IdempotencyContextDTO,
     ) -> ProjectMetadataChangeResultDTO:
         if command.expected_metadata_revision != 0:
             raise StaleRevisionError()
@@ -995,21 +1037,33 @@ class MockSDKDeletionStatusLookup(DeletionStatusLookup):
         match query.operation_id.value:
             case "settled +/&é":
                 return RetainedDeletionStatusDTO(
-                    query.operation_id,
-                    JobStatus.SUCCEEDED,
-                    True,
-                    True,
-                    True,
-                    True,
-                    datetime(2030, 1, 1, tzinfo=UTC),
+                    operation_id=query.operation_id,
+                    job_status=JobStatus.SUCCEEDED,
+                    admission_confirmed=True,
+                    access_blocked=True,
+                    application_shutdown_complete=True,
+                    physical_cleanup_complete=True,
+                    expires_at=datetime(2030, 1, 1, tzinfo=UTC),
                 )
             case "active":
                 return RetainedDeletionStatusDTO(
-                    query.operation_id, JobStatus.RUNNING, True, True, False, None, None
+                    operation_id=query.operation_id,
+                    job_status=JobStatus.RUNNING,
+                    admission_confirmed=True,
+                    access_blocked=True,
+                    application_shutdown_complete=False,
+                    physical_cleanup_complete=None,
+                    expires_at=None,
                 )
             case "unknown":
                 return RetainedDeletionStatusDTO(
-                    query.operation_id, None, None, None, None, None, None
+                    operation_id=query.operation_id,
+                    job_status=None,
+                    admission_confirmed=None,
+                    access_blocked=None,
+                    application_shutdown_complete=None,
+                    physical_cleanup_complete=None,
+                    expires_at=None,
                 )
             case "unavailable":
                 raise DependencyUnavailableError()
@@ -1028,7 +1082,7 @@ async def _fault_response(fault: SDKFaultRequestDTO | None) -> Response | None:
         return None
 
     headers = {"X-Request-ID": "00000000-0000-4000-8000-000000000099"}
-    if fault.kind == "raw":
+    if fault.kind == Kind.RAW:
         response = Response(
             base64.b64decode(fault.body_base64, validate=True),
             status_code=fault.status,
@@ -1039,24 +1093,24 @@ async def _fault_response(fault: SDKFaultRequestDTO | None) -> Response | None:
             (name.encode("ascii"), value.encode("latin1")) for name, value in fault.headers
         )
         return response
-    if fault.kind == "json":
+    if fault.kind == Kind.JSON:
         return JSONResponse(
             fault.body, status_code=fault.status, headers=headers, media_type=fault.content_type
         )
-    if fault.kind == "malformed":
+    if fault.kind == Kind.MALFORMED:
         return Response(b"{", media_type="application/json", headers=headers)
-    if fault.kind == "unexpected":
+    if fault.kind == Kind.UNEXPECTED:
         return Response(
             b'{"unrecognized":true}',
             status_code=418,
             media_type="application/json",
             headers=headers,
         )
-    if fault.kind == "redirect":
+    if fault.kind == Kind.REDIRECT:
         return RedirectResponse("/health", status_code=307)
-    if fault.kind == "slow":
+    if fault.kind == Kind.SLOW:
         await asyncio.sleep(0.25)
-    if fault.kind == "disconnect":
+    if fault.kind == Kind.DISCONNECT:
         # Observe one request, then lose its response. This is no persistence proof.
         async def interrupted_body() -> AsyncIterator[bytes]:
             yield b"{"
@@ -1140,7 +1194,7 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(create_project_creation_router(authenticate, _open_project_creator))
     application.include_router(create_project_members_router(authenticate, _open_project_members))
     application.include_router(
-        create_project_membership_router(authenticate, _open_membership_changer)
+        create_project_membership_router(authenticate, MockSDKMembershipChangeServiceFactory())
     )
     application.include_router(
         create_project_metadata_router(

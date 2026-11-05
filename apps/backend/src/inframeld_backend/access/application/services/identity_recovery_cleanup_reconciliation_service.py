@@ -28,26 +28,27 @@ class IdentityRecoveryCleanupReconciliationService(IdentityRecoveryCleanupReconc
 
     def __init__(
         self,
-        transactions: TransactionManager,
-        proofs: IdentityRecoveryCleanupProofReader,
-        writer: IdentityRecoveryCleanupProofWriter,
-        completions: IdentityRecoveryCompletionReconciler,
+        transaction_manager: TransactionManager,
+        recovery_cleanup_proof_reader: IdentityRecoveryCleanupProofReader,
+        recovery_cleanup_proof_writer: IdentityRecoveryCleanupProofWriter,
+        recovery_completion_reconciler: IdentityRecoveryCompletionReconciler,
         *,
         database_timeout_seconds: float = 5,
         stop_requested: Callable[[], bool] = lambda: False,
     ) -> None:
-        self._transactions = transactions
-        self._proofs = proofs
-        self._writer = writer
-        self._completions = completions
+        self._transaction_manager = transaction_manager
+        self._recovery_cleanup_proof_reader = recovery_cleanup_proof_reader
+        self._recovery_cleanup_proof_writer = recovery_cleanup_proof_writer
+        self._recovery_completion_reconciler = recovery_completion_reconciler
         self._database_timeout_seconds = database_timeout_seconds
         self._stop_requested = stop_requested
 
     @asynccontextmanager
     async def _stage(self) -> AsyncGenerator[None]:
+        """Bound reconciliation database work without extending the cleanup run allowance."""
         try:
             async with asyncio.timeout(self._database_timeout_seconds):
-                async with self._transactions.begin():
+                async with self._transaction_manager.begin():
                     yield
         except TimeoutError:
             raise DependencyUnavailableError(
@@ -60,36 +61,38 @@ class IdentityRecoveryCleanupReconciliationService(IdentityRecoveryCleanupReconc
             raise ValueError("Reconciliation pages contain between one and twenty-five originals.")
 
         async with self._stage():
-            pending = await self._proofs.pending_operations(limit=limit)
+            pending = await self._recovery_cleanup_proof_reader.pending_operations(limit=limit)
 
         processed = 0
         for source in pending:
             if self._stop_requested():
                 break
             async with self._stage():
-                proof = await self._proofs.read_proof(source)
+                proof = await self._recovery_cleanup_proof_reader.read_proof(source)
                 if proof is None:
                     continue
-                older = await self._proofs.linked_older(source, limit=max(1, limit - processed))
+                older = await self._recovery_cleanup_proof_reader.linked_older(
+                    source, limit=max(1, limit - processed)
+                )
             targets = (() if proof.checked_at is not None else (source,)) + older
             for target in targets:
                 if processed >= limit or self._stop_requested():
                     return processed
                 try:
-                    await self._completions.reconcile_proof(
+                    await self._recovery_completion_reconciler.reconcile_proof(
                         operation_id=target,
                         covering_operation_id=None if target == source else source,
                     )
                 except (ConflictError, DependencyUnavailableError):
                     async with self._stage():
-                        await self._writer.defer(
+                        await self._recovery_cleanup_proof_writer.defer(
                             source, until=datetime.now(UTC) + timedelta(seconds=15)
                         )
                     break
                 processed += 1
 
             async with self._stage():
-                if not await self._proofs.linked_older(source, limit=1):
-                    await self._writer.mark_propagated(source)
+                if not await self._recovery_cleanup_proof_reader.linked_older(source, limit=1):
+                    await self._recovery_cleanup_proof_writer.mark_propagated(source)
 
         return processed

@@ -33,6 +33,7 @@ from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origi
     UnadmittedStagingArtifactOriginDTO,
 )
 from inframeld_backend.shared.application.enums.artifact_cleanup_kind import ArtifactCleanupKind
+from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.enums.job_effect_observation_kind import (
     JobEffectObservationKind,
 )
@@ -74,24 +75,24 @@ def original_effect() -> JobEffectBindingDTO:
         UnadmittedStagingArtifactOriginDTO(target, RequestId(UUID(int=6))),
     )
     context = JobAttemptContextDTO(
-        JobId(UUID(int=7)),
-        binding,
-        JobPayload("artifact.cleanup", 1, b"original"),
-        1,
-        JobFence(UUID(int=8)),
-        now + timedelta(minutes=2),
-        b"checkpoint",
+        job_id=JobId(UUID(int=7)),
+        binding=binding,
+        payload=JobPayload("artifact.cleanup", 1, b"original"),
+        attempt=1,
+        fence=JobFence(UUID(int=8)),
+        work_deadline=now + timedelta(minutes=2),
+        checkpoint=b"checkpoint",
     )
     return JobEffectBindingDTO(
-        JobEffectId(UUID(int=9)),
-        context,
-        "delete-original",
-        "delete",
-        ArtifactId(UUID(int=10)),
-        target,
-        scope,
-        None,
-        None,
+        effect_id=JobEffectId(UUID(int=9)),
+        context=context,
+        unit="delete-original",
+        action=JobEffectAction.DELETE,
+        artifact_id=ArtifactId(UUID(int=10)),
+        artifact_attempt_id=target,
+        scope=scope,
+        length=None,
+        digest=None,
     )
 
 
@@ -103,22 +104,22 @@ class MockEffectStore(JobStore):
         now = datetime.now(UTC)
         context = binding.context
         self.job = JobSnapshotDTO(
-            context.job_id,
-            context.binding,
-            context.payload,
-            JobStatus.RUNNING,
-            now,
-            now + timedelta(hours=1),
-            now,
-            now,
-            context.attempt,
-            context.work_deadline,
-            context.fence,
-            now + timedelta(seconds=30),
-            False,
-            binding.unit,
-            None,
-            context.checkpoint,
+            job_id=context.job_id,
+            binding=context.binding,
+            payload=context.payload,
+            status=JobStatus.RUNNING,
+            admitted_at=now,
+            queued_deadline=now + timedelta(hours=1),
+            due_at=now,
+            observed_at=now,
+            attempt=context.attempt,
+            work_deadline=context.work_deadline,
+            fence=context.fence,
+            lease_expires_at=now + timedelta(seconds=30),
+            cancel_requested=False,
+            pending_effect=binding.unit,
+            reason=None,
+            checkpoint=context.checkpoint,
         )
         self.observation: JobEffectObservationDTO | None = JobEffectObservationDTO(binding, now)
         self.events: list[str] = []
@@ -282,14 +283,14 @@ class MockEffectCleanupAuthority(ArtifactCleanupAuthorizer):
         binding = store.binding.context.binding
         assert isinstance(binding, ArtifactCleanupJobBindingDTO)
         self.facts = ArtifactCleanupFactsDTO(
-            binding,
-            store.job.job_id,
-            (store.binding.artifact_attempt_id,),
-            True,
-            False,
-            False,
-            False,
-            False,
+            binding=binding,
+            job_id=store.job.job_id,
+            targets=(store.binding.artifact_attempt_id,),
+            owns_targets=True,
+            retirement_authorized=False,
+            retention_allows_cleanup=False,
+            published=False,
+            pending_write=False,
         )
 
     @override

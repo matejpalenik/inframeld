@@ -76,6 +76,7 @@ from inframeld_backend.shared.application.dtos.retained_deletion_status_dto impo
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -128,31 +129,31 @@ COOKIE = {"Cookie": "ory_kratos_session=fixture-cookie"}
 BEARER = {"Authorization": "Bearer fixture-token"}
 PRIVATE_VALUE = "PRIVATE_OWNER_VALUE_MUST_NOT_ESCAPE"
 BINDING = DeletionStatusBindingDTO(
-    OPERATION,
-    RequestId(UUID(int=3)),
-    InstallationId(UUID(int=123)),
-    ACTOR.organization_id,
-    ProjectId(UUID(int=4)),
-    ACTOR.id,
-    "DELETE",
-    "/v1/original-project-deletion",
-    IdempotencyKey(PRIVATE_VALUE),
-    RequestFingerprint(b"F" * 32),
-    OperationLookupAuthorityFamily.PROJECT_ACTION_USE,
-    ActionId("delete-project"),
-    NOW - timedelta(days=10),
-    30,
-    "ADR-0117/PD-KNOWLEDGE-02:v1",
+    operation_id=OPERATION,
+    request_id=RequestId(UUID(int=3)),
+    installation_id=InstallationId(UUID(int=123)),
+    organization_id=ACTOR.organization_id,
+    project_id=ProjectId(UUID(int=4)),
+    initiator_principal_id=ACTOR.id,
+    method=HttpMethod.DELETE,
+    requested_route="/v1/original-project-deletion",
+    key=IdempotencyKey(PRIVATE_VALUE),
+    fingerprint=RequestFingerprint(b"F" * 32),
+    authority_family=OperationLookupAuthorityFamily.PROJECT_ACTION_USE,
+    action_id=ActionId("delete-project"),
+    recorded_at=NOW - timedelta(days=10),
+    retention_days=30,
+    retention_policy_version="ADR-0117/PD-KNOWLEDGE-02:v1",
 )
 OBLIGATION = DeletionStatusObligationProvenanceDTO(
-    UUID(int=5),
-    OPERATION,
-    BINDING.installation_id,
-    BINDING.organization_id,
-    BINDING.project_id,
-    ACTOR.id,
-    NOW - timedelta(minutes=1),
-    1,
+    obligation_id=UUID(int=5),
+    operation_id=OPERATION,
+    installation_id=BINDING.installation_id,
+    organization_id=BINDING.organization_id,
+    project_id=BINDING.project_id,
+    initiator_principal_id=ACTOR.id,
+    observed_at=NOW - timedelta(minutes=1),
+    source_revision=1,
 )
 ACTIVE = DeletionStatusObservationDTO(
     BINDING,

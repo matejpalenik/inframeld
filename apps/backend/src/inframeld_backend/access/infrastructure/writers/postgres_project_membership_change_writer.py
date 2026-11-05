@@ -1,4 +1,4 @@
-from typing import Literal, override
+from typing import override
 from uuid import uuid4
 
 from sqlalchemy import delete, select, update
@@ -9,10 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from inframeld_backend.access.application.dtos.project_membership_change_facts_dto import (
     ProjectMembershipChangeFactsDTO,
 )
+from inframeld_backend.access.application.enums.project_membership_change_kind import (
+    ProjectMembershipChangeKind,
+)
 from inframeld_backend.access.application.protocols.project_membership_change_writer import (
     ProjectMembershipChangeWriter,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
@@ -56,7 +60,7 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
         *,
         facts: ProjectMembershipChangeFactsDTO,
         principal_id: PrincipalId,
-        change_kind: Literal["add", "remove"],
+        change_kind: ProjectMembershipChangeKind,
         operation_id: OperationId,
     ) -> None:
         try:
@@ -68,9 +72,13 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
         self,
         facts: ProjectMembershipChangeFactsDTO,
         principal_id: PrincipalId,
-        change_kind: Literal["add", "remove"],
+        change_kind: ProjectMembershipChangeKind,
         operation_id: OperationId,
     ) -> None:
+        """Persist membership, revision, receipt and audit changes in the caller transaction.
+
+        Recheck the original reservation and locked scope before mutation.
+        """
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Membership persistence requires the active caller transaction.")
         actor = facts.action.principal
@@ -90,7 +98,7 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
             facts.organization_id.value,
             principal_id.value,
         )
-        method = "PUT" if change_kind == "add" else "DELETE"
+        method = change_kind.http_method
         route = f"/v1/projects/{project}/members/{recipient}"
         with self._session.no_autoflush:
             reservation = await self._session.scalar(
@@ -102,7 +110,8 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
                     IdempotencyReservationRow.method == method,
                     IdempotencyReservationRow.requested_route == route,
                     IdempotencyReservationRow.lookup_authority_family == "project_action_use",
-                    IdempotencyReservationRow.lookup_action_id == "manage-project-members",
+                    IdempotencyReservationRow.lookup_action_id
+                    == ProjectAction.MANAGE_PROJECT_MEMBERS.value,
                     IdempotencyReservationRow.state == OperationReservationState.IN_PROGRESS,
                     IdempotencyReservationRow.replay_kind.is_(None),
                     IdempotencyReservationRow.expires_at.is_(None),
@@ -135,10 +144,10 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
 
         changed = (
             not facts.recipient_is_project_member
-            if change_kind == "add"
+            if change_kind is ProjectMembershipChangeKind.ADD
             else facts.recipient_is_project_member
         )
-        if changed and change_kind == "add":
+        if changed and change_kind is ProjectMembershipChangeKind.ADD:
             self._session.add(
                 ProjectMembershipRow(
                     project_id=project,
@@ -215,11 +224,11 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
                 project_id=project,
                 actor_principal_id=actor.id.value,
                 principal_id=recipient,
-                change_kind=change_kind,
+                change_kind=change_kind.value,
                 before_revision=revision,
                 access_revision=after,
                 changed=changed,
-                status_code=201 if change_kind == "add" and changed else 200,
+                status_code=change_kind.success_status(changed=changed),
             )
         )
         self._session.add(
@@ -231,18 +240,23 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
                 actor_principal_id=actor.id.value,
                 affected_principal_id=recipient,
                 event_type=(
-                    "project_member_added" if change_kind == "add" else "project_member_removed"
+                    "project_member_added"
+                    if change_kind is ProjectMembershipChangeKind.ADD
+                    else "project_member_removed"
                 )
                 if changed
                 else "project_membership_unchanged",
                 target_kind="project",
                 target_id=project,
-                action="manage-project-members",
+                action=ProjectAction.MANAGE_PROJECT_MEMBERS.value,
                 before_values={
                     "access_revision": revision,
                     "member": facts.recipient_is_project_member,
                 },
-                after_values={"access_revision": after, "member": change_kind == "add"},
+                after_values={
+                    "access_revision": after,
+                    "member": change_kind is ProjectMembershipChangeKind.ADD,
+                },
                 correlation_id=operation_id.value,
             )
         )

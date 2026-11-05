@@ -11,6 +11,7 @@ from inframeld_backend.shared.http.mappers.problem_mapper import for_http_status
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate JSON fields so the submitted request has one unambiguous meaning."""
     values: dict[str, object] = {}
     for key, value in pairs:
         if key in values:
@@ -20,6 +21,7 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _reject_constant(_value: str) -> object:
+    """Reject non-finite JSON constants before mapping the submitted request."""
     raise ValueError("Invalid JSON constant.")
 
 
