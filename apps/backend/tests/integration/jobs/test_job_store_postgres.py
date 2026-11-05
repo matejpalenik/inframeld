@@ -17,6 +17,7 @@ from tests.support.application_worker_process import (
     application_worker_process,
 )
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.seaweedfs_fixture import storage_settings
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
@@ -68,6 +69,7 @@ from inframeld_backend.bootstrap import application_worker
 from inframeld_backend.bootstrap.application_worker_application_settings import (
     ApplicationWorkerApplicationSettings,
 )
+from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_queue_status_dto import JobQueueStatusDTO
@@ -90,12 +92,19 @@ from inframeld_backend.shared.application.errors.job_errors import (
     JobStoppedError,
     UnsupportedJobPayloadError,
 )
+from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
+    ArtifactCleanupAuthorizationService,
+)
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
 from inframeld_backend.shared.application.services.job_admission_service import JobAdmissionService
 from inframeld_backend.shared.application.services.job_checkpoint_service import (
     JobCheckpointService,
 )
+from inframeld_backend.shared.application.services.job_continuation_eligibility_service import (
+    JobContinuationEligibilityService,
+)
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
+from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
@@ -104,6 +113,9 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
+    PostgresArtifactCleanupFactsReader,
+)
 from inframeld_backend.shared.infrastructure.readers.postgres_job_queue_status_reader import (
     PostgresJobQueueStatusReader,
 )
@@ -222,11 +234,26 @@ async def _admit(
 
 async def _claim(database: Database) -> JobAttemptContextDTO | None:
     async with database.session() as session:
+        recovery_store = PostgresJobStore(session)
+        product_authority = AdmittedWorkAuthorizationService(
+            PostgresAdmittedWorkFactsReader(session)
+        )
+        recovery_service = JobRecoveryService(
+            recovery_store,
+            JobContinuationEligibilityService(
+                recovery_store,
+                product_authority,
+                ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
+                supported_payloads=(("test.progress", 1),),
+            ),
+        )
         return await JobExecutionService(
             SqlAlchemyTransactionManager(session),
-            PostgresJobStore(session),
+            recovery_store,
             supported_payloads=(("test.progress", 1),),
             worker_id=uuid4(),
+            product=product_authority,
+            recovery=recovery_service,
         ).claim_next()
 
 
@@ -991,11 +1018,13 @@ async def test_application_human_only_action_is_denied_before_admission_effects(
 
 
 @pytest.mark.asyncio
-async def test_legacy_ineligible_application_job_cannot_publish_a_checkpoint(
+async def test_legacy_ineligible_application_job_is_rejected_before_attempt_starts(
     database: Database,
 ) -> None:
     request, authority = await _request(database)
     authority = replace(authority, action_id=ActionId("create-sources"))
+    request_id = RequestId(uuid4())
+    payload = JobPayload("test.progress", 1, b"fixed")
     async with database.session() as session, session.begin():
         await session.execute(
             update(ProjectActionGrantRow)
@@ -1010,21 +1039,14 @@ async def test_legacy_ineligible_application_job_cannot_publish_a_checkpoint(
         operation = await writer.reserve(request)
         admitted = await PostgresJobStore(session).admit(
             operation_id=operation.operation_id,
-            request_id=RequestId(uuid4()),
+            request_id=request_id,
             authority=authority,
-            payload=JobPayload("test.progress", 1, b"fixed"),
+            payload=payload,
             capacity=8,
         )
         await writer.mark_replayable(operation.operation_id, OperationReplayKind.ASYNC_JOB)
 
-    context = await _claim(database)
-    assert (
-        context is not None
-        and isinstance(context.binding, ProductJobBindingDTO)
-        and context.job_id == admitted.job_id
-    )
-    with pytest.raises(JobStoppedError):
-        await _checkpoints(database, context, b"forbidden-protected-result")
+    assert await _claim(database) is None
 
     async with database.session() as session:
         saved = await PostgresJobStore(session).find(admitted.operation_id)
@@ -1034,6 +1056,12 @@ async def test_legacy_ineligible_application_job_cannot_publish_a_checkpoint(
         and saved.reason == "authority_changed"
         and saved.checkpoint == b""
     )
+    assert saved.job_id == admitted.job_id
+    assert admitted.operation_id == operation.operation_id
+    assert saved.binding == ProductJobBindingDTO(operation.operation_id, request_id, authority)
+    assert saved.payload == payload
+    assert saved.attempt == 0 and saved.fence is None and saved.lease_expires_at is None
+    assert saved.pending_effect is None
     assert await _claim(database) is None
 
 
@@ -1138,10 +1166,19 @@ async def test_queue_reporting_failure_does_not_waste_first_executable_attempt(
             shutdown_seconds=1,
             work_seconds=20,
         ),
+        artifact_storage=storage_settings(),
     )
     stopped = asyncio.Event()
+    worker_database = Database(settings.database)
+    worker_operations = ApplicationWorkerOperations(worker_database, settings.jobs, stopped)
     worker = asyncio.create_task(
-        application_worker.run_application_worker(settings, stopped, (BoundedJobHandler(),))
+        application_worker.run_application_worker(
+            settings,
+            stopped,
+            (BoundedJobHandler(),),
+            database=worker_database,
+            operations=worker_operations,
+        )
     )
     try:
         await _wait_job(database, admission)
@@ -1195,9 +1232,18 @@ async def test_stop_during_queue_report_leaves_admitted_job_unclaimed(
             shutdown_seconds=3,
             work_seconds=20,
         ),
+        artifact_storage=storage_settings(),
     )
+    worker_database = Database(settings.database)
+    worker_operations = ApplicationWorkerOperations(worker_database, settings.jobs, stopped)
     worker = asyncio.create_task(
-        application_worker.run_application_worker(settings, stopped, (BoundedJobHandler(),))
+        application_worker.run_application_worker(
+            settings,
+            stopped,
+            (BoundedJobHandler(),),
+            database=worker_database,
+            operations=worker_operations,
+        )
     )
     try:
         await asyncio.wait_for(asyncio.shield(worker), timeout=15)

@@ -14,9 +14,15 @@ from tests.support.artifact_scenarios import (
     completed_product_origin,
 )
 
+from inframeld_backend.access.application.services.admitted_work_authorization_service import (
+    AdmittedWorkAuthorizationService,
+)
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_facts_reader import (
+    PostgresAdmittedWorkFactsReader,
+)
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto import (
@@ -34,7 +40,11 @@ from inframeld_backend.shared.application.services.artifact_cleanup_authorizatio
 from inframeld_backend.shared.application.services.artifact_cleanup_checkpoint_service import (
     ArtifactCleanupCheckpointService,
 )
+from inframeld_backend.shared.application.services.job_continuation_eligibility_service import (
+    JobContinuationEligibilityService,
+)
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
+from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
 from inframeld_backend.shared.application.value_objects.artifact_cleanup_obligation_id import (
     ArtifactCleanupObligationId,
 )
@@ -67,11 +77,26 @@ async def _claimed_cleanup(database: Database) -> JobAttemptContextDTO:
     )
     await asyncio.sleep(2.05)
     async with database.session() as session:
+        recovery_store = PostgresJobStore(session)
+        product_authority = AdmittedWorkAuthorizationService(
+            PostgresAdmittedWorkFactsReader(session)
+        )
+        recovery_service = JobRecoveryService(
+            recovery_store,
+            JobContinuationEligibilityService(
+                recovery_store,
+                product_authority,
+                ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
+                supported_payloads=(("artifact.cleanup", 1),),
+            ),
+        )
         context = await JobExecutionService(
             SqlAlchemyTransactionManager(session),
-            PostgresJobStore(session),
+            recovery_store,
             supported_payloads=(("artifact.cleanup", 1),),
             worker_id=uuid4(),
+            product=product_authority,
+            recovery=recovery_service,
         ).claim_next()
     assert context is not None and context.job_id == allocated.cleanup_job_id
     assert isinstance(context.binding, ArtifactCleanupJobBindingDTO)
