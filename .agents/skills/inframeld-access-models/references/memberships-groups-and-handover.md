@@ -121,6 +121,20 @@ Kratos handles recovery of the sign-in identity. Access decides whether the reco
 
 <a id="admission-memberships-and-lifecycle"></a>
 
+<a id="inspect-and-administer-access-groups"></a>
+
+## Inspect and administer access groups
+
+The native group creation, member/manager changes, exact metadata reads and unused-group deletion are implemented. [The task guide](../../../../apps/docs/src/app/guides/manage-access-groups/page.mdx) owns copyable HTTP and generated-client examples. [Lifecycle persistence](access-lifecycle-persistence.md#group-administration-and-deletion-recovery) owns atomic effects, original results and the deletion boundary.
+
+An eligible current Project principal may inspect one exact group ID or resolve its exact Name only when it is an ordinary member, manager or holder of an exact supported Add, Update or Delete documents grant on that group. Unsupported stored action identifiers confer no visibility. This gives safe IDs, nullable legacy Name, Display name, creation time and current Project Access revision. It gives no Project-wide group directory or document inventory. Hidden, absent and retired names return the safe not-found result. Current HTTP authentication remains human cookie or human bearer authentication. Application-key transport remains its separate delivery.
+
+Only current eligible human managers list the group's safe principal IDs, kinds and Display names. Each request rechecks management. Pages use ascending principal UUIDs, default 25 and maximum 100, and an opaque cursor bound to installation, Organization, Project, group, collection and position. A members cursor cannot select managers or another group. Reads change neither audit nor revision.
+
+Creation requires current Project `create-access-groups` use authority and a reviewed Project revision. PUT uses strict revision JSON and returns 201 for a changed assignment or 200 for an original no-op. DELETE carries exactly one revision query value and no body, and returns 200. Current authority precedes original replay. Saved receipts describe original outcomes rather than restoring a later removed relationship.
+
+The current deletion writer handles the actual Access relationships. Future Document/source/active-upload/default/case owners add their real restrictive references and compatible coordination. Their absence does not create a replacement reference registry or qualify those future journeys.
+
 ### Admission, memberships and lifecycle
 
 In the following table, `revision` means the required `expectedAccessRevision` field, and `names` means required `name` and `displayName`. All rows use Human administration unless stated otherwise. The single installation's Organization ID is explicit, not an implicit superadministrator scope. A body revision always refers to the coordinated Organization or Project access revision, not a credential or resource content revision.
@@ -175,7 +189,7 @@ For new work, the service checks the reviewed revision after obtaining the Organ
 
 Current credential and action checks run before completed replay. A retry with the same complete request returns the original status, revision, expiry and change flag. It does not restore a removed membership or remove a later rejoin. A fresh stale revision, changed meaning under the same key, ineligible add recipient or unsafe departure fails atomically. Self-departure is subject to the same rules and ends the caller's Project visibility, including authority to recover its earlier response afterward.
 
-The [service](../../../../apps/backend/src/inframeld_backend/access/application/services/project_membership_change_service.py), [receipt storage](access-lifecycle-persistence.md#project-membership-original-results) and [user guide](../../../../apps/docs/src/app/guides/manage-project-members/page.mdx) describe the implementation. Public grant administration and group membership/manager producers remain separate unfinished workflows. Their absence does not disable the automatic departure guard. Human setup, procedure preparation and acceptance remain deferred under #319.
+The [service](../../../../apps/backend/src/inframeld_backend/access/application/services/project_membership_change_service.py), [receipt storage](access-lifecycle-persistence.md#project-membership-original-results) and [user guide](../../../../apps/docs/src/app/guides/manage-project-members/page.mdx) describe the implementation. Public grant administration remains separate. Group membership and manager changes use the implemented group workflow above. Their absence does not disable the automatic departure guard. Human setup, procedure preparation and acceptance remain deferred under #319.
 
 The group's `/members` (`listAccessGroupMembers`) and `/managers` (`listAccessGroupManagers`) require current group management. Return the existing bounded page of safe `principalId`, `displayName`, `kind`, ordered by principal UUID, with the exact scope bound into the cursor. They do not expose other memberships or document contents. Own Project access uses one combined page of at most `limit` entries across its three arrays, ordered by relationship kind then target UUID then action literal, and a scope/principal-bound cursor. A grant item contains typed `target`, `actionId`, `canGrant`. Membership/management items contain only `accessGroupId`. Return only stored assignments and actual relationships, not fabricated implied grant rows. `nextCursor` is a string or null. Organization own-access lists only its four supported stored action assignments. A page reports a current access revision for that read. It is not a permission snapshot for later execution.
 

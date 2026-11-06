@@ -29,6 +29,7 @@ from inframeld_backend.shared.application.enums.operation_lookup_authority_famil
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
+    InvalidInputError,
 )
 from inframeld_backend.shared.application.protocols.deletion_status_lookup import (
     DeletionStatusLookup,
@@ -41,6 +42,9 @@ from inframeld_backend.shared.application.queries.get_deletion_status_query impo
 )
 from inframeld_backend.shared.application.value_objects.deletion_status_retention_profile import (
     DeletionStatusRetentionProfile,
+)
+from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+    OperationLookupAuthority,
 )
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
@@ -101,10 +105,28 @@ class DeletionStatusReadService(DeletionStatusLookup):
             and binding.installation_id == authorization.installation_id
             and binding.organization_id == authorization.organization_id
             and binding.initiator_principal_id == authorization.principal_id
-            and binding.authority_family is OperationLookupAuthorityFamily.PROJECT_ACTION_USE
-            and binding.action_id is not None
-            and binding.action_id.value == ProjectAction.DELETE_PROJECT.value
+            and DeletionStatusReadService._supported_binding(binding)
         )
+
+    @staticmethod
+    def _supported_binding(binding: DeletionStatusBindingDTO) -> bool:
+        if binding.action_id is None:
+            return False
+        if binding.authority_family is OperationLookupAuthorityFamily.PROJECT_ACTION_USE:
+            return binding.action_id.value == ProjectAction.DELETE_PROJECT.value
+        if binding.authority_family is not OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION:
+            return False
+        try:
+            OperationLookupAuthority(
+                binding.authority_family, binding.action_id
+            ).require_supported_scope(
+                project_id=binding.project_id,
+                method=binding.method,
+                requested_route=binding.requested_route,
+            )
+        except InvalidInputError:
+            return False
+        return True
 
     @staticmethod
     def _has_owner_observation(stored: DeletionStatusObservationDTO) -> bool:
@@ -163,6 +185,14 @@ class DeletionStatusReadService(DeletionStatusLookup):
         if stored.job_status is not None and type(stored.job_status) is not JobStatus:
             raise DependencyUnavailableError()
 
+        group = binding.authority_family is OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION
+        if group and (
+            stored.job_status is not None
+            or stored.application_shutdown_complete is not None
+            or stored.retention_started_at is None
+        ):
+            raise DependencyUnavailableError()
+
         if stored.retention_started_at is None:
             if stored.expires_at is not None or stored.physical_cleanup_complete is True:
                 raise DependencyUnavailableError()
@@ -178,7 +208,7 @@ class DeletionStatusReadService(DeletionStatusLookup):
                 for confirmed in (
                     stored.admission_confirmed,
                     stored.access_blocked,
-                    stored.application_shutdown_complete,
+                    *((stored.application_shutdown_complete,) if not group else ()),
                     stored.physical_cleanup_complete,
                 )
             )

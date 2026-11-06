@@ -125,6 +125,12 @@ from inframeld_backend.access.application.enums.project_membership_change_kind i
 from inframeld_backend.access.application.errors.retired_project_name_error import (
     RetiredProjectNameError,
 )
+from inframeld_backend.access.application.protocols.access_group_creator import AccessGroupCreator
+from inframeld_backend.access.application.protocols.access_group_deleter import AccessGroupDeleter
+from inframeld_backend.access.application.protocols.access_group_reader import AccessGroupReader
+from inframeld_backend.access.application.protocols.access_group_relationship_changer import (
+    AccessGroupRelationshipChanger,
+)
 from inframeld_backend.access.application.protocols.application_account_creator import (
     ApplicationAccountCreator,
 )
@@ -219,6 +225,7 @@ from inframeld_backend.access.http.dependencies.csrf_protection_dependency impor
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
+from inframeld_backend.access.http.routes.access_group_routes import create_access_group_router
 from inframeld_backend.access.http.routes.application_account_routes import (
     create_application_account_router,
 )
@@ -314,6 +321,7 @@ from inframeld_backend.shared.http.routes.original_operation_lookup_routes impor
     create_original_operation_lookup_router,
 )
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_sdk_access_groups import MockSDKAccessGroups
 from tests.support.mock_sdk_application_accounts import MockSDKApplicationAccounts
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
@@ -551,6 +559,26 @@ async def _open_my_organization_access() -> AsyncGenerator[MyOrganizationAccessR
 @asynccontextmanager
 async def _open_project_creator() -> AsyncGenerator[ProjectCreator]:
     yield MockSDKProjectCreator()
+
+
+@asynccontextmanager
+async def _open_access_group_creator() -> AsyncGenerator[AccessGroupCreator]:
+    yield MockSDKAccessGroups()
+
+
+@asynccontextmanager
+async def _open_access_group_reader() -> AsyncGenerator[AccessGroupReader]:
+    yield MockSDKAccessGroups()
+
+
+@asynccontextmanager
+async def _open_access_group_changer() -> AsyncGenerator[AccessGroupRelationshipChanger]:
+    yield MockSDKAccessGroups()
+
+
+@asynccontextmanager
+async def _open_access_group_deleter() -> AsyncGenerator[AccessGroupDeleter]:
+    yield MockSDKAccessGroups()
 
 
 @asynccontextmanager
@@ -974,11 +1002,28 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
         | AcceptedOperationLookupDTO
         | InProgressOperationDTO
         | RecoveryRequiredOperationDTO
+        | RetainedDeletionStatusDTO
         | UnresolvedOperationDTO
     ):
         query.expected_authority.require_supported_scope(
             project_id=query.project_id, method=query.method, requested_route=query.requested_route
         )
+        if query.expected_authority.family is OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION:
+            if (
+                query.key.value == "sdk-group-delete"
+                and query.requested_route
+                == "/v1/projects/00000000-0000-4000-8000-000000000003/access-groups/00000000-0000-4000-8000-000000000007"
+            ):
+                return RetainedDeletionStatusDTO(
+                    operation_id=OperationId("sdk-group-delete"),
+                    job_status=None,
+                    admission_confirmed=True,
+                    access_blocked=True,
+                    application_shutdown_complete=None,
+                    physical_cleanup_complete=True,
+                    expires_at=datetime(2030, 1, 31, tzinfo=UTC),
+                )
+            return UnresolvedOperationDTO()
         metadata = query.requested_route == "/v1/projects/{project_id}/metadata"
         original_action = (
             "edit-project-metadata"
@@ -1055,6 +1100,16 @@ class MockSDKDeletionStatusLookup(DeletionStatusLookup):
         self, *, access: AccessContextDTO, query: GetDeletionStatusQuery
     ) -> RetainedDeletionStatusDTO | UnresolvedOperationDTO:
         match query.operation_id.value:
+            case "sdk-group-delete":
+                return RetainedDeletionStatusDTO(
+                    operation_id=OperationId("sdk-group-delete"),
+                    job_status=None,
+                    admission_confirmed=True,
+                    access_blocked=True,
+                    application_shutdown_complete=None,
+                    physical_cleanup_complete=True,
+                    expires_at=datetime(2030, 1, 31, tzinfo=UTC),
+                )
             case "settled +/&é":
                 return RetainedDeletionStatusDTO(
                     operation_id=query.operation_id,
@@ -1212,6 +1267,15 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
         create_organization_access_router(authenticate, _open_my_organization_access)
     )
     application.include_router(create_project_creation_router(authenticate, _open_project_creator))
+    application.include_router(
+        create_access_group_router(
+            authenticate,
+            _open_access_group_creator,
+            _open_access_group_reader,
+            _open_access_group_changer,
+            _open_access_group_deleter,
+        )
+    )
     application.include_router(
         create_application_account_router(
             authenticate, _open_application_account_creator, _open_application_account_reader

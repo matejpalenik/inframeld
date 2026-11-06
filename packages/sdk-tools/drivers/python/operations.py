@@ -11,6 +11,9 @@ from inframeld_sdk.api.access_api import AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi
 from inframeld_sdk.api.operations_api import OperationsApi
+from inframeld_sdk.models.access_group_creation_request import AccessGroupCreationRequest
+from inframeld_sdk.models.access_group_manager_request import AccessGroupManagerRequest
+from inframeld_sdk.models.access_group_membership_request import AccessGroupMembershipRequest
 from inframeld_sdk.models.application_account_creation_request import (
     ApplicationAccountCreationRequest,
 )
@@ -714,7 +717,247 @@ async def fallback_async(clients: Clients, call: Call) -> NativeResponse:
     )
 
 
+def create_access_group_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).create_access_group_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        access_group_creation_request=AccessGroupCreationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def create_access_group_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).create_access_group_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        access_group_creation_request=AccessGroupCreationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def get_access_group_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_access_group_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def get_access_group_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_access_group_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def resolve_access_group_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).resolve_access_group_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        name=string(call.query["name"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def resolve_access_group_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).resolve_access_group_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        name=string(call.query["name"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_access_group_members_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_access_group_members_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_access_group_members_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_access_group_members_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_access_group_managers_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_access_group_managers_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_access_group_managers_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_access_group_managers_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def add_access_group_member_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).add_access_group_member_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        access_group_membership_request=AccessGroupMembershipRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def add_access_group_member_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).add_access_group_member_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        access_group_membership_request=AccessGroupMembershipRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def remove_access_group_member_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).remove_access_group_member_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def remove_access_group_member_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).remove_access_group_member_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def appoint_access_group_manager_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).appoint_access_group_manager_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        access_group_manager_request=AccessGroupManagerRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def appoint_access_group_manager_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).appoint_access_group_manager_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        access_group_manager_request=AccessGroupManagerRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def remove_access_group_manager_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).remove_access_group_manager_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def remove_access_group_manager_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).remove_access_group_manager_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def delete_access_group_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).delete_access_group_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def delete_access_group_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).delete_access_group_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 BINDINGS: dict[Operation, Binding] = {
+    Operation.CREATE_ACCESS_GROUP: Binding(create_access_group_sync, create_access_group_async),
+    Operation.GET_ACCESS_GROUP: Binding(get_access_group_sync, get_access_group_async),
+    Operation.RESOLVE_ACCESS_GROUP: Binding(resolve_access_group_sync, resolve_access_group_async),
+    Operation.LIST_ACCESS_GROUP_MEMBERS: Binding(
+        list_access_group_members_sync, list_access_group_members_async
+    ),
+    Operation.LIST_ACCESS_GROUP_MANAGERS: Binding(
+        list_access_group_managers_sync, list_access_group_managers_async
+    ),
+    Operation.ADD_ACCESS_GROUP_MEMBER: Binding(
+        add_access_group_member_sync, add_access_group_member_async
+    ),
+    Operation.REMOVE_ACCESS_GROUP_MEMBER: Binding(
+        remove_access_group_member_sync, remove_access_group_member_async
+    ),
+    Operation.APPOINT_ACCESS_GROUP_MANAGER: Binding(
+        appoint_access_group_manager_sync, appoint_access_group_manager_async
+    ),
+    Operation.REMOVE_ACCESS_GROUP_MANAGER: Binding(
+        remove_access_group_manager_sync, remove_access_group_manager_async
+    ),
+    Operation.DELETE_ACCESS_GROUP: Binding(delete_access_group_sync, delete_access_group_async),
     Operation.CREATE_APPLICATION_ACCOUNT: Binding(
         create_application_account_sync, create_application_account_async
     ),

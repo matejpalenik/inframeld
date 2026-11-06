@@ -35,11 +35,11 @@ from inframeld_backend.access.domain.value_objects.application_key_id import App
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.access.infrastructure.mappers.postgres_application_account_facts_mapper import (
-    PostgresApplicationAccountFactsMapper,
+from inframeld_backend.access.infrastructure.mappers.postgres_project_actor_mapper import (
+    PostgresProjectActorMapper,
 )
-from inframeld_backend.access.infrastructure.readers.application_account_authorization_queries import (
-    ApplicationAccountAuthorizationQueries,
+from inframeld_backend.access.infrastructure.readers.project_actor_queries import (
+    ProjectActorQueries,
 )
 from inframeld_backend.access.infrastructure.rows.application_account_name_reservation_row import (
     ApplicationAccountNameReservationRow,
@@ -236,7 +236,7 @@ class PostgresApplicationAccountFactsReader(ApplicationAccountFactsReader):
             .correlate(PrincipalRow, ProjectRow, ApplicationAccountRow)
         )
         statement = (
-            ApplicationAccountAuthorizationQueries.header(access, project_id)
+            ProjectActorQueries.header(access, project_id)
             .join(
                 ApplicationAccountRow,
                 and_(
@@ -288,7 +288,7 @@ class PostgresApplicationAccountFactsReader(ApplicationAccountFactsReader):
         ) = row
         if installed is None:
             raise DependencyUnavailableError("The installation identity is unavailable.")
-        action = PostgresApplicationAccountFactsMapper.action(
+        action = PostgresProjectActorMapper.action(
             access=access,
             principal=principal,
             project=project,

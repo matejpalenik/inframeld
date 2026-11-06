@@ -19,3 +19,4 @@ class AccessGroupRow(AccessPersistenceBase):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), init=False, server_default=func.now()
     )
+    resource_name: Mapped[str | None] = mapped_column(Text, default=None)

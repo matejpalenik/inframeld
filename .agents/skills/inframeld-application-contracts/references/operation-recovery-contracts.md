@@ -35,10 +35,11 @@ The following minimal metadata rules were accepted on 2026-10-29. They do not es
 | Project action-use | Current eligibility, Project visibility/membership and use permission for that accepted Project action | Original Organization and exact Project |
 | Project grant-read | Eligible human, Project visibility/membership and can-use-and-grant for the exact action | Original Organization and exact Project |
 | Organization action-use | Eligible human in the original Organization with use permission for the exact accepted Organization action | Original Organization, without a Project |
+| Access-group deletion | Current eligible human credential and recovery state, then exact original initiator matching | Original installation/Organization/Project, canonical DELETE route and key, returning only retained deletion status |
 
 The delivered grant route's meaning is fixed: `POST /v1/projects/{project_id}/grants` uses Project grant-read for `create-access-groups`. A caller cannot downgrade it to ordinary action-use. Invalid method/route/family/action combinations fail before history search. This observes the original operation without reapplying recipient assignment eligibility or expected revision.
 
-Generic action-use permits only content-free original operation/admission metadata. It does not permit current job results, resource inventory or source-derived content. Future resource-specific and deletion-exception families need their own original binding and pre-search authority contracts. They cannot be coerced into Project action-use.
+Generic action-use permits only content-free original operation/admission metadata. It does not permit current job results, resource inventory or source-derived content. Other future resource-specific and deletion-exception families need their own original binding and pre-search authority contracts. They cannot be coerced into Project action-use.
 
 After authorization, absent history, another binding, insufficient legacy metadata or a non-authoritative binding shape all return the same **Unresolved** observation without a match-specific reason, references or expiry. A valid exact binding whose retained outcome cannot be decoded remains a failed observation. Actual dependency failures and timeouts remain failures. This avoids revealing inaccessible history through status, details or recovery headers. Independently generated request correlation may differ. No constant-time database guarantee follows.
 
@@ -156,7 +157,19 @@ An eligible noninitiator receives the same `200` unresolved object as missing, e
 
 A retained response has `outcome`, original `operationId`, nullable `jobState`, `admissionConfirmed`, `accessBlocked`, `applicationShutdownComplete`, `physicalCleanupComplete` and `retentionExpiresAt`. All fields are required, and unknown facts remain explicit nulls rather than false. The unresolved response contains only `outcome: "unresolved"`. Reads and problems use `no-store`. Native OpenAPI owns the exact schema. [The task guide](../../../../apps/docs/src/app/guides/read-deletion-status/page.mdx) owns runnable HTTP/generated-client examples.
 
-The binding captures the accepted deletion-status retention profile. An unfinished authoritative obligation is not expired as ordinary settled history. A first valid settled observation fixes the expiry from its captured profile, and later reads/settings never extend it. See [Project deletion](../../inframeld-knowledge/references/project-deletion.md) and its owning retention policy. The reader consumes these facts without writing or continuing deletion. Authentic admission, shutdown and physical-cleanup producers remain separate delivery.
+The binding captures the accepted deletion-status retention profile. An unfinished authoritative obligation is not expired as ordinary settled history. A first valid settled observation fixes the expiry from its captured profile, and later reads/settings never extend it. See [Project deletion](../../inframeld-knowledge/references/project-deletion.md) and its owning retention policy. The reader consumes these facts without writing or continuing deletion. Project admission, shutdown and physical-cleanup producers retain their separate delivery. The synchronous group producer is described below.
+
+<a id="access-group-deletion-recovery"></a>
+
+### Access-group deletion recovery
+
+The implemented closed `access_group_deletion` / `delete-access-group` binding supports a lost first DELETE response. It is an operation-matching tag, not a grant-catalogue action or new viewer policy. `POST /v1/operations/lookup` takes the complete saved installation, Organization, Project, `DELETE` method, concrete canonical `/v1/projects/<project UUID>/access-groups/<group UUID>` route and original key. Authentication supplies the initiator. Current eligible-human and credential/recovery checks run before retained search.
+
+This branch locates the retained deletion binding and observation independently of the ordinary reservation and its 24-hour replay history. It returns the existing content-free retained-status alternative or the uniform unresolved object. It does not return a group Name, inventory, payload or ordinary full receipt. Missing, mismatched, ambiguous and expired retained history remains unresolved. Invalid closed guards or schemas remain input failures. Known-operation-ID status uses the same interpreter and original-initiator rule.
+
+The group owner deletes synchronously. Authentic settled observations have admission, access blocking and physical cleanup confirmed, with `jobState` and `applicationShutdownComplete` explicitly null and no unfinished obligation. The reader requires coherent recorded/start/observed timestamps, positive safe owner revision and the exact captured-profile expiry. Reads never start or extend that clock. The existing Project branch retains its application shutdown and unfinished-obligation provenance requirements.
+
+Ordinary repeated DELETE and full-receipt recovery still require current group management. A deleted group cannot supply that authority, so callers use this narrow retained path. Current eligibility remains necessary even after ordinary Project membership disappears. Human acceptance is tracked separately in [#354](https://github.com/matejpalenik/inframeld/issues/354).
 
 ## Retention, delivery and acceptance
 

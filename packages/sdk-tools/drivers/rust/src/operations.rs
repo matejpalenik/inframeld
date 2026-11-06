@@ -221,6 +221,171 @@ pub async fn observe(
                     .await
             )
         }
+        "createAccessGroup" => observed!(
+            client
+                .create_access_group(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
+        "getAccessGroup" => observed!(
+            client
+                .get_access_group(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap()
+                )
+                .await
+        ),
+        "resolveAccessGroup" => observed!(
+            client
+                .resolve_access_group(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["name"].as_str().unwrap()
+                )
+                .await
+        ),
+        "listAccessGroupMembers" => observed!(
+            client
+                .list_access_group_members(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str)
+                )
+                .await
+        ),
+        "listAccessGroupManagers" => observed!(
+            client
+                .list_access_group_managers(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str)
+                )
+                .await
+        ),
+        "addAccessGroupMember" => observed!(
+            client
+                .add_access_group_member(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
+        "removeAccessGroupMember" => observed!(
+            client
+                .remove_access_group_member(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
+        "appointAccessGroupManager" => observed!(
+            client
+                .appoint_access_group_manager(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
+        "removeAccessGroupManager" => observed!(
+            client
+                .remove_access_group_manager(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
+        "deleteAccessGroup" => observed!(
+            client
+                .delete_access_group(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
         "createApplicationAccount" => observed!(
             client
                 .create_application_account(

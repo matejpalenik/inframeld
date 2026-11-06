@@ -8,7 +8,7 @@ export const pageMetadata = {
 
 If you submit a request and lose its response, use `POST /v1/operations/lookup` to check what Inframeld retained about that request. Lookup reads the original operation's record. It does not perform the operation again.
 
-This guide uses a Project grant: Alice submitted a request to grant Bob access, but did not receive the response. The same lookup endpoint supports retained Project and Organization operations with the appropriate authority guard.
+This guide uses a Project grant: Alice submitted a request to grant Bob access, but did not receive the response. The same lookup endpoint supports retained Project and Organization operations with the appropriate authority guard. Its closed access-group deletion variant returns only content-free retained deletion status.
 
 <Note>
   An `unresolved` result or a timeout does not mean the original request failed.
@@ -82,6 +82,41 @@ For a Project metadata change, retain method `PATCH`, canonical route `/v1/proje
 For application-account creation, retain method `POST`, the original concrete route containing the actual Project UUID, family `project_action_use` and action `create-application-accounts`. [Create and inspect an application account](/guides/application-accounts#recover-an-uncertain-creation-result) explains its original-POST recovery and exact lookup context.
 
 A grant lookup requires `project_grant_read`. The weaker `project_action_use` guard cannot replace it. Lookup checks your current authority before searching retained history. It does not repeat the recipient's eligibility check from the original assignment.
+
+## Recover an access-group change
+
+For an ordinary group membership or manager change, preserve the original Project and group, exact method and route, request key and reviewed inputs. A currently authorized retry returns its original receipt without applying the relationship change again. Current management is checked before ordinary original-result disclosure. Management of a different group is insufficient.
+
+An ordinary repeated group DELETE or full business-result replay also retains current-manager authorization. After deletion removes the group, its currently eligible original human has a separate retained path using the exact saved request identity or original operation ID. It returns only content-free deletion correlation and status. It does not restore management, expose the deleted group's relationships or authorize a full receipt replay.
+
+That retained group-deletion path is independent of expired ordinary idempotency history. It preserves the captured original status expiry without renewal. [Manage access groups](/guides/manage-access-groups#recover-an-uncertain-change) explains the group workflow, while [retained deletion status](/guides/read-deletion-status#read-status-for-a-deleted-access-group) distinguishes synchronous group cleanup from Project deletion.
+
+For this closed deletion lookup, use family `access_group_deletion` and action `delete-access-group`. These are matching inputs for the original deletion, not a grant of current management or a generic lookup for every group operation. The method is `DELETE` and `requestedRoute` is the concrete original path containing both actual UUIDs, without its revision query. A literal route template is not this deletion's canonical identity.
+
+Save the following complete file as `original-request.json` in a separate group-recovery example directory. Replace all example UUIDs and the key with the values you retained before deletion. Keep earlier Project request files in their original directories. The common cURL and generated programs below can read this group-specific file without changing the client operation:
+
+<CodeGroup>
+
+```json
+{
+  "installationId": "00000000-0000-4000-8000-000000000001",
+  "organizationId": "00000000-0000-4000-8000-000000000002",
+  "projectId": "00000000-0000-4000-8000-000000000003",
+  "method": "DELETE",
+  "requestedRoute": "/v1/projects/00000000-0000-4000-8000-000000000003/access-groups/00000000-0000-4000-8000-000000000005",
+  "key": "support-knowledge-delete-1",
+  "expectedAuthority": {
+    "family": "access_group_deletion",
+    "actionId": "delete-access-group"
+  }
+}
+```
+
+</CodeGroup>
+
+Retain the installation ID from trusted target registration or the installation operator, and the Organization ID from your own Organization-access read. A new group ID, current alias, changed defaults or replacement key cannot reconstruct the original binding. The reviewed revision remains part of the original DELETE request, but is not a field in this read-only lookup body.
+
+An authorized exact retained match returns `outcome: "retained"` with the existing content-free deletion-status fields. For a settled group deletion, admission, blocked access and group cleanup are confirmed. `jobState` and `applicationShutdownComplete` are null. It returns no group Name, membership, manager inventory or business receipt. Use the same currently eligible original human. Another manager or administrator cannot inspect that human's hidden deletion history.
 
 ## Send the lookup
 
@@ -241,13 +276,14 @@ If your application uses browser cookies instead of a bearer token, send its tru
 
 A successful lookup returns HTTP `200`. Check `outcome` to decide what the response establishes.
 
-| `outcome`               | What it means                                                                                                       | What to do next                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `completed_synchronous` | The original operation completed. The record includes its operation ID, result classification, and original expiry. | Use the operation ID to investigate the original result. Lookup does not replay its contents. |
-| `accepted_asynchronous` | The original request was accepted. Its job reference may be known or unknown. Dispatch is not established.          | Keep the operation ID and any job ID. Neither confirms that a job started or finished.        |
-| `in_progress`           | The original synchronous operation has not finished.                                                                | Keep its operation ID. A later lookup can observe the same original request.                  |
-| `recovery_required`     | The original operation requires recovery. The record does not establish asynchronous acceptance.                    | Keep the operation ID and ask the installation's operator to investigate.                     |
-| `unresolved`            | Lookup cannot establish an authoritative retained match.                                                            | Keep the original details and investigate. Do not assume the operation never happened.        |
+| `outcome`               | What it means                                                                                                       | What to do next                                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `completed_synchronous` | The original operation completed. The record includes its operation ID, result classification, and original expiry. | Use the operation ID to investigate the original result. Lookup does not replay its contents.                       |
+| `accepted_asynchronous` | The original request was accepted. Its job reference may be known or unknown. Dispatch is not established.          | Keep the operation ID and any job ID. Neither confirms that a job started or finished.                              |
+| `in_progress`           | The original synchronous operation has not finished.                                                                | Keep its operation ID. A later lookup can observe the same original request.                                        |
+| `recovery_required`     | The original operation requires recovery. The record does not establish asynchronous acceptance.                    | Keep the operation ID and ask the installation's operator to investigate.                                           |
+| `retained`              | The closed access-group deletion lookup found permitted content-free original deletion status.                      | Interpret its separate facts and captured expiry. It is not a full deletion receipt or permission to repeat DELETE. |
+| `unresolved`            | Lookup cannot establish an authoritative retained match.                                                            | Keep the original details and investigate. Do not assume the operation never happened.                              |
 
 For example, a completed response has this shape. The operation ID and expiry below are illustrative:
 
@@ -313,14 +349,14 @@ Keep the operation ID before losing membership. This original-request lookup sti
 
 Error responses use `application/problem+json`. Read the HTTP status and problem details before deciding how to proceed. An SDK decoding error can also occur with HTTP `200`, so check the SDK error even when the status looks successful.
 
-| Status or failure                        | Next step                                                                                                                            |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `400` or `422`                           | Check the original identifiers, method, route, key, and authority guard. Remove unknown fields and duplicate JSON keys.              |
-| `401`                                    | Use a valid current human credential for this installation.                                                                          |
-| `403` or `404`                           | Check your current access to the original Organization and Project. A hidden scope is not evidence that the original request failed. |
-| `413`                                    | Reduce the JSON body to the supported lookup fields, within 32 KiB.                                                                  |
-| `415`                                    | Send `Content-Type: application/json`.                                                                                               |
-| `503`                                    | The lookup's dependencies are unavailable. Check installation health and try the same lookup later.                                  |
-| Timeout, disconnect, or decoding failure | Treat the result as unknown. Preserve the original details and investigate or repeat the lookup.                                     |
+| Status or failure                        | Next step                                                                                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `400` or `422`                           | Check the original identifiers, method, route, key, and authority guard. Remove unknown fields and duplicate JSON keys.                                |
+| `401`                                    | Use a valid current human credential for this installation.                                                                                            |
+| `403` or `404`                           | Check current eligibility and the authority required by the selected original family. A hidden scope is not evidence that the original request failed. |
+| `413`                                    | Reduce the JSON body to the supported lookup fields, within 32 KiB.                                                                                    |
+| `415`                                    | Send `Content-Type: application/json`.                                                                                                                 |
+| `503`                                    | The lookup's dependencies are unavailable. Check installation health and try the same lookup later.                                                    |
+| Timeout, disconnect, or decoding failure | Treat the result as unknown. Preserve the original details and investigate or repeat the lookup.                                                       |
 
 Repeating **lookup** with the same original identity is a read. Submitting the original business operation again is a separate decision that these observations do not authorize.

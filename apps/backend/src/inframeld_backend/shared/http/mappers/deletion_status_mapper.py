@@ -1,3 +1,5 @@
+from typing import overload
+
 from inframeld_backend.shared.application.dtos.retained_deletion_status_dto import (
     RetainedDeletionStatusDTO,
 )
@@ -24,6 +26,14 @@ class DeletionStatusMapper:
     @staticmethod
     def to_query(operation_id: str) -> GetDeletionStatusQuery:
         return GetDeletionStatusQuery(OperationId(operation_id))
+
+    @staticmethod
+    @overload
+    def to_response(result: RetainedDeletionStatusDTO) -> RetainedDeletionStatusResponse: ...
+
+    @staticmethod
+    @overload
+    def to_response(result: UnresolvedOperationDTO) -> UnresolvedDeletionStatusResponse: ...
 
     @staticmethod
     def to_response(

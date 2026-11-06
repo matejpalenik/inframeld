@@ -16,6 +16,16 @@ const BINDINGS: &[&str] = &[
     "getMyOrganizationAccess",
     "admitHuman",
     "createProject",
+    "createAccessGroup",
+    "getAccessGroup",
+    "resolveAccessGroup",
+    "listAccessGroupMembers",
+    "listAccessGroupManagers",
+    "addAccessGroupMember",
+    "removeAccessGroupMember",
+    "appointAccessGroupManager",
+    "removeAccessGroupManager",
+    "deleteAccessGroup",
     "createApplicationAccount",
     "getApplicationAccount",
     "resolveApplicationAccount",
@@ -88,6 +98,16 @@ async fn main() {
             "getCurrentSession"
                 | "getMyOrganizationAccess"
                 | "createProject"
+                | "createAccessGroup"
+                | "getAccessGroup"
+                | "resolveAccessGroup"
+                | "listAccessGroupMembers"
+                | "listAccessGroupManagers"
+                | "addAccessGroupMember"
+                | "removeAccessGroupMember"
+                | "appointAccessGroupManager"
+                | "removeAccessGroupManager"
+                | "deleteAccessGroup"
                 | "createApplicationAccount"
                 | "getApplicationAccount"
                 | "resolveApplicationAccount"
@@ -123,6 +143,12 @@ async fn main() {
             "assignProjectUseOnlyGrant"
                 | "updateProjectMetadata"
                 | "createProject"
+                | "createAccessGroup"
+                | "addAccessGroupMember"
+                | "removeAccessGroupMember"
+                | "appointAccessGroupManager"
+                | "removeAccessGroupManager"
+                | "deleteAccessGroup"
                 | "createApplicationAccount"
                 | "admitHuman"
                 | "addProjectMember"

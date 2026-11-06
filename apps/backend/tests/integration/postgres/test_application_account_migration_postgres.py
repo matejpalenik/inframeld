@@ -151,7 +151,7 @@ async def test_retained_account_outcome_prevents_destructive_downgrade(
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0024_application_accounts"
+            == "0025_access_group_administration"
         )
         assert (
             await session.get(

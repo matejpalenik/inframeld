@@ -14,6 +14,9 @@ from inframeld_backend.shared.http.responses.in_progress_operation_lookup_respon
 from inframeld_backend.shared.http.responses.recovery_required_operation_lookup_response import (
     RecoveryRequiredOperationLookupResponse,
 )
+from inframeld_backend.shared.http.responses.retained_deletion_status_response import (
+    RetainedDeletionStatusResponse,
+)
 from inframeld_backend.shared.http.responses.unresolved_operation_lookup_response import (
     UnresolvedOperationLookupResponse,
 )
@@ -23,6 +26,7 @@ type OperationLookupResponse = Annotated[
     | AcceptedOperationLookupResponse
     | InProgressOperationLookupResponse
     | RecoveryRequiredOperationLookupResponse
+    | RetainedDeletionStatusResponse
     | UnresolvedOperationLookupResponse,
     Field(discriminator="outcome"),
 ]

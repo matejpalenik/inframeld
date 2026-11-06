@@ -4,6 +4,9 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
     BrowserSessionAuthenticationDTO,
 )
+from inframeld_backend.access.application.dtos.deletion_recovery_authorization_dto import (
+    DeletionRecoveryAuthorizationDTO,
+)
 from inframeld_backend.access.application.dtos.deletion_status_authorization_dto import (
     DeletionStatusAuthorizationDTO,
 )
@@ -15,6 +18,9 @@ from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dt
 )
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
+)
+from inframeld_backend.access.application.protocols.deletion_recovery_authorizer import (
+    DeletionRecoveryAuthorizer,
 )
 from inframeld_backend.access.application.protocols.deletion_status_authorizer import (
     DeletionStatusAuthorizer,
@@ -30,7 +36,7 @@ from inframeld_backend.access.domain.policies.principal_access_policy import Pri
 from inframeld_backend.shared.application.errors.application_errors import AccessDeniedError
 
 
-class DeletionStatusAuthorizationService(DeletionStatusAuthorizer):
+class DeletionStatusAuthorizationService(DeletionStatusAuthorizer, DeletionRecoveryAuthorizer):
     """Check current human eligibility before permitting original-initiator matching."""
 
     def __init__(self, deletion_status_facts_reader: DeletionStatusFactsReader) -> None:
@@ -40,6 +46,18 @@ class DeletionStatusAuthorizationService(DeletionStatusAuthorizer):
     async def require_authorization(
         self, *, access: AccessContextDTO, request: DeletionStatusAuthorizationRequestDTO
     ) -> DeletionStatusAuthorizationDTO:
+        current = await self.require_current_human(access=access)
+        return DeletionStatusAuthorizationDTO(
+            request.operation_id,
+            current.installation_id,
+            current.organization_id,
+            current.principal_id,
+        )
+
+    @override
+    async def require_current_human(
+        self, *, access: AccessContextDTO
+    ) -> DeletionRecoveryAuthorizationDTO:
         facts = await self._deletion_status_facts_reader.read(access=access)
         if facts is None:
             raise AccessDeniedError()
@@ -62,8 +80,7 @@ class DeletionStatusAuthorizationService(DeletionStatusAuthorizer):
         if not PrincipalAccessPolicy.may_use_product(eligibility):
             raise AccessDeniedError()
 
-        return DeletionStatusAuthorizationDTO(
-            request.operation_id,
+        return DeletionRecoveryAuthorizationDTO(
             facts.installation_id,
             facts.principal.organization_id,
             facts.principal.id,

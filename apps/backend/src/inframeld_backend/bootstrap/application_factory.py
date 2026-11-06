@@ -33,6 +33,15 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
 from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler import (
     register_human_oauth_credential_error_handler,
 )
+from inframeld_backend.access.http.requests.access_group_creation_request import (
+    AccessGroupCreationRequest,
+)
+from inframeld_backend.access.http.requests.access_group_manager_request import (
+    AccessGroupManagerRequest,
+)
+from inframeld_backend.access.http.requests.access_group_membership_request import (
+    AccessGroupMembershipRequest,
+)
 from inframeld_backend.access.http.requests.application_account_creation_request import (
     ApplicationAccountCreationRequest,
 )
@@ -46,6 +55,30 @@ from inframeld_backend.access.http.requests.project_membership_request import (
 )
 from inframeld_backend.access.http.requests.project_metadata_update_request import (
     ProjectMetadataUpdateRequest,
+)
+from inframeld_backend.access.http.responses.access_group_creation_response import (
+    AccessGroupCreationResponse,
+)
+from inframeld_backend.access.http.responses.access_group_deletion_response import (
+    AccessGroupDeletionResponse,
+)
+from inframeld_backend.access.http.responses.access_group_manager_removal_response import (
+    AccessGroupManagerRemovalResponse,
+)
+from inframeld_backend.access.http.responses.access_group_manager_response import (
+    AccessGroupManagerResponse,
+)
+from inframeld_backend.access.http.responses.access_group_membership_removal_response import (
+    AccessGroupMembershipRemovalResponse,
+)
+from inframeld_backend.access.http.responses.access_group_membership_response import (
+    AccessGroupMembershipResponse,
+)
+from inframeld_backend.access.http.responses.access_group_metadata_response import (
+    AccessGroupMetadataResponse,
+)
+from inframeld_backend.access.http.responses.access_group_principals_page_response import (
+    AccessGroupPrincipalsPageResponse,
 )
 from inframeld_backend.access.http.responses.application_account_creation_response import (
     ApplicationAccountCreationResponse,
@@ -65,6 +98,7 @@ from inframeld_backend.access.http.responses.project_action_grant_removal_respon
 from inframeld_backend.access.http.responses.project_action_grant_response import (
     ProjectActionGrantResponse,
 )
+from inframeld_backend.access.http.routes.access_group_routes import create_access_group_router
 from inframeld_backend.access.http.routes.application_account_routes import (
     create_application_account_router,
 )
@@ -110,6 +144,12 @@ from inframeld_backend.access.infrastructure.verifiers.kratos_human_identity_ver
     KratosHumanIdentityVerifier,
 )
 from inframeld_backend.bootstrap.access_composition import create_access_components
+from inframeld_backend.bootstrap.access_group_composition import (
+    open_access_group_creation,
+    open_access_group_deletion,
+    open_access_group_read,
+    open_access_group_relationship_change,
+)
 from inframeld_backend.bootstrap.application_account_composition import (
     open_application_account_creation,
     open_application_account_read,
@@ -236,6 +276,9 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         configure_problem_openapi(
             application,
             validation_models=(
+                AccessGroupCreationRequest,
+                AccessGroupMembershipRequest,
+                AccessGroupManagerRequest,
                 ApplicationAccountCreationRequest,
                 HumanAdmissionRequest,
                 ProjectCreationRequest,
@@ -244,6 +287,14 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ProjectActionGrantRequest,
             ),
             serialization_models=(
+                AccessGroupCreationResponse,
+                AccessGroupMetadataResponse,
+                AccessGroupMembershipResponse,
+                AccessGroupMembershipRemovalResponse,
+                AccessGroupManagerResponse,
+                AccessGroupManagerRemovalResponse,
+                AccessGroupDeletionResponse,
+                AccessGroupPrincipalsPageResponse,
                 ApplicationAccountCreationResponse,
                 ApplicationAccountMetadataResponse,
                 MyOrganizationAccessResponse,
@@ -288,6 +339,20 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_project_creation_router(
                 human_session, partial(open_project_creation, database, creation_fingerprints)
+            )
+        )
+        application.include_router(
+            create_access_group_router(
+                human_session,
+                partial(open_access_group_creation, database, request_fingerprints),
+                partial(open_access_group_read, database),
+                partial(open_access_group_relationship_change, database, request_fingerprints),
+                partial(
+                    open_access_group_deletion,
+                    database,
+                    request_fingerprints,
+                    resolved_settings.deletion_status_retention.to_profile(),
+                ),
             )
         )
         application.include_router(

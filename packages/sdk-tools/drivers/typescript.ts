@@ -34,6 +34,90 @@ const options = (client: Client, call: SdkCall, signal?: AbortSignal) => ({
 // Cast only the validated test-protocol input at the generated API boundary.
 // Request validation remains the generator's qualified policy, not a driver repair.
 const calls = {
+  createAccessGroup: (client: Client, call: SdkCall) =>
+    sdk.createAccessGroup({
+      ...options(client, call),
+      path: call.path as sdk.CreateAccessGroupData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.CreateAccessGroupData["body"],
+    }),
+  getAccessGroup: (client: Client, call: SdkCall) =>
+    sdk.getAccessGroup({
+      ...options(client, call),
+      path: call.path as sdk.GetAccessGroupData["path"],
+    }),
+  resolveAccessGroup: (client: Client, call: SdkCall) =>
+    sdk.resolveAccessGroup({
+      ...options(client, call),
+      path: call.path as sdk.ResolveAccessGroupData["path"],
+      query: call.query as sdk.ResolveAccessGroupData["query"],
+    }),
+  listAccessGroupMembers: (client: Client, call: SdkCall) =>
+    sdk.listAccessGroupMembers({
+      ...options(client, call),
+      path: call.path as sdk.ListAccessGroupMembersData["path"],
+      query: call.query as sdk.ListAccessGroupMembersData["query"],
+    }),
+  listAccessGroupManagers: (client: Client, call: SdkCall) =>
+    sdk.listAccessGroupManagers({
+      ...options(client, call),
+      path: call.path as sdk.ListAccessGroupManagersData["path"],
+      query: call.query as sdk.ListAccessGroupManagersData["query"],
+    }),
+  addAccessGroupMember: (client: Client, call: SdkCall) =>
+    sdk.addAccessGroupMember({
+      ...options(client, call),
+      path: call.path as sdk.AddAccessGroupMemberData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.AddAccessGroupMemberData["body"],
+    }),
+  removeAccessGroupMember: (client: Client, call: SdkCall) =>
+    sdk.removeAccessGroupMember({
+      ...options(client, call),
+      path: call.path as sdk.RemoveAccessGroupMemberData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.RemoveAccessGroupMemberData["query"],
+    }),
+  appointAccessGroupManager: (client: Client, call: SdkCall) =>
+    sdk.appointAccessGroupManager({
+      ...options(client, call),
+      path: call.path as sdk.AppointAccessGroupManagerData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.AppointAccessGroupManagerData["body"],
+    }),
+  removeAccessGroupManager: (client: Client, call: SdkCall) =>
+    sdk.removeAccessGroupManager({
+      ...options(client, call),
+      path: call.path as sdk.RemoveAccessGroupManagerData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.RemoveAccessGroupManagerData["query"],
+    }),
+  deleteAccessGroup: (client: Client, call: SdkCall) =>
+    sdk.deleteAccessGroup({
+      ...options(client, call),
+      path: call.path as sdk.DeleteAccessGroupData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.DeleteAccessGroupData["query"],
+    }),
+
   getMyProjectAccess: (client: Client, call: SdkCall) =>
     sdk.getMyProjectAccess({
       ...options(client, call),
