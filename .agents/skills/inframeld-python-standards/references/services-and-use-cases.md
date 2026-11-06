@@ -12,31 +12,29 @@ This reference teaches the implementation shape. [Application Contracts](../../i
 
 **Situation.** You need an application operation that another entry point can invoke without rebuilding HTTP's authorization or database plumbing. The operation implemented by `ProjectGrantChangeService` is the reference.
 
-**Decision and placement.** Put the public `ProjectGrantChanger` protocol and `AssignProjectUseOnlyGrantCommand` in Access application roles. Put the instantiated implementation in `application/services/project_grant_change_service.py`. Inject operational and I/O capabilities directly. Domain rules stay on the membership aggregate and policies. A repository loads and saves that aggregate, while bootstrap constructs adapters.
+**Decision and placement.** Put the public `ProjectGrantChanger` protocol and `SetProjectActionGrantCommand` in Access application roles. Put the instantiated implementation in `application/services/project_grant_change_service.py`. Inject operational and I/O capabilities directly. Domain rules stay on the membership aggregate and policies. A repository loads and saves that aggregate, while bootstrap constructs adapters.
 
 A transaction saves related database changes together or rolls them all back. Idempotency means repeating the same operation identity and meaning can recover its outcome without applying the change again. Neither mechanism grants permission.
 
-**Code.** The following selected excerpt includes the current constructor and complete `assign_use_only()` workflow with its result guard. It retains the checks surrounding load, business action and save. The same service also implements exact-action assignment and removal, which are not reproduced here:
-
-**Inspected teaching excerpt:** required imports, constructor, `assign_use_only()` and its result guard from [apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py). The linked class supplies the other required `ProjectGrantChanger` methods. This selected code is not a standalone service or replacement module.
+**Inspected teaching excerpt:** the imports, constructor and complete public methods selected from [apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py). This excerpt explains composition and typed inputs. It is not a standalone or replacement module. The linked class owns the complete `_manage` workflow, current-authority predicates, original-receipt checks and fresh-write safeguards described below.
 
 ```python
 from typing import override
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
+from inframeld_backend.access.application.commands.remove_project_action_grant_command import (
+    RemoveProjectActionGrantCommand,
+)
+from inframeld_backend.access.application.commands.set_project_action_grant_command import (
+    SetProjectActionGrantCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.project_use_only_grant_authorization_request_dto import (
-    ProjectUseOnlyGrantAuthorizationRequestDTO,
+from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
+    ProjectActionGrantChangeResultDTO,
 )
 from inframeld_backend.access.application.protocols.project_action_grant_result_reader import (
     ProjectActionGrantResultReader,
 )
 from inframeld_backend.access.application.protocols.project_action_grant_result_writer import (
     ProjectActionGrantResultWriter,
-)
-from inframeld_backend.access.application.protocols.project_grant_authorizer import (
-    ProjectGrantAuthorizer,
 )
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
 from inframeld_backend.access.application.protocols.project_grant_management_facts_reader import (
@@ -48,43 +46,19 @@ from inframeld_backend.access.application.protocols.project_membership_repositor
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
 )
-from inframeld_backend.access.domain.errors.project_grant_errors import (
-    ProjectGrantAlreadyExistsError,
-)
-from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
-    AcceptedAsyncOperationDTO,
-)
-from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
-    CompletedSynchronousOperationDTO,
-)
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
-from inframeld_backend.shared.application.dtos.new_operation_reservation_dto import (
-    NewOperationReservationDTO,
-)
-from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
-    RecoveryRequiredOperationDTO,
-)
-from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
-    OperationLookupAuthorityFamily,
-)
-from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
-from inframeld_backend.shared.application.errors.application_errors import ConflictError, StaleRevisionError
 from inframeld_backend.shared.application.protocols.operation_idempotency import (
     OperationIdempotency,
 )
 from inframeld_backend.shared.application.protocols.transaction_manager import TransactionManager
-from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
-    OperationLookupAuthority,
-)
 
 
 class ProjectGrantChangeService(ProjectGrantChanger):
     def __init__(
         self,
         transaction_manager: TransactionManager,
-        project_grant_authorizer: ProjectGrantAuthorizer,
         operation_idempotency: OperationIdempotency,
         membership_repository: ProjectMembershipRepository,
         project_grant_change_fingerprint_service: ProjectGrantChangeFingerprintService,
@@ -94,7 +68,6 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         grant_result_writer: ProjectActionGrantResultWriter,
     ) -> None:
         self._transaction_manager = transaction_manager
-        self._project_grant_authorizer = project_grant_authorizer
         self._operation_idempotency = operation_idempotency
         self._membership_repository = membership_repository
         self._project_grant_change_fingerprint_service = project_grant_change_fingerprint_service
@@ -103,108 +76,51 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         self._grant_result_writer = grant_result_writer
 
     @override
-    async def assign_use_only(
+    async def set_action_grant(
         self,
         *,
         access: AccessContextDTO,
-        command: AssignProjectUseOnlyGrantCommand,
+        command: SetProjectActionGrantCommand,
         context: IdempotencyContextDTO,
-    ) -> CompletedSynchronousOperationDTO:
-        fingerprint = self._project_grant_change_fingerprint_service.for_assign_use_only(command)
+    ) -> ProjectActionGrantChangeResultDTO:
+        return await self._manage(
+            access=access,
+            command=command,
+            context=context,
+            fingerprint=self._project_grant_change_fingerprint_service.for_set(command),
+        )
 
-        async with self._transaction_manager.begin():
-            authorization = await self._project_grant_authorizer.require_authorization(
-                access=access,
-                request=ProjectUseOnlyGrantAuthorizationRequestDTO(
-                    project_id=command.project_id,
-                    recipient_principal_id=command.recipient_principal_id,
-                    action_id=command.action_id,
-                ),
-            )
-
-            if authorization.project_id != command.project_id:
-                raise RuntimeError("Authorization returned a different project than requested.")
-
-            operation = await self._operation_idempotency.reserve_or_recover(
-                context=context,
-                access=access,
-                authorization=authorization,
-                fingerprint=fingerprint,
-                expected_replay_kind=OperationReplayKind.SAFE_RESULT,
-                lookup_authority=OperationLookupAuthority(
-                    OperationLookupAuthorityFamily.PROJECT_GRANT_READ, command.action_id
-                ),
-            )
-
-            if not isinstance(operation, NewOperationReservationDTO):
-                return self._require_safe_completed_operation(operation)
-
-            # A replay keeps its original revision. Only new work checks current state.
-            if authorization.project_access_revision != command.expected_access_revision:
-                raise StaleRevisionError()
-
-            membership = await self._membership_repository.get(
-                organization_id=authorization.organization_id,
-                project_id=authorization.project_id,
-                principal_id=command.recipient_principal_id,
-            )
-            if (
-                membership.organization_id != authorization.organization_id
-                or membership.project_id != authorization.project_id
-                or membership.principal_id != command.recipient_principal_id
-            ):
-                raise RuntimeError(
-                    "The loaded membership does not match the authorized assignment."
-                )
-
-            try:
-                membership.assign_use_only_grant(
-                    action_id=command.action_id,
-                    assigned_by_principal_id=access.actor_principal_id,
-                )
-            except ProjectGrantAlreadyExistsError as error:
-                raise ConflictError("This project action grant already exists.") from error
-
-            await self._membership_repository.save(
-                membership,
-                expected_project_access_revision=authorization.project_access_revision,
-                operation_id=operation.operation_id,
-            )
-            completed = await self._operation_idempotency.record_completed_result(
-                operation, replay_kind=OperationReplayKind.SAFE_RESULT
-            )
-            return self._require_safe_completed_operation(completed)
-
-    @staticmethod
-    def _require_safe_completed_operation(
-        operation: CompletedSynchronousOperationDTO
-        | AcceptedAsyncOperationDTO
-        | RecoveryRequiredOperationDTO,
-    ) -> CompletedSynchronousOperationDTO:
-        """Accept only the safe synchronous result supported by this grant operation."""
-        if (
-            not isinstance(operation, CompletedSynchronousOperationDTO)
-            or operation.replay_kind is not OperationReplayKind.SAFE_RESULT
-        ):
-            raise ConflictError("The grant operation has no completed replay outcome.")
-        return operation
+    @override
+    async def remove_action_grant(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: RemoveProjectActionGrantCommand,
+        context: IdempotencyContextDTO,
+    ) -> ProjectActionGrantChangeResultDTO:
+        return await self._manage(
+            access=access,
+            command=command,
+            context=context,
+            fingerprint=self._project_grant_change_fingerprint_service.for_remove(command),
+        )
 ```
 
 <a id="walk-through-the-decisions"></a>
 
 ## Walk through the decisions
 
-1. **Make collaborators visible.** The constructor names transactions, the specific authorizer, idempotency, memberships and the configured fingerprint helper. It does not create a PostgreSQL repository or fetch one from a transaction object. [The composition example](component-roles-and-imports.md#worked-example-add-the-grant-operation) shows one clean session supplied to every transaction-bound adapter.
-2. **Separate the inputs.** `access` identifies the authenticated caller and evidence. `command` carries the requested change. `context` carries the stable retry key, method and canonical route. The Command does not establish caller identity or permission.
-3. **Compute meaning before database work.** The operation's fingerprint helper retains the canonical input and purpose. Fingerprint equality alone does not authorize replay.
-4. **Open the transaction and authorize now.** `require_authorization` reads current facts under the established coordination rules. The service checks the returned project against the requested project before looking up even a completed operation. It then uses checked organization/project scope downstream.
-5. **Admit or replay.** `reserve_or_recover` receives context, access, current authorization, typed fingerprint and expected replay kind. A supported completed outcome returns before membership loading. New work alone checks the expected revision.
-6. **Load the aggregate and verify the target.** `get` uses checked scope and the requested recipient. The service checks organization, project and principal on the returned object. A broken adapter must not redirect the mutation.
-7. **Invoke the business action.** `assign_use_only_grant` owns duplicate rejection and changes the private collection. The service translates only that recognized rejection to a stable application conflict, with `from error` preserving its cause. Loading and saving stay outside this narrow catch.
-8. **Save and complete together.** `save` receives the checked project-wide revision and original operation ID. The repository saves supported additions, revision and required audit without committing. Completion records share that transaction.
-9. **Wait for transaction exit.** A `return` inside `async with` still waits for its exit. Commit must succeed before the caller receives the result. HTTP serialization follows successful service completion.
+1. **Make collaborators visible.** The constructor names transactions, current management facts, idempotency, membership persistence, original result readers/writers and the configured fingerprint helper. Bootstrap supplies their one request-local session. A transaction object does not hide a repository or authorizer.
+2. **Separate the inputs.** `access` supplies verified caller evidence. The immutable Command supplies requested target, recipient, action, level and reviewed revision. `context` retains the original key, concrete route and method. The Command establishes neither identity nor permission.
+3. **Validate request meaning.** The service checks method, exact route and the supported catalogue before database work. The fingerprint helper retains stable purposes and canonical bytes for PUT and DELETE. Retired POST meaning is never converted into a new PUT.
+4. **Observe and authorize current state.** Inside the bounded transaction, the facts reader takes compatible coordination and reports actor, target, recipient and remaining-grantor facts. The service checks returned bindings and applies the existing principal, Project visibility and exact-delegation policies. These checks precede history.
+5. **Resolve the original operation.** Reservation receives checked scope, current authority, original context and expected safe-result kind. A completed replay must match its retained exact business receipt. It returns before fresh recipient, expected revision or handover checks and performs no mutation.
+6. **Check fresh intent.** New work checks the reviewed revision. PUT requires an eligible recipient and supported grant combination. DELETE can clear suspended recipients and return no-change after departure. Organization/kind and application owning-Project checks still constrain the target.
+7. **Change the aggregate only when needed.** Load an existing membership in checked scope and verify its identity. Apply the requested set/remove transition. A downgrade or removal that would strand exact eligible-human authority fails before persistence. No-op results retain the current revision.
+8. **Save an immutable receipt with the change.** A changed grant, one revision increment, required audit, original completion and business receipt commit together. An authorized no-op still records its original result without another revision or change audit.
+9. **Wait for commit.** A return inside the transaction context waits for successful exit. Failure and cancellation propagate for rollback. An uncertain response follows original-key recovery rather than a guessed new write.
 
-The load → business action → save loop is the domain-change portion of steps 6–8. Copying only those three calls would lose the operation's current authorization, scope, replay, revision, audit and completion contract.
+The aggregate load, transition and save form only part of the complete operation. Copying those calls without current authorization, scope, replay, revision, handover, audit and receipt checks would change its meaning.
 
 <a id="worked-example-handle-a-retry-or-failed-transition"></a>
 
@@ -214,9 +130,9 @@ The load → business action → save loop is the domain-change portion of steps
 
 **Decision.** Keep replay explicit. With current authorization and matching operation identity/meaning, the saved result returns without loading or saving membership, even though the original revision is no longer current. A later attempt with revoked authority fails before idempotency lookup. A saved result is not permission.
 
-The complete method above shows the actual branches. [The service tests](testing-and-documentation.md#worked-example-test-service-ordering-and-replay) show code proving their effects.
+The linked complete service supplies the actual branches. [The service tests](testing-and-documentation.md#worked-example-test-service-ordering-and-replay) show code proving their effects.
 
-For new work, a stale revision stops before membership load. Wrong returned scope is an internal contract failure. A duplicate domain assignment maps to `ConflictError("This project action grant already exists.")`. Do not copy arbitrary domain exception text into that application message. Required persistence, audit and completion failures propagate, and the transaction owner rolls back. Cancellation is not a successful result.
+For new work, a stale revision stops before membership load. Wrong returned scope is an internal contract failure. An existing assignment is an explicit PUT change or no-op, rather than a creation-only duplicate conflict. Recognized rejections keep stable application messages instead of copying arbitrary domain exception text. Required persistence, audit and completion failures propagate, and the transaction owner rolls back. Cancellation is not a successful result.
 
 An uncertain commit communication or lost response does not authorize new work with a fresh key. Follow the existing retry/recovery contract. The transaction manager neither retries automatically nor joins an already active transaction or creates a savepoint. Repository failure invalidates its tracked state. Discard the repository and loaded aggregates rather than attempting to continue the operation.
 
@@ -236,7 +152,7 @@ Do not require every service to inject the grant example's full collaborator set
 
 ## Sources, status and review
 
-This is an inspected example of the implemented human use-only assignment workflow, not qualification of every future command. Membership creation/removal and other grant changes remain separate work. Existing test reports remain recorded evidence unless personally rerun.
+This is an inspected example of exact Project grant management, not qualification of every future command. Membership changes and the concrete Organization, group and application-account grant services retain their own workflows. Existing test reports remain recorded evidence unless personally rerun.
 
 Review a proposed service by following typed input, current authority, checked target, replay branch, domain behavior, persistence and result. Check what fails before each side effect. Qualify actual behavior through domain, service and appropriate persistence tests. Do not add architecture or naming-enforcement tests.
 
@@ -249,7 +165,7 @@ Review a proposed service by following typed input, current authority, checked t
 
 ### Writing an application service
 
-Use this convention when generating, suggesting, reviewing or implementing backend services. Read Python Standards' [complete worked service example](./services-and-use-cases.md) for code and step-by-step decisions, and its [aggregate/repository example](aggregates-and-repositories.md) when those components are affected. Alice granting Bob permission on Support is the implemented reference: [`ProjectGrantChangeService.assign_use_only()`](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) coordinates the operation, while [`ProjectMembership.assign_use_only_grant()`](../../../../apps/backend/src/inframeld_backend/access/domain/entities/project_membership.py) protects the assignment transition. The [request walkthrough](#grant-command-flow) follows the real collaborators from HTTP through commit. Other domains adopt these responsibilities as their workflows are implemented.
+Use this convention when generating, suggesting, reviewing or implementing backend services. Read Python Standards' [complete worked service example](./services-and-use-cases.md) for code and step-by-step decisions, and its [aggregate/repository example](aggregates-and-repositories.md) when those components are affected. Alice granting Bob permission on Support is the implemented reference: [`ProjectGrantChangeService.set_action_grant()`](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) coordinates the operation, while [`ProjectMembership.set_action_grant()`](../../../../apps/backend/src/inframeld_backend/access/domain/entities/project_membership.py) protects the assignment transition. The [request walkthrough](#grant-command-flow) follows the real collaborators from HTTP through commit. Other domains adopt these responsibilities as their workflows are implemented.
 
 <a id="put-each-decision-with-its-owner"></a>
 
@@ -350,82 +266,48 @@ Review ownership and component layout manually. Do not replace these behavioral 
 
 Alice grants Bob use-only `create-access-groups` permission on Support with expected revision `7`. Her request carries an idempotency key. The backend must either commit the grant, revision `8`, audit event and replay metadata together, or leave no partial change.
 
-Read this real implementation from the outside inward:
+Read this implementation from the outside inward:
 
-1. [The HTTP route](../../../../apps/backend/src/inframeld_backend/access/http/routes/project_grant_routes.py) authenticates through its dependency, including cookie CSRF, then calls `ProjectUseOnlyGrantMapper.to_command()` and `to_operation_context()`.
-2. [The static mapper](../../../../apps/backend/src/inframeld_backend/access/http/mappers/project_use_only_grant_mapper.py) wraps the parsed IDs in the flat `AssignProjectUseOnlyGrantCommand`. `IdempotencyContextDTO` carries the key, method and canonical route. Neither record supplies permission.
-3. [Bootstrap composition](../../../../apps/backend/src/inframeld_backend/bootstrap/project_grant_composition.py) opens a clean session and injects the transaction manager, specific authorizer, idempotency operation, membership repository and fingerprint service. Each database adapter uses that same session. The provider closes the session after the call.
-4. [The application service](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) computes the fingerprint before `TransactionManager.begin()`. Inside it, the service builds `ProjectUseOnlyGrantAuthorizationRequestDTO` from the Command's project, recipient and action and calls `ProjectGrantAuthorizer.require_authorization(access, request)` to check current facts under the existing locks. The service immediately compares the returned project ID with the Command's requested project. A mismatch raises `RuntimeError` and rolls back before `OperationIdempotency.reserve_or_recover()` can reserve or inspect prior work, including a completed replay. The existing unexpected-error handler returns a generic HTTP 500 for this internal contract failure.
-5. The service passes its existing idempotency context, authenticated access context, current authorization result, typed fingerprint and expected replay kind to `reserve_or_recover()`. The shared service takes the actor from access and both scope IDs from authorization, without inspecting the Command. `IdempotencyService` alone assembles the low-level reservation request, validates the adapter's result and returns a [distinct workflow outcome](../../inframeld-application-contracts/references/idempotency-and-replay.md#workflow-outcomes). An authorized `CompletedSynchronousOperationDTO` replay returns the original operation and expiry without another grant write. For `NewOperationReservationDTO`, expected revision `7` must match the current authorization revision. The service then calls `ProjectMembershipRepository.get()` with checked organization/project scope and the requested recipient. It verifies the returned membership's organization, project and principal before calling `membership.assign_use_only_grant()` with the requested action and authenticated actor. The aggregate rejects an existing assignment at either level. The service maps that domain error to the existing conflict response. `save()` receives the changed membership, checked project revision and original operation ID. It advances the project revision once, inserts additions and delegates required audit to `AuditEventWriter.append()` in the same transaction. Replay and stale revisions never load a membership.
-6. `OperationIdempotency.record_completed_result()` accepts that new reservation and records safe replay metadata. The shared service requires the stored synchronous expiry before returning a completed outcome. The grant service rejects recovery-required or asynchronous outcomes inside its transaction. Only after commit can the route use `ProjectUseOnlyGrantMapper.to_response(command=command, result=result)` to return the unchanged HTTP response. The mapper narrows the supported action and constructs `ProjectUseOnlyGrantResponse` directly with typed arguments.
+1. [The exact-target HTTP routes](../../../../apps/backend/src/inframeld_backend/access/http/routes/project_action_grant_change_routes.py) authenticate and check cookie-write CSRF before opening request-local composition. The shared route parser bounds and strictly parses JSON or the bodyless DELETE revision query.
+2. [The static mapper](../../../../apps/backend/src/inframeld_backend/access/http/mappers/project_action_grant_change_mapper.py) constructs `SetProjectActionGrantCommand` or `RemoveProjectActionGrantCommand` from the exact path and reviewed input. It separately retains the original method, concrete route and key in `IdempotencyContextDTO`.
+3. [Bootstrap](../../../../apps/backend/src/inframeld_backend/bootstrap/project_grant_composition.py) shares one session across transaction, scoped facts, membership persistence, audit, idempotency and original business-result adapters. The service owns the transaction. Bootstrap closes the session after the operation.
+4. [The service](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) checks request meaning, computes the stable fingerprint and reads current management facts under compatible locks. It rejects wrong actor/target bindings, stale credentials, hidden Project scope, recovery ineligibility and missing exact delegation before reservation or replay.
+5. `OperationIdempotency.reserve_or_recover()` receives current checked scope. A supported completed replay loads and verifies its immutable business receipt, then returns without another membership transition. Fresh work alone checks expected revision, recipient assignment eligibility and remaining human responsibility.
+6. The membership repository loads and verifies an existing scoped aggregate. A changed set/remove is saved with one revision increment and required audit. Original completion and the exact business receipt share this transaction. A no-op saves its original outcome with unchanged revision and no change audit.
+7. After successful transaction exit, the mapper serializes the original status, revision and business fields. A new assignment returns 201. An existing change, no-op or removal returns 200. A replay retains the original response rather than today's state.
 
-`ProjectGrantChangeService` implements the public `ProjectGrantChanger` Protocol. Its collaborators are direct constructor dependencies, rather than repositories fetched from a transaction object. `SqlAlchemyTransactionManager` handles transaction lifetime only. It rejects an already active transaction instead of joining it or creating a savepoint. It propagates failures without automatic retries.
-
-The [idempotency input contract](../../inframeld-application-contracts/references/idempotency-and-replay.md#reservation-inputs) keeps retry metadata and trusted scope explicit without making every workflow construct `OperationReservationRequestDTO`. That DTO remains the reservation writer's input. Commands carry the requested business change, while authentication and current authorization establish the caller and complete scope separately. `AuthorizedOperationScope[ProjectScope]` requires organization and project fields. Project authorization DTOs implement it with `ProjectId`, while organization-scoped inputs can supply `None`. The generic `reserve_or_recover()` preserves that project type without weakening project-specific results to optional fields. Concrete DTOs declare their own fields, just like project Commands. `RequestFingerprint` validates an immutable 32-byte digest and hides its value from its representation. It preserves the existing HMAC bytes.
-
-The context manager does not decide whether its body should run. The service keeps the replay branch explicit. A new common eligibility rule still belongs in the shared Access policy and loading, rather than this orchestration or the HTTP mapper. The fingerprint keeps its original purpose and canonical bytes so reservations made before this refactor remain recognizable.
-
-A stale revision, failed audit write, failed completion or cancellation before commit rolls back the database effects. A lost response after commit is handled by an authorized retry with the same key and meaning. Failed or uncertain commit communication cannot justify submitting new work with a fresh key.
-
-This is the implemented example for new complete database writes. Access owns [`ProjectOperationAdmissionService`](../../../../apps/backend/src/inframeld_backend/access/application/services/project_operation_admission_service.py) and its `ProjectOperationAdmissionRequestDTO`, because the helper coordinates project authorization. It also uses shared `OperationIdempotency`, after current action authorization and trusted scope derivation. It creates `ProjectActionAuthorizationRequestDTO` for the action family and checks the returned project before idempotency lookup. It converts method, canonical route and key into `IdempotencyContextDTO`. Its caller specifies the expected replay kind and owns the transaction. Generic retry decisions, outcomes and reservation persistence stay shared. Sharing them does not qualify a second complete product command. Provider cleanup, account lifecycle aggregates and the other grant workflows remain separate work.
+`SqlAlchemyTransactionManager` controls transaction lifetime and rejects an already active transaction. It does not join, create a savepoint, authorize, cache a business receipt or retry uncertain work. [The idempotency input contract](../../inframeld-application-contracts/references/idempotency-and-replay.md#reservation-inputs) keeps trusted scope and request metadata separate without requiring every use case to construct a low-level reservation writer request.
 
 <a id="trace-one-grant-and-its-retries"></a>
 
 ### Trace one grant and its retries
 
-Alice assigns Bob use-only `create-access-groups` permission with key `grant-bob-1` and expected project access revision `0`. The diagram abbreviates the key as K and the saved operation ID as O. The implemented grant command fingerprints the meaningful fields and checks current authority on every attempt. Its reservation, grant, new revision, and audit event commit together.
+Alice sends exact PUT for Bob with `canGrant: false`, reviewed revision `7` and original key `grant-bob-1`. The first successful assignment commits revision `8`, audit and the original receipt together. After response loss, the same method, concrete route, actor, key and body recover that receipt only while Alice retains current exact delegation authority.
 
 ```mermaid
----
-title: "Implemented grant retry and transaction ordering"
----
 sequenceDiagram
     actor Alice
-    participant HTTP as Grant HTTP route
-    participant Service as Grant command service
-    participant DB as PostgreSQL
-
-    Alice->>HTTP: POST grant with key K and expected revision 0
-    HTTP->>HTTP: Authenticate, validate one key, check CSRF, map Command
-    HTTP->>Service: Assign use-only grant
-    Service->>Service: Compute the unchanged keyed fingerprint
-    Service->>DB: Begin transaction
-    Service->>DB: Read current actor, recipient, and project facts
-    Service->>Service: Check current Access policies
-    alt Caller no longer allowed
-        Service->>DB: Roll back
-        Service-->>HTTP: Deny or hide project
-        HTTP-->>Alice: 403 or 404, no replay
-    else Caller allowed
-        Service->>DB: Reserve principal, organization/project, method, route, K, and fingerprint
-        Note over DB: Unique scope makes concurrent equal requests share one operation
-        alt New key or expired completed reservation
-            DB-->>Service: New operation O
-            Service->>Service: Compare expected and current revision
-            alt Revision stale
-                Service->>DB: Roll back new reservation
-                Service-->>HTTP: Stale revision
-                HTTP-->>Alice: 409 stale_revision
-            else Revision current
-                Service->>DB: Save grant, revision, and audit
-                Service->>DB: Mark O replayable and store expiry
-                Service->>DB: Commit all changes
-                Service-->>HTTP: Completed operation and expiry
-                HTTP-->>Alice: 201 with O and idempotencyExpiresAt
-            end
-        else Existing key with changed fingerprint
-            DB-->>Service: Request meaning differs
-            Service->>DB: Roll back
-            HTTP-->>Alice: 409 idempotency_key_reused
-        else Existing key with same fingerprint and safe result
-            DB-->>Service: Original O and expiry
-            Service->>DB: Commit without another grant change
-            Service-->>HTTP: Original completed operation and expiry
-            HTTP-->>Alice: 201 with original O and expiry
-        end
+    participant HTTP as Exact PUT route
+    participant Service as Project grant change service
+    participant DB as Transaction-bound adapters
+    Alice->>HTTP: Original target, recipient, level, revision and key
+    HTTP->>Service: Authenticated access, Command and context
+    Service->>DB: Begin, coordinate and read current facts
+    Note over Service: Verify bindings and current exact authority before history
+    Service->>DB: Reserve or recover original meaning
+    alt Completed original
+        DB-->>Service: Original completion and immutable business receipt
+        Service->>DB: Commit without another grant change
+        Service-->>HTTP: Original status, revision and expiry
+    else Fresh operation
+        Note over Service: Review revision, recipient and remaining grantor
+        Service->>DB: Save transition, revision, audit and original receipt together
+        DB-->>Service: Successful commit
+        Service-->>HTTP: Original 201 or 200 result
     end
+    HTTP-->>Alice: Typed receipt
 ```
 
-For example, if Carol is also an eligible project member, changing Bob to Carol while keeping `grant-bob-1` conflicts. Losing permission blocks a replay before the saved result is returned. Once completed history expires, the same key is treated as a new request. Alice's old expected revision would then fail the grant's revision check. Expiry limits duplicate detection, not the lifetime of Bob's grant.
+Changing Bob, the level or another meaningful input while retaining the original key conflicts. Losing current authority denies replay before history. Completed-history expiry limits duplicate detection, not Bob's grant lifetime. A later request with the old revision fails the fresh-write revision check. Unknown history never authorizes automatic new work.
 
-The [grant application service](#grant-command-flow) computes the fingerprint from its Command and owns the transaction. `IdempotencyService`, implementing `OperationIdempotency`, validates reservation state through the existing writer. It does not authorize, commit, cache arbitrary business results or reconstruct responses.
+The retired POST keeps its historical method, literal route, fingerprint and outcome under ordinary retention. Read-only original-operation lookup does not invoke PUT or recreate that write.

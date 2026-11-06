@@ -21,3 +21,5 @@ import "./human-admission.ts";
 import "./application-accounts.ts";
 
 import "./access-groups.ts";
+
+import "./access-action-grants.ts";

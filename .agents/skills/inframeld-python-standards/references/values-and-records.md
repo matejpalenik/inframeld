@@ -36,35 +36,26 @@ class ProjectDepartureTargetKind(StrEnum):
     APPLICATION_ACCOUNT = "application_account"
 ```
 
-A departure target can use any of these three kinds. A request that supports only one Project action needs a narrower field.
+A departure target can use any of these three kinds. A response identifying an access-group target needs one exact tag, rather than every member of its transport vocabulary.
 
-**Inspected teaching excerpt:** the complete existing module [apps/backend/src/inframeld_backend/access/http/requests/project_use_only_grant_request.py](../../../../apps/backend/src/inframeld_backend/access/http/requests/project_use_only_grant_request.py), shown for explanation rather than replacement or insertion.
+**Inspected teaching excerpt:** the complete existing module [apps/backend/src/inframeld_backend/access/http/responses/access_group_grant_target_response.py](../../../../apps/backend/src/inframeld_backend/access/http/responses/access_group_grant_target_response.py), shown for explanation rather than replacement or insertion.
 
 ```python
-"""Parse the supported use-only project grant command."""
-
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from inframeld_backend.access.domain.enums.project_action import ProjectAction
-from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
+from inframeld_backend.access.http.enums.grant_target_kind import GrantTargetKind
 
 
-class ProjectUseOnlyGrantRequest(BaseModel):
-    recipient_principal_id: UUID = Field(alias="recipientPrincipalId")
-    action_id: Literal[ProjectAction.CREATE_ACCESS_GROUPS] = Field(alias="actionId")
-    expected_access_revision: int = Field(
-        alias="expectedAccessRevision",
-        strict=True,
-        ge=0,
-        le=RevisionValidation.MAX_VALUE,
-        json_schema_extra={"format": "int64"},
-    )
+class AccessGroupGrantTargetResponse(BaseModel):
+    kind: Literal[GrantTargetKind.ACCESS_GROUP]
+    project_id: UUID = Field(serialization_alias="projectId")
+    access_group_id: UUID = Field(serialization_alias="accessGroupId")
 ```
 
-Replacing this field with unrestricted `ProjectAction` would also admit actions this request does not support. Preserve explicit permission allowlists when converting vocabulary, rather than automatically admitting future enum members. Use named `ProjectAction` constants for known actions while keeping `ActionId` at boundaries that read stored identifiers.
+Replacing the literal with unrestricted `GrantTargetKind` would permit this group representation to claim another target kind. The dashed transport tags remain separate from the existing underscore departure tags. Preserve the vocabulary and subset at each boundary. Use named enum constants for known values while keeping `ActionId` at boundaries that read stored action identifiers.
 
 Convert accepted external strings into enum members at their existing parsing boundaries and serialize their existing string values on output. Preserve rejection of unknown input and the established handling of corrupt stored data. Check both supported and unsupported values. Type annotations alone do not convert dataclass fields or validate persistence results.
 
@@ -146,7 +137,7 @@ Secret-safe values must hide contents in representations and validation errors. 
 
 **Situation.** Alice's actor ID and Support's project ID may contain the same UUID bytes. Their meanings remain different. The complete `PrincipalId` declaration above supplies runtime distinction as well as a static type.
 
-**Decision and placement.** Keep an identifier in its owner's domain `value_objects` module. Parse external text into a UUID before construction. The HTTP mapper then constructs `ProjectId(project_id)` and `PrincipalId(request.recipient_principal_id)` from already parsed UUIDs. PostgreSQL predicates unwrap `.value`, and returned UUIDs are wrapped when adapters construct domain results. See the [complete HTTP mapper](static-utilities-and-mappers.md#worked-example-map-an-http-request-without-doing-the-work).
+**Decision and placement.** Keep an identifier in its owner's domain `value_objects` module. Parse external text into a UUID before construction. The HTTP mapper then constructs `ProjectId(project_id)` and `PrincipalId(recipient_id)` from already parsed UUIDs. PostgreSQL predicates unwrap `.value`, and returned UUIDs are wrapped when adapters construct domain results. See the [complete HTTP mapper](static-utilities-and-mappers.md#worked-example-map-an-http-request-without-doing-the-work).
 
 **Failure and alternatives.** A raw string fails construction. Passing a `ProjectId` to a `PrincipalId` contract is a static error, and wrapping one ID object as another fails the runtime UUID check. Neither type establishes existence or authority. Free-form text stays a string, and a bare UUID remains appropriate when the entity kind is genuinely unknown. The wrong-ID distinction does not authorize rejecting valid UUID versions or the zero UUID.
 
@@ -154,11 +145,11 @@ Secret-safe values must hide contents in representations and validation errors. 
 
 ## Worked example: request a change without carrying permission
 
-**Situation.** The grant operation needs Bob's identity, the action and the permission revision Alice last saw. Those inputs need a meaningful name and local validation.
+**Situation.** The grant operation needs Bob's identity, the action and the permission revision Alice last saw. Those inputs and the requested grant level need a meaningful name and local validation.
 
 **Decision and placement.** Use a frozen, slotted Command under Access application commands. This complete module also shows the agreed nominal and field-interface exceptions:
 
-**Inspected teaching excerpt:** complete inspected module from [apps/backend/src/inframeld_backend/access/application/commands/assign_project_use_only_grant_command.py](../../../../apps/backend/src/inframeld_backend/access/application/commands/assign_project_use_only_grant_command.py). This is existing code for explanation, not replacement or insertion instructions.
+**Inspected teaching excerpt:** complete inspected module from [apps/backend/src/inframeld_backend/access/application/commands/set_project_action_grant_command.py](../../../../apps/backend/src/inframeld_backend/access/application/commands/set_project_action_grant_command.py). This is existing code for explanation, not replacement or insertion instructions.
 
 ```python
 from dataclasses import dataclass
@@ -172,15 +163,17 @@ from inframeld_backend.shared.domain.validation.revision_validation import Revis
 
 
 @dataclass(frozen=True, slots=True)
-class AssignProjectUseOnlyGrantCommand(Command, ProjectCommand):
-    """Request a grant change - current authority and revision require fresh checks."""
-
+class SetProjectActionGrantCommand(Command, ProjectCommand):
     project_id: ProjectId
     recipient_principal_id: PrincipalId
     action_id: ActionId
+    can_grant: bool
     expected_access_revision: int
 
     def __post_init__(self) -> None:
+        if type(self.can_grant) is not bool:
+            raise TypeError("The grant level must be a boolean.")
+
         if type(self.expected_access_revision) is not int:
             raise TypeError("The expected access revision must be a whole number.")
         if not 0 <= self.expected_access_revision <= RevisionValidation.MAX_VALUE:

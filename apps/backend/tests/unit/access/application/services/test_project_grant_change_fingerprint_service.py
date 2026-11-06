@@ -1,9 +1,6 @@
 from dataclasses import replace
 from uuid import UUID
 
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
-)
 from inframeld_backend.access.application.commands.remove_project_action_grant_command import (
     RemoveProjectActionGrantCommand,
 )
@@ -18,6 +15,9 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
+)
+from inframeld_backend.shared.application.value_objects.request_fingerprint import (
+    RequestFingerprint,
 )
 from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
     RequestFingerprintKey,
@@ -34,87 +34,18 @@ def _service() -> ProjectGrantChangeFingerprintService:
     )
 
 
-def test_equivalent_grant_commands_have_the_same_fingerprint() -> None:
-    """A retry with unchanged meaning can find its original operation."""
-    service = _service()
-
-    first = service.for_assign_use_only(
-        AssignProjectUseOnlyGrantCommand(
-            project_id=PROJECT_ID,
-            recipient_principal_id=RECIPIENT_ID,
-            action_id=ACTION_ID,
-            expected_access_revision=7,
-        )
-    )
-    retry = service.for_assign_use_only(
-        AssignProjectUseOnlyGrantCommand(
-            project_id=PROJECT_ID,
-            recipient_principal_id=RECIPIENT_ID,
-            action_id=ACTION_ID,
-            expected_access_revision=7,
-        )
-    )
-
-    assert first == retry
-    assert len(first.value) == 32
-
-
-def test_each_meaningful_grant_field_changes_the_fingerprint() -> None:
-    """A reused key cannot silently change target, recipient, action, or revision."""
-    service = _service()
-    original = service.for_assign_use_only(
-        AssignProjectUseOnlyGrantCommand(
-            project_id=PROJECT_ID,
-            recipient_principal_id=RECIPIENT_ID,
-            action_id=ACTION_ID,
-            expected_access_revision=7,
-        )
-    )
-
-    assert original != service.for_assign_use_only(
-        AssignProjectUseOnlyGrantCommand(
-            project_id=ProjectId(UUID(int=3)),
-            recipient_principal_id=RECIPIENT_ID,
-            action_id=ACTION_ID,
-            expected_access_revision=7,
-        )
-    )
-    assert original != service.for_assign_use_only(
-        AssignProjectUseOnlyGrantCommand(
-            project_id=PROJECT_ID,
-            recipient_principal_id=PrincipalId(UUID(int=4)),
-            action_id=ACTION_ID,
-            expected_access_revision=7,
-        )
-    )
-    assert original != service.for_assign_use_only(
-        AssignProjectUseOnlyGrantCommand(
-            project_id=PROJECT_ID,
-            recipient_principal_id=RECIPIENT_ID,
-            action_id=ActionId("delete-access-groups"),
-            expected_access_revision=7,
-        )
-    )
-    assert original != service.for_assign_use_only(
-        AssignProjectUseOnlyGrantCommand(
-            project_id=PROJECT_ID,
-            recipient_principal_id=RECIPIENT_ID,
-            action_id=ACTION_ID,
-            expected_access_revision=8,
-        )
+def _historical_post_fingerprint() -> RequestFingerprint:
+    """Reconstitute saved request identity without retaining a live POST command."""
+    return RequestFingerprintService(RequestFingerprintKey(b"K" * 32)).fingerprint(
+        purpose="access.project-grant.assign-use-only:v1",
+        canonical_request=b'{"actionId":"create-access-groups","expectedAccessRevision":7,"projectId":"00000000-0000-0000-0000-000000000001","recipientPrincipalId":"00000000-0000-0000-0000-000000000002"}',
     )
 
 
-def test_fingerprint_matches_the_pre_refactor_contract() -> None:
-    """Retained reservations must recognize requests made before the refactor."""
-    command = AssignProjectUseOnlyGrantCommand(
-        project_id=PROJECT_ID,
-        recipient_principal_id=RECIPIENT_ID,
-        action_id=ACTION_ID,
-        expected_access_revision=7,
-    )
-    assert _service().for_assign_use_only(command).value.hex() == (
-        "318247e6c6ef37e22d5fefd65bb023dada7bac1fdc25003571ed739b7e34a10b"
+def test_historical_post_fingerprint_keeps_the_original_saved_identity() -> None:
+    assert (
+        _historical_post_fingerprint().value.hex()
+        == "318247e6c6ef37e22d5fefd65bb023dada7bac1fdc25003571ed739b7e34a10b"
     )
 
 
@@ -122,7 +53,7 @@ def test_full_mutations_have_stable_distinct_meaning_from_legacy_post() -> None:
     service = _service()
     setting = SetProjectActionGrantCommand(PROJECT_ID, RECIPIENT_ID, ACTION_ID, False, 7)
     removal = RemoveProjectActionGrantCommand(PROJECT_ID, RECIPIENT_ID, ACTION_ID, 7)
-    legacy = AssignProjectUseOnlyGrantCommand(PROJECT_ID, RECIPIENT_ID, ACTION_ID, 7)
+    legacy = _historical_post_fingerprint()
     assert service.for_set(setting) == service.for_set(replace(setting))
     assert service.for_remove(removal) == service.for_remove(replace(removal))
     assert (
@@ -130,7 +61,7 @@ def test_full_mutations_have_stable_distinct_meaning_from_legacy_post() -> None:
             {
                 service.for_set(setting),
                 service.for_remove(removal),
-                service.for_assign_use_only(legacy),
+                legacy,
             }
         )
         == 3

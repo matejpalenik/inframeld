@@ -20,6 +20,7 @@ from inframeld_backend.access.application.enums.identity_recovery_event_kind imp
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
 )
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
     IdentityRecoveryFlowId,
@@ -335,17 +336,11 @@ async def test_actor_lookup_matches_every_binding_component(
     from inframeld_backend.access.application.dtos.project_action_target_dto import (
         ProjectActionTargetDTO,
     )
-    from inframeld_backend.access.application.dtos.project_use_only_grant_authorization_request_dto import (
-        ProjectUseOnlyGrantAuthorizationRequestDTO,
-    )
     from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
         HumanOAuthCredentialRejectedError,
     )
     from inframeld_backend.access.application.services.action_authorization_service import (
         ActionAuthorizationService,
-    )
-    from inframeld_backend.access.application.services.project_grant_authorization_service import (
-        ProjectGrantAuthorizationService,
     )
     from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
     from inframeld_backend.access.domain.value_objects.human_credential_version import (
@@ -439,13 +434,6 @@ async def test_actor_lookup_matches_every_binding_component(
                 recipient_principal_id=seed.principal_id,
                 action_id=seed.action,
             )
-            with pytest.raises(HumanOAuthCredentialRejectedError):
-                await ProjectGrantAuthorizationService(grant_reader).require_authorization(
-                    access=access,
-                    request=ProjectUseOnlyGrantAuthorizationRequestDTO(
-                        seed.project_id, seed.principal_id, seed.action
-                    ),
-                )
             cookie_grant_facts = await grant_reader.read_for_change(
                 access=browser_access,
                 project_id=seed.project_id,
@@ -464,3 +452,36 @@ async def test_actor_lookup_matches_every_binding_component(
             assert facts.oauth_credential_facts.current_version == state.version
         else:
             assert facts.oauth_credential_facts.current_version is None
+
+    if family == "grant":
+        from tests.support.project_grant_changes import create_project_grant_change_service
+
+        from inframeld_backend.access.application.commands.set_project_action_grant_command import (
+            SetProjectActionGrantCommand,
+        )
+        from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
+            IdempotencyContextDTO,
+        )
+        from inframeld_backend.shared.application.enums.http_method import HttpMethod
+        from inframeld_backend.shared.application.value_objects.idempotency_key import (
+            IdempotencyKey,
+        )
+
+        grant_action = ActionId("create-access-groups")
+        async with database.session() as session:
+            with pytest.raises(HumanOAuthCredentialRejectedError):
+                await create_project_grant_change_service(session).set_action_grant(
+                    access=access,
+                    command=SetProjectActionGrantCommand(
+                        project_id=seed.project_id,
+                        recipient_principal_id=seed.principal_id,
+                        action_id=grant_action,
+                        can_grant=False,
+                        expected_access_revision=0,
+                    ),
+                    context=IdempotencyContextDTO(
+                        method=HttpMethod.PUT,
+                        requested_route=f"/v1/projects/{seed.project_id.value}/grants/{seed.principal_id.value}/{grant_action.value}",
+                        key=IdempotencyKey("credential-binding-check"),
+                    ),
+                )

@@ -6,7 +6,7 @@ import {
 } from "../../src/conformance/assertions.ts";
 import type { CaseCall } from "../../src/conformance/cases.ts";
 import { payload } from "./schema.ts";
-import { grantInput, projectId } from "./grants.ts";
+import { grantInput, grantPath } from "./grants.ts";
 
 const rawText = (
   raw: { encoding: "utf8" | "base64"; value: string } | undefined,
@@ -102,17 +102,17 @@ sdkTest(
 sdkTest(
   {
     id: "lost-response",
-    operation: "assignProjectUseOnlyGrant",
+    operation: "setProjectActionGrant",
     outcome: "failure",
   },
   async ({ call }) => {
     const { observation } = await call({
-      operation: "assignProjectUseOnlyGrant",
+      operation: "setProjectActionGrant",
       headers: {
         Authorization: "Bearer sdk-human",
-        "Idempotency-Key": "sdk-key",
+        "Idempotency-Key": "sdk-project-grant-key",
       },
-      path: { project_id: projectId },
+      path: grantPath,
       body: grantInput,
       timeout: 2000,
       fault: { kind: "disconnect" },

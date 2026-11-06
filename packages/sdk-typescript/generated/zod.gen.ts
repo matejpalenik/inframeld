@@ -3,6 +3,55 @@
 import * as z from 'zod';
 
 /**
+ * AccessGroupActionGrantItemResponse
+ */
+export const zAccessGroupActionGrantItemResponse = z.object({
+    accessGroupId: z.uuid(),
+    actionId: z.string(),
+    canGrant: z.boolean(),
+    projectId: z.uuid(),
+    recipientPrincipalId: z.uuid()
+});
+
+/**
+ * AccessGroupActionGrantRemovalResponse
+ */
+export const zAccessGroupActionGrantRemovalResponse = z.object({
+    accessGroupId: z.uuid(),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    actionId: z.string(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    projectId: z.uuid(),
+    recipientPrincipalId: z.uuid(),
+    removed: z.literal(true)
+});
+
+/**
+ * AccessGroupActionGrantRequest
+ */
+export const zAccessGroupActionGrantRequest = z.object({
+    canGrant: z.boolean(),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * AccessGroupActionGrantResponse
+ */
+export const zAccessGroupActionGrantResponse = z.object({
+    accessGroupId: z.uuid(),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    actionId: z.string(),
+    canGrant: z.boolean(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    projectId: z.uuid(),
+    recipientPrincipalId: z.uuid()
+});
+
+/**
  * AccessGroupCreationRequest
  */
 export const zAccessGroupCreationRequest = z.object({
@@ -140,6 +189,55 @@ export const zApplicationAccountAction = z.enum([
 ]);
 
 /**
+ * ApplicationAccountActionGrantItemResponse
+ */
+export const zApplicationAccountActionGrantItemResponse = z.object({
+    actionId: z.string(),
+    applicationPrincipalId: z.uuid(),
+    canGrant: z.boolean(),
+    projectId: z.uuid(),
+    recipientPrincipalId: z.uuid()
+});
+
+/**
+ * ApplicationAccountActionGrantRemovalResponse
+ */
+export const zApplicationAccountActionGrantRemovalResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    actionId: z.string(),
+    applicationPrincipalId: z.uuid(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    projectId: z.uuid(),
+    recipientPrincipalId: z.uuid(),
+    removed: z.literal(true)
+});
+
+/**
+ * ApplicationAccountActionGrantRequest
+ */
+export const zApplicationAccountActionGrantRequest = z.object({
+    canGrant: z.boolean(),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * ApplicationAccountActionGrantResponse
+ */
+export const zApplicationAccountActionGrantResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    actionId: z.string(),
+    applicationPrincipalId: z.uuid(),
+    canGrant: z.boolean(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    projectId: z.uuid(),
+    recipientPrincipalId: z.uuid()
+});
+
+/**
  * ApplicationAccountCreationRequest
  */
 export const zApplicationAccountCreationRequest = z.object({
@@ -198,6 +296,17 @@ export const zCompletedOperationLookupResponse = z.object({
 export const zCurrentSessionResponse = z.object({
     principalId: z.uuid()
 });
+
+/**
+ * GrantTargetKind
+ *
+ * Discriminate published grant targets without changing their wire tags.
+ */
+export const zGrantTargetKind = z.enum([
+    'project',
+    'access-group',
+    'application-account'
+]);
 
 /**
  * HttpMethod
@@ -364,6 +473,9 @@ export const zOperationLookupAuthorityFamily = z.enum([
     'project_action_use',
     'project_grant_read',
     'organization_action_use',
+    'organization_grant_read',
+    'access_group_grant_read',
+    'application_account_grant_read',
     'access_group_deletion'
 ]);
 
@@ -386,6 +498,52 @@ export const zOrganizationAction = z.enum([
     'restore-users',
     'create-projects'
 ]);
+
+/**
+ * OrganizationActionGrantItemResponse
+ */
+export const zOrganizationActionGrantItemResponse = z.object({
+    actionId: z.string(),
+    canGrant: z.boolean(),
+    organizationId: z.uuid(),
+    recipientPrincipalId: z.uuid()
+});
+
+/**
+ * OrganizationActionGrantRemovalResponse
+ */
+export const zOrganizationActionGrantRemovalResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    actionId: z.string(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    organizationId: z.uuid(),
+    recipientPrincipalId: z.uuid(),
+    removed: z.literal(true)
+});
+
+/**
+ * OrganizationActionGrantRequest
+ */
+export const zOrganizationActionGrantRequest = z.object({
+    canGrant: z.boolean(),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * OrganizationActionGrantResponse
+ */
+export const zOrganizationActionGrantResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    actionId: z.string(),
+    canGrant: z.boolean(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    organizationId: z.uuid(),
+    recipientPrincipalId: z.uuid()
+});
 
 /**
  * OriginalOperationLookupRequest
@@ -419,10 +577,34 @@ export const zMyOrganizationAccessResponse = z.object({
 });
 
 /**
+ * PageResponse[AccessGroupActionGrantItemResponse]
+ */
+export const zPageResponseAccessGroupActionGrantItemResponse = z.object({
+    items: z.array(zAccessGroupActionGrantItemResponse),
+    nextCursor: z.string().nullable()
+});
+
+/**
+ * PageResponse[ApplicationAccountActionGrantItemResponse]
+ */
+export const zPageResponseApplicationAccountActionGrantItemResponse = z.object({
+    items: z.array(zApplicationAccountActionGrantItemResponse),
+    nextCursor: z.string().nullable()
+});
+
+/**
  * PageResponse[ApplicationKeyMetadataResponse]
  */
 export const zPageResponseApplicationKeyMetadataResponse = z.object({
     items: z.array(zApplicationKeyMetadataResponse),
+    nextCursor: z.string().nullable()
+});
+
+/**
+ * PageResponse[OrganizationActionGrantItemResponse]
+ */
+export const zPageResponseOrganizationActionGrantItemResponse = z.object({
+    items: z.array(zOrganizationActionGrantItemResponse),
     nextCursor: z.string().nullable()
 });
 
@@ -451,6 +633,23 @@ export const zAccessGroupPrincipalsPageResponse = z.object({
     items: z.array(zAccessGroupPrincipalResponse),
     nextCursor: z.string().nullable(),
     projectId: z.uuid()
+});
+
+/**
+ * GrantRecipientResponse
+ */
+export const zGrantRecipientResponse = z.object({
+    displayName: z.string(),
+    kind: zPrincipalKind,
+    principalId: z.uuid()
+});
+
+/**
+ * PageResponse[GrantRecipientResponse]
+ */
+export const zPageResponseGrantRecipientResponse = z.object({
+    items: z.array(zGrantRecipientResponse),
+    nextCursor: z.string().nullable()
 });
 
 /**
@@ -748,30 +947,6 @@ export const zProjectNameResolutionResponse = z.object({
     name: z.string().nullable(),
     organizationId: z.uuid(),
     projectId: z.uuid()
-});
-
-/**
- * ProjectUseOnlyGrantRequest
- */
-export const zProjectUseOnlyGrantRequest = z.object({
-    actionId: z.literal('create-access-groups'),
-    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
-    recipientPrincipalId: z.uuid()
-});
-
-/**
- * ProjectUseOnlyGrantResponse
- *
- * Describe the original change - current grants require a fresh authorized read.
- */
-export const zProjectUseOnlyGrantResponse = z.object({
-    accessRevision: z.int().gte(0).lte(9007199254740991),
-    actionId: z.literal('create-access-groups'),
-    canGrant: z.literal(false).optional().default(false),
-    idempotencyExpiresAt: z.iso.datetime(),
-    operationId: z.string(),
-    projectId: z.uuid(),
-    recipientPrincipalId: z.uuid()
 });
 
 /**
@@ -1234,6 +1409,192 @@ export const zLookupOriginalOperation503Representation0Response = zProblemDetail
  */
 export const zLookupOriginalOperationResponse = zOperationLookupResponse;
 
+export const zListOrganizationActionGrantsPath = z.object({
+    organization_id: z.uuid()
+});
+
+export const zListOrganizationActionGrantsQuery = z.object({
+    actionId: z.string().min(1).max(100),
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListOrganizationActionGrants200Representation0Response = zPageResponseOrganizationActionGrantItemResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListOrganizationActionGrants400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListOrganizationActionGrants401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListOrganizationActionGrants403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListOrganizationActionGrants404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zListOrganizationActionGrants409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListOrganizationActionGrants422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListOrganizationActionGrants503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListOrganizationActionGrantsResponse = zPageResponseOrganizationActionGrantItemResponse;
+
+export const zRemoveOrganizationActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRemoveOrganizationActionGrantPath = z.object({
+    organization_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: z.string()
+});
+
+export const zRemoveOrganizationActionGrantQuery = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zRemoveOrganizationActionGrant200Representation0Response = zOrganizationActionGrantRemovalResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRemoveOrganizationActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRemoveOrganizationActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRemoveOrganizationActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRemoveOrganizationActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zRemoveOrganizationActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRemoveOrganizationActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRemoveOrganizationActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRemoveOrganizationActionGrantResponse = zOrganizationActionGrantRemovalResponse;
+
+export const zSetOrganizationActionGrantBody = zOrganizationActionGrantRequest;
+
+export const zSetOrganizationActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zSetOrganizationActionGrantPath = z.object({
+    organization_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: z.string()
+});
+
+/**
+ * Changed or unchanged existing assignment.
+ */
+export const zSetOrganizationActionGrant200Representation0Response = zOrganizationActionGrantResponse;
+
+/**
+ * Successful Response
+ */
+export const zSetOrganizationActionGrant201Representation0Response = zOrganizationActionGrantResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zSetOrganizationActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zSetOrganizationActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zSetOrganizationActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zSetOrganizationActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zSetOrganizationActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zSetOrganizationActionGrant413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zSetOrganizationActionGrant415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zSetOrganizationActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zSetOrganizationActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Changed or unchanged existing assignment.
+ */
+export const zSetOrganizationActionGrantResponse = zOrganizationActionGrantResponse;
+
 export const zAdmitHumanBody = zHumanAdmissionRequest;
 
 export const zAdmitHumanHeaders = z.object({
@@ -1639,6 +2000,195 @@ export const zGetAccessGroup503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zGetAccessGroupResponse = zAccessGroupMetadataResponse;
+
+export const zListAccessGroupActionGrantsPath = z.object({
+    project_id: z.uuid(),
+    access_group_id: z.uuid()
+});
+
+export const zListAccessGroupActionGrantsQuery = z.object({
+    actionId: z.string().min(1).max(100),
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListAccessGroupActionGrants200Representation0Response = zPageResponseAccessGroupActionGrantItemResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListAccessGroupActionGrants400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListAccessGroupActionGrants401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListAccessGroupActionGrants403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListAccessGroupActionGrants404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zListAccessGroupActionGrants409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListAccessGroupActionGrants422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListAccessGroupActionGrants503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListAccessGroupActionGrantsResponse = zPageResponseAccessGroupActionGrantItemResponse;
+
+export const zRemoveAccessGroupActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRemoveAccessGroupActionGrantPath = z.object({
+    project_id: z.uuid(),
+    access_group_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: z.string()
+});
+
+export const zRemoveAccessGroupActionGrantQuery = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zRemoveAccessGroupActionGrant200Representation0Response = zAccessGroupActionGrantRemovalResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRemoveAccessGroupActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRemoveAccessGroupActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRemoveAccessGroupActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRemoveAccessGroupActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zRemoveAccessGroupActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRemoveAccessGroupActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRemoveAccessGroupActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRemoveAccessGroupActionGrantResponse = zAccessGroupActionGrantRemovalResponse;
+
+export const zSetAccessGroupActionGrantBody = zAccessGroupActionGrantRequest;
+
+export const zSetAccessGroupActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zSetAccessGroupActionGrantPath = z.object({
+    project_id: z.uuid(),
+    access_group_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: z.string()
+});
+
+/**
+ * Changed or unchanged existing assignment.
+ */
+export const zSetAccessGroupActionGrant200Representation0Response = zAccessGroupActionGrantResponse;
+
+/**
+ * Successful Response
+ */
+export const zSetAccessGroupActionGrant201Representation0Response = zAccessGroupActionGrantResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zSetAccessGroupActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zSetAccessGroupActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zSetAccessGroupActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zSetAccessGroupActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zSetAccessGroupActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zSetAccessGroupActionGrant413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zSetAccessGroupActionGrant415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zSetAccessGroupActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zSetAccessGroupActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Changed or unchanged existing assignment.
+ */
+export const zSetAccessGroupActionGrantResponse = zAccessGroupActionGrantResponse;
 
 export const zListAccessGroupManagersPath = z.object({
     project_id: z.uuid(),
@@ -2180,6 +2730,195 @@ export const zGetApplicationAccount503Representation0Response = zProblemDetails;
  */
 export const zGetApplicationAccountResponse = zApplicationAccountMetadataResponse;
 
+export const zListApplicationAccountActionGrantsPath = z.object({
+    project_id: z.uuid(),
+    application_principal_id: z.uuid()
+});
+
+export const zListApplicationAccountActionGrantsQuery = z.object({
+    actionId: z.string().min(1).max(100),
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListApplicationAccountActionGrants200Representation0Response = zPageResponseApplicationAccountActionGrantItemResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListApplicationAccountActionGrants400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListApplicationAccountActionGrants401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListApplicationAccountActionGrants403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListApplicationAccountActionGrants404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zListApplicationAccountActionGrants409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListApplicationAccountActionGrants422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListApplicationAccountActionGrants503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListApplicationAccountActionGrantsResponse = zPageResponseApplicationAccountActionGrantItemResponse;
+
+export const zRemoveApplicationAccountActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRemoveApplicationAccountActionGrantPath = z.object({
+    project_id: z.uuid(),
+    application_principal_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: z.string()
+});
+
+export const zRemoveApplicationAccountActionGrantQuery = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zRemoveApplicationAccountActionGrant200Representation0Response = zApplicationAccountActionGrantRemovalResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRemoveApplicationAccountActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRemoveApplicationAccountActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRemoveApplicationAccountActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRemoveApplicationAccountActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zRemoveApplicationAccountActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRemoveApplicationAccountActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRemoveApplicationAccountActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRemoveApplicationAccountActionGrantResponse = zApplicationAccountActionGrantRemovalResponse;
+
+export const zSetApplicationAccountActionGrantBody = zApplicationAccountActionGrantRequest;
+
+export const zSetApplicationAccountActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zSetApplicationAccountActionGrantPath = z.object({
+    project_id: z.uuid(),
+    application_principal_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: z.string()
+});
+
+/**
+ * Changed or unchanged existing assignment.
+ */
+export const zSetApplicationAccountActionGrant200Representation0Response = zApplicationAccountActionGrantResponse;
+
+/**
+ * Successful Response
+ */
+export const zSetApplicationAccountActionGrant201Representation0Response = zApplicationAccountActionGrantResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zSetApplicationAccountActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zSetApplicationAccountActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zSetApplicationAccountActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zSetApplicationAccountActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zSetApplicationAccountActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zSetApplicationAccountActionGrant413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zSetApplicationAccountActionGrant415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zSetApplicationAccountActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zSetApplicationAccountActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Changed or unchanged existing assignment.
+ */
+export const zSetApplicationAccountActionGrantResponse = zApplicationAccountActionGrantResponse;
+
 export const zListApplicationKeysPath = z.object({
     project_id: z.uuid(),
     application_principal_id: z.uuid()
@@ -2286,6 +3025,58 @@ export const zGetApplicationKey503Representation0Response = zProblemDetails;
  */
 export const zGetApplicationKeyResponse = zApplicationKeyMetadataResponse;
 
+export const zListProjectGrantRecipientsPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zListProjectGrantRecipientsQuery = z.object({
+    targetKind: zGrantTargetKind,
+    targetId: z.uuid(),
+    actionId: z.string().min(1).max(100),
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListProjectGrantRecipients200Representation0Response = zPageResponseGrantRecipientResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListProjectGrantRecipients400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListProjectGrantRecipients401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListProjectGrantRecipients403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListProjectGrantRecipients404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListProjectGrantRecipients422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListProjectGrantRecipients503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListProjectGrantRecipientsResponse = zPageResponseGrantRecipientResponse;
+
 export const zListProjectActionGrantsPath = z.object({
     project_id: z.uuid()
 });
@@ -2335,61 +3126,6 @@ export const zListProjectActionGrants503Representation0Response = zProblemDetail
  * Successful Response
  */
 export const zListProjectActionGrantsResponse = zPageResponseProjectActionGrantItemResponse;
-
-export const zAssignProjectUseOnlyGrantBody = zProjectUseOnlyGrantRequest;
-
-export const zAssignProjectUseOnlyGrantHeaders = z.object({
-    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
-});
-
-export const zAssignProjectUseOnlyGrantPath = z.object({
-    project_id: z.uuid()
-});
-
-/**
- * Successful Response
- */
-export const zAssignProjectUseOnlyGrant201Representation0Response = zProjectUseOnlyGrantResponse;
-
-/**
- * Invalid authentication request
- */
-export const zAssignProjectUseOnlyGrant400Representation0Response = zProblemDetails;
-
-/**
- * Unauthorized
- */
-export const zAssignProjectUseOnlyGrant401Representation0Response = zProblemDetails;
-
-/**
- * Access denied
- */
-export const zAssignProjectUseOnlyGrant403Representation0Response = zProblemDetails;
-
-/**
- * Resource not found
- */
-export const zAssignProjectUseOnlyGrant404Representation0Response = zProblemDetails;
-
-/**
- * Conflict: stale_revision, idempotency_key_reused, idempotency_in_progress, or conflict.
- */
-export const zAssignProjectUseOnlyGrant409Representation0Response = zProblemDetails;
-
-/**
- * Request validation failed
- */
-export const zAssignProjectUseOnlyGrant422Representation0Response = zProblemDetails;
-
-/**
- * Dependency unavailable
- */
-export const zAssignProjectUseOnlyGrant503Representation0Response = zProblemDetails;
-
-/**
- * Successful Response
- */
-export const zAssignProjectUseOnlyGrantResponse = zProjectUseOnlyGrantResponse;
 
 export const zRemoveProjectActionGrantHeaders = z.object({
     'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)

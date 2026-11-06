@@ -9,7 +9,9 @@ import inframeld_sdk_fixtures
 from observations import NativeModel
 from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
 
-Model = inframeld_sdk_fixtures.ContractFixturePayload | inframeld_sdk.ProjectUseOnlyGrantResponse
+Model = (
+    inframeld_sdk_fixtures.ContractFixturePayload | inframeld_sdk.ProjectActionGrantRemovalResponse
+)
 _JSON_OBJECT = TypeAdapter(dict[str, JsonValue])
 
 
@@ -44,7 +46,7 @@ def body_value(value: NativeModel) -> dict[str, JsonValue]:
 
 
 payload_type = inframeld_sdk_fixtures.ContractFixturePayload
-grant_type = inframeld_sdk.ProjectUseOnlyGrantResponse
+grant_type = inframeld_sdk.ProjectActionGrantRemovalResponse
 payload: dict[str, JsonValue] = {
     "required_name": "valid",
     "required_nullable": None,
@@ -54,7 +56,8 @@ payload: dict[str, JsonValue] = {
 grant: dict[str, JsonValue] = {
     "accessRevision": 1,
     "actionId": "create-access-groups",
-    "canGrant": False,
+    "removed": True,
+    "changed": True,
     "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
     "operationId": "sdk-operation",
     "projectId": "00000000-0000-4000-8000-000000000003",
@@ -64,7 +67,7 @@ grant: dict[str, JsonValue] = {
 
 def parse(
     cls: type[inframeld_sdk_fixtures.ContractFixturePayload]
-    | type[inframeld_sdk.ProjectUseOnlyGrantResponse],
+    | type[inframeld_sdk.ProjectActionGrantRemovalResponse],
     data: dict[str, JsonValue],
 ) -> Model:
     value = cls.from_dict(data)
@@ -75,7 +78,7 @@ def parse(
 
 def rejects(
     cls: type[inframeld_sdk_fixtures.ContractFixturePayload]
-    | type[inframeld_sdk.ProjectUseOnlyGrantResponse],
+    | type[inframeld_sdk.ProjectActionGrantRemovalResponse],
     data: dict[str, JsonValue],
 ) -> bool:
     try:
@@ -87,7 +90,7 @@ def rejects(
 
 def _rejects_native_null() -> bool:
     try:
-        grant_type.model_validate(grant | {"canGrant": None})
+        grant_type.model_validate(grant | {"removed": None})
     except ValueError:
         return True
     return False
@@ -318,15 +321,15 @@ class GeneratedModelTests(unittest.TestCase):
             is None
         )
 
-    def test_boolean_constant_accepts_false(self) -> None:
-        self.assertTrue(body_value(parse(grant_type, grant))["canGrant"] is False)
+    def test_removal_acknowledgement_accepts_true(self) -> None:
+        self.assertTrue(body_value(parse(grant_type, grant))["removed"] is True)
 
-    def test_boolean_constant_rejects_true(self) -> None:
-        self.assertTrue(rejects(grant_type, grant | {"canGrant": True}))
+    def test_removal_acknowledgement_rejects_false(self) -> None:
+        self.assertTrue(rejects(grant_type, grant | {"removed": False}))
 
     def test_nonnullable_rejects_null_from_dict(self) -> None:
         with self.assertRaises(ValueError):
-            grant_type.from_dict(grant | {"canGrant": None})
+            grant_type.from_dict(grant | {"removed": None})
 
     def test_nonnullable_rejects_null_native_model(self) -> None:
         self.assertTrue(_rejects_native_null())

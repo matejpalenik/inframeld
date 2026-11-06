@@ -20,6 +20,30 @@ Read the current principal context with a valid human credential. [HTTP and cURL
 
 Read the actual admitted human's own Organization ID, principal ID, current Access revision and stored Organization grants. An eligible human without Organization grants receives `grants: []`. There is no principal selector, installation inventory or permission snapshot for a later action. [Create an additional Project](/guides/create-project#read-your-organization-access) explains how to use this read before creation.
 
+## Read Organization action grants
+
+<ApiOperation operationId="listOrganizationActionGrants" />
+
+List stored assignments for one required Organization `actionId`: `admit-users`, `suspend-users`, `restore-users` or `create-projects`. Every page requires a currently eligible admitted human with exact use-and-grant authority on this Organization. The bounded page contains only `items` and nullable `nextCursor`, with stable recipient-ID order, default 25 and maximum 100 items.
+
+Each item has flat `organizationId`, `recipientPrincipalId`, `actionId` and `canGrant` fields. Stored suspended-recipient rows remain visible. This is not a recipient directory, effective-permission report or current-revision source. Organization recipients are supplied by their verified admitted principal IDs. [Manage exact action grants](/guides/manage-action-grants) explains recipient selection and revision review.
+
+## Set an Organization action grant
+
+<ApiOperation operationId="setOrganizationActionGrant" />
+
+Require current eligible-human exact use-and-grant authority, one retained idempotency key and strict `OrganizationActionGrantRequest` JSON containing `canGrant` and the reviewed Organization `expectedAccessRevision`. A fresh recipient must be an eligible admitted human in that Organization. There is no Project selector or application recipient.
+
+A new assignment returns `201`; an existing changed or unchanged assignment returns `200`. A real change advances Organization Access revision once, while a fresh no-op does not. The flat original receipt retains the Organization, recipient, action, requested level, `changed`, `accessRevision`, operation ID and idempotency expiry. A downgrade must preserve an eligible exact-action grantor.
+
+## Remove an Organization action grant
+
+<ApiOperation operationId="removeOrganizationActionGrant" />
+
+Require the same current exact human authority and one retained key. DELETE takes one bounded `expectedAccessRevision` query value and no body. It returns `200` with `removed: true`, original `changed` and the original receipt fields. It may remove a stale assignment without restoring an inactive recipient, while retaining scope and last-grantor protection.
+
+Current caller authority is checked before immutable same-write replay. Replay returns the original status, effect, revision and expiry before fresh-recipient/revision/handover checks. It neither restores an old grant nor removes a later one. All three operations are no-store. [Recovery guidance](/guides/manage-action-grants#recover-an-uncertain-result) distinguishes historical receipts from current assignments.
+
 ## Admit an existing human
 
 <ApiOperation operationId="admitHuman" />
@@ -73,6 +97,30 @@ The bounded page has only safe key metadata in `items` and a nullable `nextCurso
 <ApiOperation operationId="getApplicationKey" />
 
 Read a specific retained key by its ID with the same exact Issue-or-Revoke authority. It returns the same safe item shape, without a secret or verifier. Neither read issues a key, authenticates it or changes its state. These GETs take no body, expected revision or idempotency key. [Inspect safe key metadata](/guides/application-accounts#inspect-safe-key-metadata) explains empty new accounts and continuation.
+
+## Read application-account action grants
+
+<ApiOperation operationId="listApplicationAccountActionGrants" />
+
+List stored assignments for one exact account and required `actionId`: `issue-application-keys`, `revoke-application-keys` or `delete-application-account`. Require a currently eligible human member with Project visibility and exact use-and-grant authority for that action on that account. This is stronger than the use authority needed for safe account or key metadata.
+
+The page has flat `projectId`, `applicationPrincipalId`, `recipientPrincipalId`, `actionId` and `canGrant` items, plus nullable `nextCursor`. Default 25 and maximum 100 items use recipient-ID order. It reports stored assignments, including suspended recipients, without a revision, total, key inventory or effective-permission expansion.
+
+## Set an application-account action grant
+
+<ApiOperation operationId="setApplicationAccountActionGrant" />
+
+Use strict `ApplicationAccountActionGrantRequest` JSON containing `canGrant` and the reviewed owning Project `expectedAccessRevision`, plus one retained idempotency key. Current caller authority is the exact use-and-grant authority above. A fresh recipient must be an eligible human member of that Project. The account's authoritative parent must match the Project path.
+
+A new assignment returns `201`; an existing changed or unchanged assignment returns `200`. The flat receipt preserves the original scope, recipient, action, grant level, `changed`, Project Access revision, operation and expiry. Real changes advance that revision once; no-ops do not. These grants administer the human's authority over the account. They issue no keys and give the application no received permissions.
+
+## Remove an application-account action grant
+
+<ApiOperation operationId="removeApplicationAccountActionGrant" />
+
+Require current exact human use-and-grant authority, one retained key and the reviewed owning Project `expectedAccessRevision` as one query value. DELETE has no body. `200` returns original `removed: true` and `changed` with the flat receipt. Removal can clean an inactive recipient's assignment without restoring that recipient, and downgrade/removal must preserve an eligible exact-action grantor.
+
+Current scope and caller authority precede immutable same-write replay, before fresh-recipient/revision/handover checks. Original receipts cannot restore removed grants or remove later assignments. All three operations are no-store. [The grant guide](/guides/manage-action-grants) covers safe changes and their distinct meaning from credential operations.
 
 ## Create an access group
 
@@ -146,6 +194,30 @@ Ordinary repeated DELETE and full receipt replay retain current-manager authoriz
 
 Group responses and problems use `Cache-Control: no-store`. Fresh stale review, unsafe handover, unavailable Name and protected-reference conflicts return `409`. Current denial is `403`, hidden/missing scope is `404`, and malformed fields, query framing or body content use the existing `422` contract. POST/PUT accept one JSON object of at most 32 KiB with `Content-Type: application/json`, retaining `413`/`415` bounds. Cookie writes require the installation's Origin and CSRF safeguards.
 
+## Read access-group action grants
+
+<ApiOperation operationId="listAccessGroupActionGrants" />
+
+List stored `add-documents`, `update-documents` or `delete-documents` assignments for one exact group. Every page requires current eligible-human Project membership/visibility and either exact use-and-grant authority or current management of this same group. Ordinary group membership and management of another group are insufficient.
+
+The bounded page has flat `projectId`, `accessGroupId`, `recipientPrincipalId`, `actionId` and `canGrant` items, plus nullable `nextCursor`. It uses recipient-ID order with default 25 and maximum 100 items. It includes stored suspended-recipient rows and supplies no effective-permission expansion, eligible-recipient inventory, Access revision or total.
+
+## Set an access-group action grant
+
+<ApiOperation operationId="setAccessGroupActionGrant" />
+
+Use strict `AccessGroupActionGrantRequest` JSON containing `canGrant` and the reviewed owning Project `expectedAccessRevision`, with one retained idempotency key. Require current exact use-and-grant authority or current management of this exact group, plus current human eligibility and Project scope. The group's authoritative parent must match the Project path.
+
+A fresh recipient must be an eligible member of that Project. Humans may receive either grant level. Eligible applications may receive only use-only grants. The assignment creates no ordinary group membership or management. New assignments return `201`; existing changed or unchanged assignments return `200`. The flat original receipt preserves the requested level, `changed`, scope, recipient, action, Project Access revision, operation and expiry. Only real changes advance the revision.
+
+## Remove an access-group action grant
+
+<ApiOperation operationId="removeAccessGroupActionGrant" />
+
+Require the same current caller authority and one retained key. DELETE accepts one bounded owning Project `expectedAccessRevision` query value and no body. It returns `200` with original `removed: true` and `changed`, including an already-absent no-op. It may clean an inactive recipient's assignment without restoring them. Downgrade/removal must preserve an eligible human exact-action grantor or eligible manager of this same group.
+
+Current authority precedes ordinary same-write replay and its immutable original status, outcome, revision and expiry. Current management may authorize that replay. Generic operation metadata lookup instead always requires exact use-and-grant authority for the original group action. Group management alone supplies no generic-history disclosure, and grant history has no deleted-target exception. The separate [content-free deletion reader](/guides/read-deletion-status#read-status-for-a-deleted-access-group) retains its own closed meaning. All three grant operations are no-store. [Manage action grants](/guides/manage-action-grants) explains the workflow.
+
 ## Read Project members
 
 <ApiOperation operationId="listProjectMembers" />
@@ -198,6 +270,16 @@ Read `GET /v1/projects/{project_id}/grants` with one required supported `actionI
 
 The page contains only `items` and nullable `nextCursor`. Each stored assignment has flat `projectId`, `recipientPrincipalId`, `actionId` and `canGrant` fields. Suspended recipients remain listed. This is neither effective-permission expansion nor recipient discovery. There is no body, Access revision, total or idempotency key. All responses are no-store. [List Project action grants](/guides/list-project-action-grants) explains setup, paging and failures.
 
+## Find eligible Project grant recipients
+
+<ApiOperation operationId="listProjectGrantRecipients" />
+
+`GET /v1/projects/{project_id}/grant-recipients` requires scalar `targetKind`, `targetId` and `actionId`, plus optional `limit` and `cursor`. The supported kind literals are `project`, `access-group` and `application-account`. Project `targetId` must equal the path Project. Group and account targets must have that same authoritative parent Project. There is no body, Organization target, JSON/deep-object target or global directory.
+
+Every page requires current eligible-human Project membership/visibility and exact target/action use-and-grant authority. Current management of the same group is an alternative for its three document actions. The response filters eligibility before filling the page and returns only safe `principalId`, `displayName` and `kind` values, ordered by principal ID. It defaults to 25 items, accepts at most 100 and has nullable `nextCursor` bound to the exact scope, target and action.
+
+A candidate's appearance grants no permission and cannot guarantee eligibility at a later write. The page has no Access revision, totals, received-grant inventory or credential data. Project target mismatch is invalid input; a foreign or hidden group/account retains the safe resource boundary. The response is no-store. [Find an eligible recipient](/guides/manage-action-grants#find-an-eligible-project-recipient) explains selection and continuation.
+
 ## Read your own Project access
 
 <ApiOperation operationId="getMyProjectAccess" />
@@ -224,11 +306,9 @@ A `200` `ProjectActionGrantRemovalResponse` records original `removed: true` and
 
 ## Assign a use-only grant
 
-<ApiOperation operationId="assignProjectUseOnlyGrant" />
+The creation-only Project POST, `assignProjectUseOnlyGrant` and its request/response exports have retired. Exact-target PUT and DELETE retain their existing meanings. There is no redirect, compatibility write alias or automatic POST-to-PUT replay.
 
-This operation assigns the delivered use-only `create-access-groups` action to the specified recipient. Supply the reviewed Project Access revision and a retained idempotency key. A grant does not bypass membership or the actor's current ability to grant that action.
-
-The request body's generated model is `ProjectUseOnlyGrantRequest`. [The compatible POST section](/guides/assign-project-grant#assign-the-permission) shows equivalent cURL, Python, TypeScript and Rust programs. The explicit Project PUT/DELETE operations retain separate meanings and original requests. Preserve the original request context before dispatch so [lookup](/guides/recover-original-request) can observe an uncertain result.
+Retained original POST metadata remains inspectable through [historical request lookup](/guides/recover-original-request#inspect-historical-use-only-post-metadata), with the original method, literal route, key, fingerprint, expiry and outcome. Current eligible-human exact use-and-grant authority for `create-access-groups` on the original Project is still required. Lookup changes no assignment and cannot establish failure from missing or unresolved history.
 
 ## Inspect account-site consent
 

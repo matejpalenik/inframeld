@@ -304,3 +304,66 @@ def test_original_guard_is_required_before_application_lookup() -> None:
         response = client.post("/v1/operations/lookup", json=body, headers=HEADERS)
     assert response.status_code == 422
     assert service.queries == []
+
+
+@pytest.mark.parametrize("method", ["PUT", "DELETE"])
+@pytest.mark.parametrize(
+    "family,project,action,route",
+    [
+        (
+            "organization_grant_read",
+            None,
+            "create-projects",
+            f"/v1/organizations/{UUID(int=2)}/grants/{UUID(int=5)}/create-projects",
+        ),
+        (
+            "access_group_grant_read",
+            str(UUID(int=3)),
+            "add-documents",
+            f"/v1/projects/{UUID(int=3)}/access-groups/{UUID(int=6)}/grants/{UUID(int=5)}/add-documents",
+        ),
+        (
+            "application_account_grant_read",
+            str(UUID(int=3)),
+            "issue-application-keys",
+            f"/v1/projects/{UUID(int=3)}/application-accounts/{UUID(int=7)}/grants/{UUID(int=5)}/issue-application-keys",
+        ),
+    ],
+)
+def test_concrete_grant_lookup_preserves_exact_scope_method_route_and_guard(
+    method: str, family: str, project: str | None, action: str, route: str
+) -> None:
+    service = MockOriginalLookup()
+    service.result = CompletedSynchronousOperationDTO(
+        operation_id=OPERATION,
+        created=False,
+        replay_kind=OperationReplayKind.SAFE_RESULT,
+        expires_at=datetime(2030, 1, 1, tzinfo=UTC),
+    )
+    body = BODY | {
+        "projectId": project,
+        "method": method,
+        "requestedRoute": route,
+        "expectedAuthority": {"family": family, "actionId": action},
+    }
+    with client_for(service) as client:
+        response = client.post("/v1/operations/lookup", json=body, headers=HEADERS)
+    assert response.status_code == 200 and response.headers["cache-control"] == "no-store"
+    assert set(response.json()) == {
+        "outcome",
+        "operationId",
+        "classification",
+        "idempotencyExpiresAt",
+    }
+    assert len(service.queries) == 1
+    query = service.queries[0]
+    assert (query.method.value, query.requested_route, query.key.value) == (
+        method,
+        route,
+        "original-key",
+    )
+    assert (str(query.project_id.value) if query.project_id is not None else None) == project
+    assert (
+        query.expected_authority.family.value == family
+        and query.expected_authority.action_id.value == action
+    )

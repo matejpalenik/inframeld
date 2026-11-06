@@ -33,6 +33,16 @@ const BINDINGS: &[&str] = &[
     "getApplicationKey",
     "listProjectMembers",
     "listProjectActionGrants",
+    "listOrganizationActionGrants",
+    "setOrganizationActionGrant",
+    "removeOrganizationActionGrant",
+    "listAccessGroupActionGrants",
+    "setAccessGroupActionGrant",
+    "removeAccessGroupActionGrant",
+    "listApplicationAccountActionGrants",
+    "setApplicationAccountActionGrant",
+    "removeApplicationAccountActionGrant",
+    "listProjectGrantRecipients",
     "getMyProjectAccess",
     "setProjectActionGrant",
     "removeProjectActionGrant",
@@ -40,7 +50,6 @@ const BINDINGS: &[&str] = &[
     "removeProjectMember",
     "inspectHumanOAuthConsent",
     "decideHumanOAuthConsent",
-    "assignProjectUseOnlyGrant",
     "lookupOriginalOperation",
     "getDeletionStatus",
     "resolveProjectName",
@@ -116,12 +125,21 @@ async fn main() {
                 | "admitHuman"
                 | "listProjectMembers"
                 | "listProjectActionGrants"
+                | "listOrganizationActionGrants"
+                | "setOrganizationActionGrant"
+                | "removeOrganizationActionGrant"
+                | "listAccessGroupActionGrants"
+                | "setAccessGroupActionGrant"
+                | "removeAccessGroupActionGrant"
+                | "listApplicationAccountActionGrants"
+                | "setApplicationAccountActionGrant"
+                | "removeApplicationAccountActionGrant"
+                | "listProjectGrantRecipients"
                 | "getMyProjectAccess"
                 | "setProjectActionGrant"
                 | "removeProjectActionGrant"
                 | "addProjectMember"
                 | "removeProjectMember"
-                | "assignProjectUseOnlyGrant"
                 | "lookupOriginalOperation"
                 | "getDeletionStatus"
                 | "resolveProjectName"
@@ -140,8 +158,7 @@ async fn main() {
         // This header is a generated operation argument, not a default header.
         if matches!(
             call.operation.as_str(),
-            "assignProjectUseOnlyGrant"
-                | "updateProjectMetadata"
+            "updateProjectMetadata"
                 | "createProject"
                 | "createAccessGroup"
                 | "addAccessGroupMember"
@@ -155,6 +172,12 @@ async fn main() {
                 | "removeProjectMember"
                 | "setProjectActionGrant"
                 | "removeProjectActionGrant"
+                | "setOrganizationActionGrant"
+                | "removeOrganizationActionGrant"
+                | "setAccessGroupActionGrant"
+                | "removeAccessGroupActionGrant"
+                | "setApplicationAccountActionGrant"
+                | "removeApplicationAccountActionGrant"
         ) {
             additional_headers.remove("Idempotency-Key");
         }

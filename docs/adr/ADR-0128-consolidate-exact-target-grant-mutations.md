@@ -1,6 +1,6 @@
 # ADR-0128: Consolidate exact-target grant mutations
 
-**Status:** Accepted. The target contract is selected, with POST retirement and remaining target integrations still requiring implementation and qualification. Supersedes the earlier requirement in the grant references to preserve the use-only POST indefinitely. Retains ADR-0068's focused aggregate and application-owned transaction decisions.
+**Status:** Accepted. The Access-owned implementation retires live POST and its generated operation in favor of exact PUT/DELETE. Future resource-target integrations retain their owning delivery work. Automated SDK/platform and human qualification remain separately evidenced. Supersedes the earlier requirement in the grant references to preserve the use-only POST indefinitely. Retains ADR-0068's focused aggregate and application-owned transaction decisions.
 
 **Date:** 2026-11-05
 
@@ -21,7 +21,7 @@ These describe the current contract and selected replacement. No runtime benchma
 
 ## Decision Outcome
 
-Use the concrete exact-target PUT and DELETE operations for grant mutations. Retire `POST /v1/projects/{project_id}/grants`, `assignProjectUseOnlyGrant` and its generated request/response exports together in the owning implementation. Preserve the exact-target GET and existing PUT/DELETE identities and semantics. Until that change is merged, POST and its current public examples remain supported descriptions of implemented behavior.
+Use the concrete exact-target PUT and DELETE operations for grant mutations. Retire `POST /v1/projects/{project_id}/grants`, `assignProjectUseOnlyGrant` and its generated request/response exports together in the owning implementation. Preserve the exact-target GET and existing PUT/DELETE identities and semantics. The #226 implementation returns 405 for that retired POST and removes its operation and creation-only request/response exports from native OpenAPI and all three generated clients. Current callers explicitly select PUT intent.
 
 Migrate actual callers deliberately, including generated-client examples and qualification fixtures. Do not redirect or automatically transform an original POST into PUT. Changing an existing assignment requires the caller's explicit PUT intent, current authority and reviewed state. There is no selected compatibility wrapper or second grant API for v1.
 
@@ -36,7 +36,7 @@ The #226 delivery boundary is complete grant administration for Organization, Pr
 - The duplicate-rejection behavior remains a fact about original POST operations. PUT's create/update behavior must not be presented as equivalent replay.
 - Current eligibility, exact use-and-grant authority, expected revision, ordered locking, atomic grant/revision/audit/original-result persistence and safe last-grantor rules remain required.
 - Access can complete its accepted targets before future resource integrations. Each receiving feature must retain explicit grant acceptance and real producer dependencies.
-- This record changes documentation of the selected target. It neither removes a runtime route nor establishes automated or human qualification.
+- The owning implementation applies the selected cutover. This decision record and generated code alone establish neither complete automated qualification nor human acceptance.
 
 ## Links
 

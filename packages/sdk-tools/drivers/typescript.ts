@@ -118,6 +118,90 @@ const calls = {
       query: call.query as sdk.DeleteAccessGroupData["query"],
     }),
 
+  listOrganizationActionGrants: (client: Client, call: SdkCall) =>
+    sdk.listOrganizationActionGrants({
+      ...options(client, call),
+      path: call.path as sdk.ListOrganizationActionGrantsData["path"],
+      query: call.query as sdk.ListOrganizationActionGrantsData["query"],
+    }),
+  setOrganizationActionGrant: (client: Client, call: SdkCall) =>
+    sdk.setOrganizationActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.SetOrganizationActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.SetOrganizationActionGrantData["body"],
+    }),
+  removeOrganizationActionGrant: (client: Client, call: SdkCall) =>
+    sdk.removeOrganizationActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.RemoveOrganizationActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.RemoveOrganizationActionGrantData["query"],
+    }),
+  listAccessGroupActionGrants: (client: Client, call: SdkCall) =>
+    sdk.listAccessGroupActionGrants({
+      ...options(client, call),
+      path: call.path as sdk.ListAccessGroupActionGrantsData["path"],
+      query: call.query as sdk.ListAccessGroupActionGrantsData["query"],
+    }),
+  setAccessGroupActionGrant: (client: Client, call: SdkCall) =>
+    sdk.setAccessGroupActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.SetAccessGroupActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.SetAccessGroupActionGrantData["body"],
+    }),
+  removeAccessGroupActionGrant: (client: Client, call: SdkCall) =>
+    sdk.removeAccessGroupActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.RemoveAccessGroupActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.RemoveAccessGroupActionGrantData["query"],
+    }),
+  listApplicationAccountActionGrants: (client: Client, call: SdkCall) =>
+    sdk.listApplicationAccountActionGrants({
+      ...options(client, call),
+      path: call.path as sdk.ListApplicationAccountActionGrantsData["path"],
+      query: call.query as sdk.ListApplicationAccountActionGrantsData["query"],
+    }),
+  setApplicationAccountActionGrant: (client: Client, call: SdkCall) =>
+    sdk.setApplicationAccountActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.SetApplicationAccountActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.SetApplicationAccountActionGrantData["body"],
+    }),
+  removeApplicationAccountActionGrant: (client: Client, call: SdkCall) =>
+    sdk.removeApplicationAccountActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.RemoveApplicationAccountActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.RemoveApplicationAccountActionGrantData["query"],
+    }),
+  listProjectGrantRecipients: (client: Client, call: SdkCall) =>
+    sdk.listProjectGrantRecipients({
+      ...options(client, call),
+      path: call.path as sdk.ListProjectGrantRecipientsData["path"],
+      query: call.query as sdk.ListProjectGrantRecipientsData["query"],
+    }),
   getMyProjectAccess: (client: Client, call: SdkCall) =>
     sdk.getMyProjectAccess({
       ...options(client, call),
@@ -291,16 +375,6 @@ const calls = {
     sdk.getDeletionStatus({
       ...options(client, call),
       query: call.query as sdk.GetDeletionStatusData["query"],
-    }),
-  assignProjectUseOnlyGrant: (client: Client, call: SdkCall) =>
-    sdk.assignProjectUseOnlyGrant({
-      ...options(client, call),
-      headers: {
-        ...call.headers,
-        "Idempotency-Key": call.headers["Idempotency-Key"]!,
-      },
-      body: call.body as sdk.AssignProjectUseOnlyGrantData["body"],
-      path: call.path as { project_id: string },
     }),
   contractFixtureNullable: (client: Client, call: SdkCall) =>
     fixtures.contractFixtureNullable(options(client, call)),

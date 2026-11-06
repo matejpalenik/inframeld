@@ -33,6 +33,9 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
 from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler import (
     register_human_oauth_credential_error_handler,
 )
+from inframeld_backend.access.http.requests.access_group_action_grant_request import (
+    AccessGroupActionGrantRequest,
+)
 from inframeld_backend.access.http.requests.access_group_creation_request import (
     AccessGroupCreationRequest,
 )
@@ -42,10 +45,16 @@ from inframeld_backend.access.http.requests.access_group_manager_request import 
 from inframeld_backend.access.http.requests.access_group_membership_request import (
     AccessGroupMembershipRequest,
 )
+from inframeld_backend.access.http.requests.application_account_action_grant_request import (
+    ApplicationAccountActionGrantRequest,
+)
 from inframeld_backend.access.http.requests.application_account_creation_request import (
     ApplicationAccountCreationRequest,
 )
 from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
+from inframeld_backend.access.http.requests.organization_action_grant_request import (
+    OrganizationActionGrantRequest,
+)
 from inframeld_backend.access.http.requests.project_action_grant_request import (
     ProjectActionGrantRequest,
 )
@@ -55,6 +64,12 @@ from inframeld_backend.access.http.requests.project_membership_request import (
 )
 from inframeld_backend.access.http.requests.project_metadata_update_request import (
     ProjectMetadataUpdateRequest,
+)
+from inframeld_backend.access.http.responses.access_group_action_grant_removal_response import (
+    AccessGroupActionGrantRemovalResponse,
+)
+from inframeld_backend.access.http.responses.access_group_action_grant_response import (
+    AccessGroupActionGrantResponse,
 )
 from inframeld_backend.access.http.responses.access_group_creation_response import (
     AccessGroupCreationResponse,
@@ -80,6 +95,12 @@ from inframeld_backend.access.http.responses.access_group_metadata_response impo
 from inframeld_backend.access.http.responses.access_group_principals_page_response import (
     AccessGroupPrincipalsPageResponse,
 )
+from inframeld_backend.access.http.responses.application_account_action_grant_removal_response import (
+    ApplicationAccountActionGrantRemovalResponse,
+)
+from inframeld_backend.access.http.responses.application_account_action_grant_response import (
+    ApplicationAccountActionGrantResponse,
+)
 from inframeld_backend.access.http.responses.application_account_creation_response import (
     ApplicationAccountCreationResponse,
 )
@@ -92,13 +113,25 @@ from inframeld_backend.access.http.responses.my_organization_access_response imp
 from inframeld_backend.access.http.responses.my_project_access_response import (
     MyProjectAccessResponse,
 )
+from inframeld_backend.access.http.responses.organization_action_grant_removal_response import (
+    OrganizationActionGrantRemovalResponse,
+)
+from inframeld_backend.access.http.responses.organization_action_grant_response import (
+    OrganizationActionGrantResponse,
+)
 from inframeld_backend.access.http.responses.project_action_grant_removal_response import (
     ProjectActionGrantRemovalResponse,
 )
 from inframeld_backend.access.http.responses.project_action_grant_response import (
     ProjectActionGrantResponse,
 )
+from inframeld_backend.access.http.routes.access_group_action_grant_routes import (
+    create_access_group_action_grant_router,
+)
 from inframeld_backend.access.http.routes.access_group_routes import create_access_group_router
+from inframeld_backend.access.http.routes.application_account_action_grant_routes import (
+    create_application_account_action_grant_router,
+)
 from inframeld_backend.access.http.routes.application_account_routes import (
     create_application_account_router,
 )
@@ -116,6 +149,9 @@ from inframeld_backend.access.http.routes.my_project_access_routes import (
 from inframeld_backend.access.http.routes.organization_access_routes import (
     create_organization_access_router,
 )
+from inframeld_backend.access.http.routes.organization_action_grant_routes import (
+    create_organization_action_grant_router,
+)
 from inframeld_backend.access.http.routes.project_action_grant_change_routes import (
     create_project_action_grant_change_router,
 )
@@ -125,8 +161,8 @@ from inframeld_backend.access.http.routes.project_action_grant_routes import (
 from inframeld_backend.access.http.routes.project_creation_routes import (
     create_project_creation_router,
 )
-from inframeld_backend.access.http.routes.project_grant_routes import (
-    create_project_grant_router,
+from inframeld_backend.access.http.routes.project_grant_recipients_routes import (
+    create_project_grant_recipients_router,
 )
 from inframeld_backend.access.http.routes.project_members_routes import (
     create_project_members_router,
@@ -150,17 +186,30 @@ from inframeld_backend.bootstrap.access_group_composition import (
     open_access_group_read,
     open_access_group_relationship_change,
 )
+from inframeld_backend.bootstrap.access_group_grant_composition import (
+    open_access_group_grant_change,
+    open_access_group_grant_read,
+)
 from inframeld_backend.bootstrap.application_account_composition import (
     open_application_account_creation,
     open_application_account_read,
+)
+from inframeld_backend.bootstrap.application_account_grant_composition import (
+    open_application_account_grant_change,
+    open_application_account_grant_read,
 )
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
 from inframeld_backend.bootstrap.deletion_status_composition import open_deletion_status_lookup
+from inframeld_backend.bootstrap.grant_recipients_composition import open_project_grant_recipients
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
 from inframeld_backend.bootstrap.my_project_access_composition import open_my_project_access
 from inframeld_backend.bootstrap.organization_access_composition import open_my_organization_access
+from inframeld_backend.bootstrap.organization_grant_composition import (
+    open_organization_grant_change,
+    open_organization_grant_read,
+)
 from inframeld_backend.bootstrap.original_operation_lookup_composition import (
     open_original_operation_lookup,
 )
@@ -285,6 +334,9 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ProjectMembershipRequest,
                 ProjectMetadataUpdateRequest,
                 ProjectActionGrantRequest,
+                OrganizationActionGrantRequest,
+                AccessGroupActionGrantRequest,
+                ApplicationAccountActionGrantRequest,
             ),
             serialization_models=(
                 AccessGroupCreationResponse,
@@ -301,6 +353,12 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 MyProjectAccessResponse,
                 ProjectActionGrantResponse,
                 ProjectActionGrantRemovalResponse,
+                OrganizationActionGrantResponse,
+                OrganizationActionGrantRemovalResponse,
+                AccessGroupActionGrantResponse,
+                AccessGroupActionGrantRemovalResponse,
+                ApplicationAccountActionGrantResponse,
+                ApplicationAccountActionGrantRemovalResponse,
             ),
         )
         application.include_router(health_router)
@@ -378,11 +436,6 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             )
         )
         application.include_router(
-            create_project_grant_router(
-                human_session, partial(open_project_grant_change, database, fingerprints)
-            )
-        )
-        application.include_router(
             create_project_action_grant_router(
                 human_session, partial(open_project_action_grants, database)
             )
@@ -390,6 +443,32 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_project_action_grant_change_router(
                 human_session, partial(open_project_grant_change, database, fingerprints)
+            )
+        )
+        application.include_router(
+            create_organization_action_grant_router(
+                human_session,
+                partial(open_organization_grant_change, database, request_fingerprints),
+                partial(open_organization_grant_read, database),
+            )
+        )
+        application.include_router(
+            create_access_group_action_grant_router(
+                human_session,
+                partial(open_access_group_grant_change, database, request_fingerprints),
+                partial(open_access_group_grant_read, database),
+            )
+        )
+        application.include_router(
+            create_application_account_action_grant_router(
+                human_session,
+                partial(open_application_account_grant_change, database, request_fingerprints),
+                partial(open_application_account_grant_read, database),
+            )
+        )
+        application.include_router(
+            create_project_grant_recipients_router(
+                human_session, partial(open_project_grant_recipients, database)
             )
         )
         application.include_router(

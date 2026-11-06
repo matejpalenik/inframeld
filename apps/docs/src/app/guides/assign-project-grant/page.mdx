@@ -8,13 +8,13 @@ export const pageMetadata = {
 
 Alice lets Bob use or grant one action on Support. She reviews the current Project Access revision, saves one exact request and changes only that recipient's assignment. The Project routes support the fixed eighteen Project actions. They do not administer Pipeline, Organization or other resource grants.
 
-The compatible use-only POST remains available [below](#assign-the-permission). Use the PUT and DELETE paths for explicit grant levels and removal.
+Use PUT to set an explicit grant level and DELETE to remove it. The former creation-only POST has retired. Its retained metadata remains [inspectable history](#assign-the-permission).
 
 ## Prepare the exact change
 
 You need the installation URL, permanent Project ID, Bob's local principal ID and a current human credential. Alice must be a currently eligible Project member with use and grant authority for the exact action she changes. Use-only permission and group-manager status are insufficient for Project grant administration.
 
-Bob must already be a member of that Project and eligible for a fresh assignment. He can supply his local `principalId` from his authenticated `/v1/session` response. A separately authorized [member read](/guides/list-project-members) also supplies stored principal IDs. This ID is distinct from Bob's Kratos identity UUID, and a stored row alone does not prove current eligibility. [Membership changes](/guides/manage-project-members) are a separate operation.
+Bob must already be a member of that Project and eligible for a fresh assignment. [Find an eligible recipient](/guides/manage-action-grants#find-an-eligible-project-recipient) for the exact Project and action before selecting his local `principalId`. He can also supply that ID from his authenticated `/v1/session` response. A separately authorized [member read](/guides/list-project-members) supplies stored principal IDs. This ID is distinct from Bob's Kratos identity UUID, and a stored row alone does not prove current eligibility. [Membership changes](/guides/manage-project-members) are a separate operation.
 
 These requests assume `INFRAMELD_URL` and an existing valid human `INFRAMELD_TOKEN` are prepared through [HTTP setup](/clients/http#call-protected-operations). Browser sign-in alone does not create a terminal bearer token. The supported manual account-to-client/disposable setup, engineering dry run and human acceptance remain deferred to pre-v1 under [qualification #336](https://github.com/matejpalenik/inframeld/issues/336). This page does not claim that handoff is ready.
 
@@ -143,7 +143,7 @@ After a timeout, cancellation, lost response or decoding failure, preserve the o
 | `400`, `413` or `415`         | Correct malformed authentication, an oversized body or the PUT content type. Keep credentials out of diagnostics.                                                                                                   |
 | `503` or an unusable response | Preserve the original context and reconcile uncertainty before more work.                                                                                                                                           |
 
-The own-access GET and Project PUT/DELETE responses are no-store. Organization, access-group and application-account grant administration and recipient discovery remain unfinished in #226. Other resource grant integrations arrive with their respective features. The [Project API reference](/api-reference/projects-and-access) explains the supported operation shapes.
+The own-access GET and Project PUT/DELETE responses are no-store. [Manage the other Access-owned targets](/guides/manage-action-grants) for Organization, access-group and application-account grants and eligible-recipient discovery. Other resource grant integrations arrive with their respective features. The [Project API reference](/api-reference/projects-and-access) explains the supported operation shapes.
 
 ## Use a generated client
 
@@ -417,120 +417,8 @@ Each program prints the available HTTP status and typed page or receipt. A read 
 
 ## Assign the permission
 
-The compatible `POST /v1/projects/{project_id}/grants` assigns only use-only `create-access-groups`. It does not change grant levels or remove assignments. For this alternative, keep its own original `PROJECT_GRANT_KEY` and save this complete `grant.json`, replacing the recipient and illustrative revision with reviewed values:
+The former creation-only `POST /v1/projects/{project_id}/grants` and its generated operation and request/response exports have retired. Use the exact-target PUT and DELETE procedures above for new decisions. The old route has no write-replay alias or automatic conversion to PUT.
 
-<CodeGroup>
+For an uncertain historical POST, retain its original method, literal route, key, fingerprint, expiry and outcome. [Inspect historical use-only POST metadata](/guides/recover-original-request#inspect-historical-use-only-post-metadata) with current exact use-and-grant authority for `create-access-groups` on the original Project. That lookup is read-only and preserves the existing retention.
 
-```json
-{
-  "recipientPrincipalId": "00000000-0000-4000-8000-000000000004",
-  "actionId": "create-access-groups",
-  "expectedAccessRevision": 7
-}
-```
-
-</CodeGroup>
-
-Use the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) setup for these existing generated-client alternatives. Every alternative below sends that same POST request and its retained key. Save the programs as `grant.py`, `grant.ts` and `src/main.rs` respectively:
-
-<CodeGroup>
-
-```shell {{ title: "cURL" }}
-curl --fail-with-body --silent --show-error --max-time 5 \
-  --request POST \
-  --header @- \
-  --header "Idempotency-Key: $PROJECT_GRANT_KEY" \
-  --header 'Content-Type: application/json' \
-  --header 'Accept: application/json' \
-  --data-binary @grant.json \
-  "$INFRAMELD_URL/v1/projects/$PROJECT_ID/grants" <<EOF_HEADERS
-Authorization: Bearer ${INFRAMELD_TOKEN}
-EOF_HEADERS
-```
-
-```python
-import asyncio
-import os
-from pathlib import Path
-from uuid import UUID
-
-from inframeld_sdk import ApiClient, Configuration
-from inframeld_sdk.api.access_api import AccessApi
-from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest
-
-
-async def main() -> None:
-    request = ProjectUseOnlyGrantRequest.model_validate_json(Path("grant.json").read_text())
-    async with ApiClient(Configuration(host=os.environ["INFRAMELD_URL"])) as client:
-        response = await AccessApi(client).assign_project_use_only_grant_with_http_info(
-            project_id=UUID(os.environ["PROJECT_ID"]),
-            idempotency_key=os.environ["PROJECT_GRANT_KEY"],
-            project_use_only_grant_request=request,
-            _headers={"Authorization": "Bearer " + os.environ["INFRAMELD_TOKEN"]},
-            _request_timeout=5.0,
-        )
-        print(response.data.to_json())
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-```typescript
-import { readFile } from "node:fs/promises"
-import {
-  assignProjectUseOnlyGrant,
-  createClient,
-  type ProjectUseOnlyGrantRequest,
-} from "@inframeld/sdk"
-
-const { INFRAMELD_URL, INFRAMELD_TOKEN, PROJECT_ID, PROJECT_GRANT_KEY } =
-  process.env
-if (!INFRAMELD_URL || !INFRAMELD_TOKEN || !PROJECT_ID || !PROJECT_GRANT_KEY) {
-  throw new Error(
-    "Set the installation, token, Project and original request key"
-  )
-}
-const body: ProjectUseOnlyGrantRequest = JSON.parse(
-  await readFile("grant.json", "utf8")
-)
-const result = await assignProjectUseOnlyGrant({
-  client: createClient({ baseUrl: INFRAMELD_URL, timeoutMs: 5000 }),
-  path: { project_id: PROJECT_ID },
-  headers: {
-    Authorization: `Bearer ${INFRAMELD_TOKEN}`,
-    "Idempotency-Key": PROJECT_GRANT_KEY,
-  },
-  body,
-})
-if (result.error)
-  throw new Error(
-    "Grant did not produce a usable result. Keep the original request."
-  )
-console.log(JSON.stringify(result.data, null, 2))
-```
-
-```rust
-use inframeld_sdk::{HttpClient, ProjectUseOnlyGrantRequest};
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let base_url = std::env::var("INFRAMELD_URL")?;
-    let token = std::env::var("INFRAMELD_TOKEN")?;
-    let project_id = std::env::var("PROJECT_ID")?;
-    let key = std::env::var("PROJECT_GRANT_KEY")?;
-    let request: ProjectUseOnlyGrantRequest = serde_json::from_str(&std::fs::read_to_string("grant.json")?)?;
-    let client = HttpClient::new()
-        .with_base_url(base_url)
-        .with_header("Authorization", format!("Bearer {token}"));
-    let response = client.assign_project_use_only_grant(project_id, key, request).await?;
-    println!("{}", serde_json::to_string_pretty(&response.body)?);
-    Ok(())
-}
-```
-
-</CodeGroup>
-
-A completed result identifies the retained operation, recipient, action and committed Access revision. Use the [native operation and model](/api-reference/projects-and-access#assign-a-use-only-grant) for exact fields. This action permits use of `create-access-groups`. It does not let Bob grant the permission onward.
-
-Preserve this POST's original request after uncertainty as well. Its existing use-only contract is unchanged. Use the reviewed PUT or DELETE workflow above for explicit Project grant-level changes or removal, with a distinct original request and key for each operation.
+Do not turn a lost or unresolved POST result into a PUT retry. POST rejected an existing assignment, while PUT can change its level. A later deliberate PUT requires its own explicit intent, reviewed current state and distinct original request identity.

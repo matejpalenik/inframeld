@@ -45,7 +45,7 @@ Policies receive explicit inputs and have no I/O or mutable class state. Use `@s
 
 Feature HTTP mappings use static `*Mapper` classes in `mappers/*_mapper.py`. They convert validated HTTP input into Command inputs and application results into responses. Shared database conversion uses technology-prefixed static `*Mapper` classes in `infrastructure/mappers` when several adapters need the same conversion. Neither kind performs I/O or authorization.
 
-In the existing `apps/backend/src/inframeld_backend/access/http/mappers/project_use_only_grant_mapper.py`, `ProjectUseOnlyGrantMapper.to_command` wraps parsed UUIDs as `ProjectId` and `PrincipalId`. It does not load membership, authorize the actor or decide fingerprint meaning. The application service owns those steps.
+In the existing `apps/backend/src/inframeld_backend/access/http/mappers/project_action_grant_change_mapper.py`, `ProjectActionGrantChangeMapper.set_command` wraps parsed path UUIDs as `ProjectId` and `PrincipalId`, and rejects actions outside the current Project catalogue. It does not load membership, authorize the actor or decide fingerprint meaning. The application service owns those steps.
 
 <a id="worked-example-map-an-http-request-without-doing-the-work"></a>
 
@@ -55,72 +55,133 @@ In the existing `apps/backend/src/inframeld_backend/access/http/mappers/project_
 
 **Decision and placement.** Add a static mapper under the owning feature's `http/mappers`. Input conversion does not need a current-user field, database session or instance state. This is the complete existing grant mapper:
 
-**Inspected teaching excerpt:** complete inspected module from [apps/backend/src/inframeld_backend/access/http/mappers/project_use_only_grant_mapper.py](../../../../apps/backend/src/inframeld_backend/access/http/mappers/project_use_only_grant_mapper.py). This is existing code for explanation, not replacement or insertion instructions.
+**Inspected teaching excerpt:** complete inspected module from [apps/backend/src/inframeld_backend/access/http/mappers/project_action_grant_change_mapper.py](../../../../apps/backend/src/inframeld_backend/access/http/mappers/project_action_grant_change_mapper.py). This is existing code for explanation, not replacement or insertion instructions.
 
 ```python
+from typing import Literal
 from uuid import UUID
 
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
+from inframeld_backend.access.application.commands.remove_project_action_grant_command import (
+    RemoveProjectActionGrantCommand,
 )
-from inframeld_backend.access.domain.enums.project_action import ProjectAction
+from inframeld_backend.access.application.commands.set_project_action_grant_command import (
+    SetProjectActionGrantCommand,
+)
+from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
+    ProjectActionGrantChangeResultDTO,
+)
+from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
+    ProjectActionGrantChangeKind,
+)
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
+    ProjectActionEligibilityPolicy,
+)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.access.http.requests.project_use_only_grant_request import (
-    ProjectUseOnlyGrantRequest,
+from inframeld_backend.access.http.requests.project_action_grant_request import (
+    ProjectActionGrantRequest,
 )
-from inframeld_backend.access.http.responses.project_use_only_grant_response import (
-    ProjectUseOnlyGrantResponse,
+from inframeld_backend.access.http.responses.project_action_grant_removal_response import (
+    ProjectActionGrantRemovalResponse,
 )
-from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
-    CompletedSynchronousOperationDTO,
+from inframeld_backend.access.http.responses.project_action_grant_response import (
+    ProjectActionGrantResponse,
 )
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.errors.application_errors import InvalidInputError
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 
 
-class ProjectUseOnlyGrantMapper:
-    """Convert the published grant contract without performing authorization or I/O."""
+class ProjectActionGrantChangeMapper:
+    @staticmethod
+    def _action(value: str) -> ActionId:
+        try:
+            action = ActionId(value)
+        except ValueError as error:
+            raise InvalidInputError() from error
+        if not ProjectActionEligibilityPolicy.may_use(
+            action_id=action, principal_kind=PrincipalKind.HUMAN
+        ):
+            raise InvalidInputError()
+        return action
 
     @staticmethod
-    def to_command(
-        *, project_id: UUID, request: ProjectUseOnlyGrantRequest
-    ) -> AssignProjectUseOnlyGrantCommand:
-        return AssignProjectUseOnlyGrantCommand(
-            project_id=ProjectId(project_id),
-            recipient_principal_id=PrincipalId(request.recipient_principal_id),
-            action_id=ActionId(request.action_id),
-            expected_access_revision=request.expected_access_revision,
+    def set_command(
+        project_id: UUID, recipient_id: UUID, action: str, body: ProjectActionGrantRequest
+    ) -> SetProjectActionGrantCommand:
+        return SetProjectActionGrantCommand(
+            ProjectId(project_id),
+            PrincipalId(recipient_id),
+            ProjectActionGrantChangeMapper._action(action),
+            body.can_grant,
+            body.expected_access_revision,
         )
 
     @staticmethod
-    def to_operation_context(key: IdempotencyKey) -> IdempotencyContextDTO:
+    def remove_command(
+        project_id: UUID, recipient_id: UUID, action: str, revision: int
+    ) -> RemoveProjectActionGrantCommand:
+        return RemoveProjectActionGrantCommand(
+            ProjectId(project_id),
+            PrincipalId(recipient_id),
+            ProjectActionGrantChangeMapper._action(action),
+            revision,
+        )
+
+    @staticmethod
+    def context(
+        command: SetProjectActionGrantCommand | RemoveProjectActionGrantCommand,
+        method: Literal[HttpMethod.PUT, HttpMethod.DELETE],
+        key: IdempotencyKey,
+    ) -> IdempotencyContextDTO:
         return IdempotencyContextDTO(
-            method=HttpMethod.POST, requested_route="/v1/projects/{project_id}/grants", key=key
+            method,
+            f"/v1/projects/{command.project_id.value}/grants/{command.recipient_principal_id.value}/{command.action_id.value}",
+            key,
         )
 
     @staticmethod
-    def to_response(
-        *, command: AssignProjectUseOnlyGrantCommand, result: CompletedSynchronousOperationDTO
-    ) -> ProjectUseOnlyGrantResponse:
-        action = command.action_id.value
-        if action != ProjectAction.CREATE_ACCESS_GROUPS.value:
-            raise ValueError("Unsupported project grant action.")
-        return ProjectUseOnlyGrantResponse(
-            operation_id=result.operation_id.value,
-            project_id=command.project_id.value,
-            recipient_principal_id=command.recipient_principal_id.value,
-            action_id=ProjectAction.CREATE_ACCESS_GROUPS,
-            access_revision=command.expected_access_revision + 1,
-            idempotency_expires_at=result.expires_at,
+    def set_response(result: ProjectActionGrantChangeResultDTO) -> ProjectActionGrantResponse:
+        if result.change_kind != ProjectActionGrantChangeKind.SET or result.can_grant is None:
+            raise RuntimeError("Assignment returned a different original operation result.")
+        return ProjectActionGrantResponse(
+            operation_id=result.operation.operation_id.value,
+            idempotency_expires_at=result.operation.expires_at,
+            project_id=result.project_id.value,
+            recipient_principal_id=result.recipient_principal_id.value,
+            action_id=result.action_id.value,
+            can_grant=result.can_grant,
+            access_revision=result.access_revision,
+            changed=result.changed,
+        )
+
+    @staticmethod
+    def remove_response(
+        result: ProjectActionGrantChangeResultDTO,
+    ) -> ProjectActionGrantRemovalResponse:
+        if (
+            result.change_kind != ProjectActionGrantChangeKind.REMOVE
+            or result.can_grant is not None
+        ):
+            raise RuntimeError("Removal returned a different original operation result.")
+        return ProjectActionGrantRemovalResponse(
+            operation_id=result.operation.operation_id.value,
+            idempotency_expires_at=result.operation.expires_at,
+            project_id=result.project_id.value,
+            recipient_principal_id=result.recipient_principal_id.value,
+            action_id=result.action_id.value,
+            removed=True,
+            access_revision=result.access_revision,
+            changed=result.changed,
         )
 ```
 
-**Walkthrough.** `to_command` wraps parsed values without treating them as proof of existence or permission. `to_operation_context` preserves the canonical route and retry key separately from the business input. `to_response` serializes the completed operation and the original Command's meaning. It runs after the service has committed. Its `+ 1` follows this grant operation's published revision contract, not a general rule for response mappers.
+**Walkthrough.** `set_command` and `remove_command` wrap parsed path values without treating them as proof of existence or permission. `context` preserves the exact concrete route and retry key separately from the business input. `set_response` and `remove_response` serialize the committed original business receipt. They neither calculate a new revision nor reinterpret a replay using today's assignment. The kind and nullable grant-level checks reject an incoherent result before serialization.
 
 **Failures and alternatives.** The supported-action check can fail. It does not authorize the action or replace the request schema. Do not add membership reads, fingerprint decisions or persistence to this mapper. Preserve published names and supported values when adapting this convention.
 
@@ -226,9 +287,6 @@ The existing `ProjectGrantChangeFingerprintService` is another useful distinctio
 
 from json import dumps
 
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
-)
 from inframeld_backend.access.application.commands.remove_project_action_grant_command import (
     RemoveProjectActionGrantCommand,
 )
@@ -241,8 +299,6 @@ from inframeld_backend.shared.application.services.request_fingerprint_service i
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
-
-_ASSIGN_USE_ONLY_PURPOSE = "access.project-grant.assign-use-only:v1"
 
 
 class ProjectGrantChangeFingerprintService:
@@ -283,26 +339,9 @@ class ProjectGrantChangeFingerprintService:
         return self._request_fingerprint_service.fingerprint(
             purpose="access.project-grant.remove:v1", canonical_request=canonical_request
         )
-
-    def for_assign_use_only(self, command: AssignProjectUseOnlyGrantCommand) -> RequestFingerprint:
-        """Retain the canonical request bytes used by existing reservations."""
-        canonical_request = dumps(
-            {
-                "actionId": command.action_id.value,
-                "expectedAccessRevision": command.expected_access_revision,
-                "projectId": str(command.project_id.value),
-                "recipientPrincipalId": str(command.recipient_principal_id.value),
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        return self._request_fingerprint_service.fingerprint(
-            purpose=_ASSIGN_USE_ONLY_PURPOSE, canonical_request=canonical_request
-        )
 ```
 
-The exact purpose, canonical bytes and key stability matter to existing reservations. Reuse the operation's helper, not a new hash chosen by a mapper. Pure computation does not require static methods when the component deliberately holds injected configuration or collaborators. Fixtures and framework callables remain valid functions. See the [aggregate adapter example](aggregates-and-repositories.md) for local private helpers and the [service example](services-and-use-cases.md) for orchestration.
+The exact purpose, canonical bytes and key stability matter to existing reservations. Retained historical POST fingerprints stay historical and are never recomputed as PUT intent. Reuse the operation's helper, not a new hash chosen by a mapper. Pure computation does not require static methods when the component deliberately holds injected configuration or collaborators. Fixtures and framework callables remain valid functions. See the [aggregate adapter example](aggregates-and-repositories.md) for local private helpers and the [service example](services-and-use-cases.md) for orchestration.
 
 <a id="failures-and-review"></a>
 
@@ -347,4 +386,4 @@ Read the current [action policy input](../../../../apps/backend/src/inframeld_ba
 The broader utility default is an agreed coding preference for future suggestions and authorized changes. It does not claim that every existing helper has been migrated.
 
 - [Canonical static utility convention](#static-utilities-and-mappers), [qualified policies](#qualified-policy-calls) and [component roles](component-roles-and-imports.md#component-conventions).
-- Inspected examples: [ValueValidation](../../../../apps/backend/src/inframeld_backend/shared/domain/validation/value_validation.py), [PrincipalId](../../../../apps/backend/src/inframeld_backend/access/domain/value_objects/principal_id.py) and [ProjectUseOnlyGrantMapper](../../../../apps/backend/src/inframeld_backend/access/http/mappers/project_use_only_grant_mapper.py).
+- Inspected examples: [ValueValidation](../../../../apps/backend/src/inframeld_backend/shared/domain/validation/value_validation.py), [PrincipalId](../../../../apps/backend/src/inframeld_backend/access/domain/value_objects/principal_id.py) and [ProjectActionGrantChangeMapper](../../../../apps/backend/src/inframeld_backend/access/http/mappers/project_action_grant_change_mapper.py).

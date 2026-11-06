@@ -93,6 +93,10 @@
         "href": "/guides/projects-and-access",
         "children": [
           {
+            "title": "Manage Organization, group and application grants",
+            "href": "/guides/manage-action-grants"
+          },
+          {
             "title": "List Project action grants",
             "href": "/guides/list-project-action-grants"
           },

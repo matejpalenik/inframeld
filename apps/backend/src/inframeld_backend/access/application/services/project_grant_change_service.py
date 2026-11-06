@@ -1,9 +1,6 @@
 import asyncio
 from typing import override
 
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
-)
 from inframeld_backend.access.application.commands.remove_project_action_grant_command import (
     RemoveProjectActionGrantCommand,
 )
@@ -20,9 +17,6 @@ from inframeld_backend.access.application.dtos.project_action_grant_management_f
 from inframeld_backend.access.application.dtos.project_grant_authorization_dto import (
     ProjectGrantAuthorizationDTO,
 )
-from inframeld_backend.access.application.dtos.project_use_only_grant_authorization_request_dto import (
-    ProjectUseOnlyGrantAuthorizationRequestDTO,
-)
 from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
     ProjectActionGrantChangeKind,
 )
@@ -34,9 +28,6 @@ from inframeld_backend.access.application.protocols.project_action_grant_result_
 )
 from inframeld_backend.access.application.protocols.project_action_grant_result_writer import (
     ProjectActionGrantResultWriter,
-)
-from inframeld_backend.access.application.protocols.project_grant_authorizer import (
-    ProjectGrantAuthorizer,
 )
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
 from inframeld_backend.access.application.protocols.project_grant_management_facts_reader import (
@@ -56,9 +47,6 @@ from inframeld_backend.access.domain.enums.project_departure_target_kind import 
     ProjectDepartureTargetKind,
 )
 from inframeld_backend.access.domain.enums.project_grant_level import ProjectGrantLevel
-from inframeld_backend.access.domain.errors.project_grant_errors import (
-    ProjectGrantAlreadyExistsError,
-)
 from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
 from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
     ProjectActionEligibilityPolicy,
@@ -120,7 +108,6 @@ class ProjectGrantChangeService(ProjectGrantChanger):
     def __init__(
         self,
         transaction_manager: TransactionManager,
-        project_grant_authorizer: ProjectGrantAuthorizer,
         operation_idempotency: OperationIdempotency,
         membership_repository: ProjectMembershipRepository,
         project_grant_change_fingerprint_service: ProjectGrantChangeFingerprintService,
@@ -130,7 +117,6 @@ class ProjectGrantChangeService(ProjectGrantChanger):
         grant_result_writer: ProjectActionGrantResultWriter,
     ) -> None:
         self._transaction_manager = transaction_manager
-        self._project_grant_authorizer = project_grant_authorizer
         self._operation_idempotency = operation_idempotency
         self._membership_repository = membership_repository
         self._project_grant_change_fingerprint_service = project_grant_change_fingerprint_service
@@ -443,81 +429,6 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             or (original.status_code == 201 and not original.changed)
         ):
             raise ConflictError("The original grant result is incoherent.")
-
-    @override
-    async def assign_use_only(
-        self,
-        *,
-        access: AccessContextDTO,
-        command: AssignProjectUseOnlyGrantCommand,
-        context: IdempotencyContextDTO,
-    ) -> CompletedSynchronousOperationDTO:
-        fingerprint = self._project_grant_change_fingerprint_service.for_assign_use_only(command)
-
-        async with self._transaction_manager.begin():
-            authorization = await self._project_grant_authorizer.require_authorization(
-                access=access,
-                request=ProjectUseOnlyGrantAuthorizationRequestDTO(
-                    project_id=command.project_id,
-                    recipient_principal_id=command.recipient_principal_id,
-                    action_id=command.action_id,
-                ),
-            )
-
-            if authorization.project_id != command.project_id:
-                raise RuntimeError("Authorization returned a different project than requested.")
-
-            operation = await self._operation_idempotency.reserve_or_recover(
-                context=context,
-                access=access,
-                authorization=authorization,
-                fingerprint=fingerprint,
-                expected_replay_kind=OperationReplayKind.SAFE_RESULT,
-                lookup_authority=OperationLookupAuthority(
-                    OperationLookupAuthorityFamily.PROJECT_GRANT_READ, command.action_id
-                ),
-            )
-
-            if not isinstance(operation, NewOperationReservationDTO):
-                return self._require_safe_completed_operation(operation)
-
-            # A replay keeps its original revision. Only new work checks current state.
-            if authorization.project_access_revision != command.expected_access_revision:
-                raise StaleRevisionError()
-            if authorization.project_access_revision == RevisionValidation.MAX_VALUE:
-                raise ConflictError("The Project Access revision cannot advance.")
-
-            membership = await self._membership_repository.get(
-                organization_id=authorization.organization_id,
-                project_id=authorization.project_id,
-                principal_id=command.recipient_principal_id,
-            )
-            if (
-                membership.organization_id != authorization.organization_id
-                or membership.project_id != authorization.project_id
-                or membership.principal_id != command.recipient_principal_id
-            ):
-                raise RuntimeError(
-                    "The loaded membership does not match the authorized assignment."
-                )
-
-            try:
-                membership.assign_use_only_grant(
-                    action_id=command.action_id,
-                    assigned_by_principal_id=access.actor_principal_id,
-                )
-            except ProjectGrantAlreadyExistsError as error:
-                raise ConflictError("This project action grant already exists.") from error
-
-            await self._membership_repository.save(
-                membership,
-                expected_project_access_revision=authorization.project_access_revision,
-                operation_id=operation.operation_id,
-            )
-            completed = await self._operation_idempotency.record_completed_result(
-                operation, replay_kind=OperationReplayKind.SAFE_RESULT
-            )
-            return self._require_safe_completed_operation(completed)
 
     @staticmethod
     def _require_safe_completed_operation(

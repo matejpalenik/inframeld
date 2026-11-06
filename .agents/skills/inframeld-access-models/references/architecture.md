@@ -44,7 +44,7 @@ The implemented human services are `HumanSessionAuthenticationService` and `Huma
 
 `IdentityRecoveryCleanupResumeService` implements the protected host-maintenance capability. Its thin Access CLI maps stdin and results. Bootstrap owns database resources, and the service coordinates current recovery facts and atomic receipt/run persistence. Host access supplies authority, without a product session or a synthetic principal. [Maintenance](host-maintenance.md#recovery-cleanup-continuation) owns its exact contract.
 
-Current operation checks use focused authorizers and policies. `PrincipalAccessEvaluationService` interprets authentication evidence against current facts. `ActionAuthorizationService` and `ProjectGrantAuthorizationService` coordinate their specific decisions. Neither a typed ID nor an `AccessContextDTO` proves current authority.
+Current operation checks use focused authorizers and policies. `PrincipalAccessEvaluationService` interprets authentication evidence against current facts. `ActionAuthorizationService` coordinates ordinary action checks. Each grant service composes its current facts with the existing principal, visibility and exact-grant policies. Neither a typed ID nor an `AccessContextDTO` proves current authority.
 
 <a id="read-project-members-from-current-facts"></a>
 
@@ -90,60 +90,43 @@ For this operation, Alice needs use-and-grant authority for the exact action on 
 
 An aggregate owns a cohesive set of state and valid transitions. Here `ProjectMembership` owns one recipient's complete direct-grant collection. Its repository loads that existing aggregate and persists supported additions without committing. The application service coordinates the complete request.
 
-**Inspected workflow.** This sequence summarises `ProjectGrantChangeService.assign_use_only`. It is separate from a hypothetical generic command framework.
+**Inspected workflow.** `ProjectGrantChangeService.set_action_grant` and `remove_action_grant` delegate to one exact Project workflow. The concrete Organization, group and application-account services retain explicit scope and policy rather than sharing a generic grant executor.
 
 ```mermaid
----
-title: "Grant assignment - inspected application workflow"
----
 sequenceDiagram
     actor Alice
-    participant HTTP as HTTP route and static mapper
+    participant HTTP as Exact-target route and mapper
     participant Service as Grant change service
-    participant Auth as Current grant authorizer
-    participant Retry as Operation idempotency
-    participant Repo as Membership repository
-    participant Member as Membership aggregate
-    Alice->>HTTP: Request grant with original retry key and expected revision
-    Note over HTTP: Authentication and applicable CSRF finish first
-    HTTP->>Service: Access, Command and operation context
-    Note over Service: Fingerprint first, then begin transaction
-    Service->>Auth: Require current authorization
-    Auth-->>Service: Checked organization, project and revision
-    Note over Service: Match requested project before reservation or replay
-    Service->>Retry: Find or reserve checked operation
-    alt Supported completed replay
-        Retry-->>Service: Original completion metadata
-        Note over Service,Repo: No membership load, mutation or save
-        Service-->>HTTP: Original completion after successful transaction exit
-    else New work
-        Note over Service: Check expected revision
-        Service->>Repo: Get recipient in checked scope
-        Repo-->>Service: Existing membership and complete direct grants
-        Note over Service: Verify returned organization, project and recipient
-        Service->>Member: Assign missing use-only grant
-        alt Duplicate domain assignment
-            Member-->>Service: Reject without mutation
-            Note over Service: Map known conflict, propagate for rollback
-            Service-->>HTTP: Failure after rollback, no successful result
-        else Valid transition
-            Service->>Repo: Save with checked revision and original operation ID
-            Note over Repo: Required audit shares caller transaction
-            Service->>Retry: Record safe completion
-            Service-->>HTTP: Completed result only after successful commit
-        end
+    participant Facts as Scoped current facts
+    participant Retry as Original operation and business receipt
+    participant Repo as Membership persistence
+    Alice->>HTTP: Exact recipient/action, reviewed revision and original key
+    HTTP->>Service: Verified access, immutable Command and request context
+    Note over Service: Check method/route/catalogue and compute fingerprint
+    Service->>Facts: Coordinate and read current actor/target observations
+    Note over Service: Validate scope and current exact authority before history
+    Service->>Retry: Reserve or recover original meaning
+    alt Completed original
+        Retry-->>Service: Immutable original receipt
+        Note over Service,Repo: No new membership transition
+    else Fresh request
+        Note over Service: Check revision, recipient and remaining grantor
+        Service->>Repo: Load and verify the scoped membership
+        Service->>Repo: Save changed grant, revision and audit
+        Service->>Retry: Complete and save original business result
     end
+    Service-->>HTTP: Original typed result after successful transaction exit
 ```
 
-The successful returns require transaction exit to succeed. Rejections, incompatible outcomes, save/completion failures and cancellation propagate for rollback. A commit communication failure follows the original-key recovery contract. It does not authorise fresh work with a new key.
+An unchanged authorized request records its no-change receipt without advancing the revision or adding a change audit. Required writes share one transaction. A return inside the context waits for commit. Rejection, persistence failure and cancellation roll back. Uncertain output retains the original request identity and never becomes permission for an automatic fresh write.
 
-Idempotency means recognising a repeated operation and its original meaning. Current authorization still runs before replay. The expected revision is checked for new work, while a valid replay returns the original result without changing membership again. Loading and saving stay outside the narrow duplicate-error catch.
+The Organization service takes Organization-exclusive coordination. Project-scoped grant services take Organization-shared then Project-exclusive coordination. Group managers can authorize ordinary same-group document-grant operations and same-write replay. Generic retained metadata lookup in every family still requires exact current eligible-human use-and-grant. The [grant workflow](grant-administration.md#exact-grant-management-and-bounded-reads) owns that distinction.
 
 <a id="data-and-execution"></a>
 
 ## Data and execution
 
-`ProjectMembershipRepository` is an application port. Its PostgreSQL adapter keeps exact loaded instances and value snapshots within one caller transaction, saves attributed use-only additions and advances the project-wide revision once. It never provisions membership, authorizes, commits or retries. Discard its state after transaction end or a failed save.
+`ProjectMembershipRepository` is an application port. Its PostgreSQL adapter keeps exact loaded instances and value snapshots within one caller transaction, persists supported aggregate transitions and advances the Project-wide revision for a real change. Its original addition-only method remains separate from exact set/remove persistence. It never provisions membership, authorizes, commits or retries. Discard its state after transaction end or a failed save.
 
 `IdentityRecovery` owns one cleanup checklist. Its repository and local completion service record trusted outcomes and release only that original eligible obligation. Independent blocks and permanent CLI credential invalidation remain separate. A confirmed provider outcome is not sufficient evidence for every production completion condition.
 
@@ -193,9 +176,9 @@ Alice's recovery block affects authentication, action use and delegation. Adding
 | `IdentityRecovery` | Protect the original flow's independent provider outcomes and local release transition. The application must first check current eligibility and competing obligations. |
 | `IdentityRecoveryRepository` | Load and save an existing checklist within one caller-owned transaction. Preserve original admission metadata and reject conflicting changed saves. |
 
-`ProjectActionFactsDTO` carries the stored `principal`, while `ProjectGrantChangeFactsDTO` carries the stored `actor`. Both also report `has_pending_recovery` and optional `HumanOAuthCredentialFactsDTO`. After loading these observations, each authorizer calls `PrincipalAccessEvaluationService.evaluate()` to interpret the authentication evidence and construct `PrincipalAccessPolicyInput`. Operation policies compose that input with membership and exact-grant facts. Readers do not evaluate eligibility, and policies do not import application DTOs or ORM types. [Credential query and policy boundaries](eligibility-and-current-authority.md#credential-query-and-policy-boundaries) explain the full chain.
+`ProjectActionFactsDTO` carries the stored `principal`, while `ProjectGrantChangeFactsDTO` carries the stored `actor`. Both also report `has_pending_recovery` and optional `HumanOAuthCredentialFactsDTO`. After loading these observations, the owning service calls `PrincipalAccessEvaluationService.evaluate()` to interpret the authentication evidence and construct `PrincipalAccessPolicyInput`. Operation policies compose that input with membership and exact-grant facts. Readers do not evaluate eligibility, and policies do not import application DTOs or ORM types. [Credential query and policy boundaries](eligibility-and-current-authority.md#credential-query-and-policy-boundaries) explain the full chain.
 
-Keep public authorization capabilities specific. `ActionAuthorizer` remains the entry point for ordinary action checks. [`ProjectGrantChangeService`](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) calls `ProjectGrantAuthorizer`, implemented by [`ProjectGrantAuthorizationService`](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_authorization_service.py), before reserving work or returning a replay. The authorization result supplies the current organization and revision for that transaction. Access services may compose specialized reader protocols. This does not call for a universal authorization service or generic policy engine.
+Keep public capabilities specific. `ActionAuthorizer` remains the entry point for ordinary action checks. [`ProjectGrantChangeService`](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) reads `ProjectActionGrantManagementFactsDTO`, evaluates current credentials and applies existing policies before reservation or replay. The concrete Organization, group and application-account services do the same for their exact targets. Their transaction-bound authorization scope is not a reusable certificate or a universal authorization engine.
 
 The application operation owns the grant transaction under [ADR-0065](../../../../docs/adr/ADR-0065-application-services-own-write-transactions.md) and supplies its session to transaction-bound adapters. Bootstrap owns opening and closing that request-local session. Lower-level admission and persistence helpers remain caller-transaction bound. Lock acquisition and updates may require several statements. Facts used together should come from a coherent projection where practical, with recovery expressed alongside current membership and grant existence. Shared SQL-expression construction may be factored without performing I/O. Missing installation metadata must remain distinguishable from an absent block.
 

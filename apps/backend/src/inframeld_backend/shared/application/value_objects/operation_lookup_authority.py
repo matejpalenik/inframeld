@@ -1,9 +1,14 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+from inframeld_backend.access.domain.enums.access_group_action import AccessGroupAction
+from inframeld_backend.access.domain.enums.application_account_action import (
+    ApplicationAccountAction,
+)
 from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
@@ -51,7 +56,12 @@ class OperationLookupAuthority:
     action_id: ActionId
 
     def require_supported_scope(
-        self, *, project_id: ProjectId | None, method: str, requested_route: str
+        self,
+        *,
+        project_id: ProjectId | None,
+        method: str,
+        requested_route: str,
+        organization_id: OrganizationId | None = None,
     ) -> None:
         """Reject invented target/action combinations and fixed-route downgrades."""
         if method not in {"POST", "PUT", "PATCH", "DELETE"} or not requested_route.strip():
@@ -59,6 +69,65 @@ class OperationLookupAuthority:
 
         family = OperationLookupAuthorityFamily
         parts = requested_route.split("/")
+        organization_grant_path = (
+            len(parts) >= 5 and parts[:3] == ["", "v1", "organizations"] and parts[4] == "grants"
+        )
+        if organization_grant_path or self.family is family.ORGANIZATION_GRANT_READ:
+            valid = False
+            if (
+                len(parts) == 7
+                and parts[:3] == ["", "v1", "organizations"]
+                and parts[4] == "grants"
+                and organization_id is not None
+                and project_id is None
+                and method in {"PUT", "DELETE"}
+                and self.family is family.ORGANIZATION_GRANT_READ
+                and self.action_id.value in _ORGANIZATION_ACTIONS
+                and parts[3] == str(organization_id.value)
+                and parts[6] == self.action_id.value
+            ):
+                try:
+                    valid = str(UUID(parts[5])) == parts[5]
+                except ValueError:
+                    valid = False
+            if not valid:
+                raise InvalidInputError()
+            return
+
+        scoped_grant_path = (
+            len(parts) >= 7 and parts[:3] == ["", "v1", "projects"] and parts[6] == "grants"
+        )
+        if scoped_grant_path or self.family in {
+            family.ACCESS_GROUP_GRANT_READ,
+            family.APPLICATION_ACCOUNT_GRANT_READ,
+        }:
+            target, actions = (
+                ("access-groups", frozenset(AccessGroupAction))
+                if self.family is family.ACCESS_GROUP_GRANT_READ
+                else ("application-accounts", frozenset(ApplicationAccountAction))
+            )
+            valid = False
+            if (
+                len(parts) == 9
+                and parts[:3] == ["", "v1", "projects"]
+                and parts[4] == target
+                and parts[6] == "grants"
+                and project_id is not None
+                and parts[3] == str(project_id.value)
+                and self.family
+                in {family.ACCESS_GROUP_GRANT_READ, family.APPLICATION_ACCOUNT_GRANT_READ}
+                and method in {"PUT", "DELETE"}
+                and self.action_id.value in actions
+                and parts[8] == self.action_id.value
+            ):
+                try:
+                    valid = str(UUID(parts[5])) == parts[5] and str(UUID(parts[7])) == parts[7]
+                except ValueError:
+                    valid = False
+            if not valid:
+                raise InvalidInputError()
+            return
+
         grant_path = (
             len(parts) >= 5 and parts[:3] == ["", "v1", "projects"] and parts[4] == "grants"
         )

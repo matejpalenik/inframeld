@@ -11,9 +11,6 @@ from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
-)
 from inframeld_backend.access.application.commands.remove_project_action_grant_command import (
     RemoveProjectActionGrantCommand,
 )
@@ -129,16 +126,6 @@ class MockGrantChanger(ProjectGrantChanger):
         ] = []
         self.closed = 0
         self.error: Exception | None = None
-
-    @override
-    async def assign_use_only(
-        self,
-        *,
-        access: AccessContextDTO,
-        command: AssignProjectUseOnlyGrantCommand,
-        context: IdempotencyContextDTO,
-    ) -> CompletedSynchronousOperationDTO:
-        raise NotImplementedError
 
     @override
     async def set_action_grant(

@@ -177,123 +177,109 @@ The excerpt includes its actual typed fixtures. It is a complete runnable select
 
 ## Worked example: test service ordering and replay
 
-**Situation.** A saved grant result must not bypass revoked authority, and a new change must finish its required writes before commit.
+**Situation.** A saved grant result must not bypass revoked authority, and a new change must commit its required effects together.
 
-**Decision and placement.** Use application service tests with explicit protocol doubles to control results and failures. These complete tests are excerpts from the existing service test module. Its `GrantScenario`, `COMMAND`, `ACCESS`, `AUTHORIZATION`, `CONTEXT`, `SAVED_RESULT`, `NEW_RESERVATION` and `PROJECT_ID` fixtures are defined in that same linked file. They are selected examples, not standalone test files:
-
-**Inspected teaching excerpt:** the complete authorization-before-reservation test from [apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py](../../../../apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py). This is existing code for explanation, not replacement or insertion instructions.
+**Inspected teaching excerpt:** three complete tests selected from [apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py](../../../../apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py). This is an existing test-module excerpt, not a standalone or replacement file. That module defines `GrantScenario`, its typed fixtures and the names used in parameterized inputs. The selected tests use these imports:
 
 ```python
+from dataclasses import replace
+
 import pytest
 
-from inframeld_backend.shared.application.errors.application_errors import (
-    AccessDeniedError,
-    ResourceNotFoundError,
+from inframeld_backend.access.application.dtos.project_action_grant_management_facts_dto import (
+    ProjectActionGrantManagementFactsDTO,
+)
+from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+    OperationLookupAuthorityFamily,
+)
+from inframeld_backend.shared.application.errors.application_errors import AccessDeniedError
+from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
+    OperationLookupAuthority,
 )
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("error_type", [AccessDeniedError, ResourceNotFoundError])
-async def test_denied_authorization_does_not_reserve_work(
-    error_type: type[AccessDeniedError | ResourceNotFoundError],
+@pytest.mark.parametrize(
+    "facts",
+    [
+        replace(MANAGEMENT, grant=replace(MANAGEMENT.grant, actor_can_grant_action=False)),
+        replace(MANAGEMENT, grant=replace(MANAGEMENT.grant, has_pending_recovery=True)),
+        replace(
+            MANAGEMENT,
+            grant=replace(MANAGEMENT.grant, actor=replace(ACTOR, status=PrincipalStatus.SUSPENDED)),
+        ),
+    ],
+)
+async def test_current_actor_denial_precedes_even_a_completed_receipt(
+    facts: ProjectActionGrantManagementFactsDTO,
 ) -> None:
-    """Authorization failure must stop the workflow before any reservation."""
     scenario = GrantScenario()
-    scenario.authorizer.error = error_type()
-    with pytest.raises(error_type):
-        await scenario.assign()
-    assert scenario.idempotency.calls == 0
-    assert scenario.memberships.calls == 0
-    assert scenario.memberships.loads == 0
-    assert scenario.events == ["fingerprint", "begin", "authorize", "rollback"]
-```
-
-**Inspected teaching excerpt:** the complete authorized replay and revoked-authority test from [apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py](../../../../apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py). This is existing code for explanation, not replacement or insertion instructions.
-
-```python
-from dataclasses import replace
-
-import pytest
-
-from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
-    ProjectGrantChangeFingerprintService,
-)
-from inframeld_backend.shared.application.enums.operation_replay_kind import (
-    OperationReplayKind,
-)
-from inframeld_backend.shared.application.errors.application_errors import (
-    AccessDeniedError,
-)
-from inframeld_backend.shared.application.services.request_fingerprint_service import (
-    RequestFingerprintService,
-)
-from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
-    RequestFingerprintKey,
-)
-
-@pytest.mark.asyncio
-async def test_replay_rechecks_authorization_before_returning_saved_result() -> None:
-    """A prior success cannot bypass changed authority on the next request."""
-    scenario = GrantScenario()
-    old_command = replace(COMMAND, expected_access_revision=0)
-    first = await scenario.assign(old_command)
-    assert first == SAVED_RESULT
-    assert scenario.authorizer.last_request == (
-        ACCESS,
-        PROJECT_ID,
-        RECIPIENT_ID,
-        ACTION_ID,
-    )
-    expected_fingerprint = ProjectGrantChangeFingerprintService(
-        RequestFingerprintService(RequestFingerprintKey(b"K" * 32))
-    ).for_assign_use_only(old_command)
-    assert scenario.idempotency.context is CONTEXT
-    assert scenario.idempotency.access is ACCESS
-    assert scenario.idempotency.authorization is AUTHORIZATION
-    assert scenario.idempotency.fingerprint == expected_fingerprint
-    assert scenario.idempotency.expected_kind is OperationReplayKind.SAFE_RESULT
-    assert scenario.events == ["fingerprint", "begin", "authorize", "reserve", "commit"]
-    assert scenario.memberships.calls == 0
-    assert scenario.memberships.loads == 0
-    scenario.authorizer.error = AccessDeniedError()
+    scenario.management.result = facts
     with pytest.raises(AccessDeniedError):
-        await scenario.assign(old_command)
-    assert scenario.authorizer.calls == 2
-    assert scenario.idempotency.calls == 1
-```
-
-**Inspected teaching excerpt:** the complete new-assignment commit-order test from [apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py](../../../../apps/backend/tests/unit/access/application/services/test_project_grant_change_service.py). This is existing code for explanation, not replacement or insertion instructions.
-
-```python
-from dataclasses import replace
-
-import pytest
-
-from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+        await scenario.set()
+    assert scenario.idempotency.calls == 0 and "read_result" not in scenario.events
 
 @pytest.mark.asyncio
-async def test_new_assignment_completes_before_transaction_commit() -> None:
+async def test_completed_put_replays_before_fresh_revision_recipient_or_handover_checks() -> None:
     scenario = GrantScenario()
-    scenario.authorizer.result = replace(AUTHORIZATION, project_id=ProjectId(PROJECT_ID.value))
-    scenario.idempotency.result = NEW_RESERVATION
-    result = await scenario.assign()
-    assert result == replace(SAVED_RESULT, created=True)
-    assert scenario.memberships.last_operation == NEW_RESERVATION.operation_id
-    assert scenario.memberships.last_project_id is scenario.authorizer.result.project_id
+    scenario.management.result = replace(
+        MANAGEMENT,
+        recipient_has_pending_recovery=True,
+        recipient_has_coherent_identity=False,
+        other_grantors=(),
+        grant=replace(
+            MANAGEMENT.grant,
+            project_access_revision=99,
+            recipient=None,
+            recipient_is_project_member=False,
+        ),
+    )
+    result = await scenario.set()
+    assert result == ORIGINAL
     assert scenario.events == [
         "fingerprint",
         "begin",
-        "authorize",
+        "management_facts",
         "reserve",
-        "load_membership",
-        "write",
-        "complete",
+        "read_result",
         "commit",
     ]
+    assert scenario.memberships.loads == 0 and scenario.results.saved is None
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("can_grant", [False, True])
+async def test_new_full_assignment_saves_original_status_revision_and_receipt(
+    can_grant: bool,
+) -> None:
+    scenario = GrantScenario()
+    scenario.idempotency.result = NEW_RESERVATION
+    result = await scenario.set(replace(SET_COMMAND, can_grant=can_grant))
+    assert (result.can_grant, result.access_revision, result.changed, result.status_code) == (
+        can_grant,
+        8,
+        True,
+        201,
+    )
+    assert scenario.results.saved == (result, 7, None)
+    assert scenario.events == [
+        "fingerprint",
+        "begin",
+        "management_facts",
+        "reserve",
+        "load_membership",
+        "write_action",
+        "complete",
+        "store_result",
+        "commit",
+    ]
+    assert scenario.idempotency.lookup_authority == OperationLookupAuthority(
+        OperationLookupAuthorityFamily.PROJECT_GRANT_READ, ACTION_ID
+    )
 ```
 
-**Walkthrough.** The denial test proves there is no reservation, aggregate load or save. The replay test proves the original result returns after current authorization, without another load or write, and later revoked authority stops lookup. The new-work test checks the original operation identity and checked scope, then completion before commit. These observable interactions protect the security and atomicity contract rather than the service's private layout.
+The denial case establishes no reservation or original-result disclosure. The replay case supplies a changed revision and now-ineligible recipient, yet returns the original receipt after current actor authorization without loading or saving membership. The fresh case checks explicit true/false grant intent, original 201, exactly one revision increment and audit/completion/business-result storage before commit.
 
-**Failures and alternatives.** Neighboring tests cover mismatched returned scope, stale revision, narrow domain-error translation and reservation/save/completion/commit failures. Unit doubles cannot prove actual PostgreSQL rollback, locking or concurrency. The existing integration scenarios exercise those boundaries and must be qualified for a real affected implementation. Do not present a unit test as database evidence.
+Neighboring tests cover stale revision, no-ops, departed-recipient removal, foreign application binding, last-grantor preservation and required-stage rollback. These are behavioral observations. Unit doubles do not establish actual database rollback, coordination or concurrency. The owning PostgreSQL tests supply those distinct boundaries.
 
 <a id="worked-example-document-the-capability-once"></a>
 

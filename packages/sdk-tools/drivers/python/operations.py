@@ -11,20 +11,25 @@ from inframeld_sdk.api.access_api import AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi
 from inframeld_sdk.api.operations_api import OperationsApi
+from inframeld_sdk.models.access_group_action_grant_request import AccessGroupActionGrantRequest
 from inframeld_sdk.models.access_group_creation_request import AccessGroupCreationRequest
 from inframeld_sdk.models.access_group_manager_request import AccessGroupManagerRequest
 from inframeld_sdk.models.access_group_membership_request import AccessGroupMembershipRequest
+from inframeld_sdk.models.application_account_action_grant_request import (
+    ApplicationAccountActionGrantRequest,
+)
 from inframeld_sdk.models.application_account_creation_request import (
     ApplicationAccountCreationRequest,
 )
+from inframeld_sdk.models.grant_target_kind import GrantTargetKind
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
+from inframeld_sdk.models.organization_action_grant_request import OrganizationActionGrantRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
 from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest
 from inframeld_sdk.models.project_membership_request import ProjectMembershipRequest
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest
-from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest
 from inframeld_sdk_fixtures.api.default_api import DefaultApi
 from inframeld_sdk_fixtures.models.contract_fixture_payload import ContractFixturePayload
 from observations import NativeResponse
@@ -41,6 +46,270 @@ def string(value: object) -> str:
     if not isinstance(value, str):
         raise ValueError("Expected a string in the driver call")
     return value
+
+
+def list_organization_action_grants_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_organization_action_grants_sync_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_organization_action_grants_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_organization_action_grants_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def set_organization_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).set_organization_action_grant_sync_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        organization_action_grant_request=OrganizationActionGrantRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def set_organization_action_grant_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).set_organization_action_grant_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        organization_action_grant_request=OrganizationActionGrantRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def remove_organization_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).remove_organization_action_grant_sync_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def remove_organization_action_grant_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).remove_organization_action_grant_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_access_group_action_grants_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_access_group_action_grants_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_access_group_action_grants_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_access_group_action_grants_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def set_access_group_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).set_access_group_action_grant_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        access_group_action_grant_request=AccessGroupActionGrantRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def set_access_group_action_grant_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).set_access_group_action_grant_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        access_group_action_grant_request=AccessGroupActionGrantRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def remove_access_group_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).remove_access_group_action_grant_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def remove_access_group_action_grant_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).remove_access_group_action_grant_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        access_group_id=UUID(call.path["access_group_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_application_account_action_grants_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_application_account_action_grants_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_application_account_action_grants_async(
+    clients: Clients, call: Call
+) -> NativeResponse:
+    return await AccessApi(
+        clients.production
+    ).list_application_account_action_grants_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def set_application_account_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).set_application_account_action_grant_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        application_account_action_grant_request=ApplicationAccountActionGrantRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def set_application_account_action_grant_async(
+    clients: Clients, call: Call
+) -> NativeResponse:
+    return await AccessApi(clients.production).set_application_account_action_grant_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        application_account_action_grant_request=ApplicationAccountActionGrantRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def remove_application_account_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(
+        clients.production
+    ).remove_application_account_action_grant_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def remove_application_account_action_grant_async(
+    clients: Clients, call: Call
+) -> NativeResponse:
+    return await AccessApi(
+        clients.production
+    ).remove_application_account_action_grant_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=call.path["action_id"],
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def project_grant_recipients_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_project_grant_recipients_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        target_kind=GrantTargetKind(string(call.query["targetKind"])),
+        target_id=UUID(string(call.query["targetId"])),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def project_grant_recipients_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_project_grant_recipients_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        target_kind=GrantTargetKind(string(call.query["targetKind"])),
+        target_id=UUID(string(call.query["targetId"])),
+        action_id=string(call.query["actionId"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
 
 
 def my_project_access_sync(clients: Clients, call: Call) -> NativeResponse:
@@ -69,7 +338,7 @@ def set_project_action_grant_sync(clients: Clients, call: Call) -> NativeRespons
         recipient_principal_id=UUID(call.path["recipient_principal_id"]),
         action_id=call.path["action_id"],
         idempotency_key=call.headers["Idempotency-Key"],
-        project_action_grant_request=ProjectActionGrantRequest.model_validate(call.body),
+        project_action_grant_request=project_grant_body(call),
         _headers=call.headers,
         _request_timeout=call.timeout / 1000,
     )
@@ -81,7 +350,7 @@ async def set_project_action_grant_async(clients: Clients, call: Call) -> Native
         recipient_principal_id=UUID(call.path["recipient_principal_id"]),
         action_id=call.path["action_id"],
         idempotency_key=call.headers["Idempotency-Key"],
-        project_action_grant_request=ProjectActionGrantRequest.model_validate(call.body),
+        project_action_grant_request=project_grant_body(call),
         _headers=call.headers,
         _request_timeout=call.timeout / 1000,
     )
@@ -117,14 +386,13 @@ def integer(value: object) -> int:
     return value
 
 
-def grant_body(call: Call) -> ProjectUseOnlyGrantRequest:
+def project_grant_body(call: Call) -> ProjectActionGrantRequest:
     if not call.unchecked_model:
-        return ProjectUseOnlyGrantRequest.model_validate(call.body)
+        return ProjectActionGrantRequest.model_validate(call.body)
     if call.body is None:
         raise ValueError("Missing body for unchecked server-validation case")
-    return ProjectUseOnlyGrantRequest.model_construct(
-        action_id=string(call.body["actionId"]),
-        recipient_principal_id=UUID(string(call.body["recipientPrincipalId"])),
+    return ProjectActionGrantRequest.model_construct(
+        can_grant=call.body["canGrant"],
         expected_access_revision=integer(call.body["expectedAccessRevision"]),
     )
 
@@ -225,26 +493,6 @@ def decide_consent_sync(clients: Clients, call: Call) -> NativeResponse:
 async def decide_consent_async(clients: Clients, call: Call) -> NativeResponse:
     return await AccessApi(clients.production).decide_human_o_auth_consent_with_http_info(
         human_o_auth_consent_request=HumanOAuthConsentRequest.model_validate(call.body),
-        _request_timeout=call.timeout / 1000,
-        _headers=call.headers,
-    )
-
-
-def assign_grant_sync(clients: Clients, call: Call) -> NativeResponse:
-    return AccessApi(clients.production).assign_project_use_only_grant_sync_with_http_info(
-        project_id=UUID(call.path["project_id"]),
-        idempotency_key=call.headers["Idempotency-Key"],
-        project_use_only_grant_request=grant_body(call),
-        _request_timeout=call.timeout / 1000,
-        _headers=call.headers,
-    )
-
-
-async def assign_grant_async(clients: Clients, call: Call) -> NativeResponse:
-    return await AccessApi(clients.production).assign_project_use_only_grant_with_http_info(
-        project_id=UUID(call.path["project_id"]),
-        idempotency_key=call.headers["Idempotency-Key"],
-        project_use_only_grant_request=grant_body(call),
         _request_timeout=call.timeout / 1000,
         _headers=call.headers,
     )
@@ -936,6 +1184,36 @@ async def delete_access_group_async(clients: Clients, call: Call) -> NativeRespo
 
 
 BINDINGS: dict[Operation, Binding] = {
+    Operation.LIST_ORGANIZATION_ACTION_GRANTS: Binding(
+        list_organization_action_grants_sync, list_organization_action_grants_async
+    ),
+    Operation.SET_ORGANIZATION_ACTION_GRANT: Binding(
+        set_organization_action_grant_sync, set_organization_action_grant_async
+    ),
+    Operation.REMOVE_ORGANIZATION_ACTION_GRANT: Binding(
+        remove_organization_action_grant_sync, remove_organization_action_grant_async
+    ),
+    Operation.LIST_ACCESS_GROUP_ACTION_GRANTS: Binding(
+        list_access_group_action_grants_sync, list_access_group_action_grants_async
+    ),
+    Operation.SET_ACCESS_GROUP_ACTION_GRANT: Binding(
+        set_access_group_action_grant_sync, set_access_group_action_grant_async
+    ),
+    Operation.REMOVE_ACCESS_GROUP_ACTION_GRANT: Binding(
+        remove_access_group_action_grant_sync, remove_access_group_action_grant_async
+    ),
+    Operation.LIST_APPLICATION_ACCOUNT_ACTION_GRANTS: Binding(
+        list_application_account_action_grants_sync, list_application_account_action_grants_async
+    ),
+    Operation.SET_APPLICATION_ACCOUNT_ACTION_GRANT: Binding(
+        set_application_account_action_grant_sync, set_application_account_action_grant_async
+    ),
+    Operation.REMOVE_APPLICATION_ACCOUNT_ACTION_GRANT: Binding(
+        remove_application_account_action_grant_sync, remove_application_account_action_grant_async
+    ),
+    Operation.LIST_PROJECT_GRANT_RECIPIENTS: Binding(
+        project_grant_recipients_sync, project_grant_recipients_async
+    ),
     Operation.CREATE_ACCESS_GROUP: Binding(create_access_group_sync, create_access_group_async),
     Operation.GET_ACCESS_GROUP: Binding(get_access_group_sync, get_access_group_async),
     Operation.RESOLVE_ACCESS_GROUP: Binding(resolve_access_group_sync, resolve_access_group_async),
@@ -1002,7 +1280,6 @@ BINDINGS: dict[Operation, Binding] = {
     Operation.GET_CURRENT_SESSION: Binding(session_sync, session_async),
     Operation.INSPECT_HUMAN_OAUTH_CONSENT: Binding(inspect_consent_sync, inspect_consent_async),
     Operation.DECIDE_HUMAN_OAUTH_CONSENT: Binding(decide_consent_sync, decide_consent_async),
-    Operation.ASSIGN_PROJECT_USE_ONLY_GRANT: Binding(assign_grant_sync, assign_grant_async),
     Operation.LOOKUP_ORIGINAL_OPERATION: Binding(lookup_sync, lookup_async),
     Operation.GET_DELETION_STATUS: Binding(deletion_status_sync, deletion_status_async),
     Operation.GET_PROJECT_METADATA: Binding(metadata_read_sync, metadata_read_async),

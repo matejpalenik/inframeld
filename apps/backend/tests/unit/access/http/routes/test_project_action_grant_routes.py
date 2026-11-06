@@ -218,3 +218,22 @@ def test_safe_errors_close_session_and_are_declared(
     assert response.headers["cache-control"] == "no-store"
     assert "application/problem+json" in responses[str(status)]["content"]
     assert reader.closed == 1
+
+
+def test_retired_post_with_original_body_is_method_not_allowed_before_get_validation() -> None:
+    reader = MockGrantsReader()
+    with client_for(reader) as client:
+        response = client.post(
+            PATH,
+            headers=COOKIE | {"Idempotency-Key": "retired-original-post"},
+            json={
+                "recipientPrincipalId": str(UUID(int=10)),
+                "actionId": "create-access-groups",
+                "canGrant": False,
+                "expectedAccessRevision": 0,
+            },
+        )
+    assert response.status_code == 405
+    assert response.headers["cache-control"] == "no-store"
+    assert "GET" in response.headers["allow"]
+    assert reader.calls == [] and reader.closed == 0

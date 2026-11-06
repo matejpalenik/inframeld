@@ -115,86 +115,6 @@ impl AsRef<str> for ProtectedResourceMetadataResponseBearerMethodsSupportedItem1
         self.as_str()
     }
 }
-///Describe the original change - current grants require a fresh authorized read.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ProjectUseOnlyGrantResponse {
-    ///Constraint: minimum=0, maximum=9007199254740991
-    #[serde(rename = "accessRevision")]
-    pub access_revision: i64,
-    #[serde(rename = "actionId")]
-    pub action_id: ProjectUseOnlyGrantResponseActionId,
-    #[serde(
-        rename = "canGrant",
-        skip_serializing_if = "Option::is_none",
-        default,
-        deserialize_with = "presence_serde::optional_nonnull"
-    )]
-    pub can_grant: Option<BooleanConstant<false>>,
-    #[serde(rename = "idempotencyExpiresAt")]
-    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
-    #[serde(rename = "operationId")]
-    pub operation_id: String,
-    #[serde(rename = "projectId")]
-    pub project_id: uuid::Uuid,
-    #[serde(rename = "recipientPrincipalId")]
-    pub recipient_principal_id: uuid::Uuid,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
-pub enum ProjectUseOnlyGrantResponseActionId {
-    #[default]
-    #[serde(rename = "create-access-groups")]
-    CreateAccessGroups,
-}
-impl ProjectUseOnlyGrantResponseActionId {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::CreateAccessGroups => "create-access-groups",
-        }
-    }
-}
-impl ::std::fmt::Display for ProjectUseOnlyGrantResponseActionId {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-impl AsRef<str> for ProjectUseOnlyGrantResponseActionId {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ProjectUseOnlyGrantRequest {
-    #[serde(rename = "actionId")]
-    pub action_id: ProjectUseOnlyGrantRequestActionId,
-    ///Constraint: minimum=0, maximum=9007199254740991
-    #[serde(rename = "expectedAccessRevision")]
-    pub expected_access_revision: i64,
-    #[serde(rename = "recipientPrincipalId")]
-    pub recipient_principal_id: uuid::Uuid,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
-pub enum ProjectUseOnlyGrantRequestActionId {
-    #[default]
-    #[serde(rename = "create-access-groups")]
-    CreateAccessGroups,
-}
-impl ProjectUseOnlyGrantRequestActionId {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::CreateAccessGroups => "create-access-groups",
-        }
-    }
-}
-impl ::std::fmt::Display for ProjectUseOnlyGrantRequestActionId {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-impl AsRef<str> for ProjectUseOnlyGrantRequestActionId {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectMembersPageResponse {
     ///Constraint: minimum=0, maximum=9007199254740991
@@ -381,6 +301,35 @@ pub struct ProjectActionGrantItemResponse {
     pub recipient_principal_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseOrganizationActionGrantItemResponse {
+    pub items: Vec<OrganizationActionGrantItemResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OrganizationActionGrantItemResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseGrantRecipientResponse {
+    pub items: Vec<GrantRecipientResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PageResponseApplicationKeyMetadataResponse {
     pub items: Vec<ApplicationKeyMetadataResponse>,
     #[serde(
@@ -388,6 +337,50 @@ pub struct PageResponseApplicationKeyMetadataResponse {
         deserialize_with = "presence_serde::required_nullable"
     )]
     pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseApplicationAccountActionGrantItemResponse {
+    pub items: Vec<ApplicationAccountActionGrantItemResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountActionGrantItemResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "applicationPrincipalId")]
+    pub application_principal_id: uuid::Uuid,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseAccessGroupActionGrantItemResponse {
+    pub items: Vec<AccessGroupActionGrantItemResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupActionGrantItemResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OriginalOperationLookupRequest {
@@ -1555,6 +1548,12 @@ pub enum OperationLookupAuthorityFamily {
     ProjectGrantRead,
     #[serde(rename = "organization_action_use")]
     OrganizationActionUse,
+    #[serde(rename = "organization_grant_read")]
+    OrganizationGrantRead,
+    #[serde(rename = "access_group_grant_read")]
+    AccessGroupGrantRead,
+    #[serde(rename = "application_account_grant_read")]
+    ApplicationAccountGrantRead,
     #[serde(rename = "access_group_deletion")]
     AccessGroupDeletion,
 }
@@ -1564,6 +1563,9 @@ impl OperationLookupAuthorityFamily {
             Self::ProjectActionUse => "project_action_use",
             Self::ProjectGrantRead => "project_grant_read",
             Self::OrganizationActionUse => "organization_action_use",
+            Self::OrganizationGrantRead => "organization_grant_read",
+            Self::AccessGroupGrantRead => "access_group_grant_read",
+            Self::ApplicationAccountGrantRead => "application_account_grant_read",
             Self::AccessGroupDeletion => "access_group_deletion",
         }
     }
@@ -2323,6 +2325,14 @@ impl AsRef<str> for HumanOAuthScope {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GrantRecipientResponse {
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    pub kind: PrincipalKind,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
 }
 #[derive(Debug, Clone)]
 pub enum DeletionStatusResponse {
@@ -3144,6 +3154,57 @@ impl AsRef<str> for AcceptedOperationLookupResponseAdmission {
     }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupActionGrantRemovalResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupActionGrantRequest {
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupActionGrantResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AccessGroupCreationRequest {
     ///Constraint: minLength=1, maxLength=128
     #[serde(rename = "displayName")]
@@ -3289,6 +3350,57 @@ pub struct AccessGroupMetadataResponse {
     pub project_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountActionGrantRemovalResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "applicationPrincipalId")]
+    pub application_principal_id: uuid::Uuid,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountActionGrantRequest {
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountActionGrantResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "applicationPrincipalId")]
+    pub application_principal_id: uuid::Uuid,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ApplicationAccountCreationRequest {
     ///Constraint: minLength=1, maxLength=128
     #[serde(rename = "displayName")]
@@ -3310,6 +3422,36 @@ pub struct GetHealthResponse {
     /// `additionalProperties` value schema.
     #[serde(flatten)]
     pub additional_properties: std::collections::BTreeMap<String, String>,
+}
+///Discriminate published grant targets without changing their wire tags.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum GrantTargetKind {
+    #[default]
+    #[serde(rename = "project")]
+    Project,
+    #[serde(rename = "access-group")]
+    AccessGroup,
+    #[serde(rename = "application-account")]
+    ApplicationAccount,
+}
+impl GrantTargetKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Project => "project",
+            Self::AccessGroup => "access-group",
+            Self::ApplicationAccount => "application-account",
+        }
+    }
+}
+impl ::std::fmt::Display for GrantTargetKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for GrantTargetKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HumanAdmissionRequest {
@@ -3339,6 +3481,53 @@ pub struct HumanAdmissionResponse {
 pub struct HumanOAuthConsentDecisionResponse {
     #[serde(rename = "redirectTo")]
     pub redirect_to: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OrganizationActionGrantRemovalResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OrganizationActionGrantRequest {
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OrganizationActionGrantResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectActionGrantRemovalResponse {

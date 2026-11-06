@@ -66,7 +66,10 @@ class OriginalOperationLookupService(OriginalOperationLookup):
         | UnresolvedOperationDTO
     ):
         query.expected_authority.require_supported_scope(
-            project_id=query.project_id, method=query.method, requested_route=query.requested_route
+            organization_id=query.organization_id,
+            project_id=query.project_id,
+            method=query.method,
+            requested_route=query.requested_route,
         )
         if query.expected_authority.family is OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION:
             if self._group_deletion_lookup is None:
