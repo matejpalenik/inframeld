@@ -106,10 +106,10 @@ class PostgresAccessGroupCreationFactsReader(AccessGroupCreationFactsReader):
         if installed is None:
             raise DependencyUnavailableError("The installation identity is unavailable.")
         return AccessGroupCreationFactsDTO(
-            OrganizationId(principal.organization_id),
-            ProjectId(project.id),
-            project.access_revision,
-            PostgresProjectActorMapper.action(
+            organization_id=OrganizationId(principal.organization_id),
+            project_id=ProjectId(project.id),
+            access_revision=project.access_revision,
+            action=PostgresProjectActorMapper.action(
                 access=access,
                 principal=principal,
                 project=project,

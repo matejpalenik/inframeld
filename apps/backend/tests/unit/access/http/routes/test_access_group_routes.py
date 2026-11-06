@@ -107,13 +107,13 @@ class MockGroups(
         self.calls: list[object] = []
         self.changed = True
         self.metadata = AccessGroupMetadataDTO(
-            ORGANIZATION_ID,
-            PROJECT_ID,
-            GROUP,
-            ResourceName("support"),
-            "SupportKnowledge",
-            SAVED_RESULT.expires_at,
-            8,
+            organization_id=ORGANIZATION_ID,
+            project_id=PROJECT_ID,
+            group_id=GROUP,
+            name=ResourceName("support"),
+            display_name="SupportKnowledge",
+            created_at=SAVED_RESULT.expires_at,
+            access_revision=8,
         )
         self.context: IdempotencyContextDTO | None = None
         self.request_id: RequestId | None = None
@@ -130,14 +130,14 @@ class MockGroups(
         self.context = context
         return AccessGroupCreationResultDTO(
             CreatedAccessGroupDTO(
-                SAVED_RESULT.operation_id,
-                ORGANIZATION_ID,
-                PROJECT_ID,
-                GROUP,
-                PRINCIPAL,
-                command.name,
-                command.display_name.value,
-                8,
+                operation_id=SAVED_RESULT.operation_id,
+                organization_id=ORGANIZATION_ID,
+                project_id=PROJECT_ID,
+                group_id=GROUP,
+                creator_principal_id=PRINCIPAL,
+                name=command.name,
+                display_name=command.display_name.value,
+                access_revision=8,
             ),
             SAVED_RESULT,
         )
@@ -158,7 +158,9 @@ class MockGroups(
         self, *, access: AccessContextDTO, query: ListAccessGroupPrincipalsQuery
     ) -> AccessGroupPrincipalsPageDTO:
         self.calls.append(query)
-        return AccessGroupPrincipalsPageDTO(PROJECT_ID, GROUP, 8, (), None)
+        return AccessGroupPrincipalsPageDTO(
+            project_id=PROJECT_ID, group_id=GROUP, access_revision=8, items=(), next_cursor=None
+        )
 
     @override
     async def change(
@@ -171,17 +173,17 @@ class MockGroups(
         self.calls.append(command)
         self.context = context
         return AccessGroupRelationshipResultDTO(
-            ORGANIZATION_ID,
-            PROJECT_ID,
-            GROUP,
-            PRINCIPAL,
-            command.principal_id,
-            command.change_kind,
-            8 if self.changed else 7,
-            self.changed,
-            AccessGroupRelationships(True, True),
-            command.change_kind.success_status(changed=self.changed),
-            SAVED_RESULT,
+            organization_id=ORGANIZATION_ID,
+            project_id=PROJECT_ID,
+            group_id=GROUP,
+            actor_principal_id=PRINCIPAL,
+            principal_id=command.principal_id,
+            change_kind=command.change_kind,
+            access_revision=8 if self.changed else 7,
+            changed=self.changed,
+            relationships=AccessGroupRelationships(member=True, manager=True),
+            status_code=command.change_kind.success_status(changed=self.changed),
+            operation=SAVED_RESULT,
         )
 
     @override
@@ -197,7 +199,12 @@ class MockGroups(
         self.context, self.request_id = context, request_id
         return AccessGroupDeletionResultDTO(
             DeletedAccessGroupDTO(
-                SAVED_RESULT.operation_id, ORGANIZATION_ID, PROJECT_ID, GROUP, PRINCIPAL, 8
+                operation_id=SAVED_RESULT.operation_id,
+                organization_id=ORGANIZATION_ID,
+                project_id=PROJECT_ID,
+                group_id=GROUP,
+                actor_principal_id=PRINCIPAL,
+                access_revision=8,
             ),
             SAVED_RESULT,
         )

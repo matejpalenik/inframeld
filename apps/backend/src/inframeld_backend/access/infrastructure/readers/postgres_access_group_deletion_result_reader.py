@@ -77,12 +77,12 @@ class PostgresAccessGroupDeletionResultReader(AccessGroupDeletionResultReader):
             if row is None:
                 raise ConflictError("The original group deletion receipt is unavailable.")
             return DeletedAccessGroupDTO(
-                operation_id,
-                organization_id,
-                command.project_id,
-                command.group_id,
-                actor_id,
-                row.access_revision,
+                operation_id=operation_id,
+                organization_id=organization_id,
+                project_id=command.project_id,
+                group_id=command.group_id,
+                actor_principal_id=actor_id,
+                access_revision=row.access_revision,
             )
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None

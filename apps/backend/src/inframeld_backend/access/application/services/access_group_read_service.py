@@ -1,5 +1,4 @@
 import asyncio
-from dataclasses import replace
 from typing import override
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -12,6 +11,9 @@ from inframeld_backend.access.application.dtos.access_group_principals_page_dto 
 from inframeld_backend.access.application.dtos.access_group_read_facts_dto import (
     AccessGroupReadFactsDTO,
 )
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
+)
 from inframeld_backend.access.application.protocols.access_group_read_facts_reader import (
     AccessGroupReadFactsReader,
 )
@@ -19,13 +21,17 @@ from inframeld_backend.access.application.protocols.access_group_reader import A
 from inframeld_backend.access.application.queries.list_access_group_principals_query import (
     ListAccessGroupPrincipalsQuery,
 )
-from inframeld_backend.access.application.services.action_authorization_service import (
-    ActionAuthorizationService,
+from inframeld_backend.access.application.services.principal_access_evaluation_service import (
+    PrincipalAccessEvaluationService,
 )
 from inframeld_backend.access.application.value_objects.access_group_principals_cursor import (
     AccessGroupPrincipalsCursor,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
+from inframeld_backend.access.domain.policies.project_visibility_policy import (
+    ProjectVisibilityPolicy,
+)
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -108,22 +114,22 @@ class AccessGroupReadService(AccessGroupReader):
                 items = rows[: query.limit]
                 next_cursor = (
                     AccessGroupPrincipalsCursor(
-                        facts.installation_id,
-                        facts.group.organization_id,
-                        query.project_id,
-                        query.group_id,
-                        query.collection,
-                        items[-1].principal_id,
+                        installation_id=facts.installation_id,
+                        organization_id=facts.group.organization_id,
+                        project_id=query.project_id,
+                        group_id=query.group_id,
+                        collection=query.collection,
+                        after=items[-1].principal_id,
                     ).to_token()
                     if len(rows) > query.limit
                     else None
                 )
                 return AccessGroupPrincipalsPageDTO(
-                    query.project_id,
-                    query.group_id,
-                    facts.group.access_revision,
-                    items,
-                    next_cursor,
+                    project_id=query.project_id,
+                    group_id=query.group_id,
+                    access_revision=facts.group.access_revision,
+                    items=items,
+                    next_cursor=next_cursor,
                 )
         except TimeoutError:
             raise DependencyUnavailableError() from None
@@ -135,6 +141,7 @@ class AccessGroupReadService(AccessGroupReader):
         selector: AccessGroupId | ResourceName,
         facts: AccessGroupReadFactsDTO | None,
     ) -> None:
+        """Reject stale credentials before interpreting scoped Project and group visibility."""
         if facts is None:
             raise ResourceNotFoundError()
         group = facts.group
@@ -146,8 +153,21 @@ class AccessGroupReadService(AccessGroupReader):
             or (isinstance(selector, ResourceName) and group.name != selector)
         ):
             raise RuntimeError("Group metadata changed the requested actor or scope.")
-        ActionAuthorizationService.require_authorization_from_facts(
-            access=access, facts=replace(facts.action, has_exact_action_grant=True)
+        principal_access = PrincipalAccessEvaluationService.evaluate(
+            access=access,
+            principal=facts.action.principal,
+            has_pending_recovery=facts.action.has_pending_recovery,
+            oauth_credential_facts=facts.action.oauth_credential_facts,
         )
+        if not principal_access.credential_is_current:
+            raise HumanOAuthCredentialRejectedError()
+        if not ProjectVisibilityPolicy.may_view_project(
+            principal_status=facts.action.principal.status,
+            project_status=facts.action.project_status,
+            is_project_member=facts.action.is_project_member,
+        ):
+            raise ResourceNotFoundError()
+        if not PrincipalAccessPolicy.may_use_product(principal_access):
+            raise AccessDeniedError()
         if not (facts.is_member or facts.is_manager or facts.has_group_action):
             raise ResourceNotFoundError()

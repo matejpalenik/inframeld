@@ -127,7 +127,7 @@ class PostgresAccessGroupRelationshipWriter(AccessGroupRelationshipWriter):
         manager = await self._session.get(
             GroupManagerRow, (project, group, principal), populate_existing=True
         )
-        before = AccessGroupRelationships(member is not None, manager is not None)
+        before = AccessGroupRelationships(member=member is not None, manager=manager is not None)
         if before != facts.relationships:
             raise ConflictError("The checked group relationships changed before persistence.")
         changed = before != after

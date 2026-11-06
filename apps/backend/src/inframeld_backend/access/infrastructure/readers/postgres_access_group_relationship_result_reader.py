@@ -89,17 +89,17 @@ class PostgresAccessGroupRelationshipResultReader(AccessGroupRelationshipResultR
                 raise ConflictError("The original group transition is unavailable.")
             try:
                 return AccessGroupRelationshipResultDTO(
-                    facts.organization_id,
-                    facts.project_id,
-                    facts.group_id,
-                    facts.action.principal.id,
-                    command.principal_id,
-                    kind,
-                    row.access_revision,
-                    row.changed,
-                    AccessGroupRelationships(row.member, row.manager),
-                    row.status_code,
-                    operation,
+                    organization_id=facts.organization_id,
+                    project_id=facts.project_id,
+                    group_id=facts.group_id,
+                    actor_principal_id=facts.action.principal.id,
+                    principal_id=command.principal_id,
+                    change_kind=kind,
+                    access_revision=row.access_revision,
+                    changed=row.changed,
+                    relationships=AccessGroupRelationships(member=row.member, manager=row.manager),
+                    status_code=row.status_code,
+                    operation=operation,
                 )
             except (ValueError, TypeError):
                 raise ConflictError("The original group transition is incoherent.") from None

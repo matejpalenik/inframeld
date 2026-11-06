@@ -37,11 +37,7 @@ from inframeld_backend.access.domain.enums.project_departure_target_kind import 
 from inframeld_backend.access.domain.policies.access_group_relationship_policy import (
     AccessGroupRelationshipPolicy,
 )
-from inframeld_backend.access.domain.policies.principal_access_policy import PrincipalAccessPolicy
 from inframeld_backend.access.domain.policies.project_departure_policy import ProjectDeparturePolicy
-from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
-    PrincipalAccessPolicyInput,
-)
 from inframeld_backend.access.domain.policy_inputs.project_departure_candidate_policy_input import (
     ProjectDepartureCandidatePolicyInput,
 )
@@ -78,20 +74,22 @@ from inframeld_backend.shared.domain.validation.revision_validation import Revis
 
 
 class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
+    """Change group relationships under current authority while retaining original outcomes."""
+
     def __init__(
         self,
         *,
         transaction_manager: TransactionManager,
-        facts_reader: AccessGroupChangeFactsReader,
-        writer: AccessGroupRelationshipWriter,
-        result_reader: AccessGroupRelationshipResultReader,
+        group_change_facts_reader: AccessGroupChangeFactsReader,
+        group_relationship_writer: AccessGroupRelationshipWriter,
+        group_relationship_result_reader: AccessGroupRelationshipResultReader,
         operation_idempotency: OperationIdempotency,
         request_fingerprint_service: RequestFingerprintService,
     ) -> None:
         self._transaction_manager = transaction_manager
-        self._facts_reader = facts_reader
-        self._writer = writer
-        self._result_reader = result_reader
+        self._group_change_facts_reader = group_change_facts_reader
+        self._group_relationship_writer = group_relationship_writer
+        self._group_relationship_result_reader = group_relationship_result_reader
         self._operation_idempotency = operation_idempotency
         self._request_fingerprint_service = request_fingerprint_service
 
@@ -123,7 +121,9 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
         )
         try:
             async with asyncio.timeout(5), self._transaction_manager.begin():
-                facts = await self._facts_reader.lock_for_change(access=access, command=command)
+                facts = await self._group_change_facts_reader.lock_for_change(
+                    access=access, command=command
+                )
                 if facts is None:
                     raise ResourceNotFoundError()
                 if (
@@ -147,10 +147,11 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
                     expected_replay_kind=OperationReplayKind.SAFE_RESULT,
                 )
                 if not isinstance(operation, NewOperationReservationDTO):
-                    completed = self._completed(operation)
-                    original = await self._result_reader.original(
+                    completed = self._require_safe_completed_operation(operation)
+                    original = await self._group_relationship_result_reader.original(
                         facts=facts, command=command, operation=completed
                     )
+                    # A receipt describes this exact original transition, not current relationships.
                     if (
                         original.operation != completed
                         or original.organization_id != facts.organization_id
@@ -172,7 +173,7 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
                 before = facts.relationships
                 after = self._transition(kind, before)
                 if before.manager and not after.manager:
-                    candidates = await self._facts_reader.remaining_managers(
+                    candidates = await self._group_change_facts_reader.remaining_managers(
                         facts=facts, command=command
                     )
                     if any(
@@ -180,17 +181,17 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
                     ):
                         raise RuntimeError("Handover included the departing manager.")
                     responsibility = ProjectDepartureResponsibilityPolicyInput(
-                        ProjectDepartureTargetKind.ACCESS_GROUP,
-                        None,
-                        tuple(
+                        target_kind=ProjectDepartureTargetKind.ACCESS_GROUP,
+                        action_id=None,
+                        candidates=tuple(
                             ProjectDepartureCandidatePolicyInput(
-                                candidate.principal,
-                                candidate.has_pending_recovery,
-                                candidate.is_project_member,
-                                candidate.has_coherent_identity,
-                                candidate.can_grant,
-                                candidate.is_group_member,
-                                candidate.is_group_manager,
+                                principal=candidate.principal,
+                                has_pending_recovery=candidate.has_pending_recovery,
+                                is_project_member=candidate.is_project_member,
+                                has_coherent_identity=candidate.has_coherent_identity,
+                                can_grant=candidate.can_grant,
+                                is_group_member=candidate.is_group_member,
+                                is_group_manager=candidate.is_group_manager,
                             )
                             for candidate in candidates
                         ),
@@ -200,10 +201,10 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
                 changed = before != after
                 if changed and facts.access_revision == RevisionValidation.MAX_VALUE:
                     raise ConflictError("The Project Access revision cannot advance.")
-                await self._writer.save(
+                await self._group_relationship_writer.save(
                     facts=facts, command=command, operation_id=operation.operation_id, after=after
                 )
-                completed = self._completed(
+                completed = self._require_safe_completed_operation(
                     await self._operation_idempotency.record_completed_result(
                         operation, replay_kind=OperationReplayKind.SAFE_RESULT
                     )
@@ -211,17 +212,17 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
                 if completed.operation_id != operation.operation_id:
                     raise RuntimeError("Group completion changed its original operation.")
                 return AccessGroupRelationshipResultDTO(
-                    facts.organization_id,
-                    facts.project_id,
-                    facts.group_id,
-                    access.actor_principal_id,
-                    command.principal_id,
-                    kind,
-                    facts.access_revision + int(changed),
-                    changed,
-                    after,
-                    kind.success_status(changed=changed),
-                    completed,
+                    organization_id=facts.organization_id,
+                    project_id=facts.project_id,
+                    group_id=facts.group_id,
+                    actor_principal_id=access.actor_principal_id,
+                    principal_id=command.principal_id,
+                    change_kind=kind,
+                    access_revision=facts.access_revision + int(changed),
+                    changed=changed,
+                    relationships=after,
+                    status_code=kind.success_status(changed=changed),
+                    operation=completed,
                 )
         except TimeoutError:
             raise DependencyUnavailableError() from None
@@ -230,6 +231,10 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
     def _require_recipient(
         facts: AccessGroupChangeFactsDTO, command: ChangeAccessGroupRelationshipCommand
     ) -> None:
+        """Check the returned target and translate policy only for fresh changes.
+
+        Replay keeps its original receipt even if the recipient later becomes ineligible.
+        """
         recipient = facts.recipient
         if recipient is None:
             raise ResourceNotFoundError()
@@ -238,18 +243,16 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
             or recipient.organization_id != facts.organization_id
         ):
             raise RuntimeError("Group facts changed the requested recipient.")
-        if (
-            command.change_kind
-            in (AccessGroupChangeKind.APPOINT_MANAGER, AccessGroupChangeKind.REMOVE_MANAGER)
-            and recipient.kind is not PrincipalKind.HUMAN
-        ):
+        if command.change_kind in (
+            AccessGroupChangeKind.APPOINT_MANAGER,
+            AccessGroupChangeKind.REMOVE_MANAGER,
+        ) and not AccessGroupRelationshipPolicy.supports_manager_kind(recipient.kind):
             raise InvalidInputError("Only an eligible human can manage an access group.")
-        if command.change_kind.is_addition and (
-            not facts.recipient_is_project_member
-            or (recipient.kind is PrincipalKind.HUMAN and not facts.recipient_has_coherent_identity)
-            or not PrincipalAccessPolicy.may_use_product(
-                PrincipalAccessPolicyInput(recipient, facts.recipient_has_pending_recovery, True)
-            )
+        if command.change_kind.is_addition and not AccessGroupRelationshipPolicy.may_add_member(
+            principal=recipient,
+            is_project_member=facts.recipient_is_project_member,
+            has_coherent_identity=facts.recipient_has_coherent_identity,
+            has_pending_recovery=facts.recipient_has_pending_recovery,
         ):
             raise ConflictError("The recipient is not an eligible current Project member.")
 
@@ -268,7 +271,8 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
                 return AccessGroupRelationshipPolicy.remove_manager(before)
 
     @staticmethod
-    def _completed(operation: object) -> CompletedSynchronousOperationDTO:
+    def _require_safe_completed_operation(operation: object) -> CompletedSynchronousOperationDTO:
+        """Require a replay-safe synchronous completion before using an original outcome."""
         if (
             not isinstance(operation, CompletedSynchronousOperationDTO)
             or operation.replay_kind is not OperationReplayKind.SAFE_RESULT

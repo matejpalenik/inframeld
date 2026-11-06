@@ -82,14 +82,14 @@ class PostgresAccessGroupCreationResultReader(AccessGroupCreationResultReader):
                 RevisionValidation.require(row.before_revision)
                 RevisionValidation.require(row.access_revision)
                 return CreatedAccessGroupDTO(
-                    operation_id,
-                    organization_id,
-                    project_id,
-                    AccessGroupId(row.group_id),
-                    actor_id,
-                    ResourceName(row.name),
-                    row.display_name,
-                    row.access_revision,
+                    operation_id=operation_id,
+                    organization_id=organization_id,
+                    project_id=project_id,
+                    group_id=AccessGroupId(row.group_id),
+                    creator_principal_id=actor_id,
+                    name=ResourceName(row.name),
+                    display_name=row.display_name,
+                    access_revision=row.access_revision,
                 )
             except (ValueError, TypeError):
                 raise ConflictError("The original group creation result is incoherent.") from None

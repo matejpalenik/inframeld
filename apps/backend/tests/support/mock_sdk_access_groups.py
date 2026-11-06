@@ -95,14 +95,14 @@ class MockSDKAccessGroups(
         operation = self._operation("create")
         return AccessGroupCreationResultDTO(
             CreatedAccessGroupDTO(
-                operation.operation_id,
-                _ORGANIZATION,
-                _PROJECT,
-                _GROUP,
-                access.actor_principal_id,
-                command.name,
-                command.display_name.value,
-                command.expected_access_revision + 1,
+                operation_id=operation.operation_id,
+                organization_id=_ORGANIZATION,
+                project_id=_PROJECT,
+                group_id=_GROUP,
+                creator_principal_id=access.actor_principal_id,
+                name=command.name,
+                display_name=command.display_name.value,
+                access_revision=command.expected_access_revision + 1,
             ),
             operation,
         )
@@ -123,13 +123,13 @@ class MockSDKAccessGroups(
             raise ResourceNotFoundError()
         legacy = selector == _LEGACY
         return AccessGroupMetadataDTO(
-            _ORGANIZATION,
-            _PROJECT,
-            _LEGACY if legacy else _GROUP,
-            None if legacy else ResourceName("support-knowledge"),
-            "ExistingGroup" if legacy else "SupportKnowledge",
-            _NOW,
-            8,
+            organization_id=_ORGANIZATION,
+            project_id=_PROJECT,
+            group_id=_LEGACY if legacy else _GROUP,
+            name=None if legacy else ResourceName("support-knowledge"),
+            display_name="ExistingGroup" if legacy else "SupportKnowledge",
+            created_at=_NOW,
+            access_revision=8,
         )
 
     @override
@@ -157,11 +157,11 @@ class MockSDKAccessGroups(
         if query.cursor is not None:
             items = items[1:]
         return AccessGroupPrincipalsPageDTO(
-            _PROJECT,
-            query.group_id,
-            8,
-            items[: query.limit],
-            "Y29udGludWU" if len(items) > query.limit else None,
+            project_id=_PROJECT,
+            group_id=query.group_id,
+            access_revision=8,
+            items=items[: query.limit],
+            next_cursor="Y29udGludWU" if len(items) > query.limit else None,
         )
 
     @override
@@ -180,21 +180,21 @@ class MockSDKAccessGroups(
         changed = context.key.value != "sdk-group-noop"
         kind = command.change_kind
         after = AccessGroupRelationships(
-            kind is not AccessGroupChangeKind.REMOVE_MEMBER,
-            kind is AccessGroupChangeKind.APPOINT_MANAGER,
+            member=kind is not AccessGroupChangeKind.REMOVE_MEMBER,
+            manager=kind is AccessGroupChangeKind.APPOINT_MANAGER,
         )
         return AccessGroupRelationshipResultDTO(
-            _ORGANIZATION,
-            _PROJECT,
-            _GROUP,
-            access.actor_principal_id,
-            command.principal_id,
-            kind,
-            command.expected_access_revision + int(changed),
-            changed,
-            after,
-            kind.success_status(changed=changed),
-            self._operation(kind.value),
+            organization_id=_ORGANIZATION,
+            project_id=_PROJECT,
+            group_id=_GROUP,
+            actor_principal_id=access.actor_principal_id,
+            principal_id=command.principal_id,
+            change_kind=kind,
+            access_revision=command.expected_access_revision + int(changed),
+            changed=changed,
+            relationships=after,
+            status_code=kind.success_status(changed=changed),
+            operation=self._operation(kind.value),
         )
 
     @override
@@ -210,12 +210,12 @@ class MockSDKAccessGroups(
         operation = self._operation("delete")
         return AccessGroupDeletionResultDTO(
             DeletedAccessGroupDTO(
-                operation.operation_id,
-                _ORGANIZATION,
-                _PROJECT,
-                _GROUP,
-                access.actor_principal_id,
-                command.expected_access_revision + 1,
+                operation_id=operation.operation_id,
+                organization_id=_ORGANIZATION,
+                project_id=_PROJECT,
+                group_id=_GROUP,
+                actor_principal_id=access.actor_principal_id,
+                access_revision=command.expected_access_revision + 1,
             ),
             operation,
         )
@@ -223,5 +223,8 @@ class MockSDKAccessGroups(
     @staticmethod
     def _operation(kind: str) -> CompletedSynchronousOperationDTO:
         return CompletedSynchronousOperationDTO(
-            OperationId("sdk-group-" + kind), True, OperationReplayKind.SAFE_RESULT, _NOW
+            operation_id=OperationId("sdk-group-" + kind),
+            created=True,
+            replay_kind=OperationReplayKind.SAFE_RESULT,
+            expires_at=_NOW,
         )

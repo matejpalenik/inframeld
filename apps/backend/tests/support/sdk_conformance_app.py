@@ -1015,13 +1015,13 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
                 == "/v1/projects/00000000-0000-4000-8000-000000000003/access-groups/00000000-0000-4000-8000-000000000007"
             ):
                 return RetainedDeletionStatusDTO(
-                    OperationId("sdk-group-delete"),
-                    None,
-                    True,
-                    True,
-                    None,
-                    True,
-                    datetime(2030, 1, 31, tzinfo=UTC),
+                    operation_id=OperationId("sdk-group-delete"),
+                    job_status=None,
+                    admission_confirmed=True,
+                    access_blocked=True,
+                    application_shutdown_complete=None,
+                    physical_cleanup_complete=True,
+                    expires_at=datetime(2030, 1, 31, tzinfo=UTC),
                 )
             return UnresolvedOperationDTO()
         metadata = query.requested_route == "/v1/projects/{project_id}/metadata"
@@ -1102,13 +1102,13 @@ class MockSDKDeletionStatusLookup(DeletionStatusLookup):
         match query.operation_id.value:
             case "sdk-group-delete":
                 return RetainedDeletionStatusDTO(
-                    OperationId("sdk-group-delete"),
-                    None,
-                    True,
-                    True,
-                    None,
-                    True,
-                    datetime(2030, 1, 31, tzinfo=UTC),
+                    operation_id=OperationId("sdk-group-delete"),
+                    job_status=None,
+                    admission_confirmed=True,
+                    access_blocked=True,
+                    application_shutdown_complete=None,
+                    physical_cleanup_complete=True,
+                    expires_at=datetime(2030, 1, 31, tzinfo=UTC),
                 )
             case "settled +/&é":
                 return RetainedDeletionStatusDTO(

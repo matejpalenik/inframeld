@@ -142,12 +142,12 @@ class PostgresAccessGroupFactsReader(
                 populate_existing=True,
             )
             return AccessGroupChangeFactsDTO(
-                group.organization_id,
-                group.project_id,
-                group.access_revision,
-                group.group_id,
-                facts.action,
-                Principal(
+                organization_id=group.organization_id,
+                project_id=group.project_id,
+                access_revision=group.access_revision,
+                group_id=group.group_id,
+                action=facts.action,
+                recipient=Principal(
                     PrincipalId(recipient[0].id),
                     group.organization_id,
                     recipient[0].kind,
@@ -155,10 +155,12 @@ class PostgresAccessGroupFactsReader(
                 )
                 if recipient is not None
                 else None,
-                recipient[2] if recipient is not None else False,
-                recipient[3] if recipient is not None else False,
-                recipient[1] if recipient is not None else False,
-                AccessGroupRelationships(member is not None, manager is not None),
+                recipient_is_project_member=recipient[2] if recipient is not None else False,
+                recipient_has_coherent_identity=recipient[3] if recipient is not None else False,
+                recipient_has_pending_recovery=recipient[1] if recipient is not None else False,
+                relationships=AccessGroupRelationships(
+                    member=member is not None, manager=manager is not None
+                ),
             )
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None
@@ -214,13 +216,15 @@ class PostgresAccessGroupFactsReader(
             )
             return tuple(
                 ProjectDepartureCandidateDTO(
-                    Principal(PrincipalId(row.id), facts.organization_id, row.kind, row.status),
-                    pending,
-                    project_member,
-                    coherent,
-                    False,
-                    group_member,
-                    True,
+                    principal=Principal(
+                        PrincipalId(row.id), facts.organization_id, row.kind, row.status
+                    ),
+                    has_pending_recovery=pending,
+                    is_project_member=project_member,
+                    has_coherent_identity=coherent,
+                    can_grant=False,
+                    is_group_member=group_member,
+                    is_group_manager=True,
                 )
                 for row, pending, project_member, coherent, group_member in rows
             )
@@ -390,16 +394,21 @@ class PostgresAccessGroupFactsReader(
                 granted=is_manager,
             )
             metadata = AccessGroupMetadataDTO(
-                OrganizationId(organization),
-                project_id,
-                AccessGroupId(group.id),
-                ResourceName(group.resource_name) if group.resource_name is not None else None,
-                group.name,
-                group.created_at,
-                project.access_revision,
+                organization_id=OrganizationId(organization),
+                project_id=project_id,
+                group_id=AccessGroupId(group.id),
+                name=ResourceName(group.resource_name) if group.resource_name is not None else None,
+                display_name=group.name,
+                created_at=group.created_at,
+                access_revision=project.access_revision,
             )
             return AccessGroupReadFactsDTO(
-                InstallationId(installed), metadata, action, is_member, is_manager, has_action
+                installation_id=InstallationId(installed),
+                group=metadata,
+                action=action,
+                is_member=is_member,
+                is_manager=is_manager,
+                has_group_action=has_action,
             )
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None

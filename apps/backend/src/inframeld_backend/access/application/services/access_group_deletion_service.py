@@ -67,24 +67,26 @@ from inframeld_backend.shared.domain.validation.revision_validation import Revis
 
 
 class AccessGroupDeletionService(AccessGroupDeleter):
+    """Delete an unused group atomically with its original receipt and retained completion."""
+
     def __init__(
         self,
         *,
         transaction_manager: TransactionManager,
-        facts_reader: AccessGroupDeletionFactsReader,
-        writer: AccessGroupDeletionWriter,
-        result_reader: AccessGroupDeletionResultReader,
+        group_deletion_facts_reader: AccessGroupDeletionFactsReader,
+        group_deletion_writer: AccessGroupDeletionWriter,
+        group_deletion_result_reader: AccessGroupDeletionResultReader,
         operation_idempotency: OperationIdempotency,
         request_fingerprint_service: RequestFingerprintService,
-        binding_writer: DeletionStatusBindingWriter,
+        deletion_status_binding_writer: DeletionStatusBindingWriter,
     ) -> None:
         self._transaction_manager = transaction_manager
-        self._facts_reader = facts_reader
-        self._writer = writer
-        self._result_reader = result_reader
+        self._group_deletion_facts_reader = group_deletion_facts_reader
+        self._group_deletion_writer = group_deletion_writer
+        self._group_deletion_result_reader = group_deletion_result_reader
         self._operation_idempotency = operation_idempotency
         self._request_fingerprint_service = request_fingerprint_service
-        self._binding_writer = binding_writer
+        self._deletion_status_binding_writer = deletion_status_binding_writer
 
     @override
     async def delete(
@@ -115,7 +117,7 @@ class AccessGroupDeletionService(AccessGroupDeleter):
         )
         try:
             async with asyncio.timeout(5), self._transaction_manager.begin():
-                facts = await self._facts_reader.lock_for_deletion(
+                facts = await self._group_deletion_facts_reader.lock_for_deletion(
                     access=access, project_id=command.project_id, group_id=command.group_id
                 )
                 if facts is None:
@@ -143,20 +145,21 @@ class AccessGroupDeletionService(AccessGroupDeleter):
                     lookup_authority=authority,
                 )
                 if not isinstance(operation, NewOperationReservationDTO):
-                    completed = self._completed(operation)
-                    original = await self._result_reader.original(
+                    completed = self._require_safe_completed_operation(operation)
+                    original = await self._group_deletion_result_reader.original(
                         organization_id=group.organization_id,
                         actor_id=access.actor_principal_id,
                         command=command,
                         operation_id=completed.operation_id,
                     )
+                    # Current management precedes recovery of this request's immutable receipt.
                     if original != DeletedAccessGroupDTO(
-                        completed.operation_id,
-                        group.organization_id,
-                        group.project_id,
-                        group.group_id,
-                        access.actor_principal_id,
-                        command.expected_access_revision + 1,
+                        operation_id=completed.operation_id,
+                        organization_id=group.organization_id,
+                        project_id=group.project_id,
+                        group_id=group.group_id,
+                        actor_principal_id=access.actor_principal_id,
+                        access_revision=command.expected_access_revision + 1,
                     ):
                         raise ConflictError("The original group deletion result is incoherent.")
                     return AccessGroupDeletionResultDTO(original, completed)
@@ -165,32 +168,32 @@ class AccessGroupDeletionService(AccessGroupDeleter):
                 if group.access_revision == RevisionValidation.MAX_VALUE:
                     raise ConflictError("The Project Access revision cannot advance.")
                 deleted = DeletedAccessGroupDTO(
-                    operation.operation_id,
-                    group.organization_id,
-                    group.project_id,
-                    group.group_id,
-                    access.actor_principal_id,
-                    group.access_revision + 1,
+                    operation_id=operation.operation_id,
+                    organization_id=group.organization_id,
+                    project_id=group.project_id,
+                    group_id=group.group_id,
+                    actor_principal_id=access.actor_principal_id,
+                    access_revision=group.access_revision + 1,
                 )
-                binding = await self._binding_writer.bind_original_request(
+                binding = await self._deletion_status_binding_writer.bind_original_request(
                     reservation=operation,
                     request_id=request_id,
                     expected_installation_id=facts.installation_id,
                     expected_request=OperationReservationRequestDTO(
-                        access.actor_principal_id,
-                        group.organization_id,
-                        group.project_id,
-                        context.method,
-                        context.requested_route,
-                        context.key,
-                        fingerprint.value,
-                        authority,
+                        principal_id=access.actor_principal_id,
+                        organization_id=group.organization_id,
+                        project_id=group.project_id,
+                        method=context.method,
+                        requested_route=context.requested_route,
+                        key=context.key,
+                        fingerprint=fingerprint.value,
+                        lookup_authority=authority,
                     ),
                 )
-                await self._writer.delete(
+                await self._group_deletion_writer.delete(
                     group=deleted, expected_project_revision=group.access_revision, binding=binding
                 )
-                completed = self._completed(
+                completed = self._require_safe_completed_operation(
                     await self._operation_idempotency.record_completed_result(
                         operation, replay_kind=OperationReplayKind.SAFE_RESULT
                     )
@@ -202,7 +205,8 @@ class AccessGroupDeletionService(AccessGroupDeleter):
             raise DependencyUnavailableError() from None
 
     @staticmethod
-    def _completed(operation: object) -> CompletedSynchronousOperationDTO:
+    def _require_safe_completed_operation(operation: object) -> CompletedSynchronousOperationDTO:
+        """Require a replay-safe synchronous completion before using a deletion outcome."""
         if (
             not isinstance(operation, CompletedSynchronousOperationDTO)
             or operation.replay_kind is not OperationReplayKind.SAFE_RESULT

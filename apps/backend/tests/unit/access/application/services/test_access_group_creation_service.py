@@ -81,28 +81,28 @@ CONTEXT = IdempotencyContextDTO(
     IdempotencyKey("create-original"),
 )
 ORIGINAL = CreatedAccessGroupDTO(
-    SAVED_RESULT.operation_id,
-    ORGANIZATION_ID,
-    PROJECT_ID,
-    AccessGroupId(UUID(int=8)),
-    ACCESS.actor_principal_id,
-    COMMAND.name,
-    COMMAND.display_name.value,
-    8,
+    operation_id=SAVED_RESULT.operation_id,
+    organization_id=ORGANIZATION_ID,
+    project_id=PROJECT_ID,
+    group_id=AccessGroupId(UUID(int=8)),
+    creator_principal_id=ACCESS.actor_principal_id,
+    name=COMMAND.name,
+    display_name=COMMAND.display_name.value,
+    access_revision=8,
 )
 FACTS = AccessGroupCreationFactsDTO(
-    ORGANIZATION_ID,
-    PROJECT_ID,
-    7,
-    ProjectActionFactsDTO(
-        Principal(
+    organization_id=ORGANIZATION_ID,
+    project_id=PROJECT_ID,
+    access_revision=7,
+    action=ProjectActionFactsDTO(
+        principal=Principal(
             ACCESS.actor_principal_id, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
         ),
-        False,
-        None,
-        ProjectStatus.ACTIVE,
-        True,
-        True,
+        has_pending_recovery=False,
+        oauth_credential_facts=None,
+        project_status=ProjectStatus.ACTIVE,
+        is_project_member=True,
+        has_exact_action_grant=True,
     ),
 )
 

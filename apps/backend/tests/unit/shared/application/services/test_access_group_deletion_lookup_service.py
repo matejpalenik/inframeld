@@ -69,7 +69,13 @@ QUERY = LookupOriginalOperationQuery(
 )
 OPERATION = OperationId("original-group-deletion")
 RETAINED = RetainedDeletionStatusDTO(
-    OPERATION, None, True, True, None, True, datetime(2030, 1, 1, tzinfo=UTC)
+    operation_id=OPERATION,
+    job_status=None,
+    admission_confirmed=True,
+    access_blocked=True,
+    application_shutdown_complete=None,
+    physical_cleanup_complete=True,
+    expires_at=datetime(2030, 1, 1, tzinfo=UTC),
 )
 
 

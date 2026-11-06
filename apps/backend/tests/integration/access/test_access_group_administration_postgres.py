@@ -215,7 +215,7 @@ async def test_relationship_lifecycle_preserves_original_receipts_and_never_rest
         "appoint-bob",
     )
     assert (
-        appointed.relationships == AccessGroupRelationships(True, True)
+        appointed.relationships == AccessGroupRelationships(member=True, manager=True)
         and appointed.status_code == 201
     )
     noop = await change_group(
@@ -237,7 +237,7 @@ async def test_relationship_lifecycle_preserves_original_receipts_and_never_rest
         4,
         "demote-bob",
     )
-    assert demoted.relationships == AccessGroupRelationships(True, False)
+    assert demoted.relationships == AccessGroupRelationships(member=True, manager=False)
     removed = await change_group(
         database,
         seed.actor.access,
@@ -247,7 +247,7 @@ async def test_relationship_lifecycle_preserves_original_receipts_and_never_rest
         5,
         "remove-bob",
     )
-    assert removed.relationships == AccessGroupRelationships(False, False)
+    assert removed.relationships == AccessGroupRelationships(member=False, manager=False)
     replay = await change_group(
         database,
         seed.actor.access,
@@ -268,7 +268,7 @@ async def test_relationship_lifecycle_preserves_original_receipts_and_never_rest
         6,
         "rejoin-bob",
     )
-    assert joined.relationships == AccessGroupRelationships(True, False)
+    assert joined.relationships == AccessGroupRelationships(member=True, manager=False)
     removed_replay = await change_group(
         database,
         seed.actor.access,
@@ -307,7 +307,7 @@ async def test_application_account_can_join_but_never_become_a_manager(database:
         4,
         "join-app",
     )
-    assert added.relationships == AccessGroupRelationships(True, False)
+    assert added.relationships == AccessGroupRelationships(member=True, manager=False)
     for kind in (AccessGroupChangeKind.APPOINT_MANAGER, AccessGroupChangeKind.REMOVE_MANAGER):
         with pytest.raises(InvalidInputError):
             await change_group(

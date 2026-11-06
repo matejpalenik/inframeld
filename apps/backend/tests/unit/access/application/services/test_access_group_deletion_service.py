@@ -92,32 +92,37 @@ CONTEXT = IdempotencyContextDTO(
     IdempotencyKey("delete-original"),
 )
 FACTS = AccessGroupReadFactsDTO(
-    InstallationId(UUID(int=20)),
-    AccessGroupMetadataDTO(
-        ORGANIZATION_ID,
-        PROJECT_ID,
-        GROUP,
-        ResourceName("support"),
-        "Support",
-        SAVED_RESULT.expires_at,
-        7,
+    installation_id=InstallationId(UUID(int=20)),
+    group=AccessGroupMetadataDTO(
+        organization_id=ORGANIZATION_ID,
+        project_id=PROJECT_ID,
+        group_id=GROUP,
+        name=ResourceName("support"),
+        display_name="Support",
+        created_at=SAVED_RESULT.expires_at,
+        access_revision=7,
     ),
-    ProjectActionFactsDTO(
-        Principal(
+    action=ProjectActionFactsDTO(
+        principal=Principal(
             ACCESS.actor_principal_id, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
         ),
-        False,
-        None,
-        ProjectStatus.ACTIVE,
-        True,
-        True,
+        has_pending_recovery=False,
+        oauth_credential_facts=None,
+        project_status=ProjectStatus.ACTIVE,
+        is_project_member=True,
+        has_exact_action_grant=True,
     ),
-    True,
-    True,
-    False,
+    is_member=True,
+    is_manager=True,
+    has_group_action=False,
 )
 ORIGINAL = DeletedAccessGroupDTO(
-    SAVED_RESULT.operation_id, ORGANIZATION_ID, PROJECT_ID, GROUP, ACCESS.actor_principal_id, 8
+    operation_id=SAVED_RESULT.operation_id,
+    organization_id=ORGANIZATION_ID,
+    project_id=PROJECT_ID,
+    group_id=GROUP,
+    actor_principal_id=ACCESS.actor_principal_id,
+    access_revision=8,
 )
 
 
@@ -194,21 +199,21 @@ class MockBinding(DeletionStatusBindingWriter):
         assert expected_request.lookup_authority is not None
         assert expected_request.project_id is not None
         return DeletionStatusBindingDTO(
-            reservation.operation_id,
-            request_id,
-            expected_installation_id,
-            expected_request.organization_id,
-            expected_request.project_id,
-            expected_request.principal_id,
-            expected_request.method,
-            expected_request.requested_route,
-            expected_request.key,
-            RequestFingerprint(expected_request.fingerprint),
-            expected_request.lookup_authority.family,
-            expected_request.lookup_authority.action_id,
-            SAVED_RESULT.expires_at - timedelta(days=1),
-            30,
-            "ADR-0117/PD-KNOWLEDGE-02:v1",
+            operation_id=reservation.operation_id,
+            request_id=request_id,
+            installation_id=expected_installation_id,
+            organization_id=expected_request.organization_id,
+            project_id=expected_request.project_id,
+            initiator_principal_id=expected_request.principal_id,
+            method=expected_request.method,
+            requested_route=expected_request.requested_route,
+            key=expected_request.key,
+            fingerprint=RequestFingerprint(expected_request.fingerprint),
+            authority_family=expected_request.lookup_authority.family,
+            action_id=expected_request.lookup_authority.action_id,
+            recorded_at=SAVED_RESULT.expires_at - timedelta(days=1),
+            retention_days=30,
+            retention_policy_version="ADR-0117/PD-KNOWLEDGE-02:v1",
         )
 
 
@@ -224,12 +229,12 @@ class DeletionScenario:
         self.idempotency.result = NEW_RESERVATION
         self.service = AccessGroupDeletionService(
             transaction_manager=MockTransactions(self.events),
-            facts_reader=self.facts,
-            writer=self.writer,
-            result_reader=MockResults(self.events),
+            group_deletion_facts_reader=self.facts,
+            group_deletion_writer=self.writer,
+            group_deletion_result_reader=MockResults(self.events),
             operation_idempotency=self.idempotency,
             request_fingerprint_service=RequestFingerprintService(RequestFingerprintKey(b"K" * 32)),
-            binding_writer=self.binding,
+            deletion_status_binding_writer=self.binding,
         )
 
     async def delete(self, command: DeleteAccessGroupCommand = COMMAND):

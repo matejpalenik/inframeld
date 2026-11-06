@@ -95,9 +95,9 @@ async def open_access_group_relationship_change(
     async with database.session() as session:
         yield AccessGroupRelationshipService(
             transaction_manager=SqlAlchemyTransactionManager(session),
-            facts_reader=PostgresAccessGroupFactsReader(session),
-            writer=PostgresAccessGroupRelationshipWriter(session),
-            result_reader=PostgresAccessGroupRelationshipResultReader(session),
+            group_change_facts_reader=PostgresAccessGroupFactsReader(session),
+            group_relationship_writer=PostgresAccessGroupRelationshipWriter(session),
+            group_relationship_result_reader=PostgresAccessGroupRelationshipResultReader(session),
             operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
             request_fingerprint_service=fingerprints,
         )
@@ -112,10 +112,10 @@ async def open_access_group_deletion(
     async with database.session() as session:
         yield AccessGroupDeletionService(
             transaction_manager=SqlAlchemyTransactionManager(session),
-            facts_reader=PostgresAccessGroupFactsReader(session),
-            writer=PostgresAccessGroupDeletionWriter(session),
-            result_reader=PostgresAccessGroupDeletionResultReader(session),
+            group_deletion_facts_reader=PostgresAccessGroupFactsReader(session),
+            group_deletion_writer=PostgresAccessGroupDeletionWriter(session),
+            group_deletion_result_reader=PostgresAccessGroupDeletionResultReader(session),
             operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
             request_fingerprint_service=fingerprints,
-            binding_writer=PostgresDeletionStatusBindingWriter(session, profile),
+            deletion_status_binding_writer=PostgresDeletionStatusBindingWriter(session, profile),
         )

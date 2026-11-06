@@ -81,33 +81,48 @@ ACTOR = Principal(
     ACCESS.actor_principal_id, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
 )
 FACTS = AccessGroupChangeFactsDTO(
-    ORGANIZATION_ID,
-    PROJECT_ID,
-    7,
-    GROUP,
-    ProjectActionFactsDTO(ACTOR, False, None, ProjectStatus.ACTIVE, True, True),
-    BOB,
-    True,
-    True,
-    False,
-    AccessGroupRelationships(False, False),
+    organization_id=ORGANIZATION_ID,
+    project_id=PROJECT_ID,
+    access_revision=7,
+    group_id=GROUP,
+    action=ProjectActionFactsDTO(
+        principal=ACTOR,
+        has_pending_recovery=False,
+        oauth_credential_facts=None,
+        project_status=ProjectStatus.ACTIVE,
+        is_project_member=True,
+        has_exact_action_grant=True,
+    ),
+    recipient=BOB,
+    recipient_is_project_member=True,
+    recipient_has_coherent_identity=True,
+    recipient_has_pending_recovery=False,
+    relationships=AccessGroupRelationships(member=False, manager=False),
 )
 COMMAND = ChangeAccessGroupRelationshipCommand(
     PROJECT_ID, GROUP, BOB.id, 7, AccessGroupChangeKind.APPOINT_MANAGER
 )
-CANDIDATE = ProjectDepartureCandidateDTO(ACTOR, False, True, True, False, True, True)
+CANDIDATE = ProjectDepartureCandidateDTO(
+    principal=ACTOR,
+    has_pending_recovery=False,
+    is_project_member=True,
+    has_coherent_identity=True,
+    can_grant=False,
+    is_group_member=True,
+    is_group_manager=True,
+)
 ORIGINAL = AccessGroupRelationshipResultDTO(
-    ORGANIZATION_ID,
-    PROJECT_ID,
-    GROUP,
-    ACTOR.id,
-    BOB.id,
-    COMMAND.change_kind,
-    8,
-    True,
-    AccessGroupRelationships(True, True),
-    201,
-    SAVED_RESULT,
+    organization_id=ORGANIZATION_ID,
+    project_id=PROJECT_ID,
+    group_id=GROUP,
+    actor_principal_id=ACTOR.id,
+    principal_id=BOB.id,
+    change_kind=COMMAND.change_kind,
+    access_revision=8,
+    changed=True,
+    relationships=AccessGroupRelationships(member=True, manager=True),
+    status_code=201,
+    operation=SAVED_RESULT,
 )
 
 
@@ -177,9 +192,9 @@ class GroupScenario:
         self.idempotency.result = NEW_RESERVATION
         self.service = AccessGroupRelationshipService(
             transaction_manager=MockTransactions(self.events),
-            facts_reader=self.facts,
-            writer=self.writer,
-            result_reader=self.results,
+            group_change_facts_reader=self.facts,
+            group_relationship_writer=self.writer,
+            group_relationship_result_reader=self.results,
             operation_idempotency=self.idempotency,
             request_fingerprint_service=RequestFingerprintService(RequestFingerprintKey(b"K" * 32)),
         )
@@ -203,7 +218,7 @@ async def test_appointment_adds_both_relationships_and_advances_once() -> None:
     scenario = GroupScenario()
     result = await scenario.change()
     assert (result.relationships, result.changed, result.access_revision, result.status_code) == (
-        AccessGroupRelationships(True, True),
+        AccessGroupRelationships(member=True, manager=True),
         True,
         8,
         201,
@@ -216,15 +231,23 @@ async def test_appointment_adds_both_relationships_and_advances_once() -> None:
 @pytest.mark.parametrize(
     "kind,after",
     [
-        (AccessGroupChangeKind.REMOVE_MANAGER, AccessGroupRelationships(True, False)),
-        (AccessGroupChangeKind.REMOVE_MEMBER, AccessGroupRelationships(False, False)),
+        (
+            AccessGroupChangeKind.REMOVE_MANAGER,
+            AccessGroupRelationships(member=True, manager=False),
+        ),
+        (
+            AccessGroupChangeKind.REMOVE_MEMBER,
+            AccessGroupRelationships(member=False, manager=False),
+        ),
     ],
 )
 async def test_departure_keeps_an_eligible_manager_and_distinct_ordinary_membership(
     kind: AccessGroupChangeKind, after: AccessGroupRelationships
 ) -> None:
     scenario = GroupScenario()
-    scenario.facts.facts = replace(FACTS, relationships=AccessGroupRelationships(True, True))
+    scenario.facts.facts = replace(
+        FACTS, relationships=AccessGroupRelationships(member=True, manager=True)
+    )
     result = await scenario.change(replace(COMMAND, change_kind=kind))
     assert (result.relationships, result.access_revision, result.status_code) == (after, 8, 200)
     assert "handover" in scenario.events
@@ -248,7 +271,9 @@ async def test_last_manager_cannot_depart_relying_on_ineligible_replacement(
     candidate_change: str,
 ) -> None:
     scenario = GroupScenario()
-    scenario.facts.facts = replace(FACTS, relationships=AccessGroupRelationships(True, True))
+    scenario.facts.facts = replace(
+        FACTS, relationships=AccessGroupRelationships(member=True, manager=True)
+    )
     candidate = CANDIDATE
     if candidate_change == "application":
         candidate = replace(candidate, principal=replace(ACTOR, kind=PrincipalKind.APPLICATION))
@@ -273,7 +298,9 @@ async def test_last_manager_cannot_depart_relying_on_ineligible_replacement(
 @pytest.mark.asyncio
 async def test_add_existing_member_is_noop_and_preserves_reviewed_revision() -> None:
     scenario = GroupScenario()
-    scenario.facts.facts = replace(FACTS, relationships=AccessGroupRelationships(True, False))
+    scenario.facts.facts = replace(
+        FACTS, relationships=AccessGroupRelationships(member=True, manager=False)
+    )
     result = await scenario.change(replace(COMMAND, change_kind=AccessGroupChangeKind.ADD_MEMBER))
     assert not result.changed and result.access_revision == 7 and result.status_code == 200
     assert "handover" not in scenario.events
@@ -291,7 +318,7 @@ async def test_application_can_join_but_cannot_be_appointed_manager() -> None:
         await scenario.change()
     assert not scenario.writer.results
     result = await scenario.change(replace(COMMAND, change_kind=AccessGroupChangeKind.ADD_MEMBER))
-    assert result.relationships == AccessGroupRelationships(True, False)
+    assert result.relationships == AccessGroupRelationships(member=True, manager=False)
 
 
 @pytest.mark.asyncio
@@ -349,6 +376,8 @@ async def test_application_cannot_be_a_manager_removal_recipient() -> None:
 async def test_replay_rejects_original_state_incompatible_with_appointment() -> None:
     scenario = GroupScenario()
     scenario.idempotency.result = SAVED_RESULT
-    scenario.results.result = replace(ORIGINAL, relationships=AccessGroupRelationships(True, False))
+    scenario.results.result = replace(
+        ORIGINAL, relationships=AccessGroupRelationships(member=True, manager=False)
+    )
     with pytest.raises(ConflictError):
         await scenario.change()
