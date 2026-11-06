@@ -29,6 +29,7 @@ class OperationLookupAuthorityFamily(str, Enum):
     PROJECT_ACTION_USE = 'project_action_use'
     PROJECT_GRANT_READ = 'project_grant_read'
     ORGANIZATION_ACTION_USE = 'organization_action_use'
+    ACCESS_GROUP_DELETION = 'access_group_deletion'
 
     @classmethod
     def from_json(cls, json_str: str) -> Self:

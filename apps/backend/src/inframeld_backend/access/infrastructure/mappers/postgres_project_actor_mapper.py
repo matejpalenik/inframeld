@@ -16,7 +16,7 @@ from inframeld_backend.access.infrastructure.rows.principal_row import Principal
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 
 
-class PostgresApplicationAccountFactsMapper:
+class PostgresProjectActorMapper:
     @staticmethod
     def action(
         *,

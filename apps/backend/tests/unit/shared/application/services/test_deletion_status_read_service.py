@@ -371,3 +371,53 @@ def test_operation_reference_has_the_shared_wire_bound() -> None:
     assert GetDeletionStatusQuery(OperationId("a" * 128)).operation_id.value == "a" * 128
     with pytest.raises(InvalidInputError):
         GetDeletionStatusQuery(OperationId("a" * 129))
+
+
+def _settled_group() -> DeletionStatusObservationDTO:
+    binding = replace(
+        BINDING,
+        authority_family=OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION,
+        action_id=ActionId("delete-access-group"),
+        requested_route=f"/v1/projects/{BINDING.project_id.value}/access-groups/{UUID(int=9)}",
+    )
+    return replace(_settled(), binding=binding, job_status=None, application_shutdown_complete=None)
+
+
+@pytest.mark.asyncio
+async def test_synchronous_group_completion_preserves_inapplicable_nulls_and_captured_expiry() -> (
+    None
+):
+    original = _settled_group()
+    result = await _lookup(original)
+    assert isinstance(result, RetainedDeletionStatusDTO)
+    assert result.job_status is None and result.application_shutdown_complete is None
+    assert result.admission_confirmed is True and result.access_blocked is True
+    assert result.physical_cleanup_complete is True
+    assert result.expires_at == original.expires_at
+    later = await _lookup(replace(original, observed_at=NOW + timedelta(days=1)))
+    assert later == result
+    assert isinstance(
+        await _lookup(replace(original, observed_at=original.expires_at)), UnresolvedOperationDTO
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("job_status", JobStatus.SUCCEEDED),
+        ("application_shutdown_complete", True),
+        ("admission_confirmed", None),
+        ("access_blocked", False),
+        ("physical_cleanup_complete", None),
+        ("unfinished_obligation", PROVENANCE),
+        ("retention_started_at", None),
+        ("expires_at", STARTED + timedelta(days=31)),
+        ("owner_observed_at", NOW + timedelta(seconds=1)),
+    ],
+)
+async def test_group_completion_rejects_inconsistent_owner_observations(
+    field: str, value: object
+) -> None:
+    with pytest.raises(DependencyUnavailableError):
+        await _lookup(replace(_settled_group(), **{field: value}))

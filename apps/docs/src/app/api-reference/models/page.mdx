@@ -17,6 +17,98 @@ Confirms original asynchronous admission with a known or explicitly unknown job 
 
 <ApiSchema name="AcceptedOperationLookupResponse" />
 
+<a id="AccessGroupCreationRequest" />
+
+## AccessGroupCreationRequest
+
+Supplies the exact group Name, display name and reviewed Project Access revision. The Project is selected in the route.
+
+<ApiSchema name="AccessGroupCreationRequest" />
+
+<a id="AccessGroupCreationResponse" />
+
+## AccessGroupCreationResponse
+
+Retains original group creation, including creator identity, names, operation, revision and expiry. The creator receives ordinary membership and management together, with no separate document-action assignment.
+
+<ApiSchema name="AccessGroupCreationResponse" />
+
+<a id="AccessGroupDeletionResponse" />
+
+## AccessGroupDeletionResponse
+
+The original synchronous unused-group deletion receipt. It is separate from the content-free retained status available to the currently eligible original initiator after the group disappears.
+
+<ApiSchema name="AccessGroupDeletionResponse" />
+
+<a id="AccessGroupManagerRemovalResponse" />
+
+## AccessGroupManagerRemovalResponse
+
+Reports original management removal or an already-absent result. Ordinary membership remains. The historical receipt does not describe a later appointment.
+
+<ApiSchema name="AccessGroupManagerRemovalResponse" />
+
+<a id="AccessGroupManagerRequest" />
+
+## AccessGroupManagerRequest
+
+<ApiSchema name="AccessGroupManagerRequest" />
+
+<a id="AccessGroupManagerResponse" />
+
+## AccessGroupManagerResponse
+
+Records original human management with `manager: true` and the change flag. Appointment includes ordinary membership and access through the group to current and future shared documents.
+
+<ApiSchema name="AccessGroupManagerResponse" />
+
+<a id="AccessGroupMembershipRemovalResponse" />
+
+## AccessGroupMembershipRemovalResponse
+
+Records original membership removal or an already-absent result. A real removal also removes management under the required handover checks. Replay does not remove a later rejoin.
+
+<ApiSchema name="AccessGroupMembershipRemovalResponse" />
+
+<a id="AccessGroupMembershipRequest" />
+
+## AccessGroupMembershipRequest
+
+<ApiSchema name="AccessGroupMembershipRequest" />
+
+<a id="AccessGroupMembershipResponse" />
+
+## AccessGroupMembershipResponse
+
+Records original ordinary membership with `member: true` and the change flag. It promises no management or unrelated action grant.
+
+<ApiSchema name="AccessGroupMembershipResponse" />
+
+<a id="AccessGroupMetadataResponse" />
+
+## AccessGroupMetadataResponse
+
+Safe identity and naming metadata under current visibility. A nullable legacy Name does not change the permanent group ID. Its Access revision belongs to the Project.
+
+<ApiSchema name="AccessGroupMetadataResponse" />
+
+<a id="AccessGroupPrincipalResponse" />
+
+## AccessGroupPrincipalResponse
+
+One safe stored member or manager item, without email, other relationships or document contents. Its presence does not establish current eligibility for a new operation.
+
+<ApiSchema name="AccessGroupPrincipalResponse" />
+
+<a id="AccessGroupPrincipalsPageResponse" />
+
+## AccessGroupPrincipalsPageResponse
+
+An exact group's bounded member or manager page with the current Project Access revision and nullable continuation. Every page requires current management of that group.
+
+<ApiSchema name="AccessGroupPrincipalsPageResponse" />
+
 <a id="ApplicationAccountAction" />
 
 ## ApplicationAccountAction
@@ -208,6 +300,8 @@ Identifies one actual own group membership or management relationship by `access
 <a id="OperationLookupResponse" />
 
 ## OperationLookupResponse
+
+Includes the content-free retained deletion-status alternative for the closed access-group deletion family. Ordinary completed-operation metadata and a retained group deletion observation have different meanings. [Group recovery](/guides/recover-original-request#recover-an-access-group-change) explains the boundary.
 
 <ApiSchema name="OperationLookupResponse" />
 
@@ -410,6 +504,8 @@ A bounded page of stored memberships and the current Project Access revision. A 
 <a id="RetainedDeletionStatusResponse" />
 
 ## RetainedDeletionStatusResponse
+
+Reports permitted original deletion facts. A settled group deletion confirms admission, blocked access and group cleanup, with no job or application-shutdown stage. [The status guide](/guides/read-deletion-status#read-status-for-a-deleted-access-group) preserves the separate Project interpretation.
 
 <ApiSchema name="RetainedDeletionStatusResponse" />
 

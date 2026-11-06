@@ -5,7 +5,6 @@ from sqlalchemy import (
     BigInteger,
     ColumnElement,
     Nullable,
-    SQLColumnExpression,
     String,
     and_,
     exists,
@@ -18,7 +17,6 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 from sqlalchemy.orm import aliased
-from sqlalchemy.sql.selectable import Exists
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
@@ -41,7 +39,6 @@ from inframeld_backend.access.application.protocols.project_membership_change_fa
     ProjectMembershipChangeFactsReader,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
-from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.enums.project_departure_target_kind import (
     ProjectDepartureTargetKind,
@@ -56,27 +53,20 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.human_credential_state_queries import (
     HumanCredentialStateQueries,
 )
+from inframeld_backend.access.infrastructure.readers.project_principal_queries import (
+    ProjectPrincipalQueries,
+)
 from inframeld_backend.access.infrastructure.rows.application_action_grant_row import (
     ApplicationActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
-from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
-    HumanCredentialVersionRow,
-)
-from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
-    HumanIdentityLinkRow,
-)
-from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
-    IdentityRecoveryAdmissionRow,
-)
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
 )
-from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
@@ -156,8 +146,8 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
         installation = InstallationId(installed)
         org = OrganizationId(locked_org)
         recipient = aliased(PrincipalRow, name="membership_recipient")
-        actor_member = self._membership(PrincipalRow.id, project_id, org)
-        recipient_member = self._membership(recipient.id, project_id, org)
+        actor_member = ProjectPrincipalQueries.membership(PrincipalRow.id, project_id, org)
+        recipient_member = ProjectPrincipalQueries.membership(recipient.id, project_id, org)
         authority = (
             exists()
             .where(
@@ -189,9 +179,9 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                         actor_member,
                         recipient_member,
                         authority,
-                        self._pending(PrincipalRow.id, installation),
-                        self._pending(recipient.id, installation),
-                        self._coherent_identity(recipient.id, org, installation),
+                        ProjectPrincipalQueries.pending(PrincipalRow.id, installation),
+                        ProjectPrincipalQueries.pending(recipient.id, installation),
+                        ProjectPrincipalQueries.coherent_identity(recipient.id, org, installation),
                         linked,
                         version,
                     )
@@ -446,9 +436,11 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                 await self._session.execute(
                     select(
                         PrincipalRow,
-                        self._pending(PrincipalRow.id, facts.installation_id),
-                        self._membership(PrincipalRow.id, facts.project_id, facts.organization_id),
-                        self._coherent_identity(
+                        ProjectPrincipalQueries.pending(PrincipalRow.id, facts.installation_id),
+                        ProjectPrincipalQueries.membership(
+                            PrincipalRow.id, facts.project_id, facts.organization_id
+                        ),
+                        ProjectPrincipalQueries.coherent_identity(
                             PrincipalRow.id, facts.organization_id, facts.installation_id
                         ),
                         grant,
@@ -477,78 +469,6 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                 is_group_manager=manages_group,
             )
             for principal, pending, member, coherent, can_grant, member_of_group, manages_group in rows
-        )
-
-    @staticmethod
-    def _membership(
-        principal: SQLColumnExpression[UUID], project: ProjectId, organization: OrganizationId
-    ) -> Exists:
-        """Build the current Project-membership predicate for a candidate human."""
-        return (
-            exists()
-            .where(
-                ProjectMembershipRow.project_id == project.value,
-                ProjectMembershipRow.organization_id == organization.value,
-                ProjectMembershipRow.principal_id == principal,
-            )
-            .correlate_except(ProjectMembershipRow)
-        )
-
-    @staticmethod
-    def _pending(principal: SQLColumnExpression[UUID], installation: InstallationId) -> Exists:
-        """Include unreleased recovery blocks when observing candidate eligibility."""
-        return (
-            select(IdentityRecoveryAdmissionRow.operation_id)
-            .join(
-                HumanIdentityLinkRow,
-                and_(
-                    HumanIdentityLinkRow.authority == IdentityRecoveryAdmissionRow.authority,
-                    HumanIdentityLinkRow.subject == IdentityRecoveryAdmissionRow.subject,
-                ),
-            )
-            .where(
-                IdentityRecoveryAdmissionRow.installation_id == installation.value,
-                HumanIdentityLinkRow.principal_id == principal,
-                IdentityRecoveryAdmissionRow.released_at.is_(None),
-            )
-            .exists()
-            .correlate_except(IdentityRecoveryAdmissionRow, HumanIdentityLinkRow)
-        )
-
-    @staticmethod
-    def _coherent_identity(
-        principal: SQLColumnExpression[UUID],
-        organization: OrganizationId,
-        installation: InstallationId,
-    ) -> Exists:
-        """Require one coherent admitted identity when observing a replacement candidate."""
-        version = (
-            exists()
-            .where(
-                HumanCredentialVersionRow.installation_id == installation.value,
-                HumanCredentialVersionRow.authority == HumanIdentityLinkRow.authority,
-                HumanCredentialVersionRow.subject == HumanIdentityLinkRow.subject,
-            )
-            .correlate(HumanIdentityLinkRow)
-        )
-        history = (
-            exists()
-            .where(
-                IdentityRecoveryAdmissionRow.installation_id == installation.value,
-                IdentityRecoveryAdmissionRow.authority == HumanIdentityLinkRow.authority,
-                IdentityRecoveryAdmissionRow.subject == HumanIdentityLinkRow.subject,
-            )
-            .correlate(HumanIdentityLinkRow)
-        )
-        return (
-            exists()
-            .where(
-                HumanIdentityLinkRow.principal_id == principal,
-                HumanIdentityLinkRow.organization_id == organization.value,
-                HumanIdentityLinkRow.principal_kind == PrincipalKind.HUMAN,
-                or_(version, ~history),
-            )
-            .correlate_except(HumanIdentityLinkRow)
         )
 
     @staticmethod

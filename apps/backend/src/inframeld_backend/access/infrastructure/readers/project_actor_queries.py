@@ -25,8 +25,8 @@ from inframeld_backend.shared.infrastructure.rows.installation_identity_row impo
 )
 
 
-class ApplicationAccountAuthorizationQueries:
-    """Compose current actor observations for account creation and metadata reads."""
+class ProjectActorQueries:
+    """Compose current actor observations for Project-scoped administration and metadata reads."""
 
     @staticmethod
     def header(

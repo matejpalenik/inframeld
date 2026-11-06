@@ -15,11 +15,11 @@ from inframeld_backend.access.application.protocols.application_account_creation
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.access.infrastructure.mappers.postgres_application_account_facts_mapper import (
-    PostgresApplicationAccountFactsMapper,
+from inframeld_backend.access.infrastructure.mappers.postgres_project_actor_mapper import (
+    PostgresProjectActorMapper,
 )
-from inframeld_backend.access.infrastructure.readers.application_account_authorization_queries import (
-    ApplicationAccountAuthorizationQueries,
+from inframeld_backend.access.infrastructure.readers.project_actor_queries import (
+    ProjectActorQueries,
 )
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
@@ -92,9 +92,7 @@ class PostgresApplicationAccountCreationFactsReader(ApplicationAccountCreationFa
             row = (
                 (
                     await self._session.execute(
-                        ApplicationAccountAuthorizationQueries.header(
-                            access, project_id
-                        ).add_columns(granted)
+                        ProjectActorQueries.header(access, project_id).add_columns(granted)
                     )
                 )
                 .tuples()
@@ -111,7 +109,7 @@ class PostgresApplicationAccountCreationFactsReader(ApplicationAccountCreationFa
             OrganizationId(principal.organization_id),
             ProjectId(project.id),
             project.access_revision,
-            PostgresApplicationAccountFactsMapper.action(
+            PostgresProjectActorMapper.action(
                 access=access,
                 principal=principal,
                 project=project,

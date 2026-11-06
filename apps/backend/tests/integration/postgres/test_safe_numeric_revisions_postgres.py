@@ -99,7 +99,7 @@ async def test_unsafe_downgrade_preserves_current_schema_and_exact_revision(
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0024_application_accounts"
+            == "0025_access_group_administration"
         )
         assert await session.scalar(select(ProjectRow.access_revision)) == 2**31
 

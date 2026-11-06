@@ -2,7 +2,7 @@
 
 Alice wants to stop managing SupportKnowledge but keep reading its documents. Demotion removes her management assignment while preserving ordinary membership. Removing membership, suspending Alice and deleting the group have different effects.
 
-**Status:** these are accepted lifecycle and persistence requirements. The manager-membership foreign key and guarded Project membership addition/removal are implemented. Group appointment, group-only departure, retirement and Project-deletion workflows retain their separate implementation status. Exact database definitions remain in [Access persistence](access-persistence.md).
+**Status:** these are accepted lifecycle and persistence requirements. The manager-membership foreign key and guarded Project membership addition/removal are implemented. Group creation, appointment, group-only departure, safe inspection and unused-group deletion are implemented through focused services and migration 0025. Application retirement, stranded-group repair and Project deletion retain their separate implementation status. Exact database definitions remain in [Access persistence](access-persistence.md).
 
 ## Apply one guarded write
 
@@ -27,7 +27,7 @@ When an authorized operation removes both, it checks handover and removes manage
 
 Creating a group, appointing a manager, or recovering a stranded group saves both assignments together. Demotion removes only management. Removing membership also removes management, and rejoining does not restore it. Save each change, scope revision, and audit event in the same protected Access transaction. See the [group workflow](memberships-groups-and-handover.md#group-managers).
 
-Suspension keeps both records but blocks their use. Foreign keys cannot prove that Alice is active, may make this change, or will leave another eligible manager. Application policy still checks those conditions. The initial migration implements the membership constraint, and the PostgreSQL constraint tests exercise it. Project removal applies the manager-before-membership order, while separate group administration remains unfinished.
+Suspension keeps both records but blocks their use. Foreign keys cannot prove that Alice is active, may make this change, or will leave another eligible manager. Application policy still checks those conditions. The initial migration implements the membership constraint, and the PostgreSQL constraint tests exercise it. Project removal and group-only member removal apply the manager-before-membership order. Current group changes use Organization-shared then Project-exclusive coordination and count only eligible remaining human managers.
 
 <a id="project-membership-original-results"></a>
 
@@ -65,3 +65,13 @@ The table assumes the owning operation has passed its current checks. A foreign-
 ## Sources
 
 [ADR-0049](../../../../docs/adr/ADR-0049-require-group-managers-to-be-ordinary-members.md) owns the member-plus-manager invariant. [The initial migration](../../../../apps/backend/migrations/versions/0001_initial.py) owns its foreign key. [Grant administration](grant-administration.md) owns coordinated writes, [membership/handover](memberships-groups-and-handover.md) owns safe departure, and [retention](../../inframeld-knowledge/references/deletion-and-retention.md) owns surviving history. Current application-key and erasure qualifications remain unchanged.
+
+## Group administration and deletion recovery
+
+Creation saves the exact scoped Name, creator membership and human management, Project revision, audit and original result together. It adds no document-action grant. Appointment includes ordinary membership, demotion retains it, and member removal clears management first. Rejoining restores no management. A changed request advances the Project Access revision once, while an authorized no-op retains the reviewed revision and its original result.
+
+Current management is checked before ordinary relationship or deletion history. Fresh additions also check current Project membership and recipient eligibility. A suspended human or an application cannot satisfy the last-manager guard. The original relationship result survives later departures and never reapplies an old change.
+
+Unused-group deletion physically removes the current Access relationships and group, retires its Name, and records audit, original result and authentic synchronous status in one transaction. Existing restrictive foreign keys protect the order and scope. Later Document/source/upload/default/case owners add their own restrictive references before their integration is delivered. The default-reference journey remains with #227.
+
+After deletion, current management cannot be proved from a nonexistent group. The original initiator uses the [closed retained recovery path](../../inframeld-application-contracts/references/operation-recovery-contracts.md#access-group-deletion-recovery). This supplies no replacement membership or full group receipt. [Human acceptance #354](https://github.com/matejpalenik/inframeld/issues/354) tracks actual human exercise separately from automated qualification.

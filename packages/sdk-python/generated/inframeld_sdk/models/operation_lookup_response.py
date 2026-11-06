@@ -21,12 +21,13 @@ from inframeld_sdk.models.accepted_operation_lookup_response import AcceptedOper
 from inframeld_sdk.models.completed_operation_lookup_response import CompletedOperationLookupResponse
 from inframeld_sdk.models.in_progress_operation_lookup_response import InProgressOperationLookupResponse
 from inframeld_sdk.models.recovery_required_operation_lookup_response import RecoveryRequiredOperationLookupResponse
+from inframeld_sdk.models.retained_deletion_status_response import RetainedDeletionStatusResponse
 from inframeld_sdk.models.unresolved_operation_lookup_response import UnresolvedOperationLookupResponse
 from pydantic import StrictStr, Field
 from typing import Union, List, Set, Optional, Dict
 from typing_extensions import Literal, Self
 
-OPERATIONLOOKUPRESPONSE_ONE_OF_SCHEMAS = ["AcceptedOperationLookupResponse", "CompletedOperationLookupResponse", "InProgressOperationLookupResponse", "RecoveryRequiredOperationLookupResponse", "UnresolvedOperationLookupResponse"]
+OPERATIONLOOKUPRESPONSE_ONE_OF_SCHEMAS = ["AcceptedOperationLookupResponse", "CompletedOperationLookupResponse", "InProgressOperationLookupResponse", "RecoveryRequiredOperationLookupResponse", "RetainedDeletionStatusResponse", "UnresolvedOperationLookupResponse"]
 
 class OperationLookupResponse(BaseModel):
     """
@@ -40,10 +41,12 @@ class OperationLookupResponse(BaseModel):
     oneof_schema_3_validator: Optional[InProgressOperationLookupResponse] = None
     # data type: RecoveryRequiredOperationLookupResponse
     oneof_schema_4_validator: Optional[RecoveryRequiredOperationLookupResponse] = None
+    # data type: RetainedDeletionStatusResponse
+    oneof_schema_5_validator: Optional[RetainedDeletionStatusResponse] = None
     # data type: UnresolvedOperationLookupResponse
-    oneof_schema_5_validator: Optional[UnresolvedOperationLookupResponse] = None
-    actual_instance: Optional[Union[AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, UnresolvedOperationLookupResponse]] = None
-    one_of_schemas: Set[str] = { "AcceptedOperationLookupResponse", "CompletedOperationLookupResponse", "InProgressOperationLookupResponse", "RecoveryRequiredOperationLookupResponse", "UnresolvedOperationLookupResponse" }
+    oneof_schema_6_validator: Optional[UnresolvedOperationLookupResponse] = None
+    actual_instance: Optional[Union[AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, RetainedDeletionStatusResponse, UnresolvedOperationLookupResponse]] = None
+    one_of_schemas: Set[str] = { "AcceptedOperationLookupResponse", "CompletedOperationLookupResponse", "InProgressOperationLookupResponse", "RecoveryRequiredOperationLookupResponse", "RetainedDeletionStatusResponse", "UnresolvedOperationLookupResponse" }
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -89,6 +92,11 @@ class OperationLookupResponse(BaseModel):
             error_messages.append(f"Error! Input type `{type(v)}` is not `RecoveryRequiredOperationLookupResponse`")
         else:
             match += 1
+        # validate data type: RetainedDeletionStatusResponse
+        if not isinstance(v, RetainedDeletionStatusResponse):
+            error_messages.append(f"Error! Input type `{type(v)}` is not `RetainedDeletionStatusResponse`")
+        else:
+            match += 1
         # validate data type: UnresolvedOperationLookupResponse
         if not isinstance(v, UnresolvedOperationLookupResponse):
             error_messages.append(f"Error! Input type `{type(v)}` is not `UnresolvedOperationLookupResponse`")
@@ -96,10 +104,10 @@ class OperationLookupResponse(BaseModel):
             match += 1
         if match > 1:
             # more than 1 match
-            raise ValueError("Multiple matches found when setting `actual_instance` in OperationLookupResponse with oneOf schemas: AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, UnresolvedOperationLookupResponse. Details: " + ", ".join(error_messages))
+            raise ValueError("Multiple matches found when setting `actual_instance` in OperationLookupResponse with oneOf schemas: AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, RetainedDeletionStatusResponse, UnresolvedOperationLookupResponse. Details: " + ", ".join(error_messages))
         elif match == 0:
             # no match
-            raise ValueError("No match found when setting `actual_instance` in OperationLookupResponse with oneOf schemas: AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, UnresolvedOperationLookupResponse. Details: " + ", ".join(error_messages))
+            raise ValueError("No match found when setting `actual_instance` in OperationLookupResponse with oneOf schemas: AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, RetainedDeletionStatusResponse, UnresolvedOperationLookupResponse. Details: " + ", ".join(error_messages))
         else:
             return v
 
@@ -138,6 +146,12 @@ class OperationLookupResponse(BaseModel):
             match += 1
         except (ValidationError, ValueError) as e:
             error_messages.append(str(e))
+        # deserialize data into RetainedDeletionStatusResponse
+        try:
+            instance.actual_instance = RetainedDeletionStatusResponse.from_json(json_str)
+            match += 1
+        except (ValidationError, ValueError) as e:
+            error_messages.append(str(e))
         # deserialize data into UnresolvedOperationLookupResponse
         try:
             instance.actual_instance = UnresolvedOperationLookupResponse.from_json(json_str)
@@ -147,10 +161,10 @@ class OperationLookupResponse(BaseModel):
 
         if match > 1:
             # more than 1 match
-            raise ValueError("Multiple matches found when deserializing the JSON string into OperationLookupResponse with oneOf schemas: AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, UnresolvedOperationLookupResponse. Details: " + ", ".join(error_messages))
+            raise ValueError("Multiple matches found when deserializing the JSON string into OperationLookupResponse with oneOf schemas: AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, RetainedDeletionStatusResponse, UnresolvedOperationLookupResponse. Details: " + ", ".join(error_messages))
         elif match == 0:
             # no match
-            raise ValueError("No match found when deserializing the JSON string into OperationLookupResponse with oneOf schemas: AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, UnresolvedOperationLookupResponse. Details: " + ", ".join(error_messages))
+            raise ValueError("No match found when deserializing the JSON string into OperationLookupResponse with oneOf schemas: AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, RetainedDeletionStatusResponse, UnresolvedOperationLookupResponse. Details: " + ", ".join(error_messages))
         else:
             return instance
 
@@ -164,7 +178,7 @@ class OperationLookupResponse(BaseModel):
         else:
             return json.dumps(self.actual_instance)
 
-    def to_dict(self) -> Optional[Union[Dict[str, Any], AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, UnresolvedOperationLookupResponse]]:
+    def to_dict(self) -> Optional[Union[Dict[str, Any], AcceptedOperationLookupResponse, CompletedOperationLookupResponse, InProgressOperationLookupResponse, RecoveryRequiredOperationLookupResponse, RetainedDeletionStatusResponse, UnresolvedOperationLookupResponse]]:
         """Returns the dict representation of the actual instance"""
         if self.actual_instance is None:
             return None

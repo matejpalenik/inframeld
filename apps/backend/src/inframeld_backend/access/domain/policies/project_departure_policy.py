@@ -1,3 +1,4 @@
+from inframeld_backend.access.domain.enums.access_group_action import AccessGroupAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_departure_target_kind import (
     ProjectDepartureTargetKind,
@@ -14,7 +15,7 @@ from inframeld_backend.access.domain.policy_inputs.project_departure_responsibil
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 
-_GROUP_DOCUMENT_ACTIONS = frozenset({"add-documents", "update-documents", "delete-documents"})
+_GROUP_DOCUMENT_ACTIONS = frozenset(AccessGroupAction)
 
 
 class ProjectDeparturePolicy:

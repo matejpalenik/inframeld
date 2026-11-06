@@ -13,6 +13,9 @@ from inframeld_backend.shared.application.dtos.in_progress_operation_dto import 
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.retained_deletion_status_dto import (
+    RetainedDeletionStatusDTO,
+)
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
@@ -35,6 +38,7 @@ from inframeld_backend.shared.http.enums.operation_dispatch_establishment import
 )
 from inframeld_backend.shared.http.enums.operation_recovery_reason import OperationRecoveryReason
 from inframeld_backend.shared.http.enums.unknown_job_reference import UnknownJobReference
+from inframeld_backend.shared.http.mappers.deletion_status_mapper import DeletionStatusMapper
 from inframeld_backend.shared.http.requests.original_operation_lookup_request import (
     OriginalOperationLookupRequest,
 )
@@ -82,9 +86,12 @@ class OriginalOperationLookupMapper:
         | AcceptedOperationLookupDTO
         | InProgressOperationDTO
         | RecoveryRequiredOperationDTO
+        | RetainedDeletionStatusDTO
         | UnresolvedOperationDTO,
     ) -> OperationLookupResponse:
         match result:
+            case RetainedDeletionStatusDTO():
+                return DeletionStatusMapper.to_response(result)
             case CompletedSynchronousOperationDTO():
                 return CompletedOperationLookupResponse(
                     outcome=OperationLookupOutcome.COMPLETED_SYNCHRONOUS,

@@ -14,6 +14,9 @@ from inframeld_backend.shared.application.dtos.in_progress_operation_dto import 
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.retained_deletion_status_dto import (
+    RetainedDeletionStatusDTO,
+)
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
@@ -33,6 +36,7 @@ class OriginalOperationLookup(Protocol):
         | AcceptedOperationLookupDTO
         | InProgressOperationDTO
         | RecoveryRequiredOperationDTO
+        | RetainedDeletionStatusDTO
         | UnresolvedOperationDTO
     ):
         """Return original metadata without admitting work or certifying payload equivalence.

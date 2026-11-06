@@ -37,6 +37,92 @@ export type AcceptedOperationLookupResponse = {
 };
 
 /**
+ * AccessGroupCreationRequest
+ */
+export type AccessGroupCreationRequest = {
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * AccessGroupCreationResponse
+ */
+export type AccessGroupCreationResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Creatorprincipalid
+     */
+    creatorPrincipalId: string;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * AccessGroupDeletionResponse
+ */
+export type AccessGroupDeletionResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
  * AccessGroupGrantTargetResponse
  */
 export type AccessGroupGrantTargetResponse = {
@@ -48,6 +134,249 @@ export type AccessGroupGrantTargetResponse = {
      * Kind
      */
     kind: 'access-group';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * AccessGroupManagerRemovalResponse
+ */
+export type AccessGroupManagerRemovalResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
+ * AccessGroupManagerRequest
+ */
+export type AccessGroupManagerRequest = {
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * AccessGroupManagerResponse
+ */
+export type AccessGroupManagerResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Manager
+     */
+    manager: true;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * AccessGroupMembershipRemovalResponse
+ */
+export type AccessGroupMembershipRemovalResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
+ * AccessGroupMembershipRequest
+ */
+export type AccessGroupMembershipRequest = {
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * AccessGroupMembershipResponse
+ */
+export type AccessGroupMembershipResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Member
+     */
+    member: true;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * AccessGroupMetadataResponse
+ */
+export type AccessGroupMetadataResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Createdat
+     */
+    createdAt: string;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Name
+     */
+    name: string | null;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * AccessGroupPrincipalResponse
+ */
+export type AccessGroupPrincipalResponse = {
+    /**
+     * Displayname
+     */
+    displayName: string;
+    kind: PrincipalKind;
+    /**
+     * Principalid
+     */
+    principalId: string;
+};
+
+/**
+ * AccessGroupPrincipalsPageResponse
+ */
+export type AccessGroupPrincipalsPageResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Items
+     */
+    items: Array<AccessGroupPrincipalResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
     /**
      * Projectid
      */
@@ -547,7 +876,7 @@ export type OAuthConsentDecision = 'allow' | 'deny';
  *
  * Select a fixed current-authority check without granting permission.
  */
-export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use';
+export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'access_group_deletion';
 
 /**
  * OperationLookupAuthorityRequest
@@ -569,6 +898,8 @@ export type OperationLookupResponse = ({
 } & InProgressOperationLookupResponse) | ({
     outcome: 'recovery_required';
 } & RecoveryRequiredOperationLookupResponse) | ({
+    outcome: 'retained';
+} & RetainedDeletionStatusResponse) | ({
     outcome: 'unresolved';
 } & UnresolvedOperationLookupResponse);
 
@@ -1980,6 +2311,700 @@ export type ResolveProjectNameResponses = {
 };
 
 export type ResolveProjectNameResponse = ResolveProjectNameResponses[keyof ResolveProjectNameResponses];
+
+export type CreateAccessGroupData = {
+    body: AccessGroupCreationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/access-groups';
+};
+
+export type CreateAccessGroupErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type CreateAccessGroupError = CreateAccessGroupErrors[keyof CreateAccessGroupErrors];
+
+export type CreateAccessGroupResponses = {
+    /**
+     * Successful Response
+     */
+    201: AccessGroupCreationResponse;
+};
+
+export type CreateAccessGroupResponse = CreateAccessGroupResponses[keyof CreateAccessGroupResponses];
+
+export type ResolveAccessGroupData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Name
+         */
+        name: string;
+    };
+    url: '/v1/projects/{project_id}/access-groups/resolve';
+};
+
+export type ResolveAccessGroupErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ResolveAccessGroupError = ResolveAccessGroupErrors[keyof ResolveAccessGroupErrors];
+
+export type ResolveAccessGroupResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessGroupMetadataResponse;
+};
+
+export type ResolveAccessGroupResponse = ResolveAccessGroupResponses[keyof ResolveAccessGroupResponses];
+
+export type DeleteAccessGroupData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}';
+};
+
+export type DeleteAccessGroupErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type DeleteAccessGroupError = DeleteAccessGroupErrors[keyof DeleteAccessGroupErrors];
+
+export type DeleteAccessGroupResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessGroupDeletionResponse;
+};
+
+export type DeleteAccessGroupResponse = DeleteAccessGroupResponses[keyof DeleteAccessGroupResponses];
+
+export type GetAccessGroupData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}';
+};
+
+export type GetAccessGroupErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetAccessGroupError = GetAccessGroupErrors[keyof GetAccessGroupErrors];
+
+export type GetAccessGroupResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessGroupMetadataResponse;
+};
+
+export type GetAccessGroupResponse = GetAccessGroupResponses[keyof GetAccessGroupResponses];
+
+export type ListAccessGroupManagersData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}/managers';
+};
+
+export type ListAccessGroupManagersErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListAccessGroupManagersError = ListAccessGroupManagersErrors[keyof ListAccessGroupManagersErrors];
+
+export type ListAccessGroupManagersResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessGroupPrincipalsPageResponse;
+};
+
+export type ListAccessGroupManagersResponse = ListAccessGroupManagersResponses[keyof ListAccessGroupManagersResponses];
+
+export type RemoveAccessGroupManagerData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+        /**
+         * Principal Id
+         */
+        principal_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}/managers/{principal_id}';
+};
+
+export type RemoveAccessGroupManagerErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveAccessGroupManagerError = RemoveAccessGroupManagerErrors[keyof RemoveAccessGroupManagerErrors];
+
+export type RemoveAccessGroupManagerResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessGroupManagerRemovalResponse;
+};
+
+export type RemoveAccessGroupManagerResponse = RemoveAccessGroupManagerResponses[keyof RemoveAccessGroupManagerResponses];
+
+export type AppointAccessGroupManagerData = {
+    body: AccessGroupManagerRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+        /**
+         * Principal Id
+         */
+        principal_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}/managers/{principal_id}';
+};
+
+export type AppointAccessGroupManagerErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type AppointAccessGroupManagerError = AppointAccessGroupManagerErrors[keyof AppointAccessGroupManagerErrors];
+
+export type AppointAccessGroupManagerResponses = {
+    /**
+     * OK
+     */
+    200: AccessGroupManagerResponse;
+    /**
+     * Successful Response
+     */
+    201: AccessGroupManagerResponse;
+};
+
+export type AppointAccessGroupManagerResponse = AppointAccessGroupManagerResponses[keyof AppointAccessGroupManagerResponses];
+
+export type ListAccessGroupMembersData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}/members';
+};
+
+export type ListAccessGroupMembersErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListAccessGroupMembersError = ListAccessGroupMembersErrors[keyof ListAccessGroupMembersErrors];
+
+export type ListAccessGroupMembersResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessGroupPrincipalsPageResponse;
+};
+
+export type ListAccessGroupMembersResponse = ListAccessGroupMembersResponses[keyof ListAccessGroupMembersResponses];
+
+export type RemoveAccessGroupMemberData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+        /**
+         * Principal Id
+         */
+        principal_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}/members/{principal_id}';
+};
+
+export type RemoveAccessGroupMemberErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveAccessGroupMemberError = RemoveAccessGroupMemberErrors[keyof RemoveAccessGroupMemberErrors];
+
+export type RemoveAccessGroupMemberResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessGroupMembershipRemovalResponse;
+};
+
+export type RemoveAccessGroupMemberResponse = RemoveAccessGroupMemberResponses[keyof RemoveAccessGroupMemberResponses];
+
+export type AddAccessGroupMemberData = {
+    body: AccessGroupMembershipRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+        /**
+         * Principal Id
+         */
+        principal_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}/members/{principal_id}';
+};
+
+export type AddAccessGroupMemberErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type AddAccessGroupMemberError = AddAccessGroupMemberErrors[keyof AddAccessGroupMemberErrors];
+
+export type AddAccessGroupMemberResponses = {
+    /**
+     * OK
+     */
+    200: AccessGroupMembershipResponse;
+    /**
+     * Successful Response
+     */
+    201: AccessGroupMembershipResponse;
+};
+
+export type AddAccessGroupMemberResponse = AddAccessGroupMemberResponses[keyof AddAccessGroupMemberResponses];
 
 export type CreateApplicationAccountData = {
     body: ApplicationAccountCreationRequest;

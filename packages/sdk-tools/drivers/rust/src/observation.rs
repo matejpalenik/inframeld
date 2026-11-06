@@ -40,6 +40,112 @@ problems!(
     GetMyOrganizationAccessApiError::Status503
 );
 problems!(
+    CreateAccessGroupApiError,
+    CreateAccessGroupApiError::Status400,
+    CreateAccessGroupApiError::Status401,
+    CreateAccessGroupApiError::Status403,
+    CreateAccessGroupApiError::Status404,
+    CreateAccessGroupApiError::Status409,
+    CreateAccessGroupApiError::Status413,
+    CreateAccessGroupApiError::Status415,
+    CreateAccessGroupApiError::Status422,
+    CreateAccessGroupApiError::Status503
+);
+problems!(
+    GetAccessGroupApiError,
+    GetAccessGroupApiError::Status400,
+    GetAccessGroupApiError::Status401,
+    GetAccessGroupApiError::Status403,
+    GetAccessGroupApiError::Status404,
+    GetAccessGroupApiError::Status409,
+    GetAccessGroupApiError::Status422,
+    GetAccessGroupApiError::Status503
+);
+problems!(
+    ResolveAccessGroupApiError,
+    ResolveAccessGroupApiError::Status400,
+    ResolveAccessGroupApiError::Status401,
+    ResolveAccessGroupApiError::Status403,
+    ResolveAccessGroupApiError::Status404,
+    ResolveAccessGroupApiError::Status409,
+    ResolveAccessGroupApiError::Status422,
+    ResolveAccessGroupApiError::Status503
+);
+problems!(
+    ListAccessGroupMembersApiError,
+    ListAccessGroupMembersApiError::Status400,
+    ListAccessGroupMembersApiError::Status401,
+    ListAccessGroupMembersApiError::Status403,
+    ListAccessGroupMembersApiError::Status404,
+    ListAccessGroupMembersApiError::Status409,
+    ListAccessGroupMembersApiError::Status422,
+    ListAccessGroupMembersApiError::Status503
+);
+problems!(
+    ListAccessGroupManagersApiError,
+    ListAccessGroupManagersApiError::Status400,
+    ListAccessGroupManagersApiError::Status401,
+    ListAccessGroupManagersApiError::Status403,
+    ListAccessGroupManagersApiError::Status404,
+    ListAccessGroupManagersApiError::Status409,
+    ListAccessGroupManagersApiError::Status422,
+    ListAccessGroupManagersApiError::Status503
+);
+problems!(
+    AddAccessGroupMemberApiError,
+    AddAccessGroupMemberApiError::Status400,
+    AddAccessGroupMemberApiError::Status401,
+    AddAccessGroupMemberApiError::Status403,
+    AddAccessGroupMemberApiError::Status404,
+    AddAccessGroupMemberApiError::Status409,
+    AddAccessGroupMemberApiError::Status413,
+    AddAccessGroupMemberApiError::Status415,
+    AddAccessGroupMemberApiError::Status422,
+    AddAccessGroupMemberApiError::Status503
+);
+problems!(
+    RemoveAccessGroupMemberApiError,
+    RemoveAccessGroupMemberApiError::Status400,
+    RemoveAccessGroupMemberApiError::Status401,
+    RemoveAccessGroupMemberApiError::Status403,
+    RemoveAccessGroupMemberApiError::Status404,
+    RemoveAccessGroupMemberApiError::Status409,
+    RemoveAccessGroupMemberApiError::Status422,
+    RemoveAccessGroupMemberApiError::Status503
+);
+problems!(
+    AppointAccessGroupManagerApiError,
+    AppointAccessGroupManagerApiError::Status400,
+    AppointAccessGroupManagerApiError::Status401,
+    AppointAccessGroupManagerApiError::Status403,
+    AppointAccessGroupManagerApiError::Status404,
+    AppointAccessGroupManagerApiError::Status409,
+    AppointAccessGroupManagerApiError::Status413,
+    AppointAccessGroupManagerApiError::Status415,
+    AppointAccessGroupManagerApiError::Status422,
+    AppointAccessGroupManagerApiError::Status503
+);
+problems!(
+    RemoveAccessGroupManagerApiError,
+    RemoveAccessGroupManagerApiError::Status400,
+    RemoveAccessGroupManagerApiError::Status401,
+    RemoveAccessGroupManagerApiError::Status403,
+    RemoveAccessGroupManagerApiError::Status404,
+    RemoveAccessGroupManagerApiError::Status409,
+    RemoveAccessGroupManagerApiError::Status422,
+    RemoveAccessGroupManagerApiError::Status503
+);
+problems!(
+    DeleteAccessGroupApiError,
+    DeleteAccessGroupApiError::Status400,
+    DeleteAccessGroupApiError::Status401,
+    DeleteAccessGroupApiError::Status403,
+    DeleteAccessGroupApiError::Status404,
+    DeleteAccessGroupApiError::Status409,
+    DeleteAccessGroupApiError::Status422,
+    DeleteAccessGroupApiError::Status503
+);
+problems!(
     CreateApplicationAccountApiError,
     CreateApplicationAccountApiError::Status400,
     CreateApplicationAccountApiError::Status401,

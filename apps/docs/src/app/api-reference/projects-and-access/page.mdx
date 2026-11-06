@@ -74,6 +74,78 @@ The bounded page has only safe key metadata in `items` and a nullable `nextCurso
 
 Read a specific retained key by its ID with the same exact Issue-or-Revoke authority. It returns the same safe item shape, without a secret or verifier. Neither read issues a key, authenticates it or changes its state. These GETs take no body, expected revision or idempotency key. [Inspect safe key metadata](/guides/application-accounts#inspect-safe-key-metadata) explains empty new accounts and continuation.
 
+## Create an access group
+
+<ApiOperation operationId="createAccessGroup" />
+
+Require a currently eligible human Project member with permission to use `create-access-groups`, a reviewed Project Access revision and one retained idempotency key. The strict body supplies `name`, `displayName` and `expectedAccessRevision`. A fresh `201` creates the group with the creator's ordinary membership and management, advances Project Access revision once and saves the original receipt. It makes no separate document-action assignment.
+
+`AccessGroupCreationResponse` identifies the Project, group, creator and original names, revision, operation and result expiry. It has no `initialGrants` inventory. [Manage access groups](/guides/manage-access-groups) explains setup, creation and current relationship reads.
+
+## Inspect an access group by ID
+
+<ApiOperation operationId="getAccessGroup" />
+
+Require current eligibility and Project visibility plus ordinary membership, management or an action on this exact group. The safe metadata contains its Project and group IDs, nullable legacy Name, display name, creation time and current Project Access revision. It exposes no documents or membership inventory. Identity visibility does not authorize member/manager list reads.
+
+## Resolve an exact access-group Name
+
+<ApiOperation operationId="resolveAccessGroup" />
+
+Use one exact Name under the same visibility as ID inspection. Resolution returns `AccessGroupMetadataResponse`. It does not normalize the selector, search by display label or reveal a Project-wide group inventory. A missing or hidden group retains the safe `404` boundary. [The guide](/guides/manage-access-groups#inspect-the-group-and-its-relationships) explains identity and current relationship inspection.
+
+## Read access-group members and managers
+
+<ApiOperation operationId="listAccessGroupMembers" />
+
+<ApiOperation operationId="listAccessGroupManagers" />
+
+Both lists require a currently eligible human Project member who currently manages this exact group. Ordinary membership or management of another group is insufficient. `AccessGroupPrincipalsPageResponse` identifies the Project, group and current Access revision, with safe principal ID/display name/kind items and required nullable `nextCursor`.
+
+Read in principal-UUID order with default limit 25 and range 1–100. Pass each cursor unchanged to its original member or manager list. Every page checks current authority. A page is neither an effective-permission directory nor a frozen traversal. GETs accept no body or idempotency key and change no revision or audit.
+
+## Add an access-group member
+
+<ApiOperation operationId="addAccessGroupMember" />
+
+Require current human management of this group, a retained idempotency key and an `AccessGroupMembershipRequest` containing only the reviewed Project `expectedAccessRevision`. The recipient must be an eligible admitted current Project human or application member. A new membership returns `201` with `member: true` and `changed: true`. An already-present eligible membership returns `200` with `changed: false`.
+
+The original receipt describes that assignment, not membership after a later removal. Applications receive ordinary membership, never management. [Add an ordinary member](/guides/manage-access-groups#add-an-ordinary-member) explains inputs and replay.
+
+## Remove an access-group member
+
+<ApiOperation operationId="removeAccessGroupMember" />
+
+Require the same current manager authority and original-key handling. DELETE takes one required canonical `expectedAccessRevision` query integer and no body. Removal also removes the recipient's management, preserving another eligible human manager when required. A fresh `200` reports `removed: true` and `changed`; an already-absent relationship is unchanged. Rejoining restores only ordinary membership.
+
+Exact currently authorized replay returns the original receipt without removing a later rejoin or restoring an earlier relationship. [Membership removal and rejoin](/guides/manage-access-groups#remove-membership-and-rejoin-deliberately) explain the distinction.
+
+## Appoint an access-group manager
+
+<ApiOperation operationId="appointAccessGroupManager" />
+
+Require current human management, one retained key and an `AccessGroupManagerRequest` containing the reviewed Project Access revision. Only eligible current Project humans may manage. Appointment saves any missing ordinary membership together with management, preserving existing membership. This includes access through the group to current and future shared documents.
+
+A changed appointment returns `201` with `manager: true` and `changed: true`. An already-present eligible manager returns `200` with `changed: false`. These results make no separate document-action assignment. [Appointment and demotion](/guides/manage-access-groups#appoint-or-demote-a-manager) explain the reader-visible effects.
+
+## Remove access-group management
+
+<ApiOperation operationId="removeAccessGroupManager" />
+
+DELETE takes the reviewed revision in its query, no body and one original idempotency key. Current management is required. The last eligible human manager cannot leave through ordinary demotion without a replacement. A fresh `200` reports `removed: true` and `changed`, leaving ordinary membership intact. An already-absent management assignment is unchanged.
+
+All relationship changes save actual effects, Project revision, audit and original result together. Changed writes advance revision once. Fresh no-ops do not. Current authority precedes original replay, which never reapplies its historical effect.
+
+## Delete an unused access group
+
+<ApiOperation operationId="deleteAccessGroup" />
+
+Require current human management, the reviewed Project Access revision as a query value, no body and the original idempotency key. Deletion rejects protected stored references without partial cleanup. Replace a reference through its owning authorized workflow first. An unused group and its owned relationships are removed together, returning synchronous `200` with `removed: true` and the original mutation fields. There is no cleanup job or application-shutdown stage.
+
+Ordinary repeated DELETE and full receipt replay retain current-manager authorization. After deletion, the currently eligible original human may use the exact saved deletion identity or original operation ID for only content-free retained status. That path is independent of expired ordinary idempotency history and preserves the captured status expiry without renewal. [Group deletion recovery](/guides/manage-access-groups#recover-an-uncertain-change) and [status interpretation](/guides/read-deletion-status#read-status-for-a-deleted-access-group) explain these separate results.
+
+Group responses and problems use `Cache-Control: no-store`. Fresh stale review, unsafe handover, unavailable Name and protected-reference conflicts return `409`. Current denial is `403`, hidden/missing scope is `404`, and malformed fields, query framing or body content use the existing `422` contract. POST/PUT accept one JSON object of at most 32 KiB with `Content-Type: application/json`, retaining `413`/`415` bounds. Cookie writes require the installation's Origin and CSRF safeguards.
+
 ## Read Project members
 
 <ApiOperation operationId="listProjectMembers" />

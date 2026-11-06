@@ -217,33 +217,6 @@ pub struct ProjectMemberResponse {
     #[serde(rename = "principalId")]
     pub principal_id: uuid::Uuid,
 }
-///Distinguish local human actors from application accounts.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
-pub enum PrincipalKind {
-    #[default]
-    #[serde(rename = "human")]
-    Human,
-    #[serde(rename = "application")]
-    Application,
-}
-impl PrincipalKind {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Human => "human",
-            Self::Application => "application",
-        }
-    }
-}
-impl ::std::fmt::Display for PrincipalKind {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-impl AsRef<str> for PrincipalKind {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
 ///Report original creation assignments, not a present permission snapshot.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectCreationResponse {
@@ -475,6 +448,7 @@ pub enum OperationLookupResponse {
     AcceptedOperationLookupResponse(AcceptedOperationLookupResponse),
     InProgressOperationLookupResponse(InProgressOperationLookupResponse),
     RecoveryRequiredOperationLookupResponse(RecoveryRequiredOperationLookupResponse),
+    RetainedDeletionStatusResponse(RetainedDeletionStatusResponse),
     UnresolvedOperationLookupResponse(UnresolvedOperationLookupResponse),
 }
 impl serde::Serialize for OperationLookupResponse {
@@ -680,6 +654,54 @@ impl serde::Serialize for OperationLookupResponse {
                 }
                 value.serialize(serializer)
             }
+            Self::RetainedDeletionStatusResponse(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(RetainedDeletionStatusResponse),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("outcome") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "retained") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "outcome", stringify!(RetainedDeletionStatusResponse),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "outcome",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "outcome".to_string(),
+                                serde_json::Value::String("retained".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
             Self::UnresolvedOperationLookupResponse(payload) => {
                 let mut value = serde_json::to_value(payload)
                     .map_err(serde::ser::Error::custom)?;
@@ -821,6 +843,25 @@ impl<'de> serde::Deserialize<'de> for OperationLookupResponse {
                             ));
                         }
                         if let Ok(payload) = serde_json::from_value::<
+                            RetainedDeletionStatusResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "completed_synchronous", first_name,
+                                            stringify!(RetainedDeletionStatusResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RetainedDeletionStatusResponse(payload),
+                                stringify!(RetainedDeletionStatusResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
                             UnresolvedOperationLookupResponse,
                         >(value.clone()) {
                             if let Some((_, first_name)) = &structural_match {
@@ -912,6 +953,25 @@ impl<'de> serde::Deserialize<'de> for OperationLookupResponse {
                             ));
                         }
                         if let Ok(payload) = serde_json::from_value::<
+                            RetainedDeletionStatusResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "accepted_asynchronous", first_name,
+                                            stringify!(RetainedDeletionStatusResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RetainedDeletionStatusResponse(payload),
+                                stringify!(RetainedDeletionStatusResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
                             UnresolvedOperationLookupResponse,
                         >(value.clone()) {
                             if let Some((_, first_name)) = &structural_match {
@@ -1000,6 +1060,25 @@ impl<'de> serde::Deserialize<'de> for OperationLookupResponse {
                             structural_match = Some((
                                 Self::RecoveryRequiredOperationLookupResponse(payload),
                                 stringify!(RecoveryRequiredOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            RetainedDeletionStatusResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "in_progress", first_name,
+                                            stringify!(RetainedDeletionStatusResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RetainedDeletionStatusResponse(payload),
+                                stringify!(RetainedDeletionStatusResponse),
                             ));
                         }
                         if let Ok(payload) = serde_json::from_value::<
@@ -1096,6 +1175,25 @@ impl<'de> serde::Deserialize<'de> for OperationLookupResponse {
                             ));
                         }
                         if let Ok(payload) = serde_json::from_value::<
+                            RetainedDeletionStatusResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "recovery_required", first_name,
+                                            stringify!(RetainedDeletionStatusResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RetainedDeletionStatusResponse(payload),
+                                stringify!(RetainedDeletionStatusResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
                             UnresolvedOperationLookupResponse,
                         >(value.clone()) {
                             if let Some((_, first_name)) = &structural_match {
@@ -1104,6 +1202,116 @@ impl<'de> serde::Deserialize<'de> for OperationLookupResponse {
                                         format!(
                                             "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
                                             "outcome", "recovery_required", first_name,
+                                            stringify!(UnresolvedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::UnresolvedOperationLookupResponse(payload),
+                                stringify!(UnresolvedOperationLookupResponse),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "retained" => {
+                        let primary_error = match serde_json::from_value::<
+                            RetainedDeletionStatusResponse,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::RetainedDeletionStatusResponse(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            CompletedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "retained", first_name,
+                                            stringify!(CompletedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::CompletedOperationLookupResponse(payload),
+                                stringify!(CompletedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            AcceptedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "retained", first_name,
+                                            stringify!(AcceptedOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::AcceptedOperationLookupResponse(payload),
+                                stringify!(AcceptedOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InProgressOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "retained", first_name,
+                                            stringify!(InProgressOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InProgressOperationLookupResponse(payload),
+                                stringify!(InProgressOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            RecoveryRequiredOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "retained", first_name,
+                                            stringify!(RecoveryRequiredOperationLookupResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RecoveryRequiredOperationLookupResponse(payload),
+                                stringify!(RecoveryRequiredOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            UnresolvedOperationLookupResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "retained", first_name,
                                             stringify!(UnresolvedOperationLookupResponse),
                                         ),
                                     ),
@@ -1203,6 +1411,25 @@ impl<'de> serde::Deserialize<'de> for OperationLookupResponse {
                             structural_match = Some((
                                 Self::RecoveryRequiredOperationLookupResponse(payload),
                                 stringify!(RecoveryRequiredOperationLookupResponse),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            RetainedDeletionStatusResponse,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "outcome", "unresolved", first_name,
+                                            stringify!(RetainedDeletionStatusResponse),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::RetainedDeletionStatusResponse(payload),
+                                stringify!(RetainedDeletionStatusResponse),
                             ));
                         }
                         match structural_match {
@@ -1328,6 +1555,8 @@ pub enum OperationLookupAuthorityFamily {
     ProjectGrantRead,
     #[serde(rename = "organization_action_use")]
     OrganizationActionUse,
+    #[serde(rename = "access_group_deletion")]
+    AccessGroupDeletion,
 }
 impl OperationLookupAuthorityFamily {
     pub fn as_str(&self) -> &'static str {
@@ -1335,6 +1564,7 @@ impl OperationLookupAuthorityFamily {
             Self::ProjectActionUse => "project_action_use",
             Self::ProjectGrantRead => "project_grant_read",
             Self::OrganizationActionUse => "organization_action_use",
+            Self::AccessGroupDeletion => "access_group_deletion",
         }
     }
 }
@@ -2710,6 +2940,57 @@ impl AsRef<str> for ApplicationAccountAction {
     }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupPrincipalsPageResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub items: Vec<AccessGroupPrincipalResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupPrincipalResponse {
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    pub kind: PrincipalKind,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+}
+///Distinguish local human actors from application accounts.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum PrincipalKind {
+    #[default]
+    #[serde(rename = "human")]
+    Human,
+    #[serde(rename = "application")]
+    Application,
+}
+impl PrincipalKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Human => "human",
+            Self::Application => "application",
+        }
+    }
+}
+impl ::std::fmt::Display for PrincipalKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for PrincipalKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AccessGroupGrantTargetResponse {
     #[serde(rename = "accessGroupId")]
     pub access_group_id: uuid::Uuid,
@@ -2861,6 +3142,151 @@ impl AsRef<str> for AcceptedOperationLookupResponseAdmission {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupCreationRequest {
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+    ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
+    pub name: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupCreationResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "creatorPrincipalId")]
+    pub creator_principal_id: uuid::Uuid,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    pub name: String,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupDeletionResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupManagerRemovalResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupManagerRequest {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupManagerResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    pub manager: BooleanConstant<true>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupMembershipRemovalResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupMembershipRequest {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupMembershipResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    pub member: BooleanConstant<true>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AccessGroupMetadataResponse {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "createdAt")]
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(deserialize_with = "presence_serde::required_nullable")]
+    pub name: Option<String>,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ApplicationAccountCreationRequest {

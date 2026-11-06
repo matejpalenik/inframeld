@@ -91,6 +91,24 @@ class OperationLookupAuthority:
                 raise InvalidInputError()
             return
 
+        if self.family is family.ACCESS_GROUP_DELETION:
+            valid = False
+            if (
+                project_id is not None
+                and method == "DELETE"
+                and self.action_id.value == "delete-access-group"
+                and len(parts) == 6
+                and parts[:3] == ["", "v1", "projects"]
+                and parts[4] == "access-groups"
+            ):
+                try:
+                    valid = parts[3] == str(project_id.value) and parts[5] == str(UUID(parts[5]))
+                except ValueError:
+                    valid = False
+            if not valid:
+                raise InvalidInputError()
+            return
+
         if self.family is family.PROJECT_ACTION_USE:
             valid = project_id is not None and self.action_id.value in _PROJECT_ACTIONS
         elif self.family is family.ORGANIZATION_ACTION_USE:

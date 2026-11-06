@@ -120,11 +120,23 @@ class PostgresDeletionStatusBindingWriter(DeletionStatusBindingWriter):
             request.project_id is None
             or authority is None
             or (
-                authority.family is not OperationLookupAuthorityFamily.PROJECT_ACTION_USE
-                or authority.action_id.value != ProjectAction.DELETE_PROJECT.value
+                not (
+                    authority.family is OperationLookupAuthorityFamily.PROJECT_ACTION_USE
+                    and authority.action_id.value == ProjectAction.DELETE_PROJECT.value
+                )
+                and not (
+                    authority.family is OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION
+                    and authority.action_id.value == "delete-access-group"
+                )
             )
         ):
             raise ConflictError()
+        if authority.family is OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION:
+            authority.require_supported_scope(
+                project_id=request.project_id,
+                method=request.method,
+                requested_route=request.requested_route,
+            )
         if native is not None:
             self._require_native_meaning(native, request)
 

@@ -16,8 +16,14 @@ from inframeld_backend.shared.application.dtos.in_progress_operation_dto import 
 from inframeld_backend.shared.application.dtos.recovery_required_operation_dto import (
     RecoveryRequiredOperationDTO,
 )
+from inframeld_backend.shared.application.dtos.retained_deletion_status_dto import (
+    RetainedDeletionStatusDTO,
+)
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
+)
+from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+    OperationLookupAuthorityFamily,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
@@ -42,9 +48,11 @@ class OriginalOperationLookupService(OriginalOperationLookup):
         self,
         operation_lookup_authorizer: OperationLookupAuthorizer,
         operation_lookup_reader: OperationLookupReader,
+        group_deletion_lookup: OriginalOperationLookup | None = None,
     ) -> None:
         self._operation_lookup_authorizer = operation_lookup_authorizer
         self._operation_lookup_reader = operation_lookup_reader
+        self._group_deletion_lookup = group_deletion_lookup
 
     @override
     async def lookup(
@@ -54,11 +62,16 @@ class OriginalOperationLookupService(OriginalOperationLookup):
         | AcceptedOperationLookupDTO
         | InProgressOperationDTO
         | RecoveryRequiredOperationDTO
+        | RetainedDeletionStatusDTO
         | UnresolvedOperationDTO
     ):
         query.expected_authority.require_supported_scope(
             project_id=query.project_id, method=query.method, requested_route=query.requested_route
         )
+        if query.expected_authority.family is OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION:
+            if self._group_deletion_lookup is None:
+                raise DependencyUnavailableError()
+            return await self._group_deletion_lookup.lookup(access=access, query=query)
         authorized = await self._operation_lookup_authorizer.require_authorization(
             access=access, request=query
         )

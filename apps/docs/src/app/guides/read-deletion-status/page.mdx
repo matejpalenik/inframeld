@@ -1,12 +1,14 @@
 export const pageMetadata = {
   title: "Read retained deletion status",
   description:
-    "Read a known Project deletion operation after membership disappears, without repeating the deletion.",
+    "Read original Project or access-group deletion status without repeating the deletion.",
 }
 
 # Read retained deletion status
 
 Use this read when you have the original operation ID for a Project deletion and need its retained status. Alice can read her original operation after her Project membership disappears, provided her human account and credential are still eligible. The response contains status facts, without the Project's name, contents or inventory.
+
+An access group has a separate synchronous deletion path. Its currently eligible original human can also read content-free retained status after the group disappears. [Group deletion recovery](#read-status-for-a-deleted-access-group) explains the difference from a Project's cleanup stages.
 
 Read each reported fact separately. A completed job alone does not establish that stored bytes have been erased.
 
@@ -30,7 +32,7 @@ export INFRAMELD_OPERATION_ID='YOUR_ORIGINAL_DELETION_OPERATION_ID'
 
 </CodeGroup>
 
-The For an SDK alternative, follow the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) setup in a separate example project. These examples use the delivered HTTP operations. [CLI command reference](/clients/cli/commands) lists available CLI tasks.
+For an SDK alternative, follow the shared [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) setup in a separate example project. These examples use the delivered HTTP operations. [CLI command reference](/clients/cli/commands) lists available CLI tasks.
 
 ## Read the original operation
 
@@ -163,7 +165,7 @@ The HTTP, Python and TypeScript examples use five-second deadlines. The Rust cli
 
 ## Interpret retained facts
 
-A successful read returns `outcome: "retained"` or `outcome: "unresolved"`, with `Cache-Control: no-store`. This is illustrative retained output:
+A successful read returns `outcome: "retained"` or `outcome: "unresolved"`, with `Cache-Control: no-store`. This is illustrative retained output for a Project deletion:
 
 <CodeGroup>
 
@@ -196,6 +198,20 @@ The response confirms admission and blocked access. It reports unfinished applic
 Every field is present in a retained response. `null` means there is no authoritative value for that fact. It is different from the observed value `false`. Keep each fact separate rather than inventing a completion state from the job status.
 
 An established expiry is returned unchanged. Repeating the read or changing installation settings never extends that operation's captured expiry. A `null` expiry does not prove completion or promise permanent availability. The server rechecks current human eligibility on every read.
+
+## Read status for a deleted access group
+
+[Deleting an unused access group](/guides/manage-access-groups#delete-an-unused-group) removes the group and its owned relationships synchronously. Its retained status confirms the original admission, blocked access and completed group cleanup. It has no cleanup job or application-shutdown stage. These facts do not describe Project deletion or physical erasure of Project-owned documents.
+
+For this settled group result, `admissionConfirmed`, `accessBlocked` and `physicalCleanupComplete` are true. `jobState` and `applicationShutdownComplete` are null. Read these values as the group's synchronous removal facts, not as unfinished Project cleanup. The shared native schema retains its nullable fields for other deletion owners.
+
+Keep the original group-deletion operation ID when you receive it. Use that original ID and the same currently eligible human for this status read. A remembered group ID, another manager or an administrator cannot replace the authoritative original initiator.
+
+If the successful deletion response was lost before you retained its operation ID, the group workflow also supports the exact saved original request identity. [Group recovery](/guides/manage-access-groups#recover-an-uncertain-change) distinguishes this content-free retained path from an ordinary DELETE retry or full business-result replay, which still requires current management.
+
+The closed saved-identity lookup uses `access_group_deletion`, `delete-access-group`, method `DELETE` and the original concrete Project/group UUID path. Its `retained` alternative uses the same content-free status interpretation as this known-operation-ID read. [The complete lookup file](/guides/recover-original-request#recover-an-access-group-change) preserves those exact inputs without introducing a caller-selected actor.
+
+The group status path remains independent of expired ordinary idempotency history. Its captured original status expiry is preserved, and reading again does not renew it. An unresolved result supplies no deletion proof and does not authorize another write.
 
 ## Handle unresolved status and failures
 

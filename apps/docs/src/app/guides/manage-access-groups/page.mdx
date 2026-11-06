@@ -1,0 +1,1070 @@
+export const pageMetadata = {
+  title: "Manage access-group members and managers",
+  description:
+    "Create a document-audience group, manage ordinary membership and human managers, and recover uncertain changes.",
+}
+
+# Manage access-group members and managers
+
+Create SupportKnowledge in your Support Project, add Bob as a member and appoint him as a manager when he should share responsibility for the group. A manager is always an ordinary member of that same group. Managing another group gives no authority over SupportKnowledge.
+
+Ordinary membership is the audience relationship used to authorize access to documents shared with the group. Management additionally permits membership and manager administration. Appointing Bob therefore includes access through the group to **current and future documents shared with it**. Querying or building still requires the relevant action permissions.
+
+## Prepare the Project and people
+
+You need an existing Project, its permanent ID and a current human credential accepted by the installation. To create a group, you must be an eligible admitted human Project member with permission to use `create-access-groups`. Either grant level permits creation. Later administration requires current management of the particular group.
+
+Use the `projectId` from Project creation or an authorized [exact-Name resolution](/guides/name-and-rename-project#resolve-the-name-and-keep-the-id). [Read your own Project access](/guides/assign-project-grant#read-your-project-access-and-current-revision) to review the required creation permission and current Project `accessRevision`. The server checks current authority again when saving each change.
+
+Set up the installation URL and an existing human bearer token through [HTTP setup](/clients/http#call-protected-operations). Browser sign-in alone does not put a bearer token in your terminal. Use the local source-package setup for a [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) alternative. Group administration has no delivered CLI command in this preview.
+
+Prepare Bob and Carol as eligible admitted humans who already belong to the Project. [Human admission](/guides/admit-human) and [Project membership](/guides/manage-project-members) are separate operations. Use the returned human `principalId`, or an ID supplied by an authorized [Project-member read](/guides/list-project-members). A group manager cannot admit a person or create their Project membership through a group change.
+
+An application account such as SupportBot may be an ordinary group member. Use the stable `principalId` returned by [application-account creation](/guides/application-accounts). Giving the account group membership needs no application key. An application cannot be a manager.
+
+The supported account-to-client setup, complete engineering walkthrough and human acceptance for this task remain unfinished in [qualification #354](https://github.com/matejpalenik/inframeld/issues/354). That qualification also retains the later real default-reference case. This guide does not establish document-ingestion, query or application-authentication qualification.
+
+For an exercise, choose positively identified disposable resources and agree on supported cleanup before starting. An unused group has its own deletion path. Application-account retirement remains separate, so an exercise that creates SupportBot may need a wholly disposable installation and its operator-supported teardown.
+
+Use a separate example directory for this guide. Replace these recognizable example IDs with the actual Project ID and Bob's human principal ID:
+
+<CodeGroup>
+
+```shell
+export PROJECT_ID='00000000-0000-4000-8000-000000000003'
+export BOB_ID='00000000-0000-4000-8000-000000000004'
+```
+
+</CodeGroup>
+
+Before each fresh write, read and review the current Project Access revision. This read needs your own current eligible-human Project membership, without a separate administration grant:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/my-access" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+Use its `accessRevision` unchanged. Follow its `nextCursor` when reviewing your remaining stored assignments. A previous mutation receipt describes an earlier result, so do not predict the next revision or assume that no other access change occurred.
+
+## Create SupportKnowledge
+
+Choose an explicit Name and display name. Keep the returned permanent group ID for later requests. An exact Name selects the group within its Project. A display name is a label and does not establish identity or permission.
+
+This example uses Name `support-knowledge` and display name `SupportKnowledge`. Names have 1–63 lowercase ASCII letters, digits or hyphens, start with a letter and end with a letter or digit. They are unique among groups in this Project, including groups you cannot inspect. Retired Names remain reserved. A collision requires another explicit choice rather than a silently added suffix.
+
+New submitted display names are non-unique labels of 1–128 Unicode code points. They must be nonblank, have no surrounding whitespace and contain no controls, surrogates or line/paragraph separators. Reads preserve retained legacy labels instead of treating them as new input. Exact-Name resolution does not trim, lowercase or match a display label.
+
+Save this complete file as `group-create.json`, replacing `0` with the Project revision you reviewed:
+
+<CodeGroup>
+
+```json
+{
+  "name": "support-knowledge",
+  "displayName": "SupportKnowledge",
+  "expectedAccessRevision": 0
+}
+```
+
+</CodeGroup>
+
+Choose one request key and keep it with the original installation URL, Project ID and complete file before dispatch. Each key has at most 128 characters:
+
+<CodeGroup>
+
+```shell
+export GROUP_CREATE_KEY='support-knowledge-create-1'
+```
+
+</CodeGroup>
+
+Choose one alternative and run from the directory containing `group-create.json`. Save the complete Python program as `create_access_group.py`, the TypeScript program as `create-access-group.ts`, or the Rust program as `src/main.rs` in its example project:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request POST \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups" \
+  --header @- \
+  --header "Idempotency-Key: $GROUP_CREATE_KEY" \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @group-create.json <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+```python
+import asyncio
+import os
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.access_group_creation_request import AccessGroupCreationRequest
+
+
+async def main() -> None:
+    request = AccessGroupCreationRequest.model_validate_json(
+        Path("group-create.json").read_text(encoding="utf-8")
+    )
+    configuration = Configuration(
+        host=os.environ["INFRAMELD_URL"],
+        access_token=os.environ["INFRAMELD_TOKEN"],
+    )
+    async with ApiClient(configuration) as client:
+        try:
+            receipt = await AccessApi(client).create_access_group(
+                project_id=UUID(os.environ["PROJECT_ID"]),
+                idempotency_key=os.environ["GROUP_CREATE_KEY"],
+                access_group_creation_request=request,
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            print(f"No usable creation receipt: HTTP {error.status}")
+            print("Keep the original request file and key.")
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("No usable response. Keep the original request file and key.")
+            raise SystemExit(1) from error
+
+        print(receipt.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import { readFileSync } from "node:fs"
+import {
+  createClient,
+  createAccessGroup,
+  type AccessGroupCreationRequest,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const key = process.env.GROUP_CREATE_KEY
+if (!baseUrl || !token || !projectId || !key) {
+  throw new Error(
+    "Set INFRAMELD_URL, INFRAMELD_TOKEN, PROJECT_ID and GROUP_CREATE_KEY"
+  )
+}
+
+const body: AccessGroupCreationRequest = JSON.parse(
+  readFileSync("group-create.json", "utf8")
+)
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const result = await createAccessGroup({
+  client,
+  path: { project_id: projectId },
+  body,
+  headers: { Authorization: `Bearer ${token}`, "Idempotency-Key": key },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error) {
+  console.error("No usable creation receipt:", result.error.kind)
+  console.error("HTTP status:", result.response?.status)
+  if (result.error.kind === "api") {
+    console.error({
+      code: result.error.body.code,
+      requestId: result.error.body.requestId,
+    })
+  }
+  console.error("Keep the original request file and key.")
+  process.exitCode = 1
+} else if (result.data) {
+  console.log("HTTP", result.response?.status)
+  console.log(JSON.stringify(result.data, null, 2))
+} else {
+  throw new Error("No usable result. Keep the original request file and key.")
+}
+```
+
+```rust
+use inframeld_sdk::{AccessGroupCreationRequest, HttpClient};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let request: AccessGroupCreationRequest =
+        serde_json::from_str(&std::fs::read_to_string("group-create.json")?)?;
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let project_id = std::env::var("PROJECT_ID")?;
+    let key = std::env::var("GROUP_CREATE_KEY")?;
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    match client.create_access_group(project_id, key, request).await {
+        Ok(response) => {
+            println!("HTTP {}", response.status);
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+        }
+        Err(error) => {
+            if let Some(context) = error.api() {
+                eprintln!("No usable creation receipt: HTTP {}", context.status);
+            } else {
+                eprintln!("No usable creation response.");
+            }
+            return Err(std::io::Error::other("Keep the original request file and key.").into());
+        }
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python create_access_group.py`, `node create-access-group.ts` with Node 26 in the ESM project, or `cargo run` from the Cargo project. The shared client pages supply local package setup. These programs do not automatically retry writes.
+
+Creation saves the group and your ordinary membership and management together. It makes no separate document-action assignment. A naming conflict, stale reviewed revision or failed commit leaves no partial new group or creator relationship.
+
+HTTP `201` returns `projectId`, `accessGroupId`, the names, your `creatorPrincipalId`, the resulting Project `accessRevision`, `operationId` and `idempotencyExpiresAt`. A fresh creation advances the Project Access revision once. Keep the returned group ID and original receipt. It describes creation, not today's memberships or management.
+
+An exact creation retry still requires your current Project creation authority. It returns that original group and receipt without recreating the group or restoring creator membership or management removed later.
+
+## Inspect the group and its relationships
+
+Inspect the group by its permanent ID or exact Name under current visibility. A remembered selector supplies no authority. Group identity inspection does not reveal document contents or a Project-wide membership inventory.
+
+Set the returned `accessGroupId`, replacing this example UUID:
+
+<CodeGroup>
+
+```shell
+export ACCESS_GROUP_ID='00000000-0000-4000-8000-000000000005'
+```
+
+</CodeGroup>
+
+Read its current metadata by ID:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+The response includes `projectId`, `accessGroupId`, `name`, `displayName`, `createdAt` and the current Project `accessRevision`. A retained legacy group can have `name: null` while remaining addressable by ID. An ordinary member, manager or holder of an action on this group may inspect its identity under current eligibility and Project visibility.
+
+Resolve the exact Name when you need its permanent ID:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/resolve" \
+  --data-urlencode 'name=support-knowledge' \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+Resolution returns the same metadata shape. Check the returned Project, group ID and exact Name. A missing or hidden group retains the safe `404` boundary.
+
+Only a current manager may inspect the group's member and manager lists. These bounded lists report safe principal IDs, display names and human/application kinds. They do not expose email addresses, other groups or document contents.
+
+Read the ordinary members:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID/members" \
+  --data-urlencode 'limit=25' \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+Read the human managers separately:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID/managers" \
+  --data-urlencode 'limit=25' \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+Each page identifies `projectId`, `accessGroupId` and the current Project `accessRevision`. Its `items` contain only `principalId`, `displayName` and `kind`, with nullable `nextCursor`. A freshly created group lists you in both relationships. Stored relationship presence does not replace the eligibility checks for a later change.
+
+Pass a continuation cursor unchanged within its original scope. Every page checks current management again. A cursor is neither a snapshot nor a permission token, and a denied read is not an empty list.
+
+The default limit is 25 and the allowed range is 1–100, in principal-UUID order. If `nextCursor` is non-null, repeat that same list with `--data-urlencode "cursor=$GROUP_CURSOR"`, using the returned value as `GROUP_CURSOR`. Member and manager cursors belong to their respective lists. These GETs accept no body or idempotency key and change no relationships, revision or audit.
+
+### Inspect with a generated client
+
+These complete programs perform the same four reads as the cURL examples. They require current management for the list calls. Leave `GROUP_MEMBERS_CURSOR` and `GROUP_MANAGERS_CURSOR` unset for their first pages, or set each to the unchanged cursor from that same list. Use the exact Name `support-knowledge` from this guide's creation request.
+
+Save the Python program as `inspect_access_group.py`, the TypeScript program as `inspect-access-group.ts`, or replace `src/main.rs` with the Rust program:
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+
+
+async def main() -> None:
+    project_id = UUID(os.environ["PROJECT_ID"])
+    group_id = UUID(os.environ["ACCESS_GROUP_ID"])
+    configuration = Configuration(
+        host=os.environ["INFRAMELD_URL"],
+        access_token=os.environ["INFRAMELD_TOKEN"],
+    )
+    async with ApiClient(configuration) as client:
+        api = AccessApi(client)
+        try:
+            group = await api.get_access_group(
+                project_id=project_id, access_group_id=group_id
+            )
+            print("Group by ID:")
+            print(group.to_json())
+
+            resolved = await api.resolve_access_group(
+                project_id=project_id, name="support-knowledge"
+            )
+            print("Group by Name:")
+            print(resolved.to_json())
+
+            members = await api.list_access_group_members(
+                project_id=project_id,
+                access_group_id=group_id,
+                limit=25,
+                cursor=os.environ.get("GROUP_MEMBERS_CURSOR"),
+            )
+            print("Member page:")
+            print(members.to_json())
+
+            managers = await api.list_access_group_managers(
+                project_id=project_id,
+                access_group_id=group_id,
+                limit=25,
+                cursor=os.environ.get("GROUP_MANAGERS_CURSOR"),
+            )
+            print("Manager page:")
+            print(managers.to_json())
+        except ApiException as error:
+            print(f"Group inspection failed: HTTP {error.status}")
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("No usable inspection response.")
+            raise SystemExit(1) from error
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import {
+  createClient,
+  getAccessGroup,
+  resolveAccessGroup,
+  listAccessGroupMembers,
+  listAccessGroupManagers,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const groupId = process.env.ACCESS_GROUP_ID
+if (!baseUrl || !token || !projectId || !groupId) {
+  throw new Error(
+    "Set INFRAMELD_URL, INFRAMELD_TOKEN, PROJECT_ID and ACCESS_GROUP_ID"
+  )
+}
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const headers = { Authorization: `Bearer ${token}` }
+const path = { project_id: projectId, access_group_id: groupId }
+
+const group = await getAccessGroup({
+  client,
+  path,
+  headers,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+if (group.error) {
+  throw new Error(
+    `Group read failed: ${group.error.kind}, HTTP ${group.response?.status ?? "unavailable"}`
+  )
+}
+console.log("Group by ID:", JSON.stringify(group.data, null, 2))
+
+const resolved = await resolveAccessGroup({
+  client,
+  path: { project_id: projectId },
+  query: { name: "support-knowledge" },
+  headers,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+if (resolved.error) {
+  throw new Error(
+    `Name resolution failed: ${resolved.error.kind}, HTTP ${resolved.response?.status ?? "unavailable"}`
+  )
+}
+console.log("Group by Name:", JSON.stringify(resolved.data, null, 2))
+
+const memberCursor = process.env.GROUP_MEMBERS_CURSOR
+const members = await listAccessGroupMembers({
+  client,
+  path,
+  headers,
+  query: {
+    limit: 25,
+    ...(memberCursor === undefined ? {} : { cursor: memberCursor }),
+  },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+if (members.error) {
+  throw new Error(
+    `Member read failed: ${members.error.kind}, HTTP ${members.response?.status ?? "unavailable"}`
+  )
+}
+console.log("Member page:", JSON.stringify(members.data, null, 2))
+
+const managerCursor = process.env.GROUP_MANAGERS_CURSOR
+const managers = await listAccessGroupManagers({
+  client,
+  path,
+  headers,
+  query: {
+    limit: 25,
+    ...(managerCursor === undefined ? {} : { cursor: managerCursor }),
+  },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+if (managers.error) {
+  throw new Error(
+    `Manager read failed: ${managers.error.kind}, HTTP ${managers.response?.status ?? "unavailable"}`
+  )
+}
+console.log("Manager page:", JSON.stringify(managers.data, null, 2))
+```
+
+```rust
+use inframeld_sdk::HttpClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let project_id = std::env::var("PROJECT_ID")?;
+    let group_id = std::env::var("ACCESS_GROUP_ID")?;
+    let member_cursor = std::env::var("GROUP_MEMBERS_CURSOR").ok();
+    let manager_cursor = std::env::var("GROUP_MANAGERS_CURSOR").ok();
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    let group = client.get_access_group(&project_id, &group_id).await?;
+    println!("Group by ID:");
+    println!("{}", serde_json::to_string_pretty(&group.body)?);
+
+    let resolved = client
+        .resolve_access_group(&project_id, "support-knowledge")
+        .await?;
+    println!("Group by Name:");
+    println!("{}", serde_json::to_string_pretty(&resolved.body)?);
+
+    let members = client
+        .list_access_group_members(&project_id, &group_id, Some(25), member_cursor.as_deref())
+        .await?;
+    println!("Member page:");
+    println!("{}", serde_json::to_string_pretty(&members.body)?);
+
+    let managers = client
+        .list_access_group_managers(&project_id, &group_id, Some(25), manager_cursor.as_deref())
+        .await?;
+    println!("Manager page:");
+    println!("{}", serde_json::to_string_pretty(&managers.body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python inspect_access_group.py`, `node inspect-access-group.ts` with Node 26, or `cargo run`. The ID and Name results should identify the same group. The programs print one member page and one manager page per run. Continue each list separately under current authority.
+
+## Add an ordinary member
+
+Add Bob when he should receive ordinary membership without administration responsibility. A human or application recipient must be an eligible current member of this Project. Membership in another Project does not satisfy that requirement.
+
+Read and review the current Project revision, then save `group-member-add.json`. Replace `0` with that reviewed value:
+
+<CodeGroup>
+
+```json
+{
+  "expectedAccessRevision": 0
+}
+```
+
+</CodeGroup>
+
+Save a distinct add key with this file and the exact IDs, then send the PUT:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+export GROUP_MEMBER_ADD_KEY='support-knowledge-bob-add-1'
+
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PUT \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID/members/$BOB_ID" \
+  --header @- \
+  --header "Idempotency-Key: $GROUP_MEMBER_ADD_KEY" \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @group-member-add.json <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A new membership returns `201` with `member: true` and `changed: true`. An already-present eligible membership returns `200` with `member: true` and `changed: false`. The receipt identifies the Project, group and recipient and carries the original operation, revision and retained-result expiry. A changed write advances the Project Access revision once. A fresh no-op does not.
+
+Adding SupportBot follows the same ordinary-membership meaning. It does not make the account a human or grant management, a credential or unrelated action permissions.
+
+For that separate addition, use SupportBot's returned application principal ID in place of `BOB_ID`, a newly reviewed revision and a distinct request file and key. Do not change Bob's original request under its existing key.
+
+## Appoint or demote a manager
+
+Appoint eligible human Bob when he should manage this group. Appointment saves any missing ordinary membership with management in the same change, preserving membership that already exists. Confirm the intended audience before the appointment because Bob gains access through the group to current and future shared documents.
+
+Review the current Project revision again. Save `group-manager-appoint.json` with that value instead of `0`:
+
+<CodeGroup>
+
+```json
+{
+  "expectedAccessRevision": 0
+}
+```
+
+</CodeGroup>
+
+Use a separate appointment key:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+export GROUP_MANAGER_APPOINT_KEY='support-knowledge-bob-appoint-1'
+
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PUT \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID/managers/$BOB_ID" \
+  --header @- \
+  --header "Idempotency-Key: $GROUP_MANAGER_APPOINT_KEY" \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @group-manager-appoint.json <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A changed appointment returns `201` with `manager: true` and `changed: true`. An already-present eligible manager returns `200` with `manager: true` and `changed: false`. Both outcomes preserve ordinary membership. This operation cannot appoint an application as a manager.
+
+Removing only Bob's management leaves him an ordinary member. Use membership removal instead when his access through this group should end. The last eligible human manager must appoint a replacement before an ordinary demotion or departure. Applications, suspended accounts and management of another group do not count as replacements.
+
+To demote Bob while keeping him a member, review the current revision and set it instead of `0`. Keep both variables with the original Project, group and recipient IDs before dispatch:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+export GROUP_MANAGER_REMOVE_REVISION='0'
+export GROUP_MANAGER_REMOVE_KEY='support-knowledge-bob-demote-1'
+
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request DELETE \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID/managers/$BOB_ID?expectedAccessRevision=$GROUP_MANAGER_REMOVE_REVISION" \
+  --header @- \
+  --header "Idempotency-Key: $GROUP_MANAGER_REMOVE_KEY" \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+DELETE sends no body. HTTP `200` returns `removed: true` and `changed`, which reports whether management was actually removed. An already-absent management assignment is unchanged. Bob's ordinary membership remains. The original receipt does not describe his status after a later appointment.
+
+## Remove membership and rejoin deliberately
+
+Removing Bob's ordinary membership also removes his management of this group. The related effects are saved together after the handover checks. Readding Bob later restores ordinary membership only. It does not restore management.
+
+Review the current revision for this distinct removal, replacing `0`:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+export GROUP_MEMBER_REMOVE_REVISION='0'
+export GROUP_MEMBER_REMOVE_KEY='support-knowledge-bob-remove-1'
+
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request DELETE \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID/members/$BOB_ID?expectedAccessRevision=$GROUP_MEMBER_REMOVE_REVISION" \
+  --header @- \
+  --header "Idempotency-Key: $GROUP_MEMBER_REMOVE_KEY" \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+HTTP `200` reports `removed: true`, the original IDs and `changed`. A real removal advances the Project Access revision once. An already-absent relationship returns `changed: false` without an advance. Read both member and manager lists to inspect current relationships after a successful change.
+
+For a deliberate rejoin, use the add-member operation with a fresh reviewed revision, a distinct request file and a new key. Do not replay the old add to restore access. That replay describes its original result and does not reapply membership.
+
+Removal ends access through this group. A document shared with another group Bob still belongs to may remain accessible through that other relationship. Removing a group membership does not erase Project-owned documents or revoke unrelated action permissions.
+
+## Delete an unused group
+
+Delete a group only when it is no longer needed and no protected stored reference uses it. Replace a protected reference through the operation owned by that resource before preparing a fresh deletion. Managing a group does not authorize changing every resource that references it.
+
+Deletion removes the group's owned relationships and the group together. A referenced-group rejection leaves those effects unchanged. Future Document, source, upload, default and case features supply their real references and deletion protection. The later default-reference workflow is separate from creating and administering this group.
+
+Keep your current management until the group deletion. You do not need to remove the last manager first. For an unused group, deletion removes the scope and its owned relationships together.
+
+Before dispatch, also prepare the [saved group-deletion identity](/guides/recover-original-request#recover-an-access-group-change) if you may need recovery without the returned operation ID. Keep the original installation and Organization IDs with the Project, group, method, concrete route and request key. The installation ID comes from a trusted [target registration](/guides/register-a-target#inspect-and-select-the-target) or your installation operator. Your [own Organization-access read](/api-reference/projects-and-access#read-your-organization-access) supplies the Organization ID.
+
+Review the current Project Access revision, then keep the deletion key and reviewed query value with the original IDs and route. Replace `0` before sending:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+export GROUP_DELETE_REVISION='0'
+export GROUP_DELETE_KEY='support-knowledge-delete-1'
+
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request DELETE \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID?expectedAccessRevision=$GROUP_DELETE_REVISION" \
+  --header @- \
+  --header "Idempotency-Key: $GROUP_DELETE_KEY" \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+HTTP `200` returns `removed: true`, `projectId`, `accessGroupId`, the resulting `accessRevision`, `operationId` and `idempotencyExpiresAt`. Keep the operation ID when you receive it. The last field describes ordinary original-result retention. It does not select or renew the separate retained deletion-status expiry.
+
+Save the complete original deletion identity before dispatch. Ordinary repeated DELETE and full-result replay still require current management. A completed synchronous group deletion has no cleanup job or application-shutdown stage.
+
+## Use a generated client for relationship changes
+
+These are operation snippets for an existing async application. Use one operation block at a time, with the client context below. The complete creation and inspection programs above show file setup and async lifetimes. The shared [Python](/clients/python), [TypeScript](/clients/typescript) and [Rust](/clients/rust) pages supply the source-package dependencies.
+
+Prepare `project_id` or `projectId` from `PROJECT_ID`, and `group_id` or `groupId` from `ACCESS_GROUP_ID`. For a relationship change, `principal_id` or `principalId` is Bob's returned human principal ID, or the application principal ID for an ordinary member addition. Python uses `UUID` values. TypeScript and Rust use strings.
+
+Set `reviewed_revision` or `reviewedRevision` to the typed Project `accessRevision` you reviewed. Use an integer from 0 through 9,007,199,254,740,991 without rounding or predicting the next value. Rust uses `i64`. Set `request_key` or `requestKey` to the separately saved key for that one operation. For a new change, review new inputs and save a distinct key. For an original retry, retain the original IDs, key and revision unchanged.
+
+### Configure the client once
+
+Use the reviewed `backend_url` or `backendUrl` and current `human_token` or `humanToken`. In Python, place one operation snippet immediately after `api = AccessApi(api_client)` inside the open `async with` block of your async application. In Rust, the configured client and operation snippet belong inside an async function returning `Result`.
+
+<CodeGroup>
+
+```python
+from uuid import UUID
+
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.models.access_group_membership_request import AccessGroupMembershipRequest
+from inframeld_sdk.models.access_group_manager_request import AccessGroupManagerRequest
+
+configuration = Configuration(host=backend_url, access_token=human_token)
+async with ApiClient(configuration) as api_client:
+    api = AccessApi(api_client)
+```
+
+```typescript
+import * as sdk from "@inframeld/sdk"
+
+const client = sdk.createClient({
+  baseUrl: backendUrl,
+  headers: { Authorization: `Bearer ${humanToken}` },
+  timeoutMs: 5000,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+```
+
+```rust
+use inframeld_sdk::{HttpClient, client::ApiOpError};
+
+/// Preserve uncertainty without printing a protected response body.
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
+    if let Some(context) = error.api() {
+        eprintln!("No usable group receipt: HTTP {}", context.status);
+    }
+    std::io::Error::other("Keep the original group request before deciding what to do next.")
+}
+
+let client = HttpClient::new()
+    .with_base_url(backend_url)
+    .with_header("Authorization", format!("Bearer {human_token}"));
+```
+
+</CodeGroup>
+
+### Add ordinary membership
+
+Use the reviewed add revision and saved add key for this exact recipient:
+
+<CodeGroup>
+
+```python
+receipt = await api.add_access_group_member(
+    project_id=project_id,
+    access_group_id=group_id,
+    principal_id=principal_id,
+    idempotency_key=request_key,
+    access_group_membership_request=AccessGroupMembershipRequest(
+        expectedAccessRevision=reviewed_revision
+    ),
+)
+print(receipt.to_json())
+```
+
+```typescript
+const result = await sdk.addAccessGroupMember({
+  client,
+  path: {
+    project_id: projectId,
+    access_group_id: groupId,
+    principal_id: principalId,
+  },
+  headers: { "Idempotency-Key": requestKey },
+  body: { expectedAccessRevision: reviewedRevision },
+})
+```
+
+```rust
+let response = client
+    .add_access_group_member(
+        &project_id,
+        &group_id,
+        &principal_id,
+        &request_key,
+        inframeld_sdk::AccessGroupMembershipRequest {
+            expected_access_revision: reviewed_revision,
+        },
+    )
+    .await
+    .map_err(report_error)?;
+println!("HTTP {}", response.status);
+println!("{}", serde_json::to_string_pretty(&response.body)?);
+```
+
+</CodeGroup>
+
+### Appoint human management
+
+Use a distinct reviewed appointment and key. The recipient must be an eligible human. The resulting management includes ordinary membership and access through the group to current and future shared documents:
+
+<CodeGroup>
+
+```python
+receipt = await api.appoint_access_group_manager(
+    project_id=project_id,
+    access_group_id=group_id,
+    principal_id=principal_id,
+    idempotency_key=request_key,
+    access_group_manager_request=AccessGroupManagerRequest(
+        expectedAccessRevision=reviewed_revision
+    ),
+)
+print(receipt.to_json())
+```
+
+```typescript
+const result = await sdk.appointAccessGroupManager({
+  client,
+  path: {
+    project_id: projectId,
+    access_group_id: groupId,
+    principal_id: principalId,
+  },
+  headers: { "Idempotency-Key": requestKey },
+  body: { expectedAccessRevision: reviewedRevision },
+})
+```
+
+```rust
+let response = client
+    .appoint_access_group_manager(
+        &project_id,
+        &group_id,
+        &principal_id,
+        &request_key,
+        inframeld_sdk::AccessGroupManagerRequest {
+            expected_access_revision: reviewed_revision,
+        },
+    )
+    .await
+    .map_err(report_error)?;
+println!("HTTP {}", response.status);
+println!("{}", serde_json::to_string_pretty(&response.body)?);
+```
+
+</CodeGroup>
+
+### Remove management and retain membership
+
+Complete the handover review before this separate operation. The revision goes in the query and no body is sent:
+
+<CodeGroup>
+
+```python
+receipt = await api.remove_access_group_manager(
+    project_id=project_id,
+    access_group_id=group_id,
+    principal_id=principal_id,
+    expected_access_revision=reviewed_revision,
+    idempotency_key=request_key,
+)
+print(receipt.to_json())
+```
+
+```typescript
+const result = await sdk.removeAccessGroupManager({
+  client,
+  path: {
+    project_id: projectId,
+    access_group_id: groupId,
+    principal_id: principalId,
+  },
+  headers: { "Idempotency-Key": requestKey },
+  query: { expectedAccessRevision: reviewedRevision },
+})
+```
+
+```rust
+let response = client
+    .remove_access_group_manager(
+        &project_id,
+        &group_id,
+        &principal_id,
+        reviewed_revision,
+        &request_key,
+    )
+    .await
+    .map_err(report_error)?;
+println!("HTTP {}", response.status);
+println!("{}", serde_json::to_string_pretty(&response.body)?);
+```
+
+</CodeGroup>
+
+### Remove membership and management together
+
+Use this operation when the recipient should lose ordinary membership too, with its own reviewed revision and key:
+
+<CodeGroup>
+
+```python
+receipt = await api.remove_access_group_member(
+    project_id=project_id,
+    access_group_id=group_id,
+    principal_id=principal_id,
+    expected_access_revision=reviewed_revision,
+    idempotency_key=request_key,
+)
+print(receipt.to_json())
+```
+
+```typescript
+const result = await sdk.removeAccessGroupMember({
+  client,
+  path: {
+    project_id: projectId,
+    access_group_id: groupId,
+    principal_id: principalId,
+  },
+  headers: { "Idempotency-Key": requestKey },
+  query: { expectedAccessRevision: reviewedRevision },
+})
+```
+
+```rust
+let response = client
+    .remove_access_group_member(
+        &project_id,
+        &group_id,
+        &principal_id,
+        reviewed_revision,
+        &request_key,
+    )
+    .await
+    .map_err(report_error)?;
+println!("HTTP {}", response.status);
+println!("{}", serde_json::to_string_pretty(&response.body)?);
+```
+
+</CodeGroup>
+
+### Delete the unused group
+
+Review that the group is unused while you remain its current manager. No recipient ID or body applies:
+
+<CodeGroup>
+
+```python
+receipt = await api.delete_access_group(
+    project_id=project_id,
+    access_group_id=group_id,
+    expected_access_revision=reviewed_revision,
+    idempotency_key=request_key,
+)
+print(receipt.to_json())
+```
+
+```typescript
+const result = await sdk.deleteAccessGroup({
+  client,
+  path: { project_id: projectId, access_group_id: groupId },
+  headers: { "Idempotency-Key": requestKey },
+  query: { expectedAccessRevision: reviewedRevision },
+})
+```
+
+```rust
+let response = client
+    .delete_access_group(&project_id, &group_id, reviewed_revision, &request_key)
+    .await
+    .map_err(report_error)?;
+println!("HTTP {}", response.status);
+println!("{}", serde_json::to_string_pretty(&response.body)?);
+```
+
+</CodeGroup>
+
+Python returns each typed receipt directly. Rust keeps HTTP metadata and its typed body together, with status alternatives for the two PUT outcomes. None of these original receipts establishes the relationship after a later change.
+
+At the Python application boundary, catch `inframeld_sdk.exceptions.ApiException` and `httpx.HTTPError`, report the available HTTP status and retain the original request. Do not print raw errors or automatically resend an uncertain write. The Rust error boundary above similarly leaves the operation unsuccessful and preserves recovery context.
+
+After any TypeScript operation, inspect the fields result before using the receipt:
+
+<CodeGroup>
+
+```typescript
+if (result.error !== undefined) {
+  console.error({
+    failureKind: result.error.kind,
+    httpStatus: result.response?.status,
+  })
+  if (result.error.kind === "api") {
+    console.error({
+      code: result.error.body.code,
+      requestId: result.error.body.requestId,
+    })
+  }
+  console.error("Keep the original group request.")
+  process.exitCode = 1
+} else {
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+</CodeGroup>
+
+A decoding failure is still a failure after HTTP `200` or `201`. These snippets neither retry nor renew a request. [Recovery](#recover-an-uncertain-change) retains the meaning of the original operation.
+
+## Recover an uncertain change
+
+Before each write, retain the original installation, Project and group IDs, method, route, complete body or revision query, and request key. Use a distinct key for a distinct operation. A timeout, disconnect or decoding failure does not establish that the write failed.
+
+For an ordinary retry, preserve the same key and complete original request, including its originally reviewed revision. The server checks current authority before returning a retained result. Replaying an old membership or manager change returns its original receipt without restoring or removing a relationship changed afterward. Read current relationships separately.
+
+Deletion has an additional retained path for the currently eligible original human. The exact saved request identity or original operation ID can disclose only content-free deletion correlation and status after the group disappears. This does not restore management or permit a full business-result replay without its ordinary current authority.
+
+The retained deletion path is independent of expired ordinary idempotency history. Its captured original status expiry does not renew when read again. An unresolved observation proves neither successful deletion nor absence of earlier effects. Preserve the original context before considering replacement work.
+
+For a lost group-deletion response, use the complete closed-family request in [original-request lookup](/guides/recover-original-request#recover-an-access-group-change). It uses family `access_group_deletion`, action `delete-access-group`, method `DELETE` and the original concrete UUID path, without the query string. These values describe the saved deletion identity, not a new permission grant. A `retained` result is content-free status, not the original group deletion receipt.
+
+If you already received the original `operationId`, use [retained deletion status](/guides/read-deletion-status#read-status-for-a-deleted-access-group) directly. For a settled group deletion, `admissionConfirmed`, `accessBlocked` and `physicalCleanupComplete` are true. `jobState` and `applicationShutdownComplete` are null because this synchronous group operation has neither stage. The returned `retentionExpiresAt` belongs to the captured group-status record, separately from ordinary `idempotencyExpiresAt`.
+
+## Review a rejection before sending new work
+
+An invalid credential, lost current authority, hidden scope, ineligible recipient, stale fresh review or unsafe last-manager change requires a different next step. Correct the stated prerequisite rather than treating an earlier successful read as permission for a later write.
+
+For a confirmed stale fresh request, reread and review the current Project Access revision before preparing distinct work with its own key. For an uncertain result, keep the original request unchanged and use its recovery path first. A rejected fresh change leaves no partial membership or management change.
+
+| Result                             | Meaning and next action                                                                                                                                                            |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401`                              | Use a currently accepted human credential for this installation.                                                                                                                   |
+| `403`                              | Current eligibility or manager authority denies this operation. An older successful read or retained key does not authorize it.                                                    |
+| `404`                              | The group or requested scope is missing or hidden. A denied observation is not proof that an uncertain write had no effect.                                                        |
+| `409`                              | Review the Problem Details for stale fresh review, unavailable Name, unsafe handover, protected reference or an original-request conflict. Preserve uncertain original work first. |
+| `400` or `422`                     | Correct malformed authentication, invalid fields or query framing. Use one canonical nonnegative revision value and reject unsupported recipient kinds.                            |
+| `413` or `415`                     | POST/PUT require one JSON object, at most 32 KiB, with `Content-Type: application/json`. DELETE has no body.                                                                       |
+| `503`, timeout or decoding failure | No usable observation or receipt is established. Keep the original request and resolve the dependency or connection problem before choosing recovery.                              |
+
+All group responses and problems use `Cache-Control: no-store`. Browser-cookie writes use the installation's actual Origin and cookie configuration with `X-Inframeld-CSRF: 1`. Do not combine a bearer token and a browser cookie. [The API reference](/api-reference/projects-and-access#create-an-access-group) reads the exact native operation and model contracts.
