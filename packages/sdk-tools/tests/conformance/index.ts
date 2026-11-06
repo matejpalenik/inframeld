@@ -17,3 +17,5 @@ import "./project-members.ts";
 import "./project-action-grants.ts";
 import "./project-membership.ts";
 import "./human-admission.ts";
+
+import "./application-accounts.ts";

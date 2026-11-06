@@ -40,6 +40,58 @@ problems!(
     GetMyOrganizationAccessApiError::Status503
 );
 problems!(
+    CreateApplicationAccountApiError,
+    CreateApplicationAccountApiError::Status400,
+    CreateApplicationAccountApiError::Status401,
+    CreateApplicationAccountApiError::Status403,
+    CreateApplicationAccountApiError::Status404,
+    CreateApplicationAccountApiError::Status409,
+    CreateApplicationAccountApiError::Status413,
+    CreateApplicationAccountApiError::Status415,
+    CreateApplicationAccountApiError::Status422,
+    CreateApplicationAccountApiError::Status503
+);
+problems!(
+    GetApplicationAccountApiError,
+    GetApplicationAccountApiError::Status400,
+    GetApplicationAccountApiError::Status401,
+    GetApplicationAccountApiError::Status403,
+    GetApplicationAccountApiError::Status404,
+    GetApplicationAccountApiError::Status409,
+    GetApplicationAccountApiError::Status422,
+    GetApplicationAccountApiError::Status503
+);
+problems!(
+    ResolveApplicationAccountApiError,
+    ResolveApplicationAccountApiError::Status400,
+    ResolveApplicationAccountApiError::Status401,
+    ResolveApplicationAccountApiError::Status403,
+    ResolveApplicationAccountApiError::Status404,
+    ResolveApplicationAccountApiError::Status409,
+    ResolveApplicationAccountApiError::Status422,
+    ResolveApplicationAccountApiError::Status503
+);
+problems!(
+    ListApplicationKeysApiError,
+    ListApplicationKeysApiError::Status400,
+    ListApplicationKeysApiError::Status401,
+    ListApplicationKeysApiError::Status403,
+    ListApplicationKeysApiError::Status404,
+    ListApplicationKeysApiError::Status409,
+    ListApplicationKeysApiError::Status422,
+    ListApplicationKeysApiError::Status503
+);
+problems!(
+    GetApplicationKeyApiError,
+    GetApplicationKeyApiError::Status400,
+    GetApplicationKeyApiError::Status401,
+    GetApplicationKeyApiError::Status403,
+    GetApplicationKeyApiError::Status404,
+    GetApplicationKeyApiError::Status409,
+    GetApplicationKeyApiError::Status422,
+    GetApplicationKeyApiError::Status503
+);
+problems!(
     CreateProjectApiError,
     CreateProjectApiError::Status400,
     CreateProjectApiError::Status401,

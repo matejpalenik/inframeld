@@ -55,6 +55,75 @@ export type AccessGroupGrantTargetResponse = {
 };
 
 /**
+ * ApplicationAccountAction
+ *
+ * Identify separate human administration actions on one application account.
+ */
+export type ApplicationAccountAction = 'issue-application-keys' | 'revoke-application-keys' | 'delete-application-account';
+
+/**
+ * ApplicationAccountCreationRequest
+ */
+export type ApplicationAccountCreationRequest = {
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * ApplicationAccountCreationResponse
+ *
+ * Report original human creator assignments, not current account permissions.
+ */
+export type ApplicationAccountCreationResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Initialgrants
+     */
+    initialGrants: [
+        InitialApplicationAccountGrantResponse,
+        InitialApplicationAccountGrantResponse,
+        InitialApplicationAccountGrantResponse
+    ];
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
  * ApplicationAccountGrantTargetResponse
  */
 export type ApplicationAccountGrantTargetResponse = {
@@ -70,6 +139,80 @@ export type ApplicationAccountGrantTargetResponse = {
      * Projectid
      */
     projectId: string;
+};
+
+/**
+ * ApplicationAccountMetadataResponse
+ */
+export type ApplicationAccountMetadataResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Createdat
+     */
+    createdAt: string;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Name
+     */
+    name: string | null;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    status: PrincipalStatus;
+};
+
+/**
+ * ApplicationKeyAdapter
+ */
+export type ApplicationKeyAdapter = 'http' | 'mcp';
+
+/**
+ * ApplicationKeyMetadataResponse
+ */
+export type ApplicationKeyMetadataResponse = {
+    /**
+     * Allowedadapters
+     */
+    allowedAdapters: Array<ApplicationKeyAdapter>;
+    /**
+     * Applicationprincipalid
+     */
+    applicationPrincipalId: string;
+    /**
+     * Createdat
+     */
+    createdAt: string;
+    /**
+     * Expiresat
+     */
+    expiresAt: string;
+    /**
+     * Keyid
+     */
+    keyId: string;
+    /**
+     * Prefix
+     */
+    prefix: 'ifm_app_';
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Revokedat
+     */
+    revokedAt: string | null;
 };
 
 /**
@@ -261,6 +404,18 @@ export type InframeldDiscoveryResponse = {
      * Schema Version
      */
     schema_version: 1;
+};
+
+/**
+ * InitialApplicationAccountGrantResponse
+ */
+export type InitialApplicationAccountGrantResponse = {
+    actionId: ApplicationAccountAction;
+    /**
+     * Cangrant
+     */
+    canGrant: true;
+    target: ApplicationAccountGrantTargetResponse;
 };
 
 /**
@@ -464,6 +619,20 @@ export type OwnOrganizationGrantResponse = {
 };
 
 /**
+ * PageResponse[ApplicationKeyMetadataResponse]
+ */
+export type PageResponseApplicationKeyMetadataResponse = {
+    /**
+     * Items
+     */
+    items: Array<ApplicationKeyMetadataResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
  * PageResponse[ProjectActionGrantItemResponse]
  */
 export type PageResponseProjectActionGrantItemResponse = {
@@ -483,6 +652,13 @@ export type PageResponseProjectActionGrantItemResponse = {
  * Distinguish local human actors from application accounts.
  */
 export type PrincipalKind = 'human' | 'application';
+
+/**
+ * PrincipalStatus
+ *
+ * Describe whether a local actor is active, suspended, or permanently retired.
+ */
+export type PrincipalStatus = 'active' | 'suspended' | 'retired';
 
 /**
  * ProblemDetails
@@ -1804,6 +1980,320 @@ export type ResolveProjectNameResponses = {
 };
 
 export type ResolveProjectNameResponse = ResolveProjectNameResponses[keyof ResolveProjectNameResponses];
+
+export type CreateApplicationAccountData = {
+    body: ApplicationAccountCreationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/application-accounts';
+};
+
+export type CreateApplicationAccountErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type CreateApplicationAccountError = CreateApplicationAccountErrors[keyof CreateApplicationAccountErrors];
+
+export type CreateApplicationAccountResponses = {
+    /**
+     * Successful Response
+     */
+    201: ApplicationAccountCreationResponse;
+};
+
+export type CreateApplicationAccountResponse = CreateApplicationAccountResponses[keyof CreateApplicationAccountResponses];
+
+export type ResolveApplicationAccountData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Name
+         */
+        name: string;
+    };
+    url: '/v1/projects/{project_id}/application-accounts/resolve';
+};
+
+export type ResolveApplicationAccountErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ResolveApplicationAccountError = ResolveApplicationAccountErrors[keyof ResolveApplicationAccountErrors];
+
+export type ResolveApplicationAccountResponses = {
+    /**
+     * Successful Response
+     */
+    200: ApplicationAccountMetadataResponse;
+};
+
+export type ResolveApplicationAccountResponse = ResolveApplicationAccountResponses[keyof ResolveApplicationAccountResponses];
+
+export type GetApplicationAccountData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Application Principal Id
+         */
+        application_principal_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/application-accounts/{application_principal_id}';
+};
+
+export type GetApplicationAccountErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetApplicationAccountError = GetApplicationAccountErrors[keyof GetApplicationAccountErrors];
+
+export type GetApplicationAccountResponses = {
+    /**
+     * Successful Response
+     */
+    200: ApplicationAccountMetadataResponse;
+};
+
+export type GetApplicationAccountResponse = GetApplicationAccountResponses[keyof GetApplicationAccountResponses];
+
+export type ListApplicationKeysData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Application Principal Id
+         */
+        application_principal_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/application-accounts/{application_principal_id}/keys';
+};
+
+export type ListApplicationKeysErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListApplicationKeysError = ListApplicationKeysErrors[keyof ListApplicationKeysErrors];
+
+export type ListApplicationKeysResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseApplicationKeyMetadataResponse;
+};
+
+export type ListApplicationKeysResponse = ListApplicationKeysResponses[keyof ListApplicationKeysResponses];
+
+export type GetApplicationKeyData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Application Principal Id
+         */
+        application_principal_id: string;
+        /**
+         * Key Id
+         */
+        key_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/application-accounts/{application_principal_id}/keys/{key_id}';
+};
+
+export type GetApplicationKeyErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetApplicationKeyError = GetApplicationKeyErrors[keyof GetApplicationKeyErrors];
+
+export type GetApplicationKeyResponses = {
+    /**
+     * Successful Response
+     */
+    200: ApplicationKeyMetadataResponse;
+};
+
+export type GetApplicationKeyResponse = GetApplicationKeyResponses[keyof GetApplicationKeyResponses];
 
 export type ListProjectActionGrantsData = {
     body?: never;

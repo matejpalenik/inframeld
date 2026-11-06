@@ -6,6 +6,9 @@ from functools import partial
 from fastapi import FastAPI
 from ory_kratos_client.api.identity_api import IdentityApi
 
+from inframeld_backend.access.application.services.application_account_creation_fingerprint_service import (
+    ApplicationAccountCreationFingerprintService,
+)
 from inframeld_backend.access.application.services.human_admission_fingerprint_service import (
     HumanAdmissionFingerprintService,
 )
@@ -30,6 +33,9 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
 from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler import (
     register_human_oauth_credential_error_handler,
 )
+from inframeld_backend.access.http.requests.application_account_creation_request import (
+    ApplicationAccountCreationRequest,
+)
 from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
 from inframeld_backend.access.http.requests.project_action_grant_request import (
     ProjectActionGrantRequest,
@@ -40,6 +46,12 @@ from inframeld_backend.access.http.requests.project_membership_request import (
 )
 from inframeld_backend.access.http.requests.project_metadata_update_request import (
     ProjectMetadataUpdateRequest,
+)
+from inframeld_backend.access.http.responses.application_account_creation_response import (
+    ApplicationAccountCreationResponse,
+)
+from inframeld_backend.access.http.responses.application_account_metadata_response import (
+    ApplicationAccountMetadataResponse,
 )
 from inframeld_backend.access.http.responses.my_organization_access_response import (
     MyOrganizationAccessResponse,
@@ -52,6 +64,9 @@ from inframeld_backend.access.http.responses.project_action_grant_removal_respon
 )
 from inframeld_backend.access.http.responses.project_action_grant_response import (
     ProjectActionGrantResponse,
+)
+from inframeld_backend.access.http.routes.application_account_routes import (
+    create_application_account_router,
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
@@ -95,6 +110,10 @@ from inframeld_backend.access.infrastructure.verifiers.kratos_human_identity_ver
     KratosHumanIdentityVerifier,
 )
 from inframeld_backend.bootstrap.access_composition import create_access_components
+from inframeld_backend.bootstrap.application_account_composition import (
+    open_application_account_creation,
+    open_application_account_read,
+)
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
@@ -174,6 +193,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         fingerprints = ProjectGrantChangeFingerprintService(request_fingerprints)
         metadata_fingerprints = ProjectMetadataFingerprintService(request_fingerprints)
         creation_fingerprints = ProjectCreationFingerprintService(request_fingerprints)
+        account_fingerprints = ApplicationAccountCreationFingerprintService(request_fingerprints)
         admission_fingerprints = HumanAdmissionFingerprintService(request_fingerprints)
         membership_fingerprints = ProjectMembershipChangeFingerprintService(request_fingerprints)
         admission_authority = (
@@ -216,6 +236,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         configure_problem_openapi(
             application,
             validation_models=(
+                ApplicationAccountCreationRequest,
                 HumanAdmissionRequest,
                 ProjectCreationRequest,
                 ProjectMembershipRequest,
@@ -223,6 +244,8 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ProjectActionGrantRequest,
             ),
             serialization_models=(
+                ApplicationAccountCreationResponse,
+                ApplicationAccountMetadataResponse,
                 MyOrganizationAccessResponse,
                 MyProjectAccessResponse,
                 ProjectActionGrantResponse,
@@ -265,6 +288,13 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_project_creation_router(
                 human_session, partial(open_project_creation, database, creation_fingerprints)
+            )
+        )
+        application.include_router(
+            create_application_account_router(
+                human_session,
+                partial(open_application_account_creation, database, account_fingerprints),
+                partial(open_application_account_read, database),
             )
         )
         application.include_router(

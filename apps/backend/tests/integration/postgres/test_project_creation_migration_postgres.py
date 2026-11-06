@@ -75,7 +75,7 @@ async def test_0016_upgrade_and_empty_outcome_roundtrip_preserve_admission_and_l
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0023_safe_numeric_revisions"
+                == "0024_application_accounts"
             )
             receipt = await session.get(
                 FirstAdministratorBootstrapReceiptRow, seed.binding.installation_id.value
@@ -127,7 +127,7 @@ async def test_retained_creation_outcome_refuses_downgrade_without_losing_replay
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0023_safe_numeric_revisions"
+            == "0024_application_accounts"
         )
         receipt = await session.get(
             ProjectCreationOperationResultRow, first.operation.operation_id.value

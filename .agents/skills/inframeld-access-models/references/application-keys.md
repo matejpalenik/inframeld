@@ -102,6 +102,24 @@ Alice receives explicit **can use and grant** assignments for Issue application 
 
 Authorized people then give SupportBot the actions and group memberships it needs. An application belongs to one project and cannot move between projects under this design. Humans may belong to several projects.
 
+<a id="implemented-application-account-creation"></a>
+
+### Create and inspect one empty application account
+
+The backend implements `POST /v1/projects/{project_id}/application-accounts` as `createApplicationAccount`. Submit the exact required `name`, `displayName` and reviewed `expectedAccessRevision`. Names follow the accepted Resource Name and Display name rules. An application Name is unique within its Project and this resource type, including inaccessible accounts. Existing unnamed extension rows remain addressable by permanent principal ID, with a nullable Name and their original display label preserved.
+
+The [creation service](../../../../apps/backend/src/inframeld_backend/access/application/services/application_account_creation_service.py) owns a short transaction. The [facts reader](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_application_account_creation_facts_reader.py) takes the Organization shared lock and Project exclusive lock before reading current human eligibility, membership, exact `create-application-accounts` authority and Project Access revision. Current authority precedes reservation or original-result replay. Fresh admission checks the reviewed revision and rejects an exhausted counter.
+
+The [writer](../../../../apps/backend/src/inframeld_backend/access/infrastructure/writers/postgres_application_account_creation_writer.py) atomically saves the new application principal, same-ID extension, required Project membership, three exact human creator assignments, one Project revision increment, required audit, immutable original result and operation completion. It creates no received action grant, group membership or key. A collision, rejected audit or failed commit leaves no partial identity. Name reservations prevent assigning an old selector to a different account. Application retirement remains separate work under #233.
+
+The 201 receipt returns `principalId`, not a second account ID. Its `initialGrants` describe the original Issue keys, Revoke keys and Delete account assignments, each with `canGrant: true` on that exact account. They are historical creation facts, not a present permission listing. An exact currently authorized POST replay returns the original account, names, revision and receipt without recreating removed grants. Original-request lookup uses the saved concrete UUID route, `project_action_use` and `create-application-accounts`. The legacy namespaces of other operations are unchanged.
+
+`getApplicationAccount` reads `/v1/projects/{project_id}/application-accounts/{application_principal_id}`. `resolveApplicationAccount` reads the same collection's `/resolve?name=<exact-name>` endpoint. Both require a currently eligible human Project member with any exact Issue, Revoke or Delete administration action on that account. They return safe names, permanent principal/Project IDs, principal status, creation time and current Project Access revision. A hidden account or unmatched Name returns the same safe 404 as an absent account. Resolution never uses a Display name, redirects a retired Name or provides a Project-wide application inventory. Eligible-recipient discovery remains with its grant owner.
+
+Safe key list/get follows [the metadata read contract](application-key-contracts.md#application-key-metadata-reads). It needs Issue or Revoke, without issuance delegation or group management. Delete alone permits account metadata but cannot disclose key metadata. Every read repeats current authorization and returns `Cache-Control: no-store`.
+
+The [application-account guide](../../../../apps/docs/src/app/guides/application-accounts/page.mdx) uses the native API and selected generated clients. Account creation and safe inspection do not implement issuance, incoming key authentication, revocation or retirement. Supported authentication procedure preparation, engineering walkthrough and human observations remain tracked by [#352](https://github.com/matejpalenik/inframeld/issues/352), due before v1 release.
+
 <a id="alice-creates-a-key-after-supportbot-gains-hr-access"></a>
 
 ### Alice creates a key after SupportBot gains HR access
@@ -262,7 +280,7 @@ Apply the accepted entries below when their scope matches. Discuss only choices 
 
 ## Status and sources
 
-The prefix, credential dispatch, complete key format/lifetimes and account-authority rules are accepted design. Application-key verification and remaining lifecycle/runtime qualification are unfinished. Authorization fixtures simulating key IDs do not establish provisioning or an authenticator.
+Empty-account creation and authorized account/key-metadata reads are implemented through the native API. The prefix, credential dispatch, complete key format/lifetimes and account-authority rules remain accepted design for the unfinished issuance, authentication, revocation and retirement workflows. Application-key verification and remaining lifecycle/runtime qualification are unfinished. Authorization fixtures simulating key IDs do not establish provisioning or an authenticator.
 
 MCP retains the accepted preconfigured, header-capable two-tool profile without implied OAuth discovery or verified user delegation.
 

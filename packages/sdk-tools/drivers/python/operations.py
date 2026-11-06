@@ -11,6 +11,9 @@ from inframeld_sdk.api.access_api import AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi
 from inframeld_sdk.api.operations_api import OperationsApi
+from inframeld_sdk.models.application_account_creation_request import (
+    ApplicationAccountCreationRequest,
+)
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
@@ -271,6 +274,108 @@ async def human_admission_async(clients: Clients, call: Call) -> NativeResponse:
         organization_id=UUID(call.path["organization_id"]),
         idempotency_key=call.headers["Idempotency-Key"],
         human_admission_request=HumanAdmissionRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def create_application_account_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).create_application_account_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        application_account_creation_request=ApplicationAccountCreationRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def create_application_account_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).create_application_account_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        application_account_creation_request=ApplicationAccountCreationRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def get_application_account_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_application_account_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def get_application_account_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_application_account_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def resolve_application_account_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).resolve_application_account_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        name=string(call.query["name"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def resolve_application_account_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).resolve_application_account_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        name=string(call.query["name"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_application_keys_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_application_keys_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_application_keys_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_application_keys_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def get_application_key_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_application_key_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        key_id=UUID(call.path["key_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def get_application_key_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_application_key_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        key_id=UUID(call.path["key_id"]),
         _headers=call.headers,
         _request_timeout=call.timeout / 1000,
     )
@@ -610,6 +715,19 @@ async def fallback_async(clients: Clients, call: Call) -> NativeResponse:
 
 
 BINDINGS: dict[Operation, Binding] = {
+    Operation.CREATE_APPLICATION_ACCOUNT: Binding(
+        create_application_account_sync, create_application_account_async
+    ),
+    Operation.GET_APPLICATION_ACCOUNT: Binding(
+        get_application_account_sync, get_application_account_async
+    ),
+    Operation.RESOLVE_APPLICATION_ACCOUNT: Binding(
+        resolve_application_account_sync, resolve_application_account_async
+    ),
+    Operation.LIST_APPLICATION_KEYS: Binding(
+        list_application_keys_sync, list_application_keys_async
+    ),
+    Operation.GET_APPLICATION_KEY: Binding(get_application_key_sync, get_application_key_async),
     Operation.ADMIT_HUMAN: Binding(human_admission_sync, human_admission_async),
     Operation.GET_MY_ORGANIZATION_ACCESS: Binding(
         organization_access_sync, organization_access_async

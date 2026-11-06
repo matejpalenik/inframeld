@@ -95,6 +95,10 @@
           {
             "title": "List Project action grants",
             "href": "/guides/list-project-action-grants"
+          },
+          {
+            "title": "Create and inspect an application account",
+            "href": "/guides/application-accounts"
           }
         ]
       },

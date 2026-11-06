@@ -65,7 +65,7 @@ Save the following as `original-request.json` in your example project's working 
 
 </CodeGroup>
 
-Use the original method and canonical route template exactly. For this grant, `requestedRoute` contains `{project_id}`, not the Project's UUID. The original idempotency key belongs in the JSON body.
+Use the original method and the exact route representation documented for that operation. For this grant, `requestedRoute` contains `{project_id}`, not the Project's UUID. The original idempotency key belongs in the JSON body.
 
 Do not reconstruct the original scope from your current Project selection or an alias. Lookup takes no grant payload or request fingerprint. The JSON body is limited to 32 KiB. Unknown fields and duplicate JSON keys are rejected.
 
@@ -78,6 +78,8 @@ For other supported operations, preserve the original authority meaning:
 | Organization operation    | `organization_action_use`  | Original Organization action | Explicit `null`       |
 
 For a Project metadata change, retain method `PATCH`, canonical route `/v1/projects/{project_id}/metadata`, family `project_action_use` and action `edit-project-metadata`. [Name and rename an existing Project](/guides/name-and-rename-project) explains the write and recovery path. Lookup observes its retained operation metadata. A separate Project metadata GET reports current fields.
+
+For application-account creation, retain method `POST`, the original concrete route containing the actual Project UUID, family `project_action_use` and action `create-application-accounts`. [Create and inspect an application account](/guides/application-accounts#recover-an-uncertain-creation-result) explains its original-POST recovery and exact lookup context.
 
 A grant lookup requires `project_grant_read`. The weaker `project_action_use` guard cannot replace it. Lookup checks your current authority before searching retained history. It does not repeat the recipient's eligibility check from the original assignment.
 
