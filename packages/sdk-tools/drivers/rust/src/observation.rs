@@ -321,16 +321,6 @@ problems!(
     DecideHumanOAuthConsentApiError::Status503
 );
 problems!(
-    AssignProjectUseOnlyGrantApiError,
-    AssignProjectUseOnlyGrantApiError::Status400,
-    AssignProjectUseOnlyGrantApiError::Status401,
-    AssignProjectUseOnlyGrantApiError::Status403,
-    AssignProjectUseOnlyGrantApiError::Status404,
-    AssignProjectUseOnlyGrantApiError::Status409,
-    AssignProjectUseOnlyGrantApiError::Status422,
-    AssignProjectUseOnlyGrantApiError::Status503
-);
-problems!(
     fixture::ContractFixtureFallbackApiError,
     fixture::ContractFixtureFallbackApiError::Default
 );
@@ -451,4 +441,119 @@ problems!(
     UpdateProjectMetadataApiError::Status415,
     UpdateProjectMetadataApiError::Status422,
     UpdateProjectMetadataApiError::Status503
+);
+
+problems!(
+    ListOrganizationActionGrantsApiError,
+    ListOrganizationActionGrantsApiError::Status400,
+    ListOrganizationActionGrantsApiError::Status401,
+    ListOrganizationActionGrantsApiError::Status403,
+    ListOrganizationActionGrantsApiError::Status404,
+    ListOrganizationActionGrantsApiError::Status409,
+    ListOrganizationActionGrantsApiError::Status422,
+    ListOrganizationActionGrantsApiError::Status503
+);
+
+problems!(
+    SetOrganizationActionGrantApiError,
+    SetOrganizationActionGrantApiError::Status400,
+    SetOrganizationActionGrantApiError::Status401,
+    SetOrganizationActionGrantApiError::Status403,
+    SetOrganizationActionGrantApiError::Status404,
+    SetOrganizationActionGrantApiError::Status409,
+    SetOrganizationActionGrantApiError::Status413,
+    SetOrganizationActionGrantApiError::Status415,
+    SetOrganizationActionGrantApiError::Status422,
+    SetOrganizationActionGrantApiError::Status503
+);
+
+problems!(
+    RemoveOrganizationActionGrantApiError,
+    RemoveOrganizationActionGrantApiError::Status400,
+    RemoveOrganizationActionGrantApiError::Status401,
+    RemoveOrganizationActionGrantApiError::Status403,
+    RemoveOrganizationActionGrantApiError::Status404,
+    RemoveOrganizationActionGrantApiError::Status409,
+    RemoveOrganizationActionGrantApiError::Status422,
+    RemoveOrganizationActionGrantApiError::Status503
+);
+
+problems!(
+    ListAccessGroupActionGrantsApiError,
+    ListAccessGroupActionGrantsApiError::Status400,
+    ListAccessGroupActionGrantsApiError::Status401,
+    ListAccessGroupActionGrantsApiError::Status403,
+    ListAccessGroupActionGrantsApiError::Status404,
+    ListAccessGroupActionGrantsApiError::Status409,
+    ListAccessGroupActionGrantsApiError::Status422,
+    ListAccessGroupActionGrantsApiError::Status503
+);
+
+problems!(
+    SetAccessGroupActionGrantApiError,
+    SetAccessGroupActionGrantApiError::Status400,
+    SetAccessGroupActionGrantApiError::Status401,
+    SetAccessGroupActionGrantApiError::Status403,
+    SetAccessGroupActionGrantApiError::Status404,
+    SetAccessGroupActionGrantApiError::Status409,
+    SetAccessGroupActionGrantApiError::Status413,
+    SetAccessGroupActionGrantApiError::Status415,
+    SetAccessGroupActionGrantApiError::Status422,
+    SetAccessGroupActionGrantApiError::Status503
+);
+
+problems!(
+    RemoveAccessGroupActionGrantApiError,
+    RemoveAccessGroupActionGrantApiError::Status400,
+    RemoveAccessGroupActionGrantApiError::Status401,
+    RemoveAccessGroupActionGrantApiError::Status403,
+    RemoveAccessGroupActionGrantApiError::Status404,
+    RemoveAccessGroupActionGrantApiError::Status409,
+    RemoveAccessGroupActionGrantApiError::Status422,
+    RemoveAccessGroupActionGrantApiError::Status503
+);
+
+problems!(
+    ListApplicationAccountActionGrantsApiError,
+    ListApplicationAccountActionGrantsApiError::Status400,
+    ListApplicationAccountActionGrantsApiError::Status401,
+    ListApplicationAccountActionGrantsApiError::Status403,
+    ListApplicationAccountActionGrantsApiError::Status404,
+    ListApplicationAccountActionGrantsApiError::Status409,
+    ListApplicationAccountActionGrantsApiError::Status422,
+    ListApplicationAccountActionGrantsApiError::Status503
+);
+
+problems!(
+    SetApplicationAccountActionGrantApiError,
+    SetApplicationAccountActionGrantApiError::Status400,
+    SetApplicationAccountActionGrantApiError::Status401,
+    SetApplicationAccountActionGrantApiError::Status403,
+    SetApplicationAccountActionGrantApiError::Status404,
+    SetApplicationAccountActionGrantApiError::Status409,
+    SetApplicationAccountActionGrantApiError::Status413,
+    SetApplicationAccountActionGrantApiError::Status415,
+    SetApplicationAccountActionGrantApiError::Status422,
+    SetApplicationAccountActionGrantApiError::Status503
+);
+
+problems!(
+    RemoveApplicationAccountActionGrantApiError,
+    RemoveApplicationAccountActionGrantApiError::Status400,
+    RemoveApplicationAccountActionGrantApiError::Status401,
+    RemoveApplicationAccountActionGrantApiError::Status403,
+    RemoveApplicationAccountActionGrantApiError::Status404,
+    RemoveApplicationAccountActionGrantApiError::Status409,
+    RemoveApplicationAccountActionGrantApiError::Status422,
+    RemoveApplicationAccountActionGrantApiError::Status503
+);
+
+problems!(
+    ListProjectGrantRecipientsApiError,
+    ListProjectGrantRecipientsApiError::Status400,
+    ListProjectGrantRecipientsApiError::Status401,
+    ListProjectGrantRecipientsApiError::Status403,
+    ListProjectGrantRecipientsApiError::Status404,
+    ListProjectGrantRecipientsApiError::Status422,
+    ListProjectGrantRecipientsApiError::Status503
 );

@@ -11,6 +11,225 @@ pub async fn observe(
 ) -> Observation {
     let body = request.body.clone().unwrap_or(Value::Null);
     match request.operation.as_str() {
+        "listOrganizationActionGrants" => observed!(
+            client
+                .list_organization_action_grants(
+                    request.path.as_ref().unwrap()["organization_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["actionId"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str)
+                )
+                .await
+        ),
+        "setOrganizationActionGrant" => observed!(
+            client
+                .set_organization_action_grant(
+                    request.path.as_ref().unwrap()["organization_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["action_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
+        "removeOrganizationActionGrant" => observed!(
+            client
+                .remove_organization_action_grant(
+                    request.path.as_ref().unwrap()["organization_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["action_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
+        "listAccessGroupActionGrants" => observed!(
+            client
+                .list_access_group_action_grants(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["actionId"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str)
+                )
+                .await
+        ),
+        "setAccessGroupActionGrant" => observed!(
+            client
+                .set_access_group_action_grant(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["action_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
+        "removeAccessGroupActionGrant" => observed!(
+            client
+                .remove_access_group_action_grant(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["access_group_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["action_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
+        "listApplicationAccountActionGrants" => observed!(
+            client
+                .list_application_account_action_grants(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["application_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["actionId"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str)
+                )
+                .await
+        ),
+        "setApplicationAccountActionGrant" => observed!(
+            client
+                .set_application_account_action_grant(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["application_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["action_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
+        "removeApplicationAccountActionGrant" => observed!(
+            client
+                .remove_application_account_action_grant(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["application_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["action_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
+        "listProjectGrantRecipients" => observed!(
+            client
+                .list_project_grant_recipients(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    serde_json::from_value(request.query.as_ref().unwrap()["targetKind"].clone())
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["targetId"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["actionId"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str)
+                )
+                .await
+        ),
         "getMyProjectAccess" => observed!(
             client
                 .get_my_project_access(
@@ -487,17 +706,6 @@ pub async fn observe(
                     request.query.as_ref().unwrap()["operationId"]
                         .as_str()
                         .unwrap()
-                )
-                .await
-        ),
-        "assignProjectUseOnlyGrant" => observed!(
-            client
-                .assign_project_use_only_grant(
-                    request.path.as_ref().unwrap()["project_id"]
-                        .as_str()
-                        .unwrap(),
-                    &request.headers["Idempotency-Key"],
-                    serde_json::from_value(body).unwrap()
                 )
                 .await
         ),

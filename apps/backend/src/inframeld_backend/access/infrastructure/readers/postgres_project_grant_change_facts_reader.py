@@ -11,7 +11,6 @@ from sqlalchemy import (
     exists,
     func,
     literal,
-    or_,
     select,
 )
 from sqlalchemy.exc import OperationalError
@@ -56,9 +55,6 @@ from inframeld_backend.access.infrastructure.readers.human_credential_state_quer
 )
 from inframeld_backend.access.infrastructure.rows.application_account_row import (
     ApplicationAccountRow,
-)
-from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
-    HumanCredentialVersionRow,
 )
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
@@ -251,23 +247,7 @@ class PostgresProjectGrantChangeFactsReader(
 
     @staticmethod
     def _pending(principal: SQLColumnExpression[UUID], installation: InstallationId) -> Exists:
-        return (
-            select(IdentityRecoveryAdmissionRow.operation_id)
-            .join(
-                HumanIdentityLinkRow,
-                and_(
-                    HumanIdentityLinkRow.authority == IdentityRecoveryAdmissionRow.authority,
-                    HumanIdentityLinkRow.subject == IdentityRecoveryAdmissionRow.subject,
-                ),
-            )
-            .where(
-                IdentityRecoveryAdmissionRow.installation_id == installation.value,
-                HumanIdentityLinkRow.principal_id == principal,
-                IdentityRecoveryAdmissionRow.released_at.is_(None),
-            )
-            .exists()
-            .correlate_except(IdentityRecoveryAdmissionRow, HumanIdentityLinkRow)
-        )
+        return HumanCredentialStateQueries.pending_for_principal(principal, installation)
 
     @staticmethod
     def _coherent_identity(
@@ -275,33 +255,8 @@ class PostgresProjectGrantChangeFactsReader(
         organization: OrganizationId,
         installation: InstallationId,
     ) -> Exists:
-        version = (
-            exists()
-            .where(
-                HumanCredentialVersionRow.installation_id == installation.value,
-                HumanCredentialVersionRow.authority == HumanIdentityLinkRow.authority,
-                HumanCredentialVersionRow.subject == HumanIdentityLinkRow.subject,
-            )
-            .correlate(HumanIdentityLinkRow)
-        )
-        history = (
-            exists()
-            .where(
-                IdentityRecoveryAdmissionRow.installation_id == installation.value,
-                IdentityRecoveryAdmissionRow.authority == HumanIdentityLinkRow.authority,
-                IdentityRecoveryAdmissionRow.subject == HumanIdentityLinkRow.subject,
-            )
-            .correlate(HumanIdentityLinkRow)
-        )
-        return (
-            exists()
-            .where(
-                HumanIdentityLinkRow.principal_id == principal,
-                HumanIdentityLinkRow.organization_id == organization.value,
-                HumanIdentityLinkRow.principal_kind == PrincipalKind.HUMAN,
-                or_(version, ~history),
-            )
-            .correlate_except(HumanIdentityLinkRow)
+        return HumanCredentialStateQueries.coherent_for_principal(
+            principal, organization, installation
         )
 
     @override

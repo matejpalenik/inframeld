@@ -1,6 +1,9 @@
 from abc import abstractmethod
 from typing import Protocol
 
+from inframeld_backend.access.application.dtos.access_action_grant_changed_audit_event_dto import (
+    AccessActionGrantChangedAuditEventDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_grant_changed_audit_event_dto import (
     ProjectActionGrantChangedAuditEventDTO,
 )
@@ -10,7 +13,7 @@ from inframeld_backend.access.application.dtos.project_use_only_grant_assigned_a
 
 
 class AuditEventWriter(Protocol):
-    """Record who assigned a project permission and which operation caused it.
+    """Record who changed an exact Access permission and which operation caused it.
 
     The required audit event belongs to the same transaction as the grant and
     its permission revision, so they become durable together.
@@ -19,7 +22,11 @@ class AuditEventWriter(Protocol):
     @abstractmethod
     async def append(
         self,
-        event: ProjectUseOnlyGrantAssignedAuditEventDTO | ProjectActionGrantChangedAuditEventDTO,
+        event: (
+            ProjectUseOnlyGrantAssignedAuditEventDTO
+            | ProjectActionGrantChangedAuditEventDTO
+            | AccessActionGrantChangedAuditEventDTO
+        ),
     ) -> None:
         """Append the assignment event and send its pending write to the database.
 

@@ -63,7 +63,9 @@ from inframeld_backend.access.http.dependencies.human_session_dependency import 
     HumanSessionDependency,
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
-from inframeld_backend.access.http.routes.project_grant_routes import create_project_grant_router
+from inframeld_backend.access.http.routes.project_action_grant_change_routes import (
+    create_project_action_grant_change_router,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
     PostgresHumanCredentialStateReader,
 )
@@ -255,7 +257,7 @@ class GrantScenario:
         configure_problem_openapi(self.application)
         self.application.include_router(create_session_router(authenticate))
         self.application.include_router(
-            create_project_grant_router(
+            create_project_action_grant_change_router(
                 authenticate, partial(open_project_grant_change, api_database, fingerprints)
             )
         )
@@ -295,6 +297,13 @@ async def grant_seed(database: Database) -> GrantSeedDTO:
         await session.flush()
         session.add_all(
             [
+                HumanIdentityLinkRow(
+                    authority=IDENTITY.authority.value,
+                    subject=str(uuid4()),
+                    organization_id=project.organization_id.value,
+                    principal_id=recipient_id.value,
+                    principal_kind=PrincipalKind.HUMAN,
+                ),
                 ProjectMembershipRow(
                     project_id=project.project_id.value,
                     principal_id=recipient_id.value,
@@ -320,10 +329,9 @@ async def grant_seed(database: Database) -> GrantSeedDTO:
     )
 
 
-def _command(seed: GrantSeedDTO, *, expected_access_revision: int = 0) -> dict[str, str | int]:
+def _command(seed: GrantSeedDTO, *, expected_access_revision: int = 0) -> dict[str, bool | int]:
     return {
-        "recipientPrincipalId": str(seed.recipient_id.value),
-        "actionId": seed.action_id.value,
+        "canGrant": False,
         "expectedAccessRevision": expected_access_revision,
     }
 
@@ -401,7 +409,7 @@ async def test_authorized_human_can_save_a_project_grant(
 ) -> None:
     """Both login paths save the same grant - bearer writes need no cookie or CSRF headers."""
     scenario = GrantScenario(temporary_postgres_settings)
-    path = f"/v1/projects/{grant_seed.project_id.value}/grants"
+    path = f"/v1/projects/{grant_seed.project_id.value}/grants/{grant_seed.recipient_id.value}/{grant_seed.action_id.value}"
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
         if credential_kind == CredentialKind.BEARER:
@@ -414,7 +422,7 @@ async def test_authorized_human_can_save_a_project_grant(
                 "X-Inframeld-CSRF": "1",
             }
 
-        response = client.post(path, headers=headers, json=_command(grant_seed))
+        response = client.put(path, headers=headers, json=_command(grant_seed))
 
     assert response.status_code == 201, response.text
     assert response.json()["recipientPrincipalId"] == str(grant_seed.recipient_id.value)
@@ -460,10 +468,10 @@ async def test_valid_bearer_without_grant_authority_cannot_write(
 
     before = await _read_state(database, grant_seed)
     scenario = GrantScenario(temporary_postgres_settings)
-    path = f"/v1/projects/{grant_seed.project_id.value}/grants"
+    path = f"/v1/projects/{grant_seed.project_id.value}/grants/{grant_seed.recipient_id.value}/{grant_seed.action_id.value}"
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
-        response = client.post(
+        response = client.put(
             path,
             headers=_bearer_headers("grant-bob-no-authority"),
             json=_command(grant_seed),
@@ -485,12 +493,12 @@ async def test_revoked_authority_denies_both_replay_and_new_request(
 ) -> None:
     """Removing current authority blocks new writes and disclosure of a saved success."""
     scenario = GrantScenario(temporary_postgres_settings)
-    path = f"/v1/projects/{grant_seed.project_id.value}/grants"
+    path = f"/v1/projects/{grant_seed.project_id.value}/grants/{grant_seed.recipient_id.value}/{grant_seed.action_id.value}"
     headers = _bearer_headers("grant-bob-original")
     command = _command(grant_seed)
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
-        first = client.post(path, headers=headers, json=command)
+        first = client.put(path, headers=headers, json=command)
         assert first.status_code == 201, first.text
 
         # Establish the post-revocation state directly for this request-level test.
@@ -505,8 +513,8 @@ async def test_revoked_authority_denies_both_replay_and_new_request(
 
         # Compare requests against the state after the intentional revocation.
         saved_state = await _read_state(database, grant_seed)
-        replay = client.post(path, headers=headers, json=command)
-        fresh = client.post(
+        replay = client.put(path, headers=headers, json=command)
+        fresh = client.put(
             path,
             headers=_bearer_headers("grant-bob-after-revocation"),
             json=_command(grant_seed, expected_access_revision=1),
@@ -534,7 +542,7 @@ async def test_provider_outage_stops_a_write_after_successful_authentication(
     """A prior session check cannot authorize a write when either provider is now unavailable."""
     before = await _read_state(database, grant_seed)
     scenario = GrantScenario(temporary_postgres_settings)
-    path = f"/v1/projects/{grant_seed.project_id.value}/grants"
+    path = f"/v1/projects/{grant_seed.project_id.value}/grants/{grant_seed.recipient_id.value}/{grant_seed.action_id.value}"
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
         first = client.get("/v1/session", headers={"Authorization": f"Bearer {TOKEN.value}"})
@@ -546,7 +554,7 @@ async def test_provider_outage_stops_a_write_after_successful_authentication(
         else:
             scenario.identity.unavailable = True
 
-        response = client.post(
+        response = client.put(
             path,
             headers=_bearer_headers("grant-bob-provider-outage"),
             json=_command(grant_seed),
@@ -581,11 +589,11 @@ async def test_cookie_write_requires_csrf_protection(
     """An eligible browser caller cannot change grants without both required CSRF checks."""
     before = await _read_state(database, grant_seed)
     scenario = GrantScenario(temporary_postgres_settings)
-    path = f"/v1/projects/{grant_seed.project_id.value}/grants"
+    path = f"/v1/projects/{grant_seed.project_id.value}/grants/{grant_seed.recipient_id.value}/{grant_seed.action_id.value}"
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
         client.cookies.set("ory_kratos_session", COOKIE.value)
-        response = client.post(
+        response = client.put(
             path,
             headers={"Idempotency-Key": "grant-bob-csrf"} | csrf_headers,
             json=_command(grant_seed),
@@ -608,11 +616,11 @@ async def test_competing_credentials_cannot_change_grants(
     """Ambiguous authentication is rejected before provider verification or durable writes."""
     before = await _read_state(database, grant_seed)
     scenario = GrantScenario(temporary_postgres_settings)
-    path = f"/v1/projects/{grant_seed.project_id.value}/grants"
+    path = f"/v1/projects/{grant_seed.project_id.value}/grants/{grant_seed.recipient_id.value}/{grant_seed.action_id.value}"
 
     with TestClient(scenario.application, raise_server_exceptions=False) as client:
         client.cookies.set("ory_kratos_session", COOKIE.value)
-        response = client.post(
+        response = client.put(
             path,
             headers=_bearer_headers("grant-bob-competing"),
             json=_command(grant_seed),

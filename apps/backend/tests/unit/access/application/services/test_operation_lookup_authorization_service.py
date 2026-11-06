@@ -173,3 +173,50 @@ async def test_availability_failure_is_not_missing_scope() -> None:
         await OperationLookupAuthorizationService(reader).require_authorization(
             access=ACCESS, request=QUERY
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "family,action,target",
+    [
+        (OperationLookupAuthorityFamily.ORGANIZATION_GRANT_READ, "create-projects", "organization"),
+        (OperationLookupAuthorityFamily.ACCESS_GROUP_GRANT_READ, "add-documents", "access-groups"),
+        (
+            OperationLookupAuthorityFamily.APPLICATION_ACCOUNT_GRANT_READ,
+            "issue-application-keys",
+            "application-accounts",
+        ),
+    ],
+)
+@pytest.mark.parametrize("can_grant", [True, False])
+async def test_other_access_grant_lookup_requires_exact_current_delegation(
+    family: OperationLookupAuthorityFamily, action: str, target: str, can_grant: bool
+) -> None:
+    organization = target == "organization"
+    route = (
+        f"/v1/organizations/{QUERY.organization_id.value}/grants/{UUID(int=8)}/{action}"
+        if organization
+        else f"/v1/projects/{UUID(int=4)}/{target}/{UUID(int=7)}/grants/{UUID(int=8)}/{action}"
+    )
+    query = replace(
+        QUERY,
+        project_id=None if organization else QUERY.project_id,
+        method=HttpMethod.PUT,
+        requested_route=route,
+        expected_authority=OperationLookupAuthority(family=family, action_id=ActionId(action)),
+    )
+    facts = replace(
+        FACTS,
+        project_status=None if organization else ProjectStatus.ACTIVE,
+        is_project_member=not organization,
+        can_grant_action=can_grant,
+    )
+    service = OperationLookupAuthorizationService(MockLookupFacts(facts))
+    if can_grant:
+        result = await service.require_authorization(access=ACCESS, request=query)
+        assert result.organization_id == query.organization_id
+        assert result.project_id == query.project_id
+    else:
+        # Use-only and group management never substitute for this exact delegated grant.
+        with pytest.raises(AccessDeniedError):
+            await service.require_authorization(access=ACCESS, request=query)

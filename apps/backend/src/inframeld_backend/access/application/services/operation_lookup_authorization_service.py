@@ -42,6 +42,7 @@ class OperationLookupAuthorizationService(OperationLookupAuthorizer):
         self, *, access: AccessContextDTO, request: LookupOriginalOperationQuery
     ) -> OperationLookupAuthorizationDTO:
         request.expected_authority.require_supported_scope(
+            organization_id=request.organization_id,
             project_id=request.project_id,
             method=request.method,
             requested_route=request.requested_route,
@@ -84,7 +85,12 @@ class OperationLookupAuthorizationService(OperationLookupAuthorizer):
         required_grant = (
             facts.can_grant_action
             if request.expected_authority.family
-            is OperationLookupAuthorityFamily.PROJECT_GRANT_READ
+            in {
+                OperationLookupAuthorityFamily.PROJECT_GRANT_READ,
+                OperationLookupAuthorityFamily.ORGANIZATION_GRANT_READ,
+                OperationLookupAuthorityFamily.ACCESS_GROUP_GRANT_READ,
+                OperationLookupAuthorityFamily.APPLICATION_ACCOUNT_GRANT_READ,
+            }
             else facts.has_exact_action_grant
         )
         if not required_grant:

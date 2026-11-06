@@ -10,6 +10,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios, ProjectAuthorizationSeedDTO
 
+from inframeld_backend.access.application.dtos.access_action_grant_changed_audit_event_dto import (
+    AccessActionGrantChangedAuditEventDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_grant_changed_audit_event_dto import (
     ProjectActionGrantChangedAuditEventDTO,
 )
@@ -432,7 +435,11 @@ class MockFailingAuditEventWriter(AuditEventWriter):
     @override
     async def append(
         self,
-        event: ProjectUseOnlyGrantAssignedAuditEventDTO | ProjectActionGrantChangedAuditEventDTO,
+        event: (
+            ProjectUseOnlyGrantAssignedAuditEventDTO
+            | ProjectActionGrantChangedAuditEventDTO
+            | AccessActionGrantChangedAuditEventDTO
+        ),
     ) -> None:
         await self._real.append(event)
         raise RuntimeError("Injected audit failure")

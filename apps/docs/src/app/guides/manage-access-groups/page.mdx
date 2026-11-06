@@ -10,6 +10,8 @@ Create SupportKnowledge in your Support Project, add Bob as a member and appoint
 
 Ordinary membership is the audience relationship used to authorize access to documents shared with the group. Management additionally permits membership and manager administration. Appointing Bob therefore includes access through the group to **current and future documents shared with it**. Querying or building still requires the relevant action permissions.
 
+To assign `add-documents`, `update-documents` or `delete-documents` on this group, use [exact action-grant administration](/guides/manage-action-grants). A current manager of this same group may administer those assignments, discover eligible recipients and recover an ordinary same-write result. A document-action grant itself creates no group membership or management. Generic operation-history lookup still requires current exact use-and-grant authority, even for the manager who made the change.
+
 ## Prepare the Project and people
 
 You need an existing Project, its permanent ID and a current human credential accepted by the installation. To create a group, you must be an eligible admitted human Project member with permission to use `create-access-groups`. Either grant level permits creation. Later administration requires current management of the particular group.

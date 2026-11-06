@@ -32,6 +32,10 @@ __all__ = [
     "ApiAttributeError",
     "ApiException",
     "AcceptedOperationLookupResponse",
+    "AccessGroupActionGrantItemResponse",
+    "AccessGroupActionGrantRemovalResponse",
+    "AccessGroupActionGrantRequest",
+    "AccessGroupActionGrantResponse",
     "AccessGroupCreationRequest",
     "AccessGroupCreationResponse",
     "AccessGroupDeletionResponse",
@@ -46,6 +50,10 @@ __all__ = [
     "AccessGroupPrincipalResponse",
     "AccessGroupPrincipalsPageResponse",
     "ApplicationAccountAction",
+    "ApplicationAccountActionGrantItemResponse",
+    "ApplicationAccountActionGrantRemovalResponse",
+    "ApplicationAccountActionGrantRequest",
+    "ApplicationAccountActionGrantResponse",
     "ApplicationAccountCreationRequest",
     "ApplicationAccountCreationResponse",
     "ApplicationAccountGrantTargetResponse",
@@ -55,6 +63,8 @@ __all__ = [
     "CompletedOperationLookupResponse",
     "CurrentSessionResponse",
     "DeletionStatusResponse",
+    "GrantRecipientResponse",
+    "GrantTargetKind",
     "HttpMethod",
     "HumanAdmissionRequest",
     "HumanAdmissionResponse",
@@ -78,9 +88,17 @@ __all__ = [
     "OperationLookupAuthorityRequest",
     "OperationLookupResponse",
     "OrganizationAction",
+    "OrganizationActionGrantItemResponse",
+    "OrganizationActionGrantRemovalResponse",
+    "OrganizationActionGrantRequest",
+    "OrganizationActionGrantResponse",
     "OriginalOperationLookupRequest",
     "OwnOrganizationGrantResponse",
+    "PageResponseAccessGroupActionGrantItemResponse",
+    "PageResponseApplicationAccountActionGrantItemResponse",
     "PageResponseApplicationKeyMetadataResponse",
+    "PageResponseGrantRecipientResponse",
+    "PageResponseOrganizationActionGrantItemResponse",
     "PageResponseProjectActionGrantItemResponse",
     "PathInner",
     "PrincipalKind",
@@ -103,8 +121,6 @@ __all__ = [
     "ProjectMetadataResponse",
     "ProjectMetadataUpdateRequest",
     "ProjectNameResolutionResponse",
-    "ProjectUseOnlyGrantRequest",
-    "ProjectUseOnlyGrantResponse",
     "ProtectedResourceMetadataResponse",
     "RecoveryRequiredOperationLookupResponse",
     "RetainedDeletionStatusResponse",
@@ -135,6 +151,10 @@ from inframeld_sdk.exceptions import ApiException as ApiException
 
 # import models into sdk package
 from inframeld_sdk.models.accepted_operation_lookup_response import AcceptedOperationLookupResponse as AcceptedOperationLookupResponse
+from inframeld_sdk.models.access_group_action_grant_item_response import AccessGroupActionGrantItemResponse as AccessGroupActionGrantItemResponse
+from inframeld_sdk.models.access_group_action_grant_removal_response import AccessGroupActionGrantRemovalResponse as AccessGroupActionGrantRemovalResponse
+from inframeld_sdk.models.access_group_action_grant_request import AccessGroupActionGrantRequest as AccessGroupActionGrantRequest
+from inframeld_sdk.models.access_group_action_grant_response import AccessGroupActionGrantResponse as AccessGroupActionGrantResponse
 from inframeld_sdk.models.access_group_creation_request import AccessGroupCreationRequest as AccessGroupCreationRequest
 from inframeld_sdk.models.access_group_creation_response import AccessGroupCreationResponse as AccessGroupCreationResponse
 from inframeld_sdk.models.access_group_deletion_response import AccessGroupDeletionResponse as AccessGroupDeletionResponse
@@ -149,6 +169,10 @@ from inframeld_sdk.models.access_group_metadata_response import AccessGroupMetad
 from inframeld_sdk.models.access_group_principal_response import AccessGroupPrincipalResponse as AccessGroupPrincipalResponse
 from inframeld_sdk.models.access_group_principals_page_response import AccessGroupPrincipalsPageResponse as AccessGroupPrincipalsPageResponse
 from inframeld_sdk.models.application_account_action import ApplicationAccountAction as ApplicationAccountAction
+from inframeld_sdk.models.application_account_action_grant_item_response import ApplicationAccountActionGrantItemResponse as ApplicationAccountActionGrantItemResponse
+from inframeld_sdk.models.application_account_action_grant_removal_response import ApplicationAccountActionGrantRemovalResponse as ApplicationAccountActionGrantRemovalResponse
+from inframeld_sdk.models.application_account_action_grant_request import ApplicationAccountActionGrantRequest as ApplicationAccountActionGrantRequest
+from inframeld_sdk.models.application_account_action_grant_response import ApplicationAccountActionGrantResponse as ApplicationAccountActionGrantResponse
 from inframeld_sdk.models.application_account_creation_request import ApplicationAccountCreationRequest as ApplicationAccountCreationRequest
 from inframeld_sdk.models.application_account_creation_response import ApplicationAccountCreationResponse as ApplicationAccountCreationResponse
 from inframeld_sdk.models.application_account_grant_target_response import ApplicationAccountGrantTargetResponse as ApplicationAccountGrantTargetResponse
@@ -158,6 +182,8 @@ from inframeld_sdk.models.application_key_metadata_response import ApplicationKe
 from inframeld_sdk.models.completed_operation_lookup_response import CompletedOperationLookupResponse as CompletedOperationLookupResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse as CurrentSessionResponse
 from inframeld_sdk.models.deletion_status_response import DeletionStatusResponse as DeletionStatusResponse
+from inframeld_sdk.models.grant_recipient_response import GrantRecipientResponse as GrantRecipientResponse
+from inframeld_sdk.models.grant_target_kind import GrantTargetKind as GrantTargetKind
 from inframeld_sdk.models.http_method import HttpMethod as HttpMethod
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest as HumanAdmissionRequest
 from inframeld_sdk.models.human_admission_response import HumanAdmissionResponse as HumanAdmissionResponse
@@ -181,9 +207,17 @@ from inframeld_sdk.models.operation_lookup_authority_family import OperationLook
 from inframeld_sdk.models.operation_lookup_authority_request import OperationLookupAuthorityRequest as OperationLookupAuthorityRequest
 from inframeld_sdk.models.operation_lookup_response import OperationLookupResponse as OperationLookupResponse
 from inframeld_sdk.models.organization_action import OrganizationAction as OrganizationAction
+from inframeld_sdk.models.organization_action_grant_item_response import OrganizationActionGrantItemResponse as OrganizationActionGrantItemResponse
+from inframeld_sdk.models.organization_action_grant_removal_response import OrganizationActionGrantRemovalResponse as OrganizationActionGrantRemovalResponse
+from inframeld_sdk.models.organization_action_grant_request import OrganizationActionGrantRequest as OrganizationActionGrantRequest
+from inframeld_sdk.models.organization_action_grant_response import OrganizationActionGrantResponse as OrganizationActionGrantResponse
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest as OriginalOperationLookupRequest
 from inframeld_sdk.models.own_organization_grant_response import OwnOrganizationGrantResponse as OwnOrganizationGrantResponse
+from inframeld_sdk.models.page_response_access_group_action_grant_item_response import PageResponseAccessGroupActionGrantItemResponse as PageResponseAccessGroupActionGrantItemResponse
+from inframeld_sdk.models.page_response_application_account_action_grant_item_response import PageResponseApplicationAccountActionGrantItemResponse as PageResponseApplicationAccountActionGrantItemResponse
 from inframeld_sdk.models.page_response_application_key_metadata_response import PageResponseApplicationKeyMetadataResponse as PageResponseApplicationKeyMetadataResponse
+from inframeld_sdk.models.page_response_grant_recipient_response import PageResponseGrantRecipientResponse as PageResponseGrantRecipientResponse
+from inframeld_sdk.models.page_response_organization_action_grant_item_response import PageResponseOrganizationActionGrantItemResponse as PageResponseOrganizationActionGrantItemResponse
 from inframeld_sdk.models.page_response_project_action_grant_item_response import PageResponseProjectActionGrantItemResponse as PageResponseProjectActionGrantItemResponse
 from inframeld_sdk.models.path_inner import PathInner as PathInner
 from inframeld_sdk.models.principal_kind import PrincipalKind as PrincipalKind
@@ -206,8 +240,6 @@ from inframeld_sdk.models.project_metadata_change_response import ProjectMetadat
 from inframeld_sdk.models.project_metadata_response import ProjectMetadataResponse as ProjectMetadataResponse
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest as ProjectMetadataUpdateRequest
 from inframeld_sdk.models.project_name_resolution_response import ProjectNameResolutionResponse as ProjectNameResolutionResponse
-from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest as ProjectUseOnlyGrantRequest
-from inframeld_sdk.models.project_use_only_grant_response import ProjectUseOnlyGrantResponse as ProjectUseOnlyGrantResponse
 from inframeld_sdk.models.protected_resource_metadata_response import ProtectedResourceMetadataResponse as ProtectedResourceMetadataResponse
 from inframeld_sdk.models.recovery_required_operation_lookup_response import RecoveryRequiredOperationLookupResponse as RecoveryRequiredOperationLookupResponse
 from inframeld_sdk.models.retained_deletion_status_response import RetainedDeletionStatusResponse as RetainedDeletionStatusResponse

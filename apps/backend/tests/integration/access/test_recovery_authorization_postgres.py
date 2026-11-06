@@ -14,8 +14,11 @@ from tests.support.access_scenarios import MockAccessScenarios, ProjectAuthoriza
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_grant_changes import create_project_grant_change_service
 
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
+from inframeld_backend.access.application.commands.set_project_action_grant_command import (
+    SetProjectActionGrantCommand,
+)
+from inframeld_backend.access.application.dtos.access_action_grant_changed_audit_event_dto import (
+    AccessActionGrantChangedAuditEventDTO,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.identity_recovery_event_dto import (
@@ -27,17 +30,14 @@ from inframeld_backend.access.application.dtos.project_action_authorization_requ
 from inframeld_backend.access.application.dtos.project_action_grant_changed_audit_event_dto import (
     ProjectActionGrantChangedAuditEventDTO,
 )
+from inframeld_backend.access.application.dtos.project_action_grant_management_facts_dto import (
+    ProjectActionGrantManagementFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
 )
-from inframeld_backend.access.application.dtos.project_grant_authorization_dto import (
-    ProjectGrantAuthorizationDTO,
-)
 from inframeld_backend.access.application.dtos.project_use_only_grant_assigned_audit_event_dto import (
     ProjectUseOnlyGrantAssignedAuditEventDTO,
-)
-from inframeld_backend.access.application.dtos.project_use_only_grant_authorization_request_dto import (
-    ProjectUseOnlyGrantAuthorizationRequestDTO,
 )
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
@@ -46,17 +46,14 @@ from inframeld_backend.access.application.enums.identity_recovery_event_kind imp
     IdentityRecoveryEventKind,
 )
 from inframeld_backend.access.application.protocols.audit_event_writer import AuditEventWriter
-from inframeld_backend.access.application.protocols.project_grant_authorizer import (
-    ProjectGrantAuthorizer,
+from inframeld_backend.access.application.protocols.project_grant_management_facts_reader import (
+    ProjectGrantManagementFactsReader,
 )
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
 )
 from inframeld_backend.access.application.services.identity_recovery_admission_service import (
     IdentityRecoveryAdmissionService,
-)
-from inframeld_backend.access.application.services.project_grant_authorization_service import (
-    ProjectGrantAuthorizationService,
 )
 from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
     IdentityRecoveryCleanupState,
@@ -70,6 +67,7 @@ from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id imp
 )
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.postgres_principal_recovery_block_reader import (
     PostgresPrincipalRecoveryBlockReader,
 )
@@ -115,7 +113,6 @@ from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
-    ConflictError,
     DependencyUnavailableError,
 )
 from inframeld_backend.shared.application.protocols.operation_idempotency import (
@@ -199,6 +196,13 @@ async def scenario(database: Database) -> RecoveryAuthorizationScenarioDTO:
                     principal_id=seed.principal_id.value,
                     principal_kind=PrincipalKind.HUMAN,
                 ),
+                HumanIdentityLinkRow(
+                    authority=identity.authority.value,
+                    subject=str(uuid4()),
+                    organization_id=seed.organization_id.value,
+                    principal_id=recipient_id.value,
+                    principal_kind=PrincipalKind.HUMAN,
+                ),
                 ProjectMembershipRow(
                     project_id=seed.project_id.value,
                     principal_id=recipient_id.value,
@@ -242,34 +246,41 @@ async def _admit(
     )
 
 
-async def _assign(
+async def _set_use_only(
     session: AsyncSession,
     scenario: RecoveryAuthorizationScenarioDTO,
     *,
     key: IdempotencyKey = KEY,
     expected_revision: int = 0,
-    authorizer: ProjectGrantAuthorizer | None = None,
+    grant_management_facts_reader: ProjectGrantManagementFactsReader | None = None,
     audit_events: AuditEventWriter | None = None,
     idempotency: OperationIdempotency | None = None,
     access: AccessContextDTO | None = None,
 ) -> CompletedSynchronousOperationDTO:
-    return await create_project_grant_change_service(
-        session, authorizer=authorizer, audit_events=audit_events, idempotency=idempotency
-    ).assign_use_only(
+    result = await create_project_grant_change_service(
+        session,
+        grant_management_facts_reader=grant_management_facts_reader,
+        audit_events=audit_events,
+        idempotency=idempotency,
+    ).set_action_grant(
         access=access
         or AccessContextDTO(
             scenario.seed.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
         ),
         context=IdempotencyContextDTO(
-            method=HttpMethod.POST, requested_route="/v1/projects/{project_id}/grants", key=key
+            method=HttpMethod.PUT,
+            requested_route=f"/v1/projects/{scenario.seed.project_id.value}/grants/{scenario.recipient_id.value}/{ACTION.value}",
+            key=key,
         ),
-        command=AssignProjectUseOnlyGrantCommand(
+        command=SetProjectActionGrantCommand(
             project_id=scenario.seed.project_id,
             recipient_principal_id=scenario.recipient_id,
             action_id=ACTION,
+            can_grant=False,
             expected_access_revision=expected_revision,
         ),
     )
+    return result.operation
 
 
 async def _effects(
@@ -341,8 +352,8 @@ async def _wait_until_database_blocks(database: Database, pid: int) -> None:
             await asyncio.sleep(0.01)
 
 
-class MockControlledProjectGrantAuthorizer(ProjectGrantAuthorizer):
-    """Observe or pause real authorization after the service has begun its transaction."""
+class MockControlledGrantManagementFactsReader(ProjectGrantManagementFactsReader):
+    """Pause current management facts under the existing Organization and Project locks."""
 
     def __init__(
         self,
@@ -353,20 +364,28 @@ class MockControlledProjectGrantAuthorizer(ProjectGrantAuthorizer):
         release: asyncio.Event | None = None,
     ) -> None:
         self._session = session
-        self._delegate = ProjectGrantAuthorizationService(
-            PostgresProjectGrantChangeFactsReader(session)
-        )
+        self._delegate = PostgresProjectGrantChangeFactsReader(session)
         self._pid_ready = pid_ready
         self._authorized = authorized
         self._release = release
 
     @override
-    async def require_authorization(
-        self, *, access: AccessContextDTO, request: ProjectUseOnlyGrantAuthorizationRequestDTO
-    ) -> ProjectGrantAuthorizationDTO:
+    async def read_for_management(
+        self,
+        *,
+        access: AccessContextDTO,
+        project_id: ProjectId,
+        recipient_principal_id: PrincipalId,
+        action_id: ActionId,
+    ) -> ProjectActionGrantManagementFactsDTO | None:
         if self._pid_ready is not None:
             self._pid_ready.set_result(await _backend_pid(self._session))
-        result = await self._delegate.require_authorization(access=access, request=request)
+        result = await self._delegate.read_for_management(
+            access=access,
+            project_id=project_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+        )
         if self._authorized is not None:
             self._authorized.set()
         if self._release is not None:
@@ -387,7 +406,11 @@ class MockControlledAuditEventWriter(AuditEventWriter):
     @override
     async def append(
         self,
-        event: ProjectUseOnlyGrantAssignedAuditEventDTO | ProjectActionGrantChangedAuditEventDTO,
+        event: (
+            ProjectUseOnlyGrantAssignedAuditEventDTO
+            | ProjectActionGrantChangedAuditEventDTO
+            | AccessActionGrantChangedAuditEventDTO
+        ),
     ) -> None:
         await self._delegate.append(event)
         self.appended.set()
@@ -448,7 +471,7 @@ async def test_recovery_denies_new_grants_and_saved_replays(
 ) -> None:
     """A saved success cannot bypass recovery or create another grant effect."""
     async with database.session() as session:
-        await _assign(session, scenario)
+        await _set_use_only(session, scenario)
 
     before = await _effects(database, scenario)
     assert before == GrantEffectsDTO(1, 1, 1, 1)
@@ -459,7 +482,7 @@ async def test_recovery_denies_new_grants_and_saved_replays(
     for key in (KEY, IdempotencyKey("another-grant-request")):
         with pytest.raises(AccessDeniedError):
             async with database.session() as session:
-                await _assign(session, scenario, key=key)
+                await _set_use_only(session, scenario, key=key)
 
     assert await _effects(database, scenario) == before
 
@@ -475,10 +498,12 @@ async def test_recovery_committing_first_denies_the_waiting_grant(
     async def try_grant() -> bool:
         try:
             async with database.session() as session:
-                await _assign(
+                await _set_use_only(
                     session,
                     scenario,
-                    authorizer=MockControlledProjectGrantAuthorizer(session, pid_ready=pid_ready),
+                    grant_management_facts_reader=MockControlledGrantManagementFactsReader(
+                        session, pid_ready=pid_ready
+                    ),
                 )
         except AccessDeniedError:
             return False
@@ -514,10 +539,10 @@ async def test_grant_committing_first_finishes_before_recovery_admission(
 
     async def grant() -> CompletedSynchronousOperationDTO:
         async with database.session() as session:
-            return await _assign(
+            return await _set_use_only(
                 session,
                 scenario,
-                authorizer=MockControlledProjectGrantAuthorizer(
+                grant_management_facts_reader=MockControlledGrantManagementFactsReader(
                     session, authorized=authorized, release=release
                 ),
             )
@@ -537,7 +562,7 @@ async def test_grant_committing_first_finishes_before_recovery_admission(
 
     with pytest.raises(AccessDeniedError):
         async with database.session() as session:
-            await _assign(
+            await _set_use_only(
                 session,
                 scenario,
                 key=IdempotencyKey("after-recovery"),
@@ -623,7 +648,7 @@ async def test_grant_lock_wait_times_out_without_saving_partial_effects(
 
             with pytest.raises(DependencyUnavailableError):
                 async with database.session() as session:
-                    await _assign(session, scenario)
+                    await _set_use_only(session, scenario)
 
     assert await _effects(database, scenario) == GrantEffectsDTO(0, 0, 0, 0)
 
@@ -731,7 +756,7 @@ async def test_audit_failure_rolls_back_all_grant_effects(
     """An audit failure must undo the already written grant, revision and reservation."""
     async with database.session() as session:
         with pytest.raises(RuntimeError, match="injected audit failure"):
-            await _assign(
+            await _set_use_only(
                 session, scenario, audit_events=MockControlledAuditEventWriter(session, fail=True)
             )
     assert await _effects(database, scenario) == GrantEffectsDTO(0, 0, 0, 0)
@@ -744,7 +769,7 @@ async def test_completion_failure_rolls_back_all_grant_effects(
     """Even a flushed replay marker cannot survive a failed operation."""
     async with database.session() as session:
         with pytest.raises(RuntimeError, match="injected completion failure"):
-            await _assign(
+            await _set_use_only(
                 session,
                 scenario,
                 idempotency=MockFailingCompletion(PostgresOperationReservationWriter(session)),
@@ -760,7 +785,7 @@ async def test_cancellation_before_commit_rolls_back_all_grant_effects(
     async with database.session() as session:
         audit = MockControlledAuditEventWriter(session, pause=True)
         async with asyncio.timeout(15), asyncio.TaskGroup() as tasks:
-            assignment = tasks.create_task(_assign(session, scenario, audit_events=audit))
+            assignment = tasks.create_task(_set_use_only(session, scenario, audit_events=audit))
             await audit.appended.wait()
             assignment.cancel()
             with pytest.raises(asyncio.CancelledError):
@@ -769,19 +794,22 @@ async def test_cancellation_before_commit_rolls_back_all_grant_effects(
 
 
 @pytest.mark.asyncio
-async def test_duplicate_assignment_rolls_back_its_new_reservation_and_revision(
+async def test_explicit_put_same_level_records_a_new_original_noop_without_change_audit(
     database: Database, scenario: RecoveryAuthorizationScenarioDTO
 ) -> None:
     async with database.session() as session:
-        await _assign(session, scenario)
-    before = await _effects(database, scenario)
-    assert before == GrantEffectsDTO(1, 1, 1, 1)
+        original = await _set_use_only(session, scenario)
+    assert await _effects(database, scenario) == GrantEffectsDTO(
+        grants=1, audit_events=1, reservations=1, revision=1
+    )
     async with database.session() as session:
-        with pytest.raises(ConflictError):
-            await _assign(
-                session, scenario, key=IdempotencyKey("duplicate-assignment"), expected_revision=1
-            )
-    assert await _effects(database, scenario) == before
+        noop = await _set_use_only(
+            session, scenario, key=IdempotencyKey("explicit-same-level"), expected_revision=1
+        )
+    assert noop.operation_id != original.operation_id and noop.created
+    assert await _effects(database, scenario) == GrantEffectsDTO(
+        grants=1, audit_events=1, reservations=2, revision=1
+    )
 
 
 @pytest.mark.asyncio
@@ -829,7 +857,7 @@ async def test_captured_credential_cannot_resume_after_recovery_release(
     if replay:
         async with database.session() as session:
             if consumer == "grant":
-                await _assign(session, scenario, access=access)
+                await _set_use_only(session, scenario, access=access)
             else:
                 async with session.begin():
                     idempotency = IdempotencyService(PostgresOperationReservationWriter(session))
@@ -863,7 +891,7 @@ async def test_captured_credential_cannot_resume_after_recovery_release(
     async with database.session() as session:
         with pytest.raises(HumanOAuthCredentialRejectedError):
             if consumer == "grant":
-                await _assign(session, scenario, access=access)
+                await _set_use_only(session, scenario, access=access)
             else:
                 async with session.begin():
                     await ProjectOperationAdmissionService(

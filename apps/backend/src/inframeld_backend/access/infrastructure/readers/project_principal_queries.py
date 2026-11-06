@@ -44,8 +44,12 @@ class ProjectPrincipalQueries:
         )
 
     @staticmethod
-    def pending(principal: SQLColumnExpression[UUID], installation: InstallationId) -> Exists:
+    def pending(
+        principal: SQLColumnExpression[UUID],
+        installation: InstallationId | SQLColumnExpression[UUID],
+    ) -> Exists:
         """Include unreleased recovery blocks when observing candidate eligibility."""
+        installed = installation.value if isinstance(installation, InstallationId) else installation
         return (
             select(IdentityRecoveryAdmissionRow.operation_id)
             .join(
@@ -56,7 +60,7 @@ class ProjectPrincipalQueries:
                 ),
             )
             .where(
-                IdentityRecoveryAdmissionRow.installation_id == installation.value,
+                IdentityRecoveryAdmissionRow.installation_id == installed,
                 HumanIdentityLinkRow.principal_id == principal,
                 IdentityRecoveryAdmissionRow.released_at.is_(None),
             )
@@ -67,33 +71,37 @@ class ProjectPrincipalQueries:
     @staticmethod
     def coherent_identity(
         principal: SQLColumnExpression[UUID],
-        organization: OrganizationId,
-        installation: InstallationId,
+        organization: OrganizationId | SQLColumnExpression[UUID],
+        installation: InstallationId | SQLColumnExpression[UUID],
     ) -> Exists:
         """Require one coherent admitted identity when observing a replacement candidate."""
+        installed = installation.value if isinstance(installation, InstallationId) else installation
+        organization_id = (
+            organization.value if isinstance(organization, OrganizationId) else organization
+        )
         version = (
             exists()
             .where(
-                HumanCredentialVersionRow.installation_id == installation.value,
+                HumanCredentialVersionRow.installation_id == installed,
                 HumanCredentialVersionRow.authority == HumanIdentityLinkRow.authority,
                 HumanCredentialVersionRow.subject == HumanIdentityLinkRow.subject,
             )
-            .correlate(HumanIdentityLinkRow)
+            .correlate_except(HumanCredentialVersionRow)
         )
         history = (
             exists()
             .where(
-                IdentityRecoveryAdmissionRow.installation_id == installation.value,
+                IdentityRecoveryAdmissionRow.installation_id == installed,
                 IdentityRecoveryAdmissionRow.authority == HumanIdentityLinkRow.authority,
                 IdentityRecoveryAdmissionRow.subject == HumanIdentityLinkRow.subject,
             )
-            .correlate(HumanIdentityLinkRow)
+            .correlate_except(IdentityRecoveryAdmissionRow)
         )
         return (
             exists()
             .where(
                 HumanIdentityLinkRow.principal_id == principal,
-                HumanIdentityLinkRow.organization_id == organization.value,
+                HumanIdentityLinkRow.organization_id == organization_id,
                 HumanIdentityLinkRow.principal_kind == PrincipalKind.HUMAN,
                 or_(version, ~history),
             )

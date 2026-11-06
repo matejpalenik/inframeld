@@ -2,9 +2,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
-from inframeld_backend.access.application.services.project_grant_authorization_service import (
-    ProjectGrantAuthorizationService,
-)
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
 )
@@ -45,9 +42,6 @@ async def open_project_grant_change(
     async with database.session() as session:
         yield ProjectGrantChangeService(
             transaction_manager=SqlAlchemyTransactionManager(session),
-            project_grant_authorizer=ProjectGrantAuthorizationService(
-                PostgresProjectGrantChangeFactsReader(session)
-            ),
             operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
             membership_repository=PostgresProjectMembershipRepository(
                 session, PostgresAuditEventWriter(session)

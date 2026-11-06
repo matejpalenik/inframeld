@@ -3,11 +3,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.application.protocols.audit_event_writer import AuditEventWriter
-from inframeld_backend.access.application.protocols.project_grant_authorizer import (
-    ProjectGrantAuthorizer,
-)
-from inframeld_backend.access.application.services.project_grant_authorization_service import (
-    ProjectGrantAuthorizationService,
+from inframeld_backend.access.application.protocols.project_grant_management_facts_reader import (
+    ProjectGrantManagementFactsReader,
 )
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
@@ -51,15 +48,12 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
 def create_project_grant_change_service(
     session: AsyncSession,
     *,
-    authorizer: ProjectGrantAuthorizer | None = None,
+    grant_management_facts_reader: ProjectGrantManagementFactsReader | None = None,
     audit_events: AuditEventWriter | None = None,
     idempotency: OperationIdempotency | None = None,
 ) -> ProjectGrantChangeService:
     return ProjectGrantChangeService(
         transaction_manager=SqlAlchemyTransactionManager(session),
-        project_grant_authorizer=authorizer
-        if authorizer is not None
-        else ProjectGrantAuthorizationService(PostgresProjectGrantChangeFactsReader(session)),
         operation_idempotency=idempotency
         if idempotency is not None
         else IdempotencyService(PostgresOperationReservationWriter(session)),
@@ -69,7 +63,9 @@ def create_project_grant_change_service(
         project_grant_change_fingerprint_service=ProjectGrantChangeFingerprintService(
             RequestFingerprintService(RequestFingerprintKey(b"T" * 32))
         ),
-        grant_management_facts_reader=PostgresProjectGrantChangeFactsReader(session),
+        grant_management_facts_reader=grant_management_facts_reader
+        if grant_management_facts_reader is not None
+        else PostgresProjectGrantChangeFactsReader(session),
         grant_result_reader=PostgresProjectActionGrantResultReader(session),
         grant_result_writer=PostgresProjectActionGrantResultWriter(session),
     )

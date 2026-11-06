@@ -98,11 +98,24 @@ const problem: ProblemDetails = {
 };
 void [valid, alternate, absent, wrongChoice, problem];
 
-import type { ProjectUseOnlyGrantResponse as Grant } from "../../../sdk-typescript/generated/types.gen.js";
-const noGrantAuthority: Pick<Grant, "canGrant"> = { canGrant: false };
-// @ts-expect-error This response cannot grant authority to its recipient.
-const inventedAuthority: Pick<Grant, "canGrant"> = { canGrant: true };
-void [noGrantAuthority, inventedAuthority];
+import type {
+  ProjectActionGrantRemovalResponse,
+  ProjectActionGrantResponse,
+} from "../../../sdk-typescript/generated/types.gen.js";
+const removed: Pick<ProjectActionGrantRemovalResponse, "removed"> = {
+  removed: true,
+};
+const inventedRemoval: Pick<ProjectActionGrantRemovalResponse, "removed"> = {
+  // @ts-expect-error A removal acknowledgement cannot report false.
+  removed: false,
+};
+const useOnly: Pick<ProjectActionGrantResponse, "canGrant"> = {
+  canGrant: false,
+};
+const delegating: Pick<ProjectActionGrantResponse, "canGrant"> = {
+  canGrant: true,
+};
+void [removed, inventedRemoval, useOnly, delegating];
 
 import type {
   Options as SessionOptions,

@@ -19,6 +19,9 @@ from pydantic import Field, StrictStr, field_validator
 from typing import Optional
 from typing_extensions import Annotated
 from uuid import UUID
+from inframeld_sdk.models.access_group_action_grant_removal_response import AccessGroupActionGrantRemovalResponse
+from inframeld_sdk.models.access_group_action_grant_request import AccessGroupActionGrantRequest
+from inframeld_sdk.models.access_group_action_grant_response import AccessGroupActionGrantResponse
 from inframeld_sdk.models.access_group_creation_request import AccessGroupCreationRequest
 from inframeld_sdk.models.access_group_creation_response import AccessGroupCreationResponse
 from inframeld_sdk.models.access_group_deletion_response import AccessGroupDeletionResponse
@@ -30,11 +33,15 @@ from inframeld_sdk.models.access_group_membership_request import AccessGroupMemb
 from inframeld_sdk.models.access_group_membership_response import AccessGroupMembershipResponse
 from inframeld_sdk.models.access_group_metadata_response import AccessGroupMetadataResponse
 from inframeld_sdk.models.access_group_principals_page_response import AccessGroupPrincipalsPageResponse
+from inframeld_sdk.models.application_account_action_grant_removal_response import ApplicationAccountActionGrantRemovalResponse
+from inframeld_sdk.models.application_account_action_grant_request import ApplicationAccountActionGrantRequest
+from inframeld_sdk.models.application_account_action_grant_response import ApplicationAccountActionGrantResponse
 from inframeld_sdk.models.application_account_creation_request import ApplicationAccountCreationRequest
 from inframeld_sdk.models.application_account_creation_response import ApplicationAccountCreationResponse
 from inframeld_sdk.models.application_account_metadata_response import ApplicationAccountMetadataResponse
 from inframeld_sdk.models.application_key_metadata_response import ApplicationKeyMetadataResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse
+from inframeld_sdk.models.grant_target_kind import GrantTargetKind
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_admission_response import HumanAdmissionResponse
 from inframeld_sdk.models.human_o_auth_consent_decision_response import HumanOAuthConsentDecisionResponse
@@ -42,7 +49,14 @@ from inframeld_sdk.models.human_o_auth_consent_details_response import HumanOAut
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
 from inframeld_sdk.models.my_organization_access_response import MyOrganizationAccessResponse
 from inframeld_sdk.models.my_project_access_response import MyProjectAccessResponse
+from inframeld_sdk.models.organization_action_grant_removal_response import OrganizationActionGrantRemovalResponse
+from inframeld_sdk.models.organization_action_grant_request import OrganizationActionGrantRequest
+from inframeld_sdk.models.organization_action_grant_response import OrganizationActionGrantResponse
+from inframeld_sdk.models.page_response_access_group_action_grant_item_response import PageResponseAccessGroupActionGrantItemResponse
+from inframeld_sdk.models.page_response_application_account_action_grant_item_response import PageResponseApplicationAccountActionGrantItemResponse
 from inframeld_sdk.models.page_response_application_key_metadata_response import PageResponseApplicationKeyMetadataResponse
+from inframeld_sdk.models.page_response_grant_recipient_response import PageResponseGrantRecipientResponse
+from inframeld_sdk.models.page_response_organization_action_grant_item_response import PageResponseOrganizationActionGrantItemResponse
 from inframeld_sdk.models.page_response_project_action_grant_item_response import PageResponseProjectActionGrantItemResponse
 from inframeld_sdk.models.project_action_grant_removal_response import ProjectActionGrantRemovalResponse
 from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest
@@ -57,8 +71,6 @@ from inframeld_sdk.models.project_metadata_change_response import ProjectMetadat
 from inframeld_sdk.models.project_metadata_response import ProjectMetadataResponse
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest
 from inframeld_sdk.models.project_name_resolution_response import ProjectNameResolutionResponse
-from inframeld_sdk.models.project_use_only_grant_request import ProjectUseOnlyGrantRequest
-from inframeld_sdk.models.project_use_only_grant_response import ProjectUseOnlyGrantResponse
 import inframeld_sdk.models as response_models
 
 
@@ -2487,540 +2499,6 @@ class AccessApi:
         return self.api_client.param_serialize(
             method='PUT',
             resource_path='/v1/projects/{project_id}/access-groups/{access_group_id}/managers/{principal_id}',
-            path_params=_path_params,
-            query_params=_query_params,
-            header_params=_header_params,
-            body=_body_params,
-            post_params=_form_params,
-            files=_files,
-            auth_settings=_auth_settings,
-            collection_formats=_collection_formats,
-            _host=_host,
-            _request_auth=_request_auth
-        )
-
-
-
-
-    @validate_call
-    async def assign_project_use_only_grant(
-        self,
-        project_id: UUID,
-        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
-        project_use_only_grant_request: ProjectUseOnlyGrantRequest,
-        _request_timeout: Union[
-            None,
-            Annotated[StrictFloat, Field(gt=0)],
-            Tuple[
-                Annotated[StrictFloat, Field(gt=0)],
-                Annotated[StrictFloat, Field(gt=0)]
-            ]
-        ] = None,
-        _request_auth: Optional[Dict[StrictStr, Any]] = None,
-        _content_type: Optional[StrictStr] = None,
-        _headers: Optional[Dict[StrictStr, Any]] = None,
-        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> Union[response_models.ProjectUseOnlyGrantResponse, ]:
-        """Assign Use Only
-
-
-        :param project_id: (required)
-        :type project_id: UUID
-        :param idempotency_key: (required)
-        :type idempotency_key: str
-        :param project_use_only_grant_request: (required)
-        :type project_use_only_grant_request: ProjectUseOnlyGrantRequest
-        :param _request_timeout: timeout setting for this request. If one
-                                 number provided, it will be total request
-                                 timeout. It can also be a pair (tuple) of
-                                 (connection, read) timeouts.
-        :type _request_timeout: int, tuple(int, int), optional
-        :param _request_auth: set to override the auth_settings for an a single
-                              request; this effectively ignores the
-                              authentication in the spec for a single request.
-        :type _request_auth: dict, optional
-        :param _content_type: force content-type for the request.
-        :type _content_type: str, Optional
-        :param _headers: set to override the headers for a single
-                         request; this effectively ignores the headers
-                         in the spec for a single request.
-        :type _headers: dict, optional
-        :param _host_index: set to override the host_index for a single
-                            request; this effectively ignores the host_index
-                            in the spec for a single request.
-        :type _host_index: int, optional
-        :return: Returns the result object.
-        """ # noqa: E501
-
-        _param = self._assign_project_use_only_grant_serialize(
-            project_id=project_id,
-            idempotency_key=idempotency_key,
-            project_use_only_grant_request=project_use_only_grant_request,
-            _request_auth=_request_auth,
-            _content_type=_content_type,
-            _headers=_headers,
-            _host_index=_host_index
-        )
-
-        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
-            '201': {
-                
-                'application/json': "ProjectUseOnlyGrantResponse",
-                
-            },
-            '400': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '401': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '403': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '404': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '409': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '422': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '503': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-        }
-        response_data = await self.api_client.call_api(
-            *_param,
-            _request_timeout=_request_timeout
-        )
-        await response_data.read()
-        return self.api_client.response_deserialize(
-            response_data=response_data,
-            response_types_map=_response_types_map,
-        ).data
-
-
-    @validate_call
-    async def assign_project_use_only_grant_with_http_info(
-        self,
-        project_id: UUID,
-        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
-        project_use_only_grant_request: ProjectUseOnlyGrantRequest,
-        _request_timeout: Union[
-            None,
-            Annotated[StrictFloat, Field(gt=0)],
-            Tuple[
-                Annotated[StrictFloat, Field(gt=0)],
-                Annotated[StrictFloat, Field(gt=0)]
-            ]
-        ] = None,
-        _request_auth: Optional[Dict[StrictStr, Any]] = None,
-        _content_type: Optional[StrictStr] = None,
-        _headers: Optional[Dict[StrictStr, Any]] = None,
-        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ApiResponse[Union[response_models.ProjectUseOnlyGrantResponse, ]]:
-        """Assign Use Only
-
-
-        :param project_id: (required)
-        :type project_id: UUID
-        :param idempotency_key: (required)
-        :type idempotency_key: str
-        :param project_use_only_grant_request: (required)
-        :type project_use_only_grant_request: ProjectUseOnlyGrantRequest
-        :param _request_timeout: timeout setting for this request. If one
-                                 number provided, it will be total request
-                                 timeout. It can also be a pair (tuple) of
-                                 (connection, read) timeouts.
-        :type _request_timeout: int, tuple(int, int), optional
-        :param _request_auth: set to override the auth_settings for an a single
-                              request; this effectively ignores the
-                              authentication in the spec for a single request.
-        :type _request_auth: dict, optional
-        :param _content_type: force content-type for the request.
-        :type _content_type: str, Optional
-        :param _headers: set to override the headers for a single
-                         request; this effectively ignores the headers
-                         in the spec for a single request.
-        :type _headers: dict, optional
-        :param _host_index: set to override the host_index for a single
-                            request; this effectively ignores the host_index
-                            in the spec for a single request.
-        :type _host_index: int, optional
-        :return: Returns the result object.
-        """ # noqa: E501
-
-        _param = self._assign_project_use_only_grant_serialize(
-            project_id=project_id,
-            idempotency_key=idempotency_key,
-            project_use_only_grant_request=project_use_only_grant_request,
-            _request_auth=_request_auth,
-            _content_type=_content_type,
-            _headers=_headers,
-            _host_index=_host_index
-        )
-
-        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
-            '201': {
-                
-                'application/json': "ProjectUseOnlyGrantResponse",
-                
-            },
-            '400': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '401': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '403': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '404': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '409': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '422': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '503': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-        }
-        response_data = await self.api_client.call_api(
-            *_param,
-            _request_timeout=_request_timeout
-        )
-        await response_data.read()
-        return self.api_client.response_deserialize(
-            response_data=response_data,
-            response_types_map=_response_types_map,
-        )
-
-
-    @validate_call
-    async def assign_project_use_only_grant_without_preload_content(
-        self,
-        project_id: UUID,
-        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
-        project_use_only_grant_request: ProjectUseOnlyGrantRequest,
-        _request_timeout: Union[
-            None,
-            Annotated[StrictFloat, Field(gt=0)],
-            Tuple[
-                Annotated[StrictFloat, Field(gt=0)],
-                Annotated[StrictFloat, Field(gt=0)]
-            ]
-        ] = None,
-        _request_auth: Optional[Dict[StrictStr, Any]] = None,
-        _content_type: Optional[StrictStr] = None,
-        _headers: Optional[Dict[StrictStr, Any]] = None,
-        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> RESTResponseType:
-        """Assign Use Only
-
-
-        :param project_id: (required)
-        :type project_id: UUID
-        :param idempotency_key: (required)
-        :type idempotency_key: str
-        :param project_use_only_grant_request: (required)
-        :type project_use_only_grant_request: ProjectUseOnlyGrantRequest
-        :param _request_timeout: timeout setting for this request. If one
-                                 number provided, it will be total request
-                                 timeout. It can also be a pair (tuple) of
-                                 (connection, read) timeouts.
-        :type _request_timeout: int, tuple(int, int), optional
-        :param _request_auth: set to override the auth_settings for an a single
-                              request; this effectively ignores the
-                              authentication in the spec for a single request.
-        :type _request_auth: dict, optional
-        :param _content_type: force content-type for the request.
-        :type _content_type: str, Optional
-        :param _headers: set to override the headers for a single
-                         request; this effectively ignores the headers
-                         in the spec for a single request.
-        :type _headers: dict, optional
-        :param _host_index: set to override the host_index for a single
-                            request; this effectively ignores the host_index
-                            in the spec for a single request.
-        :type _host_index: int, optional
-        :return: Returns the result object.
-        """ # noqa: E501
-
-        _param = self._assign_project_use_only_grant_serialize(
-            project_id=project_id,
-            idempotency_key=idempotency_key,
-            project_use_only_grant_request=project_use_only_grant_request,
-            _request_auth=_request_auth,
-            _content_type=_content_type,
-            _headers=_headers,
-            _host_index=_host_index
-        )
-
-        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
-            '201': {
-                
-                'application/json': "ProjectUseOnlyGrantResponse",
-                
-            },
-            '400': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '401': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '403': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '404': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '409': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '422': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-            '503': {
-                
-                'application/problem+json': "ProblemDetails",
-                
-            },
-        }
-        response_data = await self.api_client.call_api(
-            *_param,
-            _request_timeout=_request_timeout
-        )
-        return response_data.response
-
-
-    @validate_call
-    def assign_project_use_only_grant_sync(
-        self,
-        project_id: UUID,
-        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
-        project_use_only_grant_request: ProjectUseOnlyGrantRequest,
-        _request_timeout: Union[
-            None,
-            Annotated[StrictFloat, Field(gt=0)],
-            Tuple[
-                Annotated[StrictFloat, Field(gt=0)],
-                Annotated[StrictFloat, Field(gt=0)]
-            ]
-        ] = None,
-        _request_auth: Optional[Dict[StrictStr, Any]] = None,
-        _content_type: Optional[StrictStr] = None,
-        _headers: Optional[Dict[StrictStr, Any]] = None,
-        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> Union[response_models.ProjectUseOnlyGrantResponse, ]:
-        """Assign Use Only (synchronous)
-
-        Synchronous variant of :meth:`assign_project_use_only_grant`. It calls the asynchronous
-        method and blocks until it completes.
-        """ # noqa: E501
-        return run_sync(
-            self.assign_project_use_only_grant(
-                project_id=project_id,
-                idempotency_key=idempotency_key,
-                project_use_only_grant_request=project_use_only_grant_request,
-                _request_timeout=_request_timeout,
-                _request_auth=_request_auth,
-                _content_type=_content_type,
-                _headers=_headers,
-                _host_index=_host_index,
-            )
-        )
-
-
-    @validate_call
-    def assign_project_use_only_grant_sync_with_http_info(
-        self,
-        project_id: UUID,
-        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
-        project_use_only_grant_request: ProjectUseOnlyGrantRequest,
-        _request_timeout: Union[
-            None,
-            Annotated[StrictFloat, Field(gt=0)],
-            Tuple[
-                Annotated[StrictFloat, Field(gt=0)],
-                Annotated[StrictFloat, Field(gt=0)]
-            ]
-        ] = None,
-        _request_auth: Optional[Dict[StrictStr, Any]] = None,
-        _content_type: Optional[StrictStr] = None,
-        _headers: Optional[Dict[StrictStr, Any]] = None,
-        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ApiResponse[Union[response_models.ProjectUseOnlyGrantResponse, ]]:
-        """Assign Use Only (synchronous)
-
-        Synchronous variant of :meth:`assign_project_use_only_grant_with_http_info`. It calls the
-        asynchronous method and blocks until it completes.
-        """ # noqa: E501
-        return run_sync(
-            self.assign_project_use_only_grant_with_http_info(
-                project_id=project_id,
-                idempotency_key=idempotency_key,
-                project_use_only_grant_request=project_use_only_grant_request,
-                _request_timeout=_request_timeout,
-                _request_auth=_request_auth,
-                _content_type=_content_type,
-                _headers=_headers,
-                _host_index=_host_index,
-            )
-        )
-
-
-    @validate_call
-    def assign_project_use_only_grant_sync_without_preload_content(
-        self,
-        project_id: UUID,
-        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
-        project_use_only_grant_request: ProjectUseOnlyGrantRequest,
-        _request_timeout: Union[
-            None,
-            Annotated[StrictFloat, Field(gt=0)],
-            Tuple[
-                Annotated[StrictFloat, Field(gt=0)],
-                Annotated[StrictFloat, Field(gt=0)]
-            ]
-        ] = None,
-        _request_auth: Optional[Dict[StrictStr, Any]] = None,
-        _content_type: Optional[StrictStr] = None,
-        _headers: Optional[Dict[StrictStr, Any]] = None,
-        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> RESTResponseType:
-        """Assign Use Only (synchronous)
-
-        Synchronous variant of :meth:`assign_project_use_only_grant_without_preload_content`. It calls
-        the asynchronous method and blocks until it completes.
-        """ # noqa: E501
-        return run_sync(
-            self.assign_project_use_only_grant_without_preload_content(
-                project_id=project_id,
-                idempotency_key=idempotency_key,
-                project_use_only_grant_request=project_use_only_grant_request,
-                _request_timeout=_request_timeout,
-                _request_auth=_request_auth,
-                _content_type=_content_type,
-                _headers=_headers,
-                _host_index=_host_index,
-            )
-        )
-
-
-    def _assign_project_use_only_grant_serialize(
-        self,
-        project_id,
-        idempotency_key,
-        project_use_only_grant_request,
-        _request_auth,
-        _content_type,
-        _headers,
-        _host_index,
-    ) -> RequestSerialized:
-
-        _host = None
-
-        _collection_formats: Dict[str, str] = {
-        }
-
-        _path_params: Dict[str, str] = {}
-        _query_params: List[Tuple[str, str]] = []
-        _header_params: Dict[str, Optional[str]] = _headers or {}
-        _form_params: List[Tuple[str, str]] = []
-        _files: Dict[
-            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
-        ] = {}
-        _body_params: Optional[bytes] = None
-
-        # process the path parameters
-        if project_id is not None:
-            _path_params['project_id'] = project_id
-        # process the query parameters
-        # process the header parameters
-        if idempotency_key is not None:
-            _header_params['Idempotency-Key'] = idempotency_key
-        # process the form parameters
-        # process the body parameter
-        if project_use_only_grant_request is not None:
-            _body_params = project_use_only_grant_request
-
-
-        # set the HTTP header `Accept`
-        if not any(name.lower() == 'accept' for name in _header_params):
-            _header_params['Accept'] = self.api_client.select_header_accept(
-                [
-                    'application/json', 
-                    'application/problem+json'
-                ]
-            )
-
-        # set the HTTP header `Content-Type`
-        if _content_type:
-            _header_params['Content-Type'] = _content_type
-        else:
-            _default_content_type = (
-                self.api_client.select_header_content_type(
-                    [
-                        'application/json'
-                    ]
-                )
-            )
-            if _default_content_type is not None:
-                _header_params['Content-Type'] = _default_content_type
-
-        # authentication setting
-        _auth_settings: List[str] = [
-            'KratosSession', 
-            'HumanBearer'
-        ]
-
-        return self.api_client.param_serialize(
-            method='POST',
-            resource_path='/v1/projects/{project_id}/grants',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -9544,6 +9022,575 @@ class AccessApi:
 
 
     @validate_call
+    async def list_access_group_action_grants(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.PageResponseAccessGroupActionGrantItemResponse, ]:
+        """Grants
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param access_group_id: (required)
+        :type access_group_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_access_group_action_grants_serialize(
+            project_id=project_id,
+            access_group_id=access_group_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseAccessGroupActionGrantItemResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def list_access_group_action_grants_with_http_info(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.PageResponseAccessGroupActionGrantItemResponse, ]]:
+        """Grants
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param access_group_id: (required)
+        :type access_group_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_access_group_action_grants_serialize(
+            project_id=project_id,
+            access_group_id=access_group_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseAccessGroupActionGrantItemResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def list_access_group_action_grants_without_preload_content(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Grants
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param access_group_id: (required)
+        :type access_group_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_access_group_action_grants_serialize(
+            project_id=project_id,
+            access_group_id=access_group_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseAccessGroupActionGrantItemResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def list_access_group_action_grants_sync(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.PageResponseAccessGroupActionGrantItemResponse, ]:
+        """Grants (synchronous)
+
+        Synchronous variant of :meth:`list_access_group_action_grants`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_access_group_action_grants(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def list_access_group_action_grants_sync_with_http_info(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.PageResponseAccessGroupActionGrantItemResponse, ]]:
+        """Grants (synchronous)
+
+        Synchronous variant of :meth:`list_access_group_action_grants_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_access_group_action_grants_with_http_info(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def list_access_group_action_grants_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Grants (synchronous)
+
+        Synchronous variant of :meth:`list_access_group_action_grants_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_access_group_action_grants_without_preload_content(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _list_access_group_action_grants_serialize(
+        self,
+        project_id,
+        access_group_id,
+        action_id,
+        limit,
+        cursor,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        if access_group_id is not None:
+            _path_params['access_group_id'] = access_group_id
+        # process the query parameters
+        if action_id is not None:
+            
+            _query_params.append(('actionId', action_id))
+            
+        if limit is not None:
+            
+            _query_params.append(('limit', limit))
+            
+        if cursor is not None:
+            
+            _query_params.append(('cursor', cursor))
+            
+        # process the header parameters
+        # process the form parameters
+        # process the body parameter
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='GET',
+            resource_path='/v1/projects/{project_id}/access-groups/{access_group_id}/grants',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
     async def list_access_group_managers(
         self,
         project_id: UUID,
@@ -10636,6 +10683,575 @@ class AccessApi:
 
 
     @validate_call
+    async def list_application_account_action_grants(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.PageResponseApplicationAccountActionGrantItemResponse, ]:
+        """Grants
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param application_principal_id: (required)
+        :type application_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_application_account_action_grants_serialize(
+            project_id=project_id,
+            application_principal_id=application_principal_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseApplicationAccountActionGrantItemResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def list_application_account_action_grants_with_http_info(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.PageResponseApplicationAccountActionGrantItemResponse, ]]:
+        """Grants
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param application_principal_id: (required)
+        :type application_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_application_account_action_grants_serialize(
+            project_id=project_id,
+            application_principal_id=application_principal_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseApplicationAccountActionGrantItemResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def list_application_account_action_grants_without_preload_content(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Grants
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param application_principal_id: (required)
+        :type application_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_application_account_action_grants_serialize(
+            project_id=project_id,
+            application_principal_id=application_principal_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseApplicationAccountActionGrantItemResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def list_application_account_action_grants_sync(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.PageResponseApplicationAccountActionGrantItemResponse, ]:
+        """Grants (synchronous)
+
+        Synchronous variant of :meth:`list_application_account_action_grants`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_application_account_action_grants(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def list_application_account_action_grants_sync_with_http_info(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.PageResponseApplicationAccountActionGrantItemResponse, ]]:
+        """Grants (synchronous)
+
+        Synchronous variant of :meth:`list_application_account_action_grants_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_application_account_action_grants_with_http_info(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def list_application_account_action_grants_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Grants (synchronous)
+
+        Synchronous variant of :meth:`list_application_account_action_grants_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_application_account_action_grants_without_preload_content(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _list_application_account_action_grants_serialize(
+        self,
+        project_id,
+        application_principal_id,
+        action_id,
+        limit,
+        cursor,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        if application_principal_id is not None:
+            _path_params['application_principal_id'] = application_principal_id
+        # process the query parameters
+        if action_id is not None:
+            
+            _query_params.append(('actionId', action_id))
+            
+        if limit is not None:
+            
+            _query_params.append(('limit', limit))
+            
+        if cursor is not None:
+            
+            _query_params.append(('cursor', cursor))
+            
+        # process the header parameters
+        # process the form parameters
+        # process the body parameter
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='GET',
+            resource_path='/v1/projects/{project_id}/application-accounts/{application_principal_id}/grants',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
     async def list_application_keys(
         self,
         project_id: UUID,
@@ -11166,6 +11782,554 @@ class AccessApi:
         return self.api_client.param_serialize(
             method='GET',
             resource_path='/v1/projects/{project_id}/application-accounts/{application_principal_id}/keys',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def list_organization_action_grants(
+        self,
+        organization_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.PageResponseOrganizationActionGrantItemResponse, ]:
+        """Grants
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_organization_action_grants_serialize(
+            organization_id=organization_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseOrganizationActionGrantItemResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def list_organization_action_grants_with_http_info(
+        self,
+        organization_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.PageResponseOrganizationActionGrantItemResponse, ]]:
+        """Grants
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_organization_action_grants_serialize(
+            organization_id=organization_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseOrganizationActionGrantItemResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def list_organization_action_grants_without_preload_content(
+        self,
+        organization_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Grants
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_organization_action_grants_serialize(
+            organization_id=organization_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseOrganizationActionGrantItemResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def list_organization_action_grants_sync(
+        self,
+        organization_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.PageResponseOrganizationActionGrantItemResponse, ]:
+        """Grants (synchronous)
+
+        Synchronous variant of :meth:`list_organization_action_grants`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_organization_action_grants(
+                organization_id=organization_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def list_organization_action_grants_sync_with_http_info(
+        self,
+        organization_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.PageResponseOrganizationActionGrantItemResponse, ]]:
+        """Grants (synchronous)
+
+        Synchronous variant of :meth:`list_organization_action_grants_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_organization_action_grants_with_http_info(
+                organization_id=organization_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def list_organization_action_grants_sync_without_preload_content(
+        self,
+        organization_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Grants (synchronous)
+
+        Synchronous variant of :meth:`list_organization_action_grants_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_organization_action_grants_without_preload_content(
+                organization_id=organization_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _list_organization_action_grants_serialize(
+        self,
+        organization_id,
+        action_id,
+        limit,
+        cursor,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if organization_id is not None:
+            _path_params['organization_id'] = organization_id
+        # process the query parameters
+        if action_id is not None:
+            
+            _query_params.append(('actionId', action_id))
+            
+        if limit is not None:
+            
+            _query_params.append(('limit', limit))
+            
+        if cursor is not None:
+            
+            _query_params.append(('cursor', cursor))
+            
+        # process the header parameters
+        # process the form parameters
+        # process the body parameter
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='GET',
+            resource_path='/v1/organizations/{organization_id}/grants',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -11715,6 +12879,585 @@ class AccessApi:
 
 
     @validate_call
+    async def list_project_grant_recipients(
+        self,
+        project_id: UUID,
+        target_kind: GrantTargetKind,
+        target_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.PageResponseGrantRecipientResponse, ]:
+        """Recipients
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param target_kind: (required)
+        :type target_kind: GrantTargetKind
+        :param target_id: (required)
+        :type target_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_project_grant_recipients_serialize(
+            project_id=project_id,
+            target_kind=target_kind,
+            target_id=target_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseGrantRecipientResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def list_project_grant_recipients_with_http_info(
+        self,
+        project_id: UUID,
+        target_kind: GrantTargetKind,
+        target_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.PageResponseGrantRecipientResponse, ]]:
+        """Recipients
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param target_kind: (required)
+        :type target_kind: GrantTargetKind
+        :param target_id: (required)
+        :type target_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_project_grant_recipients_serialize(
+            project_id=project_id,
+            target_kind=target_kind,
+            target_id=target_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseGrantRecipientResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def list_project_grant_recipients_without_preload_content(
+        self,
+        project_id: UUID,
+        target_kind: GrantTargetKind,
+        target_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Recipients
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param target_kind: (required)
+        :type target_kind: GrantTargetKind
+        :param target_id: (required)
+        :type target_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param limit:
+        :type limit: int
+        :param cursor:
+        :type cursor: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._list_project_grant_recipients_serialize(
+            project_id=project_id,
+            target_kind=target_kind,
+            target_id=target_id,
+            action_id=action_id,
+            limit=limit,
+            cursor=cursor,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "PageResponseGrantRecipientResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def list_project_grant_recipients_sync(
+        self,
+        project_id: UUID,
+        target_kind: GrantTargetKind,
+        target_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.PageResponseGrantRecipientResponse, ]:
+        """Recipients (synchronous)
+
+        Synchronous variant of :meth:`list_project_grant_recipients`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_project_grant_recipients(
+                project_id=project_id,
+                target_kind=target_kind,
+                target_id=target_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def list_project_grant_recipients_sync_with_http_info(
+        self,
+        project_id: UUID,
+        target_kind: GrantTargetKind,
+        target_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.PageResponseGrantRecipientResponse, ]]:
+        """Recipients (synchronous)
+
+        Synchronous variant of :meth:`list_project_grant_recipients_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_project_grant_recipients_with_http_info(
+                project_id=project_id,
+                target_kind=target_kind,
+                target_id=target_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def list_project_grant_recipients_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        target_kind: GrantTargetKind,
+        target_id: UUID,
+        action_id: Annotated[str, Field(min_length=1, strict=True, max_length=100)],
+        limit: Optional[Annotated[int, Field(le=100, strict=True, ge=1)]] = None,
+        cursor: Optional[Annotated[str, Field(min_length=1, strict=True, max_length=1024)]] = None,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Recipients (synchronous)
+
+        Synchronous variant of :meth:`list_project_grant_recipients_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.list_project_grant_recipients_without_preload_content(
+                project_id=project_id,
+                target_kind=target_kind,
+                target_id=target_id,
+                action_id=action_id,
+                limit=limit,
+                cursor=cursor,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _list_project_grant_recipients_serialize(
+        self,
+        project_id,
+        target_kind,
+        target_id,
+        action_id,
+        limit,
+        cursor,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        # process the query parameters
+        if target_kind is not None:
+            
+            _query_params.append(('targetKind', target_kind.value))
+            
+        if target_id is not None:
+            
+            _query_params.append(('targetId', target_id))
+            
+        if action_id is not None:
+            
+            _query_params.append(('actionId', action_id))
+            
+        if limit is not None:
+            
+            _query_params.append(('limit', limit))
+            
+        if cursor is not None:
+            
+            _query_params.append(('cursor', cursor))
+            
+        # process the header parameters
+        # process the form parameters
+        # process the body parameter
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='GET',
+            resource_path='/v1/projects/{project_id}/grant-recipients',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
     async def list_project_members(
         self,
         project_id: UUID,
@@ -12209,6 +13952,592 @@ class AccessApi:
         return self.api_client.param_serialize(
             method='GET',
             resource_path='/v1/projects/{project_id}/members',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def remove_access_group_action_grant(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.AccessGroupActionGrantRemovalResponse, ]:
+        """Remove
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param access_group_id: (required)
+        :type access_group_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param expected_access_revision: (required)
+        :type expected_access_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_access_group_action_grant_serialize(
+            project_id=project_id,
+            access_group_id=access_group_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            expected_access_revision=expected_access_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "AccessGroupActionGrantRemovalResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def remove_access_group_action_grant_with_http_info(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.AccessGroupActionGrantRemovalResponse, ]]:
+        """Remove
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param access_group_id: (required)
+        :type access_group_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param expected_access_revision: (required)
+        :type expected_access_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_access_group_action_grant_serialize(
+            project_id=project_id,
+            access_group_id=access_group_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            expected_access_revision=expected_access_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "AccessGroupActionGrantRemovalResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def remove_access_group_action_grant_without_preload_content(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Remove
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param access_group_id: (required)
+        :type access_group_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param expected_access_revision: (required)
+        :type expected_access_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_access_group_action_grant_serialize(
+            project_id=project_id,
+            access_group_id=access_group_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            expected_access_revision=expected_access_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "AccessGroupActionGrantRemovalResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def remove_access_group_action_grant_sync(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.AccessGroupActionGrantRemovalResponse, ]:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_access_group_action_grant`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_access_group_action_grant(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                expected_access_revision=expected_access_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def remove_access_group_action_grant_sync_with_http_info(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.AccessGroupActionGrantRemovalResponse, ]]:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_access_group_action_grant_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_access_group_action_grant_with_http_info(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                expected_access_revision=expected_access_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def remove_access_group_action_grant_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_access_group_action_grant_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_access_group_action_grant_without_preload_content(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                expected_access_revision=expected_access_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _remove_access_group_action_grant_serialize(
+        self,
+        project_id,
+        access_group_id,
+        recipient_principal_id,
+        action_id,
+        expected_access_revision,
+        idempotency_key,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        if access_group_id is not None:
+            _path_params['access_group_id'] = access_group_id
+        if recipient_principal_id is not None:
+            _path_params['recipient_principal_id'] = recipient_principal_id
+        if action_id is not None:
+            _path_params['action_id'] = action_id
+        # process the query parameters
+        if expected_access_revision is not None:
+            
+            _query_params.append(('expectedAccessRevision', expected_access_revision))
+            
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='DELETE',
+            resource_path='/v1/projects/{project_id}/access-groups/{access_group_id}/grants/{recipient_principal_id}/{action_id}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -13339,6 +15668,1157 @@ class AccessApi:
         return self.api_client.param_serialize(
             method='DELETE',
             resource_path='/v1/projects/{project_id}/access-groups/{access_group_id}/members/{principal_id}',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def remove_application_account_action_grant(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ApplicationAccountActionGrantRemovalResponse, ]:
+        """Remove
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param application_principal_id: (required)
+        :type application_principal_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param expected_access_revision: (required)
+        :type expected_access_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_application_account_action_grant_serialize(
+            project_id=project_id,
+            application_principal_id=application_principal_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            expected_access_revision=expected_access_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ApplicationAccountActionGrantRemovalResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def remove_application_account_action_grant_with_http_info(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ApplicationAccountActionGrantRemovalResponse, ]]:
+        """Remove
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param application_principal_id: (required)
+        :type application_principal_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param expected_access_revision: (required)
+        :type expected_access_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_application_account_action_grant_serialize(
+            project_id=project_id,
+            application_principal_id=application_principal_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            expected_access_revision=expected_access_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ApplicationAccountActionGrantRemovalResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def remove_application_account_action_grant_without_preload_content(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Remove
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param application_principal_id: (required)
+        :type application_principal_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param expected_access_revision: (required)
+        :type expected_access_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_application_account_action_grant_serialize(
+            project_id=project_id,
+            application_principal_id=application_principal_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            expected_access_revision=expected_access_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ApplicationAccountActionGrantRemovalResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def remove_application_account_action_grant_sync(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ApplicationAccountActionGrantRemovalResponse, ]:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_application_account_action_grant`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_application_account_action_grant(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                expected_access_revision=expected_access_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def remove_application_account_action_grant_sync_with_http_info(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ApplicationAccountActionGrantRemovalResponse, ]]:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_application_account_action_grant_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_application_account_action_grant_with_http_info(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                expected_access_revision=expected_access_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def remove_application_account_action_grant_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_application_account_action_grant_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_application_account_action_grant_without_preload_content(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                expected_access_revision=expected_access_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _remove_application_account_action_grant_serialize(
+        self,
+        project_id,
+        application_principal_id,
+        recipient_principal_id,
+        action_id,
+        expected_access_revision,
+        idempotency_key,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        if application_principal_id is not None:
+            _path_params['application_principal_id'] = application_principal_id
+        if recipient_principal_id is not None:
+            _path_params['recipient_principal_id'] = recipient_principal_id
+        if action_id is not None:
+            _path_params['action_id'] = action_id
+        # process the query parameters
+        if expected_access_revision is not None:
+            
+            _query_params.append(('expectedAccessRevision', expected_access_revision))
+            
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='DELETE',
+            resource_path='/v1/projects/{project_id}/application-accounts/{application_principal_id}/grants/{recipient_principal_id}/{action_id}',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def remove_organization_action_grant(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.OrganizationActionGrantRemovalResponse, ]:
+        """Remove
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param expected_access_revision: (required)
+        :type expected_access_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_organization_action_grant_serialize(
+            organization_id=organization_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            expected_access_revision=expected_access_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "OrganizationActionGrantRemovalResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def remove_organization_action_grant_with_http_info(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.OrganizationActionGrantRemovalResponse, ]]:
+        """Remove
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param expected_access_revision: (required)
+        :type expected_access_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_organization_action_grant_serialize(
+            organization_id=organization_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            expected_access_revision=expected_access_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "OrganizationActionGrantRemovalResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def remove_organization_action_grant_without_preload_content(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Remove
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param expected_access_revision: (required)
+        :type expected_access_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_organization_action_grant_serialize(
+            organization_id=organization_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            expected_access_revision=expected_access_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "OrganizationActionGrantRemovalResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def remove_organization_action_grant_sync(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.OrganizationActionGrantRemovalResponse, ]:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_organization_action_grant`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_organization_action_grant(
+                organization_id=organization_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                expected_access_revision=expected_access_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def remove_organization_action_grant_sync_with_http_info(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.OrganizationActionGrantRemovalResponse, ]]:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_organization_action_grant_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_organization_action_grant_with_http_info(
+                organization_id=organization_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                expected_access_revision=expected_access_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def remove_organization_action_grant_sync_without_preload_content(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        expected_access_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_organization_action_grant_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_organization_action_grant_without_preload_content(
+                organization_id=organization_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                expected_access_revision=expected_access_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _remove_organization_action_grant_serialize(
+        self,
+        organization_id,
+        recipient_principal_id,
+        action_id,
+        expected_access_revision,
+        idempotency_key,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if organization_id is not None:
+            _path_params['organization_id'] = organization_id
+        if recipient_principal_id is not None:
+            _path_params['recipient_principal_id'] = recipient_principal_id
+        if action_id is not None:
+            _path_params['action_id'] = action_id
+        # process the query parameters
+        if expected_access_revision is not None:
+            
+            _query_params.append(('expectedAccessRevision', expected_access_revision))
+            
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='DELETE',
+            resource_path='/v1/organizations/{organization_id}/grants/{recipient_principal_id}/{action_id}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -15931,6 +19411,1911 @@ class AccessApi:
         return self.api_client.param_serialize(
             method='GET',
             resource_path='/v1/projects/by-name/{name}',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def set_access_group_action_grant(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        access_group_action_grant_request: AccessGroupActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.AccessGroupActionGrantResponse, response_models.AccessGroupActionGrantResponse, ]:
+        """Assign
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param access_group_id: (required)
+        :type access_group_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param access_group_action_grant_request: (required)
+        :type access_group_action_grant_request: AccessGroupActionGrantRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._set_access_group_action_grant_serialize(
+            project_id=project_id,
+            access_group_id=access_group_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            idempotency_key=idempotency_key,
+            access_group_action_grant_request=access_group_action_grant_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "AccessGroupActionGrantResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "AccessGroupActionGrantResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def set_access_group_action_grant_with_http_info(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        access_group_action_grant_request: AccessGroupActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.AccessGroupActionGrantResponse, response_models.AccessGroupActionGrantResponse, ]]:
+        """Assign
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param access_group_id: (required)
+        :type access_group_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param access_group_action_grant_request: (required)
+        :type access_group_action_grant_request: AccessGroupActionGrantRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._set_access_group_action_grant_serialize(
+            project_id=project_id,
+            access_group_id=access_group_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            idempotency_key=idempotency_key,
+            access_group_action_grant_request=access_group_action_grant_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "AccessGroupActionGrantResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "AccessGroupActionGrantResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def set_access_group_action_grant_without_preload_content(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        access_group_action_grant_request: AccessGroupActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Assign
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param access_group_id: (required)
+        :type access_group_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param access_group_action_grant_request: (required)
+        :type access_group_action_grant_request: AccessGroupActionGrantRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._set_access_group_action_grant_serialize(
+            project_id=project_id,
+            access_group_id=access_group_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            idempotency_key=idempotency_key,
+            access_group_action_grant_request=access_group_action_grant_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "AccessGroupActionGrantResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "AccessGroupActionGrantResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def set_access_group_action_grant_sync(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        access_group_action_grant_request: AccessGroupActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.AccessGroupActionGrantResponse, response_models.AccessGroupActionGrantResponse, ]:
+        """Assign (synchronous)
+
+        Synchronous variant of :meth:`set_access_group_action_grant`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.set_access_group_action_grant(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                idempotency_key=idempotency_key,
+                access_group_action_grant_request=access_group_action_grant_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def set_access_group_action_grant_sync_with_http_info(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        access_group_action_grant_request: AccessGroupActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.AccessGroupActionGrantResponse, response_models.AccessGroupActionGrantResponse, ]]:
+        """Assign (synchronous)
+
+        Synchronous variant of :meth:`set_access_group_action_grant_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.set_access_group_action_grant_with_http_info(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                idempotency_key=idempotency_key,
+                access_group_action_grant_request=access_group_action_grant_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def set_access_group_action_grant_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        access_group_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        access_group_action_grant_request: AccessGroupActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Assign (synchronous)
+
+        Synchronous variant of :meth:`set_access_group_action_grant_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.set_access_group_action_grant_without_preload_content(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                idempotency_key=idempotency_key,
+                access_group_action_grant_request=access_group_action_grant_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _set_access_group_action_grant_serialize(
+        self,
+        project_id,
+        access_group_id,
+        recipient_principal_id,
+        action_id,
+        idempotency_key,
+        access_group_action_grant_request,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        if access_group_id is not None:
+            _path_params['access_group_id'] = access_group_id
+        if recipient_principal_id is not None:
+            _path_params['recipient_principal_id'] = recipient_principal_id
+        if action_id is not None:
+            _path_params['action_id'] = action_id
+        # process the query parameters
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+        if access_group_action_grant_request is not None:
+            _body_params = access_group_action_grant_request
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+        # set the HTTP header `Content-Type`
+        if _content_type:
+            _header_params['Content-Type'] = _content_type
+        else:
+            _default_content_type = (
+                self.api_client.select_header_content_type(
+                    [
+                        'application/json'
+                    ]
+                )
+            )
+            if _default_content_type is not None:
+                _header_params['Content-Type'] = _default_content_type
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='PUT',
+            resource_path='/v1/projects/{project_id}/access-groups/{access_group_id}/grants/{recipient_principal_id}/{action_id}',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def set_application_account_action_grant(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        application_account_action_grant_request: ApplicationAccountActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ApplicationAccountActionGrantResponse, response_models.ApplicationAccountActionGrantResponse, ]:
+        """Assign
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param application_principal_id: (required)
+        :type application_principal_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param application_account_action_grant_request: (required)
+        :type application_account_action_grant_request: ApplicationAccountActionGrantRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._set_application_account_action_grant_serialize(
+            project_id=project_id,
+            application_principal_id=application_principal_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            idempotency_key=idempotency_key,
+            application_account_action_grant_request=application_account_action_grant_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ApplicationAccountActionGrantResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "ApplicationAccountActionGrantResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def set_application_account_action_grant_with_http_info(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        application_account_action_grant_request: ApplicationAccountActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ApplicationAccountActionGrantResponse, response_models.ApplicationAccountActionGrantResponse, ]]:
+        """Assign
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param application_principal_id: (required)
+        :type application_principal_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param application_account_action_grant_request: (required)
+        :type application_account_action_grant_request: ApplicationAccountActionGrantRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._set_application_account_action_grant_serialize(
+            project_id=project_id,
+            application_principal_id=application_principal_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            idempotency_key=idempotency_key,
+            application_account_action_grant_request=application_account_action_grant_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ApplicationAccountActionGrantResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "ApplicationAccountActionGrantResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def set_application_account_action_grant_without_preload_content(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        application_account_action_grant_request: ApplicationAccountActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Assign
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param application_principal_id: (required)
+        :type application_principal_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param application_account_action_grant_request: (required)
+        :type application_account_action_grant_request: ApplicationAccountActionGrantRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._set_application_account_action_grant_serialize(
+            project_id=project_id,
+            application_principal_id=application_principal_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            idempotency_key=idempotency_key,
+            application_account_action_grant_request=application_account_action_grant_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ApplicationAccountActionGrantResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "ApplicationAccountActionGrantResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def set_application_account_action_grant_sync(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        application_account_action_grant_request: ApplicationAccountActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ApplicationAccountActionGrantResponse, response_models.ApplicationAccountActionGrantResponse, ]:
+        """Assign (synchronous)
+
+        Synchronous variant of :meth:`set_application_account_action_grant`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.set_application_account_action_grant(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                idempotency_key=idempotency_key,
+                application_account_action_grant_request=application_account_action_grant_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def set_application_account_action_grant_sync_with_http_info(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        application_account_action_grant_request: ApplicationAccountActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ApplicationAccountActionGrantResponse, response_models.ApplicationAccountActionGrantResponse, ]]:
+        """Assign (synchronous)
+
+        Synchronous variant of :meth:`set_application_account_action_grant_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.set_application_account_action_grant_with_http_info(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                idempotency_key=idempotency_key,
+                application_account_action_grant_request=application_account_action_grant_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def set_application_account_action_grant_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        application_principal_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        application_account_action_grant_request: ApplicationAccountActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Assign (synchronous)
+
+        Synchronous variant of :meth:`set_application_account_action_grant_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.set_application_account_action_grant_without_preload_content(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                idempotency_key=idempotency_key,
+                application_account_action_grant_request=application_account_action_grant_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _set_application_account_action_grant_serialize(
+        self,
+        project_id,
+        application_principal_id,
+        recipient_principal_id,
+        action_id,
+        idempotency_key,
+        application_account_action_grant_request,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        if application_principal_id is not None:
+            _path_params['application_principal_id'] = application_principal_id
+        if recipient_principal_id is not None:
+            _path_params['recipient_principal_id'] = recipient_principal_id
+        if action_id is not None:
+            _path_params['action_id'] = action_id
+        # process the query parameters
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+        if application_account_action_grant_request is not None:
+            _body_params = application_account_action_grant_request
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+        # set the HTTP header `Content-Type`
+        if _content_type:
+            _header_params['Content-Type'] = _content_type
+        else:
+            _default_content_type = (
+                self.api_client.select_header_content_type(
+                    [
+                        'application/json'
+                    ]
+                )
+            )
+            if _default_content_type is not None:
+                _header_params['Content-Type'] = _default_content_type
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='PUT',
+            resource_path='/v1/projects/{project_id}/application-accounts/{application_principal_id}/grants/{recipient_principal_id}/{action_id}',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def set_organization_action_grant(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        organization_action_grant_request: OrganizationActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.OrganizationActionGrantResponse, response_models.OrganizationActionGrantResponse, ]:
+        """Assign
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param organization_action_grant_request: (required)
+        :type organization_action_grant_request: OrganizationActionGrantRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._set_organization_action_grant_serialize(
+            organization_id=organization_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            idempotency_key=idempotency_key,
+            organization_action_grant_request=organization_action_grant_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "OrganizationActionGrantResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "OrganizationActionGrantResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def set_organization_action_grant_with_http_info(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        organization_action_grant_request: OrganizationActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.OrganizationActionGrantResponse, response_models.OrganizationActionGrantResponse, ]]:
+        """Assign
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param organization_action_grant_request: (required)
+        :type organization_action_grant_request: OrganizationActionGrantRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._set_organization_action_grant_serialize(
+            organization_id=organization_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            idempotency_key=idempotency_key,
+            organization_action_grant_request=organization_action_grant_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "OrganizationActionGrantResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "OrganizationActionGrantResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def set_organization_action_grant_without_preload_content(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        organization_action_grant_request: OrganizationActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Assign
+
+
+        :param organization_id: (required)
+        :type organization_id: UUID
+        :param recipient_principal_id: (required)
+        :type recipient_principal_id: UUID
+        :param action_id: (required)
+        :type action_id: str
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param organization_action_grant_request: (required)
+        :type organization_action_grant_request: OrganizationActionGrantRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._set_organization_action_grant_serialize(
+            organization_id=organization_id,
+            recipient_principal_id=recipient_principal_id,
+            action_id=action_id,
+            idempotency_key=idempotency_key,
+            organization_action_grant_request=organization_action_grant_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "OrganizationActionGrantResponse",
+                
+            },
+            '201': {
+                
+                'application/json': "OrganizationActionGrantResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def set_organization_action_grant_sync(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        organization_action_grant_request: OrganizationActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.OrganizationActionGrantResponse, response_models.OrganizationActionGrantResponse, ]:
+        """Assign (synchronous)
+
+        Synchronous variant of :meth:`set_organization_action_grant`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.set_organization_action_grant(
+                organization_id=organization_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                idempotency_key=idempotency_key,
+                organization_action_grant_request=organization_action_grant_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def set_organization_action_grant_sync_with_http_info(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        organization_action_grant_request: OrganizationActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.OrganizationActionGrantResponse, response_models.OrganizationActionGrantResponse, ]]:
+        """Assign (synchronous)
+
+        Synchronous variant of :meth:`set_organization_action_grant_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.set_organization_action_grant_with_http_info(
+                organization_id=organization_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                idempotency_key=idempotency_key,
+                organization_action_grant_request=organization_action_grant_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def set_organization_action_grant_sync_without_preload_content(
+        self,
+        organization_id: UUID,
+        recipient_principal_id: UUID,
+        action_id: StrictStr,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        organization_action_grant_request: OrganizationActionGrantRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Assign (synchronous)
+
+        Synchronous variant of :meth:`set_organization_action_grant_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.set_organization_action_grant_without_preload_content(
+                organization_id=organization_id,
+                recipient_principal_id=recipient_principal_id,
+                action_id=action_id,
+                idempotency_key=idempotency_key,
+                organization_action_grant_request=organization_action_grant_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _set_organization_action_grant_serialize(
+        self,
+        organization_id,
+        recipient_principal_id,
+        action_id,
+        idempotency_key,
+        organization_action_grant_request,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if organization_id is not None:
+            _path_params['organization_id'] = organization_id
+        if recipient_principal_id is not None:
+            _path_params['recipient_principal_id'] = recipient_principal_id
+        if action_id is not None:
+            _path_params['action_id'] = action_id
+        # process the query parameters
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+        if organization_action_grant_request is not None:
+            _body_params = organization_action_grant_request
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+        # set the HTTP header `Content-Type`
+        if _content_type:
+            _header_params['Content-Type'] = _content_type
+        else:
+            _default_content_type = (
+                self.api_client.select_header_content_type(
+                    [
+                        'application/json'
+                    ]
+                )
+            )
+            if _default_content_type is not None:
+                _header_params['Content-Type'] = _default_content_type
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'HumanBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='PUT',
+            resource_path='/v1/organizations/{organization_id}/grants/{recipient_principal_id}/{action_id}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

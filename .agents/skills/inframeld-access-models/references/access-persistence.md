@@ -144,6 +144,14 @@ The foundation grant tables use recipient, action and exact target together as t
 
 For example, Alice's permission to issue SupportBot's keys belongs in `application_action_grants`. SupportBot's permission to query Production belongs in the future `deployment_action_grants`. SupportBot's access to the Support-documents audience belongs in `group_memberships`. These three records have different purposes.
 
+<a id="access-action-grant-results"></a>
+
+## Original exact action-grant results
+
+[0026_access_action_grant_results](../../../../apps/backend/migrations/versions/0026_access_action_grant_results.py) adds three concrete result tables: `organization_action_grant_operation_results`, `group_action_grant_operation_results` and `application_action_grant_operation_results`. They retain the original target, recipient, method, level/removal meaning, HTTP status, changed flag and revision alongside the existing operation binding. Project grants retain their already implemented result table.
+
+These are historical receipts, not live assignments or authority. They survive later membership or grant removal through their original operation lifetime. A replay validates the retained actor, exact scope, method, action and business result before returning it. Fresh changes save grant, one revision increment, required audit and original result atomically. No-ops record the original unchanged revision without a change audit. Downgrade refuses to discard these retained result rows. [Grant administration](grant-administration.md#exact-grant-management-and-bounded-reads) owns current permission, recipient eligibility and handover checks.
+
 <a id="audit-table"></a>
 
 ## Audit table

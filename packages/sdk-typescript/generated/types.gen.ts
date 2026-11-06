@@ -37,6 +37,130 @@ export type AcceptedOperationLookupResponse = {
 };
 
 /**
+ * AccessGroupActionGrantItemResponse
+ */
+export type AccessGroupActionGrantItemResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
+ * AccessGroupActionGrantRemovalResponse
+ */
+export type AccessGroupActionGrantRemovalResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
+ * AccessGroupActionGrantRequest
+ */
+export type AccessGroupActionGrantRequest = {
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * AccessGroupActionGrantResponse
+ */
+export type AccessGroupActionGrantResponse = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
  * AccessGroupCreationRequest
  */
 export type AccessGroupCreationRequest = {
@@ -391,6 +515,130 @@ export type AccessGroupPrincipalsPageResponse = {
 export type ApplicationAccountAction = 'issue-application-keys' | 'revoke-application-keys' | 'delete-application-account';
 
 /**
+ * ApplicationAccountActionGrantItemResponse
+ */
+export type ApplicationAccountActionGrantItemResponse = {
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Applicationprincipalid
+     */
+    applicationPrincipalId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
+ * ApplicationAccountActionGrantRemovalResponse
+ */
+export type ApplicationAccountActionGrantRemovalResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Applicationprincipalid
+     */
+    applicationPrincipalId: string;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
+ * ApplicationAccountActionGrantRequest
+ */
+export type ApplicationAccountActionGrantRequest = {
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * ApplicationAccountActionGrantResponse
+ */
+export type ApplicationAccountActionGrantResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Applicationprincipalid
+     */
+    applicationPrincipalId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
  * ApplicationAccountCreationRequest
  */
 export type ApplicationAccountCreationRequest = {
@@ -583,6 +831,28 @@ export type DeletionStatusResponse = ({
 } & RetainedDeletionStatusResponse) | ({
     outcome: 'unresolved';
 } & UnresolvedDeletionStatusResponse);
+
+/**
+ * GrantRecipientResponse
+ */
+export type GrantRecipientResponse = {
+    /**
+     * Displayname
+     */
+    displayName: string;
+    kind: PrincipalKind;
+    /**
+     * Principalid
+     */
+    principalId: string;
+};
+
+/**
+ * GrantTargetKind
+ *
+ * Discriminate published grant targets without changing their wire tags.
+ */
+export type GrantTargetKind = 'project' | 'access-group' | 'application-account';
 
 /**
  * HttpMethod
@@ -876,7 +1146,7 @@ export type OAuthConsentDecision = 'allow' | 'deny';
  *
  * Select a fixed current-authority check without granting permission.
  */
-export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'access_group_deletion';
+export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'organization_grant_read' | 'access_group_grant_read' | 'application_account_grant_read' | 'access_group_deletion';
 
 /**
  * OperationLookupAuthorityRequest
@@ -909,6 +1179,118 @@ export type OperationLookupResponse = ({
  * Name an action on the installation Organization.
  */
 export type OrganizationAction = 'admit-users' | 'suspend-users' | 'restore-users' | 'create-projects';
+
+/**
+ * OrganizationActionGrantItemResponse
+ */
+export type OrganizationActionGrantItemResponse = {
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
+ * OrganizationActionGrantRemovalResponse
+ */
+export type OrganizationActionGrantRemovalResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
+ * OrganizationActionGrantRequest
+ */
+export type OrganizationActionGrantRequest = {
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * OrganizationActionGrantResponse
+ */
+export type OrganizationActionGrantResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
 
 /**
  * OriginalOperationLookupRequest
@@ -950,6 +1332,34 @@ export type OwnOrganizationGrantResponse = {
 };
 
 /**
+ * PageResponse[AccessGroupActionGrantItemResponse]
+ */
+export type PageResponseAccessGroupActionGrantItemResponse = {
+    /**
+     * Items
+     */
+    items: Array<AccessGroupActionGrantItemResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
+ * PageResponse[ApplicationAccountActionGrantItemResponse]
+ */
+export type PageResponseApplicationAccountActionGrantItemResponse = {
+    /**
+     * Items
+     */
+    items: Array<ApplicationAccountActionGrantItemResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
  * PageResponse[ApplicationKeyMetadataResponse]
  */
 export type PageResponseApplicationKeyMetadataResponse = {
@@ -957,6 +1367,34 @@ export type PageResponseApplicationKeyMetadataResponse = {
      * Items
      */
     items: Array<ApplicationKeyMetadataResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
+ * PageResponse[GrantRecipientResponse]
+ */
+export type PageResponseGrantRecipientResponse = {
+    /**
+     * Items
+     */
+    items: Array<GrantRecipientResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
+ * PageResponse[OrganizationActionGrantItemResponse]
+ */
+export type PageResponseOrganizationActionGrantItemResponse = {
+    /**
+     * Items
+     */
+    items: Array<OrganizationActionGrantItemResponse>;
     /**
      * Nextcursor
      */
@@ -1548,60 +1986,6 @@ export type ProjectNameResolutionResponse = {
 };
 
 /**
- * ProjectUseOnlyGrantRequest
- */
-export type ProjectUseOnlyGrantRequest = {
-    /**
-     * Actionid
-     */
-    actionId: 'create-access-groups';
-    /**
-     * Expectedaccessrevision
-     */
-    expectedAccessRevision: number;
-    /**
-     * Recipientprincipalid
-     */
-    recipientPrincipalId: string;
-};
-
-/**
- * ProjectUseOnlyGrantResponse
- *
- * Describe the original change - current grants require a fresh authorized read.
- */
-export type ProjectUseOnlyGrantResponse = {
-    /**
-     * Accessrevision
-     */
-    accessRevision: number;
-    /**
-     * Actionid
-     */
-    actionId: 'create-access-groups';
-    /**
-     * Cangrant
-     */
-    canGrant?: false;
-    /**
-     * Idempotencyexpiresat
-     */
-    idempotencyExpiresAt: string;
-    /**
-     * Operationid
-     */
-    operationId: string;
-    /**
-     * Projectid
-     */
-    projectId: string;
-    /**
-     * Recipientprincipalid
-     */
-    recipientPrincipalId: string;
-};
-
-/**
  * ProtectedResourceMetadataResponse
  *
  * Publish the bounded first-party RFC 9728 profile, not private provider configuration.
@@ -2121,6 +2505,226 @@ export type LookupOriginalOperationResponses = {
 
 export type LookupOriginalOperationResponse = LookupOriginalOperationResponses[keyof LookupOriginalOperationResponses];
 
+export type ListOrganizationActionGrantsData = {
+    body?: never;
+    path: {
+        /**
+         * Organization Id
+         */
+        organization_id: string;
+    };
+    query: {
+        /**
+         * Actionid
+         */
+        actionId: string;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/organizations/{organization_id}/grants';
+};
+
+export type ListOrganizationActionGrantsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListOrganizationActionGrantsError = ListOrganizationActionGrantsErrors[keyof ListOrganizationActionGrantsErrors];
+
+export type ListOrganizationActionGrantsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseOrganizationActionGrantItemResponse;
+};
+
+export type ListOrganizationActionGrantsResponse = ListOrganizationActionGrantsResponses[keyof ListOrganizationActionGrantsResponses];
+
+export type RemoveOrganizationActionGrantData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Organization Id
+         */
+        organization_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/organizations/{organization_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type RemoveOrganizationActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveOrganizationActionGrantError = RemoveOrganizationActionGrantErrors[keyof RemoveOrganizationActionGrantErrors];
+
+export type RemoveOrganizationActionGrantResponses = {
+    /**
+     * Successful Response
+     */
+    200: OrganizationActionGrantRemovalResponse;
+};
+
+export type RemoveOrganizationActionGrantResponse = RemoveOrganizationActionGrantResponses[keyof RemoveOrganizationActionGrantResponses];
+
+export type SetOrganizationActionGrantData = {
+    body: OrganizationActionGrantRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Organization Id
+         */
+        organization_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query?: never;
+    url: '/v1/organizations/{organization_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type SetOrganizationActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type SetOrganizationActionGrantError = SetOrganizationActionGrantErrors[keyof SetOrganizationActionGrantErrors];
+
+export type SetOrganizationActionGrantResponses = {
+    /**
+     * Changed or unchanged existing assignment.
+     */
+    200: OrganizationActionGrantResponse;
+    /**
+     * Successful Response
+     */
+    201: OrganizationActionGrantResponse;
+};
+
+export type SetOrganizationActionGrantResponse = SetOrganizationActionGrantResponses[keyof SetOrganizationActionGrantResponses];
+
 export type AdmitHumanData = {
     body: HumanAdmissionRequest;
     headers: {
@@ -2565,6 +3169,238 @@ export type GetAccessGroupResponses = {
 };
 
 export type GetAccessGroupResponse = GetAccessGroupResponses[keyof GetAccessGroupResponses];
+
+export type ListAccessGroupActionGrantsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+    };
+    query: {
+        /**
+         * Actionid
+         */
+        actionId: string;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}/grants';
+};
+
+export type ListAccessGroupActionGrantsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListAccessGroupActionGrantsError = ListAccessGroupActionGrantsErrors[keyof ListAccessGroupActionGrantsErrors];
+
+export type ListAccessGroupActionGrantsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseAccessGroupActionGrantItemResponse;
+};
+
+export type ListAccessGroupActionGrantsResponse = ListAccessGroupActionGrantsResponses[keyof ListAccessGroupActionGrantsResponses];
+
+export type RemoveAccessGroupActionGrantData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type RemoveAccessGroupActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveAccessGroupActionGrantError = RemoveAccessGroupActionGrantErrors[keyof RemoveAccessGroupActionGrantErrors];
+
+export type RemoveAccessGroupActionGrantResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessGroupActionGrantRemovalResponse;
+};
+
+export type RemoveAccessGroupActionGrantResponse = RemoveAccessGroupActionGrantResponses[keyof RemoveAccessGroupActionGrantResponses];
+
+export type SetAccessGroupActionGrantData = {
+    body: AccessGroupActionGrantRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Access Group Id
+         */
+        access_group_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/access-groups/{access_group_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type SetAccessGroupActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type SetAccessGroupActionGrantError = SetAccessGroupActionGrantErrors[keyof SetAccessGroupActionGrantErrors];
+
+export type SetAccessGroupActionGrantResponses = {
+    /**
+     * Changed or unchanged existing assignment.
+     */
+    200: AccessGroupActionGrantResponse;
+    /**
+     * Successful Response
+     */
+    201: AccessGroupActionGrantResponse;
+};
+
+export type SetAccessGroupActionGrantResponse = SetAccessGroupActionGrantResponses[keyof SetAccessGroupActionGrantResponses];
 
 export type ListAccessGroupManagersData = {
     body?: never;
@@ -3191,6 +4027,238 @@ export type GetApplicationAccountResponses = {
 
 export type GetApplicationAccountResponse = GetApplicationAccountResponses[keyof GetApplicationAccountResponses];
 
+export type ListApplicationAccountActionGrantsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Application Principal Id
+         */
+        application_principal_id: string;
+    };
+    query: {
+        /**
+         * Actionid
+         */
+        actionId: string;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/application-accounts/{application_principal_id}/grants';
+};
+
+export type ListApplicationAccountActionGrantsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListApplicationAccountActionGrantsError = ListApplicationAccountActionGrantsErrors[keyof ListApplicationAccountActionGrantsErrors];
+
+export type ListApplicationAccountActionGrantsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseApplicationAccountActionGrantItemResponse;
+};
+
+export type ListApplicationAccountActionGrantsResponse = ListApplicationAccountActionGrantsResponses[keyof ListApplicationAccountActionGrantsResponses];
+
+export type RemoveApplicationAccountActionGrantData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Application Principal Id
+         */
+        application_principal_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}/application-accounts/{application_principal_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type RemoveApplicationAccountActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveApplicationAccountActionGrantError = RemoveApplicationAccountActionGrantErrors[keyof RemoveApplicationAccountActionGrantErrors];
+
+export type RemoveApplicationAccountActionGrantResponses = {
+    /**
+     * Successful Response
+     */
+    200: ApplicationAccountActionGrantRemovalResponse;
+};
+
+export type RemoveApplicationAccountActionGrantResponse = RemoveApplicationAccountActionGrantResponses[keyof RemoveApplicationAccountActionGrantResponses];
+
+export type SetApplicationAccountActionGrantData = {
+    body: ApplicationAccountActionGrantRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Application Principal Id
+         */
+        application_principal_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        /**
+         * Action Id
+         */
+        action_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/application-accounts/{application_principal_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type SetApplicationAccountActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type SetApplicationAccountActionGrantError = SetApplicationAccountActionGrantErrors[keyof SetApplicationAccountActionGrantErrors];
+
+export type SetApplicationAccountActionGrantResponses = {
+    /**
+     * Changed or unchanged existing assignment.
+     */
+    200: ApplicationAccountActionGrantResponse;
+    /**
+     * Successful Response
+     */
+    201: ApplicationAccountActionGrantResponse;
+};
+
+export type SetApplicationAccountActionGrantResponse = SetApplicationAccountActionGrantResponses[keyof SetApplicationAccountActionGrantResponses];
+
 export type ListApplicationKeysData = {
     body?: never;
     path: {
@@ -3320,6 +4388,74 @@ export type GetApplicationKeyResponses = {
 
 export type GetApplicationKeyResponse = GetApplicationKeyResponses[keyof GetApplicationKeyResponses];
 
+export type ListProjectGrantRecipientsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        targetKind: GrantTargetKind;
+        /**
+         * Targetid
+         */
+        targetId: string;
+        /**
+         * Actionid
+         */
+        actionId: string;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/grant-recipients';
+};
+
+export type ListProjectGrantRecipientsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListProjectGrantRecipientsError = ListProjectGrantRecipientsErrors[keyof ListProjectGrantRecipientsErrors];
+
+export type ListProjectGrantRecipientsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseGrantRecipientResponse;
+};
+
+export type ListProjectGrantRecipientsResponse = ListProjectGrantRecipientsResponses[keyof ListProjectGrantRecipientsResponses];
+
 export type ListProjectActionGrantsData = {
     body?: never;
     path: {
@@ -3382,66 +4518,6 @@ export type ListProjectActionGrantsResponses = {
 };
 
 export type ListProjectActionGrantsResponse = ListProjectActionGrantsResponses[keyof ListProjectActionGrantsResponses];
-
-export type AssignProjectUseOnlyGrantData = {
-    body: ProjectUseOnlyGrantRequest;
-    headers: {
-        /**
-         * Idempotency-Key
-         */
-        'Idempotency-Key': string;
-    };
-    path: {
-        /**
-         * Project Id
-         */
-        project_id: string;
-    };
-    query?: never;
-    url: '/v1/projects/{project_id}/grants';
-};
-
-export type AssignProjectUseOnlyGrantErrors = {
-    /**
-     * Invalid authentication request
-     */
-    400: ProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: ProblemDetails;
-    /**
-     * Access denied
-     */
-    403: ProblemDetails;
-    /**
-     * Resource not found
-     */
-    404: ProblemDetails;
-    /**
-     * Conflict: stale_revision, idempotency_key_reused, idempotency_in_progress, or conflict.
-     */
-    409: ProblemDetails;
-    /**
-     * Request validation failed
-     */
-    422: ProblemDetails;
-    /**
-     * Dependency unavailable
-     */
-    503: ProblemDetails;
-};
-
-export type AssignProjectUseOnlyGrantError = AssignProjectUseOnlyGrantErrors[keyof AssignProjectUseOnlyGrantErrors];
-
-export type AssignProjectUseOnlyGrantResponses = {
-    /**
-     * Successful Response
-     */
-    201: ProjectUseOnlyGrantResponse;
-};
-
-export type AssignProjectUseOnlyGrantResponse = AssignProjectUseOnlyGrantResponses[keyof AssignProjectUseOnlyGrantResponses];
 
 export type RemoveProjectActionGrantData = {
     body?: never;

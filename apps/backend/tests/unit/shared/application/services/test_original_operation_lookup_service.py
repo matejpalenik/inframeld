@@ -138,6 +138,34 @@ class MockLookupReader(OperationLookupReader):
 
 
 @pytest.mark.asyncio
+async def test_organization_lookup_preserves_original_identity_after_current_authorization() -> (
+    None
+):
+    query = replace(
+        QUERY,
+        project_id=None,
+        method=HttpMethod.PUT,
+        requested_route=f"/v1/organizations/{QUERY.organization_id.value}/grants/{UUID(int=9)}/create-projects",
+        expected_authority=OperationLookupAuthority(
+            family=OperationLookupAuthorityFamily.ORGANIZATION_GRANT_READ,
+            action_id=ActionId("create-projects"),
+        ),
+    )
+    events: list[str] = []
+    authorizer = MockLookupAuthorizer(events)
+    authorizer.query = query
+    authorizer.scope = OperationLookupAuthorizationDTO(query.organization_id, None)
+    reader = MockLookupReader(events, SAVED)
+    reader.query = query
+    result = await OriginalOperationLookupService(authorizer, reader).lookup(
+        access=ACCESS, query=query
+    )
+    assert isinstance(result, CompletedSynchronousOperationDTO)
+    assert result.operation_id == SAVED.operation_id and result.expires_at == SAVED.expires_at
+    assert events == ["authorize", "read"]
+
+
+@pytest.mark.asyncio
 async def test_lookup_preserves_established_job_reference_without_execution_facts() -> None:
     events: list[str] = []
     query = replace(

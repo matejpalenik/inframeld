@@ -6,17 +6,21 @@ import {
 } from "../../src/conformance/assertions.ts";
 
 export const projectId = "00000000-0000-4000-8000-000000000003";
-export const grantInput = {
-  recipientPrincipalId: "00000000-0000-4000-8000-000000000002",
-  actionId: "create-access-groups",
-  expectedAccessRevision: 0,
+// These caller/transport checks now exercise exact PUT, including delegation.
+// The retired POST's false-only response is no longer a live client contract.
+export const grantPath = {
+  project_id: projectId,
+  recipient_principal_id: "00000000-0000-4000-8000-000000000004",
+  action_id: "create-access-groups",
 };
+export const grantInput = { canGrant: true, expectedAccessRevision: 7 };
 export const grantResponse = {
-  recipientPrincipalId: grantInput.recipientPrincipalId,
-  actionId: grantInput.actionId,
-  accessRevision: 1,
-  canGrant: false,
-  operationId: "sdk-operation",
+  recipientPrincipalId: grantPath.recipient_principal_id,
+  actionId: grantPath.action_id,
+  accessRevision: 8,
+  canGrant: true,
+  changed: true,
+  operationId: "sdk-project-grant-set",
   projectId,
   idempotencyExpiresAt: "2030-01-01T00:00:00Z",
 };
@@ -26,36 +30,37 @@ for (const [id, credential] of [
   ["grant-cookie", { Cookie: "ory_kratos_session=sdk-cookie" }],
 ] as const)
   sdkTest(
-    { id, operation: "assignProjectUseOnlyGrant", outcome: "success" },
+    { id, operation: "setProjectActionGrant", outcome: "success" },
     async ({ call, origin }) => {
       const headers = {
         ...credential,
-        "Idempotency-Key": "sdk-key",
+        "Idempotency-Key": "sdk-project-grant-key",
         ...("Cookie" in credential
           ? { Origin: origin, "X-Inframeld-CSRF": "1" }
           : {}),
       };
       const { observation, witness } = await call({
-        operation: "assignProjectUseOnlyGrant",
+        operation: "setProjectActionGrant",
         headers,
-        path: { project_id: projectId },
+        path: grantPath,
         body: grantInput,
         timeout: 2000,
       });
       const body = assertSuccess(observation, 201);
-      assert.equal(body.canGrant, false);
-      assert.equal(body.accessRevision, 1);
-      assert.equal(body.operationId, "sdk-operation");
+      assert.equal(body.canGrant, true);
+      assert.equal(body.accessRevision, 8);
+      assert.equal(body.operationId, "sdk-project-grant-set");
+      assert.equal(body.changed, true);
       assert.equal(body.projectId, projectId);
-      assert.equal(body.recipientPrincipalId, grantInput.recipientPrincipalId);
-      assert.equal(body.actionId, grantInput.actionId);
+      assert.equal(body.recipientPrincipalId, grantPath.recipient_principal_id);
+      assert.equal(body.actionId, grantPath.action_id);
       assertJsonBody(witness, grantInput);
       assert.ok(
         witness.headers &&
           typeof witness.headers === "object" &&
           !Array.isArray(witness.headers),
       );
-      assert.equal(witness.headers["idempotency-key"], "sdk-key");
+      assert.equal(witness.headers["idempotency-key"], "sdk-project-grant-key");
     },
   );
 
@@ -66,17 +71,17 @@ for (const [id, revision] of [
   sdkTest(
     {
       id,
-      operation: "assignProjectUseOnlyGrant",
+      operation: "setProjectActionGrant",
       outcome: "failure",
     },
     async ({ call }) => {
       const { observation } = await call({
-        operation: "assignProjectUseOnlyGrant",
+        operation: "setProjectActionGrant",
         headers: {
           Authorization: "Bearer sdk-human",
-          "Idempotency-Key": "sdk-key",
+          "Idempotency-Key": "sdk-project-grant-key",
         },
-        path: { project_id: projectId },
+        path: grantPath,
         body: { ...grantInput, expectedAccessRevision: revision },
         uncheckedModel: true,
         timeout: 2000,

@@ -5,7 +5,7 @@ import {
   assertJsonBody,
   headerValues,
 } from "../../src/conformance/assertions.ts";
-import { grantInput, grantResponse, projectId } from "./grants.ts";
+import { grantInput, grantResponse, grantPath } from "./grants.ts";
 
 export const payload = {
   required_name: "valid",
@@ -80,19 +80,19 @@ for (const [id, body] of [
   );
 
 for (const [id, canGrant] of [
-  ["constant-rejects-true", true],
+  ["grant-boolean-rejects-string", "false"],
   ["nonnull-rejects-null", null],
 ] as const)
   sdkTest(
-    { id, operation: "assignProjectUseOnlyGrant", outcome: "failure" },
+    { id, operation: "setProjectActionGrant", outcome: "failure" },
     async ({ call }) => {
       const { observation } = await call({
-        operation: "assignProjectUseOnlyGrant",
+        operation: "setProjectActionGrant",
         headers: {
           Authorization: "Bearer sdk-human",
-          "Idempotency-Key": "sdk-key",
+          "Idempotency-Key": "sdk-project-grant-key",
         },
-        path: { project_id: projectId },
+        path: grantPath,
         body: grantInput,
         timeout: 2000,
         fault: {

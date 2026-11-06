@@ -20,8 +20,8 @@ from tests.support.project_membership_postgres_scenarios import (
     seed_membership_project,
 )
 
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
+from inframeld_backend.access.application.commands.set_project_action_grant_command import (
+    SetProjectActionGrantCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.project_action_grants_page_dto import (
@@ -106,7 +106,7 @@ pytestmark = [
 ACTION = ActionId("inspect-budget")
 
 
-async def test_registered_http_admission_membership_legacy_post_and_exact_grant_get(
+async def test_registered_http_admission_membership_explicit_put_and_exact_grant_get(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
 ) -> None:
@@ -165,11 +165,10 @@ async def test_registered_http_admission_membership_legacy_post_and_exact_grant_
                 headers={"Idempotency-Key": "join-bob"},
             )
             assert joined.status_code == 201
-            granted = await client.post(
-                f"/v1/projects/{project}/grants",
+            granted = await client.put(
+                f"/v1/projects/{project}/grants/{bob}/create-access-groups",
                 json={
-                    "recipientPrincipalId": bob,
-                    "actionId": "create-access-groups",
+                    "canGrant": False,
                     "expectedAccessRevision": joined.json()["accessRevision"],
                 },
                 headers={"Idempotency-Key": "grant-bob"},
@@ -273,11 +272,19 @@ async def test_delivered_admission_membership_and_use_only_grant_are_readable(
     project = seed.project.project_id
     action = ActionId("create-access-groups")
     async with database.session() as session:
-        await create_project_grant_change_service(session).assign_use_only(
+        await create_project_grant_change_service(session).set_action_grant(
             access=seed.actor.access,
-            command=AssignProjectUseOnlyGrantCommand(project, seed.bob_id, action, 2),
+            command=SetProjectActionGrantCommand(
+                project_id=project,
+                recipient_principal_id=seed.bob_id,
+                action_id=action,
+                can_grant=False,
+                expected_access_revision=2,
+            ),
             context=IdempotencyContextDTO(
-                HttpMethod.POST, "/v1/projects/{project_id}/grants", IdempotencyKey("grant-bob")
+                HttpMethod.PUT,
+                f"/v1/projects/{project.value}/grants/{seed.bob_id.value}/{action.value}",
+                IdempotencyKey("grant-bob"),
             ),
         )
     page = await _read(database, seed.actor.access, project, action=action)

@@ -72,6 +72,7 @@ class IdempotencyService(OperationIdempotency):
     ):
         if lookup_authority is not None:
             lookup_authority.require_supported_scope(
+                organization_id=authorization.organization_id,
                 project_id=authorization.project_id,
                 method=context.method,
                 requested_route=context.requested_route,

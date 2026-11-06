@@ -64,7 +64,7 @@ Native `KratosSession` and `HumanBearer` security alternatives mean cookie or be
 
 ## Neighboring implemented operations
 
-The currently implemented `POST /v1/projects/{project_id}/grants` exposes `assignProjectUseOnlyGrant`, its existing request/response names, 201, `create-access-groups` and `canGrant: false`. It rejects an existing assignment. [The selected cutover](grant-contracts.md#grant-delivery-boundary-and-cutover) retires this operation before v1 in favor of exact-target PUT/DELETE, with implementation still pending. Do not redirect or replay an original POST as PUT. Preserve authorized read-only lookup of retained original-operation metadata.
+Exact-target grant PUT/DELETE uses current eligible-human authority and cookie-write CSRF where applicable. The retired `POST /v1/projects/{project_id}/grants` returns 405 and has no live generated operation. [The cutover contract](grant-contracts.md#grant-delivery-boundary-and-cutover) preserves read-only retained original-operation lookup under current exact use-and-grant authority. Do not redirect or replay the historical POST as PUT.
 
 Consent GET/POST at `/v1/oauth/consent` retain `inspectHumanOAuthConsent` and `decideHumanOAuthConsent`. They are cookie-only, non-cacheable and accept independently verified identities before admission. POST uses CSRF and returns a checked continuation rather than tokens. Read [consent](human-cli-consent.md) for exact current code contracts and recovery/version ordering.
 

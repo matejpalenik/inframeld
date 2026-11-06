@@ -1,0 +1,1320 @@
+export const pageMetadata = {
+  title: "Manage Organization, group and application grants",
+  description:
+    "Find an eligible recipient, inspect exact action assignments and deliberately set or remove a grant.",
+}
+
+# Manage Organization, group and application grants
+
+Alice shares responsibility for Support with Bob. She can give him one installation permission, permission to add documents through SupportKnowledge, or permission to administer SupportBot. Each assignment identifies one recipient, one action and one exact target. Changing it leaves the recipient's other assignments alone.
+
+Use this guide for Organization, access-group and application-account grants. [Manage Project action grants](/guides/assign-project-grant) covers the existing Project operations and all eighteen Project actions. Other resource features supply their own grant integration when their resources are available.
+
+## Prepare the target and current authority
+
+You need the installation URL, a current human credential, the target's permanent ID and the recipient's local `principalId`. Use the IDs returned by the corresponding creation or authorized inspection operation. An application account uses its principal ID as its account ID. Names and display labels do not replace permanent IDs in these grant operations.
+
+Set `INFRAMELD_URL` and an existing valid human `INFRAMELD_TOKEN` through [HTTP setup](/clients/http#call-protected-operations). Browser sign-in alone does not create a terminal bearer token. For an SDK alternative, follow the local source-package setup for [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) in a separate example project. There is no delivered grant-administration CLI command.
+
+The supported account-to-client and disposable-resource setup, engineering dry run and human acceptance remain deferred to pre-v1 under [qualification #336](https://github.com/matejpalenik/inframeld/issues/336). This guide does not establish that the complete human handoff is ready.
+
+You must be a currently eligible admitted human with use-and-grant authority for the exact action on the target. Project-scoped targets also require current membership and visibility in their owning Project. For the three document actions on an access group, current management of that same group is an alternative for ordinary grant reads, changes, recipient discovery and same-write replay. Managing another group or merely belonging to the group is insufficient.
+
+Generic [original-operation metadata lookup](/guides/recover-original-request) has a different permission requirement. It always requires current exact use-and-grant authority for the original grant action and target, including group grant history. Group management alone cannot authorize that lookup.
+
+Cookie-authenticated writes retain the installation's trusted Origin requirement and `X-Inframeld-CSRF: 1`. Use one supported credential family per request and keep credentials out of saved examples and diagnostics.
+
+## Choose the grant you mean
+
+The target determines the action and eligible recipient:
+
+| Target              | Meaning                                                                             | Recipient                                                      |
+| ------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Organization        | `admit-users`, `suspend-users`, `restore-users` or `create-projects`                | An eligible admitted human in that Organization                |
+| Access group        | `add-documents`, `update-documents` or `delete-documents`                           | An eligible human or application account in the owning Project |
+| Application account | `issue-application-keys`, `revoke-application-keys` or `delete-application-account` | An eligible human member of the owning Project                 |
+
+An Organization grant uses the Organization's current Access revision. [Read your own Organization access](/guides/create-project#read-your-organization-access) to obtain the Organization ID, current revision and your stored Organization grants. The read requires current admitted-human eligibility and reveals only your own access.
+
+A group or application-account grant uses the owning Project's current Access revision. [Read your own Project access](/guides/assign-project-grant#read-your-project-access-and-current-revision) before a fresh change. Its typed grant targets distinguish Project, group and application-account assignments. Follow a non-null cursor to review the remaining stored entries. Neither an own-access page nor an old receipt authorizes a later change.
+
+`canGrant: false` gives use-only permission. `true` permits use and administration of that same action on that exact target. A human group recipient may receive either level. An application recipient can receive only an eligible use-only assignment. To take permission away, remove the assignment rather than setting `canGrant` to `false`.
+
+Giving Bob a document-action grant does not add him to SupportKnowledge or make him its manager. [Group membership and management](/guides/manage-access-groups) remain separate relationships. Giving Bob an account-administration grant over SupportBot does not give SupportBot an action permission or issue a key. [Application-account creation and inspection](/guides/application-accounts) explains those separate identities.
+
+The examples below use Bob as an eligible human recipient. Replace these recognizable IDs with your actual values. Keep the application ID distinct from Bob's recipient ID. Choose just the target and action you intend to change:
+
+<CodeGroup>
+
+```shell
+export ORGANIZATION_ID='00000000-0000-4000-8000-000000000002'
+export PROJECT_ID='00000000-0000-4000-8000-000000000003'
+export RECIPIENT_ID='00000000-0000-4000-8000-000000000004'
+export ACCESS_GROUP_ID='00000000-0000-4000-8000-000000000005'
+export APPLICATION_ID='00000000-0000-4000-8000-000000000006'
+export ORGANIZATION_ACTION_ID='create-projects'
+export GROUP_ACTION_ID='add-documents'
+export ACCOUNT_ACTION_ID='issue-application-keys'
+export GRANT_TARGET_KIND='access-group'
+export GRANT_TARGET_ID="$ACCESS_GROUP_ID"
+export DISCOVERY_ACTION_ID="$GROUP_ACTION_ID"
+```
+
+</CodeGroup>
+
+## Find an eligible Project recipient
+
+Use recipient discovery when choosing a recipient for a Project, group or application-account grant. Supply the exact target kind, target ID and action within its owning Project. The supported kinds are `project`, `access-group` and `application-account`. For a Project target, its ID must equal the Project in the request path.
+
+For example, list eligible recipients of `add-documents` on SupportKnowledge with the prepared group and Project IDs:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --data-urlencode "targetKind=$GRANT_TARGET_KIND" \
+  --data-urlencode "targetId=$GRANT_TARGET_ID" \
+  --data-urlencode "actionId=$DISCOVERY_ACTION_ID" \
+  --data-urlencode 'limit=25' \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/grant-recipients" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+For a Project, deliberately choose `targetKind=project`, its Project UUID as `targetId` and a supported Project action. For an account-administration recipient, choose `targetKind=application-account`, the account's principal UUID and one of its administration actions. These are scalar query parameters. The request has no JSON target object, body, revision or idempotency key.
+
+The directory returns only currently eligible candidates for that action and target. Each item contains a safe principal ID, display name and kind. It filters eligibility before filling a page, so suspended people and unsupported recipient kinds do not consume its page limit. It does not expose credentials or an installation-wide account inventory.
+
+One page defaults to 25 items and accepts at most 100. Pass `nextCursor` unchanged with the same installation, Project, target and action to continue. Every page checks current authority again. Changing the target or action requires a fresh first page. A candidate can become ineligible before a later write, so discovery never guarantees that assignment will succeed.
+
+Organization grants have no recipient-directory endpoint. Use a positively identified admitted human's local principal ID, for example the `principalId` they obtain from their authenticated session. A Kratos identity UUID is a different identifier. Do not guess a principal ID from an email address or label.
+
+## Inspect stored assignments
+
+List one action on one exact target before changing it. A stored-grant page reports assignments, including retained rows for suspended recipients. It is not the eligible-recipient directory or a complete effective-permission report. The response supplies no Access revision or total count.
+
+Grant pages use the same default 25 and maximum 100 items, in stable recipient-ID order. Continue with the returned cursor in the same scope and action. A cursor neither freezes the assignments nor retains your permission to read another page. The own-access read supplies the current revision needed for a later fresh write.
+
+Choose the cURL request for your exact target. These first-page reads use no body, revision or idempotency key:
+
+<CodeGroup>
+
+```shell {{ title: "Organization cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --data-urlencode "actionId=$ORGANIZATION_ACTION_ID" \
+  --data-urlencode 'limit=25' \
+  --url "$INFRAMELD_URL/v1/organizations/$ORGANIZATION_ID/grants" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+```shell {{ title: "Access group cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --data-urlencode "actionId=$GROUP_ACTION_ID" \
+  --data-urlencode 'limit=25' \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID/grants" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+```shell {{ title: "Application account cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --data-urlencode "actionId=$ACCOUNT_ACTION_ID" \
+  --data-urlencode 'limit=25' \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/application-accounts/$APPLICATION_ID/grants" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+Read `items` and nullable `nextCursor`. Organization items identify `organizationId`; group items identify `projectId` and `accessGroupId`; account items identify `projectId` and `applicationPrincipalId`. Each also identifies `recipientPrincipalId`, `actionId` and `canGrant`. To continue, supply the unchanged cursor as one `cursor` query value on the same read.
+
+## Set one assignment deliberately
+
+Review the current Access revision and choose the requested grant level. Save the exact target, recipient, action, body and one nonblank idempotency key of at most 128 characters before dispatch. Keep that key with the original reviewed revision.
+
+Save the complete JSON file for your target in the example directory. Replace the illustrative `0` with the reviewed **Organization** revision in `organization-grant.json`, or the reviewed **Project** revision in `group-grant.json` or `account-grant.json`. The three request types have the same two strict fields. JSON booleans, strings or fractions cannot stand in for the integer revision, and the accepted integer range is 0 through 9,007,199,254,740,991.
+
+<CodeGroup>
+
+```json {{ title: "organization-grant.json" }}
+{
+  "canGrant": true,
+  "expectedAccessRevision": 0
+}
+```
+
+```json {{ title: "group-grant.json" }}
+{
+  "canGrant": true,
+  "expectedAccessRevision": 0
+}
+```
+
+```json {{ title: "account-grant.json" }}
+{
+  "canGrant": true,
+  "expectedAccessRevision": 0
+}
+```
+
+</CodeGroup>
+
+Choose and retain `SET_ORGANIZATION_GRANT_KEY`, `SET_GROUP_GRANT_KEY` or `SET_ACCOUNT_GRANT_KEY` for the one request you send. The example gives Bob use-and-grant authority. An application recipient for an eligible group action instead requires an explicit `false` level.
+
+<CodeGroup>
+
+```shell {{ title: "Organization cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PUT \
+  --url "$INFRAMELD_URL/v1/organizations/$ORGANIZATION_ID/grants/$RECIPIENT_ID/$ORGANIZATION_ACTION_ID" \
+  --header @- \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @organization-grant.json <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $SET_ORGANIZATION_GRANT_KEY
+EOF_HEADERS
+```
+
+```shell {{ title: "Access group cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PUT \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID/grants/$RECIPIENT_ID/$GROUP_ACTION_ID" \
+  --header @- \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @group-grant.json <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $SET_GROUP_GRANT_KEY
+EOF_HEADERS
+```
+
+```shell {{ title: "Application account cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PUT \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/application-accounts/$APPLICATION_ID/grants/$RECIPIENT_ID/$ACCOUNT_ACTION_ID" \
+  --header @- \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @account-grant.json <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $SET_ACCOUNT_GRANT_KEY
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A new assignment returns `201`. An existing assignment returns `200`, whether its level changed or already matched the request. `changed: true` records a real change and advances the owning Access revision once. A fresh no-op reports `changed: false` and leaves that revision unchanged.
+
+The receipt identifies the original operation, its idempotency expiry and the committed Access revision. It describes that operation's result. A later assignment change does not rewrite it. Use a fresh authorized grant read to inspect the current assignment.
+
+## Remove an assignment
+
+For a fresh removal, read and review the owning Access revision again. Use a distinct retained removal key. DELETE carries the expected revision as one query value and has no request body.
+
+For Organization removal, set `EXPECTED_ORGANIZATION_ACCESS_REVISION` to the reviewed Organization revision and choose `REMOVE_ORGANIZATION_GRANT_KEY`. For group or account removal, set `EXPECTED_PROJECT_ACCESS_REVISION` to the reviewed Project revision and choose `REMOVE_GROUP_GRANT_KEY` or `REMOVE_ACCOUNT_GRANT_KEY`. Use the unchanged decimal integer, without signs, spaces or leading zeros. Save the full request before sending the one target-specific command:
+
+<CodeGroup>
+
+```shell {{ title: "Organization cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request DELETE \
+  --url "$INFRAMELD_URL/v1/organizations/$ORGANIZATION_ID/grants/$RECIPIENT_ID/$ORGANIZATION_ACTION_ID?expectedAccessRevision=$EXPECTED_ORGANIZATION_ACCESS_REVISION" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $REMOVE_ORGANIZATION_GRANT_KEY
+EOF_HEADERS
+```
+
+```shell {{ title: "Access group cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request DELETE \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/access-groups/$ACCESS_GROUP_ID/grants/$RECIPIENT_ID/$GROUP_ACTION_ID?expectedAccessRevision=$EXPECTED_PROJECT_ACCESS_REVISION" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $REMOVE_GROUP_GRANT_KEY
+EOF_HEADERS
+```
+
+```shell {{ title: "Application account cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request DELETE \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/application-accounts/$APPLICATION_ID/grants/$RECIPIENT_ID/$ACCOUNT_ACTION_ID?expectedAccessRevision=$EXPECTED_PROJECT_ACCESS_REVISION" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+Idempotency-Key: $REMOVE_ACCOUNT_GRANT_KEY
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A successful removal returns `200` with `removed: true` and `changed`. Actual removal advances the revision once. An already-absent assignment is a fresh no-op. The endpoint can remove a stale grant held by an inactive recipient without first restoring their account, while retaining exact scope and current caller checks.
+
+Downgrading or removing delegation must preserve an eligible human able to administer the exact action. Applications, use-only holders and suspended or recovery-blocked humans cannot supply that responsibility. For group document actions, a current eligible manager of that same group can preserve it. A change that would strand the action conflicts atomically. The endpoint never chooses a replacement automatically.
+
+Self-downgrade or removal can leave you unable to inspect or replay the action afterward. Arrange another eligible grantor before taking away your own authority. Membership and the recipient's unrelated grants remain unchanged.
+
+## Recover an uncertain result
+
+After a timeout, cancellation or unusable response, retain the exact original request. A same-write retry keeps its method, route, target, recipient, action, body or revision query, and key unchanged. It checks your current authority before returning the original status, outcome, revision and expiry. It does not apply the change again.
+
+For example, replaying an old successful assignment after someone removes it returns the old receipt without restoring permission. Replaying an old removal after someone grants the action again cannot remove the later assignment. An original result is found before treating the original revision or recipient state as a fresh change.
+
+Group managers may use that ordinary same-write replay while they remain eligible and manage the exact group. A separate metadata lookup requires exact use-and-grant authority, even for a manager who made the original change. Grant history has no deleted-target exception. The [content-free group-deletion recovery path](/guides/recover-original-request#recover-an-access-group-change) concerns a different original operation and does not reveal grant history.
+
+Do not refresh an uncertain request's revision, change its level or choose a new key merely to retry. An unresolved or expired lookup does not prove the original failed. Preserve the evidence and follow [original-request recovery](/guides/recover-original-request) before deciding whether to perform new work.
+
+## Handle a rejected change
+
+| Observation              | Next decision                                                                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` or `403`           | Review the credential, current human eligibility and exact target/action authority. A saved key supplies no permission.                                     |
+| `404`                    | The target or recipient is missing or hidden in the checked scope. A remembered ID does not establish visibility.                                           |
+| `409`                    | Review the actual conflict, such as a stale fresh-write revision, newly ineligible recipient, last-grantor protection or changed inputs under the same key. |
+| `422`                    | Check the target/action/recipient combination, strict grant-level boolean, bounded integer revision and unchanged cursor scope.                             |
+| `400`, `413` or `415`    | Correct malformed authentication, an oversized body or the PUT content type.                                                                                |
+| `503` or a lost response | Keep the original context and reconcile uncertainty before another change.                                                                                  |
+
+Own-access reads, grant pages, recipient pages and grant receipts are no-store. [The API reference](/api-reference/projects-and-access) provides the native operation and model views.
+
+## Use a generated client
+
+These complete programs call the generated operations directly. Follow the linked local source-package setup, and use a separate Python, ESM TypeScript or Cargo example project for each target. They need the prepared URL, existing human token and exact target/action IDs above. `GRANT_OPERATION` selects `list`, `set` or `remove` in these example programs. It is not an Inframeld CLI command. Each invocation sends one request.
+
+A list needs no recipient, revision or key. A set reads the matching saved JSON file and original set key. A removal uses the matching reviewed revision variable and original removal key, with no body. Keep the saved write inputs unchanged after uncertainty. A successful list prints a stored-grant page, while a write prints its immutable original receipt.
+
+### Organization client
+
+Save the complete Python program as `organization_grants.py`, the TypeScript program as `organization-grants.ts`, or the Rust program as `src/main.rs` in its own example project. This target uses `ORGANIZATION_ACTION_ID`, the saved `organization-grant.json`, `SET_ORGANIZATION_GRANT_KEY`, `REMOVE_ORGANIZATION_GRANT_KEY` and `EXPECTED_ORGANIZATION_ACCESS_REVISION`.
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+import re
+import sys
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.organization_action_grant_request import OrganizationActionGrantRequest
+
+
+async def main() -> None:
+    operation = os.environ["GRANT_OPERATION"]
+    organization_id = UUID(os.environ["ORGANIZATION_ID"])
+    action_id = os.environ["ORGANIZATION_ACTION_ID"]
+    headers = {"Authorization": "Bearer " + os.environ["INFRAMELD_TOKEN"]}
+    async with ApiClient(Configuration(host=os.environ["INFRAMELD_URL"])) as client:
+        api = AccessApi(client)
+        if operation == "list":
+            response = await api.list_organization_action_grants_with_http_info(
+                organization_id=organization_id,
+                action_id=action_id,
+                limit=25,
+                cursor=os.environ.get("ORGANIZATION_GRANT_CURSOR"),
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        elif operation == "set":
+            request = OrganizationActionGrantRequest.model_validate_json(
+                Path("organization-grant.json").read_text()
+            )
+            response = await api.set_organization_action_grant_with_http_info(
+                organization_id=organization_id,
+                recipient_principal_id=UUID(os.environ["RECIPIENT_ID"]),
+                action_id=action_id,
+                idempotency_key=os.environ["SET_ORGANIZATION_GRANT_KEY"],
+                organization_action_grant_request=request,
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        elif operation == "remove":
+            raw_revision = os.environ["EXPECTED_ORGANIZATION_ACCESS_REVISION"]
+            if re.fullmatch(r"0|[1-9][0-9]{0,15}", raw_revision) is None:
+                raise ValueError("Use the exact reviewed decimal Access revision")
+            revision = int(raw_revision)
+            if revision > 9007199254740991:
+                raise ValueError("The Access revision is outside its exact range")
+            response = await api.remove_organization_action_grant_with_http_info(
+                organization_id=organization_id,
+                recipient_principal_id=UUID(os.environ["RECIPIENT_ID"]),
+                action_id=action_id,
+                expected_access_revision=revision,
+                idempotency_key=os.environ["REMOVE_ORGANIZATION_GRANT_KEY"],
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        else:
+            raise ValueError("Choose list, set or remove")
+        print("HTTP", response.status_code)
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except ApiException as error:
+        print("No usable result: HTTP", error.status, file=sys.stderr)
+        raise SystemExit(1) from None
+    except httpx.HTTPError:
+        print("No usable response. Preserve the original request.", file=sys.stderr)
+        raise SystemExit(1) from None
+```
+
+```typescript
+import { readFile } from "node:fs/promises"
+import {
+  createClient,
+  listOrganizationActionGrants,
+  removeOrganizationActionGrant,
+  setOrganizationActionGrant,
+  type OrganizationActionGrantRequest,
+} from "@inframeld/sdk"
+
+function required(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`Set ${name}`)
+  return value
+}
+
+function reviewedRevision(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error("Use an Access revision from 0 through 9007199254740991")
+  }
+  return value
+}
+
+function reviewedRevisionText(value: string): number {
+  if (!/^(0|[1-9][0-9]{0,15})$/.test(value)) {
+    throw new Error("Use the exact reviewed decimal Access revision")
+  }
+  return reviewedRevision(Number(value))
+}
+
+const client = createClient({
+  baseUrl: required("INFRAMELD_URL"),
+  timeoutMs: 5000,
+})
+const scope = { organization_id: required("ORGANIZATION_ID") }
+const actionId = required("ORGANIZATION_ACTION_ID")
+const headers = { Authorization: `Bearer ${required("INFRAMELD_TOKEN")}` }
+
+async function request() {
+  switch (required("GRANT_OPERATION")) {
+    case "list":
+      return listOrganizationActionGrants({
+        client,
+        path: scope,
+        query: {
+          actionId,
+          limit: 25,
+          cursor: process.env.ORGANIZATION_GRANT_CURSOR,
+        },
+        headers,
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    case "set": {
+      const body: OrganizationActionGrantRequest = JSON.parse(
+        await readFile("organization-grant.json", "utf8")
+      )
+      reviewedRevision(body.expectedAccessRevision)
+      if (typeof body.canGrant !== "boolean") {
+        throw new Error("Use a boolean canGrant")
+      }
+      return setOrganizationActionGrant({
+        client,
+        path: {
+          ...scope,
+          recipient_principal_id: required("RECIPIENT_ID"),
+          action_id: actionId,
+        },
+        headers: {
+          ...headers,
+          "Idempotency-Key": required("SET_ORGANIZATION_GRANT_KEY"),
+        },
+        body,
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    }
+    case "remove":
+      return removeOrganizationActionGrant({
+        client,
+        path: {
+          ...scope,
+          recipient_principal_id: required("RECIPIENT_ID"),
+          action_id: actionId,
+        },
+        query: {
+          expectedAccessRevision: reviewedRevisionText(
+            required("EXPECTED_ORGANIZATION_ACCESS_REVISION")
+          ),
+        },
+        headers: {
+          ...headers,
+          "Idempotency-Key": required("REMOVE_ORGANIZATION_GRANT_KEY"),
+        },
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    default:
+      throw new Error("Choose list, set or remove")
+  }
+}
+
+const result = await request()
+if (result.error) {
+  console.error("No usable result:", result.error.kind)
+  console.error("HTTP status:", result.response?.status ?? "unavailable")
+  if (result.error.kind === "api") {
+    console.error(result.error.body.code, result.error.body.requestId)
+  }
+  process.exitCode = 1
+} else {
+  console.log("HTTP status:", result.response?.status ?? "unavailable")
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+use std::env;
+
+use inframeld_sdk::client::{ApiOpError, HttpClient};
+use inframeld_sdk::types::OrganizationActionGrantRequest;
+
+/// Preserve HTTP context without printing raw upstream content.
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
+    if let Some(context) = error.api() {
+        eprintln!("Request failed: HTTP {}", context.status);
+    } else {
+        eprintln!("No usable response.");
+    }
+    std::io::Error::other("Preserve the original request before deciding what to do next")
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let token = env::var("INFRAMELD_TOKEN")?;
+    let organization_id = env::var("ORGANIZATION_ID")?;
+    let action_id = env::var("ORGANIZATION_ACTION_ID")?;
+    let client = HttpClient::new()
+        .with_base_url(env::var("INFRAMELD_URL")?)
+        .with_header("Authorization", format!("Bearer {token}"));
+    let (status, body) = match env::var("GRANT_OPERATION")?.as_str() {
+        "list" => {
+            let cursor = env::var("ORGANIZATION_GRANT_CURSOR").ok();
+            let response = client
+                .list_organization_action_grants(&organization_id, &action_id, Some(25), cursor.as_deref())
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        "set" => {
+            let request: OrganizationActionGrantRequest =
+                serde_json::from_str(&std::fs::read_to_string("organization-grant.json")?)?;
+            if !(0..=9_007_199_254_740_991).contains(&request.expected_access_revision) {
+                return Err("Use the exact reviewed Access revision".into());
+            }
+            let response = client
+                .set_organization_action_grant(
+                    &organization_id,
+                    env::var("RECIPIENT_ID")?,
+                    &action_id,
+                    env::var("SET_ORGANIZATION_GRANT_KEY")?,
+                    request,
+                )
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        "remove" => {
+            let revision_text = env::var("EXPECTED_ORGANIZATION_ACCESS_REVISION")?;
+            let revision: i64 = revision_text.parse()?;
+            if revision_text != revision.to_string()
+                || !(0..=9_007_199_254_740_991).contains(&revision)
+            {
+                return Err("Use the exact reviewed decimal Access revision".into());
+            }
+            let response = client
+                .remove_organization_action_grant(
+                    &organization_id,
+                    env::var("RECIPIENT_ID")?,
+                    &action_id,
+                    revision,
+                    env::var("REMOVE_ORGANIZATION_GRANT_KEY")?,
+                )
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        _ => return Err("Choose list, set or remove".into()),
+    };
+    println!("HTTP {status}");
+    println!("{}", serde_json::to_string_pretty(&body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Start with `GRANT_OPERATION=list .venv/bin/python organization_grants.py`, `GRANT_OPERATION=list node organization-grants.ts` using Node 26, or `GRANT_OPERATION=list cargo run` in the Cargo project. For another page, keep the target/action and pass the returned cursor unchanged as `ORGANIZATION_GRANT_CURSOR`. Clear it when starting a different scope. Change the selector to `set` or `remove` only after preparing the matching fresh decision or retaining the exact original request for replay.
+
+### Access group client
+
+Save the complete Python program as `group_grants.py`, the TypeScript program as `group-grants.ts`, or the Rust program as `src/main.rs` in its own example project. This target uses `GROUP_ACTION_ID`, the saved `group-grant.json`, `SET_GROUP_GRANT_KEY`, `REMOVE_GROUP_GRANT_KEY` and `EXPECTED_PROJECT_ACCESS_REVISION`.
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+import re
+import sys
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.access_group_action_grant_request import AccessGroupActionGrantRequest
+
+
+async def main() -> None:
+    operation = os.environ["GRANT_OPERATION"]
+    project_id = UUID(os.environ["PROJECT_ID"])
+    access_group_id = UUID(os.environ["ACCESS_GROUP_ID"])
+    action_id = os.environ["GROUP_ACTION_ID"]
+    headers = {"Authorization": "Bearer " + os.environ["INFRAMELD_TOKEN"]}
+    async with ApiClient(Configuration(host=os.environ["INFRAMELD_URL"])) as client:
+        api = AccessApi(client)
+        if operation == "list":
+            response = await api.list_access_group_action_grants_with_http_info(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                action_id=action_id,
+                limit=25,
+                cursor=os.environ.get("GROUP_GRANT_CURSOR"),
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        elif operation == "set":
+            request = AccessGroupActionGrantRequest.model_validate_json(
+                Path("group-grant.json").read_text()
+            )
+            response = await api.set_access_group_action_grant_with_http_info(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                recipient_principal_id=UUID(os.environ["RECIPIENT_ID"]),
+                action_id=action_id,
+                idempotency_key=os.environ["SET_GROUP_GRANT_KEY"],
+                access_group_action_grant_request=request,
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        elif operation == "remove":
+            raw_revision = os.environ["EXPECTED_PROJECT_ACCESS_REVISION"]
+            if re.fullmatch(r"0|[1-9][0-9]{0,15}", raw_revision) is None:
+                raise ValueError("Use the exact reviewed decimal Access revision")
+            revision = int(raw_revision)
+            if revision > 9007199254740991:
+                raise ValueError("The Access revision is outside its exact range")
+            response = await api.remove_access_group_action_grant_with_http_info(
+                project_id=project_id,
+                access_group_id=access_group_id,
+                recipient_principal_id=UUID(os.environ["RECIPIENT_ID"]),
+                action_id=action_id,
+                expected_access_revision=revision,
+                idempotency_key=os.environ["REMOVE_GROUP_GRANT_KEY"],
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        else:
+            raise ValueError("Choose list, set or remove")
+        print("HTTP", response.status_code)
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except ApiException as error:
+        print("No usable result: HTTP", error.status, file=sys.stderr)
+        raise SystemExit(1) from None
+    except httpx.HTTPError:
+        print("No usable response. Preserve the original request.", file=sys.stderr)
+        raise SystemExit(1) from None
+```
+
+```typescript
+import { readFile } from "node:fs/promises"
+import {
+  createClient,
+  listAccessGroupActionGrants,
+  removeAccessGroupActionGrant,
+  setAccessGroupActionGrant,
+  type AccessGroupActionGrantRequest,
+} from "@inframeld/sdk"
+
+function required(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`Set ${name}`)
+  return value
+}
+
+function reviewedRevision(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error("Use an Access revision from 0 through 9007199254740991")
+  }
+  return value
+}
+
+function reviewedRevisionText(value: string): number {
+  if (!/^(0|[1-9][0-9]{0,15})$/.test(value)) {
+    throw new Error("Use the exact reviewed decimal Access revision")
+  }
+  return reviewedRevision(Number(value))
+}
+
+const client = createClient({
+  baseUrl: required("INFRAMELD_URL"),
+  timeoutMs: 5000,
+})
+const scope = {
+  project_id: required("PROJECT_ID"),
+  access_group_id: required("ACCESS_GROUP_ID"),
+}
+const actionId = required("GROUP_ACTION_ID")
+const headers = { Authorization: `Bearer ${required("INFRAMELD_TOKEN")}` }
+
+async function request() {
+  switch (required("GRANT_OPERATION")) {
+    case "list":
+      return listAccessGroupActionGrants({
+        client,
+        path: scope,
+        query: { actionId, limit: 25, cursor: process.env.GROUP_GRANT_CURSOR },
+        headers,
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    case "set": {
+      const body: AccessGroupActionGrantRequest = JSON.parse(
+        await readFile("group-grant.json", "utf8")
+      )
+      reviewedRevision(body.expectedAccessRevision)
+      if (typeof body.canGrant !== "boolean") {
+        throw new Error("Use a boolean canGrant")
+      }
+      return setAccessGroupActionGrant({
+        client,
+        path: {
+          ...scope,
+          recipient_principal_id: required("RECIPIENT_ID"),
+          action_id: actionId,
+        },
+        headers: {
+          ...headers,
+          "Idempotency-Key": required("SET_GROUP_GRANT_KEY"),
+        },
+        body,
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    }
+    case "remove":
+      return removeAccessGroupActionGrant({
+        client,
+        path: {
+          ...scope,
+          recipient_principal_id: required("RECIPIENT_ID"),
+          action_id: actionId,
+        },
+        query: {
+          expectedAccessRevision: reviewedRevisionText(
+            required("EXPECTED_PROJECT_ACCESS_REVISION")
+          ),
+        },
+        headers: {
+          ...headers,
+          "Idempotency-Key": required("REMOVE_GROUP_GRANT_KEY"),
+        },
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    default:
+      throw new Error("Choose list, set or remove")
+  }
+}
+
+const result = await request()
+if (result.error) {
+  console.error("No usable result:", result.error.kind)
+  console.error("HTTP status:", result.response?.status ?? "unavailable")
+  if (result.error.kind === "api") {
+    console.error(result.error.body.code, result.error.body.requestId)
+  }
+  process.exitCode = 1
+} else {
+  console.log("HTTP status:", result.response?.status ?? "unavailable")
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+use std::env;
+
+use inframeld_sdk::client::{ApiOpError, HttpClient};
+use inframeld_sdk::types::AccessGroupActionGrantRequest;
+
+/// Preserve HTTP context without printing raw upstream content.
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
+    if let Some(context) = error.api() {
+        eprintln!("Request failed: HTTP {}", context.status);
+    } else {
+        eprintln!("No usable response.");
+    }
+    std::io::Error::other("Preserve the original request before deciding what to do next")
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let token = env::var("INFRAMELD_TOKEN")?;
+    let project_id = env::var("PROJECT_ID")?;
+    let access_group_id = env::var("ACCESS_GROUP_ID")?;
+    let action_id = env::var("GROUP_ACTION_ID")?;
+    let client = HttpClient::new()
+        .with_base_url(env::var("INFRAMELD_URL")?)
+        .with_header("Authorization", format!("Bearer {token}"));
+    let (status, body) = match env::var("GRANT_OPERATION")?.as_str() {
+        "list" => {
+            let cursor = env::var("GROUP_GRANT_CURSOR").ok();
+            let response = client
+                .list_access_group_action_grants(&project_id, &access_group_id, &action_id, Some(25), cursor.as_deref())
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        "set" => {
+            let request: AccessGroupActionGrantRequest =
+                serde_json::from_str(&std::fs::read_to_string("group-grant.json")?)?;
+            if !(0..=9_007_199_254_740_991).contains(&request.expected_access_revision) {
+                return Err("Use the exact reviewed Access revision".into());
+            }
+            let response = client
+                .set_access_group_action_grant(
+                    &project_id,
+                    &access_group_id,
+                    env::var("RECIPIENT_ID")?,
+                    &action_id,
+                    env::var("SET_GROUP_GRANT_KEY")?,
+                    request,
+                )
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        "remove" => {
+            let revision_text = env::var("EXPECTED_PROJECT_ACCESS_REVISION")?;
+            let revision: i64 = revision_text.parse()?;
+            if revision_text != revision.to_string()
+                || !(0..=9_007_199_254_740_991).contains(&revision)
+            {
+                return Err("Use the exact reviewed decimal Access revision".into());
+            }
+            let response = client
+                .remove_access_group_action_grant(
+                    &project_id,
+                    &access_group_id,
+                    env::var("RECIPIENT_ID")?,
+                    &action_id,
+                    revision,
+                    env::var("REMOVE_GROUP_GRANT_KEY")?,
+                )
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        _ => return Err("Choose list, set or remove".into()),
+    };
+    println!("HTTP {status}");
+    println!("{}", serde_json::to_string_pretty(&body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Start with `GRANT_OPERATION=list .venv/bin/python group_grants.py`, `GRANT_OPERATION=list node group-grants.ts` using Node 26, or `GRANT_OPERATION=list cargo run` in the Cargo project. For another page, keep the target/action and pass the returned cursor unchanged as `GROUP_GRANT_CURSOR`. Clear it when starting a different scope. Change the selector to `set` or `remove` only after preparing the matching fresh decision or retaining the exact original request for replay.
+
+### Application account client
+
+Save the complete Python program as `account_grants.py`, the TypeScript program as `account-grants.ts`, or the Rust program as `src/main.rs` in its own example project. This target uses `ACCOUNT_ACTION_ID`, the saved `account-grant.json`, `SET_ACCOUNT_GRANT_KEY`, `REMOVE_ACCOUNT_GRANT_KEY` and `EXPECTED_PROJECT_ACCESS_REVISION`.
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+import re
+import sys
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.application_account_action_grant_request import ApplicationAccountActionGrantRequest
+
+
+async def main() -> None:
+    operation = os.environ["GRANT_OPERATION"]
+    project_id = UUID(os.environ["PROJECT_ID"])
+    application_principal_id = UUID(os.environ["APPLICATION_ID"])
+    action_id = os.environ["ACCOUNT_ACTION_ID"]
+    headers = {"Authorization": "Bearer " + os.environ["INFRAMELD_TOKEN"]}
+    async with ApiClient(Configuration(host=os.environ["INFRAMELD_URL"])) as client:
+        api = AccessApi(client)
+        if operation == "list":
+            response = await api.list_application_account_action_grants_with_http_info(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                action_id=action_id,
+                limit=25,
+                cursor=os.environ.get("ACCOUNT_GRANT_CURSOR"),
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        elif operation == "set":
+            request = ApplicationAccountActionGrantRequest.model_validate_json(
+                Path("account-grant.json").read_text()
+            )
+            response = await api.set_application_account_action_grant_with_http_info(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                recipient_principal_id=UUID(os.environ["RECIPIENT_ID"]),
+                action_id=action_id,
+                idempotency_key=os.environ["SET_ACCOUNT_GRANT_KEY"],
+                application_account_action_grant_request=request,
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        elif operation == "remove":
+            raw_revision = os.environ["EXPECTED_PROJECT_ACCESS_REVISION"]
+            if re.fullmatch(r"0|[1-9][0-9]{0,15}", raw_revision) is None:
+                raise ValueError("Use the exact reviewed decimal Access revision")
+            revision = int(raw_revision)
+            if revision > 9007199254740991:
+                raise ValueError("The Access revision is outside its exact range")
+            response = await api.remove_application_account_action_grant_with_http_info(
+                project_id=project_id,
+                application_principal_id=application_principal_id,
+                recipient_principal_id=UUID(os.environ["RECIPIENT_ID"]),
+                action_id=action_id,
+                expected_access_revision=revision,
+                idempotency_key=os.environ["REMOVE_ACCOUNT_GRANT_KEY"],
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+        else:
+            raise ValueError("Choose list, set or remove")
+        print("HTTP", response.status_code)
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except ApiException as error:
+        print("No usable result: HTTP", error.status, file=sys.stderr)
+        raise SystemExit(1) from None
+    except httpx.HTTPError:
+        print("No usable response. Preserve the original request.", file=sys.stderr)
+        raise SystemExit(1) from None
+```
+
+```typescript
+import { readFile } from "node:fs/promises"
+import {
+  createClient,
+  listApplicationAccountActionGrants,
+  removeApplicationAccountActionGrant,
+  setApplicationAccountActionGrant,
+  type ApplicationAccountActionGrantRequest,
+} from "@inframeld/sdk"
+
+function required(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`Set ${name}`)
+  return value
+}
+
+function reviewedRevision(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error("Use an Access revision from 0 through 9007199254740991")
+  }
+  return value
+}
+
+function reviewedRevisionText(value: string): number {
+  if (!/^(0|[1-9][0-9]{0,15})$/.test(value)) {
+    throw new Error("Use the exact reviewed decimal Access revision")
+  }
+  return reviewedRevision(Number(value))
+}
+
+const client = createClient({
+  baseUrl: required("INFRAMELD_URL"),
+  timeoutMs: 5000,
+})
+const scope = {
+  project_id: required("PROJECT_ID"),
+  application_principal_id: required("APPLICATION_ID"),
+}
+const actionId = required("ACCOUNT_ACTION_ID")
+const headers = { Authorization: `Bearer ${required("INFRAMELD_TOKEN")}` }
+
+async function request() {
+  switch (required("GRANT_OPERATION")) {
+    case "list":
+      return listApplicationAccountActionGrants({
+        client,
+        path: scope,
+        query: {
+          actionId,
+          limit: 25,
+          cursor: process.env.ACCOUNT_GRANT_CURSOR,
+        },
+        headers,
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    case "set": {
+      const body: ApplicationAccountActionGrantRequest = JSON.parse(
+        await readFile("account-grant.json", "utf8")
+      )
+      reviewedRevision(body.expectedAccessRevision)
+      if (typeof body.canGrant !== "boolean") {
+        throw new Error("Use a boolean canGrant")
+      }
+      return setApplicationAccountActionGrant({
+        client,
+        path: {
+          ...scope,
+          recipient_principal_id: required("RECIPIENT_ID"),
+          action_id: actionId,
+        },
+        headers: {
+          ...headers,
+          "Idempotency-Key": required("SET_ACCOUNT_GRANT_KEY"),
+        },
+        body,
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    }
+    case "remove":
+      return removeApplicationAccountActionGrant({
+        client,
+        path: {
+          ...scope,
+          recipient_principal_id: required("RECIPIENT_ID"),
+          action_id: actionId,
+        },
+        query: {
+          expectedAccessRevision: reviewedRevisionText(
+            required("EXPECTED_PROJECT_ACCESS_REVISION")
+          ),
+        },
+        headers: {
+          ...headers,
+          "Idempotency-Key": required("REMOVE_ACCOUNT_GRANT_KEY"),
+        },
+        responseStyle: "fields",
+        throwOnError: false,
+      })
+    default:
+      throw new Error("Choose list, set or remove")
+  }
+}
+
+const result = await request()
+if (result.error) {
+  console.error("No usable result:", result.error.kind)
+  console.error("HTTP status:", result.response?.status ?? "unavailable")
+  if (result.error.kind === "api") {
+    console.error(result.error.body.code, result.error.body.requestId)
+  }
+  process.exitCode = 1
+} else {
+  console.log("HTTP status:", result.response?.status ?? "unavailable")
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+use std::env;
+
+use inframeld_sdk::client::{ApiOpError, HttpClient};
+use inframeld_sdk::types::ApplicationAccountActionGrantRequest;
+
+/// Preserve HTTP context without printing raw upstream content.
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
+    if let Some(context) = error.api() {
+        eprintln!("Request failed: HTTP {}", context.status);
+    } else {
+        eprintln!("No usable response.");
+    }
+    std::io::Error::other("Preserve the original request before deciding what to do next")
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let token = env::var("INFRAMELD_TOKEN")?;
+    let project_id = env::var("PROJECT_ID")?;
+    let application_principal_id = env::var("APPLICATION_ID")?;
+    let action_id = env::var("ACCOUNT_ACTION_ID")?;
+    let client = HttpClient::new()
+        .with_base_url(env::var("INFRAMELD_URL")?)
+        .with_header("Authorization", format!("Bearer {token}"));
+    let (status, body) = match env::var("GRANT_OPERATION")?.as_str() {
+        "list" => {
+            let cursor = env::var("ACCOUNT_GRANT_CURSOR").ok();
+            let response = client
+                .list_application_account_action_grants(&project_id, &application_principal_id, &action_id, Some(25), cursor.as_deref())
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        "set" => {
+            let request: ApplicationAccountActionGrantRequest =
+                serde_json::from_str(&std::fs::read_to_string("account-grant.json")?)?;
+            if !(0..=9_007_199_254_740_991).contains(&request.expected_access_revision) {
+                return Err("Use the exact reviewed Access revision".into());
+            }
+            let response = client
+                .set_application_account_action_grant(
+                    &project_id,
+                    &application_principal_id,
+                    env::var("RECIPIENT_ID")?,
+                    &action_id,
+                    env::var("SET_ACCOUNT_GRANT_KEY")?,
+                    request,
+                )
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        "remove" => {
+            let revision_text = env::var("EXPECTED_PROJECT_ACCESS_REVISION")?;
+            let revision: i64 = revision_text.parse()?;
+            if revision_text != revision.to_string()
+                || !(0..=9_007_199_254_740_991).contains(&revision)
+            {
+                return Err("Use the exact reviewed decimal Access revision".into());
+            }
+            let response = client
+                .remove_application_account_action_grant(
+                    &project_id,
+                    &application_principal_id,
+                    env::var("RECIPIENT_ID")?,
+                    &action_id,
+                    revision,
+                    env::var("REMOVE_ACCOUNT_GRANT_KEY")?,
+                )
+                .await
+                .map_err(report_error)?;
+            (response.status, serde_json::to_value(response.body)?)
+        }
+        _ => return Err("Choose list, set or remove".into()),
+    };
+    println!("HTTP {status}");
+    println!("{}", serde_json::to_string_pretty(&body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Start with `GRANT_OPERATION=list .venv/bin/python account_grants.py`, `GRANT_OPERATION=list node account-grants.ts` using Node 26, or `GRANT_OPERATION=list cargo run` in the Cargo project. For another page, keep the target/action and pass the returned cursor unchanged as `ACCOUNT_GRANT_CURSOR`. Clear it when starting a different scope. Change the selector to `set` or `remove` only after preparing the matching fresh decision or retaining the exact original request for replay.
+
+### Recipient-discovery client
+
+Save the complete program as `grant_recipients.py`, `grant-recipients.ts` or `src/main.rs` in a separate example project. The prepared `GRANT_TARGET_KIND`, `GRANT_TARGET_ID` and `DISCOVERY_ACTION_ID` select SupportKnowledge and `add-documents`, matching the cURL example. Deliberately change all three when selecting another supported target/action. These programs only list candidates and require no recipient, revision or write key.
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+import sys
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.grant_target_kind import GrantTargetKind
+
+
+async def main() -> None:
+    headers = {"Authorization": "Bearer " + os.environ["INFRAMELD_TOKEN"]}
+    async with ApiClient(Configuration(host=os.environ["INFRAMELD_URL"])) as client:
+        response = await AccessApi(client).list_project_grant_recipients_with_http_info(
+            project_id=UUID(os.environ["PROJECT_ID"]),
+            target_kind=GrantTargetKind(os.environ["GRANT_TARGET_KIND"]),
+            target_id=UUID(os.environ["GRANT_TARGET_ID"]),
+            action_id=os.environ["DISCOVERY_ACTION_ID"],
+            limit=25,
+            cursor=os.environ.get("GRANT_RECIPIENT_CURSOR"),
+            _headers=headers,
+            _request_timeout=5.0,
+        )
+        print("HTTP", response.status_code)
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except ApiException as error:
+        print("No usable result: HTTP", error.status, file=sys.stderr)
+        raise SystemExit(1) from None
+    except httpx.HTTPError:
+        print("No usable response.", file=sys.stderr)
+        raise SystemExit(1) from None
+```
+
+```typescript
+import { createClient, listProjectGrantRecipients } from "@inframeld/sdk"
+
+function required(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`Set ${name}`)
+  return value
+}
+
+const targetKind = required("GRANT_TARGET_KIND")
+if (
+  targetKind !== "project" &&
+  targetKind !== "access-group" &&
+  targetKind !== "application-account"
+) {
+  throw new Error("Choose project, access-group or application-account")
+}
+const client = createClient({
+  baseUrl: required("INFRAMELD_URL"),
+  timeoutMs: 5000,
+})
+const result = await listProjectGrantRecipients({
+  client,
+  path: { project_id: required("PROJECT_ID") },
+  query: {
+    targetKind,
+    targetId: required("GRANT_TARGET_ID"),
+    actionId: required("DISCOVERY_ACTION_ID"),
+    limit: 25,
+    cursor: process.env.GRANT_RECIPIENT_CURSOR,
+  },
+  headers: { Authorization: `Bearer ${required("INFRAMELD_TOKEN")}` },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+if (result.error) {
+  console.error("No usable result:", result.error.kind)
+  console.error("HTTP status:", result.response?.status ?? "unavailable")
+  if (result.error.kind === "api") {
+    console.error(result.error.body.code, result.error.body.requestId)
+  }
+  process.exitCode = 1
+} else {
+  console.log("HTTP status:", result.response?.status ?? "unavailable")
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+use std::env;
+
+use inframeld_sdk::client::{ApiOpError, HttpClient};
+use inframeld_sdk::types::GrantTargetKind;
+
+/// Preserve HTTP context without printing raw upstream content.
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> std::io::Error {
+    if let Some(context) = error.api() {
+        eprintln!("Request failed: HTTP {}", context.status);
+    } else {
+        eprintln!("No usable response.");
+    }
+    std::io::Error::other("Check the current credential and exact query before continuing")
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let target_kind = match env::var("GRANT_TARGET_KIND")?.as_str() {
+        "project" => GrantTargetKind::Project,
+        "access-group" => GrantTargetKind::AccessGroup,
+        "application-account" => GrantTargetKind::ApplicationAccount,
+        _ => return Err("Choose project, access-group or application-account".into()),
+    };
+    let token = env::var("INFRAMELD_TOKEN")?;
+    let client = HttpClient::new()
+        .with_base_url(env::var("INFRAMELD_URL")?)
+        .with_header("Authorization", format!("Bearer {token}"));
+    let cursor = env::var("GRANT_RECIPIENT_CURSOR").ok();
+    let response = client
+        .list_project_grant_recipients(
+            env::var("PROJECT_ID")?,
+            target_kind,
+            env::var("GRANT_TARGET_ID")?,
+            env::var("DISCOVERY_ACTION_ID")?,
+            Some(25),
+            cursor.as_deref(),
+        )
+        .await
+        .map_err(report_error)?;
+    println!("HTTP {}", response.status);
+    println!("{}", serde_json::to_string_pretty(&response.body)?);
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python grant_recipients.py`, `node grant-recipients.ts` with Node 26 in the ESM project, or `cargo run` in the Cargo project. To continue in the same scope, pass the returned non-null cursor unchanged as `GRANT_RECIPIENT_CURSOR`. Clear it for a different query. Read the returned principal's `kind` before choosing a grant level. A candidate can become ineligible before a later assignment.

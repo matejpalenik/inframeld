@@ -1,10 +1,12 @@
 import asyncio
 from typing import override
+from uuid import UUID
 
 from sqlalchemy import BigInteger, Nullable, and_, exists, literal, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
@@ -20,6 +22,8 @@ from inframeld_backend.access.application.protocols.operation_lookup_facts_reade
     OperationLookupFactsReader,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
@@ -28,6 +32,14 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.infrastructure.readers.human_credential_state_queries import (
     HumanCredentialStateQueries,
 )
+from inframeld_backend.access.infrastructure.rows.access_group_row import AccessGroupRow
+from inframeld_backend.access.infrastructure.rows.application_account_row import (
+    ApplicationAccountRow,
+)
+from inframeld_backend.access.infrastructure.rows.application_action_grant_row import (
+    ApplicationActionGrantRow,
+)
+from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
 )
@@ -43,6 +55,9 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+    OperationLookupAuthorityFamily,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -66,26 +81,80 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
         self, *, access: AccessContextDTO, query: LookupOriginalOperationQuery
     ) -> OperationLookupFactsDTO | None:
         project_id = query.project_id.value if query.project_id is not None else None
+        target_exists = literal(True)
         if query.project_id is None:
             member = literal(False)
-            granted = exists().where(
+            scope = (
                 OrganizationActionGrantRow.organization_id == PrincipalRow.organization_id,
                 OrganizationActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                OrganizationActionGrantRow.recipient_kind == PrincipalRow.kind,
                 OrganizationActionGrantRow.action == query.expected_authority.action_id.value,
             )
-            can_grant = literal(False)
+            granted = exists().where(*scope)
+            can_grant = exists().where(*scope, OrganizationActionGrantRow.can_grant.is_(True))
         else:
             member = exists().where(
                 ProjectMembershipRow.project_id == ProjectRow.id,
                 ProjectMembershipRow.principal_id == PrincipalRow.id,
             )
-            grant_scope = (
-                ProjectActionGrantRow.project_id == ProjectRow.id,
-                ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
-                ProjectActionGrantRow.action == query.expected_authority.action_id.value,
-            )
-            granted = exists().where(*grant_scope)
-            can_grant = exists().where(*grant_scope, ProjectActionGrantRow.can_grant.is_(True))
+            family = query.expected_authority.family
+            if family is OperationLookupAuthorityFamily.ACCESS_GROUP_GRANT_READ:
+                group = UUID(query.requested_route.split("/")[5])
+                target_exists = (
+                    exists()
+                    .where(AccessGroupRow.id == group, AccessGroupRow.project_id == ProjectRow.id)
+                    .correlate(ProjectRow)
+                )
+                grant_scope = (
+                    GroupActionGrantRow.project_id == ProjectRow.id,
+                    GroupActionGrantRow.group_id == group,
+                    GroupActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                    GroupActionGrantRow.recipient_kind == PrincipalRow.kind,
+                    GroupActionGrantRow.action == query.expected_authority.action_id.value,
+                )
+                granted = exists().where(*grant_scope)
+                can_grant = exists().where(*grant_scope, GroupActionGrantRow.can_grant.is_(True))
+            elif family is OperationLookupAuthorityFamily.APPLICATION_ACCOUNT_GRANT_READ:
+                application = UUID(query.requested_route.split("/")[5])
+                target_principal = aliased(PrincipalRow)
+                target_membership = aliased(ProjectMembershipRow)
+                target_exists = (
+                    exists()
+                    .where(
+                        ApplicationAccountRow.principal_id == application,
+                        ApplicationAccountRow.project_id == ProjectRow.id,
+                        ApplicationAccountRow.organization_id == ProjectRow.organization_id,
+                        ApplicationAccountRow.principal_kind == PrincipalKind.APPLICATION,
+                        target_principal.id == application,
+                        target_principal.organization_id == ProjectRow.organization_id,
+                        target_principal.kind == PrincipalKind.APPLICATION,
+                        target_principal.status == PrincipalStatus.ACTIVE,
+                        target_membership.project_id == ProjectRow.id,
+                        target_membership.principal_id == application,
+                        target_membership.application_principal_id == application,
+                        target_membership.principal_kind == PrincipalKind.APPLICATION,
+                    )
+                    .correlate(ProjectRow)
+                )
+                grant_scope = (
+                    ApplicationActionGrantRow.project_id == ProjectRow.id,
+                    ApplicationActionGrantRow.application_principal_id == application,
+                    ApplicationActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                    ApplicationActionGrantRow.recipient_kind == PrincipalRow.kind,
+                    ApplicationActionGrantRow.action == query.expected_authority.action_id.value,
+                )
+                granted = exists().where(*grant_scope)
+                can_grant = exists().where(
+                    *grant_scope, ApplicationActionGrantRow.can_grant.is_(True)
+                )
+            else:
+                grant_scope = (
+                    ProjectActionGrantRow.project_id == ProjectRow.id,
+                    ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                    ProjectActionGrantRow.action == query.expected_authority.action_id.value,
+                )
+                granted = exists().where(*grant_scope)
+                can_grant = exists().where(*grant_scope, ProjectActionGrantRow.can_grant.is_(True))
         pending = (
             select(IdentityRecoveryAdmissionRow.operation_id)
             .join(
@@ -143,7 +212,7 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
             .execution_options(populate_existing=True)
         )
         if query.project_id is not None:
-            statement = statement.where(ProjectRow.id.is_not(None))
+            statement = statement.where(ProjectRow.id.is_not(None), target_exists)
 
         try:
             async with asyncio.timeout(5.0):

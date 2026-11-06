@@ -783,15 +783,11 @@ def test_session_uses_real_dispatch_for_bearer_cookie_and_competing_credentials(
     assert competing.json()["code"] == "invalid_authentication_request"
 
 
-def test_real_consent_and_grant_routes_preserve_csrf_and_request_validation() -> None:
+def test_real_consent_and_current_grant_routes_preserve_csrf_and_request_validation() -> None:
     cookie = {"Cookie": "ory_kratos_session=sdk-cookie"}
     write = cookie | {"Origin": "https://account.test", "X-Inframeld-CSRF": "1"}
     consent = {"consentChallenge": "a+b&/", "decision": "allow", "remember": True}
-    grant = {
-        "recipientPrincipalId": "00000000-0000-4000-8000-000000000002",
-        "actionId": "create-access-groups",
-        "expectedAccessRevision": 0,
-    }
+    grant = {"canGrant": True, "expectedAccessRevision": 7}
     with TestClient(create_sdk_conformance_app()) as client:
         assert client.get("/health").json() == {"status": "ok"}
         assert (
@@ -803,13 +799,26 @@ def test_real_consent_and_grant_routes_preserve_csrf_and_request_validation() ->
         assert client.post("/v1/oauth/consent", json=consent, headers=cookie).status_code == 403
         assert client.post("/v1/oauth/consent", json=consent, headers=write).status_code == 200
         url = "/v1/projects/00000000-0000-4000-8000-000000000003/grants"
-        result = client.post(url, json=grant, headers=write | {"Idempotency-Key": "sdk-key"})
-        assert result.status_code == 201
-        assert result.json()["accessRevision"] == 1
-        invalid = client.post(
+        retired = client.post(
             url,
-            json=grant | {"recipientPrincipalId": "invalid"},
-            headers=write | {"Idempotency-Key": "sdk-key"},
+            json={
+                "recipientPrincipalId": "00000000-0000-4000-8000-000000000004",
+                "actionId": "create-access-groups",
+                "expectedAccessRevision": 0,
+            },
+            headers=write | {"Idempotency-Key": "old-original"},
+        )
+        assert retired.status_code == 405
+        target = url + "/00000000-0000-4000-8000-000000000004/create-access-groups"
+        result = client.put(
+            target, json=grant, headers=write | {"Idempotency-Key": "sdk-project-grant-key"}
+        )
+        assert result.status_code == 201 and result.json()["canGrant"] is True
+        assert result.json()["accessRevision"] == 8
+        invalid = client.put(
+            url + "/invalid/create-access-groups",
+            json=grant,
+            headers=write | {"Idempotency-Key": "sdk-project-grant-key"},
         )
         assert invalid.status_code == 422
         assert invalid.headers["content-type"] == "application/problem+json"
@@ -1197,3 +1206,135 @@ def test_project_creation_fixture_keeps_cookie_csrf_and_strict_body_validation()
     assert denied.status_code == 403
     assert allowed.status_code == 201
     assert unknown.status_code == boolean.status_code == 422
+
+
+@pytest.mark.parametrize("kind", ["organization", "access-group", "application-account"])
+@pytest.mark.parametrize("method", ["GET", "PUT", "DELETE"])
+def test_access_grant_fixtures_keep_concrete_targets_levels_and_original_receipts(
+    kind: str, method: str
+) -> None:
+    organization = "00000000-0000-4000-8000-000000000002"
+    project = "00000000-0000-4000-8000-000000000003"
+    recipient = "00000000-0000-4000-8000-000000000004"
+    if kind == "organization":
+        base, action = f"/v1/organizations/{organization}", "create-projects"
+        scope = {"organizationId": organization}
+    elif kind == "access-group":
+        target = "00000000-0000-4000-8000-000000000007"
+        base, action = f"/v1/projects/{project}/access-groups/{target}", "add-documents"
+        scope = {"projectId": project, "accessGroupId": target}
+    else:
+        target = "00000000-0000-4000-8000-000000000008"
+        base, action = (
+            f"/v1/projects/{project}/application-accounts/{target}",
+            "issue-application-keys",
+        )
+        scope = {"projectId": project, "applicationPrincipalId": target}
+    path = base + "/grants" + ("" if method == "GET" else f"/{recipient}/{action}")
+    headers = {"Authorization": "Bearer sdk-human", "Idempotency-Key": f"sdk-{kind}-grant-key"}
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.request(
+            method,
+            path,
+            headers=headers,
+            params={"actionId": action, "limit": 2}
+            if method == "GET"
+            else {"expectedAccessRevision": 7}
+            if method == "DELETE"
+            else None,
+            json={"canGrant": True, "expectedAccessRevision": 7} if method == "PUT" else None,
+        )
+    assert response.status_code == (201 if method == "PUT" else 200)
+    assert response.headers["cache-control"] == "no-store"
+    body = response.json()
+    if method == "GET":
+        assert body == {
+            "items": [
+                {**scope, "recipientPrincipalId": recipient, "actionId": action, "canGrant": True}
+            ],
+            "nextCursor": None,
+        }
+    else:
+        assert scope.items() <= body.items()
+        assert body["recipientPrincipalId"] == recipient and body["actionId"] == action
+        assert body["accessRevision"] == 8 and body["changed"] is True
+        assert body["idempotencyExpiresAt"] == "2030-01-01T00:00:00Z"
+        assert body["canGrant"] is True if method == "PUT" else body["removed"] is True
+
+
+@pytest.mark.parametrize(
+    "kind,target,action",
+    [
+        ("project", "00000000-0000-4000-8000-000000000003", "inspect-budget"),
+        ("access-group", "00000000-0000-4000-8000-000000000007", "add-documents"),
+        ("application-account", "00000000-0000-4000-8000-000000000008", "issue-application-keys"),
+    ],
+)
+def test_recipient_fixture_uses_actual_scalar_query_and_safe_choices(
+    kind: str, target: str, action: str
+) -> None:
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.get(
+            "/v1/projects/00000000-0000-4000-8000-000000000003/grant-recipients",
+            params={"targetKind": kind, "targetId": target, "actionId": action},
+            headers={"Authorization": "Bearer sdk-human"},
+        )
+    assert response.status_code == 200 and response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "items": [
+            {
+                "principalId": "00000000-0000-4000-8000-000000000004",
+                "displayName": "Bob",
+                "kind": "human",
+            }
+        ],
+        "nextCursor": None,
+    }
+
+
+@pytest.mark.parametrize("method", ["PUT", "DELETE"])
+@pytest.mark.parametrize("kind", ["organization", "access-group", "application-account"])
+def test_new_grant_lookup_fixture_preserves_original_scope_guard_and_operation(
+    kind: str, method: str
+) -> None:
+    organization = "00000000-0000-4000-8000-000000000002"
+    project = "00000000-0000-4000-8000-000000000003"
+    recipient = "00000000-0000-4000-8000-000000000004"
+    if kind == "organization":
+        base, action, family = (
+            f"/v1/organizations/{organization}",
+            "create-projects",
+            "organization_grant_read",
+        )
+    elif kind == "access-group":
+        base, action, family = (
+            f"/v1/projects/{project}/access-groups/00000000-0000-4000-8000-000000000007",
+            "add-documents",
+            "access_group_grant_read",
+        )
+    else:
+        base, action, family = (
+            f"/v1/projects/{project}/application-accounts/00000000-0000-4000-8000-000000000008",
+            "issue-application-keys",
+            "application_account_grant_read",
+        )
+    body = {
+        "installationId": "00000000-0000-4000-8000-000000000001",
+        "organizationId": organization,
+        "projectId": None if kind == "organization" else project,
+        "method": method,
+        "requestedRoute": f"{base}/grants/{recipient}/{action}",
+        "key": f"sdk-{kind}-grant-key",
+        "expectedAuthority": {"family": family, "actionId": action},
+    }
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.post(
+            "/v1/operations/lookup", json=body, headers={"Authorization": "Bearer sdk-human"}
+        )
+    assert response.status_code == 200 and response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "outcome": "completed_synchronous",
+        "operationId": f"sdk-{kind}-grant-{method.lower()}",
+        "classification": "safe_result",
+        "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
+    }

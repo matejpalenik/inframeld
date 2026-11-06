@@ -10,8 +10,8 @@ from tests.support.access_scenarios import MockAccessScenarios, ProjectAuthoriza
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_grant_changes import create_project_grant_change_service
 
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
+from inframeld_backend.access.application.commands.set_project_action_grant_command import (
+    SetProjectActionGrantCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.project_operation_admission_request_dto import (
@@ -24,6 +24,7 @@ from inframeld_backend.access.application.services.project_operation_admission_s
     ProjectOperationAdmissionService,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
 )
@@ -85,15 +86,20 @@ async def _invoke(
     consumer: str,
 ) -> None:
     if consumer == "grant":
-        await create_project_grant_change_service(session).assign_use_only(
+        grant_action = ActionId("create-access-groups")
+        await create_project_grant_change_service(session).set_action_grant(
             access=access,
-            command=AssignProjectUseOnlyGrantCommand(
-                seed.project_id, seed.principal_id, seed.action, 0
+            command=SetProjectActionGrantCommand(
+                project_id=seed.project_id,
+                recipient_principal_id=seed.principal_id,
+                action_id=grant_action,
+                can_grant=False,
+                expected_access_revision=0,
             ),
             context=IdempotencyContextDTO(
                 key=IdempotencyKey("evidence-check"),
-                method=HttpMethod.POST,
-                requested_route="/v1/projects/{project_id}/grants",
+                method=HttpMethod.PUT,
+                requested_route=f"/v1/projects/{seed.project_id.value}/grants/{seed.principal_id.value}/{grant_action.value}",
             ),
         )
     else:

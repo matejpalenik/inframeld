@@ -27,20 +27,35 @@ from inframeld_backend.access.application.commands.add_project_member_command im
     AddProjectMemberCommand,
 )
 from inframeld_backend.access.application.commands.admit_human_command import AdmitHumanCommand
-from inframeld_backend.access.application.commands.assign_project_use_only_grant_command import (
-    AssignProjectUseOnlyGrantCommand,
-)
 from inframeld_backend.access.application.commands.create_project_command import (
     CreateProjectCommand,
 )
 from inframeld_backend.access.application.commands.decide_human_oauth_consent_command import (
     DecideHumanOAuthConsentCommand,
 )
+from inframeld_backend.access.application.commands.remove_access_group_action_grant_command import (
+    RemoveAccessGroupActionGrantCommand,
+)
+from inframeld_backend.access.application.commands.remove_application_account_action_grant_command import (
+    RemoveApplicationAccountActionGrantCommand,
+)
+from inframeld_backend.access.application.commands.remove_organization_action_grant_command import (
+    RemoveOrganizationActionGrantCommand,
+)
 from inframeld_backend.access.application.commands.remove_project_action_grant_command import (
     RemoveProjectActionGrantCommand,
 )
 from inframeld_backend.access.application.commands.remove_project_member_command import (
     RemoveProjectMemberCommand,
+)
+from inframeld_backend.access.application.commands.set_access_group_action_grant_command import (
+    SetAccessGroupActionGrantCommand,
+)
+from inframeld_backend.access.application.commands.set_application_account_action_grant_command import (
+    SetApplicationAccountActionGrantCommand,
+)
+from inframeld_backend.access.application.commands.set_organization_action_grant_command import (
+    SetOrganizationActionGrantCommand,
 )
 from inframeld_backend.access.application.commands.set_project_action_grant_command import (
     SetProjectActionGrantCommand,
@@ -49,13 +64,35 @@ from inframeld_backend.access.application.commands.update_project_metadata_comma
     UpdateProjectMetadataCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.access_group_action_grant_change_result_dto import (
+    AccessGroupActionGrantChangeResultDTO,
+)
+from inframeld_backend.access.application.dtos.access_group_action_grant_dto import (
+    AccessGroupActionGrantDTO,
+)
+from inframeld_backend.access.application.dtos.access_group_action_grants_page_dto import (
+    AccessGroupActionGrantsPageDTO,
+)
 from inframeld_backend.access.application.dtos.access_group_grant_target_dto import (
     AccessGroupGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.application_account_action_grant_change_result_dto import (
+    ApplicationAccountActionGrantChangeResultDTO,
+)
+from inframeld_backend.access.application.dtos.application_account_action_grant_dto import (
+    ApplicationAccountActionGrantDTO,
+)
+from inframeld_backend.access.application.dtos.application_account_action_grants_page_dto import (
+    ApplicationAccountActionGrantsPageDTO,
 )
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
 from inframeld_backend.access.application.dtos.created_project_dto import CreatedProjectDTO
+from inframeld_backend.access.application.dtos.grant_recipient_dto import GrantRecipientDTO
+from inframeld_backend.access.application.dtos.grant_recipients_page_dto import (
+    GrantRecipientsPageDTO,
+)
 from inframeld_backend.access.application.dtos.human_admission_result_dto import (
     HumanAdmissionResultDTO,
 )
@@ -83,8 +120,17 @@ from inframeld_backend.access.application.dtos.my_project_access_relationship_dt
 from inframeld_backend.access.application.dtos.oauth_consent_continuation_dto import (
     OAuthConsentContinuationDTO,
 )
+from inframeld_backend.access.application.dtos.organization_action_grant_assignment_dto import (
+    OrganizationActionGrantAssignmentDTO,
+)
+from inframeld_backend.access.application.dtos.organization_action_grant_change_result_dto import (
+    OrganizationActionGrantChangeResultDTO,
+)
 from inframeld_backend.access.application.dtos.organization_action_grant_dto import (
     OrganizationActionGrantDTO,
+)
+from inframeld_backend.access.application.dtos.organization_action_grants_page_dto import (
+    OrganizationActionGrantsPageDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
@@ -125,11 +171,23 @@ from inframeld_backend.access.application.enums.project_membership_change_kind i
 from inframeld_backend.access.application.errors.retired_project_name_error import (
     RetiredProjectNameError,
 )
+from inframeld_backend.access.application.protocols.access_group_action_grant_changer import (
+    AccessGroupActionGrantChanger,
+)
+from inframeld_backend.access.application.protocols.access_group_action_grants_reader import (
+    AccessGroupActionGrantsReader,
+)
 from inframeld_backend.access.application.protocols.access_group_creator import AccessGroupCreator
 from inframeld_backend.access.application.protocols.access_group_deleter import AccessGroupDeleter
 from inframeld_backend.access.application.protocols.access_group_reader import AccessGroupReader
 from inframeld_backend.access.application.protocols.access_group_relationship_changer import (
     AccessGroupRelationshipChanger,
+)
+from inframeld_backend.access.application.protocols.application_account_action_grant_changer import (
+    ApplicationAccountActionGrantChanger,
+)
+from inframeld_backend.access.application.protocols.application_account_action_grants_reader import (
+    ApplicationAccountActionGrantsReader,
 )
 from inframeld_backend.access.application.protocols.application_account_creator import (
     ApplicationAccountCreator,
@@ -153,11 +211,20 @@ from inframeld_backend.access.application.protocols.my_organization_access_reade
 from inframeld_backend.access.application.protocols.my_project_access_facts_reader import (
     MyProjectAccessFactsReader,
 )
+from inframeld_backend.access.application.protocols.organization_action_grant_changer import (
+    OrganizationActionGrantChanger,
+)
+from inframeld_backend.access.application.protocols.organization_action_grants_reader import (
+    OrganizationActionGrantsReader,
+)
 from inframeld_backend.access.application.protocols.project_action_grants_facts_reader import (
     ProjectActionGrantsFactsReader,
 )
 from inframeld_backend.access.application.protocols.project_creator import ProjectCreator
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
+from inframeld_backend.access.application.protocols.project_grant_recipients_reader import (
+    ProjectGrantRecipientsReader,
+)
 from inframeld_backend.access.application.protocols.project_members_facts_reader import (
     ProjectMembersFactsReader,
 )
@@ -179,6 +246,18 @@ from inframeld_backend.access.application.queries.get_project_metadata_query imp
 )
 from inframeld_backend.access.application.queries.inspect_human_oauth_consent_query import (
     InspectHumanOAuthConsentQuery,
+)
+from inframeld_backend.access.application.queries.list_access_group_action_grants_query import (
+    ListAccessGroupActionGrantsQuery,
+)
+from inframeld_backend.access.application.queries.list_application_account_action_grants_query import (
+    ListApplicationAccountActionGrantsQuery,
+)
+from inframeld_backend.access.application.queries.list_organization_action_grants_query import (
+    ListOrganizationActionGrantsQuery,
+)
+from inframeld_backend.access.application.queries.list_project_grant_recipients_query import (
+    ListProjectGrantRecipientsQuery,
 )
 from inframeld_backend.access.application.queries.resolve_project_name_query import (
     ResolveProjectNameQuery,
@@ -225,7 +304,13 @@ from inframeld_backend.access.http.dependencies.csrf_protection_dependency impor
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
+from inframeld_backend.access.http.routes.access_group_action_grant_routes import (
+    create_access_group_action_grant_router,
+)
 from inframeld_backend.access.http.routes.access_group_routes import create_access_group_router
+from inframeld_backend.access.http.routes.application_account_action_grant_routes import (
+    create_application_account_action_grant_router,
+)
 from inframeld_backend.access.http.routes.application_account_routes import (
     create_application_account_router,
 )
@@ -243,6 +328,9 @@ from inframeld_backend.access.http.routes.my_project_access_routes import (
 from inframeld_backend.access.http.routes.organization_access_routes import (
     create_organization_access_router,
 )
+from inframeld_backend.access.http.routes.organization_action_grant_routes import (
+    create_organization_action_grant_router,
+)
 from inframeld_backend.access.http.routes.project_action_grant_change_routes import (
     create_project_action_grant_change_router,
 )
@@ -252,7 +340,9 @@ from inframeld_backend.access.http.routes.project_action_grant_routes import (
 from inframeld_backend.access.http.routes.project_creation_routes import (
     create_project_creation_router,
 )
-from inframeld_backend.access.http.routes.project_grant_routes import create_project_grant_router
+from inframeld_backend.access.http.routes.project_grant_recipients_routes import (
+    create_project_grant_recipients_router,
+)
 from inframeld_backend.access.http.routes.project_members_routes import (
     create_project_members_router,
 )
@@ -283,6 +373,7 @@ from inframeld_backend.shared.application.dtos.retained_deletion_status_dto impo
 from inframeld_backend.shared.application.dtos.unresolved_operation_dto import (
     UnresolvedOperationDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -481,28 +572,376 @@ class MockSDKGrantChanger(ProjectGrantChanger):
             ),
         )
 
-    @override
-    async def assign_use_only(
-        self,
-        *,
-        access: AccessContextDTO,
-        command: AssignProjectUseOnlyGrantCommand,
-        context: IdempotencyContextDTO,
-    ) -> CompletedSynchronousOperationDTO:
-        if context.key.value != "sdk-key":
-            raise ValueError("The SDK changed the idempotency header.")
-
-        return CompletedSynchronousOperationDTO(
-            OperationId("sdk-operation"),
-            True,
-            OperationReplayKind.SAFE_RESULT,
-            datetime(2030, 1, 1, tzinfo=UTC),
-        )
-
 
 @asynccontextmanager
 async def _open_grant_change() -> AsyncGenerator[ProjectGrantChanger]:
     yield MockSDKGrantChanger()
+
+
+class MockSDKOrganizationGrants(OrganizationActionGrantChanger, OrganizationActionGrantsReader):
+    """Return controlled wire receipts without simulating persistence or authorization."""
+
+    @override
+    async def set_grant(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: SetOrganizationActionGrantCommand,
+        context: IdempotencyContextDTO,
+    ) -> OrganizationActionGrantChangeResultDTO:
+        return self._outcome(access=access, command=command, context=context, method=HttpMethod.PUT)
+
+    @override
+    async def remove_grant(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: RemoveOrganizationActionGrantCommand,
+        context: IdempotencyContextDTO,
+    ) -> OrganizationActionGrantChangeResultDTO:
+        return self._outcome(
+            access=access, command=command, context=context, method=HttpMethod.DELETE
+        )
+
+    @staticmethod
+    def _outcome(
+        *,
+        access: AccessContextDTO,
+        command: SetOrganizationActionGrantCommand | RemoveOrganizationActionGrantCommand,
+        context: IdempotencyContextDTO,
+        method: Literal[HttpMethod.PUT, HttpMethod.DELETE],
+    ) -> OrganizationActionGrantChangeResultDTO:
+        if command.organization_id.value != UUID("00000000-0000-4000-8000-000000000002"):
+            raise ResourceNotFoundError()
+        recipient = command.recipient_principal_id.value
+        if recipient not in {
+            UUID("00000000-0000-4000-8000-000000000004"),
+            UUID("00000000-0000-4000-8000-000000000005"),
+            UUID("00000000-0000-4000-8000-000000000006"),
+        }:
+            raise ResourceNotFoundError()
+        if command.expected_access_revision != 7:
+            raise StaleRevisionError()
+        if context.key.value != "sdk-organization-grant-key":
+            raise ValueError("The SDK changed the exact-grant idempotency header.")
+        changed = recipient != UUID("00000000-0000-4000-8000-000000000005")
+        return OrganizationActionGrantChangeResultDTO(
+            installation_id=InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            organization_id=command.organization_id,
+            actor_principal_id=access.actor_principal_id,
+            recipient_principal_id=command.recipient_principal_id,
+            action_id=command.action_id,
+            method=method,
+            can_grant=command.can_grant
+            if isinstance(command, SetOrganizationActionGrantCommand)
+            else None,
+            access_revision=7 + int(changed),
+            changed=changed,
+            status_code=201
+            if method is HttpMethod.PUT
+            and recipient == UUID("00000000-0000-4000-8000-000000000004")
+            else 200,
+            operation=CompletedSynchronousOperationDTO(
+                operation_id=OperationId("sdk-organization-grant-" + method.value.lower()),
+                created=False,
+                replay_kind=OperationReplayKind.SAFE_RESULT,
+                expires_at=datetime(2030, 1, 1, tzinfo=UTC),
+            ),
+        )
+
+    @override
+    async def list_grants(
+        self, *, access: AccessContextDTO, query: ListOrganizationActionGrantsQuery
+    ) -> OrganizationActionGrantsPageDTO:
+        if query.organization_id.value != UUID("00000000-0000-4000-8000-000000000002"):
+            raise ResourceNotFoundError()
+        return OrganizationActionGrantsPageDTO(
+            organization_id=query.organization_id,
+            action_id=query.action_id,
+            items=(
+                OrganizationActionGrantAssignmentDTO(
+                    recipient_principal_id=PrincipalId(
+                        UUID("00000000-0000-4000-8000-000000000004")
+                    ),
+                    action_id=query.action_id,
+                    can_grant=True,
+                ),
+            ),
+            next_cursor=None,
+        )
+
+
+@asynccontextmanager
+async def _open_organization_grants_changer() -> AsyncGenerator[OrganizationActionGrantChanger]:
+    yield MockSDKOrganizationGrants()
+
+
+@asynccontextmanager
+async def _open_organization_grants_reader() -> AsyncGenerator[OrganizationActionGrantsReader]:
+    yield MockSDKOrganizationGrants()
+
+
+class MockSDKAccessGroupGrants(AccessGroupActionGrantChanger, AccessGroupActionGrantsReader):
+    """Return controlled wire receipts without simulating persistence or authorization."""
+
+    @override
+    async def set_grant(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: SetAccessGroupActionGrantCommand,
+        context: IdempotencyContextDTO,
+    ) -> AccessGroupActionGrantChangeResultDTO:
+        return self._outcome(access=access, command=command, context=context, method=HttpMethod.PUT)
+
+    @override
+    async def remove_grant(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: RemoveAccessGroupActionGrantCommand,
+        context: IdempotencyContextDTO,
+    ) -> AccessGroupActionGrantChangeResultDTO:
+        return self._outcome(
+            access=access, command=command, context=context, method=HttpMethod.DELETE
+        )
+
+    @staticmethod
+    def _outcome(
+        *,
+        access: AccessContextDTO,
+        command: SetAccessGroupActionGrantCommand | RemoveAccessGroupActionGrantCommand,
+        context: IdempotencyContextDTO,
+        method: Literal[HttpMethod.PUT, HttpMethod.DELETE],
+    ) -> AccessGroupActionGrantChangeResultDTO:
+        if command.project_id.value != UUID(
+            "00000000-0000-4000-8000-000000000003"
+        ) or command.group_id.value != UUID("00000000-0000-4000-8000-000000000007"):
+            raise ResourceNotFoundError()
+        recipient = command.recipient_principal_id.value
+        if recipient not in {
+            UUID("00000000-0000-4000-8000-000000000004"),
+            UUID("00000000-0000-4000-8000-000000000005"),
+            UUID("00000000-0000-4000-8000-000000000006"),
+        }:
+            raise ResourceNotFoundError()
+        if command.expected_access_revision != 7:
+            raise StaleRevisionError()
+        if context.key.value != "sdk-access-group-grant-key":
+            raise ValueError("The SDK changed the exact-grant idempotency header.")
+        changed = recipient != UUID("00000000-0000-4000-8000-000000000005")
+        return AccessGroupActionGrantChangeResultDTO(
+            installation_id=InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            organization_id=OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            project_id=command.project_id,
+            group_id=command.group_id,
+            actor_principal_id=access.actor_principal_id,
+            recipient_principal_id=command.recipient_principal_id,
+            action_id=command.action_id,
+            method=method,
+            can_grant=command.can_grant
+            if isinstance(command, SetAccessGroupActionGrantCommand)
+            else None,
+            access_revision=7 + int(changed),
+            changed=changed,
+            status_code=201
+            if method is HttpMethod.PUT
+            and recipient == UUID("00000000-0000-4000-8000-000000000004")
+            else 200,
+            operation=CompletedSynchronousOperationDTO(
+                operation_id=OperationId("sdk-access-group-grant-" + method.value.lower()),
+                created=False,
+                replay_kind=OperationReplayKind.SAFE_RESULT,
+                expires_at=datetime(2030, 1, 1, tzinfo=UTC),
+            ),
+        )
+
+    @override
+    async def list_grants(
+        self, *, access: AccessContextDTO, query: ListAccessGroupActionGrantsQuery
+    ) -> AccessGroupActionGrantsPageDTO:
+        if query.project_id.value != UUID(
+            "00000000-0000-4000-8000-000000000003"
+        ) or query.group_id.value != UUID("00000000-0000-4000-8000-000000000007"):
+            raise ResourceNotFoundError()
+        return AccessGroupActionGrantsPageDTO(
+            project_id=query.project_id,
+            group_id=query.group_id,
+            action_id=query.action_id,
+            items=(
+                AccessGroupActionGrantDTO(
+                    recipient_principal_id=PrincipalId(
+                        UUID("00000000-0000-4000-8000-000000000004")
+                    ),
+                    action_id=query.action_id,
+                    can_grant=True,
+                ),
+            ),
+            next_cursor=None,
+        )
+
+
+@asynccontextmanager
+async def _open_access_group_grants_changer() -> AsyncGenerator[AccessGroupActionGrantChanger]:
+    yield MockSDKAccessGroupGrants()
+
+
+@asynccontextmanager
+async def _open_access_group_grants_reader() -> AsyncGenerator[AccessGroupActionGrantsReader]:
+    yield MockSDKAccessGroupGrants()
+
+
+class MockSDKApplicationAccountGrants(
+    ApplicationAccountActionGrantChanger, ApplicationAccountActionGrantsReader
+):
+    """Return controlled wire receipts without simulating persistence or authorization."""
+
+    @override
+    async def set_grant(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: SetApplicationAccountActionGrantCommand,
+        context: IdempotencyContextDTO,
+    ) -> ApplicationAccountActionGrantChangeResultDTO:
+        return self._outcome(access=access, command=command, context=context, method=HttpMethod.PUT)
+
+    @override
+    async def remove_grant(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: RemoveApplicationAccountActionGrantCommand,
+        context: IdempotencyContextDTO,
+    ) -> ApplicationAccountActionGrantChangeResultDTO:
+        return self._outcome(
+            access=access, command=command, context=context, method=HttpMethod.DELETE
+        )
+
+    @staticmethod
+    def _outcome(
+        *,
+        access: AccessContextDTO,
+        command: SetApplicationAccountActionGrantCommand
+        | RemoveApplicationAccountActionGrantCommand,
+        context: IdempotencyContextDTO,
+        method: Literal[HttpMethod.PUT, HttpMethod.DELETE],
+    ) -> ApplicationAccountActionGrantChangeResultDTO:
+        if command.project_id.value != UUID(
+            "00000000-0000-4000-8000-000000000003"
+        ) or command.application_principal_id.value != UUID("00000000-0000-4000-8000-000000000008"):
+            raise ResourceNotFoundError()
+        recipient = command.recipient_principal_id.value
+        if recipient not in {
+            UUID("00000000-0000-4000-8000-000000000004"),
+            UUID("00000000-0000-4000-8000-000000000005"),
+            UUID("00000000-0000-4000-8000-000000000006"),
+        }:
+            raise ResourceNotFoundError()
+        if command.expected_access_revision != 7:
+            raise StaleRevisionError()
+        if context.key.value != "sdk-application-account-grant-key":
+            raise ValueError("The SDK changed the exact-grant idempotency header.")
+        changed = recipient != UUID("00000000-0000-4000-8000-000000000005")
+        return ApplicationAccountActionGrantChangeResultDTO(
+            installation_id=InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            organization_id=OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            project_id=command.project_id,
+            application_principal_id=command.application_principal_id,
+            actor_principal_id=access.actor_principal_id,
+            recipient_principal_id=command.recipient_principal_id,
+            action_id=command.action_id,
+            method=method,
+            can_grant=command.can_grant
+            if isinstance(command, SetApplicationAccountActionGrantCommand)
+            else None,
+            access_revision=7 + int(changed),
+            changed=changed,
+            status_code=201
+            if method is HttpMethod.PUT
+            and recipient == UUID("00000000-0000-4000-8000-000000000004")
+            else 200,
+            operation=CompletedSynchronousOperationDTO(
+                operation_id=OperationId("sdk-application-account-grant-" + method.value.lower()),
+                created=False,
+                replay_kind=OperationReplayKind.SAFE_RESULT,
+                expires_at=datetime(2030, 1, 1, tzinfo=UTC),
+            ),
+        )
+
+    @override
+    async def list_grants(
+        self, *, access: AccessContextDTO, query: ListApplicationAccountActionGrantsQuery
+    ) -> ApplicationAccountActionGrantsPageDTO:
+        if query.project_id.value != UUID(
+            "00000000-0000-4000-8000-000000000003"
+        ) or query.application_principal_id.value != UUID("00000000-0000-4000-8000-000000000008"):
+            raise ResourceNotFoundError()
+        return ApplicationAccountActionGrantsPageDTO(
+            project_id=query.project_id,
+            application_principal_id=query.application_principal_id,
+            action_id=query.action_id,
+            items=(
+                ApplicationAccountActionGrantDTO(
+                    recipient_principal_id=PrincipalId(
+                        UUID("00000000-0000-4000-8000-000000000004")
+                    ),
+                    action_id=query.action_id,
+                    can_grant=True,
+                ),
+            ),
+            next_cursor=None,
+        )
+
+
+@asynccontextmanager
+async def _open_application_account_grants_changer() -> AsyncGenerator[
+    ApplicationAccountActionGrantChanger
+]:
+    yield MockSDKApplicationAccountGrants()
+
+
+@asynccontextmanager
+async def _open_application_account_grants_reader() -> AsyncGenerator[
+    ApplicationAccountActionGrantsReader
+]:
+    yield MockSDKApplicationAccountGrants()
+
+
+class MockSDKGrantRecipients(ProjectGrantRecipientsReader):
+    """Supply one bounded eligible human without creating a directory or grant."""
+
+    @override
+    async def list_recipients(
+        self, *, access: AccessContextDTO, query: ListProjectGrantRecipientsQuery
+    ) -> GrantRecipientsPageDTO:
+        if query.project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
+            raise ResourceNotFoundError()
+        if isinstance(
+            query.target, AccessGroupGrantTargetDTO
+        ) and query.target.access_group_id.value != UUID("00000000-0000-4000-8000-000000000007"):
+            raise ResourceNotFoundError()
+        if isinstance(
+            query.target, ApplicationAccountGrantTargetDTO
+        ) and query.target.application_principal_id.value != UUID(
+            "00000000-0000-4000-8000-000000000008"
+        ):
+            raise ResourceNotFoundError()
+        return GrantRecipientsPageDTO(
+            items=(
+                GrantRecipientDTO(
+                    principal_id=PrincipalId(UUID("00000000-0000-4000-8000-000000000004")),
+                    display_name="Bob",
+                    kind=PrincipalKind.HUMAN,
+                ),
+            ),
+            next_cursor=None,
+        )
+
+
+@asynccontextmanager
+async def _open_grant_recipients() -> AsyncGenerator[ProjectGrantRecipientsReader]:
+    yield MockSDKGrantRecipients()
 
 
 class MockSDKMyOrganizationAccess(MyOrganizationAccessReader):
@@ -1006,7 +1445,10 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
         | UnresolvedOperationDTO
     ):
         query.expected_authority.require_supported_scope(
-            project_id=query.project_id, method=query.method, requested_route=query.requested_route
+            organization_id=query.organization_id,
+            project_id=query.project_id,
+            method=query.method,
+            requested_route=query.requested_route,
         )
         if query.expected_authority.family is OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION:
             if (
@@ -1024,6 +1466,55 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
                     expires_at=datetime(2030, 1, 31, tzinfo=UTC),
                 )
             return UnresolvedOperationDTO()
+        family = query.expected_authority.family
+        if family in {
+            OperationLookupAuthorityFamily.ORGANIZATION_GRANT_READ,
+            OperationLookupAuthorityFamily.ACCESS_GROUP_GRANT_READ,
+            OperationLookupAuthorityFamily.APPLICATION_ACCOUNT_GRANT_READ,
+        }:
+            organization = "00000000-0000-4000-8000-000000000002"
+            project = "00000000-0000-4000-8000-000000000003"
+            if query.installation_id.value != UUID(
+                "00000000-0000-4000-8000-000000000001"
+            ) or query.organization_id.value != UUID(organization):
+                return UnresolvedOperationDTO()
+            if family is OperationLookupAuthorityFamily.ORGANIZATION_GRANT_READ:
+                slug, action, base = (
+                    "organization",
+                    "create-projects",
+                    f"/v1/organizations/{organization}",
+                )
+                if query.project_id is not None:
+                    return UnresolvedOperationDTO()
+            elif family is OperationLookupAuthorityFamily.ACCESS_GROUP_GRANT_READ:
+                slug, action, base = (
+                    "access-group",
+                    "add-documents",
+                    f"/v1/projects/{project}/access-groups/00000000-0000-4000-8000-000000000007",
+                )
+                if query.project_id != ProjectId(UUID(project)):
+                    return UnresolvedOperationDTO()
+            else:
+                slug, action, base = (
+                    "application-account",
+                    "issue-application-keys",
+                    f"/v1/projects/{project}/application-accounts/00000000-0000-4000-8000-000000000008",
+                )
+                if query.project_id != ProjectId(UUID(project)):
+                    return UnresolvedOperationDTO()
+            if (
+                query.expected_authority.action_id.value != action
+                or query.requested_route
+                != base + f"/grants/00000000-0000-4000-8000-000000000004/{action}"
+                or query.key.value != f"sdk-{slug}-grant-key"
+            ):
+                return UnresolvedOperationDTO()
+            return CompletedSynchronousOperationDTO(
+                operation_id=OperationId(f"sdk-{slug}-grant-{query.method.value.lower()}"),
+                created=False,
+                replay_kind=OperationReplayKind.SAFE_RESULT,
+                expires_at=datetime(2030, 1, 1, tzinfo=UTC),
+            )
         metadata = query.requested_route == "/v1/projects/{project_id}/metadata"
         original_action = (
             "edit-project-metadata"
@@ -1252,8 +1743,27 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(create_discovery_router(discovery_snapshot.get))
     application.include_router(health_router)
     application.include_router(create_session_router(authenticate))
+    application.include_router(
+        create_organization_action_grant_router(
+            authenticate, _open_organization_grants_changer, _open_organization_grants_reader
+        )
+    )
+    application.include_router(
+        create_access_group_action_grant_router(
+            authenticate, _open_access_group_grants_changer, _open_access_group_grants_reader
+        )
+    )
+    application.include_router(
+        create_application_account_action_grant_router(
+            authenticate,
+            _open_application_account_grants_changer,
+            _open_application_account_grants_reader,
+        )
+    )
+    application.include_router(
+        create_project_grant_recipients_router(authenticate, _open_grant_recipients)
+    )
     application.include_router(create_human_admission_router(authenticate, _open_human_admitter))
-    application.include_router(create_project_grant_router(authenticate, _open_grant_change))
     application.include_router(
         create_project_action_grant_change_router(authenticate, _open_grant_change)
     )

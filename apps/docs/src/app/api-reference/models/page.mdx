@@ -17,6 +17,38 @@ Confirms original asynchronous admission with a known or explicitly unknown job 
 
 <ApiSchema name="AcceptedOperationLookupResponse" />
 
+<a id="AccessGroupActionGrantItemResponse" />
+
+## AccessGroupActionGrantItemResponse
+
+One stored exact group/action assignment. It reports the flat Project, group and recipient IDs and grant level, including rows for suspended recipients.
+
+<ApiSchema name="AccessGroupActionGrantItemResponse" />
+
+<a id="AccessGroupActionGrantRemovalResponse" />
+
+## AccessGroupActionGrantRemovalResponse
+
+Preserves original `removed: true`, `changed`, Project Access revision, operation and expiry. It describes the original removal rather than today's assignment.
+
+<ApiSchema name="AccessGroupActionGrantRemovalResponse" />
+
+<a id="AccessGroupActionGrantRequest" />
+
+## AccessGroupActionGrantRequest
+
+Supplies a strict grant-level boolean and the reviewed owning Project Access revision. The route selects the exact group, recipient and action.
+
+<ApiSchema name="AccessGroupActionGrantRequest" />
+
+<a id="AccessGroupActionGrantResponse" />
+
+## AccessGroupActionGrantResponse
+
+Preserves the original flat scope, recipient, action, requested level, `changed`, Project Access revision, operation and expiry. The receipt does not create group membership or management.
+
+<ApiSchema name="AccessGroupActionGrantResponse" />
+
 <a id="AccessGroupCreationRequest" />
 
 ## AccessGroupCreationRequest
@@ -115,6 +147,38 @@ An exact group's bounded member or manager page with the current Project Access 
 
 <ApiSchema name="ApplicationAccountAction" />
 
+<a id="ApplicationAccountActionGrantItemResponse" />
+
+## ApplicationAccountActionGrantItemResponse
+
+One stored human administration assignment on an exact application account. Its flat `applicationPrincipalId` selects the account being administered.
+
+<ApiSchema name="ApplicationAccountActionGrantItemResponse" />
+
+<a id="ApplicationAccountActionGrantRemovalResponse" />
+
+## ApplicationAccountActionGrantRemovalResponse
+
+Preserves the original removal, `changed`, Project Access revision, operation and expiry. It does not remove the account or revoke a key.
+
+<ApiSchema name="ApplicationAccountActionGrantRemovalResponse" />
+
+<a id="ApplicationAccountActionGrantRequest" />
+
+## ApplicationAccountActionGrantRequest
+
+Supplies strict `canGrant` and the reviewed owning Project `expectedAccessRevision`. The recipient must be human for a fresh assignment.
+
+<ApiSchema name="ApplicationAccountActionGrantRequest" />
+
+<a id="ApplicationAccountActionGrantResponse" />
+
+## ApplicationAccountActionGrantResponse
+
+Preserves the original account-administration assignment and Project Access revision. It gives no received permission or credential to the application.
+
+<ApiSchema name="ApplicationAccountActionGrantResponse" />
+
 <a id="ApplicationAccountCreationRequest" />
 
 ## ApplicationAccountCreationRequest
@@ -170,6 +234,22 @@ Safe retained key identity, scope and lifecycle metadata. It contains no secret 
 ## DeletionStatusResponse
 
 <ApiSchema name="DeletionStatusResponse" />
+
+<a id="GrantRecipientResponse" />
+
+## GrantRecipientResponse
+
+One currently eligible Project grant candidate, with only safe principal ID, display name and kind. Discovery supplies neither a grant nor a guarantee of eligibility at a later write.
+
+<ApiSchema name="GrantRecipientResponse" />
+
+<a id="GrantTargetKind" />
+
+## GrantTargetKind
+
+The closed Project-recipient discovery selector uses `project`, `access-group` or `application-account`. The server checks the target's authoritative Project binding.
+
+<ApiSchema name="GrantTargetKind" />
 
 <a id="HumanAdmissionRequest" />
 
@@ -311,6 +391,38 @@ Includes the content-free retained deletion-status alternative for the closed ac
 
 <ApiSchema name="OriginalOperationLookupRequest" />
 
+<a id="OrganizationActionGrantItemResponse" />
+
+## OrganizationActionGrantItemResponse
+
+One stored exact Organization/action assignment. It is not an eligible-recipient directory or an effective-permission report.
+
+<ApiSchema name="OrganizationActionGrantItemResponse" />
+
+<a id="OrganizationActionGrantRemovalResponse" />
+
+## OrganizationActionGrantRemovalResponse
+
+Preserves original `removed: true`, `changed`, Organization Access revision, operation and expiry, including a fresh already-absent no-op.
+
+<ApiSchema name="OrganizationActionGrantRemovalResponse" />
+
+<a id="OrganizationActionGrantRequest" />
+
+## OrganizationActionGrantRequest
+
+Supplies strict `canGrant` and the reviewed Organization `expectedAccessRevision`. The route selects the Organization, admitted human recipient and action.
+
+<ApiSchema name="OrganizationActionGrantRequest" />
+
+<a id="OrganizationActionGrantResponse" />
+
+## OrganizationActionGrantResponse
+
+Preserves the original flat Organization scope, recipient, action, requested grant level, `changed`, revision, operation and expiry.
+
+<ApiSchema name="OrganizationActionGrantResponse" />
+
 <a id="OwnOrganizationGrantResponse" />
 
 ## OwnOrganizationGrantResponse
@@ -324,6 +436,38 @@ Includes the content-free retained deletion-status alternative for the closed ac
 A bounded key-UUID-ordered page with safe `items` and required nullable `nextCursor`. It supplies no secret, verifier, total or permission snapshot.
 
 <ApiSchema name="PageResponse_ApplicationKeyMetadataResponse_" />
+
+<a id="PageResponse_AccessGroupActionGrantItemResponse_" />
+
+## Access-group action-grant page
+
+Stored assignments for one exact group/action, with nullable `nextCursor` and no current Access revision.
+
+<ApiSchema name="PageResponse_AccessGroupActionGrantItemResponse_" />
+
+<a id="PageResponse_ApplicationAccountActionGrantItemResponse_" />
+
+## Application-account action-grant page
+
+Stored human administration assignments for one exact account/action. These rows are separate from application credentials.
+
+<ApiSchema name="PageResponse_ApplicationAccountActionGrantItemResponse_" />
+
+<a id="PageResponse_GrantRecipientResponse_" />
+
+## Eligible Project grant-recipient page
+
+Eligible candidates for the exact Project-bound target and action, filtered before pagination. A candidate is not a committed assignment.
+
+<ApiSchema name="PageResponse_GrantRecipientResponse_" />
+
+<a id="PageResponse_OrganizationActionGrantItemResponse_" />
+
+## Organization action-grant page
+
+Stored assignments for one Organization action, including retained suspended-recipient rows. This is not an Organization directory.
+
+<ApiSchema name="PageResponse_OrganizationActionGrantItemResponse_" />
 
 <a id="PageResponse_ProjectActionGrantItemResponse_" />
 
@@ -481,13 +625,13 @@ A bounded page of stored memberships and the current Project Access revision. A 
 
 ## ProjectUseOnlyGrantRequest
 
-<ApiSchema name="ProjectUseOnlyGrantRequest" />
+The former POST request export has retired. Preserve an original request as evidence and use [historical metadata lookup](/guides/recover-original-request#inspect-historical-use-only-post-metadata) after an uncertain response.
 
 <a id="ProjectUseOnlyGrantResponse" />
 
 ## ProjectUseOnlyGrantResponse
 
-<ApiSchema name="ProjectUseOnlyGrantResponse" />
+The former POST response export has retired. Historical operation metadata retains its original outcome and expiry. It supplies no current assignment or permission to dispatch PUT.
 
 <a id="ProtectedResourceMetadataResponse" />
 

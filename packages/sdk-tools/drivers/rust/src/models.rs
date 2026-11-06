@@ -148,32 +148,36 @@ mod tests {
     }
 
     #[test]
-    fn boolean_constants_reject_true_and_explicit_null() {
+    fn removal_acknowledgement_rejects_false_null_and_omission() {
         let grant = serde_json::json!({
-            "accessRevision":1,"actionId":"create-access-groups","canGrant":false,
+            "accessRevision":1,"actionId":"create-access-groups","removed":true,"changed":true,
             "idempotencyExpiresAt":"2030-01-01T00:00:00Z","operationId":"sdk-operation",
             "projectId":"00000000-0000-4000-8000-000000000003",
             "recipientPrincipalId":"00000000-0000-4000-8000-000000000002"
         });
         assert!(
-            serde_json::from_value::<inframeld_sdk::types::ProjectUseOnlyGrantResponse>(
+            serde_json::from_value::<inframeld_sdk::types::ProjectActionGrantRemovalResponse>(
                 grant.clone()
             )
             .is_ok()
         );
-        for invalid in [serde_json::json!(true), serde_json::Value::Null] {
+        for invalid in [serde_json::json!(false), serde_json::Value::Null] {
             let mut input = grant.clone();
-            input["canGrant"] = invalid;
+            input["removed"] = invalid;
             assert!(
-                serde_json::from_value::<inframeld_sdk::types::ProjectUseOnlyGrantResponse>(input)
-                    .is_err()
+                serde_json::from_value::<inframeld_sdk::types::ProjectActionGrantRemovalResponse>(
+                    input
+                )
+                .is_err()
             );
         }
         let mut omitted = grant;
-        omitted.as_object_mut().unwrap().remove("canGrant");
+        omitted.as_object_mut().unwrap().remove("removed");
         assert!(
-            serde_json::from_value::<inframeld_sdk::types::ProjectUseOnlyGrantResponse>(omitted)
-                .is_ok()
+            serde_json::from_value::<inframeld_sdk::types::ProjectActionGrantRemovalResponse>(
+                omitted
+            )
+            .is_err()
         );
     }
     use serde_json::{Value, json};

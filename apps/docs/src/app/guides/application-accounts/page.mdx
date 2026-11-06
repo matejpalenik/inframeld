@@ -10,6 +10,8 @@ Create SupportBot in your Support Project as a separate identity for an integrat
 
 You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation and safe metadata reads. Key issuance, application authentication, revocation and account retirement are not available through these operations.
 
+Use [exact action-grant administration](/guides/manage-action-grants) to share one account-administration permission with another eligible human in the Project. Those grants control the human's authority over SupportBot. They do not give SupportBot an action permission, create a key or copy any human access. An application account cannot receive account-administration grants or grant authority.
+
 ## Prepare your access
 
 You need an existing Project, its permanent ID and a current human credential accepted by the installation. You must be an eligible admitted human member of that Project with permission to use `create-application-accounts`. Either `canGrant` level permits creation. Project membership alone does not.

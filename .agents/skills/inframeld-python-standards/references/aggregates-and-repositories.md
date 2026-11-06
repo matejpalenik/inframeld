@@ -163,7 +163,7 @@ class ProjectMembership:
         return hash(self.identity)
 ```
 
-**Walkthrough.** The constructor reconstitutes the complete collection and rejects duplicate actions, wrong-scope children and application delegation rights. `grants` returns an immutable tuple. `assign_use_only_grant` expresses the requested business action, rejects an already assigned action at either level, and creates the new attributed child only after that check.
+**Walkthrough.** The constructor reconstitutes the complete collection and rejects duplicate actions, wrong-scope children and application delegation rights. Exact `set_action_grant` and `remove_action_grant` report whether state changed, preserving no-op meaning. Current authority, recipient eligibility and handover are service/policy responsibilities. `grants` returns an immutable tuple. `assign_use_only_grant` expresses the requested business action, rejects an already assigned action at either level, and creates the new attributed child only after that check.
 
 The aggregate identity is project plus principal. Organization and kind are read-only metadata. `ProjectActionGrant` children are immutable and have natural identity project plus recipient plus action. Level and attribution are state. Equality by entity identity does not establish that those state values are unchanged.
 
@@ -285,7 +285,7 @@ class ProjectMembershipRepository(Protocol):
 
 **Walkthrough.** The service passes checked organization/project IDs and the requested recipient to `get`. The adapter loads an existing membership and all its direct grants. Missing membership raises the existing not-found failure and never provisions a membership. Repeated loads in the active transaction return the same instance. The service verifies the returned target before invoking domain behavior.
 
-The full [service example](services-and-use-cases.md#worked-example-add-a-complete-database-write) shows `get`, `assign_use_only_grant` and `save` inside their actual safeguards. The expected revision supplied to save belongs to the whole Project, not one membership. `operation_id` is the original reservation identity used for required audit correlation.
+The full [service example](services-and-use-cases.md#worked-example-add-a-complete-database-write) shows the current exact set/remove workflow and its safeguards. The aggregate addition method above remains a narrower supported domain operation, not a live POST route. The expected revision supplied to save belongs to the whole Project, not one membership. `operation_id` is the original reservation identity used for required audit correlation.
 
 **Failure and alternatives.** Loading a membership grants no action permission. A repository does not replace authorization. A read projection needs no save method. Creation needs a separately designed persistence contract rather than changing this `get` into an implicit create. Keep supporting audit and reservation writers as focused capabilities.
 

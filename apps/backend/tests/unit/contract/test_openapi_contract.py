@@ -161,7 +161,41 @@ def test_openapi_contract_matches_application() -> None:
     ("path", "method"),
     [
         ("/v1/session", "get"),
-        ("/v1/projects/{project_id}/grants", "post"),
+        (
+            "/v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}",
+            "put",
+        ),
+        ("/v1/organizations/{organization_id}/grants", "get"),
+        (
+            "/v1/organizations/{organization_id}/grants/{recipient_principal_id}/{action_id}",
+            "put",
+        ),
+        (
+            "/v1/organizations/{organization_id}/grants/{recipient_principal_id}/{action_id}",
+            "delete",
+        ),
+        ("/v1/projects/{project_id}/access-groups/{access_group_id}/grants", "get"),
+        (
+            "/v1/projects/{project_id}/access-groups/{access_group_id}/grants/{recipient_principal_id}/{action_id}",
+            "put",
+        ),
+        (
+            "/v1/projects/{project_id}/access-groups/{access_group_id}/grants/{recipient_principal_id}/{action_id}",
+            "delete",
+        ),
+        (
+            "/v1/projects/{project_id}/application-accounts/{application_principal_id}/grants",
+            "get",
+        ),
+        (
+            "/v1/projects/{project_id}/application-accounts/{application_principal_id}/grants/{recipient_principal_id}/{action_id}",
+            "put",
+        ),
+        (
+            "/v1/projects/{project_id}/application-accounts/{application_principal_id}/grants/{recipient_principal_id}/{action_id}",
+            "delete",
+        ),
+        ("/v1/projects/{project_id}/grant-recipients", "get"),
         ("/v1/operations/lookup", "post"),
         ("/v1/projects/{project_id}/metadata", "get"),
         ("/v1/projects/{project_id}/members", "get"),

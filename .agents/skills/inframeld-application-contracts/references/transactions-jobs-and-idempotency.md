@@ -16,12 +16,12 @@ The idempotency context, authenticated `access`, current `authorization`, typed 
 
 ## Follow the implemented grant pattern
 
-1. The static `ProjectUseOnlyGrantMapper` creates a flat Command from HTTP input. It constructs the typed response directly after narrowing the supported action. Fingerprint meaning belongs to the service.
-2. The service computes the unchanged fingerprint before opening `TransactionManager`. Bootstrap supplies its adapters one clean request-local session and closes it afterward.
-3. Inside the transaction, call `ProjectGrantAuthorizer` through the service's direct dependency. Immediately compare returned project scope to the Command, before reservation or replay. A mismatch raises an internal runtime error and rolls back. Scope matching does not replace current permission checks.
-4. Pass current context/access/authorization/fingerprint/replay kind to idempotency. A completed retry can resolve its original outcome. New work retains the existing expected-project-revision check and lock/deadline contract.
-5. Load the recipient through `ProjectMembershipRepository` in authorization scope. Check organization, project and recipient. Invoke `assign_use_only_grant()` with business details from the unchanged Command.
-6. Save supported additions with the checked project-wide revision and original operation ID. Required audit, durable change and safe completion/replay metadata commit together.
+1. `ProjectActionGrantChangeMapper` constructs a flat exact set/remove Command and original operation context from strictly parsed HTTP input. It serializes the committed original business receipt without inventing a revision. Fingerprint meaning belongs to the service.
+2. The service computes the unchanged operation fingerprint before opening `TransactionManager`. Bootstrap supplies each transaction-bound adapter the same clean request-local session and closes it afterward.
+3. Inside the transaction, read scoped current management facts under compatible coordination. Check actor/target bindings and existing eligibility, visibility and exact-delegation policies before reservation or replay. Wrong scope is an internal contract failure, not permission.
+4. Pass current context/access/checked scope/fingerprint/replay kind to idempotency. A completed retry validates and returns its original immutable business result before fresh recipient, reviewed revision or handover checks.
+5. Fresh work checks expected revision and the applicable recipient/remaining-grantor rules. Load an existing membership only where required, verify its scope and invoke the exact set/remove aggregate transition.
+6. Save changed grant, one revision increment, audit, completion and original business result together. An authorized no-op records its unchanged original receipt without another revision or change audit. Return only after successful transaction exit.
 
 Load/save stay outside narrow domain-error catches. Translate recognized aggregate rejections with stable application-owned messages and preserve causes. Persistence, audit, commit failure or cancellation must leave rollback with the service transaction. The repository neither commits nor retries and must discard transaction-bound instances after failure/end.
 

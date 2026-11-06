@@ -40,7 +40,7 @@ Follow domain → layer → component role. Preserve the existing frontend's Nex
 | Configuration | `*Settings` in `infrastructure/settings`, aggregated by bootstrap. |
 | Pure business decision | `*Policy` in `policies/*_policy.py`, with pure static methods. |
 
-For example, `AssignProjectUseOnlyGrantCommand` belongs in `application/commands/` and `GetProjectQuery` in `application/queries/`. The first is implemented. The latter is a naming example, not evidence of a delivered read. Results and metadata such as `CommandContextDTO` retain DTO. Technology-prefixed aggregate adapters belong in `infrastructure/repositories`.
+For example, `SetProjectActionGrantCommand` belongs in `application/commands/` and `GetProjectQuery` in `application/queries/`. The first is implemented. The latter is a naming example, not evidence of a delivered read. Results and metadata such as `CommandContextDTO` retain DTO. Technology-prefixed aggregate adapters belong in `infrastructure/repositories`.
 
 <a id="give-each-public-type-a-home"></a>
 
@@ -72,14 +72,14 @@ Do not introduce an aggregate, repository or abstraction merely to demonstrate a
 access/
   domain/entities/project_membership.py
   domain/policies/project_grant_delegation_policy.py
-  application/commands/assign_project_use_only_grant_command.py
+  application/commands/set_project_action_grant_command.py
   application/protocols/project_grant_changer.py
   application/protocols/project_membership_repository.py
   application/services/project_grant_change_service.py
-  http/requests/project_use_only_grant_request.py
-  http/responses/project_use_only_grant_response.py
-  http/mappers/project_use_only_grant_mapper.py
-  http/routes/project_grant_routes.py
+  http/requests/project_action_grant_request.py
+  http/responses/project_action_grant_response.py
+  http/mappers/project_action_grant_change_mapper.py
+  http/routes/project_action_grant_change_routes.py
   infrastructure/repositories/postgres_project_membership_repository.py
 bootstrap/
   project_grant_composition.py
@@ -98,9 +98,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
-from inframeld_backend.access.application.services.project_grant_authorization_service import (
-    ProjectGrantAuthorizationService,
-)
 from inframeld_backend.access.application.services.project_grant_change_fingerprint_service import (
     ProjectGrantChangeFingerprintService,
 )
@@ -141,9 +138,6 @@ async def open_project_grant_change(
     async with database.session() as session:
         yield ProjectGrantChangeService(
             transaction_manager=SqlAlchemyTransactionManager(session),
-            project_grant_authorizer=ProjectGrantAuthorizationService(
-                PostgresProjectGrantChangeFactsReader(session)
-            ),
             operation_idempotency=IdempotencyService(PostgresOperationReservationWriter(session)),
             membership_repository=PostgresProjectMembershipRepository(
                 session, PostgresAuditEventWriter(session)
@@ -163,7 +157,7 @@ The constructor lists the operation's dependencies instead of hiding them in a g
 
 ## Worked example: read facts without inventing an aggregate
 
-**Situation.** An authorizer needs current account, project and exact-grant facts. It needs an observation for a decision, not a mutable object to save.
+**Situation.** A grant service needs current account, project and exact-grant facts. It needs an observation for a decision, not a mutable object to save.
 
 **Decision and placement.** The existing `ProjectActionFactsReader` application protocol, `PostgresProjectActionFactsReader` infrastructure reader and `ProjectActionFactsDTO` result express that need. A typed projection is a named view of selected data. It need not contain every record in an aggregate.
 
@@ -204,7 +198,7 @@ inframeld_backend/
 │   │       ├── human_authentication_policy.py
 │   │       └── project_visibility_policy.py
 │   ├── application/
-│   │   ├── commands/assign_project_use_only_grant_command.py
+│   │   ├── commands/set_project_action_grant_command.py
 │   │   ├── services/
 │   │   │   ├── human_session_authentication_service.py
 │   │   │   ├── human_access_token_authentication_service.py
@@ -228,11 +222,11 @@ inframeld_backend/
 │   │       ├── browser_session_credential.py
 │   │       └── human_access_token_credential.py
 │   ├── http/
-│   │   ├── routes/                    # current_session_routes, project_grant_routes
+│   │   ├── routes/                    # current_session_routes, project_action_grant_change_routes
 │   │   ├── dependencies/              # HumanSessionDependency, CSRFProtectionDependency
-│   │   ├── mappers/project_use_only_grant_mapper.py
+│   │   ├── mappers/project_action_grant_change_mapper.py
 │   │   ├── openapi/human_authentication_responses.py
-│   │   └── responses/                 # CurrentSessionResponse, ProjectUseOnlyGrantResponse
+│   │   └── responses/                 # CurrentSessionResponse, ProjectActionGrantResponse
 │   └── infrastructure/
 │       ├── readers/                   # PostgresHumanIdentityLinkReader, project facts reader
 │       ├── mappers/postgres_human_credential_state_mapper.py
@@ -295,7 +289,7 @@ Use one primary public type per production module, with a matching snake-case fi
 | Entity | `Principal` in `entities/principal.py` | Hold account state with stable identity. Equality follows its ID. |
 | Value object | `PrincipalId`, `IdentitySubject`, `BrowserSessionCredential` in `value_objects` | Give a value its meaning and enforce its invariants. |
 | Enum | `PrincipalStatus` in `enums/principal_status.py` | Define a closed vocabulary. |
-| CQRS command input | `*Command` in `commands/*_command.py` | Describe the change to request, such as `AssignProjectUseOnlyGrantCommand`. |
+| CQRS command input | `*Command` in `commands/*_command.py` | Describe the change to request, such as `SetProjectActionGrantCommand`. |
 | CQRS query input | `*Query` in `queries/*_query.py` | Describe the read to request, such as `GetProjectQuery`. |
 | Other application DTO | `*DTO` in `dtos/*_dto.py` | Carry results, read projections, or caller/operation context. |
 | Dedicated policy input | `*PolicyInput` in `policy_inputs/*_policy_input.py` | Supply the values a domain policy needs for its decision. |
@@ -313,7 +307,7 @@ Use one primary public type per production module, with a matching snake-case fi
 
 Existing published HTTP names such as `ProblemDetails` and `ValidationIssue` are preserved, including their OpenAPI descriptions. New HTTP models use Request/Response naming. CQRS command and query inputs end in `Command` and `Query`, without `DTO`. Other application transfer records use the uppercase `DTO` suffix, including command/query results, read projections, and caller/operation metadata.
 
-`AssignProjectUseOnlyGrantCommand` is implemented under Access's `application/commands/` folder and describes the supported grant change. `GetProjectQuery` remains a naming example for a future read that benefits from a named input. Create role folders with the first real workflow that needs them. Query results can still be DTOs, and `CommandContextDTO` remains metadata rather than a command input.
+`SetProjectActionGrantCommand` is implemented under Access's `application/commands/` folder and describes the supported grant change. `GetProjectQuery` remains a naming example for a future read that benefits from a named input. Create role folders with the first real workflow that needs them. Query results can still be DTOs, and `CommandContextDTO` remains metadata rather than a command input.
 
 This follows the CQRS distinction between a request to change state and a request to read it. Microsoft describes a command as a specialized DTO and illustrates a purpose-specific name such as `CreateOrderCommand`. Inframeld uses the more specific `Command` and `Query` suffixes for these input roles. They need no DTO base class or command bus. The agreed nominal `Command` base supplies classification only. See [Microsoft's command definition](https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/microservice-application-layer-implementation-web-api#the-command-class) and [CQRS overview](https://learn.microsoft.com/en-us/azure/architecture/patterns/cqrs).
 

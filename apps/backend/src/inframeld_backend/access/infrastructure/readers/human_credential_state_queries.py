@@ -1,6 +1,15 @@
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Nullable, Select, and_, exists, select
+from sqlalchemy import (
+    ColumnElement,
+    Nullable,
+    Select,
+    SQLColumnExpression,
+    and_,
+    exists,
+    or_,
+    select,
+)
 from sqlalchemy.sql.selectable import Exists, ScalarSelect
 
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
@@ -9,6 +18,8 @@ from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dt
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
     HumanCredentialVersionRow,
 )
@@ -19,6 +30,7 @@ from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_ro
     IdentityRecoveryAdmissionRow,
 )
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.rows.installation_identity_row import (
     InstallationIdentityRow,
 )
@@ -26,6 +38,64 @@ from inframeld_backend.shared.infrastructure.rows.installation_identity_row impo
 
 class HumanCredentialStateQueries:
     """Compose typed security projections without opening sessions or executing readers."""
+
+    @staticmethod
+    def pending_for_principal(
+        principal: SQLColumnExpression[UUID], installation: InstallationId
+    ) -> Exists:
+        return (
+            select(IdentityRecoveryAdmissionRow.operation_id)
+            .join(
+                HumanIdentityLinkRow,
+                and_(
+                    HumanIdentityLinkRow.authority == IdentityRecoveryAdmissionRow.authority,
+                    HumanIdentityLinkRow.subject == IdentityRecoveryAdmissionRow.subject,
+                ),
+            )
+            .where(
+                IdentityRecoveryAdmissionRow.installation_id == installation.value,
+                HumanIdentityLinkRow.principal_id == principal,
+                IdentityRecoveryAdmissionRow.released_at.is_(None),
+            )
+            .exists()
+            .correlate_except(IdentityRecoveryAdmissionRow, HumanIdentityLinkRow)
+        )
+
+    @staticmethod
+    def coherent_for_principal(
+        principal: SQLColumnExpression[UUID],
+        organization: OrganizationId,
+        installation: InstallationId,
+    ) -> Exists:
+        """Observe a scoped identity link with the existing legacy/version coherence rule."""
+        version = (
+            exists()
+            .where(
+                HumanCredentialVersionRow.installation_id == installation.value,
+                HumanCredentialVersionRow.authority == HumanIdentityLinkRow.authority,
+                HumanCredentialVersionRow.subject == HumanIdentityLinkRow.subject,
+            )
+            .correlate(HumanIdentityLinkRow)
+        )
+        history = (
+            exists()
+            .where(
+                IdentityRecoveryAdmissionRow.installation_id == installation.value,
+                IdentityRecoveryAdmissionRow.authority == HumanIdentityLinkRow.authority,
+                IdentityRecoveryAdmissionRow.subject == HumanIdentityLinkRow.subject,
+            )
+            .correlate(HumanIdentityLinkRow)
+        )
+        return (
+            exists()
+            .where(
+                HumanIdentityLinkRow.principal_id == principal,
+                HumanIdentityLinkRow.organization_id == organization.value,
+                HumanIdentityLinkRow.principal_kind == PrincipalKind.HUMAN,
+                or_(version, ~history),
+            )
+            .correlate_except(HumanIdentityLinkRow)
+        )
 
     @staticmethod
     def for_identity(

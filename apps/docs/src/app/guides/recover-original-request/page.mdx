@@ -8,7 +8,7 @@ export const pageMetadata = {
 
 If you submit a request and lose its response, use `POST /v1/operations/lookup` to check what Inframeld retained about that request. Lookup reads the original operation's record. It does not perform the operation again.
 
-This guide uses a Project grant: Alice submitted a request to grant Bob access, but did not receive the response. The same lookup endpoint supports retained Project and Organization operations with the appropriate authority guard. Its closed access-group deletion variant returns only content-free retained deletion status.
+This guide uses an exact Project grant PUT: Alice submitted a request to grant Bob access, but did not receive the response. The same lookup endpoint supports retained Project and Organization operations with the appropriate authority guard. Its closed access-group deletion variant returns only content-free retained deletion status.
 
 <Note>
   An `unresolved` result or a timeout does not mean the original request failed.
@@ -25,7 +25,7 @@ You need:
 - The backend URL for your Inframeld installation.
 - A current human bearer credential for that installation.
 - The original installation, Organization, Project, HTTP method, canonical route, request key, and authority guard. Retain these before sending the original request.
-- Current permission to inspect the original scope. For a grant, you must still have Project membership and visibility, with can-use-and-grant authority for `create-access-groups`.
+- Current permission to inspect the original scope. Grant-operation metadata requires current eligible-human use-and-grant authority for the original exact action and target. Project-scoped grants also require current membership and visibility. Group management alone is insufficient for this metadata lookup.
 
 The authority guard describes the permission associated with the original operation. Supplying it does not grant permission. Authentication identifies the caller, so the request body has no actor field.
 
@@ -53,6 +53,109 @@ Save the following as `original-request.json` in your example project's working 
   "installationId": "00000000-0000-4000-8000-000000000001",
   "organizationId": "00000000-0000-4000-8000-000000000002",
   "projectId": "00000000-0000-4000-8000-000000000003",
+  "method": "PUT",
+  "requestedRoute": "/v1/projects/00000000-0000-4000-8000-000000000003/grants/00000000-0000-4000-8000-000000000004/create-access-groups",
+  "key": "grant-bob-1",
+  "expectedAuthority": {
+    "family": "project_grant_read",
+    "actionId": "create-access-groups"
+  }
+}
+```
+
+</CodeGroup>
+
+Use the original method and the exact route representation documented for that operation. This exact-target PUT uses the concrete original path containing the actual Project and recipient UUIDs and action. An exact-target DELETE uses its concrete path without the revision query. The original idempotency key belongs in the lookup JSON body.
+
+Do not reconstruct the original scope from your current Project selection or an alias. Lookup takes no grant payload or request fingerprint. The JSON body is limited to 32 KiB. Unknown fields and duplicate JSON keys are rejected.
+
+For other supported operations, preserve the original authority meaning:
+
+| Original operation                   | `expectedAuthority.family`       | `expectedAuthority.actionId`           | `projectId`           |
+| ------------------------------------ | -------------------------------- | -------------------------------------- | --------------------- |
+| Project grant PUT/DELETE             | `project_grant_read`             | Original Project action                | Original Project UUID |
+| Organization grant PUT/DELETE        | `organization_grant_read`        | Original Organization action           | Explicit `null`       |
+| Access-group grant PUT/DELETE        | `access_group_grant_read`        | Original group document action         | Original Project UUID |
+| Application-account grant PUT/DELETE | `application_account_grant_read` | Original account-administration action | Original Project UUID |
+| Generic Project operation            | `project_action_use`             | Original Project action                | Original Project UUID |
+| Other Organization operation         | `organization_action_use`        | Original Organization action           | Explicit `null`       |
+
+For a Project metadata change, retain method `PATCH`, canonical route `/v1/projects/{project_id}/metadata`, family `project_action_use` and action `edit-project-metadata`. [Name and rename an existing Project](/guides/name-and-rename-project) explains the write and recovery path. Lookup observes its retained operation metadata. A separate Project metadata GET reports current fields.
+
+For application-account creation, retain method `POST`, the original concrete route containing the actual Project UUID, family `project_action_use` and action `create-application-accounts`. [Create and inspect an application account](/guides/application-accounts#recover-an-uncertain-creation-result) explains its original-POST recovery and exact lookup context.
+
+A grant lookup requires the exact grant-read family above. A weaker action-use guard cannot replace it. Lookup checks your current eligible-human exact use-and-grant authority before searching retained history. It does not repeat the recipient's eligibility or reviewed-revision check from the original assignment. A current group manager may replay an ordinary same-write result, but management alone cannot authorize this generic metadata lookup. Grant history has no deleted-target exception.
+
+## Inspect another exact grant operation
+
+For an Organization, group or application-account grant, retain the original concrete route containing the actual scope, target and recipient UUIDs and action. Use the original `PUT` or `DELETE` method. DELETE's revision query remains part of the original business request but is excluded from its lookup route. Organization grants require explicit `projectId: null`.
+
+Choose the matching complete lookup input below and save it as `original-request.json` in its own example directory. Replace the illustrative IDs and key with the original values. The common cURL and three generated programs below use the same lookup operation for each input, without resending a grant change:
+
+<CodeGroup>
+
+```json {{ title: "Organization original-request.json" }}
+{
+  "installationId": "00000000-0000-4000-8000-000000000001",
+  "organizationId": "00000000-0000-4000-8000-000000000002",
+  "projectId": null,
+  "method": "PUT",
+  "requestedRoute": "/v1/organizations/00000000-0000-4000-8000-000000000002/grants/00000000-0000-4000-8000-000000000004/create-projects",
+  "key": "organization-grant-bob-1",
+  "expectedAuthority": {
+    "family": "organization_grant_read",
+    "actionId": "create-projects"
+  }
+}
+```
+
+```json {{ title: "Group original-request.json" }}
+{
+  "installationId": "00000000-0000-4000-8000-000000000001",
+  "organizationId": "00000000-0000-4000-8000-000000000002",
+  "projectId": "00000000-0000-4000-8000-000000000003",
+  "method": "PUT",
+  "requestedRoute": "/v1/projects/00000000-0000-4000-8000-000000000003/access-groups/00000000-0000-4000-8000-000000000005/grants/00000000-0000-4000-8000-000000000004/add-documents",
+  "key": "group-grant-bob-1",
+  "expectedAuthority": {
+    "family": "access_group_grant_read",
+    "actionId": "add-documents"
+  }
+}
+```
+
+```json {{ title: "Account original-request.json" }}
+{
+  "installationId": "00000000-0000-4000-8000-000000000001",
+  "organizationId": "00000000-0000-4000-8000-000000000002",
+  "projectId": "00000000-0000-4000-8000-000000000003",
+  "method": "PUT",
+  "requestedRoute": "/v1/projects/00000000-0000-4000-8000-000000000003/application-accounts/00000000-0000-4000-8000-000000000006/grants/00000000-0000-4000-8000-000000000004/issue-application-keys",
+  "key": "account-grant-bob-1",
+  "expectedAuthority": {
+    "family": "application_account_grant_read",
+    "actionId": "issue-application-keys"
+  }
+}
+```
+
+</CodeGroup>
+
+The same current exact use-and-grant requirement applies to all three. A saved key, original creator receipt or current group-management relationship grants no generic-history disclosure. [Manage exact action grants](/guides/manage-action-grants#recover-an-uncertain-result) explains the ordinary business-replay alternative and current-authority checks.
+
+## Inspect historical use-only POST metadata
+
+An older client may have sent the creation-only `POST /v1/projects/{project_id}/grants` for use-only `create-access-groups`. Preserve that original request's method, literal logical route, key, fingerprint, expiry and outcome. Its lookup identity uses the literal `{project_id}` route segment shown below, rather than the concrete UUID path used by exact-target PUT/DELETE.
+
+For that historical request only, save this complete lookup input as `original-request.json` in its own example directory. Replace the illustrative scope IDs and key with the retained values:
+
+<CodeGroup>
+
+```json
+{
+  "installationId": "00000000-0000-4000-8000-000000000001",
+  "organizationId": "00000000-0000-4000-8000-000000000002",
+  "projectId": "00000000-0000-4000-8000-000000000003",
   "method": "POST",
   "requestedRoute": "/v1/projects/{project_id}/grants",
   "key": "grant-bob-1",
@@ -65,23 +168,9 @@ Save the following as `original-request.json` in your example project's working 
 
 </CodeGroup>
 
-Use the original method and the exact route representation documented for that operation. For this grant, `requestedRoute` contains `{project_id}`, not the Project's UUID. The original idempotency key belongs in the JSON body.
+The common lookup programs below read this file without performing the old write. Current exact use-and-grant authority for `create-access-groups` on the original Project remains required. Retained history supplies neither renewed expiry nor new permission.
 
-Do not reconstruct the original scope from your current Project selection or an alias. Lookup takes no grant payload or request fingerprint. The JSON body is limited to 32 KiB. Unknown fields and duplicate JSON keys are rejected.
-
-For other supported operations, preserve the original authority meaning:
-
-| Original operation        | `expectedAuthority.family` | `expectedAuthority.actionId` | `projectId`           |
-| ------------------------- | -------------------------- | ---------------------------- | --------------------- |
-| Project grant             | `project_grant_read`       | `create-access-groups`       | Original Project UUID |
-| Generic Project operation | `project_action_use`       | Original Project action      | Original Project UUID |
-| Organization operation    | `organization_action_use`  | Original Organization action | Explicit `null`       |
-
-For a Project metadata change, retain method `PATCH`, canonical route `/v1/projects/{project_id}/metadata`, family `project_action_use` and action `edit-project-metadata`. [Name and rename an existing Project](/guides/name-and-rename-project) explains the write and recovery path. Lookup observes its retained operation metadata. A separate Project metadata GET reports current fields.
-
-For application-account creation, retain method `POST`, the original concrete route containing the actual Project UUID, family `project_action_use` and action `create-application-accounts`. [Create and inspect an application account](/guides/application-accounts#recover-an-uncertain-creation-result) explains its original-POST recovery and exact lookup context.
-
-A grant lookup requires `project_grant_read`. The weaker `project_action_use` guard cannot replace it. Lookup checks your current authority before searching retained history. It does not repeat the recipient's eligibility check from the original assignment.
+An uncertain original POST must never be automatically translated into PUT. POST rejected an existing assignment, while PUT can change its level. Missing, expired or unresolved evidence does not establish that the original failed or authorize a new mutation. Keep the original request evidence and make any later PUT a separate explicit decision with current authority and reviewed state.
 
 ## Recover an access-group change
 
