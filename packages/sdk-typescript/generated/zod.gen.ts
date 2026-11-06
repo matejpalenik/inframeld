@@ -12,12 +12,51 @@ export const zAccessGroupGrantTargetResponse = z.object({
 });
 
 /**
+ * ApplicationAccountAction
+ *
+ * Identify separate human administration actions on one application account.
+ */
+export const zApplicationAccountAction = z.enum([
+    'issue-application-keys',
+    'revoke-application-keys',
+    'delete-application-account'
+]);
+
+/**
+ * ApplicationAccountCreationRequest
+ */
+export const zApplicationAccountCreationRequest = z.object({
+    displayName: z.string().min(1).max(128),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
+    name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/)
+});
+
+/**
  * ApplicationAccountGrantTargetResponse
  */
 export const zApplicationAccountGrantTargetResponse = z.object({
     applicationPrincipalId: z.uuid(),
     kind: z.literal('application-account'),
     projectId: z.uuid()
+});
+
+/**
+ * ApplicationKeyAdapter
+ */
+export const zApplicationKeyAdapter = z.enum(['http', 'mcp']);
+
+/**
+ * ApplicationKeyMetadataResponse
+ */
+export const zApplicationKeyMetadataResponse = z.object({
+    allowedAdapters: z.array(zApplicationKeyAdapter).min(1).max(2),
+    applicationPrincipalId: z.uuid(),
+    createdAt: z.iso.datetime(),
+    expiresAt: z.iso.datetime(),
+    keyId: z.uuid(),
+    prefix: z.literal('ifm_app_'),
+    projectId: z.uuid(),
+    revokedAt: z.iso.datetime().nullable()
 });
 
 /**
@@ -128,6 +167,35 @@ export const zInframeldDiscoveryResponse = z.object({
 });
 
 /**
+ * InitialApplicationAccountGrantResponse
+ */
+export const zInitialApplicationAccountGrantResponse = z.object({
+    actionId: zApplicationAccountAction,
+    canGrant: z.literal(true),
+    target: zApplicationAccountGrantTargetResponse
+});
+
+/**
+ * ApplicationAccountCreationResponse
+ *
+ * Report original human creator assignments, not current account permissions.
+ */
+export const zApplicationAccountCreationResponse = z.object({
+    accessRevision: z.int().gte(1).lte(9007199254740991),
+    displayName: z.string(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    initialGrants: z.tuple([
+        zInitialApplicationAccountGrantResponse,
+        zInitialApplicationAccountGrantResponse,
+        zInitialApplicationAccountGrantResponse
+    ]),
+    name: z.string(),
+    operationId: z.string(),
+    principalId: z.uuid(),
+    projectId: z.uuid()
+});
+
+/**
  * JobStatus
  */
 export const zJobStatus = z.enum([
@@ -233,11 +301,43 @@ export const zMyOrganizationAccessResponse = z.object({
 });
 
 /**
+ * PageResponse[ApplicationKeyMetadataResponse]
+ */
+export const zPageResponseApplicationKeyMetadataResponse = z.object({
+    items: z.array(zApplicationKeyMetadataResponse),
+    nextCursor: z.string().nullable()
+});
+
+/**
  * PrincipalKind
  *
  * Distinguish local human actors from application accounts.
  */
 export const zPrincipalKind = z.enum(['human', 'application']);
+
+/**
+ * PrincipalStatus
+ *
+ * Describe whether a local actor is active, suspended, or permanently retired.
+ */
+export const zPrincipalStatus = z.enum([
+    'active',
+    'suspended',
+    'retired'
+]);
+
+/**
+ * ApplicationAccountMetadataResponse
+ */
+export const zApplicationAccountMetadataResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    createdAt: z.iso.datetime(),
+    displayName: z.string(),
+    name: z.string().nullable(),
+    principalId: z.uuid(),
+    projectId: z.uuid(),
+    status: zPrincipalStatus
+});
 
 /**
  * ProjectAction
@@ -1174,6 +1274,280 @@ export const zResolveProjectName503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zResolveProjectNameResponse = zProjectNameResolutionResponse;
+
+export const zCreateApplicationAccountBody = zApplicationAccountCreationRequest;
+
+export const zCreateApplicationAccountHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zCreateApplicationAccountPath = z.object({
+    project_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zCreateApplicationAccount201Representation0Response = zApplicationAccountCreationResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zCreateApplicationAccount400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zCreateApplicationAccount401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zCreateApplicationAccount403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zCreateApplicationAccount404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zCreateApplicationAccount409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zCreateApplicationAccount413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zCreateApplicationAccount415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zCreateApplicationAccount422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zCreateApplicationAccount503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zCreateApplicationAccountResponse = zApplicationAccountCreationResponse;
+
+export const zResolveApplicationAccountPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zResolveApplicationAccountQuery = z.object({
+    name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/)
+});
+
+/**
+ * Successful Response
+ */
+export const zResolveApplicationAccount200Representation0Response = zApplicationAccountMetadataResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zResolveApplicationAccount400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zResolveApplicationAccount401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zResolveApplicationAccount403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zResolveApplicationAccount404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zResolveApplicationAccount409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zResolveApplicationAccount422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zResolveApplicationAccount503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zResolveApplicationAccountResponse = zApplicationAccountMetadataResponse;
+
+export const zGetApplicationAccountPath = z.object({
+    project_id: z.uuid(),
+    application_principal_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetApplicationAccount200Representation0Response = zApplicationAccountMetadataResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetApplicationAccount400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetApplicationAccount401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetApplicationAccount403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zGetApplicationAccount404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zGetApplicationAccount409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zGetApplicationAccount422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetApplicationAccount503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetApplicationAccountResponse = zApplicationAccountMetadataResponse;
+
+export const zListApplicationKeysPath = z.object({
+    project_id: z.uuid(),
+    application_principal_id: z.uuid()
+});
+
+export const zListApplicationKeysQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListApplicationKeys200Representation0Response = zPageResponseApplicationKeyMetadataResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListApplicationKeys400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListApplicationKeys401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListApplicationKeys403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListApplicationKeys404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zListApplicationKeys409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListApplicationKeys422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListApplicationKeys503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListApplicationKeysResponse = zPageResponseApplicationKeyMetadataResponse;
+
+export const zGetApplicationKeyPath = z.object({
+    project_id: z.uuid(),
+    application_principal_id: z.uuid(),
+    key_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetApplicationKey200Representation0Response = zApplicationKeyMetadataResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetApplicationKey400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetApplicationKey401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetApplicationKey403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zGetApplicationKey404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zGetApplicationKey409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zGetApplicationKey422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetApplicationKey503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetApplicationKeyResponse = zApplicationKeyMetadataResponse;
 
 export const zListProjectActionGrantsPath = z.object({
     project_id: z.uuid()

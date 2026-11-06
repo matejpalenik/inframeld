@@ -221,6 +221,74 @@ pub async fn observe(
                     .await
             )
         }
+        "createApplicationAccount" => observed!(
+            client
+                .create_application_account(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap()
+                )
+                .await
+        ),
+        "getApplicationAccount" => observed!(
+            client
+                .get_application_account(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["application_principal_id"]
+                        .as_str()
+                        .unwrap()
+                )
+                .await
+        ),
+        "resolveApplicationAccount" => observed!(
+            client
+                .resolve_application_account(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["name"].as_str().unwrap()
+                )
+                .await
+        ),
+        "listApplicationKeys" => observed!(
+            client
+                .list_application_keys(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["application_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str)
+                )
+                .await
+        ),
+        "getApplicationKey" => observed!(
+            client
+                .get_application_key(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["application_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["key_id"].as_str().unwrap()
+                )
+                .await
+        ),
         "createProject" => observed!(
             client
                 .create_project(

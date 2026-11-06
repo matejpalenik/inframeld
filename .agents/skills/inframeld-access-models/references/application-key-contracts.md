@@ -2,7 +2,7 @@
 
 Alice issues SupportBot a key and loses the response. The first successful delivery can contain the secret. A safe replay contains metadata only. The key’s public identifier is not proof of validity or current authority.
 
-> **Status:** Accepted key format/lifetimes and documented transport drafts. No production key authenticator or key-management routes are established here.
+> **Status:** Safe key metadata GET routes and native/generated-client contracts are implemented. Key format/lifetimes remain accepted design for issuance and authentication. Issue and Revoke POST routes are not implemented by the metadata read capability.
 
 <a id="application-key-contract"></a>
 
@@ -20,7 +20,7 @@ Keep the two-usable-key limit across audiences and explicit issue/update-consume
 
 The public `ifm_app_` prefix contributes no secret entropy and encodes neither installation nor application identity, Project or permissions. `ifm_app_...` is a placeholder, not a usable credential. A prefix alone cannot authenticate anyone, and absence of the prefix does not prove a human OAuth credential. Never send a failed application key to Hydra. Selected Kratos/Hydra human token formats remain unchanged. No enterprise Ory token-format customization is required.
 
-## Draft key-management routes
+## Key-management routes
 
 | Method and route | Operation ID | Named input / result | Authority and success |
 | --- | --- | --- | --- |
@@ -29,9 +29,19 @@ The public `ifm_app_` prefix contributes no secret entropy and encodes neither i
 | `GET` at that route plus `/{key_id}` | `getApplicationKey` | No body / `ApplicationKeyMetadataResponse` | Exact Issue or Revoke keys. 200. No secret retrieval. |
 | `POST` at that route plus `/{key_id}/revoke` | `revokeApplicationKey` | `ApplicationKeyRevocationRequest` / `ApplicationKeyRevocationResponse` | Exact `revoke-application-keys`. 200. Immediate revocation independent of issuance delegation. |
 
+<a id="application-key-metadata-reads"></a>
+
+### Implemented safe metadata reads
+
+`listApplicationKeys` and `getApplicationKey` use the GET rows above. [ApplicationAccountReadService](../../../../apps/backend/src/inframeld_backend/access/application/services/application_account_read_service.py) requires current eligible human authority and Project membership before returning metadata. Any administration action establishes account visibility, while the key read separately requires exact Issue or Revoke use. Delete alone returns 403 for key metadata on an otherwise visible account. Neither read requires the additional issuance delegation or group-management checks.
+
+The [PostgreSQL reader](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_application_account_facts_reader.py) observes current caller facts, exact account binding and safe metadata in one statement. Its explicit key projection never fetches the verifier, audience or original secret. Lists include retained expired/revoked records, ordered by key UUID, with default 25 and limit 1–100. An endpoint-owned opaque cursor binds installation, Organization, Project, account principal and UUID position. Each continuation is a fresh authorized observation, not a snapshot or authority token. Empty continuations retain the authorization header. Invalid or incompatible cursors return `invalid_input` 422.
+
+The native `ApplicationKeyMetadataResponse` has exactly the documented safe fields. There is no secret retrieval endpoint. Account create/get/exact-Name inspection follows [the owning workflow](application-keys.md#implemented-application-account-creation). Issuance, full verification, revocation and retirement remain #231, #230, #232 and #233 respectively.
+
 ## Typed response alternatives
 
-**Design notation, not production implementation.** UUID and datetime denote their JSON string forms. Unknown fields are rejected. The common teaching names distinguish delivery cases without changing the documented `ApplicationKeyIssueResponse` symbol.
+**Design notation for the unfinished issue/revoke alternatives.** The safe `ApplicationKeyMetadataResponse` is implemented. UUID and datetime denote their JSON string forms. Unknown fields are rejected. The common teaching names distinguish delivery cases without changing the documented `ApplicationKeyIssueResponse` symbol.
 
 ```python
 from datetime import datetime

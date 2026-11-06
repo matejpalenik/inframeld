@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import Uuid
+from sqlalchemy import Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
@@ -19,3 +19,5 @@ class ApplicationAccountRow(AccessPersistenceBase):
     organization_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     project_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     principal_kind: Mapped[PrincipalKind] = mapped_column(PRINCIPAL_KIND_TYPE, nullable=False)
+
+    resource_name: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)

@@ -408,6 +408,15 @@ pub struct ProjectActionGrantItemResponse {
     pub recipient_principal_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseApplicationKeyMetadataResponse {
+    pub items: Vec<ApplicationKeyMetadataResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OriginalOperationLookupRequest {
     #[serde(rename = "expectedAuthority")]
     pub expected_authority: OperationLookupAuthorityRequest,
@@ -2493,6 +2502,153 @@ impl AsRef<str> for CompletedOperationLookupResponseClassification {
     }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationKeyMetadataResponse {
+    ///Constraint: minItems=1, maxItems=2
+    #[serde(rename = "allowedAdapters")]
+    pub allowed_adapters: Vec<ApplicationKeyAdapter>,
+    #[serde(rename = "applicationPrincipalId")]
+    pub application_principal_id: uuid::Uuid,
+    #[serde(rename = "createdAt")]
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "keyId")]
+    pub key_id: uuid::Uuid,
+    pub prefix: ApplicationKeyMetadataResponsePrefix,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    #[serde(
+        rename = "revokedAt",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub revoked_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ApplicationKeyMetadataResponsePrefix {
+    #[default]
+    #[serde(rename = "ifm_app_")]
+    IfmApp,
+}
+impl ApplicationKeyMetadataResponsePrefix {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::IfmApp => "ifm_app_",
+        }
+    }
+}
+impl ::std::fmt::Display for ApplicationKeyMetadataResponsePrefix {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ApplicationKeyMetadataResponsePrefix {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ApplicationKeyAdapter {
+    #[default]
+    #[serde(rename = "http")]
+    Http,
+    #[serde(rename = "mcp")]
+    Mcp,
+}
+impl ApplicationKeyAdapter {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Http => "http",
+            Self::Mcp => "mcp",
+        }
+    }
+}
+impl ::std::fmt::Display for ApplicationKeyAdapter {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ApplicationKeyAdapter {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountMetadataResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "createdAt")]
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(deserialize_with = "presence_serde::required_nullable")]
+    pub name: Option<String>,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    pub status: PrincipalStatus,
+}
+///Describe whether a local actor is active, suspended, or permanently retired.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum PrincipalStatus {
+    #[default]
+    #[serde(rename = "active")]
+    Active,
+    #[serde(rename = "suspended")]
+    Suspended,
+    #[serde(rename = "retired")]
+    Retired,
+}
+impl PrincipalStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Suspended => "suspended",
+            Self::Retired => "retired",
+        }
+    }
+}
+impl ::std::fmt::Display for PrincipalStatus {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for PrincipalStatus {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+///Report original human creator assignments, not current account permissions.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountCreationResponse {
+    ///Constraint: minimum=1, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minItems=3, maxItems=3
+    #[serde(rename = "initialGrants")]
+    pub initial_grants: Vec<InitialApplicationAccountGrantResponse>,
+    pub name: String,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InitialApplicationAccountGrantResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: ApplicationAccountAction,
+    #[serde(rename = "canGrant")]
+    pub can_grant: BooleanConstant<true>,
+    pub target: ApplicationAccountGrantTargetResponse,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ApplicationAccountGrantTargetResponse {
     #[serde(rename = "applicationPrincipalId")]
     pub application_principal_id: uuid::Uuid,
@@ -2519,6 +2675,36 @@ impl ::std::fmt::Display for ApplicationAccountGrantTargetResponseKind {
     }
 }
 impl AsRef<str> for ApplicationAccountGrantTargetResponseKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+///Identify separate human administration actions on one application account.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ApplicationAccountAction {
+    #[default]
+    #[serde(rename = "issue-application-keys")]
+    IssueApplicationKeys,
+    #[serde(rename = "revoke-application-keys")]
+    RevokeApplicationKeys,
+    #[serde(rename = "delete-application-account")]
+    DeleteApplicationAccount,
+}
+impl ApplicationAccountAction {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::IssueApplicationKeys => "issue-application-keys",
+            Self::RevokeApplicationKeys => "revoke-application-keys",
+            Self::DeleteApplicationAccount => "delete-application-account",
+        }
+    }
+}
+impl ::std::fmt::Display for ApplicationAccountAction {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ApplicationAccountAction {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
@@ -2675,6 +2861,17 @@ impl AsRef<str> for AcceptedOperationLookupResponseAdmission {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountCreationRequest {
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+    ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
+    pub name: String,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CurrentSessionResponse {

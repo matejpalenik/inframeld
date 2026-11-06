@@ -18,7 +18,7 @@ Browser and human CLI paths identify Alice. An Inframeld application key identif
 
 ## Main parts and boundaries
 
-**Accepted responsibility view.** The human paths, consent and focused grant/recovery foundations have inspected code. Application-key authentication remains unfinished. Protected host continuation is implemented separately from product authentication. Native callbacks, the dedicated cleanup worker and proof-backed completion are implemented.
+**Accepted responsibility view.** The human paths, consent and focused grant/recovery foundations have inspected code. Empty application-account creation and authorized account/key metadata reads are implemented. Application-key authentication remains unfinished. Protected host continuation is implemented separately from product authentication. Native callbacks, the dedicated cleanup worker and proof-backed completion are implemented.
 
 ```mermaid
 ---
@@ -67,6 +67,12 @@ The [facts reader](../../../../apps/backend/src/inframeld_backend/access/infrast
 The [writer](../../../../apps/backend/src/inframeld_backend/access/infrastructure/writers/postgres_project_membership_change_writer.py) saves membership effects, the Project Access revision, audit and the original business receipt in the same transaction. Departure removes the recipient's Project, group and application-account grants, manager assignments before group memberships, then Project membership. Grants that Alice merely assigned to others survive. Admission, credentials, other Projects and Project-owned content survive too. Rejoining restores none of the removed relationships.
 
 Current authorization runs before replay. The original receipt remains independent of the removable membership row, so replay reports the original status, change flag and revision without applying the old change again. [The workflow](memberships-groups-and-handover.md#change-project-membership) owns the exact contract and [lifecycle persistence](access-lifecycle-persistence.md#project-membership-original-results) owns receipt storage. Public grant and group administration remain separate work. The [task guide](../../../../apps/docs/src/app/guides/manage-project-members/page.mdx) does not supply their unfinished setup procedures or establish human qualification.
+
+## Create and inspect Project-bound application identities
+
+Access implements the empty-account [creation and safe inspection workflow](application-keys.md#implemented-application-account-creation). `ApplicationAccountCreationService` coordinates current human creation authority, original-operation recovery and atomic persistence. Its PostgreSQL writer saves a shared principal and same-ID extension, required Project membership, three fixed creator assignments, audit and immutable original result in one transaction. Bootstrap supplies the clean shared session through `application_account_composition.py`.
+
+`ApplicationAccountReadService` interprets current scoped observations before disclosing one account or a bounded safe key page. Its facts reader uses one statement for caller/account authority and metadata, preserving the header on empty key continuations. The shared eligibility evaluator remains the owner of credential/recovery interpretation. Account visibility requires an exact human administration action. Key metadata separately needs Issue or Revoke. Neither service implements key issuance, incoming-key authentication, revocation, retirement or a Project-wide account directory.
 
 <a id="follow-the-implemented-grant-operation"></a>
 

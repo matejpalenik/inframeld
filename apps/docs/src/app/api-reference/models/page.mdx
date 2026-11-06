@@ -17,6 +17,50 @@ Confirms original asynchronous admission with a known or explicitly unknown job 
 
 <ApiSchema name="AcceptedOperationLookupResponse" />
 
+<a id="ApplicationAccountAction" />
+
+## ApplicationAccountAction
+
+<ApiSchema name="ApplicationAccountAction" />
+
+<a id="ApplicationAccountCreationRequest" />
+
+## ApplicationAccountCreationRequest
+
+Supplies the exact Name, display name and reviewed Project Access revision. The Project is selected in the route. No permission set, group or credential input is accepted.
+
+<ApiSchema name="ApplicationAccountCreationRequest" />
+
+<a id="ApplicationAccountCreationResponse" />
+
+## ApplicationAccountCreationResponse
+
+Records the original application principal ID, Project, names, Access revision and three creator-administration assignments. It is a retained creation receipt, not current account permissions. [The guide](/guides/application-accounts) explains exact-request recovery and separate metadata reads.
+
+<ApiSchema name="ApplicationAccountCreationResponse" />
+
+<a id="ApplicationAccountMetadataResponse" />
+
+## ApplicationAccountMetadataResponse
+
+Safe account metadata returned by both permanent-ID inspection and exact-Name resolution under current visibility. Its `accessRevision` belongs to the Project. A nullable legacy Name does not change the permanent identity.
+
+<ApiSchema name="ApplicationAccountMetadataResponse" />
+
+<a id="ApplicationKeyAdapter" />
+
+## ApplicationKeyAdapter
+
+<ApiSchema name="ApplicationKeyAdapter" />
+
+<a id="ApplicationKeyMetadataResponse" />
+
+## ApplicationKeyMetadataResponse
+
+Safe retained key identity, scope and lifecycle metadata. It contains no secret or verifier and supplies no authentication or issuance authority. [Safe key reads](/guides/application-accounts#inspect-safe-key-metadata) require exact Issue or Revoke authority.
+
+<ApiSchema name="ApplicationKeyMetadataResponse" />
+
 <a id="CompletedOperationLookupResponse" />
 
 ## CompletedOperationLookupResponse
@@ -86,6 +130,14 @@ Records the original admission or no-change result, including the local `princip
 ## InframeldDiscoveryResponse
 
 <ApiSchema name="InframeldDiscoveryResponse" />
+
+<a id="InitialApplicationAccountGrantResponse" />
+
+## InitialApplicationAccountGrantResponse
+
+One original use-and-grant assignment to the human creator on the new application account. The three assignments do not belong to the application.
+
+<ApiSchema name="InitialApplicationAccountGrantResponse" />
 
 <a id="InitialProjectGrantResponse" />
 
@@ -171,6 +223,14 @@ Identifies one actual own group membership or management relationship by `access
 
 <ApiSchema name="OwnOrganizationGrantResponse" />
 
+<a id="PageResponse_ApplicationKeyMetadataResponse_" />
+
+## Application key metadata page
+
+A bounded key-UUID-ordered page with safe `items` and required nullable `nextCursor`. It supplies no secret, verifier, total or permission snapshot.
+
+<ApiSchema name="PageResponse_ApplicationKeyMetadataResponse_" />
+
 <a id="PageResponse_ProjectActionGrantItemResponse_" />
 
 ## Project action-grant page
@@ -184,6 +244,12 @@ Contains stored exact-action assignments and a required nullable continuation cu
 ## PrincipalKind
 
 <ApiSchema name="PrincipalKind" />
+
+<a id="PrincipalStatus" />
+
+## PrincipalStatus
+
+<ApiSchema name="PrincipalStatus" />
 
 <a id="ProblemDetails" />
 

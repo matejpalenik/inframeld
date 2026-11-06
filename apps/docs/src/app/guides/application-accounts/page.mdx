@@ -1,0 +1,595 @@
+export const pageMetadata = {
+  title: "Create and inspect an application account",
+  description:
+    "Give an integration a separate Project-bound identity and inspect its safe account and key metadata.",
+}
+
+# Create and inspect an application account
+
+Create SupportBot in your Support Project as a separate identity for an integration. The account belongs to that one Project and starts with no action permissions, document-group memberships or keys. Creating it does not copy your human access.
+
+You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation and safe metadata reads. Key issuance, application authentication, revocation and account retirement are not available through these operations.
+
+## Prepare your access
+
+You need an existing Project, its permanent ID and a current human credential accepted by the installation. You must be an eligible admitted human member of that Project with permission to use `create-application-accounts`. Either `canGrant` level permits creation. Project membership alone does not.
+
+Set `INFRAMELD_URL` and `INFRAMELD_TOKEN` through the shared [HTTP setup](/clients/http#call-protected-operations). These examples assume an existing valid human bearer token. Browser sign-in alone does not put a bearer token in your terminal. If you have no supported protected credential, start with the [health request](/clients/http#make-your-first-request). The complete account-to-API procedure, engineering dry run and human acceptance remain unfinished in [qualification #352](https://github.com/matejpalenik/inframeld/issues/352).
+
+For a generated SDK, follow the local source-package setup for [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) in a separate example project. There is no delivered CLI command for this task.
+
+Use the `projectId` from the Project's creation response or an authorized [exact-Name resolution](/guides/name-and-rename-project#resolve-the-name-and-keep-the-id). Set it in your example directory, replacing this recognizable example UUID with the Support Project's actual ID:
+
+<CodeGroup>
+
+```shell
+export PROJECT_ID='00000000-0000-4000-8000-000000000003'
+```
+
+</CodeGroup>
+
+Creation persists the account and its creator's administration grants. For a disposable exercise, use a wholly disposable installation and agree on its operator-supported teardown before creating accounts. This preview provides no public account-retirement procedure.
+
+## Review your Project access
+
+Read your own Project access before creating the account:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/my-access" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+The response identifies your human `principalId`, the `projectId` and the current Project `accessRevision`. Review your exact Project grant for `create-application-accounts`. Follow `nextCursor` while it is non-null to read your remaining stored assignments. [Read your Project access](/guides/assign-project-grant#read-your-project-access-and-current-revision) explains this combined paging contract and the generated clients.
+
+The revision detects competing access changes. It is not a permission snapshot. The server checks your current eligibility, membership and creation permission again when saving the account.
+
+## Save the reviewed creation request
+
+Choose `support-bot` as the exact Name and `SupportBot` as its display name. A Name selects the account. A display name is a non-unique label. The server assigns the permanent identity.
+
+Names contain 1–63 lowercase ASCII letters, digits or hyphens, start with a letter and end with a letter or digit. Names are unique among application accounts in the Project, including accounts you cannot inspect. Retired Names remain reserved. An unavailable Name needs another explicit choice. The server does not silently add a suffix.
+
+Display names contain 1–128 Unicode code points, are nonblank and have no surrounding whitespace, controls, surrogates or line/paragraph separators. Lookup uses the exact Name, without trimming, lowercasing, matching a display label or choosing a near match.
+
+Save this complete new file as `application-account-create.json`. Replace `0` with the Project `accessRevision` you reviewed:
+
+<CodeGroup>
+
+```json
+{
+  "name": "support-bot",
+  "displayName": "SupportBot",
+  "expectedAccessRevision": 0
+}
+```
+
+</CodeGroup>
+
+Choose one request key for this creation. Keep the original installation URL, Project ID, complete request file and key together before dispatch. Use a distinct key for a distinct creation, with at most 128 characters:
+
+<CodeGroup>
+
+```shell
+export APPLICATION_ACCOUNT_CREATE_KEY='support-bot-create-1'
+```
+
+</CodeGroup>
+
+## Create the account
+
+Choose one alternative and run it from the directory containing `application-account-create.json`. Keep the body and request key unchanged if you do not receive a usable result. Save the Python program as `create_application_account.py`, the TypeScript program as `create-application-account.ts`, or the Rust program as `src/main.rs` in its example project:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request POST \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/application-accounts" \
+  --header @- \
+  --header "Idempotency-Key: $APPLICATION_ACCOUNT_CREATE_KEY" \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary @application-account-create.json <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+```python
+import asyncio
+import os
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.application_account_creation_request import (
+    ApplicationAccountCreationRequest,
+)
+
+
+async def main() -> None:
+    request = ApplicationAccountCreationRequest.model_validate_json(
+        Path("application-account-create.json").read_text(encoding="utf-8")
+    )
+    configuration = Configuration(
+        host=os.environ["INFRAMELD_URL"],
+        access_token=os.environ["INFRAMELD_TOKEN"],
+    )
+    async with ApiClient(configuration) as client:
+        try:
+            account = await AccessApi(client).create_application_account(
+                project_id=UUID(os.environ["PROJECT_ID"]),
+                idempotency_key=os.environ["APPLICATION_ACCOUNT_CREATE_KEY"],
+                application_account_creation_request=request,
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            print(f"Creation could not be confirmed: HTTP {error.status}")
+            print(error.body)
+            print("Keep the original request file and key.")
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("No usable response. Keep the original request file and key.")
+            raise SystemExit(1) from error
+
+        print(account.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import { readFileSync } from "node:fs"
+import {
+  createClient,
+  createApplicationAccount,
+  type ApplicationAccountCreationRequest,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const key = process.env.APPLICATION_ACCOUNT_CREATE_KEY
+if (!baseUrl || !token || !projectId || !key) {
+  throw new Error(
+    "Set INFRAMELD_URL, INFRAMELD_TOKEN, PROJECT_ID and APPLICATION_ACCOUNT_CREATE_KEY"
+  )
+}
+
+const body: ApplicationAccountCreationRequest = JSON.parse(
+  readFileSync("application-account-create.json", "utf8")
+)
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const result = await createApplicationAccount({
+  client,
+  path: { project_id: projectId },
+  body,
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Idempotency-Key": key,
+  },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error) {
+  console.error("Creation could not be confirmed:", result.error.kind)
+  console.error("HTTP status:", result.response?.status)
+  if (result.error.kind === "api") {
+    console.error(result.error.body)
+  } else {
+    console.error(result.error.message)
+  }
+  console.error("Keep the original request file and key.")
+  process.exitCode = 1
+} else if (result.data) {
+  console.log("HTTP", result.response?.status)
+  console.log(JSON.stringify(result.data, null, 2))
+} else {
+  throw new Error("No usable result. Keep the original request file and key.")
+}
+```
+
+```rust
+use inframeld_sdk::{ApplicationAccountCreationRequest, HttpClient};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let request: ApplicationAccountCreationRequest =
+        serde_json::from_str(&std::fs::read_to_string("application-account-create.json")?)?;
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let project_id = std::env::var("PROJECT_ID")?;
+    let key = std::env::var("APPLICATION_ACCOUNT_CREATE_KEY")?;
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    match client
+        .create_application_account(project_id, key, request)
+        .await
+    {
+        Ok(response) => {
+            println!("HTTP {}", response.status);
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+        }
+        Err(error) => {
+            if let Some(context) = error.api() {
+                eprintln!("Creation could not be confirmed: HTTP {}", context.status);
+                eprintln!("{}", context.body);
+            } else {
+                eprintln!("No usable response: {error}");
+            }
+            eprintln!("Keep the original request file and key.");
+            return Err(error.into());
+        }
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python create_application_account.py`, `node create-application-account.ts` with Node 26 in the ESM project, or `cargo run` from the Cargo project. The shared SDK setup pages supply the local dependency and runtime configuration.
+
+HTTP `201` returns `principalId`, `projectId`, the chosen names and the new Project `accessRevision`. A fresh creation advances that Project revision once. Keep `principalId` as the application account's permanent ID. The account and its application principal use this same ID. There is no second account ID, and the account cannot move to another Project.
+
+`initialGrants` records three assignments to you, each with `canGrant: true` and an exact `application-account` target for SupportBot:
+
+| Action                       | Meaning                                                                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `issue-application-keys`     | Administer key issuance for this account when that separate operation is available and its current checks pass. |
+| `revoke-application-keys`    | Administer key revocation for this account when that separate operation is available.                           |
+| `delete-application-account` | Administer retirement of this account when that separate operation is available.                                |
+
+These grants belong to your human identity, not SupportBot. They do not administer other accounts or give the bot access to documents or models. Creation saves the account, required Project membership, three creator grants, audit and original result together. A rejected commit leaves none of those partial creation effects.
+
+The response also includes `operationId` and `idempotencyExpiresAt`. These describe the retained original creation result. Its `initialGrants` is a historical receipt, not today's permission inventory. Read your own Project access again for your current stored grants.
+
+## Inspect the account by ID or exact Name
+
+Set the returned application ID for the following reads:
+
+<CodeGroup>
+
+```shell
+export APPLICATION_PRINCIPAL_ID='00000000-0000-4000-8000-000000000004'
+```
+
+</CodeGroup>
+
+Replace the example UUID with the actual `principalId`. Account metadata requires a currently eligible human Project member with at least one of the three exact account-administration permissions above. Creating accounts on the Project does not by itself reveal every application account.
+
+Read SupportBot by its permanent ID:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/application-accounts/$APPLICATION_PRINCIPAL_ID" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+The response contains safe account metadata: its Project and principal IDs, Name, display name, `status`, `createdAt` and the current Project `accessRevision`. It includes no grants, group memberships, credentials or secrets. A legacy account can have `name: null` and still be addressable by ID.
+
+If you know its exact Name instead, resolve that Name within this Project:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/application-accounts/resolve" \
+  --data-urlencode 'name=support-bot' \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+Resolution returns the same metadata shape. Check the returned `projectId`, `principalId` and `name`. It is an exact lookup under current visibility, not a Project-wide inventory. A missing or hidden account returns a safe `404`. A remembered Name or UUID supplies no authority.
+
+## Inspect safe key metadata
+
+Key reads require current permission to use `issue-application-keys` or `revoke-application-keys` on this exact account. `delete-application-account` alone is insufficient. Metadata reads do not require the additional delegation and group-management authority needed by the separate key-issuance contract.
+
+Read one page of retained key metadata:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --get \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/application-accounts/$APPLICATION_PRINCIPAL_ID/keys" \
+  --data-urlencode 'limit=25' \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A newly created account returns an empty `items` array and `nextCursor: null`, because creation issued no key. For an account with retained keys, each item gives safe binding and lifecycle metadata. `expiresAt` is its recorded expiry. `revokedAt` is null or its recorded revocation time. The item never contains the key secret or verifier. Listing a key does not establish that it can currently authenticate or use any particular action.
+
+Lists use key-UUID order, a default limit of 25 and a range of 1–100. If `nextCursor` is non-null, repeat the same scoped GET with that value as the `cursor` query parameter, passed unchanged through `--data-urlencode`. Every page checks current authority. A cursor supplies neither a snapshot nor permission, and a denied read is not an empty page.
+
+For an account that already has a retained key, set `APPLICATION_KEY_ID` to its `keyId` and read that one record:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/application-accounts/$APPLICATION_PRINCIPAL_ID/keys/$APPLICATION_KEY_ID" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer ${INFRAMELD_TOKEN}
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+The single-key response has the same safe item shape. It cannot retrieve a lost secret. These GETs take no body, reviewed revision or idempotency key. Account and key responses use `Cache-Control: no-store`. [The API reference](/api-reference/projects-and-access#read-application-key-metadata) shows their exact native contracts.
+
+## Read with a generated client
+
+These complete programs repeat the account-by-ID, exact-Name and key-list reads above. Use the same `PROJECT_ID` and `APPLICATION_PRINCIPAL_ID`, and current Issue or Revoke keys authority. The exact Name is `support-bot`, matching this guide's creation request.
+
+Leave `APPLICATION_KEYS_CURSOR` unset for the first key page, or set it to the unchanged `nextCursor` from the previous page. If the account has a retained key, set `APPLICATION_KEY_ID` to that item's `keyId` to include its single-key read. Leave it unset for a new account.
+
+Save the Python program as `inspect_application_account.py`, the TypeScript program as `inspect-application-account.ts`, or replace `src/main.rs` with the Rust program in its example project:
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+
+
+async def main() -> None:
+    project_id = UUID(os.environ["PROJECT_ID"])
+    account_id = UUID(os.environ["APPLICATION_PRINCIPAL_ID"])
+    configuration = Configuration(
+        host=os.environ["INFRAMELD_URL"],
+        access_token=os.environ["INFRAMELD_TOKEN"],
+    )
+    async with ApiClient(configuration) as client:
+        api = AccessApi(client)
+        try:
+            account = await api.get_application_account(
+                project_id=project_id,
+                application_principal_id=account_id,
+            )
+            print("Account by ID:")
+            print(account.to_json())
+
+            resolved = await api.resolve_application_account(
+                project_id=project_id,
+                name="support-bot",
+            )
+            print("Account by Name:")
+            print(resolved.to_json())
+
+            page = await api.list_application_keys(
+                project_id=project_id,
+                application_principal_id=account_id,
+                limit=25,
+                cursor=os.environ.get("APPLICATION_KEYS_CURSOR"),
+            )
+            print("Key metadata page:")
+            print(page.to_json())
+
+            key_id = os.environ.get("APPLICATION_KEY_ID")
+            if key_id:
+                key = await api.get_application_key(
+                    project_id=project_id,
+                    application_principal_id=account_id,
+                    key_id=UUID(key_id),
+                )
+                print("One key's metadata:")
+                print(key.to_json())
+        except ApiException as error:
+            print(f"Metadata read failed: HTTP {error.status}")
+            print(error.body)
+            raise SystemExit(1) from error
+        except httpx.HTTPError as error:
+            print("No usable metadata response.")
+            raise SystemExit(1) from error
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import {
+  createClient,
+  getApplicationAccount,
+  getApplicationKey,
+  listApplicationKeys,
+  resolveApplicationAccount,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const accountId = process.env.APPLICATION_PRINCIPAL_ID
+if (!baseUrl || !token || !projectId || !accountId) {
+  throw new Error(
+    "Set INFRAMELD_URL, INFRAMELD_TOKEN, PROJECT_ID and APPLICATION_PRINCIPAL_ID"
+  )
+}
+
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const headers = { Authorization: `Bearer ${token}` }
+const path = {
+  project_id: projectId,
+  application_principal_id: accountId,
+}
+const account = await getApplicationAccount({
+  client,
+  path,
+  headers,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+if (account.error) {
+  throw new Error(
+    `Account read failed: ${account.error.kind}, HTTP ${account.response?.status ?? "unavailable"}`
+  )
+}
+console.log("Account by ID:", JSON.stringify(account.data, null, 2))
+
+const resolved = await resolveApplicationAccount({
+  client,
+  path: { project_id: projectId },
+  query: { name: "support-bot" },
+  headers,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+if (resolved.error) {
+  throw new Error(
+    `Name resolution failed: ${resolved.error.kind}, HTTP ${resolved.response?.status ?? "unavailable"}`
+  )
+}
+console.log("Account by Name:", JSON.stringify(resolved.data, null, 2))
+
+const cursor = process.env.APPLICATION_KEYS_CURSOR
+const page = await listApplicationKeys({
+  client,
+  path,
+  query: { limit: 25, ...(cursor === undefined ? {} : { cursor }) },
+  headers,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+if (page.error) {
+  throw new Error(
+    `Key metadata list failed: ${page.error.kind}, HTTP ${page.response?.status ?? "unavailable"}`
+  )
+}
+console.log("Key metadata page:", JSON.stringify(page.data, null, 2))
+
+const keyId = process.env.APPLICATION_KEY_ID
+if (keyId) {
+  const key = await getApplicationKey({
+    client,
+    path: { ...path, key_id: keyId },
+    headers,
+    responseStyle: "fields",
+    throwOnError: false,
+  })
+  if (key.error) {
+    throw new Error(
+      `Key metadata read failed: ${key.error.kind}, HTTP ${key.response?.status ?? "unavailable"}`
+    )
+  }
+  console.log("One key's metadata:", JSON.stringify(key.data, null, 2))
+}
+```
+
+```rust
+use inframeld_sdk::HttpClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let project_id = std::env::var("PROJECT_ID")?;
+    let account_id = std::env::var("APPLICATION_PRINCIPAL_ID")?;
+    let cursor = std::env::var("APPLICATION_KEYS_CURSOR").ok();
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    let account = client
+        .get_application_account(&project_id, &account_id)
+        .await?;
+    println!("Account by ID:");
+    println!("{}", serde_json::to_string_pretty(&account.body)?);
+
+    let resolved = client
+        .resolve_application_account(&project_id, "support-bot")
+        .await?;
+    println!("Account by Name:");
+    println!("{}", serde_json::to_string_pretty(&resolved.body)?);
+
+    let page = client
+        .list_application_keys(&project_id, &account_id, Some(25), cursor.as_deref())
+        .await?;
+    println!("Key metadata page:");
+    println!("{}", serde_json::to_string_pretty(&page.body)?);
+
+    if let Ok(key_id) = std::env::var("APPLICATION_KEY_ID") {
+        let key = client
+            .get_application_key(&project_id, &account_id, key_id)
+            .await?;
+        println!("One key's metadata:");
+        println!("{}", serde_json::to_string_pretty(&key.body)?);
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python inspect_application_account.py`, `node inspect-application-account.ts` with Node 26, or `cargo run`. The ID and Name reads should identify the same account and Project. The key page and optional single-key result contain only safe metadata. These programs print one key page per run. Continue with the returned cursor under the same current authority.
+
+## Recover an uncertain creation result
+
+A timeout, disconnect, `503` or decoding failure can leave creation uncertain. Keep the original installation, Project ID, `POST` method, account-collection route, complete request file and request key. Finding an account by Name alone does not prove which request created it.
+
+Within the retained replay period, repeat the original POST with the same key and complete original body using a currently valid credential for the same human. Keep the originally reviewed revision, even if today's revision has advanced. The server checks your current eligibility, Project membership and `create-application-accounts` authority before returning a retained result.
+
+An exact completed replay returns the original `201`, account ID, operation ID, names, revision, creator-grant receipt and expiry. It creates no duplicate account, restores no removed grant and does not extend retention. Use fresh account and own-access reads to inspect current state.
+
+[Original-request lookup](/guides/recover-original-request) can inspect retained operation metadata when you also kept the original installation and Organization IDs. For this creation, use method `POST`, family `project_action_use`, action `create-application-accounts` and the original concrete route containing your actual Project UUID. For example, the route is `/v1/projects/00000000-0000-4000-8000-000000000003/application-accounts` for this guide's example Project ID. Replace that UUID with your original Project ID. The literal `{project_id}` template does not match this operation's retained route.
+
+Supply the original Project ID and request key as well. Lookup does not replace the creation receipt. An unresolved observation does not prove that nothing happened. Preserve the original context and use the installation's supported recovery path before considering a distinct creation.
+
+## Interpret a rejection
+
+| Result         | Meaning and next action                                                                                                                                              |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401`          | Supply a currently accepted credential for this installation. This procedure uses a human identity.                                                                  |
+| `403`          | Current eligibility or exact operation authority does not permit the action. A retained key or earlier successful read cannot bypass current checks.                 |
+| `404`          | The Project, account or key is missing or hidden under the current scope. Do not interpret this as a safe reason to create replacement work.                         |
+| `409`          | Inspect the Problem Details for a stale reviewed revision, unavailable Name or original-request conflict. Preserve uncertain original work before changing anything. |
+| `400` or `422` | Correct malformed authentication, invalid naming, revision, fields or cursor. Send each scalar query parameter once.                                                 |
+| `413` or `415` | Send creation as one JSON object with `Content-Type: application/json`, at most 32 KiB.                                                                              |
+| `503`          | A required dependency could not be confirmed. A creation outcome may remain uncertain. Keep its original context.                                                    |
+
+For a confirmed stale fresh request, reread and review your Project access before preparing a distinct request. For a confirmed Name conflict, choose a different explicit Name. GET reads are safe to repeat with current credentials and authority, while writes retain their original request meaning.
+
+Browser-cookie POST callers use the installation's actual cookie and Origin configuration and send `X-Inframeld-CSRF: 1`. Do not combine a bearer token and a session cookie. Errors use the shared [Problem Details contract](/api-reference/operations#errors-and-uncertain-effects).

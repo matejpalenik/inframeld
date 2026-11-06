@@ -90,6 +90,38 @@ const calls = {
       },
       body: call.body as sdk.AdmitHumanData["body"],
     }),
+  createApplicationAccount: (client: Client, call: SdkCall) =>
+    sdk.createApplicationAccount({
+      ...options(client, call),
+      path: call.path as sdk.CreateApplicationAccountData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.CreateApplicationAccountData["body"],
+    }),
+  getApplicationAccount: (client: Client, call: SdkCall) =>
+    sdk.getApplicationAccount({
+      ...options(client, call),
+      path: call.path as sdk.GetApplicationAccountData["path"],
+    }),
+  resolveApplicationAccount: (client: Client, call: SdkCall) =>
+    sdk.resolveApplicationAccount({
+      ...options(client, call),
+      path: call.path as sdk.ResolveApplicationAccountData["path"],
+      query: call.query as sdk.ResolveApplicationAccountData["query"],
+    }),
+  listApplicationKeys: (client: Client, call: SdkCall) =>
+    sdk.listApplicationKeys({
+      ...options(client, call),
+      path: call.path as sdk.ListApplicationKeysData["path"],
+      query: call.query as sdk.ListApplicationKeysData["query"],
+    }),
+  getApplicationKey: (client: Client, call: SdkCall) =>
+    sdk.getApplicationKey({
+      ...options(client, call),
+      path: call.path as sdk.GetApplicationKeyData["path"],
+    }),
   getProtectedResourceMetadata: (client: Client, call: SdkCall) =>
     sdk.getProtectedResourceMetadata(options(client, call)),
   getProtectedResourceMetadataForPath: (client: Client, call: SdkCall) =>

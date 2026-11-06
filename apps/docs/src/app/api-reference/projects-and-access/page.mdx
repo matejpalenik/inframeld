@@ -1,7 +1,7 @@
 export const pageMetadata = {
   title: "Projects and access",
   description:
-    "Inspect access, admit a human, create and manage Projects, and review consent.",
+    "Inspect access, manage Projects and application accounts, admit humans, and review consent.",
 }
 
 # Projects and access
@@ -37,6 +37,42 @@ Exact business replay requires Alice's current authority and Bob's current admis
 Require current human `create-projects` authority on the requested Organization, the reviewed Organization Access revision and one retained idempotency key. Save the Project, creator membership, eighteen explicit creator grants, audit and original result together. Creation leaves the Organization Access revision unchanged. The new Project starts at Access revision `1` and metadata revision `0`.
 
 The creation receipt's `initialGrants` describes the original assignments. Exact replay requires current authorization and returns that original result without restoring removed grants or reversing later renames. [The guide](/guides/create-project) covers the saved request, generated clients, current metadata and uncertain-result recovery. This operation creates no starter or RAG resources.
+
+## Create an application account
+
+<ApiOperation operationId="createApplicationAccount" />
+
+Require a currently eligible human Project member with permission to use `create-application-accounts`, a reviewed Project Access revision and one retained idempotency key. Supply the exact `name`, `displayName` and `expectedAccessRevision`. Creation atomically saves the application identity, its one-Project binding and membership, three creator administration grants, audit and original result.
+
+HTTP `201` returns one permanent `principalId`, also used as the application account ID, plus its original names, Project Access revision and three `initialGrants`. Those use-and-grant assignments belong to the human creator for Issue keys, Revoke keys and Delete account on this exact account. The application starts with no received actions, groups or keys. It inherits no human permissions and cannot move Projects.
+
+Exact completed replay checks current creation authority and returns the same original `201`, account and receipt. It neither restores removed grants nor creates another account. [Create and inspect an application account](/guides/application-accounts) explains preparation, saved requests, generated clients and uncertain-result recovery. Key issuance, authentication, revocation and retirement remain separate unfinished operations.
+
+## Read application-account metadata
+
+<ApiOperation operationId="getApplicationAccount" />
+
+Read one account by its permanent application principal ID. Require a currently eligible human Project member with permission to use at least one exact account action: `issue-application-keys`, `revoke-application-keys` or `delete-application-account`. Permission to create accounts does not expose a Project-wide account inventory.
+
+The response contains safe account identity, naming, lifecycle metadata and the current Project Access revision. It supplies no grants, groups, key material or authority to issue or revoke a credential. [The guide](/guides/application-accounts#inspect-the-account-by-id-or-exact-name) explains ID and Name inspection.
+
+## Resolve an exact application-account Name
+
+<ApiOperation operationId="resolveApplicationAccount" />
+
+Use `GET /v1/projects/{project_id}/application-accounts/resolve?name=...` with one exact Name and the same current account-metadata authority. The result uses `ApplicationAccountMetadataResponse`, identifying the actual Project and application principal. There is no display-name search, fuzzy match, normalization or broad account listing. Missing and hidden accounts retain the safe `404` disclosure boundary.
+
+## Read application key metadata
+
+<ApiOperation operationId="listApplicationKeys" />
+
+Require a currently eligible human Project member with exact permission to use Issue keys or Revoke keys on this account. Delete account alone is insufficient. Metadata reads do not require the additional delegation and group-management authority used by the separate issuance contract.
+
+The bounded page has only safe key metadata in `items` and a nullable `nextCursor`. It uses key-UUID order and `limit` from 1 to 100, default 25. Pass each returned cursor unchanged within the same scope. Every page checks current authority. A cursor is neither a snapshot nor a permission token, and denial is not an empty list.
+
+<ApiOperation operationId="getApplicationKey" />
+
+Read a specific retained key by its ID with the same exact Issue-or-Revoke authority. It returns the same safe item shape, without a secret or verifier. Neither read issues a key, authenticates it or changes its state. These GETs take no body, expected revision or idempotency key. [Inspect safe key metadata](/guides/application-accounts#inspect-safe-key-metadata) explains empty new accounts and continuation.
 
 ## Read Project members
 

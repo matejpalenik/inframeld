@@ -34,7 +34,7 @@ Changing a name or credential does not change the principal. Creating another ac
 
 #### Logical application-key record contract
 
-The [accepted key contract](application-key-contracts.md#application-key-contract) requires the following values. This is a logical record specification for the incoming-credential workflow, not a new migration or implemented table map:
+The [accepted key contract](application-key-contracts.md#application-key-contract) requires the following values. This is the logical record specification for the incoming-credential workflow. The [application_keys persistence](access-persistence.md#application-creation-names-and-key-metadata) now stores these values for safe metadata reads. Credential issuance and authentication remain separate unfinished work:
 
 | Value | Meaning and constraint |
 | --- | --- |
@@ -42,7 +42,7 @@ The [accepted key contract](application-key-contracts.md#application-key-contrac
 | Verifier | SHA-256 digest bytes of the complete canonical `ifm_app_<key-UUID>_<secret>` key. Compare in constant time. Never store/replay plaintext or expose the verifier as safe metadata. |
 | Account/principal/project bindings | Authoritative association to the exact application and project. Verify current principal/account/project eligibility. Key rotation preserves the account principal. |
 | Installation binding | Associate verification with the trusted installation, rather than a caller-selected target label or a key prefix. The [maintenance draft](host-maintenance.md#maintenance-wire) specifies one immutable installation UUID persisted during managed initialization and bound to the operator-controlled installation record. Physical persistence remains an implementation decision. |
-| Audience/adapter binding | Authoritative permitted incoming audience/resource/adapter restrictions, checked in addition to the prefix. The issuance input selects supported HTTP/MCP adapter restrictions. The server derives installation/project bindings and current account authority. Exact persistence/wire encoding remains to specify. |
+| Audience/adapter binding | Authoritative permitted incoming audience/resource/adapter restrictions, checked in addition to the prefix. The issuance input selects supported HTTP/MCP adapter restrictions. The server derives installation/project bindings and current account authority. The concrete record stores the authoritative audience and a nonempty unique HTTP/MCP adapter array. Issuance and verification still need their runtime implementation. |
 | Safe lifecycle metadata | Issuance attribution/time, expiry and revocation state/time sufficient for the authorized management workflow. Public metadata excludes the secret and digest. |
 
 The secret is 32 cryptographically random bytes encoded as 43 unpadded base64url characters. The default lifetime is 90 days and the maximum 365 days, both operator-configurable. Validate default against maximum. The account has at most two usable keys across audiences. Issuance coordinates the current usable count, full issuer delegation/group-management authority, bindings and audit under the Access write protocol. Revocation and retirement use their independent current human Revoke keys/Delete application account authority and lifecycle checks. They do not require issuance delegation or document-reading authority. Keys use current grants, not a historical issuer ceiling or cached permission snapshot. General UUID identifier constructors retain their existing valid-version/zero-value rules.

@@ -125,6 +125,12 @@ from inframeld_backend.access.application.enums.project_membership_change_kind i
 from inframeld_backend.access.application.errors.retired_project_name_error import (
     RetiredProjectNameError,
 )
+from inframeld_backend.access.application.protocols.application_account_creator import (
+    ApplicationAccountCreator,
+)
+from inframeld_backend.access.application.protocols.application_account_reader import (
+    ApplicationAccountReader,
+)
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
 )
@@ -212,6 +218,9 @@ from inframeld_backend.access.http.dependencies.csrf_protection_dependency impor
 )
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
+)
+from inframeld_backend.access.http.routes.application_account_routes import (
+    create_application_account_router,
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
@@ -305,6 +314,7 @@ from inframeld_backend.shared.http.routes.original_operation_lookup_routes impor
     create_original_operation_lookup_router,
 )
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_sdk_application_accounts import MockSDKApplicationAccounts
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
 
@@ -541,6 +551,16 @@ async def _open_my_organization_access() -> AsyncGenerator[MyOrganizationAccessR
 @asynccontextmanager
 async def _open_project_creator() -> AsyncGenerator[ProjectCreator]:
     yield MockSDKProjectCreator()
+
+
+@asynccontextmanager
+async def _open_application_account_creator() -> AsyncGenerator[ApplicationAccountCreator]:
+    yield MockSDKApplicationAccounts()
+
+
+@asynccontextmanager
+async def _open_application_account_reader() -> AsyncGenerator[ApplicationAccountReader]:
+    yield MockSDKApplicationAccounts()
 
 
 class MockSDKHumanAdmitter(HumanAdmitter):
@@ -1192,6 +1212,11 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
         create_organization_access_router(authenticate, _open_my_organization_access)
     )
     application.include_router(create_project_creation_router(authenticate, _open_project_creator))
+    application.include_router(
+        create_application_account_router(
+            authenticate, _open_application_account_creator, _open_application_account_reader
+        )
+    )
     application.include_router(create_project_members_router(authenticate, _open_project_members))
     application.include_router(
         create_project_membership_router(authenticate, MockSDKMembershipChangeServiceFactory())

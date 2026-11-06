@@ -84,6 +84,20 @@ Keeping the owning-project reference separate from membership lets retirement re
 
 A separate human-profile table is unnecessary until Inframeld needs human-only application data. Kratos owns passwords and sessions.
 
+## Application creation, names and key metadata
+
+[Migration 0024](../../../../apps/backend/migrations/versions/0024_application_accounts.py) extends the existing account row with a nullable `resource_name`. Existing principal Display names remain unchanged, and migration invents no selector. New names are unique per Project and application-account type. The principal-kind and scoped membership foreign keys bind the account to its one Project. Application memberships must carry the non-null matching application principal ID, so SQL null semantics cannot bypass that foreign key. Human memberships retain a null application binding.
+
+| Table | Implemented purpose |
+| --- | --- |
+| `application_account_name_reservations` | Reserve an exact Project-scoped Name for its original principal, with its authoritative Organization/Project/account foreign key. A retired reservation cannot be overwritten by another creation. |
+| `application_account_creation_results` | Retain original account ID, creator, names, before/after revisions and exactly three fixed creator actions. Its foreign key binds the Project-scoped reservation, Organization and actor. Deleting expired reservation history removes this result without releasing the separate Name reservation. |
+| `application_keys` | Store key UUID, exact account/Project/Organization and installation bindings, audience, nonempty unique supported adapter array, SHA-256 verifier bytes and safe issuance/expiry/revocation metadata. Verifiers are excluded from row representations and the authorized read projection. No plaintext is stored. |
+
+Creation results require a single revision increment within 0–9,007,199,254,740,991 and the fixed three initial actions. Credential checks constrain digest length, adapter alternatives and lifecycle order, with an account/UUID index for bounded key reads. These records establish persistence and metadata reads. They do not implement issuance authority, the two-usable-key limit, authentication, revocation or retirement. Those workflows retain their own current authorization and coordination obligations.
+
+The creation writer retains all existing Project coordination and conditional revision guards. Principal, extension, membership, creator assignments, audit and completion commit together. Downgrade refuses to discard retained new account outcomes, Name reservations or credentials. An empty extension migration remains reversible and preserves legacy labels and identities.
+
 <a id="organize-grant-tables-by-target-type"></a>
 
 ## Organize grant tables by target type
