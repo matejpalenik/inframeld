@@ -817,6 +817,20 @@ export type CompletedOperationLookupResponse = {
 };
 
 /**
+ * CurrentApplicationSessionResponse
+ */
+export type CurrentApplicationSessionResponse = {
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
  * CurrentSessionResponse
  */
 export type CurrentSessionResponse = {
@@ -2265,6 +2279,43 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type GetCurrentApplicationSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/application-session';
+};
+
+export type GetCurrentApplicationSessionErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetCurrentApplicationSessionError = GetCurrentApplicationSessionErrors[keyof GetCurrentApplicationSessionErrors];
+
+export type GetCurrentApplicationSessionResponses = {
+    /**
+     * Successful Response
+     */
+    200: CurrentApplicationSessionResponse;
+};
+
+export type GetCurrentApplicationSessionResponse = GetCurrentApplicationSessionResponses[keyof GetCurrentApplicationSessionResponses];
 
 export type GetDeletionStatusData = {
     body?: never;

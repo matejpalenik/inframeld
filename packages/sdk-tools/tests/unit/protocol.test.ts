@@ -2,8 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   parseDriverReply,
+  driverRequestSchema,
   type DriverRequest,
 } from "../../src/conformance/protocol.ts";
+
+test("application identity accepts a header-only call without body/query/retry input", () => {
+  const request = {
+    version: 2,
+    profile: "typescript-node",
+    caseId: "application-session",
+    baseUrl: "http://localhost/",
+    calls: [
+      {
+        id: "identity",
+        operation: "getCurrentApplicationSession",
+        headers: { Authorization: "Bearer synthetic-input" },
+        timeout: 100,
+      },
+    ],
+  };
+  assert.deepEqual(driverRequestSchema.parse(request), request);
+});
 
 const request: DriverRequest = {
   version: 2,

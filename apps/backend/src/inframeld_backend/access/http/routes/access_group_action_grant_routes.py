@@ -12,8 +12,8 @@ from inframeld_backend.access.application.protocols.access_group_action_grant_ch
 from inframeld_backend.access.application.protocols.access_group_action_grants_reader import (
     AccessGroupActionGrantsReader,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.access_group_action_grant_mapper import (
     AccessGroupActionGrantMapper,
@@ -55,7 +55,7 @@ from inframeld_backend.shared.http.responses.page_response import PageResponse
 
 
 def create_access_group_action_grant_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_changer: Callable[[], AbstractAsyncContextManager[AccessGroupActionGrantChanger]],
     open_reader: Callable[[], AbstractAsyncContextManager[AccessGroupActionGrantsReader]],
 ) -> APIRouter:

@@ -26,6 +26,9 @@ from inframeld_backend.access.application.protocols.access_group_deletion_writer
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
 )
+from inframeld_backend.access.application.services.principal_access_evaluation_service import (
+    PrincipalAccessEvaluationService,
+)
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
@@ -130,6 +133,9 @@ class AccessGroupDeletionService(AccessGroupDeleter):
                     or facts.action.principal.organization_id != group.organization_id
                 ):
                     raise RuntimeError("Group deletion facts changed the actor or scope.")
+                PrincipalAccessEvaluationService.require_human(
+                    access=access, principal=facts.action.principal
+                )
                 ActionAuthorizationService.require_authorization_from_facts(
                     access=access, facts=facts.action
                 )

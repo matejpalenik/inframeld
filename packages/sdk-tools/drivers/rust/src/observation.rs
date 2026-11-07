@@ -32,6 +32,13 @@ problems!(
     GetCurrentSessionApiError::Status503
 );
 problems!(
+    GetCurrentApplicationSessionApiError,
+    GetCurrentApplicationSessionApiError::Status400,
+    GetCurrentApplicationSessionApiError::Status401,
+    GetCurrentApplicationSessionApiError::Status403,
+    GetCurrentApplicationSessionApiError::Status503
+);
+problems!(
     GetMyOrganizationAccessApiError,
     GetMyOrganizationAccessApiError::Status400,
     GetMyOrganizationAccessApiError::Status401,

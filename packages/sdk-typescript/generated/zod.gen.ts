@@ -291,6 +291,14 @@ export const zCompletedOperationLookupResponse = z.object({
 });
 
 /**
+ * CurrentApplicationSessionResponse
+ */
+export const zCurrentApplicationSessionResponse = z.object({
+    principalId: z.uuid(),
+    projectId: z.uuid()
+});
+
+/**
  * CurrentSessionResponse
  */
 export const zCurrentSessionResponse = z.object({
@@ -1191,6 +1199,36 @@ export const zGetHealth500Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zGetHealthResponse = z.record(z.string(), z.string());
+
+/**
+ * Successful Response
+ */
+export const zGetCurrentApplicationSession200Representation0Response = zCurrentApplicationSessionResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetCurrentApplicationSession400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetCurrentApplicationSession401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetCurrentApplicationSession403Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetCurrentApplicationSession503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetCurrentApplicationSessionResponse = zCurrentApplicationSessionResponse;
 
 export const zGetDeletionStatusQuery = z.object({
     operationId: z.string().min(1).max(128)

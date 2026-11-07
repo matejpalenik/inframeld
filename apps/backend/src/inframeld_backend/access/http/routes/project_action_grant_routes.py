@@ -9,8 +9,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.protocols.project_action_grants_reader import (
     ProjectActionGrantsReader,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.project_action_grant_mapper import (
     ProjectActionGrantMapper,
@@ -35,7 +35,7 @@ from inframeld_backend.shared.http.responses.page_response import PageResponse
 
 
 def create_project_action_grant_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_reader: Callable[[], AbstractAsyncContextManager[ProjectActionGrantsReader]],
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", route_class=ActionGrantRoute)

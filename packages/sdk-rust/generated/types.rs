@@ -3412,6 +3412,13 @@ pub struct ApplicationAccountCreationRequest {
     pub name: String,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CurrentApplicationSessionResponse {
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CurrentSessionResponse {
     #[serde(rename = "principalId")]
     pub principal_id: uuid::Uuid,

@@ -8,6 +8,9 @@ from typing import Self
 from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from inframeld_backend.access.infrastructure.settings.application_key_authentication_settings import (
+    ApplicationKeyAuthenticationSettings,
+)
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
 from inframeld_backend.access.infrastructure.settings.discovery_settings import DiscoverySettings
 from inframeld_backend.access.infrastructure.settings.human_authentication_settings import (
@@ -51,6 +54,9 @@ class ApplicationSettings(BaseSettings):
     hydra: HydraSettings | None = None
     human_authentication: HumanAuthenticationSettings = Field(
         default_factory=HumanAuthenticationSettings
+    )
+    application_key_authentication: ApplicationKeyAuthenticationSettings = Field(
+        default_factory=ApplicationKeyAuthenticationSettings
     )
     deletion_status_retention: DeletionStatusRetentionSettings = Field(
         default_factory=DeletionStatusRetentionSettings

@@ -140,8 +140,10 @@ HTTPSignatureAuthSetting = TypedDict(
 AuthSettings = TypedDict(
     "AuthSettings",
     {
+        "ApplicationKeyBearer": BearerAuthSetting,
         "HumanBearer": BearerAuthSetting,
         "KratosSession": APIKeyAuthSetting,
+        "ProductBearer": BearerAuthSetting,
     },
     total=False,
 )
@@ -565,6 +567,13 @@ conf = inframeld_sdk.Configuration(
         """
         auth: AuthSettings = {}
         if self.access_token is not None:
+            auth['ApplicationKeyBearer'] = {
+                'type': AuthType.BEARER,
+                'in': AuthLocation.HEADER,
+                'key': AuthHeader.AUTHORIZATION,
+                'value': 'Bearer ' + self.access_token
+            }
+        if self.access_token is not None:
             auth['HumanBearer'] = {
                 'type': AuthType.BEARER,
                 'in': AuthLocation.HEADER,
@@ -579,6 +588,13 @@ conf = inframeld_sdk.Configuration(
                 'value': self.get_api_key_with_prefix(
                     'KratosSession',
                 ),
+            }
+        if self.access_token is not None:
+            auth['ProductBearer'] = {
+                'type': AuthType.BEARER,
+                'in': AuthLocation.HEADER,
+                'key': AuthHeader.AUTHORIZATION,
+                'value': 'Bearer ' + self.access_token
             }
         return auth
 

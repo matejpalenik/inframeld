@@ -58,6 +58,7 @@ class OperationLookupAuthorizationService(OperationLookupAuthorizer):
         ):
             raise ResourceNotFoundError()
 
+        PrincipalAccessEvaluationService.require_human(access=access, principal=facts.principal)
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=facts.principal,

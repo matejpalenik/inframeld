@@ -12,6 +12,7 @@ export const operations = [
   "getProtectedResourceMetadataForPath",
   "getHealth",
   "getCurrentSession",
+  "getCurrentApplicationSession",
   "getMyOrganizationAccess",
   "admitHuman",
   "createProject",

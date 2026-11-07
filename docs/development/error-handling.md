@@ -55,11 +55,13 @@ This fragment belongs inside the problem object. Return at most 20 sanitized iss
 
 <a id="accepted-authentication-outcomes-for-116"></a>
 
-### Accepted authentication outcomes for
+### Accepted authentication outcomes
 
 The implemented [consent API](../../.agents/skills/inframeld-access-models/references/human-cli-consent.md#human-oauth-consent) has an explicit precedence rule. After HTTP credential selection and POST CSRF, unsupported Hydra client/access returns 403 before browser verification, including when the supplied cookie is invalid. Supported requests keep the usual invalid-session 401, policy-denial 403 and unavailable-dependency 503 outcomes. This ordering initializes no credential state for unsupported requests.
 
-The [Access dispatch contract](../../.agents/skills/inframeld-access-models/references/credential-dispatch.md#credential-dispatch) selects one verifier before provider I/O. The following extension was accepted on 2026-10-04. Human cookie/bearer dispatch, verification adapters, the `invalid_authentication_request` catalogue entry and route declarations now have inspected implementation, described in [Access](../../.agents/skills/inframeld-access-models/references/credential-dispatch.md#implemented-human-authentication). Application-key authentication and complete account-UI/CLI/recovery production qualification remain unfinished. This status correction reports source inspection, not tests rerun here:
+The [Access dispatch contract](../../.agents/skills/inframeld-access-models/references/credential-dispatch.md#credential-dispatch) selects one verifier before provider I/O. The following extension was accepted on 2026-10-04. Human cookie/bearer dispatch, verification adapters, the `invalid_authentication_request` catalogue entry and route declarations have inspected implementation, described in [Access](../../.agents/skills/inframeld-access-models/references/credential-dispatch.md#implemented-human-authentication). Complete account-UI/CLI/recovery production qualification remains unfinished.
+
+Application-key profile configuration, credential-family dispatch and HTTP/MCP error adapters are also implemented. PostgreSQL local admission and independent current-key reads are implemented, and [Project action facts](../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_project_action_facts_reader.py) supply current key bindings to ordinary authorizers in the calling operation's transaction. Current-key reads require READ COMMITTED isolation and take Organization, Project and key shared locks before observing database UTC time and non-secret key bindings. The table below defines the accepted outcome contract. These backend components do not establish complete client, platform or full-feature qualification.
 
 | Status | Condition | Public problem contract |
 | --- | --- | --- |
@@ -69,9 +71,13 @@ The [Access dispatch contract](../../.agents/skills/inframeld-access-models/refe
 | 404 | Missing resource or resource hidden from this caller under the ordinary visibility rule | Preserve hidden-resource semantics. A visible resource with denied action instead returns 403. |
 | 409 | Stale reviewed revision or conflicting use of an idempotency key | Preserve existing stale-state/idempotency problem mappings. Never turn conflict into a fresh mutation. |
 | 422 | Invalid request fields | Preserve the existing bounded validation problem contract. |
-| 503 | Required provider verification is unavailable or its response cannot be validated | Preserve the existing safe authentication 503 body. Do not admit stale/cached success. |
+| 503 | Required verification or current-authorization facts are unavailable or cannot be confirmed, including an omitted application-key verification profile for the selected adapter | Preserve the existing safe authentication 503 body. Do not admit stale/cached success. |
 
 A malformed complete credential value with otherwise valid header syntax is a failed credential (401), rather than a malformed request (400). Invalid credential bindings, expiry and revocation likewise return 401. A verified application credential still cannot admit a currently ineligible account/project (403). Application keys at the human-session operation are an unsupported family (401). A verified application at an ordinary human-only operation fails principal eligibility (403). No failed verifier falls back to another family.
+
+The application-session operation and application-only MCP adapter reject human bearer credentials and browser cookies with 401 before calling a human verifier. Ordinary product operations instead authenticate a supported application key before applying any human-only eligibility rule. A key rejected by a fresh authorization check retains 401 and the constant `invalid_token` challenge. Local denial remains 403, and inability to confirm required current facts remains the accepted 503 contract. The MCP adapter applies these mappings before attempting to start a response and does not itself mount an MCP server.
+
+Configure the server-owned HTTP/MCP audiences through [application-key verification profiles](getting-started/local-setup.md#application-key-verification-profiles). A missing applicable profile returns 503 for a selected application credential before database or provider I/O. These profiles are independent of human OAuth configuration and never authorize fallback to Hydra or another identity family.
 
 The new 400 definition uses these accepted literal values, within the existing `ProblemDetails` representation:
 

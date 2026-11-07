@@ -1,7 +1,7 @@
 """Compose real group creation with controlled incoming identity evidence."""
 
 from functools import partial
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI
 from pydantic import HttpUrl
@@ -41,8 +41,8 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler import (
     register_human_oauth_credential_error_handler,
@@ -69,6 +69,9 @@ from inframeld_backend.bootstrap.original_operation_lookup_composition import (
 )
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import IdempotencyContextDTO
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.errors.application_errors import (
+    AuthenticationRequiredError,
+)
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
@@ -104,6 +107,8 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
     PostgresOperationReservationWriter,
 )
 from tests.support.application_account_scenarios import MockApplicationAccountAuthenticator
+from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 
 
 def group_creation_service(session: AsyncSession) -> AccessGroupCreationService:
@@ -204,10 +209,16 @@ def group_http_application(
     database: Database, access: AccessContextDTO, bearer_access: AccessContextDTO
 ) -> FastAPI:
     authenticator = MockApplicationAccountAuthenticator(access, bearer_access)
-    authenticate = HumanSessionDependency(
+    authenticate = ProductAccessDependency(
         authenticator,
         CSRFProtectionDependency((HttpUrl("https://account.test"),)),
         access_token_authenticator=authenticator,
+        application_authenticator=MockApplicationAuthenticator(
+            AccessContextDTO(
+                PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+            ),
+            failure=AuthenticationRequiredError(),
+        ),
     )
     app = FastAPI()
     register_error_handlers(app)

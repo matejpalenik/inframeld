@@ -1,6 +1,9 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
+)
 from inframeld_backend.access.application.protocols.project_name_resolver import ProjectNameResolver
 from inframeld_backend.access.application.services.project_metadata_authorization_service import (
     ProjectMetadataAuthorizationService,
@@ -41,13 +44,18 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
 
 @asynccontextmanager
 async def open_project_metadata(
-    database: Database, metadata_fingerprint_service: ProjectMetadataFingerprintService
+    database: Database,
+    metadata_fingerprint_service: ProjectMetadataFingerprintService,
+    *,
+    application_key_profile: ApplicationKeyVerificationProfileDTO | None = None,
 ) -> AsyncGenerator[ProjectMetadataService]:
     async with database.session() as session:
         yield ProjectMetadataService(
             transaction_manager=SqlAlchemyTransactionManager(session),
             metadata_authorizer=ProjectMetadataAuthorizationService(
-                PostgresProjectMetadataFactsReader(session)
+                PostgresProjectMetadataFactsReader(
+                    session, application_key_profile=application_key_profile
+                )
             ),
             metadata_repository=PostgresProjectMetadataRepository(
                 session, PostgresProjectMetadataAuditWriter(session)
@@ -58,9 +66,15 @@ async def open_project_metadata(
 
 
 @asynccontextmanager
-async def open_project_name_resolution(database: Database) -> AsyncGenerator[ProjectNameResolver]:
+async def open_project_name_resolution(
+    database: Database,
+    *,
+    application_key_profile: ApplicationKeyVerificationProfileDTO | None = None,
+) -> AsyncGenerator[ProjectNameResolver]:
     async with database.session() as session:
-        facts = PostgresProjectMetadataFactsReader(session)
+        facts = PostgresProjectMetadataFactsReader(
+            session, application_key_profile=application_key_profile
+        )
         yield ProjectNameResolutionService(
             transaction_manager=SqlAlchemyTransactionManager(session),
             metadata_facts_reader=facts,

@@ -8,8 +8,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.protocols.my_organization_access_reader import (
     MyOrganizationAccessReader,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.organization_access_mapper import (
     OrganizationAccessMapper,
@@ -30,7 +30,7 @@ from inframeld_backend.shared.http.openapi.problem_openapi import problem_respon
 
 
 def create_organization_access_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_reader: Callable[[], AbstractAsyncContextManager[MyOrganizationAccessReader]],
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", route_class=ProjectCreationRoute)

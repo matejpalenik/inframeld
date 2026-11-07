@@ -11,8 +11,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.protocols.project_membership_change_service_factory import (
     ProjectMembershipChangeServiceFactory,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.project_membership_mapper import ProjectMembershipMapper
 from inframeld_backend.access.http.openapi.human_authentication_responses import (
@@ -153,7 +153,7 @@ class _ProjectMembershipRoute(APIRoute):
 
 
 def create_project_membership_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     membership_service_factory: ProjectMembershipChangeServiceFactory,
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", route_class=_ProjectMembershipRoute)

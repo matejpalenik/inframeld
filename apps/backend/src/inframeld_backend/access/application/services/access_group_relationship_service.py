@@ -30,6 +30,9 @@ from inframeld_backend.access.application.protocols.access_group_relationship_wr
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
 )
+from inframeld_backend.access.application.services.principal_access_evaluation_service import (
+    PrincipalAccessEvaluationService,
+)
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_departure_target_kind import (
     ProjectDepartureTargetKind,
@@ -134,6 +137,9 @@ class AccessGroupRelationshipService(AccessGroupRelationshipChanger):
                 ):
                     raise RuntimeError("Group change facts altered the requested actor or scope.")
                 RevisionValidation.require(facts.access_revision)
+                PrincipalAccessEvaluationService.require_human(
+                    access=access, principal=facts.action.principal
+                )
                 ActionAuthorizationService.require_authorization_from_facts(
                     access=access, facts=facts.action
                 )

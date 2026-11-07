@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from functools import partial
 from typing import override
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
@@ -14,7 +14,10 @@ from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 from sqlalchemy import delete, select, update
 from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 
+from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
@@ -62,6 +65,9 @@ from inframeld_backend.access.http.dependencies.csrf_protection_dependency impor
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
+)
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.project_action_grant_change_routes import (
     create_project_action_grant_change_router,
@@ -92,6 +98,7 @@ from inframeld_backend.bootstrap.application_lifespan import application_lifespa
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.shared.application.errors.application_errors import (
+    AuthenticationRequiredError,
     DependencyUnavailableError,
 )
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
@@ -234,16 +241,29 @@ class GrantScenario:
         self.identity = MockIdentityVerifier()
         self.browser = MockBrowserVerifier()
 
-        authenticate = HumanSessionDependency(
-            HumanSessionAuthenticationService(
-                self.browser, reader, recovery_block_reader=recovery_block_reader
-            ),
+        cookie_authenticator = HumanSessionAuthenticationService(
+            self.browser, reader, recovery_block_reader=recovery_block_reader
+        )
+        bearer_authenticator = HumanAccessTokenAuthenticationService(
+            self.token,
+            self.identity,
+            reader,
+            credential_state_reader=PostgresHumanCredentialStateReader(api_database),
+        )
+        human_session = HumanSessionDependency(
+            cookie_authenticator,
             CSRFProtectionDependency((HttpUrl(TRUSTED_ORIGIN),)),
-            access_token_authenticator=HumanAccessTokenAuthenticationService(
-                self.token,
-                self.identity,
-                reader,
-                credential_state_reader=PostgresHumanCredentialStateReader(api_database),
+            access_token_authenticator=bearer_authenticator,
+        )
+        authenticate = ProductAccessDependency(
+            cookie_authenticator,
+            CSRFProtectionDependency((HttpUrl(TRUSTED_ORIGIN),)),
+            access_token_authenticator=bearer_authenticator,
+            application_authenticator=MockApplicationAuthenticator(
+                AccessContextDTO(
+                    PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+                ),
+                failure=AuthenticationRequiredError(),
             ),
         )
         fingerprints = ProjectGrantChangeFingerprintService(
@@ -255,7 +275,7 @@ class GrantScenario:
         )
         register_error_handlers(self.application)
         configure_problem_openapi(self.application)
-        self.application.include_router(create_session_router(authenticate))
+        self.application.include_router(create_session_router(human_session))
         self.application.include_router(
             create_project_action_grant_change_router(
                 authenticate, partial(open_project_grant_change, api_database, fingerprints)

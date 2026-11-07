@@ -30,6 +30,9 @@ from inframeld_backend.access.application.services.access_group_creation_fingerp
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
 )
+from inframeld_backend.access.application.services.principal_access_evaluation_service import (
+    PrincipalAccessEvaluationService,
+)
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
@@ -107,6 +110,9 @@ class AccessGroupCreationService(AccessGroupCreator):
                 ):
                     raise RuntimeError("Group creation facts changed the actor or scope.")
                 RevisionValidation.require(facts.access_revision)
+                PrincipalAccessEvaluationService.require_human(
+                    access=access, principal=facts.action.principal
+                )
                 ActionAuthorizationService.require_authorization_from_facts(
                     access=access, facts=facts.action
                 )

@@ -24,11 +24,21 @@ from inframeld_backend.access.application.services.project_membership_change_fin
 from inframeld_backend.access.application.services.project_metadata_fingerprint_service import (
     ProjectMetadataFingerprintService,
 )
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
+from inframeld_backend.access.http.dependencies.application_key_dependency import (
+    ApplicationKeyDependency,
+)
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
+)
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
+)
+from inframeld_backend.access.http.handlers.application_key_credential_error_handler import (
+    register_application_key_credential_error_handler,
 )
 from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler import (
     register_human_oauth_credential_error_handler,
@@ -107,6 +117,9 @@ from inframeld_backend.access.http.responses.application_account_creation_respon
 from inframeld_backend.access.http.responses.application_account_metadata_response import (
     ApplicationAccountMetadataResponse,
 )
+from inframeld_backend.access.http.responses.current_application_session_response import (
+    CurrentApplicationSessionResponse,
+)
 from inframeld_backend.access.http.responses.my_organization_access_response import (
     MyOrganizationAccessResponse,
 )
@@ -134,6 +147,9 @@ from inframeld_backend.access.http.routes.application_account_action_grant_route
 )
 from inframeld_backend.access.http.routes.application_account_routes import (
     create_application_account_router,
+)
+from inframeld_backend.access.http.routes.current_application_session_routes import (
+    create_application_session_router,
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
@@ -267,6 +283,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             resolved_settings.hydra,
             database,
             human_authentication_settings=resolved_settings.human_authentication,
+            application_key_authentication_settings=resolved_settings.application_key_authentication,
         )
         for client in (
             access.kratos_client,
@@ -322,6 +339,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
 
         register_error_handlers(application)
         register_human_oauth_credential_error_handler(application)
+        register_application_key_credential_error_handler(application)
         configure_problem_openapi(
             application,
             validation_models=(
@@ -339,6 +357,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ApplicationAccountActionGrantRequest,
             ),
             serialization_models=(
+                CurrentApplicationSessionResponse,
                 AccessGroupCreationResponse,
                 AccessGroupMetadataResponse,
                 AccessGroupMembershipResponse,
@@ -371,11 +390,26 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
             access_token_authenticator=access.access_token_authenticator,
         )
+        product_access = ProductAccessDependency(
+            access.authenticator,
+            CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
+            access_token_authenticator=access.access_token_authenticator,
+            application_authenticator=access.application_authenticator,
+        )
+        http_application_key_profile = resolved_settings.application_key_authentication.profile(
+            ApplicationKeyAdapter.HTTP
+        )
 
         application.include_router(create_session_router(human_session))
         application.include_router(
+            create_application_session_router(
+                ApplicationKeyDependency(access.application_authenticator),
+                access.application_session_reader,
+            )
+        )
+        application.include_router(
             create_human_admission_router(
-                human_session,
+                product_access,
                 partial(
                     open_human_admission,
                     database,
@@ -391,19 +425,23 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
         application.include_router(
             create_organization_access_router(
-                human_session, partial(open_my_organization_access, database)
+                product_access, partial(open_my_organization_access, database)
             )
         )
         application.include_router(
             create_project_creation_router(
-                human_session, partial(open_project_creation, database, creation_fingerprints)
+                product_access, partial(open_project_creation, database, creation_fingerprints)
             )
         )
         application.include_router(
             create_access_group_router(
-                human_session,
+                product_access,
                 partial(open_access_group_creation, database, request_fingerprints),
-                partial(open_access_group_read, database),
+                partial(
+                    open_access_group_read,
+                    database,
+                    application_key_profile=http_application_key_profile,
+                ),
                 partial(open_access_group_relationship_change, database, request_fingerprints),
                 partial(
                     open_access_group_deletion,
@@ -415,17 +453,17 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
         application.include_router(
             create_application_account_router(
-                human_session,
+                product_access,
                 partial(open_application_account_creation, database, account_fingerprints),
                 partial(open_application_account_read, database),
             )
         )
         application.include_router(
-            create_project_members_router(human_session, partial(open_project_members, database))
+            create_project_members_router(product_access, partial(open_project_members, database))
         )
         application.include_router(
             create_project_membership_router(
-                human_session,
+                product_access,
                 PostgresProjectMembershipChangeServiceFactory(database, membership_fingerprints),
             )
         )
@@ -437,63 +475,77 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
         application.include_router(
             create_project_action_grant_router(
-                human_session, partial(open_project_action_grants, database)
+                product_access, partial(open_project_action_grants, database)
             )
         )
         application.include_router(
             create_project_action_grant_change_router(
-                human_session, partial(open_project_grant_change, database, fingerprints)
+                product_access, partial(open_project_grant_change, database, fingerprints)
             )
         )
         application.include_router(
             create_organization_action_grant_router(
-                human_session,
+                product_access,
                 partial(open_organization_grant_change, database, request_fingerprints),
                 partial(open_organization_grant_read, database),
             )
         )
         application.include_router(
             create_access_group_action_grant_router(
-                human_session,
+                product_access,
                 partial(open_access_group_grant_change, database, request_fingerprints),
                 partial(open_access_group_grant_read, database),
             )
         )
         application.include_router(
             create_application_account_action_grant_router(
-                human_session,
+                product_access,
                 partial(open_application_account_grant_change, database, request_fingerprints),
                 partial(open_application_account_grant_read, database),
             )
         )
         application.include_router(
             create_project_grant_recipients_router(
-                human_session, partial(open_project_grant_recipients, database)
+                product_access, partial(open_project_grant_recipients, database)
             )
         )
         application.include_router(
             create_my_project_access_router(
-                human_session, partial(open_my_project_access, database)
+                product_access, partial(open_my_project_access, database)
             )
         )
 
         application.include_router(
             create_project_metadata_router(
-                human_session,
-                partial(open_project_metadata, database, metadata_fingerprints),
-                partial(open_project_metadata, database, metadata_fingerprints),
-                partial(open_project_name_resolution, database),
+                product_access,
+                partial(
+                    open_project_metadata,
+                    database,
+                    metadata_fingerprints,
+                    application_key_profile=http_application_key_profile,
+                ),
+                partial(
+                    open_project_metadata,
+                    database,
+                    metadata_fingerprints,
+                    application_key_profile=http_application_key_profile,
+                ),
+                partial(
+                    open_project_name_resolution,
+                    database,
+                    application_key_profile=http_application_key_profile,
+                ),
             )
         )
 
         application.include_router(
             create_original_operation_lookup_router(
-                human_session, partial(open_original_operation_lookup, database)
+                product_access, partial(open_original_operation_lookup, database)
             )
         )
         application.include_router(
             create_deletion_status_router(
-                human_session, partial(open_deletion_status_lookup, database)
+                product_access, partial(open_deletion_status_lookup, database)
             )
         )
 

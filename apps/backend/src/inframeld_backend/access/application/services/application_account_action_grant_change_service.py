@@ -192,6 +192,9 @@ class ApplicationAccountActionGrantChangeService(ApplicationAccountActionGrantCh
                         "ApplicationAccount grant facts changed actor, scope or revision."
                     )
 
+                PrincipalAccessEvaluationService.require_human(
+                    access=access, principal=facts.actor.principal
+                )
                 eligibility = PrincipalAccessEvaluationService.evaluate(
                     access=access,
                     principal=facts.actor.principal,

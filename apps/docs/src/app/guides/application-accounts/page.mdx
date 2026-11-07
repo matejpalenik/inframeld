@@ -8,7 +8,7 @@ export const pageMetadata = {
 
 Create SupportBot in your Support Project as a separate identity for an integration. The account belongs to that one Project and starts with no action permissions, document-group memberships or keys. Creating it does not copy your human access.
 
-You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation and safe metadata reads. Key issuance, application authentication, revocation and account retirement are not available through these operations.
+You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation and safe metadata reads. [Application identity authentication](/guides/authenticate-an-application) has its own component contract and credential prerequisites. Creation and these reads issue no key or authentication proof. Public issuance, revocation and account retirement remain separate unfinished operations.
 
 Use [exact action-grant administration](/guides/manage-action-grants) to share one account-administration permission with another eligible human in the Project. Those grants control the human's authority over SupportBot. They do not give SupportBot an action permission, create a key or copy any human access. An application account cannot receive account-administration grants or grant authority.
 

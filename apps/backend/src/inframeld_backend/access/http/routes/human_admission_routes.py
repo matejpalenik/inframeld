@@ -11,8 +11,8 @@ from starlette.types import Message, Receive, Scope, Send
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.protocols.human_admitter import HumanAdmitter
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.human_admission_mapper import HumanAdmissionMapper
 from inframeld_backend.access.http.openapi.human_authentication_responses import (
@@ -113,7 +113,7 @@ class _HumanAdmissionRoute(APIRoute):
 
 
 def create_human_admission_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_admitter: Callable[[], AbstractAsyncContextManager[HumanAdmitter]],
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", route_class=_HumanAdmissionRoute)

@@ -410,6 +410,7 @@ pub async fn observe(
                 .await
         ),
         "getCurrentSession" => observed!(client.get_current_session().await),
+        "getCurrentApplicationSession" => observed!(client.get_current_application_session().await),
         "getMyOrganizationAccess" => observed!(client.get_my_organization_access().await),
         "listProjectMembers" => {
             let query = request.query.as_ref();

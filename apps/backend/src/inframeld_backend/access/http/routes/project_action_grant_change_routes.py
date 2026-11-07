@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, Query, Response
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.project_action_grant_change_mapper import (
     ProjectActionGrantChangeMapper,
@@ -45,7 +45,7 @@ from inframeld_backend.shared.http.openapi.problem_openapi import problem_respon
 
 
 def create_project_action_grant_change_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_changer: Callable[[], AbstractAsyncContextManager[ProjectGrantChanger]],
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", route_class=ActionGrantRoute)

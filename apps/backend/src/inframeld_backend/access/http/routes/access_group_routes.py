@@ -31,8 +31,8 @@ from inframeld_backend.access.application.queries.list_access_group_principals_q
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.access_group_mapper import AccessGroupMapper
 from inframeld_backend.access.http.openapi.human_authentication_responses import (
@@ -98,7 +98,7 @@ from inframeld_backend.shared.http.requests.pagination_query import PaginationQu
 
 
 def create_access_group_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_creator: Callable[[], AbstractAsyncContextManager[AccessGroupCreator]],
     open_reader: Callable[[], AbstractAsyncContextManager[AccessGroupReader]],
     open_changer: Callable[[], AbstractAsyncContextManager[AccessGroupRelationshipChanger]],

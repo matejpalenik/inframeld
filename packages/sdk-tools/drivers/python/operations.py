@@ -466,6 +466,20 @@ async def session_async(clients: Clients, call: Call) -> NativeResponse:
     )
 
 
+def application_session_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_current_application_session_sync_with_http_info(
+        _request_timeout=call.timeout / 1000,
+        _headers=call.headers,
+    )
+
+
+async def application_session_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_current_application_session_with_http_info(
+        _request_timeout=call.timeout / 1000,
+        _headers=call.headers,
+    )
+
+
 def inspect_consent_sync(clients: Clients, call: Call) -> NativeResponse:
     return AccessApi(clients.production).inspect_human_o_auth_consent_sync_with_http_info(
         consent_challenge=string(call.query["consent_challenge"]),
@@ -1278,6 +1292,9 @@ BINDINGS: dict[Operation, Binding] = {
     Operation.CONTRACT_FIXTURE_MEDIA: Binding(media_sync, media_async),
     Operation.GET_HEALTH: Binding(health_sync, health_async),
     Operation.GET_CURRENT_SESSION: Binding(session_sync, session_async),
+    Operation.GET_CURRENT_APPLICATION_SESSION: Binding(
+        application_session_sync, application_session_async
+    ),
     Operation.INSPECT_HUMAN_OAUTH_CONSENT: Binding(inspect_consent_sync, inspect_consent_async),
     Operation.DECIDE_HUMAN_OAUTH_CONSENT: Binding(decide_consent_sync, decide_consent_async),
     Operation.LOOKUP_ORIGINAL_OPERATION: Binding(lookup_sync, lookup_async),

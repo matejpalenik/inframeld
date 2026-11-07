@@ -1,11 +1,14 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import override
+from uuid import UUID
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
+from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 from tests.support.mock_project_metadata import ACCESS, ORGANIZATION_ID, PROJECT_ID, SAVED_RESULT
 
 from inframeld_backend.access.application.commands.update_project_metadata_command import (
@@ -35,11 +38,12 @@ from inframeld_backend.access.application.queries.resolve_project_name_query imp
 from inframeld_backend.access.application.value_objects.browser_session_credential import (
     BrowserSessionCredential,
 )
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
@@ -116,9 +120,15 @@ def client_for(service: MockMetadataOperations) -> TestClient:
     register_error_handlers(app)
     app.include_router(
         create_project_metadata_router(
-            HumanSessionDependency(
+            ProductAccessDependency(
                 MockMetadataAuthenticator(),
                 CSRFProtectionDependency((HttpUrl("https://account.test"),)),
+                application_authenticator=MockApplicationAuthenticator(
+                    AccessContextDTO(
+                        PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+                    ),
+                    failure=AuthenticationRequiredError(),
+                ),
             ),
             open_service,
             open_service,

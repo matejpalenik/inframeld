@@ -13,6 +13,7 @@ class Operation(StrEnum):
     GET_PROTECTED_RESOURCE_METADATA_FOR_PATH = "getProtectedResourceMetadataForPath"
     GET_HEALTH = "getHealth"
     GET_CURRENT_SESSION = "getCurrentSession"
+    GET_CURRENT_APPLICATION_SESSION = "getCurrentApplicationSession"
     GET_MY_ORGANIZATION_ACCESS = "getMyOrganizationAccess"
     ADMIT_HUMAN = "admitHuman"
     CREATE_PROJECT = "createProject"
