@@ -1,7 +1,7 @@
 """Exercise real live-instance S3 behavior, without claiming durable or physical cleanup."""
 
 import os
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import closing
 from dataclasses import replace
 from io import BytesIO
@@ -12,14 +12,23 @@ import pytest
 import trustme
 from botocore.awsrequest import AWSResponse
 from botocore.exceptions import ClientError, EndpointConnectionError, SSLError
+from tests.support.artifact_scenarios import (
+    allocate_artifact,
+    artifact_scenario,
+    seed_artifact_scope,
+)
 from tests.support.seaweedfs_fixture import (
     BUCKET,
     MAX_OBJECT_BYTES,
     SeaweedFixture,
     create_client,
     new_attempt,
+    storage_settings,
 )
 
+from inframeld_backend.bootstrap.artifact_preparation_composition import create_artifact_preparation
+from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
+from inframeld_backend.shared.application.dtos.artifact_capacity_dto import ArtifactCapacityDTO
 from inframeld_backend.shared.application.errors.artifact_errors import (
     ArtifactIntegrityError,
     ArtifactWriteOutcomeUnknownError,
@@ -28,6 +37,25 @@ from inframeld_backend.shared.application.services.artifact_verification_service
     ArtifactVerificationService,
 )
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
+from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
+    ArtifactContentDigest,
+)
+from inframeld_backend.shared.infrastructure.readers.postgres_artifact_staging_reservation_reader import (
+    PostgresArtifactStagingReservationReader,
+)
+from inframeld_backend.shared.infrastructure.repositories.postgres_artifact_attempt_repository import (
+    PostgresArtifactAttemptRepository,
+)
+from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.rows.artifact_cleanup_obligation_row import (
+    ArtifactCleanupObligationRow,
+)
+from inframeld_backend.shared.infrastructure.rows.artifact_staging_reservation_row import (
+    ArtifactStagingReservationRow,
+)
+from inframeld_backend.shared.infrastructure.settings.artifact_staging_settings import (
+    ArtifactStagingSettings,
+)
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("INFRAMELD_RUN_ARTIFACT_INTEGRATION") != "1",
@@ -48,6 +76,84 @@ def seaweed() -> Iterator[SeaweedFixture]:
             ):
                 raise
     yield SeaweedFixture()
+
+
+@pytest.mark.asyncio
+async def test_private_preparation_resumes_and_publishes_original_allocation(
+    seaweed: SeaweedFixture, database: Database, tmp_path: Path
+) -> None:
+    """Join real private preparation and SQL without claiming capacity or physical retirement."""
+    scope = await seed_artifact_scope(database)
+    # Supplied capacity qualifies allocation's SQL policy, not filesystem measurement.
+    allocation = await allocate_artifact(
+        database,
+        artifact_scenario(scope),
+        physical_capacity=ArtifactCapacityDTO(usable_bytes=1024**4, free_bytes=512 * 1024**3),
+    )
+    original = allocation.reservation
+    content = seaweed.body(b"prepared storage bytes" * 4096)
+    expected = ArtifactAttemptDTO(
+        original.artifact_id,
+        original.attempt_id,
+        original.scope,
+        len(content),
+        ArtifactContentDigest.from_content(content),
+    )
+    async with database.session() as session:
+        reservation = await session.get(
+            ArtifactStagingReservationRow, original.reservation_id.value
+        )
+        assert reservation is not None
+        remote_charge = reservation.remote_reserved_bytes
+    assert remote_charge == original.limit_bytes
+    staging_root = tmp_path / "staging"
+    staging_root.mkdir(mode=0o700)
+    preparation = await create_artifact_preparation(
+        database, ArtifactStagingSettings(root=staging_root), storage_settings()
+    )
+
+    async def chunks() -> AsyncIterator[bytes]:
+        for offset in range(0, len(content), 4096):
+            yield content[offset : offset + 4096]
+
+    verified = await preparation.prepare(allocation, chunks())
+    assert verified.attempt == expected
+    resumed = await preparation.resume(allocation)
+    assert resumed == verified
+    async with seaweed.open_store() as store:
+        assert (await ArtifactVerificationService(store).verify(expected)) == verified
+    async with database.session() as session, session.begin():
+        await PostgresArtifactAttemptRepository(session).publish_verified(allocation, resumed)
+    facts = await PostgresArtifactStagingReservationReader(database).read(original.reservation_id)
+    assert facts is not None
+    assert (
+        facts.reservation_id,
+        facts.artifact_id,
+        facts.attempt_id,
+        facts.scope,
+        facts.expires_at,
+        facts.length,
+        facts.digest,
+    ) == (
+        original.reservation_id,
+        expected.artifact_id,
+        expected.attempt_id,
+        expected.scope,
+        original.expires_at,
+        expected.length,
+        expected.digest,
+    )
+    assert facts.published and facts.put_confirmed and facts.put_pending
+    assert not facts.retired and not facts.released and not facts.staging_removed
+    async with database.session() as session:
+        reservation = await session.get(
+            ArtifactStagingReservationRow, original.reservation_id.value
+        )
+        obligation = await session.get(
+            ArtifactCleanupObligationRow, allocation.cleanup_binding.obligation_id.value
+        )
+        assert reservation is not None and reservation.remote_reserved_bytes == remote_charge
+        assert obligation is not None and not obligation.physically_complete
 
 
 @pytest.mark.asyncio

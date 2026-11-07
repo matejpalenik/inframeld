@@ -2,11 +2,11 @@
 
 Use this guide to start, observe and stop the PostgreSQL-backed application worker. For example, after a worker process exits, a replacement uses the original job and its saved checkpoints rather than admitting replacement work.
 
-The shared execution engine now registers `artifact.cleanup`, version `1`, for one original abandoned-staging target. Starting it does not enable document processing, builds or evaluations. There is no generic job submission, inspection, cancellation or continuation command, HTTP endpoint or SDK operation. The production composition and expired-attempt recovery are implemented. Targeted integration checks exercise original-invocation recovery and the registered PostgreSQL/S3 cleanup consumer. The limits below bound execution. They do not establish measured capacity for the full installation or complete artifact cleanup.
+The shared execution engine now registers `artifact.cleanup`, version `1`, for one original abandoned-staging target. Starting it does not enable document processing, builds or evaluations. There is no generic job submission, inspection, cancellation or continuation command, HTTP endpoint or SDK operation. The production composition and expired-attempt recovery are implemented. Targeted integration checks exercise original-invocation recovery and the registered PostgreSQL/S3 cleanup consumer. The focused private-preparation case has passed through real PostgreSQL, filesystem staging, S3 readback and conditional storage publication while retaining pending PUT evidence and remote charges. The producer case covers preparation. Separate maintained registered-worker/native and startup/queue tests cover worker continuation. The limits below bound execution. They do not establish measured capacity for the full installation or complete artifact cleanup.
 
 ## Prepare the database and configuration
 
-Run commands from the repository root. Complete [local setup](../getting-started/local-setup.md), including locked backend dependencies and the explicit migration step. The worker and API must use compatible code and the same application database. This revision requires `0021_job_effect_observations`, whose parent is `0020_project_membership`. The [migration source](../../../apps/backend/migrations/versions/0021_job_effect_observations.py) retains original storage-invocation admission and observations.
+Run commands from the repository root. Complete [local setup](../getting-started/local-setup.md), including locked backend dependencies and the explicit migration step. The worker and API must use compatible code and the same application database. This revision requires [0022_project_grant_results](../../../apps/backend/migrations/versions/0022_project_grant_results.py), whose parent is `0021_job_effect_observations`. [Migration 0021](../../../apps/backend/migrations/versions/0021_job_effect_observations.py) retains original storage-invocation admission and observations above `0020_project_membership`.
 
 The existing operator-controlled migration command is:
 
@@ -22,6 +22,8 @@ The worker also requires an operator-supplied private S3 endpoint, existing buck
 
 For a private certificate authority, set `INFRAMELD_ARTIFACT_STORAGE__CA_BUNDLE` to an absolute, worker-readable CA file. Omit it to use system trust. Keep TLS verification enabled. The existing [storage settings](../../../apps/backend/src/inframeld_backend/shared/infrastructure/settings/artifact_storage_settings.py) own call bounds and the other optional settings. Configuring these values does not create storage, grant product authority or prove storage health.
 
+Set `INFRAMELD_ARTIFACT_STAGING__ROOT` to the existing absolute staging directory owned by the worker's operating-system user, with mode `0700`. Internal preparation and cleanup must use the same root. Startup validates it and prepares private lock metadata without replacing a missing root. Keep the permanent per-attempt lock files. Staging and an arbitrary S3 endpoint do not establish a shared backing filesystem or measured capacity.
+
 ## Start on the host
 
 With the database running and migrated, run:
@@ -30,7 +32,7 @@ With the database running and migrated, run:
 mise exec -- uv run --project apps/backend --locked --env-file apps/backend/.env python -m inframeld_backend.application_worker
 ```
 
-The `--env-file` option explicitly loads your ignored local configuration. The worker does not automatically load the API's dotenv files. The worker reads the required database and artifact-storage settings, plus optional `INFRAMELD_JOBS__*`, `INFRAMELD_LOG_LEVEL` and `INFRAMELD_LOG_FORMAT` settings.
+The `--env-file` option explicitly loads your ignored local configuration. The worker does not automatically load the API's dotenv files. The worker reads the required database, artifact-storage and staging settings, plus optional `INFRAMELD_JOBS__*`, `INFRAMELD_LOG_LEVEL` and `INFRAMELD_LOG_FORMAT` settings.
 
 Look for `application_worker_ready` after schema and installation-identity checks pass. This confirms startup, not successful product work or continuing dependency health. Stop this foreground process with Ctrl-C when finished.
 
@@ -43,6 +45,8 @@ podman compose -f compose.dev.yaml --profile jobs up -d --build --no-deps applic
 ```
 
 Use `docker compose` in place of `podman compose` on Docker. The service has no published port. It uses the development database on the Compose network, with a pool of two connections and no overflow. Host settings otherwise default to a pool of ten with up to twenty overflow connections. Keep the API and worker on compatible revisions when rebuilding.
+
+The jobs profile binds `INFRAMELD_ARTIFACT_STAGING_HOST_ROOT`, defaulting to `/var/lib/inframeld/staging`, at the worker's `/var/lib/inframeld/staging`. Prepare that existing private host directory with the correct worker ownership before startup. Compose refuses to create a missing source path automatically. This mount does not measure or configure the S3 server's data filesystem.
 
 Read recent worker events with:
 
@@ -83,7 +87,7 @@ Queue reports use `application_worker_queue`, with `queue_depth`, `oldest_eligib
 | Observation | Meaning and next step |
 | --- | --- |
 | Exit code `2` with `{"code":"invalid_configuration"}` | Required configuration is missing or invalid. Check the named settings and bounds without printing secret values. |
-| `application_worker_stopped` with `required_state_unavailable`, exit code `1` | Startup or runtime could not continue. Check database availability, schema compatibility and installation identity. Repair the cause before restarting. |
+| `application_worker_stopped` with `required_state_unavailable`, exit code `1` | Startup or runtime could not continue. Check database availability, schema compatibility, installation identity, and the configured original staging root/mount, worker ownership and private permissions. Restore the original root or mount before restarting, preserving permanent lock files and retirement metadata. |
 | `application_worker_deferred` | A required queue or database observation could not be confirmed. The loop waits and tries again within its configured bounds. This does not establish that no earlier effect occurred. |
 | `application_job_deferred` | The attempt needs bounded recovery. Preserve its identity and confirmed progress. The event alone does not establish whether external work happened. |
 | `application_job_stopped` | The attempt stopped after an ownership, authority, cancellation or shutdown boundary. This is not proof of remote cancellation. |
@@ -96,7 +100,7 @@ After an interrupted lease, safe remaining work can retry with retained checkpoi
 
 If an external effect was started but its outcome is unknown, the job retains `recovery_required` and the engine does not automatically repeat that effect. Its original admission replay binding remains nonexpiring while the effect is unresolved. Keep the original operation identity and evidence. A restart, missing response or failed process is not permission to issue replacement paid work.
 
-The registered cleanup consumer validates the current fence, original obligation, retained target and cleanup conditions before issuing its exact DELETE. A matching saved acknowledgment checkpoint suppresses redispatch only after those checks. A DELETE acknowledgment, an object-not-found observation or local drain does not establish physical retirement or release byte reservations. Without stored physical-completion facts, cleanup remains `recovery_required` with `physical_cleanup_pending`.
+The registered cleanup consumer validates the current fence, original obligation, retained target and cleanup conditions. It retires the local producer before taking exclusive per-attempt ownership, rechecks stored facts, joins local work and durably removes the exact local target before releasing its local charge. Unrelated occupied bytes and remote charges remain. A matching saved remote acknowledgment suppresses DELETE redispatch only after validation and never skips unfinished local cleanup. A DELETE acknowledgment, an object-not-found observation or client drain does not establish remote physical retirement or release remote reservations. Without stored physical-completion facts, cleanup remains `recovery_required` with `physical_cleanup_pending`.
 
 The claim path takes an unlocked candidate observation, then checks current Access authority for product work before acquiring the queue turn. It locks and matches that exact candidate before mandatory recovery of an expired attempt. Recovery checks current eligibility and the original effect binding. For a pending effect, matching unused `not_dispatched` proof is consumed with retirement of the old attempt in one transaction. Only eligible safe work is requeued with its original identity, deadlines, checkpoints and attempt budget. An unconfirmed pending effect retains `recovery_required`. An observation is not permission to dispatch, and no operator command can manufacture completion or release bytes.
 

@@ -4,6 +4,7 @@ import asyncio
 import os
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
 from typing import override
 from uuid import uuid4
 
@@ -133,6 +134,9 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
 from inframeld_backend.shared.infrastructure.rows.installation_identity_row import (
     InstallationIdentityRow,
 )
+from inframeld_backend.shared.infrastructure.settings.artifact_staging_settings import (
+    ArtifactStagingSettings,
+)
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 from inframeld_backend.shared.infrastructure.settings.job_settings import JobSettings
 from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservation_writer import (
@@ -143,6 +147,13 @@ pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
     reason="Requires PostgreSQL integration services",
 )
+
+
+@pytest.fixture(autouse=True)
+def private_staging_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "staging"
+    root.mkdir(mode=0o700)
+    monkeypatch.setenv("INFRAMELD_ARTIFACT_STAGING__ROOT", str(root))
 
 
 async def _request(
@@ -1149,6 +1160,9 @@ async def test_queue_reporting_failure_does_not_waste_first_executable_attempt(
         application_worker, "PostgresJobQueueStatusReader", MockTransientQueueStatusReader
     )
     settings = ApplicationWorkerApplicationSettings(
+        artifact_staging=ArtifactStagingSettings(
+            root=Path(os.environ["INFRAMELD_ARTIFACT_STAGING__ROOT"])
+        ),
         database=temporary_postgres_settings,
         jobs=JobSettings(
             lease_seconds=3,
@@ -1215,6 +1229,9 @@ async def test_stop_during_queue_report_leaves_admitted_job_unclaimed(
         application_worker, "PostgresJobQueueStatusReader", MockStoppingQueueStatusReader
     )
     settings = ApplicationWorkerApplicationSettings(
+        artifact_staging=ArtifactStagingSettings(
+            root=Path(os.environ["INFRAMELD_ARTIFACT_STAGING__ROOT"])
+        ),
         database=temporary_postgres_settings,
         jobs=JobSettings(
             lease_seconds=3,

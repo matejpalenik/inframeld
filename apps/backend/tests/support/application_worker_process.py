@@ -32,6 +32,8 @@ def _environment(database: DatabaseSettings) -> dict[str, str]:
         }
     )
     artifacts = storage_settings()
+    if staging_root := os.environ.get("INFRAMELD_ARTIFACT_STAGING__ROOT"):
+        environment["INFRAMELD_ARTIFACT_STAGING__ROOT"] = staging_root
     environment.update(
         {
             "INFRAMELD_ARTIFACT_STORAGE__ENDPOINT_URL": artifacts.endpoint_url,

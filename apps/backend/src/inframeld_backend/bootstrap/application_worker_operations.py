@@ -17,6 +17,9 @@ from inframeld_backend.shared.application.dtos.artifact_attempt_dto import Artif
 from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto import (
     ArtifactCleanupJobBindingDTO,
 )
+from inframeld_backend.shared.application.dtos.artifact_cleanup_target_dto import (
+    ArtifactCleanupTargetDTO,
+)
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_effect_binding_dto import JobEffectBindingDTO
@@ -26,6 +29,9 @@ from inframeld_backend.shared.application.errors.application_errors import (
 from inframeld_backend.shared.application.errors.job_errors import JobWorkerStoppingError
 from inframeld_backend.shared.application.protocols.artifact_cleanup_preparer import (
     ArtifactCleanupPreparer,
+)
+from inframeld_backend.shared.application.protocols.artifact_local_cleanup import (
+    ArtifactLocalCleanup,
 )
 from inframeld_backend.shared.application.protocols.job_checkpoints import JobCheckpoints
 from inframeld_backend.shared.application.protocols.job_effect_observation_recorder import (
@@ -39,6 +45,9 @@ from inframeld_backend.shared.application.services.artifact_cleanup_checkpoint_s
 )
 from inframeld_backend.shared.application.services.artifact_cleanup_preparation_service import (
     ArtifactCleanupPreparationService,
+)
+from inframeld_backend.shared.application.services.artifact_local_cleanup_service import (
+    ArtifactLocalCleanupService,
 )
 from inframeld_backend.shared.application.services.job_checkpoint_service import (
     JobCheckpointService,
@@ -54,6 +63,9 @@ from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_f
 from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_target_reader import (
     PostgresArtifactCleanupTargetReader,
 )
+from inframeld_backend.shared.infrastructure.repositories.postgres_artifact_attempt_repository import (
+    PostgresArtifactAttemptRepository,
+)
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
@@ -63,7 +75,7 @@ from inframeld_backend.shared.infrastructure.settings.job_settings import JobSet
 
 
 class ApplicationWorkerOperations(
-    JobCheckpoints, ArtifactCleanupPreparer, JobEffectObservationRecorder
+    JobCheckpoints, ArtifactCleanupPreparer, JobEffectObservationRecorder, ArtifactLocalCleanup
 ):
     """Close each protected SQL session before returning to the handler or native-call gate."""
 
@@ -131,6 +143,32 @@ class ApplicationWorkerOperations(
                 ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
                 PostgresArtifactCleanupTargetReader(session),
             ).prepare(context)
+
+    @override
+    async def prepare_local(self, context: JobAttemptContextDTO) -> ArtifactCleanupTargetDTO | None:
+        if self._stopped.is_set():
+            raise JobWorkerStoppingError()
+        async with self._session() as session:
+            return await ArtifactLocalCleanupService(
+                SqlAlchemyTransactionManager(session),
+                PostgresJobStore(session),
+                ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
+                PostgresArtifactCleanupTargetReader(session),
+                PostgresArtifactAttemptRepository(session),
+            ).prepare_local(context)
+
+    @override
+    async def confirm_local(
+        self, context: JobAttemptContextDTO, target: ArtifactCleanupTargetDTO
+    ) -> None:
+        async with self._session() as session:
+            await ArtifactLocalCleanupService(
+                SqlAlchemyTransactionManager(session),
+                PostgresJobStore(session),
+                ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
+                PostgresArtifactCleanupTargetReader(session),
+                PostgresArtifactAttemptRepository(session),
+            ).confirm_local(context, target)
 
     @override
     async def admit_put(self, observation: JobEffectId, attempt: ArtifactAttemptDTO) -> None:
