@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 
 from inframeld_backend.access.application.commands.remove_access_group_action_grant_command import (
     RemoveAccessGroupActionGrantCommand,
@@ -56,8 +57,8 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.routes.access_group_action_grant_routes import (
     create_access_group_action_grant_router,
@@ -72,6 +73,7 @@ from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     ConflictError,
     DependencyUnavailableError,
     InvalidInputError,
@@ -219,10 +221,16 @@ def _client(changer: MockGrantChanger, reader: MockGrantsReader | None = None) -
     auth = MockAuthentication()
     app.include_router(
         create_access_group_action_grant_router(
-            HumanSessionDependency(
+            ProductAccessDependency(
                 auth,
                 CSRFProtectionDependency((HttpUrl("https://account.test"),)),
                 access_token_authenticator=auth,
+                application_authenticator=MockApplicationAuthenticator(
+                    AccessContextDTO(
+                        PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+                    ),
+                    failure=AuthenticationRequiredError(),
+                ),
             ),
             open_changer,
             open_reader,

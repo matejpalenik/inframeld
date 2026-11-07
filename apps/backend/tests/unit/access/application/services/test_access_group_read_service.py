@@ -5,6 +5,7 @@ from typing import override
 from uuid import UUID
 
 import pytest
+from tests.support.application_key_scenarios import current_key_facts
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.mock_project_metadata import (
     ACCESS,
@@ -29,6 +30,9 @@ from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto 
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.enums.access_group_collection import AccessGroupCollection
+from inframeld_backend.access.application.errors.application_key_credential_rejected_error import (
+    ApplicationKeyCredentialRejectedError,
+)
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
 )
@@ -280,4 +284,41 @@ async def test_recovery_denies_a_visible_project_before_group_visibility_or_page
             access=ACCESS,
             query=ListAccessGroupPrincipalsQuery(PROJECT_ID, GROUP, AccessGroupCollection.MEMBERS),
         )
+    assert reader.page_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_application_group_metadata_requires_its_current_key_and_exact_relationship() -> None:
+    reader = MockReadFacts()
+    evidence = MockAuthenticationEvidence.application_key()
+    key = current_key_facts(
+        key_id=evidence.key_id,
+        principal_id=ACTION.principal.id,
+        organization_id=ORGANIZATION_ID,
+        project_id=PROJECT_ID,
+    )
+    reader.facts = replace(
+        FACTS,
+        action=replace(
+            ACTION,
+            principal=replace(ACTION.principal, kind=PrincipalKind.APPLICATION),
+            application_key_facts=key,
+        ),
+    )
+    access = AccessContextDTO(ACTION.principal.id, evidence)
+    service = AccessGroupReadService(MockTransactions([]), reader)
+    assert await service.inspect(access=access, project_id=PROJECT_ID, selector=GROUP) == META
+    with pytest.raises(AccessDeniedError):
+        await service.list_principals(
+            access=access,
+            query=ListAccessGroupPrincipalsQuery(PROJECT_ID, GROUP, AccessGroupCollection.MEMBERS),
+        )
+    reader.facts = replace(
+        reader.facts,
+        action=replace(
+            reader.facts.action, application_key_facts=replace(key, revoked_at=key.checked_at)
+        ),
+    )
+    with pytest.raises(ApplicationKeyCredentialRejectedError):
+        await service.inspect(access=access, project_id=PROJECT_ID, selector=GROUP)
     assert reader.page_calls == 0

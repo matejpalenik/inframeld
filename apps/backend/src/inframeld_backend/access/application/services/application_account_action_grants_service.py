@@ -91,6 +91,9 @@ class ApplicationAccountActionGrantsService(ApplicationAccountActionGrantsReader
             or facts.actor.principal.organization_id != facts.organization_id
         ):
             raise RuntimeError("The grant page changed its current actor or scope.")
+        PrincipalAccessEvaluationService.require_human(
+            access=access, principal=facts.actor.principal
+        )
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=facts.actor.principal,

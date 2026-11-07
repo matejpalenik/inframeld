@@ -11,9 +11,6 @@ from inframeld_backend.access.application.dtos.project_action_facts_dto import P
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.action_authorizer import ActionAuthorizer
 from inframeld_backend.access.application.protocols.project_action_facts_reader import (
     ProjectActionFactsReader,
@@ -73,9 +70,11 @@ class ActionAuthorizationService(ActionAuthorizer):
             principal=facts.principal,
             has_pending_recovery=facts.has_pending_recovery,
             oauth_credential_facts=facts.oauth_credential_facts,
+            application_key_facts=facts.application_key_facts,
         )
-        if not principal_access.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=principal_access
+        )
 
         if not ProjectVisibilityPolicy.may_view_project(
             principal_status=facts.principal.status,

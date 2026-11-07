@@ -9,6 +9,7 @@ from typing import override
 from uuid import UUID
 
 import pytest
+from tests.support.application_key_scenarios import current_key_facts
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -24,6 +25,9 @@ from inframeld_backend.access.application.dtos.project_action_authorization_requ
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
+)
+from inframeld_backend.access.application.errors.application_key_credential_rejected_error import (
+    ApplicationKeyCredentialRejectedError,
 )
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
@@ -100,9 +104,19 @@ async def test_authorizes_current_human_for_the_exact_budget_action(action: str)
 
 @pytest.mark.asyncio
 async def test_application_can_inspect_with_its_own_exact_grant() -> None:
-    access = AccessContextDTO(ACTOR_ID, MockAuthenticationEvidence.application_key())
+    evidence = MockAuthenticationEvidence.application_key()
+    access = AccessContextDTO(ACTOR_ID, evidence)
     reader = MockProjectActionFactsReader(
-        replace(CURRENT_FACTS, principal=replace(HUMAN, kind=PrincipalKind.APPLICATION))
+        replace(
+            CURRENT_FACTS,
+            principal=replace(HUMAN, kind=PrincipalKind.APPLICATION),
+            application_key_facts=current_key_facts(
+                key_id=evidence.key_id,
+                principal_id=ACTOR_ID,
+                organization_id=ORGANIZATION_ID,
+                project_id=PROJECT_ID,
+            ),
+        )
     )
 
     result = await ProjectBudgetAuthorizationService(reader).require_authorization(
@@ -115,9 +129,19 @@ async def test_application_can_inspect_with_its_own_exact_grant() -> None:
 
 @pytest.mark.asyncio
 async def test_application_cannot_manage_even_with_a_stored_management_grant() -> None:
-    access = AccessContextDTO(ACTOR_ID, MockAuthenticationEvidence.application_key())
+    evidence = MockAuthenticationEvidence.application_key()
+    access = AccessContextDTO(ACTOR_ID, evidence)
     reader = MockProjectActionFactsReader(
-        replace(CURRENT_FACTS, principal=replace(HUMAN, kind=PrincipalKind.APPLICATION))
+        replace(
+            CURRENT_FACTS,
+            principal=replace(HUMAN, kind=PrincipalKind.APPLICATION),
+            application_key_facts=current_key_facts(
+                key_id=evidence.key_id,
+                principal_id=ACTOR_ID,
+                organization_id=ORGANIZATION_ID,
+                project_id=PROJECT_ID,
+            ),
+        )
     )
 
     with pytest.raises(AccessDeniedError):
@@ -236,4 +260,27 @@ async def test_fact_identity_cannot_replace_the_authenticated_actor() -> None:
         await ProjectBudgetAuthorizationService(reader).require_authorization(
             access=HUMAN_ACCESS,
             request=ProjectActionAuthorizationRequestDTO(PROJECT_ID, ActionId("manage-budget")),
+        )
+
+
+@pytest.mark.asyncio
+async def test_application_expiry_equality_rejects_before_budget_disclosure() -> None:
+    evidence = MockAuthenticationEvidence.application_key()
+    key = current_key_facts(
+        key_id=evidence.key_id,
+        principal_id=ACTOR_ID,
+        organization_id=ORGANIZATION_ID,
+        project_id=PROJECT_ID,
+    )
+    facts = replace(
+        CURRENT_FACTS,
+        principal=replace(HUMAN, kind=PrincipalKind.APPLICATION),
+        application_key_facts=replace(key, expires_at=key.checked_at),
+    )
+    with pytest.raises(ApplicationKeyCredentialRejectedError):
+        await ProjectBudgetAuthorizationService(
+            MockProjectActionFactsReader(facts)
+        ).require_authorization(
+            access=AccessContextDTO(ACTOR_ID, evidence),
+            request=ProjectActionAuthorizationRequestDTO(PROJECT_ID, ActionId("inspect-budget")),
         )

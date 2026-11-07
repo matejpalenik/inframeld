@@ -3,12 +3,16 @@ from typing import override
 from uuid import uuid4
 
 import pytest
+from tests.support.application_key_scenarios import current_key_facts
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_metadata_authorization_facts_dto import (
     ProjectMetadataAuthorizationFactsDTO,
+)
+from inframeld_backend.access.application.errors.application_key_credential_rejected_error import (
+    ApplicationKeyCredentialRejectedError,
 )
 from inframeld_backend.access.application.protocols.project_metadata_facts_reader import (
     ProjectMetadataFactsReader,
@@ -42,8 +46,10 @@ class MockMetadataFacts(ProjectMetadataFactsReader):
             if kind is PrincipalKind.HUMAN
             else MockAuthenticationEvidence.application_key(),
         )
+        project_id = ProjectId(uuid4())
+        evidence = MockAuthenticationEvidence.application_key()
         self.facts = ProjectMetadataAuthorizationFactsDTO(
-            ProjectId(uuid4()),
+            project_id,
             InstallationId(uuid4()),
             ProjectActionFactsDTO(
                 principal=actor,
@@ -52,6 +58,14 @@ class MockMetadataFacts(ProjectMetadataFactsReader):
                 project_status=ProjectStatus.ACTIVE,
                 is_project_member=True,
                 has_exact_action_grant=granted,
+                application_key_facts=current_key_facts(
+                    key_id=evidence.key_id,
+                    principal_id=actor.id,
+                    organization_id=actor.organization_id,
+                    project_id=project_id,
+                )
+                if kind is PrincipalKind.APPLICATION
+                else None,
             ),
         )
 
@@ -116,3 +130,24 @@ async def test_lost_membership_hides_metadata_and_recovery_blocks_change() -> No
         await ProjectMetadataAuthorizationService(facts).require_change(
             access=facts.access, project_id=facts.facts.project_id
         )
+
+
+@pytest.mark.asyncio
+async def test_current_application_can_read_metadata_but_revocation_rejects_before_disclosure() -> (
+    None
+):
+    reader = MockMetadataFacts(PrincipalKind.APPLICATION)
+    service = ProjectMetadataAuthorizationService(reader)
+    assert (
+        await service.require_read(access=reader.access, project_id=reader.facts.project_id)
+    ).project_id == reader.facts.project_id
+    key = reader.facts.action.application_key_facts
+    assert key is not None
+    reader.facts = replace(
+        reader.facts,
+        action=replace(
+            reader.facts.action, application_key_facts=replace(key, revoked_at=key.checked_at)
+        ),
+    )
+    with pytest.raises(ApplicationKeyCredentialRejectedError):
+        await service.require_read(access=reader.access, project_id=reader.facts.project_id)

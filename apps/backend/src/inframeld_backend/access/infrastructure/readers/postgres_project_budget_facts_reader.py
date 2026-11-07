@@ -5,6 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
+)
 from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
     BrowserSessionAuthenticationDTO,
 )
@@ -40,8 +43,14 @@ from inframeld_backend.shared.infrastructure.rows.installation_identity_row impo
 class PostgresProjectBudgetFactsReader(ProjectActionFactsReader):
     """Read fresh budget facts under identity, Organization and shared Project coordination."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        application_key_profile: ApplicationKeyVerificationProfileDTO | None = None,
+    ) -> None:
         self._session = session
+        self._application_key_profile = application_key_profile
 
     @override
     async def read_action_facts(
@@ -98,9 +107,9 @@ class PostgresProjectBudgetFactsReader(ProjectActionFactsReader):
         if project is None:
             return None
 
-        facts = await PostgresProjectActionFactsReader(self._session).read_action_facts(
-            access=access, action_id=action_id, target=target
-        )
+        facts = await PostgresProjectActionFactsReader(
+            self._session, application_key_profile=self._application_key_profile
+        ).read_action_facts(access=access, action_id=action_id, target=target)
         if facts is not None and facts.principal.organization_id.value != organization:
             raise RuntimeError("Budget facts changed their Organization scope.")
         return facts

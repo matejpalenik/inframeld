@@ -345,6 +345,8 @@ const calls = {
     sdk.getHealth(options(client, call)),
   getCurrentSession: (client: Client, call: SdkCall) =>
     sdk.getCurrentSession(options(client, call)),
+  getCurrentApplicationSession: (client: Client, call: SdkCall) =>
+    sdk.getCurrentApplicationSession(options(client, call)),
   getMyOrganizationAccess: (client: Client, call: SdkCall) =>
     sdk.getMyOrganizationAccess(options(client, call)),
   createProject: (client: Client, call: SdkCall) =>

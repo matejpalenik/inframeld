@@ -61,6 +61,7 @@ __all__ = [
     "ApplicationKeyAdapter",
     "ApplicationKeyMetadataResponse",
     "CompletedOperationLookupResponse",
+    "CurrentApplicationSessionResponse",
     "CurrentSessionResponse",
     "DeletionStatusResponse",
     "GrantRecipientResponse",
@@ -180,6 +181,7 @@ from inframeld_sdk.models.application_account_metadata_response import Applicati
 from inframeld_sdk.models.application_key_adapter import ApplicationKeyAdapter as ApplicationKeyAdapter
 from inframeld_sdk.models.application_key_metadata_response import ApplicationKeyMetadataResponse as ApplicationKeyMetadataResponse
 from inframeld_sdk.models.completed_operation_lookup_response import CompletedOperationLookupResponse as CompletedOperationLookupResponse
+from inframeld_sdk.models.current_application_session_response import CurrentApplicationSessionResponse as CurrentApplicationSessionResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse as CurrentSessionResponse
 from inframeld_sdk.models.deletion_status_response import DeletionStatusResponse as DeletionStatusResponse
 from inframeld_sdk.models.grant_recipient_response import GrantRecipientResponse as GrantRecipientResponse

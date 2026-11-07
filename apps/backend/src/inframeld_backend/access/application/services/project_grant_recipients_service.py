@@ -115,6 +115,9 @@ class ProjectGrantRecipientsService(ProjectGrantRecipientsReader):
             or facts.actor.principal.organization_id != facts.organization_id
         ):
             raise RuntimeError("The eligible-recipient observation changed actor or exact scope.")
+        PrincipalAccessEvaluationService.require_human(
+            access=access, principal=facts.actor.principal
+        )
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=facts.actor.principal,

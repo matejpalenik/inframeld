@@ -12,8 +12,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.protocols.project_members_reader import (
     ProjectMembersReader,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.project_members_mapper import ProjectMembersMapper
 from inframeld_backend.access.http.openapi.human_authentication_responses import (
@@ -69,7 +69,7 @@ class _ProjectMembersRoute(APIRoute):
 
 
 def create_project_members_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_reader: Callable[[], AbstractAsyncContextManager[ProjectMembersReader]],
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", route_class=_ProjectMembersRoute)

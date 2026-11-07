@@ -1,0 +1,248 @@
+export const pageMetadata = {
+  title: "Check an application's identity",
+  description:
+    "Understand full-key verification, current application identity and safe authentication failures.",
+}
+
+# Check an application's identity
+
+SupportBot has its own permanent identity in the Support Project. A complete application key identifies that account. The account's current state and permissions determine what a later request may do. Alice's permissions are not added to the bot's access.
+
+The application identity check reports the recognized application and its bound Project. It is useful before trusting that an integration is using the intended identity. A successful check supplies no permission snapshot for another request.
+
+<Note>
+  Public key issuance and a complete supported account-to-key procedure remain
+  unavailable. These examples require an existing compatible application
+  credential. Account creation and safe key metadata reads cannot produce a
+  usable key or retrieve a secret.
+</Note>
+
+## Prepare the account and credential
+
+Use the permanent `principalId` and `projectId` from authorized [application-account creation or inspection](/guides/application-accounts). The account ID and principal ID are the same. [Exact grants](/guides/manage-action-grants) and [group membership](/guides/manage-access-groups) remain separate from its credentials. Creating an account starts with no received actions, groups or keys.
+
+The check needs the installation's HTTPS API URL and a complete, actually issued application credential compatible with the operation's trusted binding. Neither the public key prefix nor a key ID is proof of identity. Do not construct a key from an example or a database record.
+
+Credential compatibility is specific to the operation's trusted installation, audience and adapter. A successful check through one adapter does not establish usability through another.
+
+Keep incoming application keys separate from human sign-in credentials and outgoing model-provider secrets. Supply one supported credential family through its documented header. Never put a key in a URL, request body, command-line argument, browser bundle, log or diagnostic capture. Do not combine it with a browser session or fall back to a saved human after failure.
+
+## Interpret the application-session contract
+
+`GET /v1/application-session`, operation `getCurrentApplicationSession`, uses the complete application-key bearer credential. It does not use a human cookie or human OAuth token. There is no caller-selected principal or Project, request body, revision or idempotency key.
+
+A successful `200` response contains only `principalId` and `projectId`. Compare both with the account you intended to use. This is an illustrative response, not a captured request result:
+
+<CodeGroup>
+
+```json {{ title: "Illustrative identity result" }}
+{
+  "principalId": "00000000-0000-4000-8000-000000000004",
+  "projectId": "00000000-0000-4000-8000-000000000003"
+}
+```
+
+</CodeGroup>
+
+The response contains no key, grants, account-status field or permission inventory. It is no-store and returns the ordinary request correlation header. It neither creates credentials nor probes a model. [The native reference](/api-reference/projects-and-access#inspect-an-applications-identity) and [response model](/api-reference/models#CurrentApplicationSessionResponse) own the exact contract.
+
+The human identity check remains `GET /v1/session`. An application key is an unsupported credential family there and receives `401`. On an ordinary product operation, a verified application may instead receive `403` because the action requires a human. Successful authentication does not convert human administration into an application permission.
+
+## Make one identity request
+
+Set `INFRAMELD_URL` to the trusted installation URL. Supply the existing complete credential as `INFRAMELD_APPLICATION_KEY` through your application's private credential-handling procedure. These input names configure the examples. They do not obtain a credential or complete the missing public issuance/setup procedure.
+
+For an SDK alternative, follow the local source-package setup for [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust). Use a separate example project for each language. Save the complete Python program as `application_session.py`, the Node TypeScript program as `application-session.ts`, or the Rust program as `src/main.rs` in its Cargo project. Each alternative makes one application-session request, with no automatic retry or human fallback.
+
+The cURL alternative supplies the Authorization header through stdin. Its status/correlation output uses cURL 7.84 or newer. It prints the response body without validating the JSON schema. The generated clients require a valid typed response before printing the two identity fields.
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/application-session" \
+  --header @- \
+  --header 'Accept: application/json' \
+  --write-out '\nHTTP %{http_code}\nRequest ID: %header{x-request-id}\n' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_APPLICATION_KEY
+EOF_HEADERS
+```
+
+```python
+import asyncio
+import json
+import os
+import sys
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+
+
+async def main() -> int:
+    headers = {
+        "Authorization": "Bearer " + os.environ["INFRAMELD_APPLICATION_KEY"]
+    }
+    try:
+        async with ApiClient(Configuration(host=os.environ["INFRAMELD_URL"])) as client:
+            response = await AccessApi(client).get_current_application_session_with_http_info(
+                _headers=headers,
+                _request_timeout=5.0,
+            )
+            print(json.dumps({
+                "httpStatus": response.status_code,
+                "requestId": response.headers.get("x-request-id")
+                if response.headers is not None else None,
+            }))
+            print(json.dumps({
+                "principalId": str(response.data.principal_id),
+                "projectId": str(response.data.project_id),
+            }))
+        return 0
+    except ApiException as error:
+        print(json.dumps({
+            "httpStatus": error.status,
+            "requestId": error.headers.get("x-request-id")
+            if error.headers is not None else None,
+        }), file=sys.stderr)
+        kind = "decode" if error.__cause__ is not None else "http"
+        print(kind + ": No usable application identity result.", file=sys.stderr)
+        return 1
+    except httpx.HTTPError:
+        print("transport: No usable HTTP response.", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(asyncio.run(main()))
+```
+
+```typescript
+import { createClient, getCurrentApplicationSession } from "@inframeld/sdk"
+
+function required(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`Set ${name} through the private configuration`)
+  return value
+}
+
+const client = createClient({
+  baseUrl: required("INFRAMELD_URL"),
+  timeoutMs: 5000,
+})
+const result = await getCurrentApplicationSession({
+  client,
+  headers: {
+    Authorization: `Bearer ${required("INFRAMELD_APPLICATION_KEY")}`,
+  },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+const metadata = {
+  httpStatus: result.response?.status ?? null,
+  requestId: result.response?.headers.get("x-request-id") ?? null,
+}
+if (result.error) {
+  console.error(JSON.stringify(metadata))
+  console.error("No usable application identity:", result.error.kind)
+  if (result.error.kind === "transport") {
+    console.error("Transport outcome:", result.error.reason)
+  }
+  process.exitCode = 1
+} else {
+  console.log(JSON.stringify(metadata))
+  console.log(
+    JSON.stringify({
+      principalId: result.data.principalId,
+      projectId: result.data.projectId,
+    })
+  )
+}
+```
+
+```rust
+use std::{env, process::ExitCode};
+
+use inframeld_sdk::client::{ApiOpError, HttpClient};
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    let (Ok(url), Ok(key)) = (
+        env::var("INFRAMELD_URL"),
+        env::var("INFRAMELD_APPLICATION_KEY"),
+    ) else {
+        eprintln!("Set the URL and application key through the private configuration.");
+        return ExitCode::FAILURE;
+    };
+    let client = HttpClient::new()
+        .with_base_url(url)
+        .with_header("Authorization", format!("Bearer {key}"));
+    match client.get_current_application_session().await {
+        Ok(response) => {
+            println!("HTTP {}", response.status);
+            println!(
+                "Request ID: {}",
+                response.headers.get("x-request-id")
+                    .and_then(|value| value.to_str().ok())
+                    .unwrap_or("unavailable")
+            );
+            println!("principalId: {}", response.body.principal_id);
+            println!("projectId: {}", response.body.project_id);
+            ExitCode::SUCCESS
+        }
+        Err(ApiOpError::Api(error)) => {
+            eprintln!("HTTP {}", error.status);
+            eprintln!(
+                "Request ID: {}",
+                error.headers.get("x-request-id")
+                    .and_then(|value| value.to_str().ok())
+                    .unwrap_or("unavailable")
+            );
+            if error.parse_error.is_some() {
+                eprintln!("decode: No usable typed HTTP response.");
+            } else {
+                eprintln!("http: The application identity request was rejected.");
+            }
+            ExitCode::FAILURE
+        }
+        Err(ApiOpError::Transport(_)) => {
+            eprintln!("transport: No usable HTTP response.");
+            ExitCode::FAILURE
+        }
+    }
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python application_session.py`, `node application-session.ts` with Node 26 in the ESM project, or `cargo run` in the Cargo project. Keep the original request's safe status and request ID when available. The examples do not print the credential or raw SDK error bodies. HTTP rejection, decoding failure and transport failure remain distinct unsuccessful outcomes, including when a received `200` body cannot be decoded.
+
+An accepted identity result does not authorize another business request. Follow the failure guidance below before relying on a result or deciding what to do next.
+
+## Understand a rejected or unconfirmed check
+
+| Observation                  | Meaning and next action                                                                                                                                                                                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`                        | Authentication inputs are malformed or competing. Supply exactly one supported credential family without exposing it in diagnostics.                                                                                                                                      |
+| `401`                        | The complete credential is invalid, expired, revoked or bound to a different installation, audience or adapter, or the identity check does not support that credential family. Preserve the selected identity and correct its credential through the supported lifecycle. |
+| `403`                        | Credential verification succeeded, but current local account or Project eligibility prevents access. Replacing a key does not repair that account state or grant authority.                                                                                               |
+| `503`                        | Required verification or dependency facts are unconfirmed. No cached success or human fallback follows. Retain the request's safe correlation information and resolve availability before relying on a result.                                                            |
+| Timeout or unusable response | Identity remains unconfirmed. Do not treat an HTTP status alone as a valid typed result or repeat another business operation because this check was inconclusive.                                                                                                         |
+
+Key expiry is evaluated at the server's current authorization boundary. Equality to the recorded expiry is expired. A client clock, earlier check or remembered receipt cannot extend it. Required verification failures never become permission to use an old successful observation.
+
+## Check current authority for each protected request
+
+A key may pass the identity check and then be revoked before the next operation. Protected requests and original-result disclosure check current key, account, exact scope, grants and protected inputs again. No key or response contains a continuing permission certificate.
+
+If revocation wins before a protected local write is authorized and committed, that key cannot authorize the effect. Later revocation does not undo an already committed effect or recall bytes or external calls already sent. Subsequent protected delivery and dispatch steps require fresh authorization. An unavailable check does not authorize an automatic business retry.
+
+A valid replacement credential for the same account preserves the principal. It must pass its own current credential binding and access checks. It gives no new permission and does not borrow the issuer's authority. A retained operation still belongs to its original principal and scope.
+
+## Keep admitted jobs separate from incoming credentials
+
+An already admitted job retains its server-owned principal, scope and fixed inputs. Ordinary key expiry, replacement or individual revocation does not automatically cancel that work. The job's owner still checks current account, required permissions and protected inputs at its bounded checkpoints. Suspension, retirement, resource deletion, cancellation or lost required authority can stop later protected work.
+
+Use the owning feature's actual job controls when they are delivered. This identity component does not supply a job runner, a mounted MCP endpoint or a CLI key-login command. Issuance, independent revocation and permanent account retirement remain separate lifecycle operations. The [credential guide](/clients/http#use-an-application-credential) explains the transport boundary without supplying a missing secret producer.

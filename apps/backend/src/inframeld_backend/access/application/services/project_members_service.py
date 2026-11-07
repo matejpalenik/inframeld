@@ -73,6 +73,7 @@ class ProjectMembersService(ProjectMembersReader):
             project_id=query.project_id,
         )
         action = facts.action
+        PrincipalAccessEvaluationService.require_human(access=access, principal=action.principal)
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=action.principal,

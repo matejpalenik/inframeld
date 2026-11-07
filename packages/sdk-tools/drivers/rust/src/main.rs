@@ -13,6 +13,7 @@ const BINDINGS: &[&str] = &[
     "getProtectedResourceMetadataForPath",
     "getHealth",
     "getCurrentSession",
+    "getCurrentApplicationSession",
     "getMyOrganizationAccess",
     "admitHuman",
     "createProject",
@@ -105,6 +106,7 @@ async fn main() {
         if matches!(
             call.operation.as_str(),
             "getCurrentSession"
+                | "getCurrentApplicationSession"
                 | "getMyOrganizationAccess"
                 | "createProject"
                 | "createAccessGroup"

@@ -165,6 +165,7 @@ class OrganizationActionGrantChangeService(OrganizationActionGrantChanger):
                 ):
                     raise RuntimeError("Organization grant facts changed actor, scope or revision.")
 
+                PrincipalAccessEvaluationService.require_human(access=access, principal=facts.actor)
                 eligibility = PrincipalAccessEvaluationService.evaluate(
                     access=access,
                     principal=facts.actor,

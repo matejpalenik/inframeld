@@ -298,11 +298,20 @@ from inframeld_backend.access.domain.value_objects.identity_subject import Ident
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.http.dependencies.application_key_dependency import (
+    ApplicationKeyDependency,
+)
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
+)
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
+)
+from inframeld_backend.access.http.handlers.application_key_credential_error_handler import (
+    register_application_key_credential_error_handler,
 )
 from inframeld_backend.access.http.routes.access_group_action_grant_routes import (
     create_access_group_action_grant_router,
@@ -313,6 +322,9 @@ from inframeld_backend.access.http.routes.application_account_action_grant_route
 )
 from inframeld_backend.access.http.routes.application_account_routes import (
     create_application_account_router,
+)
+from inframeld_backend.access.http.routes.current_application_session_routes import (
+    create_application_session_router,
 )
 from inframeld_backend.access.http.routes.current_session_routes import create_session_router
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
@@ -412,8 +424,11 @@ from inframeld_backend.shared.http.routes.original_operation_lookup_routes impor
     create_original_operation_lookup_router,
 )
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 from tests.support.mock_sdk_access_groups import MockSDKAccessGroups
 from tests.support.mock_sdk_application_accounts import MockSDKApplicationAccounts
+from tests.support.mock_sdk_application_authenticator import MockSDKApplicationAuthenticator
+from tests.support.mock_sdk_application_session_reader import MockSDKApplicationSessionReader
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
 
@@ -1702,13 +1717,27 @@ class SDKCaseEvidenceDTO(BaseModel):
 
 def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application = create_schema_fixture_app()
+    register_application_key_credential_error_handler(application)
     origins = (HttpUrl("https://account.test"),)
     if browser_origin is not None:
         origins += (HttpUrl(browser_origin),)
 
     csrf = CSRFProtectionDependency(origins)
-    authenticate = HumanSessionDependency(
-        MockSDKBrowserAuthenticator(), csrf, access_token_authenticator=MockSDKTokenAuthenticator()
+    browser_authenticator = MockSDKBrowserAuthenticator()
+    token_authenticator = MockSDKTokenAuthenticator()
+    human_session = HumanSessionDependency(
+        browser_authenticator, csrf, access_token_authenticator=token_authenticator
+    )
+    authenticate = ProductAccessDependency(
+        browser_authenticator,
+        csrf,
+        access_token_authenticator=token_authenticator,
+        application_authenticator=MockApplicationAuthenticator(
+            AccessContextDTO(
+                PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+            ),
+            failure=AuthenticationRequiredError(),
+        ),
     )
     discovery_snapshot: ContextVar[PublicDiscoveryDTO | None] = ContextVar("discovery_snapshot")
 
@@ -1742,7 +1771,13 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
 
     application.include_router(create_discovery_router(discovery_snapshot.get))
     application.include_router(health_router)
-    application.include_router(create_session_router(authenticate))
+    application.include_router(create_session_router(human_session))
+    application.include_router(
+        create_application_session_router(
+            ApplicationKeyDependency(MockSDKApplicationAuthenticator()),
+            MockSDKApplicationSessionReader(),
+        )
+    )
     application.include_router(
         create_organization_action_grant_router(
             authenticate, _open_organization_grants_changer, _open_organization_grants_reader

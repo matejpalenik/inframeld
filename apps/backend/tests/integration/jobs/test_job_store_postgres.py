@@ -12,6 +12,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios
 from tests.support.application_job_handler import BoundedJobHandler
+from tests.support.application_key_scenarios import store_application_key
 from tests.support.application_worker_process import (
     application_worker_command,
     application_worker_process,
@@ -22,6 +23,9 @@ from tests.support.seaweedfs_fixture import storage_settings
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
     AdmittedWorkAuthorityDTO,
+)
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
 )
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
@@ -35,9 +39,16 @@ from inframeld_backend.access.application.services.action_authorization_service 
 from inframeld_backend.access.application.services.admitted_work_authorization_service import (
     AdmittedWorkAuthorizationService,
 )
+from inframeld_backend.access.application.services.application_authentication_service import (
+    ApplicationAuthenticationService,
+)
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.application_key_audience import (
+    ApplicationKeyAudience,
+)
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
@@ -46,6 +57,9 @@ from inframeld_backend.access.domain.value_objects.identity_subject import Ident
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_facts_reader import (
     PostgresAdmittedWorkFactsReader,
+)
+from inframeld_backend.access.infrastructure.readers.postgres_application_authentication_facts_reader import (
+    PostgresApplicationAuthenticationFactsReader,
 )
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
@@ -62,6 +76,9 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
     ProjectActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.access.infrastructure.verifiers.postgres_application_key_verifier import (
+    PostgresApplicationKeyVerifier,
+)
 from inframeld_backend.access.infrastructure.writers.postgres_job_admission_audit_writer import (
     PostgresJobAdmissionAuditWriter,
 )
@@ -143,6 +160,25 @@ pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
     reason="Requires PostgreSQL integration services",
 )
+APPLICATION_PROFILE = ApplicationKeyVerificationProfileDTO(
+    ApplicationKeyAudience("https://api.test"), ApplicationKeyAdapter.HTTP
+)
+
+
+async def _application_access(
+    database: Database, authority: AdmittedWorkAuthorityDTO
+) -> AccessContextDTO:
+    credential = await store_application_key(
+        database,
+        principal_id=authority.principal_id,
+        organization_id=authority.organization_id,
+        project_id=authority.project_id,
+    )
+    return await ApplicationAuthenticationService(
+        key_verifier=PostgresApplicationKeyVerifier(database),
+        authentication_facts_reader=PostgresApplicationAuthenticationFactsReader(database),
+        verification_profile=APPLICATION_PROFILE,
+    ).authenticate(credential)
 
 
 async def _request(
@@ -362,12 +398,17 @@ async def test_lost_admission_response_recovers_original_job_request_and_one_aud
     database: Database,
 ) -> None:
     request, authority = await _request(database)
+    access = await _application_access(database, authority)
     original_request = RequestId(uuid4())
 
     async def admit(request_id: RequestId) -> JobAdmissionDTO:
         async with database.session() as session, session.begin():
             service = JobAdmissionService(
-                ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+                ActionAuthorizationService(
+                    PostgresProjectActionFactsReader(
+                        session, application_key_profile=APPLICATION_PROFILE
+                    )
+                ),
                 AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
                 IdempotencyService(PostgresOperationReservationWriter(session)),
                 PostgresJobStore(session),
@@ -375,9 +416,7 @@ async def test_lost_admission_response_recovers_original_job_request_and_one_aud
                 supported_payloads=(("test.progress", 1),),
             )
             return await service.admit(
-                access=AccessContextDTO(
-                    authority.principal_id, MockAuthenticationEvidence.application_key()
-                ),
+                access=access,
                 authority=authority,
                 context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
@@ -586,13 +625,18 @@ async def test_rejected_admission_leaves_no_job_audit_or_reservation(
     database: Database, audit_failure: bool
 ) -> None:
     request, authority = await _request(database)
+    access = await _application_access(database, authority)
     expected = RuntimeError if audit_failure else UnsupportedJobPayloadError
     with pytest.raises(
         expected, match="forced required audit failure" if audit_failure else "does not support"
     ):
         async with database.session() as session, session.begin():
             service = JobAdmissionService(
-                ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+                ActionAuthorizationService(
+                    PostgresProjectActionFactsReader(
+                        session, application_key_profile=APPLICATION_PROFILE
+                    )
+                ),
                 AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
                 IdempotencyService(PostgresOperationReservationWriter(session)),
                 PostgresJobStore(session),
@@ -602,9 +646,7 @@ async def test_rejected_admission_leaves_no_job_audit_or_reservation(
                 supported_payloads=(("test.progress", 1),),
             )
             await service.admit(
-                access=AccessContextDTO(
-                    authority.principal_id, MockAuthenticationEvidence.application_key()
-                ),
+                access=access,
                 authority=authority,
                 context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
@@ -731,7 +773,9 @@ async def _human_request(
 
 def _admission_service(session: AsyncSession) -> JobAdmissionService:
     return JobAdmissionService(
-        ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+        ActionAuthorizationService(
+            PostgresProjectActionFactsReader(session, application_key_profile=APPLICATION_PROFILE)
+        ),
         AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
         IdempotencyService(PostgresOperationReservationWriter(session)),
         PostgresJobStore(session),
@@ -979,6 +1023,7 @@ async def test_application_human_only_action_is_denied_before_admission_effects(
     database: Database,
 ) -> None:
     request, authority = await _request(database)
+    access = await _application_access(database, authority)
     authority = replace(authority, action_id=ActionId("create-sources"))
     async with database.session() as session, session.begin():
         await session.execute(
@@ -992,9 +1037,7 @@ async def test_application_human_only_action_is_denied_before_admission_effects(
         # Catch inside the owning transaction. A denial must leave nothing to commit.
         with pytest.raises(AccessDeniedError):
             await _admission_service(session).admit(
-                access=AccessContextDTO(
-                    authority.principal_id, MockAuthenticationEvidence.application_key()
-                ),
+                access=access,
                 authority=authority,
                 context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),
@@ -1063,13 +1106,12 @@ async def test_aged_unresolved_effect_replay_preserves_original_job_and_operatio
     database: Database,
 ) -> None:
     request, authority = await _request(database)
+    access = await _application_access(database, authority)
 
     async def admit() -> JobAdmissionDTO:
         async with database.session() as session, session.begin():
             return await _admission_service(session).admit(
-                access=AccessContextDTO(
-                    authority.principal_id, MockAuthenticationEvidence.application_key()
-                ),
+                access=access,
                 authority=authority,
                 context=IdempotencyContextDTO(request.method, request.requested_route, request.key),
                 fingerprint=RequestFingerprint(request.fingerprint),

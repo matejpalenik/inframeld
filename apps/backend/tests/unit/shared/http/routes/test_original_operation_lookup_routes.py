@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.protocols.human_session_authenticator import (
@@ -23,8 +24,8 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto import (
     AcceptedOperationLookupDTO,
@@ -125,9 +126,15 @@ def client_for(service: MockOriginalLookup) -> TestClient:
     register_error_handlers(app)
     app.include_router(
         create_original_operation_lookup_router(
-            HumanSessionDependency(
+            ProductAccessDependency(
                 MockLookupAuthenticator(),
                 CSRFProtectionDependency((HttpUrl("https://account.test"),)),
+                application_authenticator=MockApplicationAuthenticator(
+                    AccessContextDTO(
+                        PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+                    ),
+                    failure=AuthenticationRequiredError(),
+                ),
             ),
             open_lookup,
         )

@@ -16,6 +16,12 @@ from inframeld_backend.access.application.protocols.human_access_token_authentic
 from inframeld_backend.access.application.protocols.human_oauth_consent_handler import (
     HumanOAuthConsentHandler,
 )
+from inframeld_backend.access.application.services.application_authentication_service import (
+    ApplicationAuthenticationService,
+)
+from inframeld_backend.access.application.services.application_session_service import (
+    ApplicationSessionService,
+)
 from inframeld_backend.access.application.services.human_access_token_authentication_service import (
     HumanAccessTokenAuthenticationService,
 )
@@ -28,8 +34,12 @@ from inframeld_backend.access.application.services.human_session_authentication_
 from inframeld_backend.access.application.services.unavailable_human_session_authentication_service import (
     UnavailableHumanSessionAuthenticationService,
 )
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.infrastructure.readers.hydra_oauth_consent_request_reader import (
     HydraOAuthConsentRequestReader,
+)
+from inframeld_backend.access.infrastructure.readers.postgres_application_authentication_facts_reader import (
+    PostgresApplicationAuthenticationFactsReader,
 )
 from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
     PostgresHumanCredentialStateReader,
@@ -39,6 +49,9 @@ from inframeld_backend.access.infrastructure.readers.postgres_human_identity_lin
 )
 from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
     PostgresIdentityRecoveryBlockReader,
+)
+from inframeld_backend.access.infrastructure.settings.application_key_authentication_settings import (
+    ApplicationKeyAuthenticationSettings,
 )
 from inframeld_backend.access.infrastructure.settings.human_authentication_settings import (
     HumanAuthenticationSettings,
@@ -53,6 +66,9 @@ from inframeld_backend.access.infrastructure.verifiers.kratos_browser_session_ve
 )
 from inframeld_backend.access.infrastructure.verifiers.kratos_human_identity_verifier import (
     KratosHumanIdentityVerifier,
+)
+from inframeld_backend.access.infrastructure.verifiers.postgres_application_key_verifier import (
+    PostgresApplicationKeyVerifier,
 )
 from inframeld_backend.access.infrastructure.writers.hydra_oauth_consent_decision_writer import (
     HydraOAuthConsentDecisionWriter,
@@ -70,18 +86,47 @@ def create_access_components(
     database: Database,
     *,
     human_authentication_settings: HumanAuthenticationSettings,
+    application_key_authentication_settings: ApplicationKeyAuthenticationSettings | None = None,
 ) -> AccessComponents:
     """Assemble authentication without provider calls or shared database sessions.
 
     Retain cleanup responsibility until assembly succeeds. The application then
     owns the returned clients and releases them through its lifespan.
     """
+    application_settings = (
+        application_key_authentication_settings
+        if application_key_authentication_settings is not None
+        else ApplicationKeyAuthenticationSettings()
+    )
+    application_facts = PostgresApplicationAuthenticationFactsReader(database)
+    application_verifier = PostgresApplicationKeyVerifier(database)
+    http_profile = application_settings.profile(ApplicationKeyAdapter.HTTP)
+    application_authenticator = ApplicationAuthenticationService(
+        key_verifier=application_verifier,
+        authentication_facts_reader=application_facts,
+        verification_profile=http_profile,
+        total_timeout_seconds=application_settings.total_timeout_seconds,
+    )
+    mcp_application_authenticator = ApplicationAuthenticationService(
+        key_verifier=application_verifier,
+        authentication_facts_reader=application_facts,
+        verification_profile=application_settings.profile(ApplicationKeyAdapter.MCP),
+        total_timeout_seconds=application_settings.total_timeout_seconds,
+    )
+    application_session_reader = ApplicationSessionService(
+        authentication_facts_reader=application_facts,
+        verification_profile=http_profile,
+        total_timeout_seconds=application_settings.total_timeout_seconds,
+    )
     if kratos_settings is None:
         if hydra_settings is not None:
             raise ValueError("Hydra authentication requires Kratos configuration.")
         return AccessComponents(
             authenticator=UnavailableHumanSessionAuthenticationService(),
             kratos_client=None,
+            application_authenticator=application_authenticator,
+            mcp_application_authenticator=mcp_application_authenticator,
+            application_session_reader=application_session_reader,
         )
 
     reader = PostgresHumanIdentityLinkReader(database)
@@ -178,6 +223,9 @@ def create_access_components(
         components = AccessComponents(
             authenticator=authenticator,
             kratos_client=kratos_client,
+            application_authenticator=application_authenticator,
+            mcp_application_authenticator=mcp_application_authenticator,
+            application_session_reader=application_session_reader,
             access_token_authenticator=access_token_authenticator,
             kratos_admin_client=kratos_admin_client,
             hydra_client=hydra_client,

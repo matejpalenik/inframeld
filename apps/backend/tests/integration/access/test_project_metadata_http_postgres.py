@@ -3,6 +3,7 @@
 import os
 from functools import partial
 from typing import override
+from uuid import UUID
 
 import httpx2
 import pytest
@@ -10,6 +11,7 @@ from fastapi import FastAPI
 from pydantic import HttpUrl
 from sqlalchemy import delete, update
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 from tests.support.project_metadata_scenarios import (
     seed_another_metadata_project,
     seed_metadata_project,
@@ -29,8 +31,8 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
@@ -91,9 +93,15 @@ def application(database: Database, actor: PrincipalId) -> FastAPI:
     open_metadata = partial(open_project_metadata, database, fingerprints)
     app.include_router(
         create_project_metadata_router(
-            HumanSessionDependency(
+            ProductAccessDependency(
                 MockMetadataHttpAuthenticator(actor),
                 CSRFProtectionDependency((HttpUrl("https://account.test"),)),
+                application_authenticator=MockApplicationAuthenticator(
+                    AccessContextDTO(
+                        PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+                    ),
+                    failure=AuthenticationRequiredError(),
+                ),
             ),
             open_metadata,
             open_metadata,

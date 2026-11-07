@@ -16,6 +16,7 @@ from tests.support.historical_project_grant_scenarios import (
     RetainedProjectGrantPostDTO,
     seed_retained_project_grant_post,
 )
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 from tests.support.project_action_grant_postgres_scenarios import change_project_grant
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -31,11 +32,12 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.routes.project_action_grant_routes import (
     create_project_action_grant_router,
@@ -94,9 +96,15 @@ def _test_app(database: Database, access: AccessContextDTO) -> FastAPI:
     app = FastAPI(lifespan=partial(application_lifespan, ApplicationResources(database)))
     register_error_handlers(app)
     configure_problem_openapi(app)
-    authenticate = HumanSessionDependency(
+    authenticate = ProductAccessDependency(
         FixedHumanSessionAuthenticator(access),
         CSRFProtectionDependency((HttpUrl("http://account.test"),)),
+        application_authenticator=MockApplicationAuthenticator(
+            AccessContextDTO(
+                PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+            ),
+            failure=AuthenticationRequiredError(),
+        ),
     )
     app.include_router(
         create_project_action_grant_router(

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import override
 
 from sqlalchemy import String, exists, func, select
@@ -21,6 +22,12 @@ from inframeld_backend.access.application.dtos.access_group_principal_dto import
 from inframeld_backend.access.application.dtos.access_group_read_facts_dto import (
     AccessGroupReadFactsDTO,
 )
+from inframeld_backend.access.application.dtos.application_key_authentication_dto import (
+    ApplicationKeyAuthenticationDTO,
+)
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
+)
 from inframeld_backend.access.application.dtos.project_departure_candidate_dto import (
     ProjectDepartureCandidateDTO,
 )
@@ -36,6 +43,7 @@ from inframeld_backend.access.application.protocols.access_group_read_facts_read
 )
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.access_group_action import AccessGroupAction
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
 from inframeld_backend.access.domain.value_objects.access_group_relationships import (
     AccessGroupRelationships,
@@ -43,8 +51,14 @@ from inframeld_backend.access.domain.value_objects.access_group_relationships im
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.mappers.postgres_application_key_facts_mapper import (
+    PostgresApplicationKeyFactsMapper,
+)
 from inframeld_backend.access.infrastructure.mappers.postgres_project_actor_mapper import (
     PostgresProjectActorMapper,
+)
+from inframeld_backend.access.infrastructure.readers.application_key_state_queries import (
+    ApplicationKeyStateQueries,
 )
 from inframeld_backend.access.infrastructure.readers.project_actor_queries import (
     ProjectActorQueries,
@@ -56,6 +70,7 @@ from inframeld_backend.access.infrastructure.rows.access_group_name_reservation_
     AccessGroupNameReservationRow,
 )
 from inframeld_backend.access.infrastructure.rows.access_group_row import AccessGroupRow
+from inframeld_backend.access.infrastructure.rows.application_key_row import ApplicationKeyRow
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
@@ -77,8 +92,14 @@ class PostgresAccessGroupFactsReader(
 ):
     """Read current group facts under compatible Organization and Project coordination."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        application_key_profile: ApplicationKeyVerificationProfileDTO | None = None,
+    ) -> None:
         self._session = session
+        self._application_key_profile = application_key_profile
 
     @override
     async def read(
@@ -279,6 +300,16 @@ class PostgresAccessGroupFactsReader(
     ) -> AccessGroupReadFactsDTO | None:
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Group facts require the active caller transaction.")
+        evidence = access.authentication_evidence
+        # Change and deletion services reject application actors before credential evaluation.
+        application_key = (
+            evidence
+            if isinstance(evidence, ApplicationKeyAuthenticationDTO) and not exclusive
+            else None
+        )
+        profile = self._application_key_profile
+        if application_key is not None and profile is None:
+            raise DependencyUnavailableError("The application verification profile is unavailable.")
         try:
             if (
                 await self._session.scalar(
@@ -287,6 +318,35 @@ class PostgresAccessGroupFactsReader(
                 != "read committed"
             ):
                 raise RuntimeError("Group facts require READ COMMITTED isolation.")
+            if application_key is not None:
+                scope = (
+                    (
+                        await self._session.execute(
+                            ApplicationKeyStateQueries.account_scope(
+                                access.actor_principal_id
+                            ).execution_options(autoflush=False)
+                        )
+                    )
+                    .tuples()
+                    .one_or_none()
+                )
+                if scope is None:
+                    principal_kind = await self._session.scalar(
+                        select(PrincipalRow.kind).where(
+                            PrincipalRow.id == access.actor_principal_id.value
+                        )
+                    )
+                    if (
+                        principal_kind is not None
+                        and principal_kind is not PrincipalKind.APPLICATION
+                    ):
+                        raise RuntimeError(
+                            "Authentication evidence does not match the principal kind."
+                        )
+                    return None
+                _, bound_project = scope
+                if bound_project != project_id.value:
+                    return None
             organization = await self._session.scalar(
                 select(PrincipalRow.organization_id).where(
                     PrincipalRow.id == access.actor_principal_id.value
@@ -314,6 +374,20 @@ class PostgresAccessGroupFactsReader(
                 is None
             ):
                 return None
+            if application_key is not None:
+                key_scope = ApplicationKeyStateQueries.key_scope(
+                    key_id=application_key.key_id,
+                    principal_id=access.actor_principal_id,
+                    organization_id=OrganizationId(organization),
+                    project_id=project_id,
+                )
+                # Retain the caller's shared key lock against ordinary revocation UPDATEs.
+                await self._session.scalar(
+                    select(ApplicationKeyRow.key_id)
+                    .where(key_scope)
+                    .with_for_update(read=True)
+                    .execution_options(autoflush=False)
+                )
             member = (
                 exists()
                 .where(
@@ -393,6 +467,28 @@ class PostgresAccessGroupFactsReader(
                 version=version,
                 granted=is_manager,
             )
+            if application_key is not None:
+                assert profile is not None
+                current_key = (
+                    (
+                        await self._session.execute(
+                            ApplicationKeyStateQueries.current_key(
+                                key_id=application_key.key_id,
+                                principal_id=access.actor_principal_id,
+                                organization_id=OrganizationId(organization),
+                                project_id=project_id,
+                            )
+                        )
+                    )
+                    .tuples()
+                    .one_or_none()
+                )
+                action = replace(
+                    action,
+                    application_key_facts=PostgresApplicationKeyFactsMapper.to_facts(
+                        current_key, evidence=application_key, profile=profile
+                    ),
+                )
             metadata = AccessGroupMetadataDTO(
                 organization_id=OrganizationId(organization),
                 project_id=project_id,

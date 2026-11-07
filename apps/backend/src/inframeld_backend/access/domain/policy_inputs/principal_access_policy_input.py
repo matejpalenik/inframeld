@@ -5,9 +5,9 @@ from inframeld_backend.access.domain.entities.principal import Principal
 
 @dataclass(frozen=True, slots=True)
 class PrincipalAccessPolicyInput:
-    """Current eligibility for one attempt, including the human OAuth version check.
+    """Current eligibility for one attempt, including current credential observations.
 
-    Credential currentness is explicitly true when that version check does not apply.
+    Credential currentness follows the presented evidence family and fresh stored facts.
     This input does not verify browser sessions or application keys.
     """
 

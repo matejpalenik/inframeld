@@ -176,6 +176,7 @@ class HumanAdmissionService(HumanAdmitter):
         if facts.principal.organization_id != organization_id:
             raise ResourceNotFoundError()
 
+        PrincipalAccessEvaluationService.require_human(access=access, principal=facts.principal)
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=facts.principal,

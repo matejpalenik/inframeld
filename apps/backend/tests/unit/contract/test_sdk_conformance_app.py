@@ -2,11 +2,109 @@
 
 import base64
 from urllib.parse import parse_qs
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
 from tests.support.project_creation_scenarios import INITIAL_ACTIONS
 from tests.support.sdk_conformance_app import create_sdk_conformance_app
+
+
+def _application_key(suffix: str) -> str:
+    return "ifm_app_00000000-0000-4000-8000-" + suffix + "_" + "A" * 43
+
+
+def test_application_session_fixture_has_exact_identity_and_independent_header_only_witness() -> (
+    None
+):
+    key = _application_key("000000000003")
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/application-session",
+            json={"calls": {"app-identity": {"kind": "none"}}},
+        )
+        response = client.get(
+            "/v1/application-session",
+            headers={"Authorization": "Bearer " + key, "X-SDK-Test": "app-identity"},
+        )
+        witness = client.get("/sdk-control/cases/application-session").json()
+        totals = client.get("/sdk-control/counts").json()
+    assert response.status_code == 200
+    assert response.json() == {
+        "principalId": "00000000-0000-4000-8000-000000000008",
+        "projectId": "00000000-0000-4000-8000-000000000003",
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert UUID(response.headers["x-request-id"])
+    assert witness["counts"] == {"app-identity": 1} and totals == {"_total": 1}
+    seen = witness["observations"]["app-identity"]
+    assert (
+        seen["method"],
+        seen["path"],
+        seen["query"],
+        seen["rawBodyBase64"],
+        seen["authorization"],
+    ) == ("GET", "/v1/application-session", "", "", "Bearer " + key)
+    assert "idempotency-key" not in seen["headers"] and "jsonBody" not in seen
+
+
+@pytest.mark.parametrize(
+    ("headers", "status", "code"),
+    [
+        ({}, 401, "http_error"),
+        ({"Authorization": "Bearer sdk-human"}, 401, "http_error"),
+        ({"Cookie": "ory_kratos_session=sdk-cookie"}, 401, "http_error"),
+        ({"Authorization": "Bearer " + _application_key("000000000099")}, 401, "http_error"),
+        ({"Authorization": "Bearer " + _application_key("000000000004")}, 403, "access_denied"),
+        (
+            {"Authorization": "Bearer " + _application_key("000000000005")},
+            503,
+            "dependency_unavailable",
+        ),
+        ({"Authorization": "Bearer " + _application_key("000000000007")}, 401, "http_error"),
+        ({"Authorization": "Bearer " + _application_key("000000000009")}, 403, "access_denied"),
+        (
+            {
+                "Authorization": "Bearer " + _application_key("000000000003"),
+                "Cookie": "ory_kratos_session=sdk-cookie",
+            },
+            400,
+            "invalid_authentication_request",
+        ),
+    ],
+)
+def test_application_session_fixture_keeps_safe_authentication_outcomes(
+    headers: dict[str, str], status: int, code: str
+) -> None:
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.get("/v1/application-session", headers=headers)
+    assert response.status_code == status and response.json()["code"] == code
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-request-id"] == response.json()["requestId"]
+    assert "ifm_app_" not in response.text
+    if status == 401:
+        assert response.headers["www-authenticate"].startswith('Bearer realm="inframeld"')
+
+
+def test_application_session_fixture_reuses_no_prior_credential_and_keeps_human_identity_exclusive() -> (
+    None
+):
+    with TestClient(create_sdk_conformance_app()) as client:
+        first = client.get(
+            "/v1/application-session",
+            headers={"Authorization": "Bearer " + _application_key("000000000003")},
+        )
+        replacement = client.get(
+            "/v1/application-session",
+            headers={"Authorization": "Bearer " + _application_key("000000000006")},
+        )
+        anonymous = client.get("/v1/application-session")
+        human = client.get(
+            "/v1/session", headers={"Authorization": "Bearer " + _application_key("000000000003")}
+        )
+    assert first.status_code == replacement.status_code == 200
+    assert replacement.json() == first.json()
+    assert anonymous.status_code == human.status_code == 401
 
 
 @pytest.mark.parametrize(

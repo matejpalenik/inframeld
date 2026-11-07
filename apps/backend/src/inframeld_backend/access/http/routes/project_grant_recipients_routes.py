@@ -12,8 +12,8 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.protocols.project_grant_recipients_reader import (
     ProjectGrantRecipientsReader,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.enums.grant_target_kind import GrantTargetKind
 from inframeld_backend.access.http.mappers.project_grant_recipients_mapper import (
@@ -72,7 +72,7 @@ class _GrantRecipientsRoute(APIRoute):
 
 
 def create_project_grant_recipients_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_reader: Callable[[], AbstractAsyncContextManager[ProjectGrantRecipientsReader]],
 ) -> APIRouter:
     router = APIRouter(prefix="/v1", route_class=_GrantRecipientsRoute)

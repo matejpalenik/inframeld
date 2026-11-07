@@ -1,4 +1,4 @@
-"""Seed real scoped ownership without creating a product principal or reservation."""
+"""Build scoped artifact ownership and ordinary business origins for integration tests."""
 
 from dataclasses import dataclass
 from typing import override
@@ -7,9 +7,11 @@ from uuid import uuid4
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
     AdmittedWorkAuthorityDTO,
+)
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
 )
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
@@ -17,9 +19,13 @@ from inframeld_backend.access.application.services.action_authorization_service 
 from inframeld_backend.access.application.services.admitted_work_authorization_service import (
     AdmittedWorkAuthorizationService,
 )
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.application_key_audience import (
+    ApplicationKeyAudience,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -114,7 +120,11 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
     PostgresOperationReservationWriter,
 )
 from tests.support.access_scenarios import MockAccessScenarios
-from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.application_key_scenarios import verified_application_access
+
+APPLICATION_PROFILE = ApplicationKeyVerificationProfileDTO(
+    ApplicationKeyAudience("https://api.test"), ApplicationKeyAdapter.HTTP
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,17 +273,28 @@ async def completed_product_origin(
         action_id=ActionId("inspect-feedback"),
         human_binding=None,
     )
+    access = await verified_application_access(
+        database,
+        principal_id=actor,
+        organization_id=scope.organization_id,
+        project_id=scope.project_id,
+        profile=APPLICATION_PROFILE,
+    )
     request_id = RequestId(uuid4())
     async with database.session() as session, session.begin():
         admission = await JobAdmissionService(
-            ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+            ActionAuthorizationService(
+                PostgresProjectActionFactsReader(
+                    session, application_key_profile=APPLICATION_PROFILE
+                )
+            ),
             AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
             IdempotencyService(PostgresOperationReservationWriter(session)),
             PostgresJobStore(session),
             PostgresJobAdmissionAuditWriter(session),
             supported_payloads=(("test.progress", 1),),
         ).admit(
-            access=AccessContextDTO(actor, MockAuthenticationEvidence.application_key()),
+            access=access,
             authority=authority,
             context=IdempotencyContextDTO(
                 HttpMethod.POST,

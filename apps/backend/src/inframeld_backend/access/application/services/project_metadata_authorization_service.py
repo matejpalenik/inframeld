@@ -7,9 +7,6 @@ from inframeld_backend.access.application.dtos.project_action_authorization_dto 
 from inframeld_backend.access.application.dtos.project_metadata_authorization_facts_dto import (
     ProjectMetadataAuthorizationFactsDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.project_metadata_authorizer import (
     ProjectMetadataAuthorizer,
 )
@@ -75,9 +72,11 @@ class ProjectMetadataAuthorizationService(ProjectMetadataAuthorizer):
             principal=action.principal,
             has_pending_recovery=action.has_pending_recovery,
             oauth_credential_facts=action.oauth_credential_facts,
+            application_key_facts=action.application_key_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         if not ProjectVisibilityPolicy.may_view_project(
             principal_status=action.principal.status,
             project_status=action.project_status,

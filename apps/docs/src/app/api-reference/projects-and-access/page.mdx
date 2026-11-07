@@ -14,6 +14,16 @@ These operations use current identity and authority. [Authentication](/api-refer
 
 Read the current principal context with a valid human credential. [HTTP and cURL](/clients/http#call-protected-operations) shows a complete request. Each SDK exposes this operation through its generated client.
 
+## Inspect an application's identity
+
+<ApiOperation operationId="getCurrentApplicationSession" />
+
+The declared application-session contract uses `GET /v1/application-session` with one complete application-key bearer credential. Its result contains only `principalId` and the account's bound `projectId`. It accepts no caller-selected principal or Project, body, expected revision or idempotency key. The response is no-store and supplies no grants, account status or promise of later authorization.
+
+Verification requires the complete credential's exact trusted installation/audience/adapter binding and current lifecycle facts. Current account and Project eligibility remain separate local checks. The human-session operation above rejects application keys with `401`; this identity check likewise rejects human credentials. Ordinary human-only product actions may instead deny a verified application with `403`.
+
+Invalid, expired, revoked or incorrectly bound credentials receive `401`, verified local ineligibility `403`, and unconfirmed required verification `503`, without human fallback. [The component guide](/guides/authenticate-an-application) records current publication and credential-producer limits. Public issuance is unfinished and its profile mapping is unresolved. This component neither chooses that mapping nor promises a key usable through both HTTP and MCP.
+
 ## Read your Organization access
 
 <ApiOperation operationId="getMyOrganizationAccess" />

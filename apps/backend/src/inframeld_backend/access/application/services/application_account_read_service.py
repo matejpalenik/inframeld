@@ -221,6 +221,7 @@ class ApplicationAccountReadService(ApplicationAccountReader):
         ):
             raise RuntimeError("The account metadata observation changed its actor or scope.")
         RevisionValidation.require(account.access_revision)
+        PrincipalAccessEvaluationService.require_human(access=access, principal=action.principal)
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=action.principal,

@@ -41,6 +41,9 @@ from inframeld_backend.access.application.protocols.project_membership_changer i
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
 )
+from inframeld_backend.access.application.services.principal_access_evaluation_service import (
+    PrincipalAccessEvaluationService,
+)
 from inframeld_backend.access.application.services.project_membership_change_fingerprint_service import (
     ProjectMembershipChangeFingerprintService,
 )
@@ -246,6 +249,9 @@ class ProjectMembershipChangeService(ProjectMembershipChanger):
             project_id=command.project_id,
         )
 
+        PrincipalAccessEvaluationService.require_human(
+            access=access, principal=facts.action.principal
+        )
         ActionAuthorizationService.require_authorization_from_facts(
             access=access, facts=facts.action
         )

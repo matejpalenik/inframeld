@@ -89,7 +89,7 @@ def test_human_admission_contract_preserves_original_receipt_and_current_human_s
     schema = create_app().openapi()
     operation = schema["paths"]["/v1/organizations/{organization_id}/human-admissions"]["post"]
     assert operation["operationId"] == "admitHuman"
-    assert operation["security"] == [{"KratosSession": []}, {"HumanBearer": []}]
+    assert operation["security"] == [{"KratosSession": []}, {"ProductBearer": []}]
     for status in ("200", "201"):
         assert operation["responses"][status]["content"]["application/json"]["schema"] == {
             "$ref": "#/components/schemas/HumanAdmissionResponse"
@@ -203,23 +203,24 @@ def test_openapi_contract_matches_application() -> None:
         ("/v1/projects/by-name/{name}", "get"),
     ],
 )
-def test_human_routes_declare_cookie_or_bearer_and_authentication_errors(
+def test_identity_and_product_routes_declare_their_bearer_family_and_authentication_errors(
     path: str, method: str
 ) -> None:
-    """Tell clients they can use either human credential and how authentication failures look."""
+    """Keep the human identity route exclusive while ordinary routes dispatch product bearers."""
     schema = create_app().openapi()
     operation = schema["paths"][path][method]
 
+    bearer = "HumanBearer" if path == "/v1/session" else "ProductBearer"
     assert operation["security"] == [
         {"KratosSession": []},
-        {"HumanBearer": []},
+        {bearer: []},
     ]
     schemes = schema["components"]["securitySchemes"]
     assert schemes["KratosSession"]["type"] == "apiKey"
     assert schemes["KratosSession"]["in"] == "cookie"
     assert schemes["KratosSession"]["name"] == "ory_kratos_session"
-    assert schemes["HumanBearer"]["type"] == "http"
-    assert schemes["HumanBearer"]["scheme"] == "bearer"
+    assert schemes[bearer]["type"] == "http"
+    assert schemes[bearer]["scheme"] == "bearer"
 
     for status in ("400", "401"):
         response = operation["responses"][status]
@@ -505,7 +506,7 @@ def test_deletion_status_contract_preserves_human_read_and_explicit_unknowns() -
     assert "/v1/deletions/status" in schema["paths"]
     operation = schema["paths"]["/v1/deletions/status"]["get"]
     assert operation["operationId"] == "getDeletionStatus"
-    assert operation["security"] == [{"KratosSession": []}, {"HumanBearer": []}]
+    assert operation["security"] == [{"KratosSession": []}, {"ProductBearer": []}]
     assert "requestBody" not in operation
     assert len(operation["parameters"]) == 1
     parameter = operation["parameters"][0]

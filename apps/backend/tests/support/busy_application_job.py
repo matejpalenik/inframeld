@@ -7,9 +7,11 @@ from uuid import uuid4
 
 from sqlalchemy import select, update
 
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
     AdmittedWorkAuthorityDTO,
+)
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
 )
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
@@ -17,16 +19,29 @@ from inframeld_backend.access.application.services.action_authorization_service 
 from inframeld_backend.access.application.services.admitted_work_authorization_service import (
     AdmittedWorkAuthorizationService,
 )
+from inframeld_backend.access.application.services.application_authentication_service import (
+    ApplicationAuthenticationService,
+)
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.application_key_audience import (
+    ApplicationKeyAudience,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_facts_reader import (
     PostgresAdmittedWorkFactsReader,
+)
+from inframeld_backend.access.infrastructure.readers.postgres_application_authentication_facts_reader import (
+    PostgresApplicationAuthenticationFactsReader,
 )
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
 )
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
+)
+from inframeld_backend.access.infrastructure.verifiers.postgres_application_key_verifier import (
+    PostgresApplicationKeyVerifier,
 )
 from inframeld_backend.access.infrastructure.writers.postgres_job_admission_audit_writer import (
     PostgresJobAdmissionAuditWriter,
@@ -69,7 +84,11 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
     PostgresOperationReservationWriter,
 )
 from tests.support.access_scenarios import MockAccessScenarios
-from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.application_key_scenarios import store_application_key
+
+APPLICATION_PROFILE = ApplicationKeyVerificationProfileDTO(
+    ApplicationKeyAudience("https://api.test"), ApplicationKeyAdapter.HTTP
+)
 
 
 @asynccontextmanager
@@ -97,8 +116,24 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
             action_id=ActionId("inspect-feedback"),
             human_binding=None,
         )
+    credential = await store_application_key(
+        database,
+        principal_id=authority.principal_id,
+        organization_id=authority.organization_id,
+        project_id=authority.project_id,
+    )
+    access = await ApplicationAuthenticationService(
+        key_verifier=PostgresApplicationKeyVerifier(database),
+        authentication_facts_reader=PostgresApplicationAuthenticationFactsReader(database),
+        verification_profile=APPLICATION_PROFILE,
+    ).authenticate(credential)
+    async with database.session() as session, session.begin():
         service = JobAdmissionService(
-            ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+            ActionAuthorizationService(
+                PostgresProjectActionFactsReader(
+                    session, application_key_profile=APPLICATION_PROFILE
+                )
+            ),
             AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
             IdempotencyService(PostgresOperationReservationWriter(session)),
             PostgresJobStore(session),
@@ -106,9 +141,7 @@ async def busy_application_job(database: Database) -> AsyncGenerator[JobAttemptC
             supported_payloads=(("test.busy", 1),),
         )
         admission = await service.admit(
-            access=AccessContextDTO(
-                seed.principal_id, MockAuthenticationEvidence.application_key()
-            ),
+            access=access,
             authority=authority,
             context=IdempotencyContextDTO(
                 HttpMethod.POST,

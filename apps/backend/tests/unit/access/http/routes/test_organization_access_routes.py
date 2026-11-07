@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.my_organization_access_dto import (
@@ -33,8 +34,8 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.routes.organization_access_routes import (
     create_organization_access_router,
@@ -94,10 +95,16 @@ def client_for(
     register_error_handlers(app)
     app.include_router(
         create_organization_access_router(
-            HumanSessionDependency(
+            ProductAccessDependency(
                 authenticator,
                 CSRFProtectionDependency((HttpUrl("https://account.test"),)),
                 access_token_authenticator=authenticator,
+                application_authenticator=MockApplicationAuthenticator(
+                    AccessContextDTO(
+                        PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+                    ),
+                    failure=AuthenticationRequiredError(),
+                ),
             ),
             open_reader,
         )

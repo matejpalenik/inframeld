@@ -1,6 +1,9 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
+)
 from inframeld_backend.access.application.protocols.access_group_creator import AccessGroupCreator
 from inframeld_backend.access.application.protocols.access_group_deleter import AccessGroupDeleter
 from inframeld_backend.access.application.protocols.access_group_reader import AccessGroupReader
@@ -81,10 +84,17 @@ async def open_access_group_creation(
 
 
 @asynccontextmanager
-async def open_access_group_read(database: Database) -> AsyncGenerator[AccessGroupReader]:
+async def open_access_group_read(
+    database: Database,
+    *,
+    application_key_profile: ApplicationKeyVerificationProfileDTO | None = None,
+) -> AsyncGenerator[AccessGroupReader]:
     async with database.session() as session:
         yield AccessGroupReadService(
-            SqlAlchemyTransactionManager(session), PostgresAccessGroupFactsReader(session)
+            SqlAlchemyTransactionManager(session),
+            PostgresAccessGroupFactsReader(
+                session, application_key_profile=application_key_profile
+            ),
         )
 
 

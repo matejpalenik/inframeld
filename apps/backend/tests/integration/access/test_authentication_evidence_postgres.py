@@ -14,6 +14,9 @@ from inframeld_backend.access.application.commands.set_project_action_grant_comm
     SetProjectActionGrantCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
+)
 from inframeld_backend.access.application.dtos.project_operation_admission_request_dto import (
     ProjectOperationAdmissionRequestDTO,
 )
@@ -23,8 +26,12 @@ from inframeld_backend.access.application.services.action_authorization_service 
 from inframeld_backend.access.application.services.project_operation_admission_service import (
     ProjectOperationAdmissionService,
 )
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.application_key_audience import (
+    ApplicationKeyAudience,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
 )
@@ -61,6 +68,9 @@ from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservat
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
     reason="Requires PostgreSQL integration services",
+)
+APPLICATION_PROFILE = ApplicationKeyVerificationProfileDTO(
+    ApplicationKeyAudience("https://api.test"), ApplicationKeyAdapter.HTTP
 )
 
 
@@ -105,7 +115,11 @@ async def _invoke(
     else:
         async with session.begin():
             await ProjectOperationAdmissionService(
-                ActionAuthorizationService(PostgresProjectActionFactsReader(session)),
+                ActionAuthorizationService(
+                    PostgresProjectActionFactsReader(
+                        session, application_key_profile=APPLICATION_PROFILE
+                    )
+                ),
                 IdempotencyService(PostgresOperationReservationWriter(session)),
             ).reserve(
                 access=access,
