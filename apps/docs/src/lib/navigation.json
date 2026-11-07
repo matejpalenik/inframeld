@@ -105,6 +105,10 @@
             "href": "/guides/application-accounts"
           },
           {
+            "title": "Check an application's identity",
+            "href": "/guides/authenticate-an-application"
+          },
+          {
             "title": "Manage access-group members and managers",
             "href": "/guides/manage-access-groups"
           }

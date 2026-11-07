@@ -5,6 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
 )
@@ -38,8 +41,14 @@ from inframeld_backend.shared.infrastructure.rows.installation_identity_row impo
 class PostgresProjectMetadataFactsReader(ProjectMetadataFactsReader):
     """Read fresh facts after ordered Access locks, using the caller's short transaction."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        application_key_profile: ApplicationKeyVerificationProfileDTO | None = None,
+    ) -> None:
         self._session = session
+        self._application_key_profile = application_key_profile
 
     def _require_transaction(self) -> None:
         if not self._session.in_transaction() or not self._session.is_active:
@@ -69,7 +78,9 @@ class PostgresProjectMetadataFactsReader(ProjectMetadataFactsReader):
         self, *, access: AccessContextDTO, project_id: ProjectId
     ) -> ProjectMetadataAuthorizationFactsDTO | None:
         scope = await self.scope(access=access)
-        facts = await PostgresProjectActionFactsReader(self._session).read_action_facts(
+        facts = await PostgresProjectActionFactsReader(
+            self._session, application_key_profile=self._application_key_profile
+        ).read_action_facts(
             access=access,
             action_id=ActionId(ProjectAction.EDIT_PROJECT_METADATA.value),
             target=ProjectActionTargetDTO(project_id),

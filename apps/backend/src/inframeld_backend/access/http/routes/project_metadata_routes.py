@@ -25,8 +25,8 @@ from inframeld_backend.access.application.queries.resolve_project_name_query imp
     ResolveProjectNameQuery,
 )
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.project_metadata_mapper import ProjectMetadataMapper
 from inframeld_backend.access.http.openapi.human_authentication_responses import (
@@ -74,7 +74,7 @@ _PROBLEMS = (
 
 
 def create_project_metadata_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_reader: Callable[[], AbstractAsyncContextManager[ProjectMetadataReader]],
     open_changer: Callable[[], AbstractAsyncContextManager[ProjectMetadataChanger]],
     open_resolver: Callable[[], AbstractAsyncContextManager[ProjectNameResolver]],

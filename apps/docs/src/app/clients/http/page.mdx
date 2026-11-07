@@ -43,6 +43,14 @@ EOF
 
 The session response returns `principalId`, identifying the current human principal. A failed response remains a failure even when it contains useful diagnostic information. Avoid tracing commands that would reveal credentials.
 
+## Use an application credential
+
+An application key identifies a separate Project-bound account. [Check an application's identity](/guides/authenticate-an-application) explains the application-session contract, current credential/account checks and its availability. The human `/v1/session` example above remains human-only.
+
+Use a complete compatible credential from its actual supported issuer through the documented Authorization bearer header. A public prefix or key ID is insufficient. Application-account creation and safe key metadata cannot supply the secret, and the public issuance procedure remains unfinished. The issuance mapping to trusted resource profiles is unresolved, so do not assume that a key usable for one adapter works for another.
+
+Keep the credential outside argv, URLs, request bodies, browser distribution and logs. Send one supported family per request. Invalid application credentials remain on the application path without Hydra verification or a fallback to a human. Verification and current local denial have different failure outcomes, as [the component guide](/guides/authenticate-an-application#understand-a-rejected-or-unconfirmed-check) explains.
+
 ## Continue with a task
 
 - [Read or change an existing Project](/guides/name-and-rename-project).

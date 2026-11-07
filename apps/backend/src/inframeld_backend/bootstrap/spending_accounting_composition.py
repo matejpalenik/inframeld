@@ -1,6 +1,9 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
+)
 from inframeld_backend.access.application.services.admitted_work_authorization_service import (
     AdmittedWorkAuthorizationService,
 )
@@ -44,7 +47,11 @@ from inframeld_backend.shared.infrastructure.writers.postgres_spending_ledger_wr
 
 
 @asynccontextmanager
-async def open_spending_accounting(database: Database) -> AsyncGenerator[SpendingAccountant]:
+async def open_spending_accounting(
+    database: Database,
+    *,
+    application_key_profile: ApplicationKeyVerificationProfileDTO | None = None,
+) -> AsyncGenerator[SpendingAccountant]:
     async with database.session() as session:
         yield SpendingAccountingService(
             transaction_manager=SqlAlchemyTransactionManager(session),
@@ -55,20 +62,27 @@ async def open_spending_accounting(database: Database) -> AsyncGenerator[Spendin
             spending_ledger_reader=PostgresSpendingLedgerReader(session),
             spending_ledger_writer=PostgresSpendingLedgerWriter(session),
             project_budget_authorizer=ProjectBudgetAuthorizationService(
-                PostgresProjectBudgetFactsReader(session)
+                PostgresProjectBudgetFactsReader(
+                    session, application_key_profile=application_key_profile
+                )
             ),
         )
 
 
 @asynccontextmanager
 async def open_project_spending_policy(
-    database: Database, spending_policy_fingerprint_service: ProjectSpendingPolicyFingerprintService
+    database: Database,
+    spending_policy_fingerprint_service: ProjectSpendingPolicyFingerprintService,
+    *,
+    application_key_profile: ApplicationKeyVerificationProfileDTO | None = None,
 ) -> AsyncGenerator[ProjectSpendingPolicyManager]:
     async with database.session() as session:
         yield ProjectSpendingPolicyService(
             transaction_manager=SqlAlchemyTransactionManager(session),
             project_budget_authorizer=ProjectBudgetAuthorizationService(
-                PostgresProjectBudgetFactsReader(session)
+                PostgresProjectBudgetFactsReader(
+                    session, application_key_profile=application_key_profile
+                )
             ),
             spending_ledger_reader=PostgresSpendingLedgerReader(session),
             spending_ledger_writer=PostgresSpendingLedgerWriter(session),

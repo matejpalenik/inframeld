@@ -2,11 +2,14 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from typing import override
+from uuid import UUID
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
+from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 from tests.support.project_membership_change_scenarios import (
     ACCESS,
     ADD,
@@ -48,11 +51,12 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.routes.project_membership_routes import (
     create_project_membership_router,
@@ -148,10 +152,16 @@ def client_for(service: MockMembershipChanger) -> TestClient:
     authenticator = MockMembershipAuthenticator()
     app.include_router(
         create_project_membership_router(
-            HumanSessionDependency(
+            ProductAccessDependency(
                 authenticator,
                 CSRFProtectionDependency((HttpUrl("https://account.test"),)),
                 access_token_authenticator=authenticator,
+                application_authenticator=MockApplicationAuthenticator(
+                    AccessContextDTO(
+                        PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+                    ),
+                    failure=AuthenticationRequiredError(),
+                ),
             ),
             MockMembershipChangeServiceFactory(service),
         )

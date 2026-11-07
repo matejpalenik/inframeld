@@ -4,10 +4,15 @@ import os
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import update
 from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.application_key_scenarios import verified_application_access
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
     ProjectActionAuthorizationRequestDTO,
 )
@@ -17,12 +22,21 @@ from inframeld_backend.access.application.dtos.project_action_target_dto import 
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
 )
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.application_key_audience import (
+    ApplicationKeyAudience,
+)
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
+)
+from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
+    ProjectActionGrantRow,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -33,6 +47,9 @@ from inframeld_backend.shared.infrastructure.resources.database import Database
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
     reason="Set INFRAMELD_RUN_DB_INTEGRATION=1 to run PostgreSQL integration tests",
+)
+APPLICATION_PROFILE = ApplicationKeyVerificationProfileDTO(
+    ApplicationKeyAudience("https://api.test"), ApplicationKeyAdapter.HTTP
 )
 
 
@@ -185,6 +202,7 @@ async def test_allows_application_principal_with_its_exact_project_action_grant(
     database: Database,
 ) -> None:
     """Apply current project action checks to an application principal as well as a human."""
+    action = ActionId(ProjectAction.INSPECT_FEEDBACK.value)
     async with database.session() as session, session.begin():
         scenario = await MockAccessScenarios.seed_project_authorization(
             session,
@@ -192,17 +210,34 @@ async def test_allows_application_principal_with_its_exact_project_action_grant(
             has_action_grant=True,
             principal_kind=PrincipalKind.APPLICATION,
         )
-        authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
+        await session.execute(
+            update(ProjectActionGrantRow)
+            .where(
+                ProjectActionGrantRow.project_id == scenario.project_id.value,
+                ProjectActionGrantRow.recipient_principal_id == scenario.principal_id.value,
+            )
+            .values(action=action.value)
+        )
+    access = await verified_application_access(
+        database,
+        principal_id=scenario.principal_id,
+        organization_id=scenario.organization_id,
+        project_id=scenario.project_id,
+        profile=APPLICATION_PROFILE,
+    )
+    async with database.session() as session, session.begin():
+        authorizer = ActionAuthorizationService(
+            PostgresProjectActionFactsReader(session, application_key_profile=APPLICATION_PROFILE)
+        )
 
-        await authorizer.require_authorization(
-            access=AccessContextDTO(
-                actor_principal_id=scenario.principal_id,
-                authentication_evidence=MockAuthenticationEvidence.application_key(),
-            ),
+        authorized = await authorizer.require_authorization(
+            access=access,
             request=ProjectActionAuthorizationRequestDTO(
-                project_id=scenario.project_id, action_id=scenario.action
+                project_id=scenario.project_id, action_id=action
             ),
         )
+    assert authorized.organization_id == scenario.organization_id
+    assert authorized.project_id == scenario.project_id
 
 
 @pytest.mark.asyncio

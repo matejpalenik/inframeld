@@ -11,6 +11,7 @@ import pytest_asyncio
 from sqlalchemy import ARRAY, Integer, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios, ProjectAuthorizationSeedDTO
+from tests.support.application_key_scenarios import verified_application_access
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_grant_changes import create_project_grant_change_service
 
@@ -21,6 +22,9 @@ from inframeld_backend.access.application.dtos.access_action_grant_changed_audit
     AccessActionGrantChangedAuditEventDTO,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
+    ApplicationKeyVerificationProfileDTO,
+)
 from inframeld_backend.access.application.dtos.identity_recovery_event_dto import (
     IdentityRecoveryEventDTO,
 )
@@ -55,12 +59,17 @@ from inframeld_backend.access.application.services.action_authorization_service 
 from inframeld_backend.access.application.services.identity_recovery_admission_service import (
     IdentityRecoveryAdmissionService,
 )
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
     IdentityRecoveryCleanupState,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.application_key_audience import (
+    ApplicationKeyAudience,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
     IdentityRecoveryFlowId,
@@ -721,6 +730,7 @@ async def test_one_humans_recovery_does_not_block_an_unrelated_application(
     scenario: RecoveryAuthorizationScenarioDTO,
 ) -> None:
     """Recovery must follow the affected identity rather than block every principal."""
+    action = ActionId(ProjectAction.INSPECT_FEEDBACK.value)
     async with database.session() as session, session.begin():
         await _admit(session, scenario)
 
@@ -731,17 +741,32 @@ async def test_one_humans_recovery_does_not_block_an_unrelated_application(
             has_action_grant=True,
             principal_kind=PrincipalKind.APPLICATION,
         )
+        await session.execute(
+            update(ProjectActionGrantRow)
+            .where(
+                ProjectActionGrantRow.project_id == application.project_id.value,
+                ProjectActionGrantRow.recipient_principal_id == application.principal_id.value,
+            )
+            .values(action=action.value)
+        )
+    profile = ApplicationKeyVerificationProfileDTO(
+        ApplicationKeyAudience("https://api.test"), ApplicationKeyAdapter.HTTP
+    )
+    access = await verified_application_access(
+        database,
+        principal_id=application.principal_id,
+        organization_id=application.organization_id,
+        project_id=application.project_id,
+        profile=profile,
+    )
 
     async with database.session() as session:
         authorization = await ActionAuthorizationService(
-            PostgresProjectActionFactsReader(session)
+            PostgresProjectActionFactsReader(session, application_key_profile=profile)
         ).require_authorization(
-            access=AccessContextDTO(
-                application.principal_id,
-                authentication_evidence=MockAuthenticationEvidence.application_key(),
-            ),
+            access=access,
             request=ProjectActionAuthorizationRequestDTO(
-                project_id=application.project_id, action_id=application.action
+                project_id=application.project_id, action_id=action
             ),
         )
 

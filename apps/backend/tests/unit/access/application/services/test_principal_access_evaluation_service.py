@@ -2,6 +2,7 @@ from dataclasses import replace
 from uuid import UUID
 
 import pytest
+from tests.support.application_key_scenarios import current_key_facts
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -21,13 +22,19 @@ from inframeld_backend.access.application.services.principal_access_evaluation_s
     PrincipalAccessEvaluationService,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.value_objects.application_key_audience import (
+    ApplicationKeyAudience,
+)
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
 PRINCIPAL = Principal(
     id=PrincipalId(UUID(int=1)),
@@ -63,7 +70,7 @@ def test_oauth_requires_a_matching_actor_and_exact_current_version(
 
 @pytest.mark.parametrize(
     "evidence, kind",
-    [(BROWSER, PrincipalKind.HUMAN), (APPLICATION, PrincipalKind.APPLICATION)],
+    [(BROWSER, PrincipalKind.HUMAN)],
 )
 @pytest.mark.parametrize("pending_recovery", [False, True])
 def test_other_families_do_not_require_an_oauth_generation(
@@ -118,3 +125,62 @@ def test_oauth_cannot_silently_omit_its_current_observations() -> None:
             has_pending_recovery=False,
             oauth_credential_facts=None,
         )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"principal_id": PrincipalId(UUID(int=99))},
+        {"organization_id": OrganizationId(UUID(int=99))},
+        {"installation_id": InstallationId(UUID(int=99))},
+        {"audience": ApplicationKeyAudience("https://other.test")},
+        {"allowed_adapters": (ApplicationKeyAdapter.MCP,)},
+        {"account_binding_matches": False},
+        {"principal_id": None, "expires_at": None},
+    ],
+)
+def test_application_requires_fresh_stored_bindings(change: dict[str, object]) -> None:
+    principal = replace(PRINCIPAL, kind=PrincipalKind.APPLICATION)
+    facts = current_key_facts(
+        key_id=APPLICATION.key_id,
+        principal_id=principal.id,
+        organization_id=principal.organization_id,
+        project_id=ProjectId(UUID(int=5)),
+    )
+    facts = replace(facts, **change)
+    result = PrincipalAccessEvaluationService.evaluate(
+        access=AccessContextDTO(principal.id, APPLICATION),
+        principal=principal,
+        has_pending_recovery=False,
+        oauth_credential_facts=None,
+        application_key_facts=facts,
+    )
+    assert not result.credential_is_current
+
+
+def test_application_cannot_omit_current_key_observations() -> None:
+    with pytest.raises(RuntimeError, match="Application.*facts"):
+        PrincipalAccessEvaluationService.evaluate(
+            access=AccessContextDTO(PRINCIPAL.id, APPLICATION),
+            principal=replace(PRINCIPAL, kind=PrincipalKind.APPLICATION),
+            has_pending_recovery=False,
+            oauth_credential_facts=None,
+        )
+
+
+def test_application_expiry_equality_is_not_current() -> None:
+    principal = replace(PRINCIPAL, kind=PrincipalKind.APPLICATION)
+    facts = current_key_facts(
+        key_id=APPLICATION.key_id,
+        principal_id=principal.id,
+        organization_id=principal.organization_id,
+        project_id=ProjectId(UUID(int=5)),
+    )
+    result = PrincipalAccessEvaluationService.evaluate(
+        access=AccessContextDTO(principal.id, APPLICATION),
+        principal=principal,
+        has_pending_recovery=False,
+        oauth_credential_facts=None,
+        application_key_facts=replace(facts, expires_at=facts.checked_at),
+    )
+    assert not result.credential_is_current

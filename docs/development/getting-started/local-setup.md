@@ -195,6 +195,27 @@ Do not commit `.env` or `.env.test`.
 
 The development passwords and Kratos secrets are only for local Compose and must not be reused in production. Kratos settings remain optional at startup. A request with no supported credential returns 401. A supplied cookie returns 503 when Kratos verification is not configured. A human bearer similarly returns 503 when Hydra verification is not configured. Malformed or competing credentials are rejected before reaching either verifier.
 
+<a id="application-key-verification-profiles"></a>
+
+### Application-key verification profiles
+
+`ApplicationKeyAuthenticationSettings` defines separate incoming HTTP and MCP verification profiles. Configure it in the backend environment file or process environment with the prefix `INFRAMELD_APPLICATION_KEY_AUTHENTICATION__`:
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `HTTP_AUDIENCE` | Unset | Exact resource identity accepted by the HTTP application-key adapter. |
+| `MCP_AUDIENCE` | Unset | Exact canonical resource identity accepted by the MCP application-key adapter. |
+| `TRANSPORT_PROFILE` | `https` | URL validation for both configured audiences. |
+| `TOTAL_TIMEOUT_SECONDS` | `10.0` | Finite positive total budget for key verification and local admission. |
+
+Both committed backend env examples contain optional commented settings. Leave an unused audience unset. An empty string is invalid configuration. The default transport requires HTTPS URLs without credentials, query or fragment. For managed local development, `managed-local` instead requires literal IPv4 loopback HTTP, such as `http://127.0.0.1:8000`. It does not accept `localhost` or HTTPS. Invalid supplied settings prevent startup.
+
+Audience values remain exact strings, including paths and trailing slashes. A key must match the adapter's configured audience and allow that adapter, `http` or `mcp`. The two configured audiences may be equal or different. Neither is inferred from Hydra, discovery, a request header or the stored key. These consumer settings do not choose how a future issuance operation assigns audiences to keys.
+
+Omitting an audience permits startup, but a supported application credential at that adapter returns `503 dependency_unavailable` before database or provider I/O. Missing credentials and unsupported identity families still return 401, and malformed or competing credentials return 400 before authentication. Application-key authentication is assembled independently of Kratos and Hydra. Human-provider configuration does not supply its verification profile or an alternate verifier.
+
+The [authentication error contract](../error-handling.md#authentication-contract) separates credential rejection from local ineligibility. The adapters, profile configuration and PostgreSQL local-admission/current-key reads are implemented. [Ordinary Project action facts](../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_project_action_facts_reader.py) use the explicitly supplied profile and current persisted key/account state within the calling operation's transaction. HTTP metadata composition forwards the configured HTTP profile. An MCP consumer must likewise inject its trusted MCP profile into its authorizer. Initial authentication cannot supply a missing current-authorization profile. Configuration alone does not establish complete client, platform or production qualification. These settings issue no key and mount no MCP server. Public key issuance and a mounted MCP transport remain separate delivery work.
+
 <a id="development-services"></a>
 
 ## Development services

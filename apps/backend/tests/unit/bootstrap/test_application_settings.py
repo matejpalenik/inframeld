@@ -384,3 +384,56 @@ def test_retention_configuration_error_identifies_field_without_echoing_input(
         assert marker not in str(caught.value)
     finally:
         get_settings.cache_clear()
+
+
+@pytest.mark.parametrize(
+    "mcp_audience", ["https://mcp.example.test/mcp/", "https://api.example.test"]
+)
+def test_application_profiles_load_independently_without_human_providers(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    mcp_audience: str,
+) -> None:
+    monkeypatch.setenv(
+        "INFRAMELD_APPLICATION_KEY_AUTHENTICATION__HTTP_AUDIENCE", "https://api.example.test"
+    )
+    monkeypatch.setenv("INFRAMELD_APPLICATION_KEY_AUTHENTICATION__MCP_AUDIENCE", mcp_audience)
+    monkeypatch.setenv("INFRAMELD_APPLICATION_KEY_AUTHENTICATION__TOTAL_TIMEOUT_SECONDS", "7.5")
+    settings = _load_bearer_settings()
+    assert settings.kratos is None and settings.hydra is None and settings.discovery is None
+    assert settings.model_dump().get("application_key_authentication") == {
+        "http_audience": "https://api.example.test",
+        "mcp_audience": mcp_audience,
+        "transport_profile": "https",
+        "total_timeout_seconds": 7.5,
+    }
+
+
+def test_missing_application_profiles_are_not_inferred_from_hydra_or_discovery(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_kratos(monkeypatch, with_admin_url=True)
+    _configure_hydra(monkeypatch)
+    settings = _load_bearer_settings()
+    assert settings.model_dump().get("application_key_authentication") == {
+        "http_audience": None,
+        "mcp_audience": None,
+        "transport_profile": "https",
+        "total_timeout_seconds": 10.0,
+    }
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "true"])
+def test_invalid_application_timeout_environment_is_rejected(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+) -> None:
+    monkeypatch.setenv("INFRAMELD_APPLICATION_KEY_AUTHENTICATION__TOTAL_TIMEOUT_SECONDS", value)
+    with pytest.raises(ValidationError) as caught:
+        _load_bearer_settings()
+    assert caught.value.errors()[0]["loc"] == (
+        "application_key_authentication",
+        "total_timeout_seconds",
+    )

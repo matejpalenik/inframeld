@@ -487,7 +487,7 @@ class OperationsApi:
         # authentication setting
         _auth_settings: List[str] = [
             'KratosSession', 
-            'HumanBearer'
+            'ProductBearer'
         ]
 
         return self.api_client.param_serialize(
@@ -994,7 +994,7 @@ class OperationsApi:
         # authentication setting
         _auth_settings: List[str] = [
             'KratosSession', 
-            'HumanBearer'
+            'ProductBearer'
         ]
 
         return self.api_client.param_serialize(

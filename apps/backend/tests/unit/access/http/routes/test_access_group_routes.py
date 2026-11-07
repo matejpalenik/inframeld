@@ -9,6 +9,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
+from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 from tests.support.mock_project_metadata import ACCESS, ORGANIZATION_ID, PROJECT_ID, SAVED_RESULT
 
 from inframeld_backend.access.application.commands.change_access_group_relationship_command import (
@@ -63,15 +65,19 @@ from inframeld_backend.access.domain.value_objects.access_group_id import Access
 from inframeld_backend.access.domain.value_objects.access_group_relationships import (
     AccessGroupRelationships,
 )
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.routes.access_group_routes import create_access_group_router
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import IdempotencyContextDTO
+from inframeld_backend.shared.application.errors.application_errors import (
+    AuthenticationRequiredError,
+)
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
@@ -216,10 +222,16 @@ def client_for(groups: MockGroups) -> TestClient:
         yield groups
 
     auth = MockAuthenticator()
-    authenticate = HumanSessionDependency(
+    authenticate = ProductAccessDependency(
         auth,
         CSRFProtectionDependency((HttpUrl("https://account.test"),)),
         access_token_authenticator=auth,
+        application_authenticator=MockApplicationAuthenticator(
+            AccessContextDTO(
+                PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+            ),
+            failure=AuthenticationRequiredError(),
+        ),
     )
     app = FastAPI()
     register_error_handlers(app)

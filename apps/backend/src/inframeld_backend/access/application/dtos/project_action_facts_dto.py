@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from inframeld_backend.access.application.dtos.application_key_current_facts_dto import (
+    ApplicationKeyCurrentFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
     HumanOAuthCredentialFactsDTO,
 )
@@ -21,3 +24,5 @@ class ProjectActionFactsDTO:
     project_status: ProjectStatus
     is_project_member: bool
     has_exact_action_grant: bool
+
+    application_key_facts: ApplicationKeyCurrentFactsDTO | None = None

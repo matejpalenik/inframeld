@@ -5,6 +5,7 @@ from typing import override
 from uuid import UUID
 
 import pytest
+from tests.support.application_key_scenarios import current_key_facts
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -20,6 +21,9 @@ from inframeld_backend.access.application.dtos.project_action_authorization_requ
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
+)
+from inframeld_backend.access.application.errors.application_key_credential_rejected_error import (
+    ApplicationKeyCredentialRejectedError,
 )
 from inframeld_backend.access.application.protocols.project_action_facts_reader import (
     ProjectActionFactsReader,
@@ -103,8 +107,20 @@ async def test_allows_current_member_with_exact_grant() -> None:
 @pytest.mark.asyncio
 async def test_general_action_authorization_keeps_application_callers_eligible() -> None:
     principal = replace(PRINCIPAL, kind=PrincipalKind.APPLICATION)
-    reader = MockProjectActionFactsReader(replace(ALLOWED_FACTS, principal=principal))
-    access = replace(ACCESS, authentication_evidence=MockAuthenticationEvidence.application_key())
+    evidence = MockAuthenticationEvidence.application_key()
+    reader = MockProjectActionFactsReader(
+        replace(
+            ALLOWED_FACTS,
+            principal=principal,
+            application_key_facts=current_key_facts(
+                key_id=evidence.key_id,
+                principal_id=principal.id,
+                organization_id=principal.organization_id,
+                project_id=TARGET.project_id,
+            ),
+        )
+    )
+    access = replace(ACCESS, authentication_evidence=evidence)
 
     authorization = await ActionAuthorizationService(reader).require_authorization(
         access=access,
@@ -225,4 +241,28 @@ async def test_stale_credentials_are_rejected_before_authority_can_be_reused(
             request=ProjectActionAuthorizationRequestDTO(
                 project_id=TARGET.project_id, action_id=ACTION
             ),
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("hidden", [False, True])
+async def test_revoked_application_key_is_401_before_current_scope_disclosure(hidden: bool) -> None:
+    principal = replace(PRINCIPAL, kind=PrincipalKind.APPLICATION)
+    evidence = MockAuthenticationEvidence.application_key()
+    key = current_key_facts(
+        key_id=evidence.key_id,
+        principal_id=principal.id,
+        organization_id=principal.organization_id,
+        project_id=TARGET.project_id,
+    )
+    facts = replace(
+        ALLOWED_FACTS,
+        principal=principal,
+        is_project_member=not hidden,
+        application_key_facts=replace(key, revoked_at=key.checked_at),
+    )
+    with pytest.raises(ApplicationKeyCredentialRejectedError):
+        await ActionAuthorizationService(MockProjectActionFactsReader(facts)).require_authorization(
+            access=AccessContextDTO(principal.id, evidence),
+            request=ProjectActionAuthorizationRequestDTO(TARGET.project_id, ACTION),
         )

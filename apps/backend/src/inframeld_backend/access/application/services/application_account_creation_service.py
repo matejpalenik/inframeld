@@ -30,6 +30,9 @@ from inframeld_backend.access.application.services.action_authorization_service 
 from inframeld_backend.access.application.services.application_account_creation_fingerprint_service import (
     ApplicationAccountCreationFingerprintService,
 )
+from inframeld_backend.access.application.services.principal_access_evaluation_service import (
+    PrincipalAccessEvaluationService,
+)
 from inframeld_backend.access.domain.enums.application_account_action import (
     ApplicationAccountAction,
 )
@@ -118,6 +121,9 @@ class ApplicationAccountCreationService(ApplicationAccountCreator):
                 ):
                     raise RuntimeError("Account creation facts changed the actor or scope.")
                 RevisionValidation.require(facts.access_revision)
+                PrincipalAccessEvaluationService.require_human(
+                    access=access, principal=facts.action.principal
+                )
                 ActionAuthorizationService.require_authorization_from_facts(
                     access=access, facts=facts.action
                 )

@@ -93,6 +93,7 @@ class ProjectActionGrantsService(ProjectActionGrantsReader):
         ):
             raise RuntimeError("The Project action grants observation changed its actor or scope.")
 
+        PrincipalAccessEvaluationService.require_human(access=access, principal=action.principal)
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=action.principal,

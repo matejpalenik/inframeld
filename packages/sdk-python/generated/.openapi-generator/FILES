@@ -39,6 +39,7 @@ inframeld_sdk/models/application_account_metadata_response.py
 inframeld_sdk/models/application_key_adapter.py
 inframeld_sdk/models/application_key_metadata_response.py
 inframeld_sdk/models/completed_operation_lookup_response.py
+inframeld_sdk/models/current_application_session_response.py
 inframeld_sdk/models/current_session_response.py
 inframeld_sdk/models/deletion_status_response.py
 inframeld_sdk/models/grant_recipient_response.py

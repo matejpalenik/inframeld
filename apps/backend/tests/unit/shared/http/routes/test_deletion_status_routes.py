@@ -13,6 +13,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.deletion_status_authorization_dto import (
@@ -55,8 +56,8 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.handlers.human_oauth_credential_error_handler import (
     register_human_oauth_credential_error_handler,
@@ -270,10 +271,16 @@ def app_for(scenario: Scenario) -> FastAPI:
     configure_problem_openapi(app)
     app.include_router(
         create_deletion_status_router(
-            HumanSessionDependency(
+            ProductAccessDependency(
                 MockBrowserAuthenticator(scenario),
                 CSRFProtectionDependency(()),
                 access_token_authenticator=MockBearerAuthenticator(scenario),
+                application_authenticator=MockApplicationAuthenticator(
+                    AccessContextDTO(
+                        PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+                    ),
+                    failure=AuthenticationRequiredError(),
+                ),
             ),
             scenario.open_lookup,
         )

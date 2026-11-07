@@ -5,8 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.openapi.human_authentication_responses import (
     human_authentication_responses,
@@ -42,7 +42,7 @@ _RESPONSES = (
 
 
 def create_deletion_status_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_lookup: Callable[[], AbstractAsyncContextManager[DeletionStatusLookup]],
 ) -> APIRouter:
     """Expose retained reads using supplied authentication and request-local lookup lifetime."""

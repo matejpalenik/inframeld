@@ -18,8 +18,8 @@ from inframeld_backend.access.application.queries.list_application_keys_query im
 from inframeld_backend.access.domain.value_objects.application_key_id import ApplicationKeyId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.application_account_mapper import (
     ApplicationAccountMapper,
@@ -60,7 +60,7 @@ from inframeld_backend.shared.http.responses.page_response import PageResponse
 
 
 def create_application_account_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_creator: Callable[[], AbstractAsyncContextManager[ApplicationAccountCreator]],
     open_reader: Callable[[], AbstractAsyncContextManager[ApplicationAccountReader]],
 ) -> APIRouter:

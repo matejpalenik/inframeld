@@ -19,7 +19,7 @@ def test_native_account_contract_preserves_identity_revisions_and_safe_key_proje
     ):
         entry = schema["paths"][path][method]
         assert entry["operationId"] == operation
-        assert entry["security"] == [{"KratosSession": []}, {"HumanBearer": []}]
+        assert entry["security"] == [{"KratosSession": []}, {"ProductBearer": []}]
     models = schema["components"]["schemas"]
     request = models["ApplicationAccountCreationRequest"]
     assert request["additionalProperties"] is False

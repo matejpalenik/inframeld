@@ -12,8 +12,8 @@ from inframeld_backend.access.application.protocols.application_account_action_g
 from inframeld_backend.access.application.protocols.application_account_action_grants_reader import (
     ApplicationAccountActionGrantsReader,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.mappers.application_account_action_grant_mapper import (
     ApplicationAccountActionGrantMapper,
@@ -55,7 +55,7 @@ from inframeld_backend.shared.http.responses.page_response import PageResponse
 
 
 def create_application_account_action_grant_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_changer: Callable[[], AbstractAsyncContextManager[ApplicationAccountActionGrantChanger]],
     open_reader: Callable[[], AbstractAsyncContextManager[ApplicationAccountActionGrantsReader]],
 ) -> APIRouter:

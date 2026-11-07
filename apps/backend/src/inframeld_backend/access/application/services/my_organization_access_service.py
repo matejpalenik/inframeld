@@ -36,6 +36,7 @@ class MyOrganizationAccessService(MyOrganizationAccessReader):
         if facts.principal.id != access.actor_principal_id:
             raise RuntimeError("Organization facts changed the authenticated actor.")
 
+        PrincipalAccessEvaluationService.require_human(access=access, principal=facts.principal)
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=facts.principal,

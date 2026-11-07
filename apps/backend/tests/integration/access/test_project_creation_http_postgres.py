@@ -3,13 +3,15 @@
 import os
 from functools import partial
 from typing import override
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx2
 import pytest
 from fastapi import FastAPI
 from pydantic import HttpUrl
 from sqlalchemy import delete, func, select
+from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 from tests.support.project_creation_scenarios import (
     INITIAL_ACTIONS,
     creation_fingerprints,
@@ -23,11 +25,12 @@ from inframeld_backend.access.application.protocols.human_session_authenticator 
 from inframeld_backend.access.application.value_objects.browser_session_credential import (
     BrowserSessionCredential,
 )
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.routes.organization_access_routes import (
     create_organization_access_router,
@@ -82,9 +85,15 @@ class MockCreationHttpAuthenticator(HumanSessionAuthenticator):
 def _application(database: Database, access: AccessContextDTO) -> FastAPI:
     app = FastAPI()
     register_error_handlers(app)
-    authenticate = HumanSessionDependency(
+    authenticate = ProductAccessDependency(
         MockCreationHttpAuthenticator(access),
         CSRFProtectionDependency((HttpUrl("https://account.test"),)),
+        application_authenticator=MockApplicationAuthenticator(
+            AccessContextDTO(
+                PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+            ),
+            failure=AuthenticationRequiredError(),
+        ),
     )
     app.include_router(
         create_organization_access_router(

@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.human_admission_scenarios import (
     ACCESS,
     ALICE,
@@ -18,6 +19,7 @@ from tests.support.human_admission_scenarios import (
     ORG,
     HumanAdmissionScenario,
 )
+from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 
 from inframeld_backend.access.application.commands.admit_human_command import AdmitHumanCommand
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -37,11 +39,12 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
 )
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.routes.human_admission_routes import (
     create_human_admission_router,
@@ -118,10 +121,16 @@ def client_for(service: MockHumanAdmitter, *, hydra: bool = True) -> TestClient:
     auth = MockAdmissionAuthenticator()
     app.include_router(
         create_human_admission_router(
-            HumanSessionDependency(
+            ProductAccessDependency(
                 auth,
                 CSRFProtectionDependency((HttpUrl("https://account.test"),)),
                 access_token_authenticator=auth if hydra else None,
+                application_authenticator=MockApplicationAuthenticator(
+                    AccessContextDTO(
+                        PrincipalId(UUID(int=900)), MockAuthenticationEvidence.application_key()
+                    ),
+                    failure=AuthenticationRequiredError(),
+                ),
             ),
             open_admitter,
         )

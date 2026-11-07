@@ -105,6 +105,12 @@ class GeneratedModelTests(unittest.TestCase):
         self.assertEqual(
             configuration.auth_settings(),
             {
+                "ApplicationKeyBearer": {
+                    "type": "bearer",
+                    "in": "header",
+                    "key": "Authorization",
+                    "value": "Bearer test-only-token",
+                },
                 "HumanBearer": {
                     "type": "bearer",
                     "in": "header",
@@ -116,6 +122,12 @@ class GeneratedModelTests(unittest.TestCase):
                     "in": "cookie",
                     "key": "ory_kratos_session",
                     "value": "test-only-session",
+                },
+                "ProductBearer": {
+                    "type": "bearer",
+                    "in": "header",
+                    "key": "Authorization",
+                    "value": "Bearer test-only-token",
                 },
             },
         )

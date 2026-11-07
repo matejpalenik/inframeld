@@ -5,8 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.http.dependencies.human_session_dependency import (
-    HumanSessionDependency,
+from inframeld_backend.access.http.dependencies.product_access_dependency import (
+    ProductAccessDependency,
 )
 from inframeld_backend.access.http.openapi.human_authentication_responses import (
     human_authentication_responses,
@@ -45,10 +45,10 @@ _RESPONSES = (
 
 
 def create_original_operation_lookup_router(
-    authenticate: HumanSessionDependency,
+    authenticate: ProductAccessDependency,
     open_lookup: Callable[[], AbstractAsyncContextManager[OriginalOperationLookup]],
 ) -> APIRouter:
-    """Expose read-only original admission lookup through current human authentication."""
+    """Expose read-only original admission lookup through product authentication and current human-only authority."""
     router = APIRouter(prefix="/v1", route_class=OperationLookupRoute)
 
     @router.post(

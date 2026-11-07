@@ -2,7 +2,7 @@
 
 Alice checks who the backend recognizes before asking a protected question. A session result identifies a verified local principal. It does not freeze account state, grants or document access.
 
-> **Status:** Human session is implemented. The separate application check is accepted design, not a delivered route.
+> **Status:** Human session is implemented. The application-session response is defined and its router is registered in the inspected implementation, with the HTTP shape declared in native OpenAPI. PostgreSQL local admission, current-key reads and application-key facts for ordinary Project action authorization are implemented. Full client, platform and feature qualification remain incomplete, and registration does not establish merged delivery.
 
 <a id="transport-mapping"></a><a id="session-contracts"></a>
 
@@ -11,26 +11,17 @@ Alice checks who the backend recognizes before asking a protected question. A se
 | Operation | Supported credential | Result and status |
 | --- | --- | --- |
 | `GET /v1/session`, `getCurrentSession` | Kratos cookie or Hydra human bearer, selected once | Implemented `CurrentSessionResponse`, only `principalId`, 200. |
-| `GET /v1/application-session`, `getCurrentApplicationSession` | Application-key bearer for the bound HTTP audience/adapter | Accepted `CurrentApplicationSessionResponse` design, only `principalId` and `projectId`, 200 when implemented. |
+| `GET /v1/application-session`, `getCurrentApplicationSession` | Application-key bearer for the bound HTTP audience/adapter | `CurrentApplicationSessionResponse`, only `principalId` and `projectId`, 200. |
 
-The implemented [CurrentSessionResponse](../../../../apps/backend/src/inframeld_backend/access/http/responses/current_session_response.py), [route](../../../../apps/backend/src/inframeld_backend/access/http/routes/current_session_routes.py) and [native OpenAPI](../../../../contracts/openapi/v1/inframeld-v1.json) own the delivered human representation. Keep its operation ID and fields unchanged.
+The implemented [CurrentSessionResponse](../../../../apps/backend/src/inframeld_backend/access/http/responses/current_session_response.py) and [human route](../../../../apps/backend/src/inframeld_backend/access/http/routes/current_session_routes.py) retain their operation ID and fields. The [application response](../../../../apps/backend/src/inframeld_backend/access/http/responses/current_application_session_response.py) and [application router](../../../../apps/backend/src/inframeld_backend/access/http/routes/current_application_session_routes.py) define the separate application surface. The [application factory](../../../../apps/backend/src/inframeld_backend/bootstrap/application_factory.py) registers it, and [native OpenAPI](../../../../contracts/openapi/v1/inframeld-v1.json) owns both declared HTTP shapes.
 
 Both checks require `Cache-Control: no-store`, the ordinary server-generated `X-Request-ID` and UUID-string resource IDs. Neither returns a status/permission snapshot, probes a model or writes local access. A later protected operation performs its own current authorization.
 
 ## Separate application-check design
 
-**Design notation, not production implementation.** This is the documented complete response shape. UUID means its JSON string representation.
+The defining response contains only the application's permanent principal ID and bound Project ID as UUID strings. A response with permissions, account status or another selected Project would violate this shape. Full key verification, expiry/revocation, installation/audience/adapter and current account/Project checks remain mandatory. A public prefix or key-ID lookup is not authentication. The accepted [PD-ACCESS-01](decision-key-currentness.md#approved-resolution) governs verifier inputs and currentness coordination.
 
-```python
-from typing import TypedDict
-from uuid import UUID
-
-class CurrentApplicationSessionResponse(TypedDict):
-    principalId: UUID
-    projectId: UUID
-```
-
-A response with permissions, account status or another selected Project would violate this shape. Full key verification, expiry/revocation, installation/audience/adapter and current account/Project checks remain mandatory. A public prefix or key-ID lookup is not authentication. The accepted [PD-ACCESS-01](decision-key-currentness.md#approved-resolution) governs verifier inputs and currentness coordination. Implementation remains pending.
+The inspected [ApplicationKeyDependency](../../../../apps/backend/src/inframeld_backend/access/http/dependencies/application_key_dependency.py) accepts only the application credential family. [ApplicationSessionService](../../../../apps/backend/src/inframeld_backend/access/application/services/application_session_service.py) requests fresh credential and local-admission facts before returning the two IDs. The local-admission `read` and current-key `read_current` on [PostgresApplicationAuthenticationFactsReader](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_application_authentication_facts_reader.py) are implemented. The current-key read coordinates with ordinary revocation updates and observes database UTC after its locks. Ordinary Project actions instead obtain current key and exact-grant facts through [PostgresProjectActionFactsReader](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_project_action_facts_reader.py) in the calling operation's transaction. These backend components do not establish complete TypeScript, platform or full-feature qualification.
 
 <a id="session-checks"></a><a id="session-responses-and-authentication-budgets"></a>
 
@@ -43,6 +34,8 @@ A response with permissions, account status or another selected Project would vi
 | CLI session-check HTTP request | Fifteen seconds | Backend authentication plus transport. Still unfinished CLI implementation/qualification. |
 
 The cookie and bearer services enforce total deadlines through [HumanAuthenticationSettings](../../../../apps/backend/src/inframeld_backend/access/infrastructure/settings/human_authentication_settings.py). `INFRAMELD_HUMAN_AUTHENTICATION__PROVIDER_TIMEOUT_SECONDS` and `INFRAMELD_HUMAN_AUTHENTICATION__TOTAL_TIMEOUT_SECONDS` accept finite positive values. Defaults are starting limits, not measured latency guarantees.
+
+The defined application authenticator and application-session reader use the separate finite positive total in [ApplicationKeyAuthenticationSettings](../../../../apps/backend/src/inframeld_backend/access/infrastructure/settings/application_key_authentication_settings.py), also defaulting to ten seconds. Their trusted HTTP/MCP profiles and missing-profile 503 behavior are described in [operator configuration](../../../../docs/development/getting-started/local-setup.md#application-key-verification-profiles). They never derive an application audience from human OAuth or fall back to a human verifier.
 
 If Hydra takes four seconds and Kratos another four, only two remain for local lookup under the ten-second default. A late successful response cannot authenticate. Required verification timeout is 503, not permission to reuse an earlier success. No cross-request positive authentication cache, blind verification retry or verifier fallback follows.
 
@@ -60,6 +53,8 @@ Identity-specific session checks return 401 for an unsupported family. Ordinary 
 
 Native `KratosSession` and `HumanBearer` security alternatives mean cookie or bearer. They do not permit sending both. Runtime credential selection must reject competition even though the OpenAPI alternatives cannot express that rule alone. Current 400/401 responses retain safe problem bodies and optional `WWW-Authenticate` headers. Public health/documentation remains public and credential-free.
 
+The application-session declaration uses `ApplicationKeyBearer`. Ordinary product routers use `ProductBearer` alongside their cookie alternative through [ProductAccessDependency](../../../../apps/backend/src/inframeld_backend/access/http/dependencies/product_access_dependency.py). Those declarations describe supported families, not permission for an application to perform a human-only action.
+
 <a id="sessions-and-preserved-command"></a>
 
 ## Neighboring implemented operations
@@ -70,6 +65,6 @@ Consent GET/POST at `/v1/oauth/consent` retain `inspectHumanOAuthConsent` and `d
 
 ## Sources and limitations
 
-[Browser sessions](browser-sessions.md) and [human CLI login](human-cli-login.md) explain identity verification. [Authentication problems](../../../../docs/development/error-handling.md#authentication-contract) own public challenges and safe wording. Generated clients must consume actual native OpenAPI, never the unimplemented application-check name as if it were published.
+[Browser sessions](browser-sessions.md) and [human CLI login](human-cli-login.md) explain identity verification. [Authentication problems](../../../../docs/development/error-handling.md#authentication-contract) own public challenges and safe wording. Generated clients consume the actual native application-session declaration. Generated bindings and local client checks establish that declared surface, not a merged or fully qualified application-authentication feature.
 
 Human OAuth credentials require their configured API audience and official client/scope. Application keys retain separate audience/adapter restrictions. MCP retains its separate two-tool application-key profile. Session checks do not add human OAuth tools, provisioning or a paid connection test.

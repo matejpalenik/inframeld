@@ -371,6 +371,7 @@ class ProjectGrantChangeService(ProjectGrantChanger):
     ) -> ProjectGrantAuthorizationDTO:
         """Check current exact-action delegation from the facts held under the Project lock."""
         grant = facts.grant
+        PrincipalAccessEvaluationService.require_human(access=access, principal=grant.actor)
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=grant.actor,
