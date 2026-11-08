@@ -9,10 +9,10 @@ export const pageMetadata = {
 Alice invites Bob to the Support Project with explicit membership and action permissions. Bob signs in as himself, previews the intended access and chooses whether to activate it. The invitation records Alice's intent. It does not promise that she will still be allowed to assign that access later.
 
 <Note>
-  The HTTP API and generated clients support invitation issuance, preview,
-  activation and revocation. These examples require existing credentials and the
-  installation's supported account flow. They do not supply account
-  registration, password setup or a complete invitation UI. For admission
+  The account site's `/invitations` page supports recipient preview, explicit
+  activation and recovery of an original activation. Registration and password
+  setup are separate [account tasks](/guides/account-and-consent). Issuing and
+  revoking invitations use their authorized API operations. For admission
   without invitation assignments, use the [human-admission
   guide](/guides/admit-human).
 </Note>
@@ -321,7 +321,9 @@ To explicitly repeat the original issuance, keep the same identity, request and 
 
 ## Preview the invitation as Bob
 
-The preview contract is `POST /v1/invitations/preview`, operation `previewInvitation`. Bob supplies the protected token through the supported browser client, with his verified cookie and Origin/CSRF checks. This POST is a read. It needs no idempotency key and creates no reservation, principal, membership, grant or consumption.
+Open the installation's HTTPS account site and choose **Use an invitation**, or open `/invitations` there. Sign in as Bob in his own browser profile. Choose **Check browser identity** to read the current identity without previewing or activating anything. Local product admission is not required for this narrow identity/preview path.
+
+Paste the token into **Protected invitation token** and choose **Preview invitation**. Keep the token out of URLs and browser storage. The preview uses `POST /v1/invitations/preview`, operation `previewInvitation`, with Bob's verified cookie and actual Origin/CSRF checks. This POST is a read. It needs no idempotency key and creates no reservation, principal, membership, grant or consumption.
 
 Review the intended assignments, authoritative scope labels and `expiresAt`. Labels help Bob recognize the intended resources. Permanent IDs retain their identity. A preview exposes no unrelated account inventory or document content, and it does not guarantee a later activation will succeed.
 
@@ -329,7 +331,7 @@ Preview does not check password setup. Bob can review the invitation before comp
 
 ## Before you activate
 
-**Password setup and the current session's login method are different.** Fresh activation requires confirmation that a password is set up for Bob's same account. A successful OIDC sign-in alone does not establish that prerequisite. Complete password setup through the installation's supported account flow before starting a fresh activation.
+**Password setup and the current session's login method are different.** Fresh activation requires confirmation that a password is set up for Bob's same account. A successful OIDC sign-in alone does not establish that prerequisite. Complete password setup through the installation's [Security settings](/guides/account-and-consent#change-your-password-or-configured-sign-in-methods) before starting a fresh activation. Successful recovery code entry alone is not password setup or completion of required security cleanup.
 
 If Bob's existing OIDC session remains valid after password setup, he may keep using it. Activation does not require the current session to have used a password. The setup check does not test whether a password can currently sign in or establish a permanent onboarding history.
 
@@ -337,7 +339,9 @@ Recovering an already completed activation is different from activating a new in
 
 ## Activate the reviewed intent
 
-The activation contract is `POST /v1/invitations/activate`, operation `activateInvitation`. Bob explicitly submits the protected token through the supported browser client. Retain the exact original method, route, private request body and idempotency key before dispatch.
+The activation contract is `POST /v1/invitations/activate`, operation `activateInvitation`. Before dispatch, privately save the installation, original browser identity, exact method/route, token body and one unique idempotency key.
+
+On `/invitations`, preview fills **Original activation identity** with Bob's verified identity. Enter **Original activation key** and acknowledge the checkbox confirming that the exact token and key were saved privately with the original identity and `POST /v1/invitations/activate`. After reviewing the preview, choose **Activate reviewed invitation**. The page fixes this original request before the activation call. Its identity, token and key cannot be edited while that protected context is retained.
 
 For a fresh activation, the server verifies Bob's current identity, confirms password setup and rechecks the unused invitation, current issuer authority and every intended effect. Existing recovery or suspension restrictions remain effective. Activation cannot restore an account or release a recovery block.
 
@@ -345,9 +349,23 @@ Admission, all legitimate assignments, invitation consumption and the original r
 
 A successful `200` identifies Bob's stable `principalId`, the invitation, Organization and original operation. Its Access revisions describe that committed result. They are not a permission snapshot or proof that today's assignments still match. Use current authorized reads to inspect later state.
 
+## Keep or discard the browser's original context
+
+The `/invitations` page retains the original request only in memory. It does not save the token or key in local/session storage or a URL. Keep your own protected original copy before activating. The checkbox records your acknowledgment, not proof that an external copy exists.
+
+| Page action or event            | What it establishes                                                                                                                                                                                      |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cancel waiting**              | Stops waiting in this page. If activation may have been sent, its outcome stays unknown and the original context is retained. It does not prove rollback.                                                |
+| **Discard protected context**   | Removes the page's saved identity, local token, key, preview and receipt. It does not cancel, revoke or undo a dispatched activation. Preserve your private original copy while the result is uncertain. |
+| Leave the tab/page, then return | Hides protected details and rechecks browser identity. Returning or restoring a page never automatically previews, activates or recovers.                                                                |
+| Identity changes or signs out   | Clears the protected context and previous receipt. Another person's session cannot inherit the original result.                                                                                          |
+| Full reload                     | Loses the in-memory context. Manual restoration requires your exact private original inputs and original identity.                                                                                       |
+
+**Check browser identity** performs only the identity read. If verification is unavailable, protected details stay hidden and no activation is sent by that check. An unknown activation warning remains after a successful same-identity recheck or an unavailable check. Neither result confirms the activation or proves rollback. A generic restriction message cannot diagnose suspension, missing admission or unfinished recovery cleanup, and this page cannot release a block.
+
 ## Call from Bob's existing browser session
 
-Build the source TypeScript SDK using [its setup](/clients/typescript#build-and-install-the-package). Save this complete module as `invitation.ts` in your existing browser application's client bundle on the configured HTTPS account/API origin. Load it in Bob's signed-in browser profile. The browser owns the actual cookie and `Origin`. The module supplies only the API's CSRF marker. Do not add an `Authorization` header, a copied `Cookie` header or a spoofed `Origin`.
+For a separate browser integration, build the source TypeScript SDK using [its setup](/clients/typescript#build-and-install-the-package). Save this complete module as `invitation.ts` in your existing browser application's client bundle on the configured HTTPS account/API origin. Load it in Bob's signed-in browser profile. The browser owns the actual cookie and `Origin`. The module supplies only the API's CSRF marker. Do not add an `Authorization` header, a copied `Cookie` header or a spoofed `Origin`.
 
 The module asks for `preview`, `activate` or `recover`. Supply the protected token through the private input, not a URL. Before choosing activation, save one unique idempotency key with the exact token, method and route in your protected original-request context. Enter that saved key when asked. Keep it for recovery. This module does not acquire a session or complete password setup.
 
@@ -554,6 +572,10 @@ Current revocation authority is checked before disclosing an original result. Re
 ## Recover a lost activation response
 
 After a timeout, cancellation or unusable response, keep the exact original request and key. Do not switch identity, refresh the original inputs or choose another key merely to try again. A different identity or key cannot turn a consumed invitation into a second activation.
+
+On `/invitations`, choose **Recover original activation** using the retained original context. Recovery bypasses preview, because an already consumed invitation may no longer be previewable. It is an explicit repeat of the original activation request, not a new invitation decision or a read-only identity refresh.
+
+If a full reload lost the in-memory context, sign in as the original person, choose **Check browser identity** and compare it with your private original identity. Fill **Original activation identity** from your privately saved original identity, restore the exact **Protected invitation token** and **Original activation key**, acknowledge the saved-context checkbox, then choose **Recover original activation** directly. The page checks that saved identity against the actual current Kratos identity before sending an activation POST. A mismatch clears the protected context without sending activation. The identity field is locked after preview or while an original request is retained, and discarding the context clears it. Do not reconstruct the request from a new preview or another account's defaults.
 
 While the original result remains retained, the same currently verified and eligible recipient can recover it even after invitation expiry or the issuer's departure. Recovery finds the original completed outcome before applying fresh-consumption checks. It does not repeat assignments, restore removed rights or depend on a fresh password-setup observation being available.
 

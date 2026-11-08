@@ -46,6 +46,53 @@ async function main() {
     JSON.stringify({ subject: identity.id, email, password }),
     { mode: 0o600, flag: "wx" }
   )
+  const oidc = await api.createIdentity({
+    createIdentityBody: {
+      schema_id: "default",
+      state: "active",
+      traits: { email: "native-account-oidc@example.test" },
+      credentials: {
+        oidc: {
+          config: {
+            providers: [
+              { provider: "company", subject: "native-account-oidc" },
+            ],
+          },
+        },
+      },
+    },
+  })
+  await writeFile(
+    "/run/account-fixture/oidc.json",
+    JSON.stringify({ subject: oidc.id }),
+    { mode: 0o600, flag: "wx" }
+  )
+  for (const name of ["recovery", "switch", "recipient"] as const) {
+    const email = `${name}-${randomBytes(12).toString("hex")}@example.test`
+    const password =
+      name === "recipient"
+        ? undefined
+        : `Native-${randomBytes(24).toString("hex")}!`
+    const created = await api.createIdentity({
+      createIdentityBody: {
+        schema_id: "default",
+        state: "active",
+        traits: { email },
+        ...(password
+          ? { credentials: { password: { config: { password } } } }
+          : {}),
+      },
+    })
+    await writeFile(
+      `/run/account-fixture/${name}.json`,
+      JSON.stringify({
+        subject: created.id,
+        email,
+        ...(password ? { password } : {}),
+      }),
+      { mode: 0o600, flag: "wx" }
+    )
+  }
 }
 main().catch(() => {
   console.error(

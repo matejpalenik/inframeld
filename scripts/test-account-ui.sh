@@ -26,7 +26,7 @@ startup_stack() {
     for service in account-tls-init breach-tls-init; do
         "${account_compose[@]}" run --rm --no-deps -T "${service}" || return "$?"
     done
-    "${account_compose[@]}" up -d --no-deps --no-build postgres kratos-postgres hydra-postgres mailpit password-breaches || return "$?"
+    "${account_compose[@]}" up -d --no-deps --no-build postgres kratos-postgres hydra-postgres mailpit password-breaches mock-oidc || return "$?"
     wait_for_postgres postgres account_test account_ui_test || return "$?"
     wait_for_postgres kratos-postgres kratos_test kratos_test || return "$?"
     wait_for_postgres hydra-postgres hydra_test hydra_test || return "$?"
@@ -37,7 +37,8 @@ startup_stack() {
     for service in oauth-client-setup identity-setup seed; do
         "${account_compose[@]}" run --rm --no-deps -T "${service}" || return "$?"
     done
-    "${account_compose[@]}" up -d --no-deps --no-build backend web gateway
+    # The real worker reads the installation initialized by seed, never a new database.
+    "${account_compose[@]}" up -d --no-deps --no-build recovery-callbacks recovery-hooks recovery-worker backend web gateway
 }
 
 cleanup_stack() {
@@ -92,6 +93,11 @@ prepare_contexts() {
         "${account_root}" "${account_directory}/web-context" || return "$?"
     "${account_python}" "${account_root}/apps/web/tests/fixtures/prepare_build_context.py" \
         "${account_root}" "${account_directory}/proof-context" --recipient-proof
+}
+
+account_browser_stack() {
+    "${account_compose[@]}" --profile qualification run --rm --no-deps -T browser-tests || return "$?"
+    "${account_compose[@]}" exec -T backend python /fixture/backend.py verify-account-result
 }
 
 build_stack() {

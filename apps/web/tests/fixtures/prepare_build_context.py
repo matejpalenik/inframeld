@@ -5,6 +5,7 @@ import os
 import shutil
 import signal
 import stat
+import subprocess
 import sys
 from pathlib import Path
 from types import FrameType
@@ -146,7 +147,11 @@ def require_public_npm_policy(descriptor: int) -> None:
 
 
 def prepare_build_context(
-    source: Path, destination: Path, *, recipient_proof: bool = False
+    source: Path,
+    destination: Path,
+    *,
+    recipient_proof: bool = False,
+    invitation_guide: bool = False,
 ) -> None:
     # Refuse preexisting state. Only this freshly created context may be removed on failure.
     destination.mkdir(mode=0o700)
@@ -184,6 +189,8 @@ def prepare_build_context(
             destination / ".dockerignore",
         )
         (destination / ".dockerignore").chmod(0o644)
+        if invitation_guide:
+            prepare_invitation_guide(source, destination)
     except BaseException:
         shutil.rmtree(destination)
         raise
@@ -193,16 +200,67 @@ def terminate(signum: int, _frame: FrameType | None) -> NoReturn:
     raise SystemExit(128 + signum)
 
 
+def prepare_invitation_guide(source: Path, destination: Path) -> None:
+    """Bundle the literal browser guide for the existing private account image."""
+    root = os.open(source, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        descriptor = open_input(root, "apps/docs/src/app/guides/manage-invitations/page.mdx")
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise ValueError("The browser guide must be regular public source.")
+            with os.fdopen(os.dup(descriptor), "rb") as document:
+                body = document.read(131_073)
+        finally:
+            os.close(descriptor)
+    finally:
+        os.close(root)
+    if len(body) > 131_072:
+        raise ValueError("The browser guide exceeded its fixed input bound.")
+    marker = b'```typescript {{ title: "TypeScript (browser)" }}\n'
+    if body.count(marker) != 1:
+        raise ValueError("The guide must contain one literal browser program.")
+    program, separator, _tail = body.split(marker, 1)[1].partition(b"\n```")
+    if not separator:
+        raise ValueError("The literal browser program is incomplete.")
+    entry = destination.parent / "invitation-guide.ts"
+    with entry.open("xb") as output:
+        output.write(program + b"\n")
+        os.fchmod(output.fileno(), 0o600)
+    bundle = destination / "apps/web/tests/fixtures/invitation-guide.iife.js"
+    # This child shares the existing preparation phase's group and 30-second budget.
+    subprocess.run(
+        [
+            str(source / "packages/sdk-tools/node_modules/esbuild/bin/esbuild"),
+            str(entry),
+            "--bundle",
+            "--platform=browser",
+            "--format=iife",
+            f"--alias:@inframeld/sdk={source / 'packages/sdk-typescript/index.ts'}",
+            f"--outfile={bundle}",
+            "--log-level=warning",
+        ],
+        cwd=source,
+        stdin=subprocess.DEVNULL,
+        check=True,
+    )
+    bundle.chmod(0o644)
+
+
 def main() -> int:
-    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != "--recipient-proof"):
+    if len(sys.argv) not in (3, 4) or (
+        len(sys.argv) == 4 and sys.argv[3] not in {"--recipient-proof", "--invitation-guide"}
+    ):
         return 2
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGINT, terminate)
     try:
         prepare_build_context(
-            Path(sys.argv[1]), Path(sys.argv[2]), recipient_proof=len(sys.argv) == 4
+            Path(sys.argv[1]),
+            Path(sys.argv[2]),
+            recipient_proof=sys.argv[3:] == ["--recipient-proof"],
+            invitation_guide=sys.argv[3:] == ["--invitation-guide"],
         )
-    except (OSError, ValueError):
+    except (OSError, ValueError, subprocess.CalledProcessError):
         print("The private web build context could not be prepared.", file=sys.stderr)
         return 1
     return 0

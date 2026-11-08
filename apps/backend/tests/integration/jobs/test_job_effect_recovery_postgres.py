@@ -11,7 +11,7 @@ from uuid import uuid4
 
 import boto3
 import pytest
-from sqlalchemy import func, select, update
+from sqlalchemy import DateTime, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.artifact_scenarios import (
     allocate_artifact,
@@ -86,6 +86,12 @@ from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_ma
     SqlAlchemyTransactionManager,
 )
 from inframeld_backend.shared.infrastructure.rows.artifact_attempt_row import ArtifactAttemptRow
+from inframeld_backend.shared.infrastructure.rows.artifact_cleanup_obligation_row import (
+    ArtifactCleanupObligationRow,
+)
+from inframeld_backend.shared.infrastructure.rows.artifact_staging_reservation_row import (
+    ArtifactStagingReservationRow,
+)
 from inframeld_backend.shared.infrastructure.rows.durable_job_attempt_row import (
     DurableJobAttemptRow,
 )
@@ -108,12 +114,53 @@ async def test_migration_creates_queryable_empty_invocation_history(database: Da
         assert tuple(await session.scalars(select(DurableJobEffectRow.id))) == ()
 
 
+async def _expire_staging_allocation(database: Database, allocation: ArtifactAllocationDTO) -> None:
+    """Make an admitted allocation due without racing its real admission SQL."""
+    async with database.session() as session, session.begin():
+        reservation = await session.get(
+            ArtifactStagingReservationRow, allocation.reservation.reservation_id.value
+        )
+        obligation = await session.get(
+            ArtifactCleanupObligationRow, allocation.cleanup_binding.obligation_id.value
+        )
+        job = await session.get(DurableJobRow, allocation.cleanup_job_id.value)
+        assert reservation is not None and obligation is not None and job is not None
+        assert reservation.attempt_id == allocation.reservation.attempt_id.value
+        assert obligation.staging_reservation_id == reservation.id
+        assert job.cleanup_obligation_id == obligation.id
+        assert (obligation.installation_id, obligation.organization_id, obligation.project_id) == (
+            allocation.reservation.scope.installation_id.value,
+            allocation.reservation.scope.organization_id.value,
+            allocation.reservation.scope.project_id.value,
+        )
+        assert (job.installation_id, job.organization_id, job.project_id) == (
+            obligation.installation_id,
+            obligation.organization_id,
+            obligation.project_id,
+        )
+
+        observed_at = await session.scalar(
+            select(func.clock_timestamp(type_=DateTime(timezone=True)))
+        )
+        assert observed_at is not None
+        expired_at = observed_at - timedelta(seconds=1)
+        reservation.expires_at = expired_at
+        obligation.transfer_deadline = expired_at
+        job.due_at = expired_at
+        await session.flush()
+        await session.refresh(reservation)
+        await session.refresh(obligation)
+        await session.refresh(job)
+        assert reservation.expires_at == obligation.transfer_deadline == job.due_at == expired_at
+        assert job.due_at < observed_at
+
+
 @pytest.mark.asyncio
 async def test_registered_unsealed_cleanup_invocation_is_admitted_once(database: Database) -> None:
     scope = await seed_artifact_scope(database)
     scenario = artifact_scenario(scope)
-    allocation = await allocate_artifact(database, scenario, transfer_seconds=0.05)
-    await asyncio.sleep(0.06)
+    allocation = await allocate_artifact(database, scenario)
+    await _expire_staging_allocation(database, allocation)
     async with database.session() as session:
         context = await JobExecutionService(
             SqlAlchemyTransactionManager(session),
@@ -167,8 +214,8 @@ async def _cleanup_context(
 ) -> tuple[ArtifactAllocationDTO, JobAttemptContextDTO]:
     scope = await seed_artifact_scope(database)
     scenario = artifact_scenario(scope)
-    allocation = await allocate_artifact(database, scenario, transfer_seconds=0.05)
-    await asyncio.sleep(0.06)
+    allocation = await allocate_artifact(database, scenario)
+    await _expire_staging_allocation(database, allocation)
     async with database.session() as session:
         context = await JobExecutionService(
             SqlAlchemyTransactionManager(session),
@@ -692,10 +739,8 @@ async def test_changed_checkpoint_after_abort_requires_recovery_without_blocking
         )
         await checkpoints.save(binding.context, saved)
     assert binding.context.checkpoint == b""
-    next_allocation = await allocate_artifact(
-        database, artifact_scenario(binding.scope), transfer_seconds=0.05
-    )
-    await asyncio.sleep(0.06)
+    next_allocation = await allocate_artifact(database, artifact_scenario(binding.scope))
+    await _expire_staging_allocation(database, next_allocation)
     original = await _expired_original(database, binding)
     assert original.checkpoint == saved
 

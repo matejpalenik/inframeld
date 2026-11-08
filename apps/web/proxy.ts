@@ -11,5 +11,16 @@ export function proxy() {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/consent", "/logout", "/error"],
+  matcher: [
+    "/",
+    "/login",
+    "/registration",
+    "/verification",
+    "/recovery",
+    "/settings",
+    "/invitations",
+    "/consent",
+    "/logout",
+    "/error",
+  ],
 }

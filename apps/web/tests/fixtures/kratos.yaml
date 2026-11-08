@@ -26,7 +26,21 @@ selfservice:
       config:
         lifespan: 30s
     oidc:
-      enabled: false
+      enabled: true
+      config:
+        providers:
+          - id: company
+            provider: generic
+            client_id: inframeld-account-oidc
+            client_secret: account-ui-oidc-test-only
+            issuer_url: https://login.identity.test:8443/inframeld
+            mapper_url: file:///etc/oidc.email.jsonnet
+            claims_source: id_token
+            scope: [openid, email]
+    totp:
+      enabled: true
+    lookup_secret:
+      enabled: true
   flows:
     error:
       ui_url: https://inframeld.account.test:8443/error
@@ -37,16 +51,22 @@ selfservice:
       after:
         default_browser_return_url: https://inframeld.account.test:8443/
     registration:
-      enabled: false
-      ui_url: https://inframeld.account.test:8443/error
+      enabled: true
+      ui_url: https://inframeld.account.test:8443/registration
+      after:
+        password:
+          hooks:
+            - hook: session
     settings:
-      ui_url: https://inframeld.account.test:8443/error
+      ui_url: https://inframeld.account.test:8443/settings
     recovery:
-      enabled: false
-      ui_url: https://inframeld.account.test:8443/error
+      enabled: true
+      use: code
+      ui_url: https://inframeld.account.test:8443/recovery
     verification:
-      enabled: false
-      ui_url: https://inframeld.account.test:8443/error
+      enabled: true
+      use: code
+      ui_url: https://inframeld.account.test:8443/verification
 cookies:
   path: /
   same_site: Lax

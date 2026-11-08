@@ -93,6 +93,10 @@
         "href": "/guides/projects-and-access",
         "children": [
           {
+            "title": "Manage your account and consent",
+            "href": "/guides/account-and-consent"
+          },
+          {
             "title": "Invite a person and activate their access",
             "href": "/guides/manage-invitations"
           },

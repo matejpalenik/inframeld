@@ -23,6 +23,9 @@
             },
             "recovery": {
               "via": "email"
+            },
+            "verification": {
+              "via": "email"
             }
           }
         }
